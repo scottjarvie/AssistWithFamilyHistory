@@ -124,14 +124,17 @@ function updateState(data) {
 /**
  * Handle extraction complete
  */
-async function handleComplete(evidencePack) {
+async function handleComplete(capturePackage) {
   extractionState.status = "complete";
   broadcastState();
 
-  // Store the evidence pack
-  await chrome.storage.local.set({ lastEvidencePack: evidencePack });
+  // Store the latest capture package for download/copy actions.
+  await chrome.storage.local.set({
+    lastCapturePackage: capturePackage,
+    lastEvidencePack: capturePackage,
+  });
 
-  console.log("Extraction complete:", evidencePack);
+  console.log("Extraction complete:", capturePackage);
 }
 
 /**

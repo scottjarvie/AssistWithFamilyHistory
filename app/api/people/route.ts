@@ -14,10 +14,12 @@
 
 import { NextResponse } from "next/server";
 import { listPeople } from "@/lib/storage/fileStorage";
+import { getVaultAccessContext } from "@/lib/vault/server";
 
 export async function GET() {
   try {
-    const people = await listPeople();
+    const { vaultOwnerId } = await getVaultAccessContext();
+    const people = await listPeople(vaultOwnerId);
     
     return NextResponse.json({
       success: true,

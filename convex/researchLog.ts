@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { Doc } from "./_generated/dataModel";
+import { filterByVaultOwner, normalizeVaultOwnerId } from "./vaultCore";
 
 const entityTypeValidator = v.union(
   v.literal("person"),
@@ -57,6 +58,7 @@ const statusValidator = v.union(
  */
 export const upsert = mutation({
   args: {
+    vaultOwnerId: v.string(),
     entityType: entityTypeValidator,
     entityId: v.optional(entityIdValidator),
     activityType: activityTypeValidator,
@@ -69,11 +71,12 @@ export const upsert = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
 
     let existing: Doc<"researchLog"> | null = null;
 
     if (args.entityId !== undefined) {
-      existing = await ctx.db
+      const matches = await ctx.db
         .query("researchLog")
         .withIndex("by_entity_activity", (q) =>
           q
@@ -81,7 +84,8 @@ export const upsert = mutation({
             .eq("entityId", args.entityId)
             .eq("activityType", args.activityType)
         )
-        .first();
+        .collect();
+      existing = filterByVaultOwner(matches, vaultOwnerId)[0] ?? null;
     } else {
       const candidates = await ctx.db
         .query("researchLog")
@@ -89,7 +93,7 @@ export const upsert = mutation({
         .collect();
 
       existing =
-        candidates.find(
+        filterByVaultOwner(candidates, vaultOwnerId).find(
           (entry) =>
             entry.entityType === args.entityType && entry.entityId === undefined
         ) || null;
@@ -117,6 +121,7 @@ export const upsert = mutation({
     }
 
     const researchLogId = await ctx.db.insert("researchLog", {
+      vaultOwnerId,
       entityType: args.entityType,
       entityId: args.entityId,
       activityType: args.activityType,
@@ -136,12 +141,14 @@ export const upsert = mutation({
 
 export const listForEntity = query({
   args: {
+    vaultOwnerId: v.string(),
     entityType: entityTypeValidator,
     entityId: v.optional(entityIdValidator),
     activityType: v.optional(activityTypeValidator),
     status: v.optional(statusValidator),
   },
   handler: async (ctx, args) => {
+    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
     let query = ctx.db
       .query("researchLog")
       .withIndex("by_entity", (q) => q.eq("entityType", args.entityType));
@@ -162,6 +169,6 @@ export const listForEntity = query({
       query = query.filter((q) => q.eq(q.field("entityId"), undefined));
     }
 
-    return await query.collect();
+    return filterByVaultOwner(await query.collect(), vaultOwnerId);
   },
 });

@@ -1,10 +1,12 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
+import { filterByVaultOwner, matchesVaultOwner, normalizeVaultOwnerId } from "./vaultCore";
 
 // Create a new citation
 export const create = mutation({
   args: {
+    vaultOwnerId: v.string(),
     sourceId: v.id("sources"),
     page: v.optional(v.string()),
     confidence: v.union(
@@ -25,6 +27,7 @@ export const create = mutation({
     const now = Date.now();
     const citationId = await ctx.db.insert("citations", {
       ...args,
+      vaultOwnerId: normalizeVaultOwnerId(args.vaultOwnerId),
       isEvidence: false,
       createdAt: now,
       updatedAt: now,
@@ -35,28 +38,34 @@ export const create = mutation({
 
 // Get a citation by ID
 export const get = query({
-  args: { id: v.id("citations") },
+  args: { id: v.id("citations"), vaultOwnerId: v.string() },
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.id);
+    const citation = await ctx.db.get(args.id);
+    return citation && matchesVaultOwner(citation.vaultOwnerId, args.vaultOwnerId) ? citation : null;
   },
 });
 
 // Get citations for a source
 export const getForSource = query({
   args: {
+    vaultOwnerId: v.string(),
     sourceId: v.id("sources"),
   },
   handler: async (ctx, args) => {
-    return await ctx.db
+    return filterByVaultOwner(
+      await ctx.db
       .query("citations")
       .withIndex("by_source", (q) => q.eq("sourceId", args.sourceId))
-      .collect();
+      .collect(),
+      normalizeVaultOwnerId(args.vaultOwnerId)
+    );
   },
 });
 
 // Get citations for a person, event, relationship, or place
 export const getForTarget = query({
   args: {
+    vaultOwnerId: v.string(),
     targetType: v.union(
       v.literal("person"),
       v.literal("event"),
@@ -66,19 +75,23 @@ export const getForTarget = query({
     targetId: v.string(),
   },
   handler: async (ctx, args) => {
+    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
     // Get all citation links for this target
-    const links = await ctx.db
+    const links = filterByVaultOwner(
+      await ctx.db
       .query("citationLinks")
       .withIndex("by_target", (q) =>
         q.eq("targetType", args.targetType).eq("targetId", args.targetId)
       )
-      .collect();
+      .collect(),
+      vaultOwnerId
+    );
 
     // Get the full citation details for each
     const citations = await Promise.all(
       links.map(async (link) => {
         const citation = await ctx.db.get(link.citationId);
-        if (!citation) return null;
+        if (!citation || !matchesVaultOwner(citation.vaultOwnerId, vaultOwnerId)) return null;
         
         // Get the source details too
         const source = await ctx.db.get(citation.sourceId);
@@ -99,6 +112,7 @@ export const getForTarget = query({
 // List citations with optional filters
 export const list = query({
   args: {
+    vaultOwnerId: v.string(),
     confidence: v.optional(
       v.union(
         v.literal("very_high"),
@@ -113,23 +127,25 @@ export const list = query({
   handler: async (ctx, args) => {
     const applyLimit = (rows: Doc<"citations">[]) =>
       args.limit ? rows.slice(0, args.limit) : rows;
+    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
 
     if (args.confidence !== undefined) {
       const results = await ctx.db
         .query("citations")
         .withIndex("by_confidence", (q) => q.eq("confidence", args.confidence!))
         .collect();
-      return applyLimit(results);
+      return applyLimit(filterByVaultOwner(results, vaultOwnerId));
     }
 
     const results = await ctx.db.query("citations").collect();
-    return applyLimit(results);
+    return applyLimit(filterByVaultOwner(results, vaultOwnerId));
   },
 });
 
 // Link a citation to a person, event, relationship, or place
 export const linkToTarget = mutation({
   args: {
+    vaultOwnerId: v.string(),
     citationId: v.id("citations"),
     targetType: v.union(
       v.literal("person"),
@@ -142,7 +158,7 @@ export const linkToTarget = mutation({
   },
   handler: async (ctx, args) => {
     // Check if link already exists
-    const existing = await ctx.db
+    const existingRows = await ctx.db
       .query("citationLinks")
       .withIndex("by_citation_and_target", (q) =>
         q
@@ -150,7 +166,8 @@ export const linkToTarget = mutation({
           .eq("targetType", args.targetType)
           .eq("targetId", args.targetId)
       )
-      .first();
+      .collect();
+    const existing = filterByVaultOwner(existingRows, normalizeVaultOwnerId(args.vaultOwnerId))[0] ?? null;
 
     if (existing) {
       // Update the field if it changed
@@ -164,6 +181,7 @@ export const linkToTarget = mutation({
 
     // Create new link
     const linkId = await ctx.db.insert("citationLinks", {
+      vaultOwnerId: normalizeVaultOwnerId(args.vaultOwnerId),
       citationId: args.citationId,
       targetType: args.targetType,
       targetId: args.targetId,
@@ -178,6 +196,7 @@ export const linkToTarget = mutation({
 // Unlink a citation from a target
 export const unlinkFromTarget = mutation({
   args: {
+    vaultOwnerId: v.string(),
     citationId: v.id("citations"),
     targetType: v.union(
       v.literal("person"),
@@ -188,7 +207,7 @@ export const unlinkFromTarget = mutation({
     targetId: v.string(),
   },
   handler: async (ctx, args) => {
-    const link = await ctx.db
+    const links = await ctx.db
       .query("citationLinks")
       .withIndex("by_citation_and_target", (q) =>
         q
@@ -196,7 +215,8 @@ export const unlinkFromTarget = mutation({
           .eq("targetType", args.targetType)
           .eq("targetId", args.targetId)
       )
-      .first();
+      .collect();
+    const link = filterByVaultOwner(links, normalizeVaultOwnerId(args.vaultOwnerId))[0] ?? null;
 
     if (link) {
       await ctx.db.delete(link._id);

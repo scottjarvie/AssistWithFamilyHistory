@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Compass Quill</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#173745" />
+      <stop offset="100%" stop-color="#355f53" />
+    </linearGradient>
+    <linearGradient id="quill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f7f1e2" />
+      <stop offset="100%" stop-color="#e7d9be" />
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#bg)" />
+  <circle cx="256" cy="244" r="154" fill="none" stroke="#ddb67f" stroke-width="16" />
+
+  <path d="M256 122l30 72 72 30-72 30-30 72-30-72-72-30 72-30z" fill="#f0c98d" />
+  <circle cx="256" cy="224" r="10" fill="#fef7ea" />
+
+  <path d="M170 368c56-36 116-52 174-52" fill="none" stroke="#f0dfbf" stroke-width="14" stroke-linecap="round" />
+  <path d="M332 301l18 16-16 18" fill="none" stroke="#f0dfbf" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M326 313l48 52" fill="none" stroke="#d8c7a8" stroke-width="10" stroke-linecap="round" />
+</svg>

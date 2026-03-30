@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
+import { getVaultAccessContext } from "@/lib/vault/server";
 
 const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
 
@@ -49,9 +50,11 @@ export async function GET(request: NextRequest) {
 
   try {
     const client = new ConvexHttpClient(convexUrl);
+    const { vaultOwnerId } = await getVaultAccessContext();
 
     if (type) {
       const document = await client.query(api.documents.getDocument, {
+        vaultOwnerId,
         personId,
         type,
       });
@@ -63,6 +66,7 @@ export async function GET(request: NextRequest) {
     }
 
     const documents = await client.query(api.documents.getDocumentsByPerson, {
+      vaultOwnerId,
       personId,
     });
 

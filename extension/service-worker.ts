@@ -131,13 +131,14 @@ function updateProgress(data: Partial<ExtractionState>) {
 }
 
 // Complete extraction
-function completeExtraction(evidencePack: unknown) {
+function completeExtraction(capturePackage: unknown) {
   extractionState.status = "complete";
   broadcastState();
 
-  // Store the evidence pack temporarily
-  chrome.storage.local.set({ 
-    lastEvidencePack: evidencePack,
+  // Store the latest capture package temporarily for download/copy actions.
+  chrome.storage.local.set({
+    lastCapturePackage: capturePackage,
+    lastEvidencePack: capturePackage,
     lastExtractionTime: Date.now(),
   });
 }
@@ -159,17 +160,17 @@ function broadcastState() {
   });
 }
 
-// Check if on FamilySearch sources page
+// Check if on supported FamilySearch person capture pages
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === "complete" && tab.url) {
-    const isFamilySearchSources = 
+    const isFamilySearchCapture = 
       tab.url.includes("familysearch.org/tree/person") && 
-      tab.url.includes("sources");
+      (tab.url.includes("sources") || tab.url.includes("memories"));
     
     // Update extension icon based on page
     chrome.action.setIcon({
       tabId,
-      path: isFamilySearchSources ? {
+      path: isFamilySearchCapture ? {
         "16": "icons/icon16.png",
         "32": "icons/icon32.png",
         "48": "icons/icon48.png",

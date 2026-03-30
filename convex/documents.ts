@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { filterByVaultOwner, normalizeVaultOwnerId } from "./vaultCore";
 
 const documentTypeValidator = v.union(v.literal("PS"), v.literal("CST"));
 
@@ -23,25 +24,31 @@ const stripMarkdown = (markdown: string) => {
 
 export const upsertDocument = mutation({
   args: {
+    vaultOwnerId: v.string(),
     personId: v.string(),
+    importRunId: v.optional(v.id("importRuns")),
     type: documentTypeValidator,
     title: v.string(),
     contentMarkdown: v.string(),
+    artifactPath: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
     const contentText = stripMarkdown(args.contentMarkdown);
-    const existing = await ctx.db
+    const existingRows = await ctx.db
       .query("documents")
       .withIndex("by_personId_type", (q) =>
         q.eq("personId", args.personId).eq("type", args.type)
       )
-      .first();
+      .collect();
+    const existing = filterByVaultOwner(existingRows, normalizeVaultOwnerId(args.vaultOwnerId))[0] ?? null;
 
     const update = {
       title: args.title,
       contentMarkdown: args.contentMarkdown,
       contentText,
+      importRunId: args.importRunId,
+      artifactPath: args.artifactPath,
       updatedAt: now,
     };
 
@@ -51,6 +58,7 @@ export const upsertDocument = mutation({
     }
 
     const documentId = await ctx.db.insert("documents", {
+      vaultOwnerId: normalizeVaultOwnerId(args.vaultOwnerId),
       personId: args.personId,
       type: args.type,
       ...update,
@@ -62,35 +70,42 @@ export const upsertDocument = mutation({
 });
 
 export const getDocumentsByPerson = query({
-  args: { personId: v.string() },
+  args: { personId: v.string(), vaultOwnerId: v.string() },
   handler: async (ctx, args) => {
     const results = await ctx.db
       .query("documents")
       .withIndex("by_personId", (q) => q.eq("personId", args.personId))
       .collect();
 
-    return results.sort((a, b) => a.type.localeCompare(b.type));
+    return filterByVaultOwner(results, normalizeVaultOwnerId(args.vaultOwnerId)).sort((a, b) =>
+      a.type.localeCompare(b.type)
+    );
   },
 });
 
 export const getDocument = query({
   args: {
+    vaultOwnerId: v.string(),
     personId: v.string(),
     type: documentTypeValidator,
   },
   handler: async (ctx, args) => {
-    return await ctx.db
+    const rows = await ctx.db
       .query("documents")
       .withIndex("by_personId_type", (q) =>
         q.eq("personId", args.personId).eq("type", args.type)
       )
-      .first();
+      .collect();
+    return filterByVaultOwner(rows, normalizeVaultOwnerId(args.vaultOwnerId))[0] ?? null;
   },
 });
 
 export const list = query({
-  args: {},
-  handler: async (ctx) => {
-    return await ctx.db.query("documents").collect();
+  args: { vaultOwnerId: v.string() },
+  handler: async (ctx, args) => {
+    return filterByVaultOwner(
+      await ctx.db.query("documents").collect(),
+      normalizeVaultOwnerId(args.vaultOwnerId)
+    );
   },
 });

@@ -23,6 +23,7 @@ export default defineSchema({
    * GEDCOM X: Person extends Subject extends Conclusion
    */
   persons: defineTable({
+    vaultOwnerId: v.optional(v.string()),
     // FamilySearch Integration
     fsId: v.optional(v.string()),              // FamilySearch Person ID (e.g., "KWCJ-RN4")
     qualityScore: v.optional(v.string()),      // FamilySearch quality score
@@ -116,6 +117,7 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   })
+    .index("by_owner", ["vaultOwnerId"])
     .index("by_fsId", ["fsId"])
     .index("by_surname", ["name.surname"])
     .index("by_research_status", ["researchStatus"])
@@ -133,6 +135,7 @@ export default defineSchema({
    * - Unknown parents (can have one-sided relationships)
    */
   relationships: defineTable({
+    vaultOwnerId: v.optional(v.string()),
     type: v.union(
       v.literal("Couple"),                      // Marriage, partnership
       v.literal("ParentChild"),                 // Biological, adopted, step, foster, etc.
@@ -185,16 +188,19 @@ export default defineSchema({
     
     // FamilySearch integration
     familySearchId: v.optional(v.string()),
+    importKey: v.optional(v.string()),
     
     // Metadata
     createdAt: v.number(),
     updatedAt: v.number(),
   })
+    .index("by_owner", ["vaultOwnerId"])
     .index("by_person1", ["person1"])
     .index("by_person2", ["person2"])
     .index("by_type", ["type"])
     .index("by_type_person1", ["type", "person1"])     // Find all relationships of a type for person1
-    .index("by_type_person2", ["type", "person2"]),    // Find all relationships of a type for person2
+    .index("by_type_person2", ["type", "person2"])    // Find all relationships of a type for person2
+    .index("by_import_key", ["importKey"]),
 
   /**
    * EVENTS
@@ -205,6 +211,7 @@ export default defineSchema({
    * - Events that might not have a person yet
    */
   events: defineTable({
+    vaultOwnerId: v.optional(v.string()),
     type: v.union(
       v.literal("birth"),
       v.literal("death"),
@@ -257,13 +264,16 @@ export default defineSchema({
     ),
     description: v.optional(v.string()),
     notes: v.optional(v.string()),
+    importKey: v.optional(v.string()),
     
     // Metadata
     createdAt: v.number(),
     updatedAt: v.number(),
   })
+    .index("by_owner", ["vaultOwnerId"])
     .index("by_type", ["type"])
-    .index("by_place", ["place.placeId"]),
+    .index("by_place", ["place.placeId"])
+    .index("by_import_key", ["importKey"]),
 
   /**
    * PERSON EVENTS
@@ -271,6 +281,7 @@ export default defineSchema({
    * GEDCOM X: EventRole
    */
   personEvents: defineTable({
+    vaultOwnerId: v.optional(v.string()),
     personId: v.id("persons"),
     eventId: v.id("events"),
     role: v.union(
@@ -284,6 +295,7 @@ export default defineSchema({
     // Metadata
     createdAt: v.number(),
   })
+    .index("by_owner", ["vaultOwnerId"])
     .index("by_person", ["personId"])
     .index("by_event", ["eventId"])
     .index("by_person_and_event", ["personId", "eventId"]),
@@ -294,6 +306,7 @@ export default defineSchema({
    * GEDCOM X: PlaceDescription with temporal support
    */
   places: defineTable({
+    vaultOwnerId: v.optional(v.string()),
     name: v.string(),
     fullName: v.string(),                       // Full hierarchical name
     type: v.union(
@@ -334,6 +347,7 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   })
+    .index("by_owner", ["vaultOwnerId"])
     .index("by_name", ["name"])
     .index("by_parent", ["parentId"])
     .index("by_type", ["type"])
@@ -348,6 +362,7 @@ export default defineSchema({
    * Citation is the specific reference (page 42, line 3).
    */
   sources: defineTable({
+    vaultOwnerId: v.optional(v.string()),
     title: v.string(),
     type: v.union(
       v.literal("census"),
@@ -370,6 +385,7 @@ export default defineSchema({
     repository: v.optional(v.string()),
     url: v.optional(v.string()),
     fsId: v.optional(v.string()),
+    importKey: v.optional(v.string()),
     author: v.optional(v.string()),
     publicationDate: v.optional(v.string()),
     
@@ -393,9 +409,11 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   })
+    .index("by_owner", ["vaultOwnerId"])
     .index("by_type", ["type"])
     .index("by_fsId", ["fsId"])
-    .index("by_repository", ["repository"]),
+    .index("by_repository", ["repository"])
+    .index("by_import_key", ["importKey"]),
 
   /**
    * CITATIONS
@@ -407,12 +425,14 @@ export default defineSchema({
    * - isEvidence: false = researcher's conclusion combining multiple sources
    */
   citations: defineTable({
+    vaultOwnerId: v.optional(v.string()),
     sourceId: v.id("sources"),
     
     // Evidence vs Conclusion (GEDCOM X distinction)
     isEvidence: v.boolean(),                    // true = raw from record, false = researcher's conclusion
     
     // Citation details
+    importKey: v.optional(v.string()),
     page: v.optional(v.string()),               // "Page 42, Line 3"
     confidence: v.union(
       v.literal("very_high"),                   // 4 - Direct, original record
@@ -438,9 +458,11 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   })
+    .index("by_owner", ["vaultOwnerId"])
     .index("by_source", ["sourceId"])
     .index("by_confidence", ["confidence"])
-    .index("by_evidence", ["isEvidence"]),
+    .index("by_evidence", ["isEvidence"])
+    .index("by_import_key", ["importKey"]),
 
   /**
    * CITATION LINKS
@@ -448,6 +470,7 @@ export default defineSchema({
    * (persons, relationships, events, places)
    */
   citationLinks: defineTable({
+    vaultOwnerId: v.optional(v.string()),
     citationId: v.id("citations"),
     targetType: v.union(
       v.literal("person"),
@@ -461,6 +484,7 @@ export default defineSchema({
     // Metadata
     createdAt: v.number(),
   })
+    .index("by_owner", ["vaultOwnerId"])
     .index("by_citation", ["citationId"])
     .index("by_target", ["targetType", "targetId"])
     .index("by_citation_and_target", ["citationId", "targetType", "targetId"]),
@@ -470,6 +494,7 @@ export default defineSchema({
    * Photos, documents, scans, videos, audio
    */
   media: defineTable({
+    vaultOwnerId: v.optional(v.string()),
     type: v.union(
       v.literal("photo"),
       v.literal("document"),
@@ -500,6 +525,7 @@ export default defineSchema({
     // Links
     personIds: v.array(v.id("persons")),
     sourceId: v.optional(v.id("sources")),
+    importKey: v.optional(v.string()),
     
     // FamilySearch integration
     familySearchUrl: v.optional(v.string()),
@@ -508,8 +534,64 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   })
+    .index("by_owner", ["vaultOwnerId"])
     .index("by_type", ["type"])
-    .index("by_source", ["sourceId"]),
+    .index("by_source", ["sourceId"])
+    .index("by_import_key", ["importKey"]),
+
+  /**
+   * IMPORT RUNS
+   * Canonical record of capture imports and merge outcomes
+   */
+  importRuns: defineTable({
+    vaultOwnerId: v.optional(v.string()),
+    personId: v.optional(v.id("persons")),
+    personFsId: v.string(),
+    personName: v.string(),
+    captureId: v.string(),
+    captureVersion: v.string(),
+    pageTypes: v.array(
+      v.union(v.literal("sources"), v.literal("memories"), v.literal("person"))
+    ),
+    sourceUrls: v.array(v.string()),
+    capturedAt: v.number(),
+    importedAt: v.number(),
+    compatibilityMode: v.boolean(),
+    mergeStatus: v.union(
+      v.literal("created"),
+      v.literal("merged"),
+      v.literal("updated"),
+      v.literal("partial")
+    ),
+    counts: v.object({
+      sources: v.number(),
+      citations: v.number(),
+      memories: v.number(),
+      relationships: v.number(),
+      places: v.number(),
+      events: v.number(),
+      warnings: v.number(),
+    }),
+    warnings: v.array(v.string()),
+    artifactPaths: v.object({
+      capturePackagePath: v.optional(v.string()),
+      evidencePackPath: v.optional(v.string()),
+      rawDocumentPath: v.optional(v.string()),
+      contextualizedPath: v.optional(v.string()),
+    }),
+    metadata: v.optional(
+      v.object({
+        extractorVersion: v.optional(v.string()),
+        mode: v.optional(v.union(v.literal("standard"), v.literal("admin"))),
+        pageTitle: v.optional(v.string()),
+      })
+    ),
+  })
+    .index("by_owner", ["vaultOwnerId"])
+    .index("by_person", ["personId"])
+    .index("by_person_fsId", ["personFsId"])
+    .index("by_imported_at", ["importedAt"])
+    .index("by_capture_id", ["captureId"]),
 
   /**
    * FAMILYSEARCH SYNC
@@ -522,6 +604,7 @@ export default defineSchema({
    * - Conflict detection (local changes vs remote)
    */
   familySearchSync: defineTable({
+    vaultOwnerId: v.optional(v.string()),
     personId: v.id("persons"),
     fsPersonId: v.string(),                     // FamilySearch Person ID
     
@@ -553,6 +636,7 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   })
+    .index("by_owner", ["vaultOwnerId"])
     .index("by_person", ["personId"])
     .index("by_fs_person", ["fsPersonId"])
     .index("by_status", ["syncStatus"])
@@ -563,6 +647,7 @@ export default defineSchema({
    * AI-suggested or user-created research tasks
    */
   researchTasks: defineTable({
+    vaultOwnerId: v.optional(v.string()),
     personId: v.optional(v.id("persons")),
     type: v.union(
       v.literal("source_extraction"),
@@ -604,6 +689,7 @@ export default defineSchema({
     completedAt: v.optional(v.number()),
     updatedAt: v.number(),
   })
+    .index("by_owner", ["vaultOwnerId"])
     .index("by_person", ["personId"])
     .index("by_status", ["status"])
     .index("by_priority", ["priority"])
@@ -615,6 +701,7 @@ export default defineSchema({
    * Tracks research activities across entity types
    */
   researchLog: defineTable({
+    vaultOwnerId: v.optional(v.string()),
     entityType: v.union(
       v.literal("person"),
       v.literal("place"),
@@ -670,6 +757,7 @@ export default defineSchema({
     updatedAt: v.number(),
     completedAt: v.optional(v.number()),
   })
+    .index("by_owner", ["vaultOwnerId"])
     .index("by_entity", ["entityType", "entityId"])
     .index("by_activity", ["activityType"])
     .index("by_status", ["status"])
@@ -680,16 +768,21 @@ export default defineSchema({
    * Person-level documents (Person Sheet + CST)
    */
   documents: defineTable({
+    vaultOwnerId: v.optional(v.string()),
     personId: v.string(),
+    importRunId: v.optional(v.id("importRuns")),
     type: v.union(v.literal("PS"), v.literal("CST")),
     title: v.string(),
     contentMarkdown: v.string(),
     contentText: v.string(),
+    artifactPath: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
+    .index("by_owner", ["vaultOwnerId"])
     .index("by_personId", ["personId"])
-    .index("by_personId_type", ["personId", "type"]),
+    .index("by_personId_type", ["personId", "type"])
+    .index("by_importRunId", ["importRunId"]),
 
   /**
    * STORIES
@@ -697,6 +790,7 @@ export default defineSchema({
    * Our unique differentiator!
    */
   stories: defineTable({
+    vaultOwnerId: v.optional(v.string()),
     personId: v.optional(v.id("persons")),
     relationshipId: v.optional(v.id("relationships")),
     type: v.union(
@@ -745,11 +839,81 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   })
+    .index("by_owner", ["vaultOwnerId"])
     .index("by_person", ["personId"])
     .index("by_relationship", ["relationshipId"])
     .index("by_status", ["status"])
     .index("by_type", ["type"])
     .index("by_generated_by", ["generatedBy"]),
+
+  provisionalRelatives: defineTable({
+    vaultOwnerId: v.optional(v.string()),
+    anchorPersonId: v.id("persons"),
+    anchorPersonFsId: v.optional(v.string()),
+    displayName: v.string(),
+    relationshipHint: v.optional(v.string()),
+    dedupeKey: v.string(),
+    familySearchId: v.optional(v.string()),
+    possibleBirthYear: v.optional(v.number()),
+    possibleDeathYear: v.optional(v.number()),
+    possiblePlaces: v.optional(v.array(v.string())),
+    sourceKeys: v.array(v.string()),
+    sourceTitles: v.optional(v.array(v.string())),
+    evidenceCount: v.number(),
+    mergeState: v.union(
+      v.literal("provisional"),
+      v.literal("promoted"),
+      v.literal("merged"),
+      v.literal("dismissed")
+    ),
+    canonicalPersonId: v.optional(v.id("persons")),
+    notes: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner", ["vaultOwnerId"])
+    .index("by_anchor", ["anchorPersonId"])
+    .index("by_dedupe_key", ["dedupeKey"])
+    .index("by_merge_state", ["mergeState"]),
+
+  researchChecks: defineTable({
+    vaultOwnerId: v.optional(v.string()),
+    personId: v.id("persons"),
+    personFsId: v.optional(v.string()),
+    checkKey: v.string(),
+    status: v.union(
+      v.literal("missing"),
+      v.literal("in_progress"),
+      v.literal("complete"),
+      v.literal("not_applicable"),
+      v.literal("needs_review")
+    ),
+    applicability: v.union(
+      v.literal("required"),
+      v.literal("recommended"),
+      v.literal("not_applicable"),
+      v.literal("unknown")
+    ),
+    completionSource: v.union(
+      v.literal("inferred"),
+      v.literal("user"),
+      v.literal("ai_agent"),
+      v.literal("import")
+    ),
+    confidence: v.number(),
+    summary: v.optional(v.string()),
+    notes: v.optional(v.string()),
+    linkedSourceIds: v.optional(v.array(v.id("sources"))),
+    linkedPlaceIds: v.optional(v.array(v.id("places"))),
+    linkedPersonIds: v.optional(v.array(v.id("persons"))),
+    lastReviewedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner", ["vaultOwnerId"])
+    .index("by_person", ["personId"])
+    .index("by_person_check", ["personId", "checkKey"])
+    .index("by_status", ["status"]),
 
   /**
    * HISTORICAL CONTEXT
@@ -757,6 +921,7 @@ export default defineSchema({
    * (e.g., "Daily life in 1920s New York", "The Great Migration")
    */
   historicalContext: defineTable({
+    vaultOwnerId: v.optional(v.string()),
     placeId: v.optional(v.id("places")),
     timePeriod: v.object({
       startYear: v.number(),
@@ -785,6 +950,7 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   })
+    .index("by_owner", ["vaultOwnerId"])
     .index("by_place", ["placeId"])
     .index("by_topic", ["topic"])
     .index("by_time_period", ["timePeriod.startYear", "timePeriod.endYear"]),

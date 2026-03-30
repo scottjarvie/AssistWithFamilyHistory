@@ -93,12 +93,12 @@ export default function ContextualizedPage({ params }: PageProps) {
           </CardHeader>
           <CardContent className="flex flex-wrap gap-3">
             <Button asChild className="bg-amber-700 hover:bg-amber-800">
-              <Link href={`/app/source-docs/${personId}/ai${runId ? `?run=${runId}` : ""}`}>
+              <Link href={`/app/people/${personId}/ai${runId ? `?run=${runId}` : ""}`}>
                 Generate in AI Analysis
               </Link>
             </Button>
             <Button asChild variant="outline">
-              <Link href={`/app/source-docs/${personId}`}>Back to Person Workspace</Link>
+              <Link href={`/app/people/${personId}`}>Back to Person Workspace</Link>
             </Button>
           </CardContent>
         </Card>
@@ -109,7 +109,7 @@ export default function ContextualizedPage({ params }: PageProps) {
   return (
     <div className="p-4 sm:p-8">
       <Link
-        href={`/app/source-docs/${personId}`}
+        href={`/app/people/${personId}`}
         className="mb-4 inline-flex items-center gap-1 text-stone-500 hover:text-stone-900"
       >
         <ArrowLeft className="w-4 h-4" />

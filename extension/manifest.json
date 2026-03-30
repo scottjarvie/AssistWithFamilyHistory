@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Discover Their Stories - Source Extractor",
+  "name": "Discover Their Stories - FamilySearch Capture",
   "version": "1.0.0",
-  "description": "Extract and document FamilySearch sources for Discover Their Stories",
+  "description": "Capture FamilySearch sources and memories for the Discover Their Stories research vault",
   "permissions": [
     "activeTab",
     "storage"
@@ -34,7 +34,9 @@
     {
       "matches": [
         "https://www.familysearch.org/tree/person/sources/*",
-        "https://familysearch.org/tree/person/sources/*"
+        "https://familysearch.org/tree/person/sources/*",
+        "https://www.familysearch.org/tree/person/memories/*",
+        "https://familysearch.org/tree/person/memories/*"
       ],
       "js": ["content/extractor.js"],
       "run_at": "document_idle"

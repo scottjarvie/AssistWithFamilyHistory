@@ -54,8 +54,8 @@ A suite of AI-powered tools that help people:
 ## Guiding Principles
 
 ### Privacy First
-- All data stays local on the user's computer
-- No accounts required
+- Canonical structured genealogy data lives in the private vault backend
+- Raw capture artifacts and exports remain on the user's computer
 - User controls what (if anything) goes to AI services
 - Sensitive information can be redacted before AI processing
 
@@ -83,18 +83,18 @@ The project has a foundation but is largely a **blank slate** for experimentatio
 
 ### Built So Far
 - ✅ Next.js marketing site and app shell
-- ✅ Chrome extension skeleton for FamilySearch extraction
-- ✅ Evidence Pack schema for structured data
-- ✅ AI processing pipeline design (OpenRouter)
+- ✅ FamilySearch capture extension for sources and memories
+- ✅ Capture package schema and compatibility mapping for structured FamilySearch intake
+- ✅ Convex-backed Research Vault for people, places, sources, memories, documents, and import runs
+- ✅ Context pack export and person/place workspaces
+- ✅ Story Writer v1 draft workflow
 - ✅ Settings page with API key management
-- ✅ Local file storage system
+- ✅ Raw artifact and export storage system
 
 ### Not Yet Built
-- ⏳ Full extraction logic in the extension
-- ⏳ Contextualized dossier generation
-- ⏳ Story Writer tool
-- ⏳ Photo Analyzer
+- ⏳ Richer FamilySearch integrations beyond extension capture
 - ⏳ Timeline Builder
+- ⏳ Photo Analyzer
 - ⏳ Research Planner
 - ⏳ Podcast/audio features
 
@@ -104,8 +104,8 @@ The project has a foundation but is largely a **blank slate** for experimentatio
 
 *These are experiments to try — not all will work or ship*
 
-### Source Documentation Tool (in progress)
-Extract FamilySearch sources → AI analysis → Evidence Documents + Dossiers
+### Research Vault workflow (in progress)
+Capture FamilySearch data → merge into person/place graph → generate documents, dossiers, and context packs
 
 ### Story Generator
 Input: Evidence documents, family tree data
@@ -144,9 +144,9 @@ Output: Vivid description of what a typical day might have looked like
 - User provides their own API key
 - Redaction options for privacy
 
-### Local-First Architecture
-- Data stored in local filesystem (JSON, Markdown)
-- No database required
+### Vault Architecture
+- Convex stores canonical structured genealogy data
+- Local filesystem keeps raw artifacts, exports, and caches
 - Easy to backup and export
 
 ### Browser Extension

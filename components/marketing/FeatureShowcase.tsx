@@ -26,7 +26,7 @@ const journeyStages: JourneyStage[] = [
     accentClass: "text-[#234d5e]",
     cardClass: "border-[#234d5e55]",
     features: [
-      { name: "Source Documentation", status: "available", href: "/features/source-docs" },
+      { name: "Research Vault Intake", status: "available", href: "/features/source-docs" },
       { name: "Photo Analyzer", status: "planned" },
     ],
   },
@@ -37,7 +37,7 @@ const journeyStages: JourneyStage[] = [
     accentClass: "text-[#9f5a2d]",
     cardClass: "border-[#9f5a2d55]",
     features: [
-      { name: "Context Dossiers", status: "available", href: "/features/source-docs" },
+      { name: "Context Packs & Dossiers", status: "available", href: "/features/source-docs" },
       { name: "Timeline Builder", status: "planned" },
     ],
   },
@@ -59,7 +59,7 @@ const journeyStages: JourneyStage[] = [
     accentClass: "text-[#476553]",
     cardClass: "border-[#47655355]",
     features: [
-      { name: "Story Writer", status: "coming-soon" },
+      { name: "Story Writer", status: "available", href: "/app/story-writer" },
       { name: "Narrative Composer", status: "planned" },
     ],
   },

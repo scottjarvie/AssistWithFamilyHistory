@@ -5,46 +5,44 @@
  */
 
 import { NextResponse } from "next/server";
-import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
-
-const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+import { getConvexClient, getConvexReadyStatus, getConvexRuntimeIssue } from "@/lib/convex/server";
+import { getVaultAccessContext } from "@/lib/vault/server";
 
 export async function GET() {
-  if (!convexUrl) {
-    return NextResponse.json(
-      { error: "Missing NEXT_PUBLIC_CONVEX_URL" },
-      { status: 500 }
-    );
-  }
+  const ready = getConvexReadyStatus();
 
   try {
-    const client = new ConvexHttpClient(convexUrl);
-    const [people, sources, citations, places, events, media] = await Promise.all([
-      client.query(api.persons.list, {}),
-      client.query(api.sources.list, {}),
-      client.query(api.citations.list, {}),
-      client.query(api.places.list, {}),
-      client.query(api.events.list, {}),
-      client.query(api.media.list, {}),
-    ]);
+    const client = getConvexClient();
+    const { vaultOwnerId } = await getVaultAccessContext();
+    const summary = await client.query(api.vault.getDashboardSummary, { vaultOwnerId });
 
-    return NextResponse.json({
-      success: true,
-      counts: {
-        people: people.length,
-        sources: sources.length,
-        citations: citations.length,
-        places: places.length,
-        events: events.length,
-        media: media.length,
+    return NextResponse.json(
+      {
+        success: true,
+        backendState: ready.state,
+        backendTitle: ready.title,
+        backendDescription: ready.description,
+        counts: summary.counts,
+        recentPeople: summary.recentPeople,
+        recentImports: summary.recentImports,
       },
-    });
+      { status: 200 }
+    );
   } catch (error) {
     console.error("Convex stats error:", error);
+    const issue = getConvexRuntimeIssue(error);
+
     return NextResponse.json(
-      { error: "Failed to load stats" },
-      { status: 500 }
+      {
+        success: false,
+        backendState: issue.state,
+        backendTitle: issue.title,
+        backendDescription: issue.description,
+        error: issue.title,
+        details: issue.description,
+      },
+      { status: issue.statusCode }
     );
   }
 }

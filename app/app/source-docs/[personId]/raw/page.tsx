@@ -56,7 +56,7 @@ export default function RawDocumentPage({ params }: PageProps) {
         const personData = await personResponse.json();
         
         if (!personData.success) {
-          router.push("/app/source-docs");
+          router.push("/app/people");
           return;
         }
 
@@ -68,7 +68,7 @@ export default function RawDocumentPage({ params }: PageProps) {
           return;
         }
 
-        // Fetch the evidence pack
+        // Fetch the legacy source capture artifact
         const packResponse = await fetch(
           `/api/people/${personId}/runs/${targetRunId}/pack`
         );
@@ -84,7 +84,7 @@ export default function RawDocumentPage({ params }: PageProps) {
             setMarkdown(data.markdown);
             setPersonName(data.personName || personId);
           } else {
-            setMarkdown("Could not load evidence pack for this run.");
+            setMarkdown("Could not load the legacy source capture for this run.");
           }
           setLoading(false);
           return;
@@ -145,7 +145,7 @@ export default function RawDocumentPage({ params }: PageProps) {
       <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
         <div>
           <Link 
-            href={`/app/source-docs/${personId}`}
+            href={`/app/people/${personId}`}
             className="inline-flex items-center gap-1 text-stone-500 hover:text-stone-900 mb-2"
           >
             <ArrowLeft className="w-4 h-4" />

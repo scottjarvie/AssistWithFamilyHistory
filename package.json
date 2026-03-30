@@ -4,7 +4,7 @@
   "private": true,
   "description": "A Family History AI Toolset - Go beyond names and dates",
   "scripts": {
-    "dev": "next dev --port 3443",
+    "dev": "next dev --webpack --port 3443",
     "build": "next build",
     "start": "next start --port 3443",
     "lint": "eslint",

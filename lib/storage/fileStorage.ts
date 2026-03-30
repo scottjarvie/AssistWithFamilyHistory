@@ -1,7 +1,7 @@
 /**
  * File Storage Utilities
  * 
- * Purpose: Manage local file storage for evidence packs and documents
+ * Purpose: Manage local file storage for raw capture artifacts and derived documents
  * 
  * Key Elements:
  * - Read/write JSON files
@@ -20,9 +20,14 @@
 import fs from "fs/promises";
 import path from "path";
 import { PersonMetadata, RunMetadata, LatestPointer } from "./types";
+import { DEFAULT_LOCAL_VAULT_OWNER } from "@/lib/vault/constants";
 
 // Base data directory
 const DATA_DIR = path.join(process.cwd(), "data", "source-docs", "people");
+
+function resolveVaultOwnerDir(vaultOwnerId?: string) {
+  return (vaultOwnerId || DEFAULT_LOCAL_VAULT_OWNER).replace(/[^a-zA-Z0-9_-]/g, "_");
+}
 
 /**
  * Ensure directory exists
@@ -38,36 +43,37 @@ export async function ensureDir(dirPath: string): Promise<void> {
 /**
  * Get path to a person's directory
  */
-export function getPersonDir(personId: string): string {
-  return path.join(DATA_DIR, personId);
+export function getPersonDir(personId: string, vaultOwnerId?: string): string {
+  return path.join(DATA_DIR, resolveVaultOwnerDir(vaultOwnerId), personId);
 }
 
 /**
  * Get path to a person's runs directory
  */
-export function getRunsDir(personId: string): string {
-  return path.join(getPersonDir(personId), "runs");
+export function getRunsDir(personId: string, vaultOwnerId?: string): string {
+  return path.join(getPersonDir(personId, vaultOwnerId), "runs");
 }
 
 /**
  * Get path to a specific run
  */
-export function getRunDir(personId: string, runId: string): string {
-  return path.join(getRunsDir(personId), runId);
+export function getRunDir(personId: string, runId: string, vaultOwnerId?: string): string {
+  return path.join(getRunsDir(personId, vaultOwnerId), runId);
 }
 
 /**
  * List all people with stored data
  */
-export async function listPeople(): Promise<PersonMetadata[]> {
+export async function listPeople(vaultOwnerId?: string): Promise<PersonMetadata[]> {
   try {
-    await ensureDir(DATA_DIR);
-    const entries = await fs.readdir(DATA_DIR, { withFileTypes: true });
+    const ownerDir = path.join(DATA_DIR, resolveVaultOwnerDir(vaultOwnerId));
+    await ensureDir(ownerDir);
+    const entries = await fs.readdir(ownerDir, { withFileTypes: true });
     const people: PersonMetadata[] = [];
 
     for (const entry of entries) {
       if (entry.isDirectory()) {
-        const personPath = path.join(DATA_DIR, entry.name, "person.json");
+        const personPath = path.join(ownerDir, entry.name, "person.json");
         try {
           const content = await fs.readFile(personPath, "utf-8");
           people.push(JSON.parse(content));
@@ -88,9 +94,9 @@ export async function listPeople(): Promise<PersonMetadata[]> {
 /**
  * Get a person's metadata
  */
-export async function getPerson(personId: string): Promise<PersonMetadata | null> {
+export async function getPerson(personId: string, vaultOwnerId?: string): Promise<PersonMetadata | null> {
   try {
-    const personPath = path.join(getPersonDir(personId), "person.json");
+    const personPath = path.join(getPersonDir(personId, vaultOwnerId), "person.json");
     const content = await fs.readFile(personPath, "utf-8");
     return JSON.parse(content);
   } catch {
@@ -101,8 +107,8 @@ export async function getPerson(personId: string): Promise<PersonMetadata | null
 /**
  * Save a person's metadata
  */
-export async function savePerson(person: PersonMetadata): Promise<void> {
-  const personDir = getPersonDir(person.familySearchId);
+export async function savePerson(person: PersonMetadata, vaultOwnerId?: string): Promise<void> {
+  const personDir = getPersonDir(person.familySearchId, vaultOwnerId);
   await ensureDir(personDir);
   const personPath = path.join(personDir, "person.json");
   await fs.writeFile(personPath, JSON.stringify(person, null, 2));
@@ -111,9 +117,9 @@ export async function savePerson(person: PersonMetadata): Promise<void> {
 /**
  * List runs for a person
  */
-export async function listRuns(personId: string): Promise<RunMetadata[]> {
+export async function listRuns(personId: string, vaultOwnerId?: string): Promise<RunMetadata[]> {
   try {
-    const runsDir = getRunsDir(personId);
+    const runsDir = getRunsDir(personId, vaultOwnerId);
     await ensureDir(runsDir);
     const entries = await fs.readdir(runsDir, { withFileTypes: true });
     const runs: RunMetadata[] = [];
@@ -149,9 +155,9 @@ export async function listRuns(personId: string): Promise<RunMetadata[]> {
 /**
  * Get the latest run pointer
  */
-export async function getLatestRun(personId: string): Promise<LatestPointer | null> {
+export async function getLatestRun(personId: string, vaultOwnerId?: string): Promise<LatestPointer | null> {
   try {
-    const latestPath = path.join(getPersonDir(personId), "latest.json");
+    const latestPath = path.join(getPersonDir(personId, vaultOwnerId), "latest.json");
     const content = await fs.readFile(latestPath, "utf-8");
     return JSON.parse(content);
   } catch {
@@ -162,24 +168,25 @@ export async function getLatestRun(personId: string): Promise<LatestPointer | nu
 /**
  * Set the latest run pointer
  */
-export async function setLatestRun(personId: string, runId: string): Promise<void> {
-  const latestPath = path.join(getPersonDir(personId), "latest.json");
+export async function setLatestRun(personId: string, runId: string, vaultOwnerId?: string): Promise<void> {
+  const latestPath = path.join(getPersonDir(personId, vaultOwnerId), "latest.json");
   const pointer: LatestPointer = {
     runId,
-    runPath: getRunDir(personId, runId),
+    runPath: getRunDir(personId, runId, vaultOwnerId),
   };
   await fs.writeFile(latestPath, JSON.stringify(pointer, null, 2));
 }
 
 /**
- * Save an evidence pack
+ * Save a legacy evidence pack artifact
  */
 export async function saveEvidencePack(
   personId: string, 
   runId: string, 
-  evidencePack: unknown
+  evidencePack: unknown,
+  vaultOwnerId?: string
 ): Promise<string> {
-  const runDir = getRunDir(personId, runId);
+  const runDir = getRunDir(personId, runId, vaultOwnerId);
   await ensureDir(runDir);
   
   const packPath = path.join(runDir, "evidence-pack.json");
@@ -189,11 +196,42 @@ export async function saveEvidencePack(
 }
 
 /**
- * Get an evidence pack
+ * Save a capture package artifact
  */
-export async function getEvidencePack(personId: string, runId: string): Promise<unknown | null> {
+export async function saveCapturePackage(
+  personId: string,
+  runId: string,
+  capturePackage: unknown,
+  vaultOwnerId?: string
+): Promise<string> {
+  const runDir = getRunDir(personId, runId, vaultOwnerId);
+  await ensureDir(runDir);
+
+  const capturePath = path.join(runDir, "capture-package.json");
+  await fs.writeFile(capturePath, JSON.stringify(capturePackage, null, 2));
+
+  return capturePath;
+}
+
+/**
+ * Get a capture package artifact
+ */
+export async function getCapturePackage(personId: string, runId: string, vaultOwnerId?: string): Promise<unknown | null> {
   try {
-    const packPath = path.join(getRunDir(personId, runId), "evidence-pack.json");
+    const capturePath = path.join(getRunDir(personId, runId, vaultOwnerId), "capture-package.json");
+    const content = await fs.readFile(capturePath, "utf-8");
+    return JSON.parse(content);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get a legacy evidence pack artifact
+ */
+export async function getEvidencePack(personId: string, runId: string, vaultOwnerId?: string): Promise<unknown | null> {
+  try {
+    const packPath = path.join(getRunDir(personId, runId, vaultOwnerId), "evidence-pack.json");
     const content = await fs.readFile(packPath, "utf-8");
     return JSON.parse(content);
   } catch {
@@ -207,9 +245,10 @@ export async function getEvidencePack(personId: string, runId: string): Promise<
 export async function saveRawDocument(
   personId: string,
   runId: string,
-  markdown: string
+  markdown: string,
+  vaultOwnerId?: string
 ): Promise<void> {
-  const runDir = getRunDir(personId, runId);
+  const runDir = getRunDir(personId, runId, vaultOwnerId);
   await ensureDir(runDir);
   const docPath = path.join(runDir, "raw-document.md");
   await fs.writeFile(docPath, markdown);
@@ -220,10 +259,11 @@ export async function saveRawDocument(
  */
 export async function getRawDocument(
   personId: string,
-  runId: string
+  runId: string,
+  vaultOwnerId?: string
 ): Promise<string | null> {
   try {
-    const docPath = path.join(getRunDir(personId, runId), "raw-document.md");
+    const docPath = path.join(getRunDir(personId, runId, vaultOwnerId), "raw-document.md");
     return await fs.readFile(docPath, "utf-8");
   } catch {
     return null;
@@ -236,9 +276,10 @@ export async function getRawDocument(
 export async function saveContextualizedDocument(
   personId: string,
   runId: string,
-  markdown: string
+  markdown: string,
+  vaultOwnerId?: string
 ): Promise<void> {
-  const runDir = getRunDir(personId, runId);
+  const runDir = getRunDir(personId, runId, vaultOwnerId);
   await ensureDir(runDir);
   const docPath = path.join(runDir, "contextualized.md");
   await fs.writeFile(docPath, markdown);
@@ -249,10 +290,11 @@ export async function saveContextualizedDocument(
  */
 export async function getContextualizedDocument(
   personId: string,
-  runId: string
+  runId: string,
+  vaultOwnerId?: string
 ): Promise<string | null> {
   try {
-    const docPath = path.join(getRunDir(personId, runId), "contextualized.md");
+    const docPath = path.join(getRunDir(personId, runId, vaultOwnerId), "contextualized.md");
     return await fs.readFile(docPath, "utf-8");
   } catch {
     return null;
@@ -267,9 +309,10 @@ export async function saveAIStageOutput(
   runId: string,
   stage: string,
   filename: string,
-  data: unknown
+  data: unknown,
+  vaultOwnerId?: string
 ): Promise<void> {
-  const stageDir = path.join(getRunDir(personId, runId), "ai-stages", stage);
+  const stageDir = path.join(getRunDir(personId, runId, vaultOwnerId), "ai-stages", stage);
   await ensureDir(stageDir);
   const filePath = path.join(stageDir, filename);
   await fs.writeFile(filePath, JSON.stringify(data, null, 2));
@@ -282,11 +325,12 @@ export async function getAIStageOutput(
   personId: string,
   runId: string,
   stage: string,
-  filename: string
+  filename: string,
+  vaultOwnerId?: string
 ): Promise<unknown | null> {
   try {
     const filePath = path.join(
-      getRunDir(personId, runId), 
+      getRunDir(personId, runId, vaultOwnerId), 
       "ai-stages", 
       stage, 
       filename

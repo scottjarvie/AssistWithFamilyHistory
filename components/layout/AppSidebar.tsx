@@ -21,22 +21,24 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { UserButton } from "@clerk/nextjs";
 import { 
   BookOpen, 
   LayoutDashboard, 
-  FileText, 
+  FileUp,
   Settings, 
   ChevronLeft,
   ChevronRight,
   PenTool,
   Clock,
-  Wrench,
   Users,
-  Menu
+  Menu,
+  MapPinned,
+  ClipboardList,
+  TableProperties
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { VaultAccountPanel } from "@/components/layout/VaultAccountPanel";
 import {
   Sheet,
   SheetClose,
@@ -61,22 +63,34 @@ const navItems = [
     available: true,
   },
   {
-    href: "/app/source-docs",
-    label: "Source Docs",
-    icon: FileText,
+    href: "/app/operations",
+    label: "Operations",
+    icon: TableProperties,
     available: true,
   },
   {
-    href: "/app/tools",
-    label: "Source Tools",
-    icon: Wrench,
+    href: "/app/places",
+    label: "Places",
+    icon: MapPinned,
+    available: true,
+  },
+  {
+    href: "/app/imports",
+    label: "Imports",
+    icon: FileUp,
+    available: true,
+  },
+  {
+    href: "/app/research",
+    label: "Research",
+    icon: ClipboardList,
     available: true,
   },
   {
     href: "/app/story-writer",
     label: "Story Writer",
     icon: PenTool,
-    comingSoon: true,
+    available: true,
   },
   {
     href: "/app/timeline",
@@ -86,7 +100,12 @@ const navItems = [
   },
 ];
 
-export function AppMobileNav() {
+interface SidebarAccessProps {
+  accountMode: "user" | "local" | "anonymous";
+  vaultOwnerId: string;
+}
+
+export function AppMobileNav({ accountMode, vaultOwnerId }: SidebarAccessProps) {
   const pathname = usePathname();
   const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 
@@ -119,7 +138,7 @@ export function AppMobileNav() {
             <SheetHeader className="sr-only">
               <SheetTitle>App navigation</SheetTitle>
               <SheetDescription>
-                Navigate between dashboard tools, source docs, and settings.
+                Navigate between people, places, imports, research, and settings.
               </SheetDescription>
             </SheetHeader>
             <div className="p-4 border-b border-stone-800">
@@ -174,13 +193,12 @@ export function AppMobileNav() {
                     <span>Settings</span>
                   </Link>
                 </SheetClose>
-                <div className="mt-3 flex items-center justify-between rounded-lg bg-stone-800/60 px-3 py-2.5 text-sm text-stone-300">
-                  <span>Account</span>
-                  {clerkEnabled ? (
-                    <UserButton afterSignOutUrl="/" />
-                  ) : (
-                    <span className="text-xs text-stone-500">Not configured</span>
-                  )}
+                <div className="mt-3">
+                  <VaultAccountPanel
+                    clerkEnabled={clerkEnabled}
+                    mode={accountMode}
+                    vaultOwnerId={vaultOwnerId}
+                  />
                 </div>
               </div>
             </nav>
@@ -191,7 +209,7 @@ export function AppMobileNav() {
   );
 }
 
-export function AppSidebar() {
+export function AppSidebar({ accountMode, vaultOwnerId }: SidebarAccessProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
@@ -224,8 +242,8 @@ export function AppSidebar() {
       <nav className="flex-1 py-4">
         <div className={cn("px-3 mb-2", collapsed && "px-2")}>
           {!collapsed && (
-            <span className="text-xs font-medium text-stone-500 uppercase tracking-wider">
-              Tools
+              <span className="text-xs font-medium text-stone-500 uppercase tracking-wider">
+              Vault
             </span>
           )}
         </div>
@@ -275,18 +293,13 @@ export function AppSidebar() {
           <Settings className="w-5 h-5 flex-shrink-0" />
           {!collapsed && <span>Settings</span>}
         </Link>
-        <div
-          className={cn(
-            "mt-2 flex items-center gap-3 rounded-lg bg-stone-800/60 px-3 py-2.5",
-            collapsed && "justify-center px-2"
-          )}
-        >
-          {!collapsed && <span className="flex-1 text-sm text-stone-300">Account</span>}
-          {clerkEnabled ? (
-            <UserButton afterSignOutUrl="/" />
-          ) : (
-            !collapsed && <span className="text-xs text-stone-500">Not configured</span>
-          )}
+        <div className="mt-3">
+          <VaultAccountPanel
+            clerkEnabled={clerkEnabled}
+            mode={accountMode}
+            vaultOwnerId={vaultOwnerId}
+            collapsed={collapsed}
+          />
         </div>
       </div>
 

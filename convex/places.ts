@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
+import { filterByVaultOwner, normalizeVaultOwnerId } from "./vaultCore";
 
 const placeTypeValidator = v.union(
   v.literal("country"),
@@ -17,6 +18,7 @@ const placeTypeValidator = v.union(
 // Create or update a place using the FamilySearch place id (or full name) as the key
 export const upsert = mutation({
   args: {
+    vaultOwnerId: v.string(),
     familySearchId: v.optional(v.string()),
     name: v.string(),
     fullName: v.string(),
@@ -26,13 +28,15 @@ export const upsert = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
     let existing: Doc<"places"> | null = null;
 
     if (args.familySearchId) {
-      existing = await ctx.db
+      const matches = await ctx.db
         .query("places")
         .withIndex("by_fsId", (q) => q.eq("familySearchId", args.familySearchId))
-        .first();
+        .collect();
+      existing = filterByVaultOwner(matches, vaultOwnerId)[0] ?? null;
     }
 
     if (!existing) {
@@ -40,7 +44,7 @@ export const upsert = mutation({
         .query("places")
         .withIndex("by_name", (q) => q.eq("name", args.name))
         .collect();
-      existing = matches.find((p) => p.fullName === args.fullName) || null;
+      existing = filterByVaultOwner(matches, vaultOwnerId).find((p) => p.fullName === args.fullName) || null;
     }
 
     const update = {
@@ -50,6 +54,7 @@ export const upsert = mutation({
       latitude: args.latitude,
       longitude: args.longitude,
       familySearchId: args.familySearchId,
+      vaultOwnerId,
       updatedAt: now,
     };
 
@@ -67,33 +72,36 @@ export const upsert = mutation({
 });
 
 export const getByFsId = query({
-  args: { fsId: v.string() },
+  args: { fsId: v.string(), vaultOwnerId: v.string() },
   handler: async (ctx, args) => {
-    return await ctx.db
+    const matches = await ctx.db
       .query("places")
       .withIndex("by_fsId", (q) => q.eq("familySearchId", args.fsId))
-      .first();
+      .collect();
+    return filterByVaultOwner(matches, normalizeVaultOwnerId(args.vaultOwnerId))[0] ?? null;
   },
 });
 
 export const list = query({
   args: {
+    vaultOwnerId: v.string(),
     type: v.optional(placeTypeValidator),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const applyLimit = (rows: Doc<"places">[]) =>
       args.limit ? rows.slice(0, args.limit) : rows;
+    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
 
     if (args.type) {
       const results = await ctx.db
         .query("places")
         .withIndex("by_type", (q) => q.eq("type", args.type!))
         .collect();
-      return applyLimit(results);
+      return applyLimit(filterByVaultOwner(results, vaultOwnerId));
     }
 
     const results = await ctx.db.query("places").collect();
-    return applyLimit(results);
+    return applyLimit(filterByVaultOwner(results, vaultOwnerId));
   },
 });

@@ -33,7 +33,7 @@ const elements = {
 
 let currentState = "notOnPage";
 let isAdminMode = false;
-let lastEvidencePack = null;
+let lastCapturePackage = null;
 
 // Show a specific state
 function showState(state) {
@@ -57,9 +57,7 @@ async function init() {
   // Get current tab
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   
-  if (!tab?.url?.includes("familysearch.org") || 
-      !tab.url.includes("/tree/person") ||
-      !tab.url.includes("sources")) {
+  if (!tab?.url?.includes("familysearch.org") || !tab.url.includes("/tree/person")) {
     showState("notOnPage");
     return;
   }
@@ -67,7 +65,7 @@ async function init() {
   // Get page info from content script
   try {
     const response = await chrome.tabs.sendMessage(tab.id, { type: "GET_PAGE_INFO" });
-    if (response?.onSourcesPage) {
+    if (response?.onCapturePage) {
       displayPageInfo(response);
       
       // Check extraction state
@@ -76,10 +74,11 @@ async function init() {
         showState("extracting");
         updateProgress(state);
       } else if (state?.status === "complete") {
-        const stored = await chrome.storage.local.get("lastEvidencePack");
-        if (stored.lastEvidencePack) {
-          lastEvidencePack = stored.lastEvidencePack;
-          showComplete(stored.lastEvidencePack);
+        const stored = await chrome.storage.local.get(["lastCapturePackage", "lastEvidencePack"]);
+        const latestCapture = stored.lastCapturePackage || stored.lastEvidencePack;
+        if (latestCapture) {
+          lastCapturePackage = latestCapture;
+          showComplete(latestCapture);
         } else {
           showState("ready");
         }
@@ -109,7 +108,8 @@ function displayPageInfo(info) {
   }
   
   if (elements.sourceCount) {
-    elements.sourceCount.textContent = `${info.sourceCount} sources available`;
+    const label = info.pageType === "memories" ? "memories" : "sources";
+    elements.sourceCount.textContent = `${info.itemCount} ${label} available`;
   }
 }
 
@@ -123,13 +123,13 @@ function updateProgress(state) {
     elements.progressFill.style.width = `${progress}%`;
   }
   if (elements.progressText) {
-    elements.progressText.textContent = `${state.currentStep} / ${state.totalSteps} sources`;
+    elements.progressText.textContent = `${state.currentStep} / ${state.totalSteps} items`;
   }
   
   let status = "Processing...";
-  if (state.status === "extracting") status = "Extracting sources...";
+  if (state.status === "extracting") status = "Capturing page data...";
   if (state.status === "expanding") status = `Expanding: ${state.currentSource || "..."}`;
-  if (state.status === "building") status = "Building evidence pack...";
+  if (state.status === "building") status = "Building capture package...";
   
   if (elements.progressStatus) {
     elements.progressStatus.textContent = status;
@@ -137,13 +137,14 @@ function updateProgress(state) {
 }
 
 // Show complete state
-function showComplete(evidencePack) {
+function showComplete(capturePackage) {
   showState("complete");
-  const sourceCount = evidencePack?.sources?.length || 0;
+  const sourceCount = capturePackage?.sources?.length || 0;
+  const memoryCount = capturePackage?.memories?.length || 0;
   if (elements.completeStats) {
-    elements.completeStats.textContent = `${sourceCount} sources extracted`;
+    elements.completeStats.textContent = `${sourceCount} sources and ${memoryCount} memories captured`;
   }
-  lastEvidencePack = evidencePack;
+  lastCapturePackage = capturePackage;
 }
 
 // Event listeners
@@ -177,15 +178,15 @@ if (elements.cancelBtn) {
 
 if (elements.downloadBtn) {
   elements.downloadBtn.addEventListener("click", () => {
-    if (!lastEvidencePack) return;
+    if (!lastCapturePackage) return;
     
-    const blob = new Blob([JSON.stringify(lastEvidencePack, null, 2)], {
+    const blob = new Blob([JSON.stringify(lastCapturePackage, null, 2)], {
       type: "application/json",
     });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `evidence-pack-${Date.now()}.json`;
+    a.download = `capture-package-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   });
@@ -193,9 +194,9 @@ if (elements.downloadBtn) {
 
 if (elements.copyBtn) {
   elements.copyBtn.addEventListener("click", async () => {
-    if (!lastEvidencePack) return;
+    if (!lastCapturePackage) return;
     
-    await navigator.clipboard.writeText(JSON.stringify(lastEvidencePack, null, 2));
+    await navigator.clipboard.writeText(JSON.stringify(lastCapturePackage, null, 2));
     elements.copyBtn.textContent = "Copied!";
     setTimeout(() => {
       elements.copyBtn.innerHTML = `
@@ -211,7 +212,7 @@ if (elements.copyBtn) {
 
 if (elements.newExtractBtn) {
   elements.newExtractBtn.addEventListener("click", () => {
-    lastEvidencePack = null;
+    lastCapturePackage = null;
     if (elements.consentCheck) elements.consentCheck.checked = false;
     if (elements.extractBtn) elements.extractBtn.disabled = true;
     showState("ready");
@@ -237,9 +238,10 @@ chrome.runtime.onMessage.addListener((message) => {
       }
       updateProgress(state);
     } else if (state.status === "complete") {
-      chrome.storage.local.get("lastEvidencePack").then((stored) => {
-        if (stored.lastEvidencePack) {
-          showComplete(stored.lastEvidencePack);
+      chrome.storage.local.get(["lastCapturePackage", "lastEvidencePack"]).then((stored) => {
+        const latestCapture = stored.lastCapturePackage || stored.lastEvidencePack;
+        if (latestCapture) {
+          showComplete(latestCapture);
         }
       });
     } else if (state.status === "error") {

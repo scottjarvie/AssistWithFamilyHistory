@@ -1,7 +1,7 @@
 /**
  * Source Docs Feature Page
  * 
- * Purpose: Deep dive on the Source Documentation Tool
+ * Purpose: Deep dive on the vault's source documentation workflow
  * 
  * Key Elements:
  * - Feature overview
@@ -33,13 +33,13 @@ const steps = [
   },
   {
     step: 2,
-    title: "Extract Sources",
-    description: "Click the extension to extract all sources for a person. It captures indexed information, citations, and attachments.",
+    title: "Capture FamilySearch Data",
+    description: "Use the extension to capture sources or memories for a person, including indexed information, citations, relationships, and place mentions.",
   },
   {
     step: 3,
     title: "Import to App",
-    description: "The extracted data downloads as a JSON file. Import it into the Discover Their Stories app.",
+    description: "Import the capture package into the Research Vault so people, places, documents, and research history update together.",
   },
   {
     step: 4,
@@ -67,9 +67,9 @@ const outputs = [
 ];
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Source Documentation Tool",
+  title: "Source Documentation In The Research Vault",
   description:
-    "Learn how Source Documentation captures FamilySearch records and turns them into raw evidence and contextualized dossiers.",
+    "Learn how the Research Vault captures FamilySearch records and turns them into raw evidence documents, dossiers, and AI-ready context packs.",
   path: "/features/source-docs",
 });
 
@@ -85,11 +85,10 @@ export default function SourceDocsFeaturePage() {
               <FileText className="w-8 h-8 text-amber-700" />
             </div>
             <h1 className="text-4xl sm:text-5xl font-bold text-stone-900 mb-6">
-              Source Documentation Tool
+              Source Documentation In The Research Vault
             </h1>
             <p className="text-xl text-stone-500 max-w-2xl mx-auto">
-              Extract FamilySearch sources and transform them into organized 
-              evidence documents and AI-contextualized research dossiers.
+              Capture FamilySearch evidence, merge it into a canonical research graph, and generate raw documents, dossiers, and context packs from one person workspace.
             </p>
             <p className="mt-4 text-sm text-stone-500">
               <Link href="/features" className="text-amber-700 hover:underline">
@@ -209,8 +208,8 @@ export default function SourceDocsFeaturePage() {
                 size="lg"
                 className="bg-amber-700 hover:bg-amber-800 text-lg px-8 py-6"
               >
-                <Link href="/app/source-docs" className="flex items-center gap-2">
-                  Try Source Documentation
+                <Link href="/app/imports" className="flex items-center gap-2">
+                  Open Imports Workspace
                   <ArrowRight className="w-5 h-5" />
                 </Link>
               </Button>

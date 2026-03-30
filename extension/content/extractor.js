@@ -32,8 +32,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
  */
 function getPageInfo() {
   const url = window.location.href;
-  const personIdMatch = url.match(/\/tree\/person\/(?:sources\/)?([A-Z0-9-]+)/i);
+  const personIdMatch = url.match(/\/tree\/person\/(?:sources|memories)?\/?([A-Z0-9-]+)/i);
   const personId = personIdMatch?.[1] || "";
+  const pageType = url.includes("/memories") ? "memories" : url.includes("/sources") ? "sources" : "person";
 
   // Get person name from page header
   const nameEl = document.querySelector("h1, [data-testid='person-name'], .person-name");
@@ -45,26 +46,18 @@ function getPageInfo() {
   const birthMatch = datesText.match(/(\d{1,2}\s+\w+\s+\d{4}|\d{4})\s*[–-]/);
   const deathMatch = datesText.match(/[–-]\s*(\d{1,2}\s+\w+\s+\d{4}|\d{4})/);
 
-  // Count sources - try multiple selectors
-  let sourceElements = document.querySelectorAll("[data-testid='source-card']");
-  if (sourceElements.length === 0) {
-    sourceElements = document.querySelectorAll(".source-card, .sourceCard");
-  }
-  if (sourceElements.length === 0) {
-    sourceElements = document.querySelectorAll("[class*='SourceCard']");
-  }
-  if (sourceElements.length === 0) {
-    // Fallback: count items in the sources list
-    sourceElements = document.querySelectorAll("article, [role='article']");
-  }
+  const itemElements = pageType === "memories"
+    ? document.querySelectorAll("[class*='memory'], [data-testid*='memory'], article, [role='article']")
+    : document.querySelectorAll("[data-testid='source-card'], .source-card, .sourceCard, [class*='SourceCard'], article, [role='article']");
 
   return {
     personId,
     personName,
     birthDate: birthMatch?.[1],
     deathDate: deathMatch?.[1],
-    sourceCount: sourceElements.length,
-    onSourcesPage: url.includes("/sources"),
+    itemCount: itemElements.length,
+    pageType,
+    onCapturePage: pageType === "sources" || pageType === "memories",
   };
 }
 
@@ -82,67 +75,68 @@ async function startExtraction(pacing) {
       data: {
         status: "extracting",
         currentStep: 0,
-        totalSteps: pageInfo.sourceCount,
+        totalSteps: pageInfo.itemCount,
       },
     });
 
-    // Find all source containers
-    let sourceContainers = document.querySelectorAll("[data-testid='source-card']");
-    if (sourceContainers.length === 0) {
-      sourceContainers = document.querySelectorAll(".source-card, .sourceCard, [class*='SourceCard']");
-    }
-    if (sourceContainers.length === 0) {
-      sourceContainers = document.querySelectorAll("article, [role='article']");
-    }
-
-    const sources = [];
-    let expandedCount = 0;
-
-    for (let i = 0; i < sourceContainers.length; i++) {
-      if (extractionCancelled) break;
-
-      const container = sourceContainers[i];
-      const sourceId = `S${i + 1}`;
-
-      // Report progress
-      chrome.runtime.sendMessage({
-        type: "UPDATE_PROGRESS",
-        data: {
-          status: "expanding",
-          currentStep: i + 1,
-          totalSteps: sourceContainers.length,
-          currentSource: sourceId,
-          expandedCount,
-        },
-      });
-
-      // Extract source data
-      const source = await extractSourceData(container, sourceId, i, pacing);
-      sources.push(source);
-
-      if (source.expansionSucceeded) {
-        expandedCount++;
+    let payload;
+    if (pageInfo.pageType === "memories") {
+      const memories = extractMemories(pageInfo);
+      payload = buildCapturePackage(pageInfo, { sources: [], memories }, startTime, pacing);
+    } else {
+      // Find all source containers
+      let sourceContainers = document.querySelectorAll("[data-testid='source-card']");
+      if (sourceContainers.length === 0) {
+        sourceContainers = document.querySelectorAll(".source-card, .sourceCard, [class*='SourceCard']");
+      }
+      if (sourceContainers.length === 0) {
+        sourceContainers = document.querySelectorAll("article, [role='article']");
       }
 
-      // Check max expansions
-      if (pacing.maxExpansions && expandedCount >= pacing.maxExpansions) {
-        console.log(`Reached max expansions limit: ${pacing.maxExpansions}`);
-        break;
+      const sources = [];
+      let expandedCount = 0;
+
+      for (let i = 0; i < sourceContainers.length; i++) {
+        if (extractionCancelled) break;
+
+        const container = sourceContainers[i];
+        const sourceId = `S${i + 1}`;
+
+        chrome.runtime.sendMessage({
+          type: "UPDATE_PROGRESS",
+          data: {
+            status: "expanding",
+            currentStep: i + 1,
+            totalSteps: sourceContainers.length,
+            currentSource: sourceId,
+            expandedCount,
+          },
+        });
+
+        const source = await extractSourceData(container, sourceId, i, pacing);
+        sources.push(source);
+
+        if (source.expansionSucceeded) {
+          expandedCount++;
+        }
+
+        if (pacing.maxExpansions && expandedCount >= pacing.maxExpansions) {
+          console.log(`Reached max expansions limit: ${pacing.maxExpansions}`);
+          break;
+        }
+
+        await sleep(pacing.expandDelay || 500);
       }
 
-      // Delay between sources
-      await sleep(pacing.expandDelay || 500);
+      payload = buildCapturePackage(pageInfo, { sources, memories: [] }, startTime, pacing);
     }
 
     if (extractionCancelled) return;
 
-    // Build evidence pack
-    const evidencePack = buildEvidencePack(pageInfo, sources, startTime, pacing);
-
     // Report complete
     chrome.runtime.sendMessage({
       type: "EXTRACTION_COMPLETE",
-      data: evidencePack,
+      data: payload,
     });
 
   } catch (error) {
@@ -275,20 +269,50 @@ async function extractSourceData(container, sourceId, orderIndex, pacing) {
   return source;
 }
 
+function extractMemories(pageInfo) {
+  const cards = document.querySelectorAll("[class*='memory'], [data-testid*='memory'], article, [role='article']");
+  return Array.from(cards).map((card, index) => {
+    const titleEl = card.querySelector("h3, h4, [class*='title']");
+    const imgEl = card.querySelector("img");
+    const linkEl = card.querySelector("a[href]");
+    const descriptionEl = card.querySelector("p, [class*='description']");
+    return {
+      id: `${pageInfo.personId}-memory-${index + 1}`,
+      title: titleEl?.textContent?.trim() || `Memory ${index + 1}`,
+      description: descriptionEl?.textContent?.trim() || undefined,
+      mediaType: imgEl ? "image/jpeg" : undefined,
+      imageUrl: imgEl?.src || undefined,
+      thumbnailUrl: imgEl?.src || undefined,
+      memoryUrl: linkEl?.href || window.location.href,
+      familySearchUrl: linkEl?.href || window.location.href,
+      createdAt: undefined,
+      attachedBy: undefined,
+      relatedPeople: [
+        {
+          name: pageInfo.personName,
+          familySearchId: pageInfo.personId,
+          role: "subject",
+        },
+      ],
+      placeMentions: [],
+    };
+  });
+}
+
 /**
- * Build the final evidence pack
+ * Build the final capture package
  */
-function buildEvidencePack(pageInfo, sources, startTime, pacing) {
+function buildCapturePackage(pageInfo, items, startTime, pacing) {
   const endTime = Date.now();
 
   return {
-    schemaVersion: "1.0",
-    runId: crypto.randomUUID(),
+    schemaVersion: "2.0",
+    captureId: crypto.randomUUID(),
     capturedAt: new Date().toISOString(),
     extractorVersion: "1.0.0",
     extractionDurationMs: endTime - startTime,
-
-    sourceUrl: window.location.href,
+    pageType: pageInfo.pageType,
+    pageUrl: window.location.href,
     pageTitle: document.title,
     uiLocale: document.documentElement.lang || "en",
 
@@ -299,17 +323,27 @@ function buildEvidencePack(pageInfo, sources, startTime, pacing) {
       deathDate: pageInfo.deathDate,
     },
 
-    sources: sources.map((s) => ({
+    sources: items.sources.map((s) => ({
       ...s,
+      relatedPeople: s.indexed.fields
+        .filter((field) => /name|spouse|father|mother|child/i.test(field.label))
+        .map((field) => ({ name: field.value, role: field.label })),
+      placeMentions: s.indexed.fields
+        .filter((field) => /place|location|residence|parish|county|city/i.test(field.label))
+        .map((field) => ({ name: field.value, role: field.label })),
+      outboundUrls: [s.webPageUrl].filter(Boolean),
       sourceKey: generateSourceKey(s),
       sourceType: inferSourceType(s),
     })),
+    memories: items.memories,
+    placeMentions: [],
 
     diagnostics: {
       mode: pacing.mode || "standard",
-      totalSources: sources.length,
-      expandedSections: sources.filter((s) => s.expansionSucceeded).length,
-      failedExpansions: sources.filter((s) => s.expansionAttempts > 0 && !s.expansionSucceeded).length,
+      totalSources: items.sources.length,
+      totalMemories: items.memories.length,
+      expandedSections: items.sources.filter((s) => s.expansionSucceeded).length,
+      failedExpansions: items.sources.filter((s) => s.expansionAttempts > 0 && !s.expansionSucceeded).length,
       warnings: [],
       errors: [],
     },

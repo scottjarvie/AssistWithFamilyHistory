@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Discover Their Stories - Source Extractor</title>
+  <title>Discover Their Stories - FamilySearch Capture</title>
   <style>
     * {
       box-sizing: border-box;
@@ -332,13 +332,13 @@
     </div>
     <div>
       <h1>Discover Their Stories</h1>
-      <p>Source Extractor</p>
+      <p>FamilySearch Capture</p>
     </div>
     <div id="adminBadge">ADMIN</div>
   </div>
 
   <div class="content">
-    <!-- State: Not on FamilySearch sources page -->
+    <!-- State: Not on a supported FamilySearch capture page -->
     <div id="notOnPage" class="state active not-on-page">
       <div class="not-on-page-icon">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#78716c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -347,8 +347,8 @@
           <line x1="12" y1="16" x2="12.01" y2="16"/>
         </svg>
       </div>
-      <h2>Navigate to a Sources Page</h2>
-      <p>This extension works on FamilySearch person source pages. Please navigate to:</p>
+      <h2>Navigate to a Capture Page</h2>
+      <p>This extension works on FamilySearch person sources or memories pages. Please navigate to:</p>
       <code>familysearch.org/tree/person/sources/XXXX-XXX</code>
     </div>
 
@@ -357,7 +357,7 @@
       <div class="person-info">
         <div id="personName">Loading...</div>
         <div id="personDates"></div>
-        <div id="sourceCount">0 sources available</div>
+        <div id="sourceCount">0 items available</div>
       </div>
 
       <div class="consent-box">
@@ -368,7 +368,7 @@
       </div>
 
       <button id="extractBtn" class="btn btn-primary" disabled>
-        Extract Sources
+        Capture Page Data
       </button>
     </div>
 
@@ -379,7 +379,7 @@
         <div class="progress-bar">
           <div id="progressFill"></div>
         </div>
-        <div id="progressText">0 / 0 sources</div>
+        <div id="progressText">0 / 0 items</div>
       </div>
 
       <button id="cancelBtn" class="btn btn-secondary">
@@ -396,7 +396,7 @@
       </div>
       <div class="complete-text">
         <h2>Extraction Complete!</h2>
-        <div id="completeStats">0 sources extracted</div>
+        <div id="completeStats">0 items captured</div>
       </div>
 
       <div class="export-buttons">
@@ -416,7 +416,7 @@
           Copy to Clipboard
         </button>
         <button id="newExtractBtn" class="btn btn-outline">
-          Start New Extraction
+          Start New Capture
         </button>
       </div>
     </div>
@@ -442,7 +442,7 @@
   </div>
 
   <div class="footer">
-    <a href="http://localhost:3443/app/source-docs" target="_blank">Open Discover Their Stories App →</a>
+    <a href="http://localhost:3443/app/imports" target="_blank">Open Discover Their Stories App →</a>
   </div>
 
   <script src="popup.js"></script>

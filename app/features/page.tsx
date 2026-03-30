@@ -33,17 +33,18 @@ import {
 
 const features = [
   {
-    title: "Source Documentation",
-    description: "Extract sources from FamilySearch person pages and create comprehensive documentation. The tool captures all indexed information, citations, and attachments, then uses AI to generate contextualized dossiers that identify patterns, conflicts, and research opportunities.",
+    title: "Research Vault Intake",
+    description: "Capture FamilySearch sources and memories, merge them into a canonical person-and-place graph, and generate raw documents, contextualized dossiers, and context packs from one workspace.",
     icon: FileText,
     status: "available" as const,
     href: "/features/source-docs",
   },
   {
     title: "Story Writer",
-    description: "Transform your documented facts into compelling narratives. Using the evidence and context from your research, the Story Writer helps you craft readable stories about your ancestors that bring their lives to life for your family.",
+    description: "Transform a person context pack into short stories, longer narrative drafts, and research-gap notes, then save those drafts back into the vault.",
     icon: BookOpen,
-    status: "coming-soon" as const,
+    status: "available" as const,
+    href: "/app/story-writer",
   },
   {
     title: "Photo Analyzer",
@@ -80,7 +81,7 @@ const features = [
 export const metadata: Metadata = createPageMetadata({
   title: "Features",
   description:
-    "Explore the tools in Discover Their Stories, including Source Documentation and planned family history workflows.",
+    "Explore the tools in Discover Their Stories, including the Research Vault workflow and planned family history storytelling tools.",
   path: "/features",
 });
 

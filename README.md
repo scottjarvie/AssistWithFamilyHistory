@@ -19,13 +19,13 @@ Discover Their Stories is a platform for family historians who want to go beyond
 - **📖 Storytelling First** - Turn data into compelling narratives  
 - **🎨 Content Creation** - Photos, documents, timelines, and shareable stories
 - **🤖 AI Assistance** - Leverage modern AI for analysis and synthesis
-- **🔒 Privacy First** - All data stays local on your computer
+- **🔒 Privacy First** - Structured vault data lives in Convex, while raw artifacts and exports stay on your machine
 
 ## ✨ Features
 
-### Source Documentation Tool (Available Now)
+### Research Vault Workflow (Available Now)
 
-Extract and document FamilySearch sources with AI-powered analysis. Creates two types of documents:
+Capture FamilySearch data, merge it into a canonical vault, and generate research outputs from one person workspace:
 
 | Document Type | Description |
 |--------------|-------------|
@@ -35,13 +35,13 @@ Extract and document FamilySearch sources with AI-powered analysis. Creates two 
 #### How It Works
 
 1. **Extract** - Use the browser extension to capture sources from FamilySearch
-2. **Import** - Upload the Evidence Pack JSON to the app
-3. **Process** - Run 3-stage AI analysis (Normalize → Cluster → Synthesize)
-4. **Export** - Download raw documents and contextualized dossiers
+2. **Import** - Upload the capture package JSON to the Imports workspace
+3. **Organize** - Open the person workspace to review sources, places, memories, documents, and research tasks
+4. **Export** - Download raw documents, contextualized dossiers, or AI-ready context packs
 
-### Coming Soon
+### Available Next
 
-- 📝 **Story Writer** - AI-assisted narrative generation from documented facts
+- 📝 **Story Writer** - AI-assisted narrative generation from context packs and vault evidence
 - 📷 **Photo Analyzer** - Extract context and dates from old photographs
 - 📅 **Timeline Builder** - Visual timelines synthesized from sources
 - 🎯 **Research Planner** - Track goals with AI-powered suggestions
@@ -76,7 +76,7 @@ The browser extension is located in the `/extension` folder:
 1. Open Chrome and navigate to `chrome://extensions/`
 2. Enable "Developer mode" (toggle in top right)
 3. Click "Load unpacked" and select the `/extension` folder
-4. Navigate to a FamilySearch person's sources page (e.g., `familysearch.org/tree/person/sources/XXXX-XXX`)
+4. Navigate to a FamilySearch person's sources or memories page (for example `familysearch.org/tree/person/sources/XXXX-XXX`)
 5. Click the extension icon to start extraction
 
 ## 📁 Project Structure
@@ -101,18 +101,18 @@ discover-their-stories/
 │   ├── sources.ts         # Source/citation operations
 │   └── helpers.ts         # Helper functions
 ├── features/              # Feature modules
-│   └── source-docs/       # Source Documentation Tool
+│   └── source-docs/       # Legacy source-document routes and generators
 │       ├── components/    # Feature-specific components
 │       └── lib/           # Schemas, generators, utils
 ├── lib/                   # Shared utilities
-│   ├── storage/           # Local file storage layer
+│   ├── storage/           # Raw artifact and export storage layer
 │   └── ai/                # OpenRouter integration
 ├── extension/             # Chrome browser extension (MV3)
 │   ├── content/           # Content scripts for extraction
 │   ├── popup/             # Extension popup UI
-│   └── lib/               # Evidence Pack schema
-└── data/                  # Local storage (gitignored)
-    └── people/            # Extracted person data
+│   └── lib/               # Capture package schema and import helpers
+└── data/                  # Local artifacts and exports (gitignored)
+    └── source-docs/       # Legacy artifact retention for captures and documents
         └── {personId}/    # Per-person folder
             └── runs/      # Versioned extraction runs
 ```
@@ -218,6 +218,13 @@ For development/testing, enable Admin Mode in Settings:
 - No expansion caps
 - Testing features enabled
 
+### Optional Auth
+
+Clerk can be configured for sign-in and user identity, but route protection is opt-in.
+
+- Leave `REQUIRE_AUTH` unset for private/local vault use
+- Set `REQUIRE_AUTH=true` when you want `/app` and protected API routes to require sign-in
+
 ## 🛠️ Tech Stack
 
 | Category | Technology |
@@ -228,14 +235,14 @@ For development/testing, enable Admin Mode in Settings:
 | Components | ShadCN UI |
 | Validation | Zod |
 | AI Integration | OpenRouter API |
-| Storage | Local filesystem (JSON, Markdown) |
+| Storage | Convex (canonical structured graph) + local artifacts |
 | Extension | Chrome Manifest V3 |
 
 ## 🔒 Data Privacy
 
 Your data stays with you:
 
-- ✅ All data stored locally on your computer
+- ✅ Canonical structured data can live in Convex while raw artifacts and exports remain local
 - ✅ Nothing sent to external servers without explicit action
 - ✅ Sensitive information auto-redacted before AI processing
 - ✅ Export everything in readable formats (JSON, Markdown)
@@ -262,14 +269,14 @@ Please ensure you comply with [FamilySearch's Terms of Use](https://www.familyse
 - [x] Settings page with API key management
 - [x] Browser extension skeleton
 
-### Phase 2: Source Documentation (Current)
-- [x] Evidence Pack schema and validation
-- [x] Import/export workflow
-- [x] Raw document generator
+### Phase 2: Research Vault (Current)
+- [x] Capture package schema and compatibility mapping
+- [x] Imports workspace and person/place vault views
+- [x] Raw document and contextualized dossier generation
+- [x] Context-pack export
 - [x] AI processing pipeline (3 stages)
-- [x] Redaction and privacy controls
-- [ ] Full extension extraction logic
-- [ ] Contextualized dossier generation
+- [ ] Full Convex deployment activation and codegen
+- [ ] Workspace polishing and story-writer handoff
 
 ### Phase 3: Storytelling
 - [ ] Story Writer tool

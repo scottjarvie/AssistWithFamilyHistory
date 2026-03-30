@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Lineage Path</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1d3f4f" />
+      <stop offset="100%" stop-color="#2a5a4d" />
+    </linearGradient>
+    <linearGradient id="path" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#f5e3c4" />
+      <stop offset="100%" stop-color="#ddb67f" />
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#bg)" />
+
+  <path d="M128 352c42-54 84-80 128-80s86 26 128 80" fill="none" stroke="url(#path)" stroke-width="20" stroke-linecap="round" />
+  <circle cx="128" cy="352" r="18" fill="#f6e8d0" />
+  <circle cx="256" cy="272" r="18" fill="#f6e8d0" />
+  <circle cx="384" cy="352" r="18" fill="#f6e8d0" />
+
+  <path d="M256 116l24 58 58 24-58 24-24 58-24-58-58-24 58-24z" fill="#f2c98f" />
+  <circle cx="256" cy="198" r="10" fill="#fff4df" />
+
+  <path d="M174 390h164" stroke="#e8d5b6" stroke-width="12" stroke-linecap="round" />
+</svg>

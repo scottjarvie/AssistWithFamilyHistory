@@ -19,7 +19,7 @@ import { createPageMetadata } from "@/lib/seo";
 export const metadata: Metadata = createPageMetadata({
   title: "Extension",
   description:
-    "Install the FamilySearch Source Extractor extension and import evidence packs into Discover Their Stories.",
+    "Install the FamilySearch capture extension and import capture packages into the Discover Their Stories research vault.",
   path: "/extension",
 });
 
@@ -34,11 +34,10 @@ export default function ExtensionPage() {
             Chrome Extension
           </Badge>
           <h1 className="text-4xl md:text-5xl font-bold text-stone-900 mb-4">
-            FamilySearch Source Extractor
+            FamilySearch Capture Extension
           </h1>
           <p className="text-xl text-stone-600 mb-8 max-w-2xl mx-auto">
-            Extract all source documentation from any FamilySearch person page with one click. 
-            Captures indexed information, citations, and attachments automatically.
+            Capture FamilySearch sources and memories from a person page, then import them into the Research Vault for people, places, documents, and AI-ready context packs.
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -105,10 +104,9 @@ export default function ExtensionPage() {
                 <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
                   <FileJson className="w-6 h-6 text-blue-700" />
                 </div>
-                <CardTitle>Creates Evidence Pack</CardTitle>
+                <CardTitle>Creates Capture Package</CardTitle>
                 <CardDescription>
-                  Generates a structured JSON file containing all extracted data—ready 
-                  to import into Discover Their Stories for AI analysis.
+                  Generates a structured JSON file containing sources, memories, indexed facts, relatives, and place mentions for import into the vault.
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -134,33 +132,33 @@ export default function ExtensionPage() {
         <div className="container max-w-4xl mx-auto px-4">
           <h2 className="text-3xl font-bold text-center mb-4">How It Works</h2>
           <p className="text-center text-stone-600 mb-12 max-w-2xl mx-auto">
-            From FamilySearch to AI-powered insights in four simple steps
+            From FamilySearch to a person workspace and AI-ready context pack in four simple steps
           </p>
 
           <div className="space-y-6">
             {[
               {
                 step: 1,
-                title: "Navigate to Sources Page",
-                description: "Go to any FamilySearch person's sources page. The URL will look like: familysearch.org/tree/person/sources/XXXX-XXX",
+                title: "Open a FamilySearch Page",
+                description: "Go to a FamilySearch person's sources or memories page. The extension supports both capture flows.",
                 icon: Chrome,
               },
               {
                 step: 2,
-                title: "Click Extract",
-                description: "Click the extension icon, check the consent box, and click 'Extract Sources'. Watch as it processes each source.",
+                title: "Capture the Page",
+                description: "Click the extension icon, check the consent box, and start the capture. The extension will build a capture package from the page data.",
                 icon: MousePointer,
               },
               {
                 step: 3,
-                title: "Download Evidence Pack",
-                description: "Once complete, download the JSON file or copy it to your clipboard. This contains all the extracted source data.",
+                title: "Download the Capture Package",
+                description: "Once complete, download the JSON file or copy it to your clipboard. This contains the data needed to merge into the vault.",
                 icon: Download,
               },
               {
                 step: 4,
                 title: "Import into App",
-                description: "Open Discover Their Stories, go to Source Documentation, and import your Evidence Pack. Now you can generate documents!",
+                description: "Open Discover Their Stories, go to Imports, and import your capture package. Then open the person workspace to generate documents and context packs.",
                 icon: Upload,
               },
             ].map((item) => (
@@ -243,7 +241,7 @@ export default function ExtensionPage() {
                   <h3 className="font-semibold mb-2">Load the Extension</h3>
                   <p className="text-stone-600 mb-3">
                     Click <strong>&quot;Load unpacked&quot;</strong> and select the extracted extension folder. 
-                    You should see &quot;Discover Their Stories - Source Extractor&quot; appear!
+                    You should see &quot;Discover Their Stories - FamilySearch Capture&quot; appear.
                   </p>
                   <div className="flex items-center gap-2 text-green-700 bg-green-50 px-3 py-2 rounded">
                     <CheckCircle2 className="w-4 h-4" />
@@ -269,9 +267,9 @@ export default function ExtensionPage() {
               </CardHeader>
               <CardContent className="text-sm text-stone-600">
                 <ul className="space-y-1">
-                  <li>• 1 second delay between sources</li>
+                  <li>• 1 second delay between captured sources</li>
                   <li>• 500ms after each click action</li>
-                  <li>• Max 50 sources per extraction</li>
+                  <li>• Max 50 source expansions per capture</li>
                 </ul>
               </CardContent>
             </Card>
@@ -285,7 +283,7 @@ export default function ExtensionPage() {
                 <ul className="space-y-1">
                   <li>• Source titles & citations</li>
                   <li>• Indexed fields (name, date, place)</li>
-                  <li>• Attachments & tags</li>
+                  <li>• Related people, memories, and tags</li>
                   <li>• Record links & contributor info</li>
                 </ul>
               </CardContent>
@@ -313,8 +311,7 @@ export default function ExtensionPage() {
         <div className="container max-w-4xl mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-4">Ready to Get Started?</h2>
           <p className="text-amber-100 mb-8 max-w-xl mx-auto">
-            Download the extension, extract your first Evidence Pack, and let AI help you 
-            document your family history.
+            Download the extension, capture your first FamilySearch package, and move it into a real person workspace with documents and AI-ready context.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button size="lg" className="bg-white text-amber-800 hover:bg-amber-50" asChild>
@@ -324,8 +321,8 @@ export default function ExtensionPage() {
               </a>
             </Button>
             <Button size="lg" variant="outline" className="border-white text-white hover:bg-amber-600" asChild>
-              <Link href="/app/source-docs">
-                Open Source Docs Tool
+              <Link href="/app/imports">
+                Open Imports Workspace
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Link>
             </Button>

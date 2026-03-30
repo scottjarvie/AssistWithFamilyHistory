@@ -14,6 +14,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getPerson, listRuns, getLatestRun } from "@/lib/storage/fileStorage";
+import { getVaultAccessContext } from "@/lib/vault/server";
 
 export async function GET(
   _request: NextRequest,
@@ -21,8 +22,9 @@ export async function GET(
 ) {
   try {
     const { id: personId } = await params;
+    const { vaultOwnerId } = await getVaultAccessContext();
     
-    const person = await getPerson(personId);
+    const person = await getPerson(personId, vaultOwnerId);
     
     if (!person) {
       return NextResponse.json(
@@ -31,8 +33,8 @@ export async function GET(
       );
     }
 
-    const runs = await listRuns(personId);
-    const latest = await getLatestRun(personId);
+    const runs = await listRuns(personId, vaultOwnerId);
+    const latest = await getLatestRun(personId, vaultOwnerId);
 
     return NextResponse.json({
       success: true,

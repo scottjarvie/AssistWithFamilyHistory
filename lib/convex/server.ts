@@ -1,0 +1,93 @@
+import { ConvexHttpClient } from "convex/browser";
+
+export type ConvexBackendState = "ready" | "missing" | "stale" | "error";
+
+export interface ConvexRuntimeIssue {
+  state: ConvexBackendState;
+  title: string;
+  description: string;
+  statusCode: number;
+}
+
+export function getConvexUrl(): string | null {
+  return process.env.NEXT_PUBLIC_CONVEX_URL || null;
+}
+
+export function isConvexConfigured(): boolean {
+  return Boolean(getConvexUrl());
+}
+
+export function getConvexClient(): ConvexHttpClient {
+  const convexUrl = getConvexUrl();
+
+  if (!convexUrl) {
+    throw new Error("Missing NEXT_PUBLIC_CONVEX_URL");
+  }
+
+  return new ConvexHttpClient(convexUrl);
+}
+
+export function getConvexReadyStatus(): ConvexRuntimeIssue {
+  return {
+    state: "ready",
+    title: "Vault backend connected",
+    description:
+      "The canonical Research Vault is available. Imports will merge into Convex and appear across People, Places, Research, and context packs.",
+    statusCode: 200,
+  };
+}
+
+export function getConvexUnavailableState(scope: string, capability: string): ConvexRuntimeIssue {
+  const url = getConvexUrl();
+
+  if (!url) {
+    return {
+      state: "missing",
+      title: `${scope} requires the vault backend`,
+      description: `${capability} Configure \`NEXT_PUBLIC_CONVEX_URL\` and run \`npx convex dev\` or deploy the latest Convex functions to enable the canonical Research Vault.`,
+      statusCode: 503,
+    };
+  }
+
+  return {
+    state: "stale",
+    title: `${scope} requires a current vault deployment`,
+    description: `${capability} Run \`npx convex dev\` or deploy the latest Convex functions, then refresh.`,
+    statusCode: 503,
+  };
+}
+
+export function getConvexRuntimeIssue(error?: unknown): ConvexRuntimeIssue {
+  if (!getConvexUrl()) {
+    return {
+      state: "missing",
+      title: "Vault backend unavailable",
+      description:
+        "Configure `NEXT_PUBLIC_CONVEX_URL` and run `npx convex dev` or deploy the latest Convex functions to enable the canonical Research Vault.",
+      statusCode: 503,
+    };
+  }
+
+  const message = error instanceof Error ? error.message : "Unknown Convex error";
+
+  if (
+    /Could not find (public )?function/i.test(message) ||
+    /Could not find function/i.test(message) ||
+    /is not a function/i.test(message)
+  ) {
+    return {
+      state: "stale",
+      title: "Convex Deployment Needs Update",
+      description:
+        "This page depends on the new Research Vault Convex functions, but the current deployment does not have them yet. Run `npx convex dev` or deploy the latest Convex functions, then refresh.",
+      statusCode: 503,
+    };
+  }
+
+  return {
+    state: "error",
+    title: "Vault backend request failed",
+    description: message,
+    statusCode: 503,
+  };
+}

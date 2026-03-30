@@ -30,20 +30,24 @@ const roadmapItems = [
     bgColor: "bg-green-50",
     items: [
       {
-        title: "Source Documentation Tool",
-        description: "Extract and document FamilySearch sources with raw evidence documents and AI-contextualized dossiers.",
+        title: "Research Vault Workflow",
+        description: "Capture FamilySearch sources and memories, merge them into the vault, and generate raw documents, dossiers, and context packs.",
       },
       {
         title: "Browser Extension",
-        description: "Chrome extension for extracting FamilySearch person/sources pages.",
+        description: "Chrome extension for capturing FamilySearch sources and memories pages.",
       },
       {
-        title: "Local Storage",
-        description: "All data stored locally on your computer in readable formats.",
+        title: "Convex-Backed Graph",
+        description: "Canonical structured genealogy data stored in Convex with raw artifacts and exports kept locally.",
       },
       {
         title: "Export/Import Workflow",
         description: "Use any AI model via export prompts and import results.",
+      },
+      {
+        title: "Story Writer v1",
+        description: "Generate short stories, longer narrative drafts, and research-gap notes from a person context pack.",
       },
     ],
   },
@@ -53,10 +57,6 @@ const roadmapItems = [
     iconColor: "text-amber-600",
     bgColor: "bg-amber-50",
     items: [
-      {
-        title: "Story Writer",
-        description: "AI-assisted narrative generation from documented facts.",
-      },
       {
         title: "FamilySearch API Integration",
         description: "Direct API access for faster and more reliable data extraction.",

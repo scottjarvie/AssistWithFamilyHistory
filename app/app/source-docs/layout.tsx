@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { createPageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Source Documentation",
+  title: "Legacy Source Documentation",
   description:
-    "Import evidence packs, generate raw evidence documents, and run contextualized AI analysis.",
+    "Legacy Source Documentation routes now redirect into the Research Vault imports and person workspace.",
   path: "/app/source-docs",
 });
 

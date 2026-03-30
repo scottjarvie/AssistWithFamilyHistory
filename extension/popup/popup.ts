@@ -32,8 +32,9 @@ interface PageInfo {
   personName: string;
   birthDate?: string;
   deathDate?: string;
-  sourceCount: number;
-  onSourcesPage: boolean;
+  itemCount: number;
+  pageType: "sources" | "memories" | "person";
+  onCapturePage: boolean;
 }
 
 // DOM Elements
@@ -66,7 +67,7 @@ const elements = {
 
 let currentState: UIState = "notOnPage";
 let isAdminMode = false;
-let lastEvidencePack: unknown = null;
+let lastCapturePackage: unknown = null;
 
 // Show a specific state
 function showState(state: UIState) {
@@ -86,8 +87,7 @@ async function init() {
   // Get current tab
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   
-  if (!tab?.url?.includes("familysearch.org/tree/person") || 
-      !tab.url.includes("sources")) {
+  if (!tab?.url?.includes("familysearch.org/tree/person")) {
     showState("notOnPage");
     return;
   }
@@ -95,7 +95,7 @@ async function init() {
   // Get page info from content script
   try {
     const response = await chrome.tabs.sendMessage(tab.id!, { type: "GET_PAGE_INFO" });
-    if (response?.onSourcesPage) {
+    if (response?.onCapturePage) {
       displayPageInfo(response);
       
       // Check extraction state
@@ -104,10 +104,11 @@ async function init() {
         showState("extracting");
         updateProgress(state);
       } else if (state?.status === "complete") {
-        const stored = await chrome.storage.local.get("lastEvidencePack");
-        if (stored.lastEvidencePack) {
-          lastEvidencePack = stored.lastEvidencePack;
-          showComplete(stored.lastEvidencePack);
+        const stored = await chrome.storage.local.get(["lastCapturePackage", "lastEvidencePack"]);
+        const latestCapture = stored.lastCapturePackage || stored.lastEvidencePack;
+        if (latestCapture) {
+          lastCapturePackage = latestCapture;
+          showComplete(latestCapture);
         }
       } else {
         showState("ready");
@@ -129,7 +130,8 @@ function displayPageInfo(info: PageInfo) {
   if (info.deathDate) dates.push(`d. ${info.deathDate}`);
   elements.personDates.textContent = dates.join(" – ");
   
-  elements.sourceCount.textContent = `${info.sourceCount} sources available`;
+  const label = info.pageType === "memories" ? "memories" : "sources";
+  elements.sourceCount.textContent = `${info.itemCount} ${label} available`;
 }
 
 // Update progress
@@ -139,22 +141,23 @@ function updateProgress(state: ExtractionState) {
     : 0;
   
   elements.progressFill.style.width = `${progress}%`;
-  elements.progressText.textContent = `${state.expandedCount} / ${state.totalSteps} sources`;
+  elements.progressText.textContent = `${state.currentStep} / ${state.totalSteps} items`;
   
   let status = "Processing...";
-  if (state.status === "extracting") status = "Extracting sources...";
+  if (state.status === "extracting") status = "Capturing page data...";
   if (state.status === "expanding") status = `Expanding: ${state.currentSource || "..."}`;
-  if (state.status === "building") status = "Building evidence pack...";
+  if (state.status === "building") status = "Building capture package...";
   
   elements.progressStatus.textContent = status;
 }
 
 // Show complete state
-function showComplete(evidencePack: { sources?: unknown[] }) {
+function showComplete(capturePackage: { sources?: unknown[]; memories?: unknown[] }) {
   showState("complete");
-  const sourceCount = evidencePack?.sources?.length || 0;
-  elements.completeStats.textContent = `${sourceCount} sources extracted`;
-  lastEvidencePack = evidencePack;
+  const sourceCount = capturePackage?.sources?.length || 0;
+  const memoryCount = capturePackage?.memories?.length || 0;
+  elements.completeStats.textContent = `${sourceCount} sources and ${memoryCount} memories captured`;
+  lastCapturePackage = capturePackage;
 }
 
 // Event listeners
@@ -182,23 +185,23 @@ elements.cancelBtn.addEventListener("click", () => {
 });
 
 elements.downloadBtn.addEventListener("click", () => {
-  if (!lastEvidencePack) return;
+  if (!lastCapturePackage) return;
   
-  const blob = new Blob([JSON.stringify(lastEvidencePack, null, 2)], {
+  const blob = new Blob([JSON.stringify(lastCapturePackage, null, 2)], {
     type: "application/json",
   });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `evidence-pack-${Date.now()}.json`;
+  a.download = `capture-package-${Date.now()}.json`;
   a.click();
   URL.revokeObjectURL(url);
 });
 
 elements.copyBtn.addEventListener("click", async () => {
-  if (!lastEvidencePack) return;
+  if (!lastCapturePackage) return;
   
-  await navigator.clipboard.writeText(JSON.stringify(lastEvidencePack, null, 2));
+  await navigator.clipboard.writeText(JSON.stringify(lastCapturePackage, null, 2));
   elements.copyBtn.textContent = "Copied!";
   setTimeout(() => {
     elements.copyBtn.innerHTML = `
@@ -212,7 +215,7 @@ elements.copyBtn.addEventListener("click", async () => {
 });
 
 elements.newExtractBtn.addEventListener("click", () => {
-  lastEvidencePack = null;
+  lastCapturePackage = null;
   elements.consentCheck.checked = false;
   elements.extractBtn.disabled = true;
   showState("ready");
@@ -235,9 +238,10 @@ chrome.runtime.onMessage.addListener((message) => {
       }
       updateProgress(state);
     } else if (state.status === "complete") {
-      chrome.storage.local.get("lastEvidencePack").then((stored) => {
-        if (stored.lastEvidencePack) {
-          showComplete(stored.lastEvidencePack);
+      chrome.storage.local.get(["lastCapturePackage", "lastEvidencePack"]).then((stored) => {
+        const latestCapture = stored.lastCapturePackage || stored.lastEvidencePack;
+        if (latestCapture) {
+          showComplete(latestCapture);
         }
       });
     } else if (state.status === "error") {

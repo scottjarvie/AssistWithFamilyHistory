@@ -1,0 +1,78 @@
+import { NextRequest, NextResponse } from "next/server";
+import { api } from "@/convex/_generated/api";
+import { getConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
+import { getVaultAccessContext } from "@/lib/vault/server";
+
+function isStatus(value: unknown): value is "missing" | "in_progress" | "complete" | "not_applicable" | "needs_review" {
+  return (
+    value === "missing" ||
+    value === "in_progress" ||
+    value === "complete" ||
+    value === "not_applicable" ||
+    value === "needs_review"
+  );
+}
+
+function isApplicability(value: unknown): value is "required" | "recommended" | "not_applicable" | "unknown" {
+  return value === "required" || value === "recommended" || value === "not_applicable" || value === "unknown";
+}
+
+function isCompletionSource(value: unknown): value is "user" | "ai_agent" {
+  return value === "user" || value === "ai_agent";
+}
+
+export async function POST(request: NextRequest) {
+  if (!isConvexConfigured()) {
+    const issue = getConvexRuntimeIssue();
+    return NextResponse.json({ error: issue.title, details: issue.description }, { status: issue.statusCode });
+  }
+
+  try {
+    const { vaultOwnerId } = await getVaultAccessContext();
+    const body = await request.json();
+    const personFsId = typeof body.personFsId === "string" ? body.personFsId : "";
+    const checkKey = typeof body.checkKey === "string" ? body.checkKey : "";
+    const status = isStatus(body.status) ? body.status : null;
+    const applicability = isApplicability(body.applicability) ? body.applicability : undefined;
+    const completionSource = isCompletionSource(body.completionSource) ? body.completionSource : "user";
+    const notes = typeof body.notes === "string" ? body.notes.trim() : undefined;
+
+    if (!personFsId || !checkKey || !status) {
+      return NextResponse.json({ error: "Missing personFsId, checkKey, or status" }, { status: 400 });
+    }
+
+    const client = getConvexClient();
+    const workspace = await client.query(api.vault.getPersonWorkspace, {
+      vaultOwnerId,
+      personFsId,
+    });
+
+    if (!workspace) {
+      return NextResponse.json({ error: "Person not found" }, { status: 404 });
+    }
+
+    const existing = workspace.researchChecks.find((check: { checkKey: string }) => check.checkKey === checkKey);
+    const result = await client.mutation(api.vaultMutations.upsertResearchCheck, {
+      vaultOwnerId,
+      personId: workspace.person._id,
+      personFsId,
+      checkKey,
+      status,
+      applicability: applicability || existing?.applicability || "recommended",
+      completionSource,
+      confidence: typeof body.confidence === "number" ? body.confidence : 0.95,
+      summary: typeof body.summary === "string" ? body.summary : existing?.summary,
+      notes: notes || existing?.notes,
+      linkedSourceIds: existing?.linkedSourceIds || [],
+      linkedPlaceIds: existing?.linkedPlaceIds || [],
+      linkedPersonIds: existing?.linkedPersonIds || [],
+      lastReviewedAt: Date.now(),
+    });
+
+    return NextResponse.json({ success: true, ...result });
+  } catch (error) {
+    const issue = getConvexRuntimeIssue(error);
+    return NextResponse.json({ error: issue.title, details: issue.description }, { status: issue.statusCode });
+  }
+}
+

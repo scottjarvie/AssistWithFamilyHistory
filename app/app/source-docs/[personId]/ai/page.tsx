@@ -134,7 +134,7 @@ export default function AIProcessingPage({ params }: PageProps) {
         const personData = await personResponse.json();
 
         if (!personResponse.ok || !personData.success) {
-          router.push("/app/source-docs");
+          router.push("/app/people");
           return;
         }
 
@@ -142,7 +142,7 @@ export default function AIProcessingPage({ params }: PageProps) {
         const targetRunId = runId || personData.latestRunId;
 
         if (!targetRunId) {
-          setPageError("No extraction runs found for this person. Import an Evidence Pack first.");
+          setPageError("No extraction runs found for this person. Import a capture package first.");
           return;
         }
 
@@ -152,7 +152,7 @@ export default function AIProcessingPage({ params }: PageProps) {
         const packData = await packResponse.json();
 
         if (!packResponse.ok || !packData.success) {
-          setPageError(packData.error || "Could not load the Evidence Pack for this run.");
+          setPageError(packData.error || "Could not load the legacy source capture for this run.");
           return;
         }
 
@@ -392,7 +392,7 @@ export default function AIProcessingPage({ params }: PageProps) {
           </CardHeader>
           <CardContent>
             <Button asChild className="bg-amber-700 hover:bg-amber-800">
-              <Link href={`/app/source-docs/${personId}`}>Back to Person Workspace</Link>
+              <Link href={`/app/people/${personId}`}>Back to Person Workspace</Link>
             </Button>
           </CardContent>
         </Card>
@@ -403,7 +403,7 @@ export default function AIProcessingPage({ params }: PageProps) {
   return (
     <div className="p-4 sm:p-8">
       <Link
-        href={`/app/source-docs/${personId}`}
+        href={`/app/people/${personId}`}
         className="mb-6 inline-flex items-center gap-1 text-stone-500 hover:text-stone-900"
       >
         <ArrowLeft className="w-4 h-4" />
@@ -609,7 +609,7 @@ export default function AIProcessingPage({ params }: PageProps) {
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Button asChild size="sm" className="bg-green-700 hover:bg-green-800">
-                      <Link href={`/app/source-docs/${personId}/contextualized?run=${activeRunId}`}>
+                      <Link href={`/app/people/${personId}/contextualized?run=${activeRunId}`}>
                         View Dossier
                       </Link>
                     </Button>

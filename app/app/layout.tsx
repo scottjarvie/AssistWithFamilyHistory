@@ -18,6 +18,7 @@ import { AppMobileNav, AppSidebar } from "@/components/layout/AppSidebar";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { createPageMetadata } from "@/lib/seo";
+import { getVaultAccessContext } from "@/lib/vault/server";
 
 export const metadata: Metadata = createPageMetadata({
   title: "Workspace",
@@ -25,15 +26,23 @@ export const metadata: Metadata = createPageMetadata({
   path: "/app",
 });
 
-export default function AppLayout({
+export default async function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const accessContext = await getVaultAccessContext();
+
   return (
     <div className="min-h-screen bg-stone-50">
-      <AppSidebar />
-      <AppMobileNav />
+      <AppSidebar
+        accountMode={accessContext.mode}
+        vaultOwnerId={accessContext.vaultOwnerId}
+      />
+      <AppMobileNav
+        accountMode={accessContext.mode}
+        vaultOwnerId={accessContext.vaultOwnerId}
+      />
       <main className="min-h-screen pt-16 transition-all duration-300 md:ml-64 md:pt-0">
         {children}
         <footer className="border-t border-stone-200 px-4 py-6 text-sm text-stone-500 md:px-8">

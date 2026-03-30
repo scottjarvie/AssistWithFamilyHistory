@@ -13,6 +13,7 @@ import type * as citations from "../citations.js";
 import type * as documents from "../documents.js";
 import type * as events from "../events.js";
 import type * as helpers from "../helpers.js";
+import type * as importRuns from "../importRuns.js";
 import type * as media from "../media.js";
 import type * as personEvents from "../personEvents.js";
 import type * as persons from "../persons.js";
@@ -20,6 +21,9 @@ import type * as places from "../places.js";
 import type * as relationships from "../relationships.js";
 import type * as researchLog from "../researchLog.js";
 import type * as sources from "../sources.js";
+import type * as vault from "../vault.js";
+import type * as vaultCore from "../vaultCore.js";
+import type * as vaultMutations from "../vaultMutations.js";
 
 import type {
   ApiFromModules,
@@ -33,6 +37,7 @@ declare const fullApi: ApiFromModules<{
   documents: typeof documents;
   events: typeof events;
   helpers: typeof helpers;
+  importRuns: typeof importRuns;
   media: typeof media;
   personEvents: typeof personEvents;
   persons: typeof persons;
@@ -40,6 +45,9 @@ declare const fullApi: ApiFromModules<{
   relationships: typeof relationships;
   researchLog: typeof researchLog;
   sources: typeof sources;
+  vault: typeof vault;
+  vaultCore: typeof vaultCore;
+  vaultMutations: typeof vaultMutations;
 }>;
 
 /**
