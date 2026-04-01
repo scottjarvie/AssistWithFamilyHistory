@@ -23,13 +23,13 @@ export async function GET(
   }
 
   try {
-    const { id: personFsId } = await params;
+    const { id: personIdentifier } = await params;
     const format = request.nextUrl.searchParams.get("format") || "json";
     const client = getConvexClient();
     const { vaultOwnerId } = await getVaultAccessContext();
     const contextPack = await client.query(api.vault.getContextPack, {
       vaultOwnerId,
-      personFsId,
+      personIdentifier,
     });
 
     if (!contextPack) {

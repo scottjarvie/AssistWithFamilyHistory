@@ -2,15 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { getEvidencePack } from "@/lib/storage/fileStorage";
 import { EvidencePackSchema } from "@/features/source-docs/lib/schemas";
 import { getVaultAccessContext } from "@/lib/vault/server";
+import { resolvePersonAccess } from "@/lib/vault/serverPersonAccess";
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string; runId: string }> }
 ) {
   try {
-    const { id: personId, runId } = await params;
+    const { id: personIdentifier, runId } = await params;
     const { vaultOwnerId } = await getVaultAccessContext();
-    const evidencePack = await getEvidencePack(personId, runId, vaultOwnerId);
+    const { storagePersonId } = await resolvePersonAccess({ personIdentifier, vaultOwnerId });
+    const evidencePack = storagePersonId
+      ? await getEvidencePack(storagePersonId, runId, vaultOwnerId)
+      : null;
 
     if (!evidencePack) {
       return NextResponse.json({ error: "Legacy source capture not found" }, { status: 404 });

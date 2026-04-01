@@ -43,7 +43,7 @@ export async function resolveImportRunForStoredRun({
 
   const latestImport = await client.query(api.importRuns.listRecent, {
     vaultOwnerId,
-    personFsId: personId,
+    personIdentifier: personId,
     limit: 1,
   });
 

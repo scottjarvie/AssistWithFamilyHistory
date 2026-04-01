@@ -278,8 +278,8 @@ export default async function OperationsPage({ searchParams }: { searchParams: S
                     <div className="space-y-1">
                       <p className="font-medium text-stone-900">{row.displayName}</p>
                       <p className="text-stone-500">{row.lifespan}</p>
-                      {row.anchorPersonFsId && row.rowType === "provisional" ? (
-                        <p className="text-xs text-stone-400">Anchor: {row.anchorPersonFsId}</p>
+                      {row.anchorPersonIdentifier && row.rowType === "provisional" ? (
+                        <p className="text-xs text-stone-400">Anchor: {row.anchorPersonIdentifier}</p>
                       ) : null}
                     </div>
                   </td>
@@ -339,9 +339,9 @@ export default async function OperationsPage({ searchParams }: { searchParams: S
                   <td className="px-4 py-4">
                     <OperationRowActions
                       rowType={row.rowType}
-                      personFsId={row.personFsId}
+                      personIdentifier={row.personIdentifier}
                       provisionalId={row.rowType === "provisional" ? row.id : undefined}
-                      anchorPersonFsId={row.anchorPersonFsId || undefined}
+                      anchorPersonIdentifier={row.anchorPersonIdentifier || undefined}
                       missingCritical={row.missingCritical}
                     />
                   </td>

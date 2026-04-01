@@ -16,10 +16,10 @@ type CheckRecord = {
 };
 
 export function ResearchChecksPanel({
-  personFsId,
+  personIdentifier,
   checks,
 }: {
-  personFsId: string;
+  personIdentifier: string;
   checks: CheckRecord[];
 }) {
   const router = useRouter();
@@ -57,7 +57,7 @@ export function ResearchChecksPanel({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          personFsId,
+          personIdentifier,
           checkKey: check.checkKey,
           status: draft.status,
           applicability: check.applicability,
@@ -88,7 +88,7 @@ export function ResearchChecksPanel({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        personFsId,
+        personIdentifier,
         title: taskTitle,
         description: taskDescription,
         priority: "medium",

@@ -116,7 +116,7 @@ export default async function PeoplePage({
           </Card>
         ) : (
           people.map((person) => (
-            <Link key={String(person._id)} href={`/app/people/${person.fsId || person._id}`}>
+            <Link key={String(person._id)} href={`/app/people/${person.routeId}`}>
               <Card className="h-full border-stone-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-lg">
                 <CardHeader>
                   <div className="flex items-start justify-between gap-4">

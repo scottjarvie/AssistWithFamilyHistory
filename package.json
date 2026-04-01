@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start --port 3443",
     "lint": "eslint",
-    "smoke:routes": "bash scripts/smoke-routes.sh"
+    "smoke:routes": "bash scripts/smoke-routes.sh",
+    "check:person-identifiers": "tsx scripts/check-person-identifiers.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.38.2",

@@ -22,37 +22,52 @@ import { generateRawDocument } from "@/features/source-docs/lib/rawDocGenerator"
 import { EvidencePackSchema } from "@/features/source-docs/lib/schemas";
 import { resolveImportRunForStoredRun } from "@/lib/familysearch/importRunResolver";
 import { getVaultAccessContext } from "@/lib/vault/server";
+import { resolvePersonAccess } from "@/lib/vault/serverPersonAccess";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: personId } = await params;
+    const { id: personIdentifier } = await params;
     const { vaultOwnerId } = await getVaultAccessContext();
     const searchParams = request.nextUrl.searchParams;
     const runId = searchParams.get("run");
+    const { vaultPerson, storagePerson, storagePersonId } = await resolvePersonAccess({
+      personIdentifier,
+      vaultOwnerId,
+    });
 
     // Get the run to use
     let targetRunId = runId;
-    if (!targetRunId) {
-      const latest = await getLatestRun(personId, vaultOwnerId);
+    if (!targetRunId && storagePersonId) {
+      const latest = await getLatestRun(storagePersonId, vaultOwnerId);
       targetRunId = latest?.runId || null;
     }
 
     if (!targetRunId) {
       return NextResponse.json(
-        { error: "No runs found for this person" },
+        {
+          error: vaultPerson
+            ? "This person is in the vault, but no stored extraction run is available for the legacy raw document flow yet."
+            : "No runs found for this person",
+          status: vaultPerson ? "vault_only" : "no_runs",
+          personName: storagePerson?.name || vaultPerson?.displayName || personIdentifier,
+        },
         { status: 404 }
       );
     }
 
     // Try to get existing raw document
-    let markdown = await getRawDocument(personId, targetRunId, vaultOwnerId);
+    let markdown = storagePersonId
+      ? await getRawDocument(storagePersonId, targetRunId, vaultOwnerId)
+      : null;
 
     if (!markdown) {
       // Generate from evidence pack
-      const evidencePack = await getEvidencePack(personId, targetRunId, vaultOwnerId);
+      const evidencePack = storagePersonId
+        ? await getEvidencePack(storagePersonId, targetRunId, vaultOwnerId)
+        : null;
       
       if (!evidencePack) {
         return NextResponse.json(
@@ -74,32 +89,34 @@ export async function GET(
       markdown = generateRawDocument(parseResult.data);
 
       // Save for future use
-      await saveRawDocument(personId, targetRunId, markdown, vaultOwnerId);
+      if (storagePersonId) {
+        await saveRawDocument(storagePersonId, targetRunId, markdown, vaultOwnerId);
+      }
     }
 
     // Get person name
-    const person = await getPerson(personId, vaultOwnerId);
+    const personName = storagePerson?.name || vaultPerson?.displayName || personIdentifier;
 
     let backendWarning: string | undefined;
 
-    if (isConvexConfigured()) {
+    if (isConvexConfigured() && storagePersonId) {
       try {
         const client = getConvexClient();
         const importRun = await resolveImportRunForStoredRun({
           client,
           vaultOwnerId,
-          personId,
+          personId: storagePersonId,
           runId: targetRunId,
           storageOwnerId: vaultOwnerId,
         });
-        const artifactPath = `data/source-docs/people/${personId}/runs/${targetRunId}/raw-document.md`;
+        const artifactPath = `data/source-docs/people/${storagePersonId}/runs/${targetRunId}/raw-document.md`;
 
         await client.mutation(api.documents.upsertDocument, {
           vaultOwnerId,
-          personId,
+          personId: storagePersonId,
           importRunId: importRun.importRunId,
           type: "CST",
-          title: `${person?.name || personId} Complete Source Transcription`,
+          title: `${personName} Complete Source Transcription`,
           contentMarkdown: markdown,
           artifactPath,
         });
@@ -133,7 +150,7 @@ export async function GET(
     return NextResponse.json({
       success: true,
       markdown,
-      personName: person?.name || personId,
+      personName,
       runId: targetRunId,
       backendWarning,
     });

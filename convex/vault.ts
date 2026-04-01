@@ -236,6 +236,7 @@ function buildPeopleRows(snapshot: VaultSnapshot) {
     return {
       ...person,
       displayName: formatPersonName(person),
+      routeId: person.fsId || String(person._id),
       stats: {
         sources: operations.relatedSources.length,
         memories: operations.relatedMedia.length,
@@ -290,6 +291,7 @@ async function assemblePersonWorkspace(
     person: {
       ...person,
       displayName: formatPersonName(person),
+      routeId: person.fsId || String(person._id),
     },
     documents: sortByTimestampDesc(operations.relatedDocuments),
     stories: sortByTimestampDesc(operations.relatedStories),
@@ -364,6 +366,7 @@ export const getPeopleExplorer = query({
       return [
         person.displayName,
         person.fsId || "",
+        String(person._id),
         person.birth?.date?.original || "",
         person.death?.date?.original || "",
         ...person.keyPlaces,
@@ -381,23 +384,23 @@ export const getPeopleExplorer = query({
 export const getPersonWorkspace = query({
   args: {
     vaultOwnerId: v.string(),
-    personFsId: v.string(),
+    personIdentifier: v.string(),
   },
   handler: async (ctx, args) => {
-    return assemblePersonWorkspace(ctx, normalizeVaultOwnerId(args.vaultOwnerId), args.personFsId);
+    return assemblePersonWorkspace(ctx, normalizeVaultOwnerId(args.vaultOwnerId), args.personIdentifier);
   },
 });
 
 export const getPersonResearchChecks = query({
   args: {
     vaultOwnerId: v.string(),
-    personFsId: v.string(),
+    personIdentifier: v.string(),
   },
   handler: async (ctx, args) => {
     const workspace = await assemblePersonWorkspace(
       ctx,
       normalizeVaultOwnerId(args.vaultOwnerId),
-      args.personFsId
+      args.personIdentifier
     );
     return workspace?.researchChecks ?? [];
   },
@@ -406,15 +409,15 @@ export const getPersonResearchChecks = query({
 export const getProvisionalRelatives = query({
   args: {
     vaultOwnerId: v.string(),
-    personFsId: v.optional(v.string()),
+    personIdentifier: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
-    if (!args.personFsId) {
+    if (!args.personIdentifier) {
       return sortByTimestampDesc(snapshot.provisionalRelatives);
     }
 
-    const person = getPersonByIdentifier(snapshot, args.personFsId);
+    const person = getPersonByIdentifier(snapshot, args.personIdentifier);
     if (!person) return [];
     return sortByTimestampDesc(
       snapshot.provisionalRelatives.filter((relative) => relative.anchorPersonId === person._id)
@@ -447,8 +450,8 @@ export const getOperationsQueue = query({
     const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
     const peopleRows = buildPeopleRows(snapshot).map((row) => ({
       rowType: "person" as const,
-      id: row.fsId || String(row._id),
-      personFsId: row.fsId || String(row._id),
+      id: row.routeId,
+      personIdentifier: row.routeId,
       displayName: row.displayName,
       relationshipHint: undefined,
       lifespan: `${row.birth?.date?.year || "?"} to ${row.death?.date?.year || "?"}`,
@@ -465,7 +468,7 @@ export const getOperationsQueue = query({
       nextActions: row.operations.nextActions,
       staleChecksCount: row.operations.staleChecksCount,
       researchChecks: row.researchChecks,
-      anchorPersonFsId: row.fsId || String(row._id),
+      anchorPersonIdentifier: row.routeId,
       badge: row.researchStatus,
     }));
 
@@ -479,7 +482,7 @@ export const getOperationsQueue = query({
         return {
           rowType: "provisional" as const,
           id: String(relative._id),
-          personFsId: null,
+          personIdentifier: null,
           displayName: relative.displayName,
           relationshipHint: relative.relationshipHint,
           lifespan:
@@ -501,7 +504,7 @@ export const getOperationsQueue = query({
           ],
           staleChecksCount: 0,
           researchChecks: [],
-          anchorPersonFsId: anchor?.fsId || String(relative.anchorPersonId),
+          anchorPersonIdentifier: anchor?.fsId || String(relative.anchorPersonId),
           badge: relative.relationshipHint || "provisional",
         };
       });
@@ -645,7 +648,12 @@ export const getPlaceWorkspace = query({
       }
     }
 
-    const people = snapshot.people.filter((person) => linkedPersonIds.has(person._id));
+    const people = snapshot.people
+      .filter((person) => linkedPersonIds.has(person._id))
+      .map((person) => ({
+        ...person,
+        routeId: person.fsId || String(person._id),
+      }));
     const citations = snapshot.citationLinks.filter(
       (link) => link.targetType === "place" && link.targetId === String(args.placeId)
     );
@@ -688,6 +696,7 @@ export const getDashboardSummary = query({
   handler: async (ctx, args) => {
     const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
     const peopleRows = buildPeopleRows(snapshot);
+    const personById = new Map(snapshot.people.map((person) => [String(person._id), person]));
 
     return {
       counts: {
@@ -704,7 +713,15 @@ export const getDashboardSummary = query({
       recentPeople: peopleRows
         .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
         .slice(0, 6),
-      recentImports: sortByTimestampDesc(snapshot.importRuns).slice(0, 6),
+      recentImports: sortByTimestampDesc(snapshot.importRuns)
+        .slice(0, 6)
+        .map((run) => {
+          const linkedPerson = run.personId ? personById.get(String(run.personId)) ?? null : null;
+          return {
+            ...run,
+            personRouteId: linkedPerson?.fsId || (run.personId ? String(run.personId) : run.personFsId),
+          };
+        }),
       operationsHighlights: peopleRows
         .sort((a, b) => b.operations.requiredMissingCount - a.operations.requiredMissingCount)
         .slice(0, 5),
@@ -739,10 +756,10 @@ export const getResearchOverview = query({
 export const getContextPack = query({
   args: {
     vaultOwnerId: v.string(),
-    personFsId: v.string(),
+    personIdentifier: v.string(),
   },
   handler: async (ctx, args) => {
-    const workspace = await assemblePersonWorkspace(ctx, normalizeVaultOwnerId(args.vaultOwnerId), args.personFsId);
+    const workspace = await assemblePersonWorkspace(ctx, normalizeVaultOwnerId(args.vaultOwnerId), args.personIdentifier);
     if (!workspace) return null;
 
     const structured = {

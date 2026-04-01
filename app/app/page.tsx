@@ -161,7 +161,11 @@ export default async function DashboardPage() {
               </div>
             ) : (
               summary.recentImports.map((run) => (
-                <div key={String(run._id)} className="rounded-2xl border border-stone-200 px-4 py-4">
+                <Link
+                  key={String(run._id)}
+                  href={run.personRouteId ? `/app/people/${run.personRouteId}` : "/app/imports"}
+                  className="block rounded-2xl border border-stone-200 px-4 py-4 transition hover:border-amber-300 hover:bg-amber-50/30"
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="font-medium text-stone-900">{run.personName}</p>
@@ -174,7 +178,7 @@ export default async function DashboardPage() {
                   <p className="mt-3 text-xs uppercase tracking-[0.2em] text-stone-400">
                     {new Date(run.importedAt).toLocaleString()}
                   </p>
-                </div>
+                </Link>
               ))
             )}
           </CardContent>
@@ -191,7 +195,7 @@ export default async function DashboardPage() {
             {summary.recentPeople.map((person) => (
               <Link
                 key={String(person._id)}
-                href={`/app/people/${person.fsId || person._id}`}
+                href={`/app/people/${person.routeId}`}
                 className="flex items-center justify-between rounded-2xl border border-stone-200 px-4 py-3 transition hover:border-amber-300 hover:bg-amber-50/40"
               >
                 <div>

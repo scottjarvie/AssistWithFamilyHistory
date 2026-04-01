@@ -16,7 +16,12 @@ export async function POST(request: NextRequest) {
   try {
     const { vaultOwnerId } = await getVaultAccessContext();
     const body = await request.json();
-    const personFsId = typeof body.personFsId === "string" ? body.personFsId : undefined;
+    const personIdentifier =
+      typeof body.personIdentifier === "string"
+        ? body.personIdentifier
+        : typeof body.personFsId === "string"
+          ? body.personFsId
+          : undefined;
     const title = typeof body.title === "string" ? body.title.trim() : "";
     const description = typeof body.description === "string" ? body.description.trim() : undefined;
     const priority = isPriority(body.priority) ? body.priority : "medium";
@@ -26,8 +31,8 @@ export async function POST(request: NextRequest) {
     }
 
     const client = getConvexClient();
-    const workspace = personFsId
-      ? await client.query(api.vault.getPersonWorkspace, { vaultOwnerId, personFsId })
+    const workspace = personIdentifier
+      ? await client.query(api.vault.getPersonWorkspace, { vaultOwnerId, personIdentifier })
       : null;
 
     const result = await client.mutation(api.vaultMutations.createResearchTask, {
@@ -44,4 +49,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: issue.title, details: issue.description }, { status: issue.statusCode });
   }
 }
-

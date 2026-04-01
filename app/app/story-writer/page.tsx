@@ -76,7 +76,7 @@ export default async function StoryWriterPage() {
                 </CardHeader>
                 <CardContent>
                   <Button asChild className="w-full justify-between bg-amber-700 hover:bg-amber-800">
-                    <Link href={`/app/people/${person.fsId || person._id}/story-writer`}>
+                    <Link href={`/app/people/${person.routeId}/story-writer`}>
                       Open Story Writer
                       <ArrowRight className="h-4 w-4" />
                     </Link>

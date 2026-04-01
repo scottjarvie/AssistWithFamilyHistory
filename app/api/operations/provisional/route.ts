@@ -28,13 +28,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, ...result });
     }
 
-    const targetPersonFsId = typeof body.targetPersonFsId === "string" ? body.targetPersonFsId : "";
-    if (!targetPersonFsId) {
-      return NextResponse.json({ error: "Missing targetPersonFsId" }, { status: 400 });
+    const targetPersonIdentifier =
+      typeof body.targetPersonIdentifier === "string"
+        ? body.targetPersonIdentifier
+        : typeof body.targetPersonFsId === "string"
+          ? body.targetPersonFsId
+          : "";
+    const anchorPersonIdentifier =
+      typeof body.anchorPersonIdentifier === "string" ? body.anchorPersonIdentifier : "";
+
+    if (!targetPersonIdentifier) {
+      return NextResponse.json({ error: "Missing targetPersonIdentifier" }, { status: 400 });
+    }
+
+    if (anchorPersonIdentifier && anchorPersonIdentifier === targetPersonIdentifier) {
+      return NextResponse.json(
+        { error: "Choose a different canonical person than the anchor person" },
+        { status: 400 }
+      );
     }
     const workspace = await client.query(api.vault.getPersonWorkspace, {
       vaultOwnerId,
-      personFsId: targetPersonFsId,
+      personIdentifier: targetPersonIdentifier,
     });
 
     if (!workspace) {

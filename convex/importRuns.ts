@@ -65,7 +65,7 @@ export const listRecent = query({
   args: {
     vaultOwnerId: v.string(),
     limit: v.optional(v.number()),
-    personFsId: v.optional(v.string()),
+    personIdentifier: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
@@ -76,8 +76,12 @@ export const listRecent = query({
       .collect();
     rows = filterByVaultOwner(rows, vaultOwnerId);
 
-    if (args.personFsId) {
-      rows = rows.filter((row) => row.personFsId === args.personFsId);
+    if (args.personIdentifier) {
+      rows = rows.filter(
+        (row) =>
+          row.personFsId === args.personIdentifier ||
+          (row.personId ? String(row.personId) === args.personIdentifier : false)
+      );
     }
 
     return args.limit ? rows.slice(0, args.limit) : rows;

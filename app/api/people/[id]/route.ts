@@ -13,32 +13,48 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getPerson, listRuns, getLatestRun } from "@/lib/storage/fileStorage";
+import { getLatestRun, listRuns } from "@/lib/storage/fileStorage";
 import { getVaultAccessContext } from "@/lib/vault/server";
+import { resolvePersonAccess } from "@/lib/vault/serverPersonAccess";
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: personId } = await params;
+    const { id: personIdentifier } = await params;
     const { vaultOwnerId } = await getVaultAccessContext();
-    
-    const person = await getPerson(personId, vaultOwnerId);
-    
-    if (!person) {
+
+    const { vaultPerson, storagePerson, storagePersonId } = await resolvePersonAccess({
+      personIdentifier,
+      vaultOwnerId,
+    });
+
+    if (!vaultPerson && !storagePerson) {
       return NextResponse.json(
         { error: "Person not found" },
         { status: 404 }
       );
     }
 
-    const runs = await listRuns(personId, vaultOwnerId);
-    const latest = await getLatestRun(personId, vaultOwnerId);
+    const runs = storagePersonId ? await listRuns(storagePersonId, vaultOwnerId) : [];
+    const latest = storagePersonId ? await getLatestRun(storagePersonId, vaultOwnerId) : null;
 
     return NextResponse.json({
       success: true,
-      person,
+      person:
+        storagePerson ||
+        (vaultPerson
+          ? {
+              familySearchId: vaultPerson.fsId,
+              name: vaultPerson.displayName,
+              createdAt: "",
+              updatedAt: "",
+            }
+          : null),
+      routeId: vaultPerson?.routeId || personIdentifier,
+      vaultOnly: Boolean(vaultPerson && !storagePerson),
+      hasStoredRun: Boolean(latest),
       runs,
       latestRunId: latest?.runId,
     });

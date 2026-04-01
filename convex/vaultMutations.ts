@@ -988,6 +988,9 @@ export const promoteProvisionalRelative = mutation({
     if (!provisional || !matchesVaultOwner(provisional.vaultOwnerId, vaultOwnerId)) {
       throw new Error("Provisional relative not found");
     }
+    if (provisional.mergeState !== "provisional") {
+      throw new Error("This provisional relative has already been resolved");
+    }
 
     const existingPerson = provisional.familySearchId
       ? filterByVaultOwner(
@@ -1044,6 +1047,12 @@ export const mergeProvisionalRelative = mutation({
       !matchesVaultOwner(target.vaultOwnerId, vaultOwnerId)
     ) {
       throw new Error("Could not merge provisional relative");
+    }
+    if (provisional.mergeState !== "provisional") {
+      throw new Error("This provisional relative has already been resolved");
+    }
+    if (provisional.anchorPersonId === args.targetPersonId) {
+      throw new Error("Choose a different canonical person than the anchor person");
     }
 
     await ctx.db.patch(args.provisionalId, {

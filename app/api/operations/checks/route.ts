@@ -30,21 +30,26 @@ export async function POST(request: NextRequest) {
   try {
     const { vaultOwnerId } = await getVaultAccessContext();
     const body = await request.json();
-    const personFsId = typeof body.personFsId === "string" ? body.personFsId : "";
+    const personIdentifier =
+      typeof body.personIdentifier === "string"
+        ? body.personIdentifier
+        : typeof body.personFsId === "string"
+          ? body.personFsId
+          : "";
     const checkKey = typeof body.checkKey === "string" ? body.checkKey : "";
     const status = isStatus(body.status) ? body.status : null;
     const applicability = isApplicability(body.applicability) ? body.applicability : undefined;
     const completionSource = isCompletionSource(body.completionSource) ? body.completionSource : "user";
     const notes = typeof body.notes === "string" ? body.notes.trim() : undefined;
 
-    if (!personFsId || !checkKey || !status) {
-      return NextResponse.json({ error: "Missing personFsId, checkKey, or status" }, { status: 400 });
+    if (!personIdentifier || !checkKey || !status) {
+      return NextResponse.json({ error: "Missing personIdentifier, checkKey, or status" }, { status: 400 });
     }
 
     const client = getConvexClient();
     const workspace = await client.query(api.vault.getPersonWorkspace, {
       vaultOwnerId,
-      personFsId,
+      personIdentifier,
     });
 
     if (!workspace) {
@@ -55,7 +60,7 @@ export async function POST(request: NextRequest) {
     const result = await client.mutation(api.vaultMutations.upsertResearchCheck, {
       vaultOwnerId,
       personId: workspace.person._id,
-      personFsId,
+      personFsId: workspace.person.fsId,
       checkKey,
       status,
       applicability: applicability || existing?.applicability || "recommended",
@@ -75,4 +80,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: issue.title, details: issue.description }, { status: issue.statusCode });
   }
 }
-

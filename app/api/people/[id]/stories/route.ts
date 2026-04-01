@@ -39,7 +39,7 @@ export async function POST(
   }
 
   try {
-    const { id: personFsId } = await params;
+    const { id: personIdentifier } = await params;
     const { vaultOwnerId } = await getVaultAccessContext();
     const body = await request.json();
     const title = typeof body.title === "string" ? body.title.trim() : "";
@@ -60,7 +60,7 @@ export async function POST(
     const client = getConvexClient();
     const workspace = await client.query(api.vault.getPersonWorkspace, {
       vaultOwnerId,
-      personFsId,
+      personIdentifier,
     });
 
     if (!workspace) {

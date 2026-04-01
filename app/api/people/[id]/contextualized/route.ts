@@ -4,36 +4,45 @@ import { getConvexClient, isConvexConfigured } from "@/lib/convex/server";
 import {
   getContextualizedDocument,
   getLatestRun,
-  getPerson,
   saveContextualizedDocument,
 } from "@/lib/storage/fileStorage";
 import { resolveImportRunForStoredRun } from "@/lib/familysearch/importRunResolver";
 import { getVaultAccessContext } from "@/lib/vault/server";
+import { resolvePersonAccess } from "@/lib/vault/serverPersonAccess";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: personId } = await params;
+    const { id: personIdentifier } = await params;
     const { vaultOwnerId } = await getVaultAccessContext();
     const runParam = request.nextUrl.searchParams.get("run");
     let runId = runParam;
+    const { vaultPerson, storagePerson, storagePersonId } = await resolvePersonAccess({
+      personIdentifier,
+      vaultOwnerId,
+    });
 
-    if (!runId) {
-      const latest = await getLatestRun(personId, vaultOwnerId);
+    if (!runId && storagePersonId) {
+      const latest = await getLatestRun(storagePersonId, vaultOwnerId);
       runId = latest?.runId || null;
     }
 
     if (!runId) {
       return NextResponse.json({
         success: false,
-        status: "no_runs",
-        error: "No runs found for this person",
+        status: vaultPerson ? "vault_only" : "no_runs",
+        error: vaultPerson
+          ? "This person is in the vault, but no stored extraction run is available for the legacy contextualized dossier flow yet."
+          : "No runs found for this person",
+        personName: storagePerson?.name || vaultPerson?.displayName || personIdentifier,
       });
     }
 
-    const markdown = await getContextualizedDocument(personId, runId, vaultOwnerId);
+    const markdown = storagePersonId
+      ? await getContextualizedDocument(storagePersonId, runId, vaultOwnerId)
+      : null;
     if (!markdown) {
       return NextResponse.json({
         success: false,
@@ -43,11 +52,10 @@ export async function GET(
       });
     }
 
-    const person = await getPerson(personId, vaultOwnerId);
     return NextResponse.json({
       success: true,
       markdown,
-      personName: person?.name || personId,
+      personName: storagePerson?.name || vaultPerson?.displayName || personIdentifier,
       runId,
     });
   } catch (error) {
@@ -66,11 +74,15 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: personId } = await params;
+    const { id: personIdentifier } = await params;
     const { vaultOwnerId } = await getVaultAccessContext();
     const body = await request.json();
     const runId = typeof body.runId === "string" ? body.runId : "";
     const markdown = typeof body.markdown === "string" ? body.markdown : "";
+    const { vaultPerson, storagePerson, storagePersonId } = await resolvePersonAccess({
+      personIdentifier,
+      vaultOwnerId,
+    });
 
     if (!runId || !markdown.trim()) {
       return NextResponse.json(
@@ -79,29 +91,38 @@ export async function POST(
       );
     }
 
-    await saveContextualizedDocument(personId, runId, markdown, vaultOwnerId);
+    if (!storagePersonId) {
+      return NextResponse.json(
+        {
+          error:
+            "This person does not have a stored extraction run yet, so the legacy contextualized dossier cannot be saved.",
+        },
+        { status: 400 }
+      );
+    }
+
+    await saveContextualizedDocument(storagePersonId, runId, markdown, vaultOwnerId);
 
     let backendWarning: string | undefined;
 
     if (isConvexConfigured()) {
       try {
         const client = getConvexClient();
-        const person = await getPerson(personId, vaultOwnerId);
         const importRun = await resolveImportRunForStoredRun({
           client,
           vaultOwnerId,
-          personId,
+          personId: storagePersonId,
           runId,
           storageOwnerId: vaultOwnerId,
         });
-        const artifactPath = `data/source-docs/people/${personId}/runs/${runId}/contextualized.md`;
+        const artifactPath = `data/source-docs/people/${storagePersonId}/runs/${runId}/contextualized.md`;
 
         await client.mutation(api.documents.upsertDocument, {
           vaultOwnerId,
-          personId,
+          personId: storagePersonId,
           importRunId: importRun.importRunId,
           type: "PS",
-          title: `${person?.name || personId} Person Sheet`,
+          title: `${storagePerson?.name || vaultPerson?.displayName || personIdentifier} Person Sheet`,
           contentMarkdown: markdown,
           artifactPath,
         });

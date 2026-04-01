@@ -50,7 +50,7 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
   try {
     workspace = await client.query(api.vault.getPersonWorkspace, {
       vaultOwnerId,
-      personFsId: personId,
+      personIdentifier: personId,
     });
   } catch (error) {
     const issue = getConvexRuntimeIssue(error);
@@ -65,6 +65,9 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
   if (!workspace) {
     notFound();
   }
+
+  const routeId = workspace.person.routeId || personId;
+  const hasStoredRuns = workspace.importRuns.length > 0;
 
   return (
     <div className="p-4 sm:p-8">
@@ -88,13 +91,13 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
               <Button asChild className="bg-amber-700 hover:bg-amber-800">
-                <Link href={`/app/people/${personId}/ai`}>Run AI Analysis</Link>
+                <Link href={`/app/people/${routeId}/ai`}>Run AI Analysis</Link>
               </Button>
               <Button asChild variant="outline">
-                <a href={`/api/people/${personId}/context-pack?format=markdown`}>Download Context Pack</a>
+                <a href={`/api/people/${routeId}/context-pack?format=markdown`}>Download Context Pack</a>
               </Button>
               <Button asChild variant="outline">
-                <a href={`/api/people/${personId}/context-pack`}>Structured JSON</a>
+                <a href={`/api/people/${routeId}/context-pack`}>Structured JSON</a>
               </Button>
             </div>
           </div>
@@ -232,21 +235,62 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
             </CardHeader>
             <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               {[
-                { href: `/app/people/${personId}/raw`, label: "Generate raw evidence", description: "Create the deterministic source transcript." },
-                { href: `/app/people/${personId}/contextualized`, label: "Open dossier", description: "Review or save contextualized research notes." },
-                { href: `/app/people/${personId}/ai`, label: "Run AI analysis", description: "Use the staged normalization and synthesis flow." },
-                { href: `/app/people/${personId}/story-writer`, label: "Open Story Writer", description: "Draft short or long narrative outputs from the context pack." },
-                { href: `/api/people/${personId}/context-pack?format=markdown`, label: "Export context pack", description: "Hand a clean Markdown package to an AI agent." },
-              ].map((action) => (
-                <a
-                  key={action.label}
-                  href={action.href}
-                  className="rounded-2xl border border-stone-200 bg-white px-4 py-4 transition hover:border-amber-300 hover:bg-amber-50/70"
-                >
-                  <p className="font-medium text-stone-900">{action.label}</p>
-                  <p className="mt-2 text-sm leading-6 text-stone-500">{action.description}</p>
-                </a>
-              ))}
+                {
+                  href: `/app/people/${routeId}/raw`,
+                  label: "Generate raw evidence",
+                  description: hasStoredRuns
+                    ? "Create the deterministic source transcript from a stored capture run."
+                    : "Requires a stored FamilySearch capture run before the legacy raw document flow is available.",
+                  available: hasStoredRuns,
+                },
+                {
+                  href: `/app/people/${routeId}/contextualized`,
+                  label: "Open dossier",
+                  description: hasStoredRuns
+                    ? "Review or save contextualized research notes from a stored run."
+                    : "Requires a stored FamilySearch capture run before the legacy dossier flow is available.",
+                  available: hasStoredRuns,
+                },
+                {
+                  href: `/app/people/${routeId}/ai`,
+                  label: "Run AI analysis",
+                  description: hasStoredRuns
+                    ? "Use the staged normalization and synthesis flow on a stored evidence pack."
+                    : "Requires a stored FamilySearch capture run before staged AI analysis can start.",
+                  available: hasStoredRuns,
+                },
+                {
+                  href: `/app/people/${routeId}/story-writer`,
+                  label: "Open Story Writer",
+                  description: "Draft short or long narrative outputs from the context pack.",
+                  available: true,
+                },
+                {
+                  href: `/api/people/${routeId}/context-pack?format=markdown`,
+                  label: "Export context pack",
+                  description: "Hand a clean Markdown package to an AI agent.",
+                  available: true,
+                },
+              ].map((action) =>
+                action.available ? (
+                  <a
+                    key={action.label}
+                    href={action.href}
+                    className="rounded-2xl border border-stone-200 bg-white px-4 py-4 transition hover:border-amber-300 hover:bg-amber-50/70"
+                  >
+                    <p className="font-medium text-stone-900">{action.label}</p>
+                    <p className="mt-2 text-sm leading-6 text-stone-500">{action.description}</p>
+                  </a>
+                ) : (
+                  <div
+                    key={action.label}
+                    className="rounded-2xl border border-dashed border-stone-200 bg-stone-50 px-4 py-4"
+                  >
+                    <p className="font-medium text-stone-900">{action.label}</p>
+                    <p className="mt-2 text-sm leading-6 text-stone-500">{action.description}</p>
+                  </div>
+                )
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -474,7 +518,7 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
               </CardHeader>
               <CardContent>
                 <Button asChild className="bg-amber-700 hover:bg-amber-800">
-                  <Link href={`/app/people/${personId}/story-writer`}>Open Story Writer</Link>
+                  <Link href={`/app/people/${routeId}/story-writer`}>Open Story Writer</Link>
                 </Button>
               </CardContent>
             </Card>
@@ -561,7 +605,7 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
             </CardHeader>
             <CardContent>
               <ResearchChecksPanel
-                personFsId={workspace.person.fsId || String(workspace.person._id)}
+                personIdentifier={workspace.person.routeId}
                 checks={workspace.researchChecks}
               />
             </CardContent>

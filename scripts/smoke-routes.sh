@@ -18,6 +18,12 @@ ROUTES=(
   "/app/source-docs"
 )
 
+if [[ -n "${PERSON_ROUTE_ID:-}" ]]; then
+  ROUTES+=("/app/people/${PERSON_ROUTE_ID}")
+else
+  echo "Skipping person-workspace smoke route. Set PERSON_ROUTE_ID to include /app/people/<id>."
+fi
+
 echo "Running route smoke checks against ${BASE_URL}"
 
 for route in "${ROUTES[@]}"; do

@@ -101,6 +101,7 @@ export default async function PlaceWorkspacePage({ params }: PageProps) {
           <CardContent className="space-y-3">
             {(workspace.people as Array<{
               _id: string;
+              routeId?: string;
               fsId?: string;
               name: { prefix?: string; given: string; surname: string; suffix?: string };
               birth?: { date?: { year?: number } };
@@ -113,6 +114,7 @@ export default async function PlaceWorkspacePage({ params }: PageProps) {
             ) : (
               (workspace.people as Array<{
                 _id: string;
+                routeId?: string;
                 fsId?: string;
                 name: { prefix?: string; given: string; surname: string; suffix?: string };
                 birth?: { date?: { year?: number } };
@@ -120,7 +122,7 @@ export default async function PlaceWorkspacePage({ params }: PageProps) {
               }>).map((person) => (
                 <Link
                   key={String(person._id)}
-                  href={`/app/people/${person.fsId || person._id}`}
+                  href={`/app/people/${person.routeId || person.fsId || person._id}`}
                   className="flex items-center justify-between rounded-2xl border border-stone-200 px-4 py-3 transition hover:border-amber-300"
                 >
                   <div>

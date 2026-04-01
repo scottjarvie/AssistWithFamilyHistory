@@ -20,13 +20,14 @@
 import { useState, useEffect, use } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   ArrowLeft, 
   Download, 
   Copy, 
   Check,
-  FileText
+  FileText,
+  AlertTriangle
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -47,6 +48,7 @@ export default function RawDocumentPage({ params }: PageProps) {
   const [markdown, setMarkdown] = useState<string>("");
   const [personName, setPersonName] = useState<string>("");
   const [copied, setCopied] = useState(false);
+  const [emptyState, setEmptyState] = useState<{ title: string; description: string } | null>(null);
 
   useEffect(() => {
     async function fetchAndGenerate() {
@@ -60,10 +62,16 @@ export default function RawDocumentPage({ params }: PageProps) {
           return;
         }
 
+        setPersonName(personData.person?.name || personId);
         const targetRunId = runId || personData.latestRunId;
         
         if (!targetRunId) {
-          setMarkdown("No extraction runs found for this person.");
+          setEmptyState({
+            title: "Raw document needs a stored capture run",
+            description: personData.vaultOnly
+              ? "This person exists in the canonical vault, but the legacy raw-evidence document flow only works when a stored FamilySearch capture run is available."
+              : "Import a FamilySearch capture package first so the legacy raw document flow has a stored run to work from.",
+          });
           setLoading(false);
           return;
         }
@@ -84,7 +92,12 @@ export default function RawDocumentPage({ params }: PageProps) {
             setMarkdown(data.markdown);
             setPersonName(data.personName || personId);
           } else {
-            setMarkdown("Could not load the legacy source capture for this run.");
+            const fallbackPayload = await fallbackResponse.json().catch(() => null);
+            setEmptyState({
+              title: "Raw document unavailable",
+              description:
+                fallbackPayload?.error || "Could not load the legacy source capture for this run.",
+            });
           }
           setLoading(false);
           return;
@@ -100,7 +113,10 @@ export default function RawDocumentPage({ params }: PageProps) {
 
       } catch (error) {
         console.error("Error generating raw document:", error);
-        setMarkdown("Error generating raw document.");
+        setEmptyState({
+          title: "Raw document unavailable",
+          description: "Error generating raw document.",
+        });
       } finally {
         setLoading(false);
       }
@@ -135,6 +151,33 @@ export default function RawDocumentPage({ params }: PageProps) {
     return (
       <div className="p-8 text-center text-stone-400">
         Generating raw document...
+      </div>
+    );
+  }
+
+  if (emptyState) {
+    return (
+      <div className="p-4 sm:p-8">
+        <Card className="border-orange-300 bg-orange-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-orange-900">
+              <AlertTriangle className="h-5 w-5" />
+              {emptyState.title}
+            </CardTitle>
+            <CardDescription className="text-orange-800">{emptyState.description}</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-3">
+            <Button asChild className="bg-amber-700 hover:bg-amber-800">
+              <Link href={`/api/people/${personId}/context-pack?format=markdown`}>Download Context Pack</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href={`/app/people/${personId}/story-writer`}>Open Story Writer</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href={`/app/people/${personId}`}>Back to Person Workspace</Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

@@ -23,12 +23,14 @@ export default function ContextualizedPage({ params }: PageProps) {
   const [personName, setPersonName] = useState("");
   const [activeRunId, setActiveRunId] = useState<string | null>(runId);
   const [error, setError] = useState<string | null>(null);
+  const [errorStatus, setErrorStatus] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     async function load() {
       try {
         setError(null);
+        setErrorStatus(null);
         const query = runId ? `?run=${encodeURIComponent(runId)}` : "";
         const response = await fetch(`/api/people/${personId}/contextualized${query}`);
         const payload = await response.json().catch(() => null);
@@ -40,6 +42,8 @@ export default function ContextualizedPage({ params }: PageProps) {
 
         if (!payload?.success) {
           setError(payload?.error || "Contextualized dossier not found");
+          setErrorStatus(payload?.status || null);
+          setPersonName(payload?.personName || personId);
           setActiveRunId(payload?.runId || runId);
           return;
         }
@@ -92,11 +96,24 @@ export default function ContextualizedPage({ params }: PageProps) {
             <CardDescription className="text-orange-800">{error}</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-3">
-            <Button asChild className="bg-amber-700 hover:bg-amber-800">
-              <Link href={`/app/people/${personId}/ai${runId ? `?run=${runId}` : ""}`}>
-                Generate in AI Analysis
-              </Link>
-            </Button>
+            {errorStatus === "vault_only" ? (
+              <>
+                <Button asChild className="bg-amber-700 hover:bg-amber-800">
+                  <Link href={`/api/people/${personId}/context-pack?format=markdown`}>
+                    Download Context Pack
+                  </Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link href={`/app/people/${personId}/story-writer`}>Open Story Writer</Link>
+                </Button>
+              </>
+            ) : (
+              <Button asChild className="bg-amber-700 hover:bg-amber-800">
+                <Link href={`/app/people/${personId}/ai${runId ? `?run=${runId}` : ""}`}>
+                  Generate in AI Analysis
+                </Link>
+              </Button>
+            )}
             <Button asChild variant="outline">
               <Link href={`/app/people/${personId}`}>Back to Person Workspace</Link>
             </Button>

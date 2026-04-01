@@ -14,6 +14,7 @@ type RecentImport = {
   _id: string;
   personName: string;
   personFsId: string;
+  personRouteId?: string;
   mergeStatus: string;
   pageTypes: string[];
   importedAt: number;
@@ -220,7 +221,7 @@ export default function ImportsPage() {
               recentImports.map((run) => (
                 <Link
                   key={run._id}
-                  href={`/app/people/${run.personFsId}`}
+                  href={`/app/people/${run.personRouteId || run.personFsId}`}
                   className="block rounded-2xl border border-stone-200 px-4 py-4 transition hover:border-amber-300 hover:bg-amber-50/30"
                 >
                   <div className="flex items-start justify-between gap-3">
