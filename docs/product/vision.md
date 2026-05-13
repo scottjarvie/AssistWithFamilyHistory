@@ -13,6 +13,8 @@
 The goal isn't just to find records or add names to a family tree. It's to:
 
 - **Understand who your ancestors were** as people
+- **Build high-quality operating data** about people, places, events, sources, relationships, memories, and research decisions
+- **Use AI as a research partner** to organize evidence, find gaps, and suggest next steps
 - **Paint pictures of their lives** through context and storytelling
 - **Connect emotionally** with your heritage
 - **Share their stories** in compelling ways
@@ -23,31 +25,39 @@ The goal isn't just to find records or add names to a family tree. It's to:
 
 A suite of AI-powered tools that help people:
 
-### 1. Deep Research
+### 1. Research Data Vault
+- Store as much useful research data as possible about each person
+- Connect people, places, events, sources, citations, documents, memories, and research tasks
+- Preserve raw evidence while also building researcher conclusions
+- Keep enough provenance that stories can be traced back to supporting evidence
+
+### 2. Deep Research
 - Understand historical context (not just individual records)
 - Research the *places* ancestors lived — what was that town like? What industries existed?
 - Research their *time periods* — what was happening in the world?
 - Research their *religions* — what did they believe? How did they practice?
 - Research their *occupations* — what did a cooper or a milliner actually do?
 
-### 2. Contextual Understanding
+### 3. Contextual Understanding
 - What was life like for them day-to-day?
 - What challenges did their generation face?
 - What opportunities did they have (or lack)?
 - What historical events shaped their lives?
 
-### 3. Storytelling & Content Creation
+### 4. Storytelling & Content Creation
 - **Stories** — Narrative accounts of ancestors' lives
 - **Books** — Compilations of family histories
 - **Podcasts** — Audio storytelling about ancestors
 - **Timelines** — Visual representations of lives in context
 - **Photo analysis** — Understanding and dating old photographs
+- **Shareable ancestor pages** — Public or private story pages backed by researched evidence
 
-### 4. AI-Assisted Discovery
+### 5. AI-Assisted Discovery
 - Use AI to synthesize information from multiple sources
 - Identify patterns, conflicts, and research opportunities
 - Generate narrative drafts from raw evidence
 - Deep research assistance for historical context
+- Support side tools that help with the operating work required before a good story can be written
 
 ---
 

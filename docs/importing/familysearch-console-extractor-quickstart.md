@@ -55,4 +55,4 @@ Done! ✅
 
 ## 🔗 Full Docs
 
-See `README-fs-extractor.md` for complete documentation.
+See `familysearch-console-extractor.md` for complete documentation.

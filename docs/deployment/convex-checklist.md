@@ -255,7 +255,7 @@ npx convex deploy --prod
 ## Next Steps After Deployment
 
 1. **Import FamilySearch data** — Use createPersonWithBirth helper
-2. **Build UI components** — See `convex/NEXTJS_INTEGRATION.md`
+2. **Build UI components** — See `docs/convex/nextjs-integration.md`
 3. **Add research workflow** — Use researchTasks table
 4. **Generate stories** — Use stories table with AI
 5. **Deploy to production** — `npx convex deploy --prod`

@@ -3,7 +3,6 @@
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?logo=typescript)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-4.0-38B2AC?logo=tailwind-css)](https://tailwindcss.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **A Family History AI Toolset** - Go beyond names and dates. Research deeply, tell stories, create content.
 
@@ -93,6 +92,12 @@ discover-their-stories/
 │   ├── ui/                # ShadCN UI components
 │   ├── layout/            # Layout components (nav, sidebar, footer)
 │   └── marketing/         # Marketing page components
+├── docs/                  # Product, setup, operations, and archived notes
+│   ├── archive/           # Historical implementation notes and old plans
+│   ├── convex/            # Convex integration and schema docs
+│   ├── deployment/        # Deployment checklists
+│   ├── importing/         # FamilySearch import/extractor docs
+│   └── product/           # Vision and product direction
 ├── convex/                # Convex backend (GEDCOM X data model)
 │   ├── schema.ts          # Data model following GEDCOM X
 │   ├── persons.ts         # Person operations
@@ -111,11 +116,14 @@ discover-their-stories/
 │   ├── content/           # Content scripts for extraction
 │   ├── popup/             # Extension popup UI
 │   └── lib/               # Capture package schema and import helpers
+├── scripts/               # One-off import, audit, and maintenance scripts
 └── data/                  # Local artifacts and exports (gitignored)
     └── source-docs/       # Legacy artifact retention for captures and documents
         └── {personId}/    # Per-person folder
             └── runs/      # Versioned extraction runs
 ```
+
+See [docs/README.md](docs/README.md) for the full documentation index.
 
 ## 📊 Data Model (GEDCOM X)
 
@@ -287,10 +295,6 @@ Please ensure you comply with [FamilySearch's Terms of Use](https://www.familyse
 - [ ] Photo Analyzer
 - [ ] Research Planner
 - [ ] Collaboration features
-
-## 📄 License
-
-MIT License - See [LICENSE](LICENSE) for details.
 
 ## 🤝 Contributing
 
