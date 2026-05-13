@@ -5,6 +5,8 @@ This directory keeps project documentation out of the repository root and separa
 ## Active Docs
 
 - [Product vision](product/vision.md)
+- [Product map](product/product-map.md)
+- [Route audit](product/route-audit.md)
 - [Codebase organization audit](codebase-organization-audit.md)
 - [Vault workflow manual checklist](vault-workflow-manual-checklist.md)
 - [Convex quick reference](convex/quick-reference.md)
@@ -19,4 +21,3 @@ This directory keeps project documentation out of the repository root and separa
 - [February 2026 Convex setup notes](archive/2026-02-convex-setup/)
 - [February 2026 import status](archive/2026-02-imports/import-summary.md)
 - [Historical implementation plans](archive/plans/)
-

@@ -34,7 +34,8 @@ import {
   Menu,
   MapPinned,
   ClipboardList,
-  TableProperties
+  TableProperties,
+  type LucideIcon
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -49,54 +50,81 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 
-const navItems = [
+type NavItem = {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  exact?: boolean;
+  comingSoon?: boolean;
+};
+
+type NavSection = {
+  label: string;
+  items: NavItem[];
+};
+
+const navSections: NavSection[] = [
   {
-    href: "/app",
-    label: "Dashboard",
-    icon: LayoutDashboard,
-    exact: true,
+    label: "Workspace",
+    items: [
+      {
+        href: "/app",
+        label: "Dashboard",
+        icon: LayoutDashboard,
+        exact: true,
+      },
+    ],
   },
   {
-    href: "/app/people",
-    label: "People",
-    icon: Users,
-    available: true,
+    label: "Research Vault",
+    items: [
+      {
+        href: "/app/people",
+        label: "People",
+        icon: Users,
+      },
+      {
+        href: "/app/places",
+        label: "Places",
+        icon: MapPinned,
+      },
+      {
+        href: "/app/imports",
+        label: "Imports",
+        icon: FileUp,
+      },
+    ],
   },
   {
-    href: "/app/operations",
-    label: "Operations",
-    icon: TableProperties,
-    available: true,
+    label: "Research Work",
+    items: [
+      {
+        href: "/app/operations",
+        label: "Research Queue",
+        icon: TableProperties,
+      },
+      {
+        href: "/app/research",
+        label: "Research Log",
+        icon: ClipboardList,
+      },
+    ],
   },
   {
-    href: "/app/places",
-    label: "Places",
-    icon: MapPinned,
-    available: true,
-  },
-  {
-    href: "/app/imports",
-    label: "Imports",
-    icon: FileUp,
-    available: true,
-  },
-  {
-    href: "/app/research",
-    label: "Research",
-    icon: ClipboardList,
-    available: true,
-  },
-  {
-    href: "/app/story-writer",
-    label: "Story Writer",
-    icon: PenTool,
-    available: true,
-  },
-  {
-    href: "/app/timeline",
-    label: "Timeline",
-    icon: Clock,
-    comingSoon: true,
+    label: "Stories & Tools",
+    items: [
+      {
+        href: "/app/story-writer",
+        label: "Story Writer",
+        icon: PenTool,
+      },
+      {
+        href: "/app/timeline",
+        label: "Timeline",
+        icon: Clock,
+        comingSoon: true,
+      },
+    ],
   },
 ];
 
@@ -150,34 +178,41 @@ export function AppMobileNav({ accountMode, vaultOwnerId }: SidebarAccessProps) 
               </Link>
             </div>
             <nav className="flex-1 py-4 px-2">
-              <ul className="space-y-1">
-                {navItems.map((item) => (
-                  <li key={item.href}>
-                    {item.comingSoon ? (
-                      <span className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-stone-500">
-                        <item.icon className="w-5 h-5 flex-shrink-0" />
-                        <span className="flex-1">{item.label}</span>
-                        <span className="text-xs bg-stone-700 px-2 py-0.5 rounded">Soon</span>
-                      </span>
-                    ) : (
-                      <SheetClose asChild>
-                        <Link
-                          href={item.href}
-                          className={cn(
-                            "flex items-center gap-3 rounded-lg px-3 py-2.5",
-                            isActive(item.href, item.exact)
-                              ? "bg-amber-700 text-white"
-                              : "text-stone-300 hover:bg-stone-800"
-                          )}
-                        >
-                          <item.icon className="w-5 h-5 flex-shrink-0" />
-                          <span>{item.label}</span>
-                        </Link>
-                      </SheetClose>
-                    )}
-                  </li>
-                ))}
-              </ul>
+              {navSections.map((section) => (
+                <div key={section.label} className="mb-5">
+                  <p className="mb-2 px-3 text-xs font-medium uppercase tracking-wider text-stone-500">
+                    {section.label}
+                  </p>
+                  <ul className="space-y-1">
+                    {section.items.map((item) => (
+                      <li key={item.href}>
+                        {item.comingSoon ? (
+                          <span className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-stone-500">
+                            <item.icon className="w-5 h-5 flex-shrink-0" />
+                            <span className="flex-1">{item.label}</span>
+                            <span className="text-xs bg-stone-700 px-2 py-0.5 rounded">Soon</span>
+                          </span>
+                        ) : (
+                          <SheetClose asChild>
+                            <Link
+                              href={item.href}
+                              className={cn(
+                                "flex items-center gap-3 rounded-lg px-3 py-2.5",
+                                isActive(item.href, item.exact)
+                                  ? "bg-amber-700 text-white"
+                                  : "text-stone-300 hover:bg-stone-800"
+                              )}
+                            >
+                              <item.icon className="w-5 h-5 flex-shrink-0" />
+                              <span>{item.label}</span>
+                            </Link>
+                          </SheetClose>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
               <div className="mt-4 border-t border-stone-800 pt-4">
                 <SheetClose asChild>
                   <Link
@@ -240,42 +275,46 @@ export function AppSidebar({ accountMode, vaultOwnerId }: SidebarAccessProps) {
 
       {/* Navigation */}
       <nav className="flex-1 py-4">
-        <div className={cn("px-3 mb-2", collapsed && "px-2")}>
-          {!collapsed && (
-              <span className="text-xs font-medium text-stone-500 uppercase tracking-wider">
-              Vault
-            </span>
-          )}
-        </div>
-        <ul className="space-y-1 px-2">
-          {navItems.map((item) => (
-            <li key={item.href}>
-              <Link
-                href={item.comingSoon ? "#" : item.href}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
-                  isActive(item.href, item.exact)
-                    ? "bg-amber-700 text-white"
-                    : item.comingSoon
-                    ? "text-stone-500 cursor-not-allowed"
-                    : "text-stone-400 hover:text-white hover:bg-stone-800",
-                  collapsed && "justify-center px-2"
-                )}
-                onClick={(e) => item.comingSoon && e.preventDefault()}
-              >
-                <item.icon className="w-5 h-5 flex-shrink-0" />
-                {!collapsed && (
-                  <span className="flex-1">{item.label}</span>
-                )}
-                {!collapsed && item.comingSoon && (
-                  <span className="text-xs bg-stone-700 px-2 py-0.5 rounded">
-                    Soon
-                  </span>
-                )}
-              </Link>
-            </li>
-          ))}
-        </ul>
+        {navSections.map((section) => (
+          <div key={section.label} className="mb-5">
+            <div className={cn("px-3 mb-2", collapsed && "px-2")}>
+              {!collapsed && (
+                <span className="text-xs font-medium text-stone-500 uppercase tracking-wider">
+                  {section.label}
+                </span>
+              )}
+            </div>
+            <ul className="space-y-1 px-2">
+              {section.items.map((item) => (
+                <li key={item.href}>
+                  <Link
+                    href={item.comingSoon ? "#" : item.href}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
+                      isActive(item.href, item.exact)
+                        ? "bg-amber-700 text-white"
+                        : item.comingSoon
+                          ? "text-stone-500 cursor-not-allowed"
+                          : "text-stone-400 hover:text-white hover:bg-stone-800",
+                      collapsed && "justify-center px-2"
+                    )}
+                    onClick={(e) => item.comingSoon && e.preventDefault()}
+                  >
+                    <item.icon className="w-5 h-5 flex-shrink-0" />
+                    {!collapsed && (
+                      <span className="flex-1">{item.label}</span>
+                    )}
+                    {!collapsed && item.comingSoon && (
+                      <span className="text-xs bg-stone-700 px-2 py-0.5 rounded">
+                        Soon
+                      </span>
+                    )}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
       </nav>
 
       {/* Settings */}

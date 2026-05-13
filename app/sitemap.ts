@@ -14,11 +14,10 @@ const publicRoutes = [
   "/app/people",
   "/app/places",
   "/app/imports",
+  "/app/operations",
   "/app/research",
   "/app/story-writer",
   "/app/settings",
-  "/app/source-docs",
-  "/app/tools",
 ];
 
 export default function sitemap(): MetadataRoute.Sitemap {

@@ -22,28 +22,31 @@ Discover Their Stories is a platform for family historians who want to go beyond
 
 ## ✨ Features
 
-### Research Vault Workflow (Available Now)
+### Research Vault And Story Workflow (Available Now)
 
-Capture FamilySearch data, merge it into a canonical vault, and generate research outputs from one person workspace:
+Capture FamilySearch data, merge it into a canonical vault, and move from evidence to story drafts from one person workspace:
 
-| Document Type | Description |
+| Output | Description |
 |--------------|-------------|
 | **Raw Evidence Document** | Complete, lossless capture of all source data (deterministic, no AI) |
 | **Contextualized Dossier** | AI-assisted synthesis that identifies patterns, conflicts, and research opportunities |
+| **Context Pack** | AI-ready package of evidence, places, memories, relationships, and research gaps |
+| **Story Drafts** | Short and long narrative drafts generated from researched person context |
 
 #### How It Works
 
 1. **Extract** - Use the browser extension to capture sources from FamilySearch
 2. **Import** - Upload the capture package JSON to the Imports workspace
 3. **Organize** - Open the person workspace to review sources, places, memories, documents, and research tasks
-4. **Export** - Download raw documents, contextualized dossiers, or AI-ready context packs
+4. **Research** - Use the operations queue and research log to find gaps, weak evidence, and next actions
+5. **Write** - Draft stories from context packs and save outputs back to the vault
 
 ### Available Next
 
-- 📝 **Story Writer** - AI-assisted narrative generation from context packs and vault evidence
 - 📷 **Photo Analyzer** - Extract context and dates from old photographs
 - 📅 **Timeline Builder** - Visual timelines synthesized from sources
-- 🎯 **Research Planner** - Track goals with AI-powered suggestions
+- 🎯 **Research Assistant** - Turn evidence gaps into next actions, prompts, and research plans
+- 🌐 **Shareable Ancestor Pages** - Publish researched ancestor stories with supporting context
 
 ## 🚀 Getting Started
 
@@ -277,23 +280,25 @@ Please ensure you comply with [FamilySearch's Terms of Use](https://www.familyse
 - [x] Settings page with API key management
 - [x] Browser extension skeleton
 
-### Phase 2: Research Vault (Current)
+### Phase 2: Research Vault ✅
 - [x] Capture package schema and compatibility mapping
 - [x] Imports workspace and person/place vault views
 - [x] Raw document and contextualized dossier generation
 - [x] Context-pack export
 - [x] AI processing pipeline (3 stages)
-- [ ] Full Convex deployment activation and codegen
-- [ ] Workspace polishing and story-writer handoff
+- [x] Research operations queue and research log
+- [x] Story Writer v1 handoff
 
-### Phase 3: Storytelling
-- [ ] Story Writer tool
+### Phase 3: Story Studio (Current)
+- [x] Story Writer v1
 - [ ] Narrative templates
+- [ ] Shareable ancestor story pages
 - [ ] Timeline visualization
 
-### Phase 4: Advanced Features
+### Phase 4: Research Assistant And Side Tools
 - [ ] Photo Analyzer
-- [ ] Research Planner
+- [ ] Research Assistant
+- [ ] Place and era context researcher
 - [ ] Collaboration features
 
 ## 🤝 Contributing
