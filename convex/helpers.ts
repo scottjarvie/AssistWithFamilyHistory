@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation } from "./_generated/server";
-import { Doc, Id } from "./_generated/dataModel";
+import { Id } from "./_generated/dataModel";
 
 /**
  * Create a person with embedded birth fact

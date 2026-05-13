@@ -200,9 +200,25 @@ export function toLegacyEvidencePack(capture: CapturePackage): EvidencePack {
 }
 
 function stripCaptureSource(source: CaptureSource): Source {
-  const { relatedPeople: _relatedPeople, placeMentions: _placeMentions, outboundUrls: _outboundUrls, ...legacy } =
-    source;
-  return legacy;
+  return {
+    id: source.id,
+    orderIndex: source.orderIndex,
+    sourceKey: source.sourceKey,
+    sourceType: source.sourceType,
+    title: source.title,
+    date: source.date,
+    citation: source.citation,
+    webPageUrl: source.webPageUrl,
+    attachedBy: source.attachedBy,
+    attachedAt: source.attachedAt,
+    reasonAttached: source.reasonAttached,
+    tags: source.tags,
+    indexed: source.indexed,
+    rawText: source.rawText,
+    expanded: source.expanded,
+    expansionAttempts: source.expansionAttempts,
+    expansionSucceeded: source.expansionSucceeded,
+  };
 }
 
 function extractRelatedPeople(source: Source): Array<{ name: string; role?: string }> {
@@ -222,4 +238,3 @@ function extractPlaceMentions(source: Source): Array<{ name: string; role?: stri
       role: field.label,
     }));
 }
-

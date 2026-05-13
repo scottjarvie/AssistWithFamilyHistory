@@ -33,7 +33,6 @@ type DocumentRecord = Doc<"documents">;
 type StoryRecord = Doc<"stories">;
 type PlaceRecord = Doc<"places">;
 type ImportRunRecord = Doc<"importRuns">;
-type TaskRecord = Doc<"researchTasks">;
 
 export function normalizeVaultOwnerId(vaultOwnerId?: string | null) {
   return vaultOwnerId || DEFAULT_LOCAL_VAULT_OWNER;

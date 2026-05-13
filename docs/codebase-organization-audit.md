@@ -20,6 +20,7 @@ The highest-value cleanup was documentation organization. The repository root ha
 - Added `docs/README.md`, `docs/archive/README.md`, `convex/README.md`, and `scripts/README.md` as folder-level orientation files.
 - Added `.cursor/` and `.archive/` to `.gitignore`.
 - Moved ignored QA/import and squirrel audit outputs into `.archive/local-artifacts/2026-05-13/`.
+- Excluded generated Convex files and one-off scripts from the main app lint boundary.
 
 ## Keep As-Is
 
@@ -48,5 +49,5 @@ output/          Local generated reports, gitignored
 - Decide whether the app should use `features/source-docs/` long term or consolidate newer vault/source-doc behavior under a `features/vault/` module.
 - Add a dedicated extension build command if TypeScript should become the source of truth for the extension `.js` runtime files.
 - Add `LICENSE` or remove the license reference from `README.md`.
-- Pay down lint debt in production code, then decide whether maintenance scripts should follow strict app lint rules or use a separate script-focused ESLint override.
+- If maintenance scripts become long-lived tools, add a separate script-focused lint/typecheck command instead of mixing them into the app lint boundary.
 - Consider moving generic marketing/layout components under route-owned folders if they are not reused outside the marketing site.

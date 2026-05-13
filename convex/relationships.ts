@@ -2,6 +2,14 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
 
+type FamilyTreeNode = {
+  person: Doc<"persons">;
+  relationType?: Doc<"relationships">["childRelationType"];
+  level: number;
+  ancestors?: FamilyTreeNode[];
+  descendants?: FamilyTreeNode[];
+};
+
 /**
  * RELATIONSHIPS API
  * 
@@ -297,14 +305,14 @@ export const getFamilyTree = query({
     const visited = new Set<string>();
     const tree = {
       person: await ctx.db.get(args.personId),
-      ancestors: [] as any[],
-      descendants: [] as any[],
+      ancestors: [] as FamilyTreeNode[],
+      descendants: [] as FamilyTreeNode[],
     };
 
     if (!tree.person) return null;
 
     // Helper to get ancestors recursively
-    async function getAncestors(personId: Id<"persons">, level: number): Promise<any[]> {
+    async function getAncestors(personId: Id<"persons">, level: number): Promise<FamilyTreeNode[]> {
       if (level >= maxGenerations || visited.has(personId)) return [];
       visited.add(personId);
 
@@ -330,7 +338,7 @@ export const getFamilyTree = query({
     }
 
     // Helper to get descendants recursively
-    async function getDescendants(personId: Id<"persons">, level: number): Promise<any[]> {
+    async function getDescendants(personId: Id<"persons">, level: number): Promise<FamilyTreeNode[]> {
       if (level >= maxGenerations || visited.has(personId)) return [];
       visited.add(personId);
 

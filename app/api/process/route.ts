@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { chatCompletion } from "@/lib/ai/openrouter";
 
+type ProcessRequestBody = {
+  prompt?: unknown;
+  data?: unknown;
+  model?: unknown;
+  apiKey?: unknown;
+  systemPrompt?: unknown;
+};
+
 export async function POST(request: NextRequest) {
   try {
-    const { prompt, data, model, apiKey, systemPrompt } = await request.json();
+    const { prompt, data, model, apiKey, systemPrompt } = (await request.json()) as ProcessRequestBody;
 
-    if (!prompt) {
+    if (typeof prompt !== "string" || !prompt.trim()) {
       return NextResponse.json(
         { error: "Missing prompt" },
         { status: 400 }
@@ -13,7 +21,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Determine API Key: Client provided > Server Env > Fail
-    const token = apiKey || process.env.OPENROUTER_API_KEY;
+    const token =
+      typeof apiKey === "string" && apiKey.trim()
+        ? apiKey
+        : process.env.OPENROUTER_API_KEY;
 
     if (!token) {
       return NextResponse.json(
@@ -29,7 +40,7 @@ export async function POST(request: NextRequest) {
     const response = await chatCompletion({
       config: {
         apiKey: token,
-        model: model || "anthropic/claude-3-sonnet", // Default model
+        model: typeof model === "string" && model.trim() ? model : "anthropic/claude-3-sonnet",
         temperature: 0.3,
       },
       messages: [
@@ -56,9 +67,9 @@ export async function POST(request: NextRequest) {
       usage: response.usage,
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { error: error.message },
+      { error: error instanceof Error ? error.message : "Request processing failed" },
       { status: 500 }
     );
   }
