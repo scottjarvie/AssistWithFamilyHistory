@@ -21,8 +21,6 @@ import { Compass } from "lucide-react";
 export function Footer() {
   return (
     <footer className="relative overflow-hidden border-t border-[#2c4f5d] bg-[#132b35] py-14 text-[#d9cdb5]">
-      <div className="absolute -right-20 -top-12 h-48 w-48 rounded-full bg-[#c57d3929] blur-3xl" />
-      <div className="absolute -left-20 bottom-0 h-48 w-48 rounded-full bg-[#4b765933] blur-3xl" />
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center justify-between gap-8 md:flex-row">
           <div className="flex items-center gap-3">
@@ -56,8 +54,8 @@ export function Footer() {
             </Link>
           </nav>
 
-          <p className="text-sm text-[#b8a987]">
-            © {new Date().getFullYear()} Discover Their Stories. Built for stories that endure.
+          <p className="max-w-xs text-sm leading-6 text-[#b8a987]">
+            Public beta workspace for evidence-grounded ancestor stories.
           </p>
         </div>
       </div>

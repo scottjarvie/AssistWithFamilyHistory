@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Compass, Database, FileUp, MapPinned, Sparkles, TableProperties } from "lucide-react";
+import { ArrowRight, BookOpen, Database, FileUp, Sparkles, TableProperties } from "lucide-react";
 import type { Metadata } from "next";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -52,55 +52,54 @@ export default async function DashboardPage() {
     );
   }
 
-  const quickLinks = [
+  const workflowStations = [
     {
-      title: "People Explorer",
-      description: "Browse imported ancestors, their source depth, and the latest research activity.",
-      href: "/app/people",
-      icon: Compass,
-    },
-    {
-      title: "Imports",
-      description: "Bring FamilySearch captures into the vault and track merge history.",
+      title: "Intake",
+      description: "Bring in FamilySearch captures and preserve the raw material before it gets interpreted.",
       href: "/app/imports",
       icon: FileUp,
     },
     {
-      title: "Operations",
-      description: "Work the full research queue across people, provisional relatives, and missing record coverage.",
+      title: "Vault",
+      description: "Organize people, places, events, sources, memories, and documents into one research graph.",
+      href: "/app/people",
+      icon: Database,
+    },
+    {
+      title: "Research",
+      description: "Work gaps and readiness checks so a story is built from evidence, not wishful thinking.",
       href: "/app/operations",
       icon: TableProperties,
     },
     {
-      title: "Places",
-      description: "Move from a person to the towns, counties, parishes, and countries shaping their story.",
-      href: "/app/places",
-      icon: MapPinned,
+      title: "Stories",
+      description: "Review drafts, publish intentionally, and keep the narrative tied to its supporting data.",
+      href: "/app/stories",
+      icon: BookOpen,
     },
   ];
 
   return (
     <div className="p-4 sm:p-8">
-      <section className="relative overflow-hidden rounded-[2rem] border border-stone-200 bg-[radial-gradient(circle_at_top_left,_rgba(180,83,9,0.18),_transparent_35%),linear-gradient(135deg,_#1f2937,_#111827_65%,_#292524)] px-6 py-8 text-white shadow-[0_30px_80px_rgba(28,25,23,0.22)] sm:px-8">
-        <div className="absolute inset-y-0 right-0 hidden w-1/2 bg-[linear-gradient(135deg,transparent,rgba(245,158,11,0.1),transparent)] md:block" />
-        <Badge className="mb-4 bg-white/10 text-white hover:bg-white/10">Research Vault V1</Badge>
+      <section className="relative overflow-hidden border border-stone-200 bg-[#1f2f35] px-6 py-8 text-white shadow-[0_24px_60px_rgba(28,25,23,0.18)] sm:px-8">
+        <Badge className="mb-4 bg-white/10 text-white hover:bg-white/10">Story-first research workspace</Badge>
         <div className="grid gap-8 lg:grid-cols-[1.4fr_0.9fr]">
           <div>
             <h1 className="max-w-3xl font-[family-name:var(--font-cormorant-garamond)] text-4xl font-semibold leading-tight sm:text-5xl">
-              A workspace for evidence, places, memories, and AI-ready family stories.
+              Collect the operating data, understand the context, then tell the story well.
             </h1>
             <p className="mt-4 max-w-2xl text-sm text-stone-200 sm:text-base">
-              Import FamilySearch captures, organize them into a research graph, and assemble context packs that give AI enough material to write better stories, plans, and books.
+              This dashboard is the working room: intake records, build the vault, chase the research gaps, and move finished drafts into Story Studio for review and explicit publishing.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Button asChild className="bg-amber-600 text-white hover:bg-amber-500">
-                <Link href="/app/imports">
-                  Open Imports
+                <Link href="/app/stories">
+                  Open Story Studio
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
               <Button asChild variant="outline" className="border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white">
-                <Link href="/app/people">Browse People</Link>
+                <Link href="/app/operations">Work Research Queue</Link>
               </Button>
             </div>
           </div>
@@ -114,7 +113,7 @@ export default async function DashboardPage() {
               ["Documents", summary.counts.documents],
               ["Open Tasks", summary.counts.openTasks],
             ].map(([label, value]) => (
-              <div key={label} className="rounded-2xl border border-white/10 bg-white/6 px-4 py-4 backdrop-blur">
+              <div key={label} className="border border-white/10 bg-white/6 px-4 py-4 backdrop-blur">
                 <p className="text-xs uppercase tracking-[0.22em] text-stone-300">{label}</p>
                 <p className="mt-2 text-3xl font-semibold text-white">{value}</p>
               </div>
@@ -124,11 +123,11 @@ export default async function DashboardPage() {
       </section>
 
       <section className="mt-8 grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
-        <div className="grid gap-5 md:grid-cols-3">
-          {quickLinks.map((item) => (
+        <div className="grid gap-5 md:grid-cols-2">
+          {workflowStations.map((item) => (
             <Card key={item.title} className="border-stone-200 bg-white/90 shadow-sm">
               <CardHeader>
-                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-md bg-amber-100 text-amber-700">
                   <item.icon className="h-5 w-5" />
                 </div>
                 <CardTitle>{item.title}</CardTitle>

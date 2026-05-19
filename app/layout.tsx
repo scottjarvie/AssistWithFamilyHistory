@@ -21,6 +21,7 @@ import type { Metadata } from "next";
 import { Cormorant_Garamond, IBM_Plex_Mono, Instrument_Sans } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "@/components/ui/sonner";
+import { getClerkPublishableKey } from "@/lib/clerk/config";
 import { defaultMetadata } from "@/lib/seo";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
@@ -51,7 +52,7 @@ export const metadata: Metadata = {
   },
 };
 
-const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+const clerkPublishableKey = getClerkPublishableKey();
 
 export default function RootLayout({
   children,

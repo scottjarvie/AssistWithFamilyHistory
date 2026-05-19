@@ -31,7 +31,7 @@ import { createPageMetadata } from "@/lib/seo";
 export const metadata: Metadata = createPageMetadata({
   title: "Home",
   description:
-    "Discover ancestor stories with AI-powered research, context building, and narrative tools that go beyond names and dates.",
+    "A private beta workspace for AI-assisted genealogy research, operating data, and ancestor story drafting.",
   path: "/",
 });
 

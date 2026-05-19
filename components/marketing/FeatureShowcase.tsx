@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock3, Search } from "lucide-react";
 
-type StageStatus = "available" | "coming-soon" | "planned";
+type StageStatus = "working" | "in-progress" | "exploring";
 
 interface StageFeature {
   name: string;
@@ -10,131 +10,102 @@ interface StageFeature {
 }
 
 interface JourneyStage {
-  name: string;
-  blurb: string;
-  pillClass: string;
-  accentClass: string;
-  cardClass: string;
+  label: string;
+  summary: string;
+  icon: typeof CheckCircle2;
+  borderClass: string;
+  headingClass: string;
   features: StageFeature[];
 }
 
 const journeyStages: JourneyStage[] = [
   {
-    name: "Discover",
-    blurb: "Collect the clues.",
-    pillClass: "bg-[#234d5e]",
-    accentClass: "text-[#234d5e]",
-    cardClass: "border-[#234d5e55]",
+    label: "Functioning now",
+    summary: "The parts beta testers can use today.",
+    icon: CheckCircle2,
+    borderClass: "border-[#476553]",
+    headingClass: "text-[#476553]",
     features: [
-      { name: "Research Vault Intake", status: "available", href: "/features/source-docs" },
-      { name: "Photo Analyzer", status: "planned" },
+      { name: "FamilySearch capture import", status: "working", href: "/extension" },
+      { name: "People, places, sources, memories vault", status: "working", href: "/app/people" },
+      { name: "Research operations queue", status: "working", href: "/app/operations" },
+      { name: "Story Writer v1", status: "working", href: "/app/story-writer" },
     ],
   },
   {
-    name: "Contextualize",
-    blurb: "Organize meaning.",
-    pillClass: "bg-[#9f5a2d]",
-    accentClass: "text-[#9f5a2d]",
-    cardClass: "border-[#9f5a2d55]",
+    label: "Being worked on",
+    summary: "The next layer that makes the workflow clearer and more useful.",
+    icon: Clock3,
+    borderClass: "border-[#9f5a2d]",
+    headingClass: "text-[#9f5a2d]",
     features: [
-      { name: "Context Packs & Dossiers", status: "available", href: "/features/source-docs" },
-      { name: "Timeline Builder", status: "planned" },
+      { name: "Story readiness and review flow", status: "in-progress" },
+      { name: "Saved story outputs and share preview", status: "in-progress" },
+      { name: "Cleaner person workspace paths", status: "in-progress" },
+      { name: "Better research-gap explanations", status: "in-progress" },
     ],
   },
   {
-    name: "Research",
-    blurb: "Resolve evidence.",
-    pillClass: "bg-[#42566b]",
-    accentClass: "text-[#42566b]",
-    cardClass: "border-[#42566b55]",
+    label: "Being explored",
+    summary: "Promising side tools that may become first-class features.",
+    icon: Search,
+    borderClass: "border-[#234d5e]",
+    headingClass: "text-[#234d5e]",
     features: [
-      { name: "Research Planner", status: "planned" },
-      { name: "Document Transcriber", status: "planned" },
-    ],
-  },
-  {
-    name: "Craft Stories",
-    blurb: "Write with voice.",
-    pillClass: "bg-[#476553]",
-    accentClass: "text-[#476553]",
-    cardClass: "border-[#47655355]",
-    features: [
-      { name: "Story Writer", status: "available", href: "/app/story-writer" },
-      { name: "Narrative Composer", status: "planned" },
-    ],
-  },
-  {
-    name: "Preserve",
-    blurb: "Pass stories on.",
-    pillClass: "bg-[#35506a]",
-    accentClass: "text-[#35506a]",
-    cardClass: "border-[#35506a55]",
-    features: [
-      { name: "Family Group Sheets", status: "planned" },
-      { name: "Export Archive", status: "available", href: "/app" },
+      { name: "Photo and document analysis", status: "exploring" },
+      { name: "Timeline builder", status: "exploring" },
+      { name: "Place and era context researcher", status: "exploring" },
+      { name: "Shareable ancestor story pages", status: "exploring" },
     ],
   },
 ];
 
 const statusLabel: Record<StageStatus, string> = {
-  available: "Available",
-  "coming-soon": "Soon",
-  planned: "Planned",
+  working: "Works",
+  "in-progress": "In progress",
+  exploring: "Exploring",
 };
 
 const statusClass: Record<StageStatus, string> = {
-  available: "border-[#2f6a69] bg-[#2f6a69] text-[#eef5f3]",
-  "coming-soon": "border-[#8a6b2f] bg-[#8a6b2f] text-[#f7edd4]",
-  planned: "border-[#c0c3b5] bg-[#e7e3d5] text-[#5f665f]",
+  working: "border-[#476553] bg-[#476553] text-[#eef5f0]",
+  "in-progress": "border-[#9f5a2d] bg-[#9f5a2d] text-[#fff5e8]",
+  exploring: "border-[#234d5e] bg-[#234d5e] text-[#edf5f7]",
 };
 
 export function FeatureShowcase() {
   return (
-    <section className="relative overflow-hidden py-24 sm:py-28">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,#ffffff8a_0%,transparent_50%),radial-gradient(circle_at_85%_0%,#d7c6a966_0%,transparent_45%)]" />
+    <section className="relative overflow-hidden bg-[#fffaf2] py-20 sm:py-24">
+      <div className="absolute inset-x-0 top-0 h-px bg-[#b79f7a]" />
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-4xl text-center">
-          <p className="text-xs uppercase tracking-[0.24em] text-[#5f665f]">One Clear Journey</p>
+        <div className="max-w-4xl">
+          <p className="text-xs uppercase tracking-[0.24em] text-[#5f665f]">Transparent beta status</p>
           <h2 className="mt-5 text-4xl leading-tight text-[#1d212a] sm:text-5xl" data-display="true">
-            The Five Stations
+            What is real, what is next, and what is still speculative.
           </h2>
-          <p className="mx-auto mt-5 max-w-3xl text-lg leading-relaxed text-[#4e5a64]">
-            AI supports every stage and helps weave stories from the context of real lives.
+          <p className="mt-5 max-w-3xl text-lg leading-relaxed text-[#4e5a64]">
+            This site is intentionally open about its stage. Some pieces are already useful for
+            research. Some are under active construction. Some are ideas being tested with real
+            family history workflows before they become product promises.
           </p>
         </div>
 
-        <div className="mt-10 overflow-x-auto pb-2">
-          <div className="mx-auto flex min-w-max items-center gap-3 rounded-2xl border border-[#b79f7a66] bg-[#efe4cdcc] px-6 py-5 shadow-[0_24px_35px_-34px_#111]">
-            {journeyStages.map((stage, index) => (
-              <div key={stage.name} className="flex items-center gap-3">
-                <span
-                  className={`rounded-full px-6 py-2.5 text-sm font-semibold uppercase tracking-[0.14em] text-[#f7f3e8] ${stage.pillClass}`}
-                >
-                  {stage.name}
-                </span>
-                {index < journeyStages.length - 1 && <span className="text-xl text-[#6d6249]">→</span>}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-5">
-          {journeyStages.map((stage, index) => (
+        <div className="mt-10 grid gap-5 lg:grid-cols-3">
+          {journeyStages.map((stage) => (
             <div
-              key={stage.name}
-              className={`rounded-2xl border bg-[#fdf9f0cc] p-5 shadow-[0_26px_35px_-34px_#111] ${stage.cardClass}`}
+              key={stage.label}
+              className={`border-t-4 bg-[#f7f1e2] p-5 shadow-[0_26px_35px_-34px_#111] ${stage.borderClass}`}
             >
-              <p className="text-[11px] uppercase tracking-[0.22em] text-[#6d6249]">Station {index + 1}</p>
-              <h3 className={`mt-2 text-3xl leading-tight ${stage.accentClass}`} data-display="true">
-                {stage.name}
+              <stage.icon className={`h-6 w-6 ${stage.headingClass}`} />
+              <h3 className={`mt-4 text-3xl leading-tight ${stage.headingClass}`} data-display="true">
+                {stage.label}
               </h3>
-              <p className="mt-1 text-sm text-[#4e5a64]">{stage.blurb}</p>
+              <p className="mt-2 text-sm leading-6 text-[#4e5a64]">{stage.summary}</p>
 
               <ul className="mt-4 space-y-2">
                 {stage.features.map((feature) => (
                   <li
                     key={feature.name}
-                    className="rounded-xl border border-[#d7cfbf] bg-[#fffaf2cc] px-3 py-2"
+                    className="border border-[#d7cfbf] bg-[#fffaf2cc] px-3 py-3"
                   >
                     <div className="flex items-center justify-between gap-2">
                       {feature.href ? (
@@ -149,7 +120,7 @@ export function FeatureShowcase() {
                         <span className="text-sm font-medium text-[#24323e]">{feature.name}</span>
                       )}
                       <span
-                        className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] ${statusClass[feature.status]}`}
+                        className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] ${statusClass[feature.status]}`}
                       >
                         {statusLabel[feature.status]}
                       </span>
@@ -159,6 +130,20 @@ export function FeatureShowcase() {
               </ul>
             </div>
           ))}
+        </div>
+
+        <div className="mt-10 grid gap-5 border border-[#d7cfbf] bg-[#f6efe1] p-6 lg:grid-cols-[0.8fr_1.2fr] lg:p-8">
+          <div>
+            <p className="text-xs uppercase tracking-[0.24em] text-[#6d6249]">The operating thesis</p>
+            <p className="mt-4 text-3xl leading-tight text-[#1d212a]" data-display="true">
+              Better stories require better research data first.
+            </p>
+          </div>
+          <p className="text-base leading-8 text-[#4e5a64]">
+            The project is not trying to be a polished family-tree replacement yet. It is testing
+            whether AI can help a researcher gather stronger evidence, understand places and
+            events, notice missing work, and turn that into stories with enough context to matter.
+          </p>
         </div>
       </div>
     </section>

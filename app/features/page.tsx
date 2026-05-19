@@ -1,125 +1,111 @@
-/**
- * Features Page
- * 
- * Purpose: Overview of all tools with detailed descriptions
- * 
- * Key Elements:
- * - Page header
- * - Detailed feature descriptions
- * - Status indicators
- * 
- * Dependencies:
- * - @/components/layout/MarketingNav
- * - @/components/layout/Footer
- * - @/components/layout/FeatureCard
- * 
- * Last Updated: Initial setup
- */
-
+import type { Metadata } from "next";
+import { BookOpen, CheckCircle2, Clock3, FlaskConical } from "lucide-react";
 import { MarketingNav } from "@/components/layout/MarketingNav";
 import { Footer } from "@/components/layout/Footer";
-import { FeatureCard } from "@/components/layout/FeatureCard";
-import type { Metadata } from "next";
+import { Badge } from "@/components/ui/badge";
 import { createPageMetadata } from "@/lib/seo";
-import { 
-  FileText, 
-  BookOpen, 
-  Image, 
-  Clock, 
-  Target, 
-  FileSearch,
-  Users
-} from "lucide-react";
 
-const features = [
+const statusGroups = [
   {
-    title: "Research Vault Intake",
-    description: "Capture FamilySearch sources and memories, merge them into a canonical person-and-place graph, and generate raw documents, contextualized dossiers, and context packs from one workspace.",
-    icon: FileText,
-    status: "available" as const,
-    href: "/features/source-docs",
+    title: "Working Now",
+    icon: CheckCircle2,
+    tone: "text-[#4f765d]",
+    items: [
+      "FamilySearch capture intake and vault merge workflow",
+      "People, places, events, sources, memories, documents, and research log views",
+      "Research readiness checks for biography, timeline, relationships, key records, memories, and place context",
+      "Context-pack driven Story Writer for draft narratives and research-gap notes",
+      "Story Studio for reviewing saved drafts and explicitly publishing story pages",
+    ],
   },
   {
-    title: "Story Writer",
-    description: "Transform a person context pack into short stories, longer narrative drafts, and research-gap notes, then save those drafts back into the vault.",
-    icon: BookOpen,
-    status: "available" as const,
-    href: "/app/story-writer",
+    title: "Being Worked On",
+    icon: Clock3,
+    tone: "text-[#9f5a2d]",
+    items: [
+      "A stronger person overview that starts with story readiness but keeps dense operating data close",
+      "Published story pages that show narrative first, then evidence, places, events, and memories",
+      "Clearer research queue labels for what blocks drafting versus publishing",
+      "More useful beta homepage, features, and roadmap language for testers",
+    ],
   },
   {
-    title: "Photo Analyzer",
-    description: "Upload old family photographs and use AI vision to extract information. Identify approximate dates from clothing and settings, detect faces for identification, and add context about locations and events captured in the images.",
-    icon: Image,
-    status: "planned" as const,
-  },
-  {
-    title: "Timeline Builder",
-    description: "Create visual timelines from your documented sources. See your ancestor's life events plotted chronologically, identify gaps in the record, and understand how their life intersected with historical events.",
-    icon: Clock,
-    status: "planned" as const,
-  },
-  {
-    title: "Research Planner",
-    description: "Keep track of your research goals and get AI-suggested next steps. The planner learns from your documented sources and suggests records you might not have considered, helping you break through brick walls.",
-    icon: Target,
-    status: "planned" as const,
-  },
-  {
-    title: "Document Transcriber",
-    description: "Upload images of handwritten documents—old letters, diaries, or records—and get AI-powered transcriptions. The tool handles cursive handwriting and provides both literal transcriptions and normalized versions.",
-    icon: FileSearch,
-    status: "planned" as const,
-  },
-  {
-    title: "Family Group Sheets",
-    description: "Generate beautifully formatted family group sheets from your documented data. Export to PDF or print-ready formats that are perfect for sharing with family or submitting to genealogical societies.",
-    icon: Users,
-    status: "planned" as const,
+    title: "Being Explored",
+    icon: FlaskConical,
+    tone: "text-[#5b6d7a]",
+    items: [
+      "Photo and document analysis for old family media",
+      "Timeline and locality context tools that connect people to towns, churches, eras, and news",
+      "Better public story URLs and richer sharing controls",
+      "AI side tools for transcription, source comparison, research planning, and book assembly",
+    ],
   },
 ];
 
 export const metadata: Metadata = createPageMetadata({
   title: "Features",
   description:
-    "Explore the tools in Discover Their Stories, including the Research Vault workflow and planned family history storytelling tools.",
+    "See what is working now, being worked on, and being explored in Discover Their Stories.",
   path: "/features",
 });
 
 export default function FeaturesPage() {
   return (
-    <div className="min-h-screen bg-stone-50">
+    <div className="min-h-screen bg-[#f8f4ec]">
       <MarketingNav />
-      <main className="pt-24 pb-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
-          <div className="text-center mb-16">
-            <h1 className="text-4xl sm:text-5xl font-bold text-stone-900 mb-6">
-              Features
+      <main className="pt-24">
+        <section className="border-b border-[#d8c7a7] bg-[#efe4cd] px-4 py-12 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-6xl">
+            <Badge className="mb-5 border-[#9f5a2d33] bg-white/60 text-[#7c4425] hover:bg-white/60">
+              Public beta feature map
+            </Badge>
+            <h1 className="max-w-4xl font-[family-name:var(--font-cormorant-garamond)] text-5xl font-semibold leading-[0.95] text-[#1d212a] sm:text-6xl">
+              Tools for turning research into ancestor stories.
             </h1>
-            <p className="text-xl text-stone-500 max-w-3xl mx-auto">
-              Purpose-built tools for family historians who want to go beyond 
-              collecting names and dates. Each tool is designed to help you 
-              research, document, and tell the stories of your ancestors.
+            <p className="mt-5 max-w-3xl text-lg leading-8 text-[#5f5542]">
+              This is not a mass-market genealogy site yet. It is a working beta for collecting the evidence, context, relationships, places, and memories needed to speak for ancestors with care.
             </p>
           </div>
+        </section>
 
-          {/* Features Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {features.map((feature) => (
-              <FeatureCard key={feature.title} {...feature} />
-            ))}
-          </div>
+        <section className="mx-auto grid max-w-6xl gap-5 px-4 py-10 sm:px-6 lg:grid-cols-3 lg:px-8">
+          {statusGroups.map((group) => (
+            <div key={group.title} className="border border-[#d8c7a7] bg-white px-5 py-6 shadow-sm">
+              <div className="flex items-center gap-3">
+                <group.icon className={`h-5 w-5 ${group.tone}`} />
+                <h2 className="text-xl font-semibold text-[#1d212a]">{group.title}</h2>
+              </div>
+              <ul className="mt-5 space-y-4">
+                {group.items.map((item) => (
+                  <li key={item} className="border-l-2 border-[#c57d39] pl-3 text-sm leading-6 text-[#5f5542]">
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </section>
 
-          {/* Coming Soon Note */}
-          <div className="mt-16 text-center">
-            <p className="text-stone-500">
-              Have a feature request?{" "}
-              <a href="mailto:features@discovertheirstories.com" className="text-amber-700 hover:underline">
-                Let us know
-              </a>
-            </p>
+        <section className="border-y border-[#d8c7a7] bg-white px-4 py-10 sm:px-6 lg:px-8">
+          <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[0.85fr_1.15fr]">
+            <div className="flex items-start gap-3">
+              <BookOpen className="mt-1 h-6 w-6 text-[#9f5a2d]" />
+              <div>
+                <h2 className="text-2xl font-semibold text-[#1d212a]">The product arc</h2>
+                <p className="mt-3 text-sm leading-7 text-[#625947]">
+                  Collect operating data, understand context, identify research gaps, write drafts, review the grounding, then publish intentionally.
+                </p>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-4">
+              {["Intake", "Vault", "Research", "Stories"].map((step) => (
+                <div key={step} className="border border-[#e6dcc8] px-4 py-4 text-center text-sm font-medium text-[#2d2b26]">
+                  {step}
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        </section>
       </main>
       <Footer />
     </div>
