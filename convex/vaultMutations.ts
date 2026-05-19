@@ -58,6 +58,34 @@ const researchCheckSourceValidator = v.union(
   v.literal("import")
 );
 
+const storyTypeValidator = v.union(
+  v.literal("biography"),
+  v.literal("day_in_life"),
+  v.literal("historical_context"),
+  v.literal("migration_story"),
+  v.literal("family_narrative"),
+  v.literal("anecdote"),
+  v.literal("timeline"),
+  v.literal("letter"),
+  v.literal("interview"),
+  v.literal("research_summary"),
+  v.literal("custom")
+);
+
+const historicalContextTopicValidator = v.union(
+  v.literal("daily_life"),
+  v.literal("economy"),
+  v.literal("religion"),
+  v.literal("politics"),
+  v.literal("migration"),
+  v.literal("health"),
+  v.literal("technology"),
+  v.literal("culture"),
+  v.literal("war"),
+  v.literal("disaster"),
+  v.literal("other")
+);
+
 export const upsertPerson = mutation({
   args: {
     vaultOwnerId: v.string(),
@@ -605,19 +633,7 @@ export const upsertStoryDraft = mutation({
   args: {
     vaultOwnerId: v.string(),
     personId: v.id("persons"),
-    type: v.union(
-      v.literal("biography"),
-      v.literal("day_in_life"),
-      v.literal("historical_context"),
-      v.literal("migration_story"),
-      v.literal("family_narrative"),
-      v.literal("anecdote"),
-      v.literal("timeline"),
-      v.literal("letter"),
-      v.literal("interview"),
-      v.literal("research_summary"),
-      v.literal("custom")
-    ),
+    type: storyTypeValidator,
     title: v.string(),
     content: v.string(),
     status: v.union(v.literal("draft"), v.literal("review"), v.literal("published")),
@@ -670,6 +686,158 @@ export const upsertStoryDraft = mutation({
     });
 
     return { storyId, created: true };
+  },
+});
+
+export const updateStoryStatus = mutation({
+  args: {
+    vaultOwnerId: v.string(),
+    storyId: v.id("stories"),
+    status: v.union(v.literal("draft"), v.literal("review"), v.literal("published")),
+  },
+  handler: async (ctx, args) => {
+    const story = await ctx.db.get(args.storyId);
+    if (!story || !matchesVaultOwner(story.vaultOwnerId, args.vaultOwnerId)) {
+      throw new Error("Story not found");
+    }
+
+    await ctx.db.patch(args.storyId, {
+      status: args.status,
+      updatedAt: Date.now(),
+    });
+
+    return { storyId: args.storyId, status: args.status };
+  },
+});
+
+export const updateStoryDraft = mutation({
+  args: {
+    vaultOwnerId: v.string(),
+    storyId: v.id("stories"),
+    title: v.string(),
+    content: v.string(),
+    type: v.optional(storyTypeValidator),
+    tags: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, args) => {
+    const story = await ctx.db.get(args.storyId);
+    if (!story || !matchesVaultOwner(story.vaultOwnerId, args.vaultOwnerId)) {
+      throw new Error("Story not found");
+    }
+
+    const generatedBy = story.generatedBy === "ai" ? "ai_edited" : story.generatedBy;
+    const now = Date.now();
+
+    await ctx.db.patch(args.storyId, {
+      title: args.title.trim(),
+      content: args.content.trim(),
+      type: args.type ?? story.type,
+      tags: args.tags,
+      generatedBy,
+      updatedAt: now,
+    });
+
+    return { storyId: args.storyId, updatedAt: now };
+  },
+});
+
+export const upsertHistoricalContext = mutation({
+  args: {
+    vaultOwnerId: v.string(),
+    placeId: v.optional(v.id("places")),
+    timePeriod: v.object({
+      startYear: v.number(),
+      endYear: v.number(),
+    }),
+    topic: historicalContextTopicValidator,
+    title: v.string(),
+    content: v.string(),
+    sources: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const now = Date.now();
+    const candidates = args.placeId
+      ? await ctx.db
+          .query("historicalContext")
+          .withIndex("by_place", (q) => q.eq("placeId", args.placeId))
+          .collect()
+      : await ctx.db.query("historicalContext").collect();
+    const existing =
+      filterByVaultOwner(candidates, vaultOwnerId).find(
+        (entry) =>
+          entry.placeId === args.placeId &&
+          entry.topic === args.topic &&
+          entry.title.trim().toLowerCase() === args.title.trim().toLowerCase() &&
+          entry.timePeriod.startYear === args.timePeriod.startYear &&
+          entry.timePeriod.endYear === args.timePeriod.endYear
+      ) ?? null;
+
+    const payload = {
+      vaultOwnerId,
+      placeId: args.placeId,
+      timePeriod: args.timePeriod,
+      topic: args.topic,
+      title: args.title.trim(),
+      content: args.content.trim(),
+      sources: args.sources.map((source) => source.trim()).filter(Boolean),
+      updatedAt: now,
+    };
+
+    const historicalContextId = existing
+      ? existing._id
+      : await ctx.db.insert("historicalContext", {
+          ...payload,
+          createdAt: now,
+        });
+
+    if (existing) {
+      await ctx.db.patch(existing._id, payload);
+    }
+
+    const logMatches = await ctx.db
+      .query("researchLog")
+      .withIndex("by_entity_activity", (q) =>
+        q
+          .eq("entityType", "historicalContext")
+          .eq("entityId", historicalContextId)
+          .eq("activityType", "context_research")
+      )
+      .collect();
+    const logEntry = filterByVaultOwner(logMatches, vaultOwnerId)[0] ?? null;
+    const summary = `Context report: ${payload.title}`;
+    const details = [
+      `Topic: ${payload.topic.replace(/_/g, " ")}`,
+      `Years: ${payload.timePeriod.startYear}-${payload.timePeriod.endYear}`,
+      payload.placeId ? `Place ID: ${payload.placeId}` : "Vault-wide context",
+      payload.sources.length > 0 ? `Sources: ${payload.sources.join("; ")}` : "Sources: none recorded",
+    ].join("\n");
+
+    if (logEntry) {
+      await ctx.db.patch(logEntry._id, {
+        status: "done",
+        summary,
+        details,
+        completedAt: now,
+        updatedAt: now,
+      });
+    } else {
+      await ctx.db.insert("researchLog", {
+        vaultOwnerId,
+        entityType: "historicalContext",
+        entityId: historicalContextId,
+        activityType: "context_research",
+        status: "done",
+        summary,
+        details,
+        outputRefs: [`historicalContext:${String(historicalContextId)}`],
+        createdAt: now,
+        updatedAt: now,
+        completedAt: now,
+      });
+    }
+
+    return { historicalContextId, created: !existing };
   },
 });
 

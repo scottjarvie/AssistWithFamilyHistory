@@ -30,6 +30,14 @@ type VaultSnapshot = {
   provisionalRelatives: Doc<"provisionalRelatives">[];
 };
 
+const storyWorkflowValidator = v.union(
+  v.literal("needs_genealogy_evidence"),
+  v.literal("needs_context_research"),
+  v.literal("ready_to_draft"),
+  v.literal("ready_to_review"),
+  v.literal("published")
+);
+
 async function getVaultSnapshot(ctx: QueryCtx, vaultOwnerId: string): Promise<VaultSnapshot> {
   const owned = <T extends { vaultOwnerId?: string }>(rows: T[]) => filterByVaultOwner(rows, vaultOwnerId);
 
@@ -98,6 +106,13 @@ function getPersonByIdentifier(snapshot: VaultSnapshot, personIdentifier: string
       (person) => person.fsId === personIdentifier || String(person._id) === personIdentifier
     ) ?? null
   );
+}
+
+function getPersonLifespan(person: Doc<"persons"> | null) {
+  if (!person) return "Unknown lifespan";
+  const birth = person.birth?.date?.year ?? person.birth?.date?.original ?? "?";
+  const death = person.death?.date?.year ?? person.death?.date?.original ?? "?";
+  return `${birth} to ${death}`;
 }
 
 function getPersonPlaces(person: Doc<"persons">, events: Doc<"events">[], places: Doc<"places">[]) {
@@ -226,9 +241,224 @@ function buildPersonOperations(snapshot: VaultSnapshot, person: Doc<"persons">) 
   };
 }
 
+function overlapsPersonYears(
+  entry: Doc<"historicalContext">,
+  person: Doc<"persons">
+) {
+  const birthYear = person.birth?.date?.year;
+  const deathYear = person.death?.date?.year;
+  if (!birthYear && !deathYear) return true;
+
+  const startYear = birthYear ?? deathYear ?? entry.timePeriod.startYear;
+  const endYear = deathYear ?? birthYear ?? entry.timePeriod.endYear;
+
+  return entry.timePeriod.endYear >= startYear && entry.timePeriod.startYear <= endYear;
+}
+
+function buildContextCoverage(
+  snapshot: VaultSnapshot,
+  person: Doc<"persons">,
+  operations: ReturnType<typeof buildPersonOperations>
+) {
+  const placeIds = new Set(operations.relatedPlaces.map((place) => String(place._id)));
+  const entries = sortByTimestampDesc(
+    snapshot.historicalContext.filter((entry) => {
+      if (!overlapsPersonYears(entry, person)) return false;
+      return !entry.placeId || placeIds.has(String(entry.placeId));
+    })
+  );
+  const placeIdsWithContext = new Set(
+    entries
+      .filter((entry) => entry.placeId)
+      .map((entry) => String(entry.placeId))
+  );
+  const missingPlaces = operations.relatedPlaces.filter(
+    (place) => !placeIdsWithContext.has(String(place._id))
+  );
+  const topics = Array.from(new Set(entries.map((entry) => entry.topic)));
+
+  return {
+    entries,
+    count: entries.length,
+    topics,
+    relatedPlaceCount: operations.relatedPlaces.length,
+    placeCountWithContext: placeIdsWithContext.size,
+    missingPlaces: missingPlaces.map((place) => ({
+      _id: place._id,
+      name: place.fullName || place.name,
+      type: place.type,
+    })),
+    status:
+      entries.length === 0
+        ? "missing"
+        : missingPlaces.length > 0
+          ? "partial"
+          : "covered",
+  };
+}
+
+function buildPublishWarnings(params: {
+  checks: ReturnType<typeof inferResearchChecks>;
+  contextCoverage: ReturnType<typeof buildContextCoverage> | null;
+  sourceCount: number;
+  storyStatus?: Doc<"stories">["status"];
+}) {
+  const requiredKeys = new Set([
+    "biography",
+    "timeline",
+    "relationships",
+    "birth_record",
+    "death_record",
+  ]);
+  const recommendedKeys = new Set(["memories", "place_context"]);
+  const warnings = [];
+
+  if (params.sourceCount === 0) {
+    warnings.push({
+      key: "sources",
+      label: "No linked source evidence",
+      status: "missing",
+      detail: "This story has no grouped source evidence attached through the person timeline yet.",
+    });
+  }
+
+  for (const check of params.checks) {
+    const actionable = check.status === "missing" || check.status === "needs_review";
+    if (!actionable) continue;
+    if (!requiredKeys.has(check.checkKey) && !recommendedKeys.has(check.checkKey)) continue;
+
+    warnings.push({
+      key: check.checkKey,
+      label: check.checkKey.replace(/_/g, " "),
+      status: check.status,
+      detail: check.summary || "This readiness check still needs research attention.",
+    });
+  }
+
+  if (!params.contextCoverage || params.contextCoverage.count === 0) {
+    warnings.push({
+      key: "historical_context",
+      label: "Historical context reports",
+      status: "missing",
+      detail: "No place, era, church, building, news, or locality context report is linked to this person's known places and years.",
+    });
+  } else if (params.contextCoverage.missingPlaces.length > 0) {
+    warnings.push({
+      key: "historical_context",
+      label: "Partial place context",
+      status: "in_progress",
+      detail: `${params.contextCoverage.missingPlaces.length} linked place${params.contextCoverage.missingPlaces.length === 1 ? "" : "s"} still lack context reports.`,
+    });
+  }
+
+  if (params.storyStatus === "draft") {
+    warnings.push({
+      key: "story_review",
+      label: "Internal review",
+      status: "needs_review",
+      detail: "This story is still marked as a draft. Move it to review before publishing if possible.",
+    });
+  }
+
+  return warnings;
+}
+
+function getStoryWorkflowStatus(params: {
+  operations: ReturnType<typeof buildPersonOperations>;
+  contextCoverage: ReturnType<typeof buildContextCoverage>;
+}) {
+  const publishedStory = params.operations.relatedStories.some((story) => story.status === "published");
+  if (publishedStory) return "published" as const;
+
+  const missingCritical = params.operations.summary.criticalMissing.filter(
+    (key) => key !== "biography"
+  );
+  const hasDraftOrReview = params.operations.relatedStories.some(
+    (story) => story.status === "draft" || story.status === "review"
+  );
+
+  if (missingCritical.length > 0 || params.operations.relatedSources.length === 0) {
+    return "needs_genealogy_evidence" as const;
+  }
+  if (params.contextCoverage.count === 0) {
+    return "needs_context_research" as const;
+  }
+  if (hasDraftOrReview) {
+    return "ready_to_review" as const;
+  }
+  return "ready_to_draft" as const;
+}
+
+function buildStoryBundle(snapshot: VaultSnapshot, story: Doc<"stories">) {
+  const person = story.personId
+    ? snapshot.people.find((entry) => entry._id === story.personId) ?? null
+    : null;
+  const operations = person ? buildPersonOperations(snapshot, person) : null;
+  const sourceRecords = person && operations
+    ? getPersonSourceRecords(snapshot, person, operations.relatedEvents)
+    : { citations: [], groupedSources: [] };
+  const contextCoverage = person && operations
+    ? buildContextCoverage(snapshot, person, operations)
+    : null;
+  const researchChecks = operations?.checks ?? [];
+
+  return {
+    story,
+    person: person
+      ? {
+          ...person,
+          displayName: formatPersonName(person),
+          routeId: person.fsId || String(person._id),
+          lifespan: getPersonLifespan(person),
+        }
+      : null,
+    readiness: operations?.summary ?? null,
+    researchChecks,
+    contextCoverage,
+    publishWarnings: buildPublishWarnings({
+      checks: researchChecks,
+      contextCoverage,
+      sourceCount: sourceRecords.groupedSources.length,
+      storyStatus: story.status,
+    }),
+    evidence: sourceRecords.groupedSources.slice(0, 8).map((entry) => ({
+      source: entry.source,
+      citations: entry.citations.slice(0, 3),
+    })),
+    events: (operations?.relatedEvents ?? [])
+      .slice()
+      .sort((a, b) => (a.date?.year ?? 0) - (b.date?.year ?? 0))
+      .slice(0, 8),
+    places: (operations?.relatedPlaces ?? []).slice(0, 8),
+    media: sortByTimestampDesc(operations?.relatedMedia ?? []).slice(0, 6),
+    relationships: operations?.relatedRelationships.map((relationship) => {
+      if (!person) return null;
+      const relatedId = relationship.person1 === person._id ? relationship.person2 : relationship.person1;
+      const relatedPerson = snapshot.people.find((entry) => entry._id === relatedId);
+      return relatedPerson
+        ? {
+            ...relationship,
+            relatedPerson,
+            relatedName: formatPersonName(relatedPerson),
+          }
+        : null;
+    }).filter(Boolean) ?? [],
+    historicalContext: contextCoverage?.entries.slice(0, 8) ?? [],
+    relatedStories: person
+      ? sortByTimestampDesc(
+          snapshot.stories.filter(
+            (entry) => entry.personId === person._id && entry._id !== story._id
+          )
+        ).slice(0, 6)
+      : [],
+  };
+}
+
 function buildPeopleRows(snapshot: VaultSnapshot) {
   return snapshot.people.map((person) => {
     const operations = buildPersonOperations(snapshot, person);
+    const contextCoverage = buildContextCoverage(snapshot, person, operations);
+    const storyWorkflow = getStoryWorkflowStatus({ operations, contextCoverage });
     const latestImport = operations.relatedImportRuns[0] ?? null;
     const hasStory = operations.relatedStories.length > 0;
     const keyPlaces = operations.relatedPlaces.slice(0, 2).map((place) => place.fullName || place.name);
@@ -247,6 +477,7 @@ function buildPeopleRows(snapshot: VaultSnapshot) {
         ).length,
         imports: operations.relatedImportRuns.length,
         provisionalRelatives: operations.provisionalRelatives.length,
+        contextReports: contextCoverage.count,
       },
       operations: {
         completionPercent: operations.summary.completionPercent,
@@ -259,6 +490,12 @@ function buildPeopleRows(snapshot: VaultSnapshot) {
       latestImport,
       keyPlaces,
       hasStory,
+      contextCoverage,
+      storyWorkflow,
+      storyReadinessScore:
+        (operations.summary.requiredMissingCount === 0 ? 100 : operations.summary.completionPercent) +
+        (hasStory ? 20 : 0) +
+        (contextCoverage.count > 0 ? 10 : 0),
       lastTouched:
         latestImport?.importedAt ??
         person.updatedAt ??
@@ -278,6 +515,7 @@ async function assemblePersonWorkspace(
   if (!person) return null;
 
   const operations = buildPersonOperations(snapshot, person);
+  const contextCoverage = buildContextCoverage(snapshot, person, operations);
   const sourceRecords = getPersonSourceRecords(snapshot, person, operations.relatedEvents);
   const relatedPeople = new Map<string, Doc<"persons">>();
 
@@ -323,6 +561,7 @@ async function assemblePersonWorkspace(
     }).filter(Boolean),
     media: sortByTimestampDesc(operations.relatedMedia),
     places: operations.relatedPlaces,
+    contextCoverage,
     provisionalRelatives: sortByTimestampDesc(operations.provisionalRelatives),
     researchChecks: operations.checks,
     operations: operations.summary,
@@ -336,6 +575,7 @@ async function assemblePersonWorkspace(
       places: operations.relatedPlaces.length,
       imports: operations.relatedImportRuns.length,
       provisionalRelatives: operations.provisionalRelatives.length,
+      contextReports: contextCoverage.count,
     },
     relatedPeople: Array.from(relatedPeople.values()),
   };
@@ -391,6 +631,75 @@ export const getPersonWorkspace = query({
   },
 });
 
+export const getStoriesIndex = query({
+  args: {
+    vaultOwnerId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
+    return sortByTimestampDesc(snapshot.stories).map((story) => {
+      const person = story.personId
+        ? snapshot.people.find((entry) => entry._id === story.personId) ?? null
+        : null;
+      const operations = person ? buildPersonOperations(snapshot, person) : null;
+      const contextCoverage = person && operations ? buildContextCoverage(snapshot, person, operations) : null;
+      const sourceCount = operations?.relatedSources.length ?? 0;
+
+      return {
+        ...story,
+        person: person
+          ? {
+              ...person,
+              displayName: formatPersonName(person),
+              routeId: person.fsId || String(person._id),
+              lifespan: getPersonLifespan(person),
+            }
+          : null,
+        readiness: operations?.summary ?? null,
+        storyWorkflow: operations && contextCoverage
+          ? getStoryWorkflowStatus({ operations, contextCoverage })
+          : "needs_genealogy_evidence",
+        publishWarnings: buildPublishWarnings({
+          checks: operations?.checks ?? [],
+          contextCoverage,
+          sourceCount,
+          storyStatus: story.status,
+        }),
+        evidenceCount: sourceCount,
+        placeCount: operations?.relatedPlaces.length ?? 0,
+        memoryCount: operations?.relatedMedia.length ?? 0,
+        contextReportCount: contextCoverage?.count ?? 0,
+      };
+    });
+  },
+});
+
+export const getStoryReview = query({
+  args: {
+    vaultOwnerId: v.string(),
+    storyId: v.id("stories"),
+  },
+  handler: async (ctx, args) => {
+    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
+    const story = snapshot.stories.find((entry) => entry._id === args.storyId);
+    return story ? buildStoryBundle(snapshot, story) : null;
+  },
+});
+
+export const getPublishedStory = query({
+  args: {
+    storyId: v.id("stories"),
+  },
+  handler: async (ctx, args) => {
+    const story = await ctx.db.get(args.storyId);
+    if (!story || story.status !== "published") return null;
+
+    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(story.vaultOwnerId));
+    const ownedStory = snapshot.stories.find((entry) => entry._id === story._id);
+    return ownedStory ? buildStoryBundle(snapshot, ownedStory) : null;
+  },
+});
+
 export const getPersonResearchChecks = query({
   args: {
     vaultOwnerId: v.string(),
@@ -432,6 +741,7 @@ export const getOperationsQueue = query({
     rowType: v.optional(v.union(v.literal("person"), v.literal("provisional"))),
     missingCheck: v.optional(v.string()),
     storyStatus: v.optional(v.union(v.literal("has_story"), v.literal("no_story"))),
+    storyWorkflow: v.optional(storyWorkflowValidator),
     staleOnly: v.optional(v.boolean()),
     sortBy: v.optional(
       v.union(
@@ -462,12 +772,17 @@ export const getOperationsQueue = query({
       documentCount: row.stats.documents,
       storyCount: row.stats.stories,
       openTaskCount: row.stats.tasks,
+      contextReportCount: row.stats.contextReports,
+      storyWorkflow: row.storyWorkflow,
       latestImportAt: row.latestImport?.importedAt ?? null,
       lastTouched: row.lastTouched,
       missingCritical: row.operations.criticalMissing,
       nextActions: row.operations.nextActions,
       staleChecksCount: row.operations.staleChecksCount,
       researchChecks: row.researchChecks,
+      storyReadinessScore:
+        (row.operations.requiredMissingCount === 0 ? 100 : row.operations.completionPercent) +
+        (row.hasStory ? 20 : 0),
       anchorPersonIdentifier: row.routeId,
       badge: row.researchStatus,
     }));
@@ -496,6 +811,8 @@ export const getOperationsQueue = query({
           documentCount: 0,
           storyCount: sourceStoryCount,
           openTaskCount: 0,
+          contextReportCount: 0,
+          storyWorkflow: "needs_genealogy_evidence" as const,
           latestImportAt: null,
           lastTouched: relative.updatedAt,
           missingCritical: ["identity_review", "relationships"],
@@ -504,6 +821,7 @@ export const getOperationsQueue = query({
           ],
           staleChecksCount: 0,
           researchChecks: [],
+          storyReadinessScore: 0,
           anchorPersonIdentifier: anchor?.fsId || String(relative.anchorPersonId),
           badge: relative.relationshipHint || "provisional",
         };
@@ -516,6 +834,7 @@ export const getOperationsQueue = query({
       if (args.rowType && row.rowType !== args.rowType) return false;
       if (args.storyStatus === "has_story" && row.storyCount === 0) return false;
       if (args.storyStatus === "no_story" && row.storyCount > 0) return false;
+      if (args.storyWorkflow && row.storyWorkflow !== args.storyWorkflow) return false;
       if (args.staleOnly && row.staleChecksCount === 0) return false;
       if (args.missingCheck && !row.missingCritical.includes(args.missingCheck)) return false;
       if (!search) return true;
@@ -533,7 +852,7 @@ export const getOperationsQueue = query({
         case "sourceCount":
           return direction * (a.sourceCount - b.sourceCount);
         case "storyReadiness":
-          return direction * ((a.storyCount > 0 ? 1 : 0) - (b.storyCount > 0 ? 1 : 0));
+          return direction * (a.storyReadinessScore - b.storyReadinessScore);
         case "newestImport":
           return direction * ((a.latestImportAt ?? 0) - (b.latestImportAt ?? 0));
         case "lastTouched":
@@ -593,6 +912,110 @@ export const getOperationsSummary = query({
       missingRequired: rows.reduce((total, row) => total + row.operations.requiredMissingCount, 0),
       staleChecks: rows.reduce((total, row) => total + row.operations.staleChecksCount, 0),
     };
+  },
+});
+
+export const getVaultAudit = query({
+  args: {
+    vaultOwnerId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
+    const peopleRows = buildPeopleRows(snapshot);
+    const storyWorkflowCounts = peopleRows.reduce<Record<string, number>>((totals, row) => {
+      totals[row.storyWorkflow] = (totals[row.storyWorkflow] || 0) + 1;
+      return totals;
+    }, {});
+    const peopleWithoutContext = peopleRows.filter((row) => row.contextCoverage.count === 0);
+    const peopleWithoutSources = peopleRows.filter((row) => row.stats.sources === 0);
+    const peopleWithoutStories = peopleRows.filter((row) => row.stats.stories === 0);
+
+    return {
+      counts: {
+        people: snapshot.people.length,
+        relationships: snapshot.relationships.length,
+        events: snapshot.events.length,
+        places: snapshot.places.length,
+        sources: snapshot.sources.length,
+        citations: snapshot.citations.length,
+        media: snapshot.media.length,
+        documents: snapshot.documents.length,
+        historicalContext: snapshot.historicalContext.length,
+        researchChecks: snapshot.researchChecks.length,
+        researchTasks: snapshot.researchTasks.length,
+        researchLog: snapshot.researchLog.length,
+        stories: snapshot.stories.length,
+        publishedStories: snapshot.stories.filter((story) => story.status === "published").length,
+      },
+      storyWorkflowCounts,
+      gaps: {
+        peopleWithoutSources: peopleWithoutSources.length,
+        peopleWithoutContext: peopleWithoutContext.length,
+        peopleWithoutStories: peopleWithoutStories.length,
+        openResearchTasks: snapshot.researchTasks.filter((task) => task.status !== "done").length,
+        placesWithoutContext: snapshot.places.filter(
+          (place) => !snapshot.historicalContext.some((entry) => entry.placeId === place._id)
+        ).length,
+      },
+      priorityPeople: peopleRows
+        .filter((row) => row.storyWorkflow !== "published")
+        .sort((a, b) => b.storyReadinessScore - a.storyReadinessScore)
+        .slice(0, 8)
+        .map((row) => ({
+          _id: row._id,
+          displayName: row.displayName,
+          routeId: row.routeId,
+          storyWorkflow: row.storyWorkflow,
+          completionPercent: row.operations.completionPercent,
+          sourceCount: row.stats.sources,
+          contextReportCount: row.stats.contextReports,
+          storyCount: row.stats.stories,
+          nextActions: row.operations.nextActions,
+        })),
+      recentContext: sortByTimestampDesc(snapshot.historicalContext).slice(0, 8),
+    };
+  },
+});
+
+export const getContextCoverage = query({
+  args: {
+    vaultOwnerId: v.string(),
+    personIdentifier: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
+    const person = getPersonByIdentifier(snapshot, args.personIdentifier);
+    if (!person) return null;
+    const operations = buildPersonOperations(snapshot, person);
+    return buildContextCoverage(snapshot, person, operations);
+  },
+});
+
+export const getStoryReadinessCandidates = query({
+  args: {
+    vaultOwnerId: v.string(),
+    storyWorkflow: v.optional(storyWorkflowValidator),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
+    const rows = buildPeopleRows(snapshot)
+      .filter((row) => !args.storyWorkflow || row.storyWorkflow === args.storyWorkflow)
+      .sort((a, b) => b.storyReadinessScore - a.storyReadinessScore)
+      .map((row) => ({
+        _id: row._id,
+        displayName: row.displayName,
+        routeId: row.routeId,
+        lifespan: getPersonLifespan(row),
+        storyWorkflow: row.storyWorkflow,
+        completionPercent: row.operations.completionPercent,
+        sourceCount: row.stats.sources,
+        contextReportCount: row.stats.contextReports,
+        storyCount: row.stats.stories,
+        nextActions: row.operations.nextActions,
+      }));
+
+    return args.limit ? rows.slice(0, args.limit) : rows;
   },
 });
 
@@ -774,6 +1197,7 @@ export const getContextPack = query({
       sources: workspace.sources,
       memories: workspace.media,
       documents: workspace.documents,
+      historicalContext: workspace.contextCoverage.entries,
       stories: workspace.stories,
       openResearchTasks: workspace.researchTasks.filter((task) => task.status !== "done"),
       unresolvedConflicts: workspace.importRuns.flatMap((run) => run.warnings).slice(0, 12),
@@ -822,6 +1246,15 @@ export const getContextPack = query({
       "## Places",
       "",
       ...workspace.places.map((place) => `- ${place.fullName || place.name || "Unknown place"}`),
+      "",
+      "## Historical and Local Context",
+      "",
+      ...(workspace.contextCoverage.entries.length > 0
+        ? workspace.contextCoverage.entries.map(
+            (entry) =>
+              `- ${entry.title} (${entry.topic.replace(/_/g, " ")}, ${entry.timePeriod.startYear}-${entry.timePeriod.endYear})`
+          )
+        : ["- No historical, place, era, church, building, news, or locality context reports linked yet."]),
       "",
       "## Sources",
       "",
