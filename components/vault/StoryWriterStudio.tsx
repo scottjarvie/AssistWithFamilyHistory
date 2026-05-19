@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Copy, Loader2, Save, Sparkles } from "lucide-react";
+import { ArrowRight, Copy, Loader2, Save, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { STORY_WRITER_MODES, STORY_WRITER_SYSTEM_PROMPT, buildStoryWriterPrompt, getStoryTitle, type StoryWriterMode } from "@/lib/ai/storyWriter";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +44,7 @@ export function StoryWriterStudio({ personId }: { personId: string }) {
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [lastModelUsed, setLastModelUsed] = useState<string>("manual");
+  const [savedStoryId, setSavedStoryId] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadContextPack() {
@@ -122,6 +123,7 @@ export function StoryWriterStudio({ personId }: { personId: string }) {
       }
 
       setDraft(payload.content);
+      setSavedStoryId(null);
       setLastModelUsed(settings.selectedModel || "manual");
       toast.success(`Generated ${STORY_WRITER_MODES[mode].outputLabel}`);
     } catch (generationError) {
@@ -160,7 +162,8 @@ export function StoryWriterStudio({ personId }: { personId: string }) {
         throw new Error(payload?.error || "Failed to save story draft");
       }
 
-      toast.success("Story draft saved to the vault");
+      setSavedStoryId(payload.storyId);
+      toast.success("Story draft saved to Story Studio");
     } catch (saveError) {
       toast.error(saveError instanceof Error ? saveError.message : "Failed to save story draft");
     } finally {
@@ -269,6 +272,14 @@ export function StoryWriterStudio({ personId }: { personId: string }) {
                 {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                 Save Draft
               </Button>
+              {savedStoryId ? (
+                <Button asChild className="bg-stone-900 hover:bg-stone-800">
+                  <Link href={`/app/stories/${savedStoryId}`}>
+                    Review Saved Story
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              ) : null}
               <Button asChild variant="ghost">
                 <Link href={`/app/people/${personId}`}>Back to Person Workspace</Link>
               </Button>
@@ -276,7 +287,10 @@ export function StoryWriterStudio({ personId }: { personId: string }) {
 
             <Textarea
               value={draft}
-              onChange={(event) => setDraft(event.target.value)}
+              onChange={(event) => {
+                setDraft(event.target.value);
+                setSavedStoryId(null);
+              }}
               className="min-h-[460px] text-sm leading-6"
               placeholder="Generate a draft in-app or paste a manual result here."
             />

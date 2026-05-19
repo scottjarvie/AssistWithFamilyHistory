@@ -4,6 +4,8 @@ import {
   ArrowLeft,
   ArrowRight,
   BookOpen,
+  CheckCircle2,
+  CircleAlert,
   Files,
   Globe2,
   ImageIcon,
@@ -68,6 +70,24 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
 
   const routeId = workspace.person.routeId || personId;
   const hasStoredRuns = workspace.importRuns.length > 0;
+  const storyCheckLabels: Record<string, string> = {
+    biography: "Biography or draft",
+    timeline: "Timeline coverage",
+    relationships: "Relationships",
+    birth_record: "Birth evidence",
+    death_record: "Death evidence",
+    memories: "Memories",
+    place_context: "Place context",
+  };
+  const storyReadinessChecks = workspace.researchChecks
+    .filter((check) => Object.keys(storyCheckLabels).includes(check.checkKey))
+    .map((check) => ({
+      key: check.checkKey,
+      label: storyCheckLabels[check.checkKey] || check.checkKey.replace(/_/g, " "),
+      status: check.status,
+      summary: check.summary,
+    }));
+  const currentStory = workspace.stories[0] ?? null;
 
   return (
     <div className="p-4 sm:p-8">
@@ -128,6 +148,123 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
         </TabsList>
 
         <TabsContent value="overview">
+          <section className="mb-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <Card className="border-stone-200 bg-white">
+              <CardHeader>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <CardTitle className="text-2xl">Story Readiness</CardTitle>
+                    <CardDescription>
+                      The overview starts with whether this person is ready to draft or publish, then keeps the operating data within reach.
+                    </CardDescription>
+                  </div>
+                  <div className="text-left sm:text-right">
+                    <p className="text-4xl font-semibold text-stone-900">{workspace.operations.completionPercent}%</p>
+                    <p className="text-xs uppercase tracking-[0.18em] text-stone-400">coverage</p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {storyReadinessChecks.map((check) => (
+                    <div key={check.key} className="border border-stone-200 bg-stone-50 px-3 py-3">
+                      <div className="flex items-center gap-2">
+                        {check.status === "complete" ? (
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        ) : (
+                          <CircleAlert className="h-4 w-4 text-amber-700" />
+                        )}
+                        <p className="text-sm font-medium text-stone-900">{check.label}</p>
+                      </div>
+                      <p className="mt-2 text-xs leading-5 text-stone-500">{check.summary || check.status}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <Button asChild className="bg-amber-700 hover:bg-amber-800">
+                    <Link href={`/app/people/${routeId}/story-writer`}>Draft from context pack</Link>
+                  </Button>
+                  <Button asChild variant="outline">
+                    <Link href="/app/stories">Open Story Studio</Link>
+                  </Button>
+                  {currentStory ? (
+                    <Button asChild variant="outline">
+                      <Link href={`/app/stories/${currentStory._id}`}>Review latest saved story</Link>
+                    </Button>
+                  ) : null}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-stone-200 bg-white">
+              <CardHeader>
+                <CardTitle>Life Sketch Preview</CardTitle>
+                <CardDescription>Quick story frame before diving into dense tabs.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm leading-6 text-stone-600">
+                <p>
+                  <span className="font-medium text-stone-900">{workspace.person.displayName}</span>
+                  {workspace.person.birth?.date?.original ? ` was born ${workspace.person.birth.date.original}` : " has an unknown birth date"}
+                  {workspace.person.birth?.place?.original ? ` in ${workspace.person.birth.place.original}` : ""}.
+                  {workspace.person.death?.date?.original ? ` Death is recorded as ${workspace.person.death.date.original}` : ""}
+                  {workspace.person.death?.place?.original ? ` in ${workspace.person.death.place.original}` : ""}.
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    ["Events", workspace.stats.events],
+                    ["Relationships", workspace.relationships.length],
+                    ["Stories", workspace.stats.stories],
+                    ["Context", workspace.stats.contextReports],
+                  ].map(([label, value]) => (
+                    <div key={label} className="border border-stone-200 px-3 py-3">
+                      <p className="text-lg font-semibold text-stone-900">{value}</p>
+                      <p className="text-xs text-stone-500">{label}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-stone-200 bg-white xl:col-span-2">
+              <CardHeader>
+                <CardTitle>Contextual Research</CardTitle>
+                <CardDescription>
+                  The non-genealogy research that helps turn names, dates, and places into a story: churches, buildings, local history, eras, migration, news, and daily life.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4 lg:grid-cols-[260px_1fr]">
+                <div className="grid grid-cols-2 gap-2 text-center text-sm lg:grid-cols-1">
+                  <div className="border border-stone-200 bg-stone-50 px-3 py-4">
+                    <p className="text-2xl font-semibold text-stone-900">{workspace.contextCoverage.count}</p>
+                    <p className="text-xs text-stone-500">context reports</p>
+                  </div>
+                  <div className="border border-stone-200 bg-stone-50 px-3 py-4">
+                    <p className="text-2xl font-semibold text-stone-900">
+                      {workspace.contextCoverage.placeCountWithContext}/{workspace.contextCoverage.relatedPlaceCount}
+                    </p>
+                    <p className="text-xs text-stone-500">places covered</p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  {workspace.contextCoverage.entries.length === 0 ? (
+                    <div className="rounded-md border border-dashed border-stone-200 px-4 py-6 text-sm leading-6 text-stone-500">
+                      This person has genealogy data, but no linked contextual research reports yet. Add place and era context from the relevant place workspaces before treating the story as ready.
+                    </div>
+                  ) : (
+                    workspace.contextCoverage.entries.slice(0, 4).map((entry) => (
+                      <div key={String(entry._id)} className="border border-stone-200 px-4 py-3">
+                        <p className="font-medium text-stone-900">{entry.title}</p>
+                        <p className="mt-1 text-sm text-stone-500">
+                          {entry.topic.replace(/_/g, " ")} · {entry.timePeriod.startYear}-{entry.timePeriod.endYear}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+
           <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
             <Card className="border-stone-200">
               <CardHeader>
@@ -535,8 +672,18 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
                     <CardTitle>{story.title}</CardTitle>
                     <CardDescription>{story.type.replace(/_/g, " ")} · {story.status}</CardDescription>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="space-y-4">
                     <p className="whitespace-pre-wrap text-sm text-stone-600">{story.content}</p>
+                    <div className="flex flex-wrap gap-3">
+                      <Button asChild variant="outline" size="sm">
+                        <Link href={`/app/stories/${story._id}`}>Review in Story Studio</Link>
+                      </Button>
+                      {story.status === "published" ? (
+                        <Button asChild variant="outline" size="sm">
+                          <Link href={`/stories/${story._id}`} target="_blank">Open public page</Link>
+                        </Button>
+                      ) : null}
+                    </div>
                   </CardContent>
                 </Card>
               ))

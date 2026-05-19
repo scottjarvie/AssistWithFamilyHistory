@@ -33,10 +33,10 @@ export default async function StoryWriterPage() {
 
   const client = getConvexClient();
   const { vaultOwnerId } = await getVaultAccessContext();
-  let people: Awaited<ReturnType<typeof client.query<typeof api.vault.getPeopleExplorer>>>;
+  let people;
 
   try {
-    people = await client.query(api.vault.getPeopleExplorer, {
+    people = await client.query(api.vault.getStoryReadinessCandidates, {
       vaultOwnerId,
       limit: 24,
     });
@@ -77,10 +77,10 @@ export default async function StoryWriterPage() {
                     </div>
                     <CardTitle>{person.displayName}</CardTitle>
                     <CardDescription>
-                      {person.stats.sources} sources · {person.stats.memories} memories · {person.stats.documents} documents
+                      {person.sourceCount} sources · {person.contextReportCount} context reports · {person.completionPercent}% ready
                     </CardDescription>
                   </div>
-                  <Badge variant="secondary">{person.fsId || "No FS ID"}</Badge>
+                  <Badge variant="secondary">{person.storyWorkflow.replace(/_/g, " ")}</Badge>
                 </div>
               </CardHeader>
               <CardContent>

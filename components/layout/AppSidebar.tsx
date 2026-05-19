@@ -35,6 +35,8 @@ import {
   MapPinned,
   ClipboardList,
   TableProperties,
+  ExternalLink,
+  Gauge,
   type LucideIcon
 } from "lucide-react";
 import { useState } from "react";
@@ -65,7 +67,7 @@ type NavSection = {
 
 const navSections: NavSection[] = [
   {
-    label: "Workspace",
+    label: "Workflow",
     items: [
       {
         href: "/app",
@@ -76,7 +78,7 @@ const navSections: NavSection[] = [
     ],
   },
   {
-    label: "Research Vault",
+    label: "Vault",
     items: [
       {
         href: "/app/people",
@@ -96,7 +98,7 @@ const navSections: NavSection[] = [
     ],
   },
   {
-    label: "Research Work",
+    label: "Research Queue",
     items: [
       {
         href: "/app/operations",
@@ -108,15 +110,30 @@ const navSections: NavSection[] = [
         label: "Research Log",
         icon: ClipboardList,
       },
+      {
+        href: "/app/audit",
+        label: "Vault Audit",
+        icon: Gauge,
+      },
     ],
   },
   {
-    label: "Stories & Tools",
+    label: "Story Studio",
     items: [
+      {
+        href: "/app/stories",
+        label: "Story Studio",
+        icon: BookOpen,
+      },
       {
         href: "/app/story-writer",
         label: "Story Writer",
         icon: PenTool,
+      },
+      {
+        href: "/app/stories?status=published",
+        label: "Published Stories",
+        icon: ExternalLink,
       },
       {
         href: "/app/timeline",
@@ -131,11 +148,11 @@ const navSections: NavSection[] = [
 interface SidebarAccessProps {
   accountMode: "user" | "local" | "anonymous";
   vaultOwnerId: string;
+  clerkEnabled: boolean;
 }
 
-export function AppMobileNav({ accountMode, vaultOwnerId }: SidebarAccessProps) {
+export function AppMobileNav({ accountMode, vaultOwnerId, clerkEnabled }: SidebarAccessProps) {
   const pathname = usePathname();
-  const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 
   const isActive = (href: string, exact?: boolean) => {
     if (exact) return pathname === href;
@@ -244,10 +261,9 @@ export function AppMobileNav({ accountMode, vaultOwnerId }: SidebarAccessProps) 
   );
 }
 
-export function AppSidebar({ accountMode, vaultOwnerId }: SidebarAccessProps) {
+export function AppSidebar({ accountMode, vaultOwnerId, clerkEnabled }: SidebarAccessProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
-  const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 
   const isActive = (href: string, exact?: boolean) => {
     if (exact) return pathname === href;
