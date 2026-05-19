@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, BookOpen, ImageIcon, MapPinned, Users } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ContextReportForm } from "@/components/vault/ContextReportForm";
 import { VaultStateCard } from "@/components/vault/VaultStateCard";
 import {
   getConvexClient,
@@ -55,6 +56,11 @@ export default async function PlaceWorkspacePage({ params }: PageProps) {
   if (!workspace) {
     notFound();
   }
+  const eventYears = workspace.events
+    .map((event) => event.date?.year)
+    .filter((year): year is number => typeof year === "number");
+  const startYear = eventYears.length > 0 ? Math.min(...eventYears) : undefined;
+  const endYear = eventYears.length > 0 ? Math.max(...eventYears) : undefined;
 
   return (
     <div className="p-4 sm:p-8">
@@ -161,6 +167,26 @@ export default async function PlaceWorkspacePage({ params }: PageProps) {
           <Card className="border-stone-200">
             <CardHeader>
               <div className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-amber-700" />
+                <CardTitle>Add Context Report</CardTitle>
+              </div>
+              <CardDescription>
+                Store researched history about this place, its buildings, churches, economy, migration, era, or local news in Convex.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ContextReportForm
+                placeId={String(workspace.place._id)}
+                placeName={workspace.place.fullName || workspace.place.name}
+                startYear={startYear}
+                endYear={endYear}
+              />
+            </CardContent>
+          </Card>
+
+          <Card className="border-stone-200">
+            <CardHeader>
+              <div className="flex items-center gap-2">
                 <MapPinned className="h-5 w-5 text-amber-700" />
                 <CardTitle>Events at This Place</CardTitle>
               </div>
@@ -225,7 +251,15 @@ export default async function PlaceWorkspacePage({ params }: PageProps) {
                 workspace.contextEntries.map((entry) => (
                   <div key={String(entry._id)} className="rounded-2xl border border-stone-200 px-4 py-4">
                     <p className="font-medium text-stone-900">{entry.title}</p>
-                    <p className="mt-1 text-sm text-stone-500">{entry.topic.replace(/_/g, " ")}</p>
+                    <p className="mt-1 text-sm text-stone-500">
+                      {entry.topic.replace(/_/g, " ")} · {entry.timePeriod.startYear}-{entry.timePeriod.endYear}
+                    </p>
+                    <p className="mt-3 line-clamp-4 text-sm leading-6 text-stone-600">{entry.content}</p>
+                    {entry.sources.length > 0 ? (
+                      <p className="mt-3 text-xs uppercase tracking-[0.16em] text-stone-400">
+                        {entry.sources.length} source{entry.sources.length === 1 ? "" : "s"}
+                      </p>
+                    ) : null}
                   </div>
                 ))
               )}
