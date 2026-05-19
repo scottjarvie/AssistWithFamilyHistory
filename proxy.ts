@@ -1,5 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { isClerkEnabled } from "@/lib/clerk/config";
 import { VAULT_PREVIEW_COOKIE } from "@/lib/vault/constants";
 
 const isProtectedRoute = createRouteMatcher([
@@ -10,9 +11,7 @@ const isProtectedRoute = createRouteMatcher([
   "/api/convex(.*)",
 ]);
 
-const hasClerkKeys = Boolean(
-  process.env.CLERK_SECRET_KEY && process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-);
+const hasClerkKeys = isClerkEnabled();
 const requireAuth = process.env.REQUIRE_AUTH === "true";
 
 const legacyHosts = new Set([
