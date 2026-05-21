@@ -1,0 +1,44 @@
+{
+  "story": {
+    "status": "review",
+    "title": "Private Note Risk",
+    "content": "This story has enough evidence and context for public review, but the person record carries private-note signals. A trusted publisher should investigate and remove or resolve the sensitive note before any public page can be published, even when the source person is clearly deceased.",
+    "citationIds": ["citation-1"]
+  },
+  "person": {
+    "displayName": "Anna Morgan",
+    "living": false,
+    "birth": { "date": { "year": 1888, "original": "1888" } },
+    "death": { "date": { "year": 1954, "original": "1954" } },
+    "notes": "Private family dispute details. Do not publish without review.",
+    "tags": ["private"]
+  },
+  "readiness": {
+    "completionPercent": 100,
+    "requiredMissingCount": 0,
+    "criticalMissing": [],
+    "nextActions": []
+  },
+  "researchChecks": [
+    {
+      "checkKey": "biography",
+      "status": "complete",
+      "applicability": "required",
+      "summary": "Biography reviewed.",
+      "confidence": 0.92
+    }
+  ],
+  "contextCoverage": {
+    "count": 1,
+    "status": "covered",
+    "relatedPlaceCount": 1,
+    "placeCountWithContext": 1,
+    "missingPlaces": []
+  },
+  "evidence": [{ "source": { "title": "County history" }, "citations": ["citation-1"] }],
+  "events": [{ "type": "birth", "date": { "year": 1888 } }],
+  "places": [{ "name": "Boise" }],
+  "relationships": [],
+  "provisionalRelatives": [],
+  "publishWarnings": []
+}

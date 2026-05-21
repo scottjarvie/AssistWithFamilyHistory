@@ -23,6 +23,7 @@ Publishing is blocked when any of these are true:
 - required research checks are missing, in progress, or need review;
 - no historical/local context is attached;
 - the person is marked living or is probably living from missing/young date evidence;
+- related people, recent events, private notes/tags, or modern/private sources create living-family risk;
 - unresolved provisional relatives remain attached to the person;
 - the draft is too short to carry grounded public context;
 - the story is still in draft rather than review.
@@ -33,10 +34,33 @@ Partial place context is a warning, not a blocker, so reviewers can still publis
 
 - `story_writer`: can create and edit drafts, and can move work toward review.
 - `trusted_operator`: required for public publishing.
-- `GET /api/stories/[id]/status` returns a side-effect-free publish preview.
+- `GET /api/stories/[id]/status` returns publish preview.
 - `GET /api/stories/[id]/status?format=handoff` includes a story handoff packet for writer/reviewer/publisher agents.
+- `GET /api/stories/[id]/status?record=true` stores a publish-preview audit snapshot.
+- `PATCH /api/stories/[id]/review` assigns a reviewer and records an assignment event.
 - `PATCH /api/stories/[id]/status` blocks public publishing unless gates pass and explicit human review confirmation is present.
-- No API key, tier, or issued scope model exists yet; these are capability planning terms.
+- `GET /api/capabilities` tells agents what story actions the current role can perform.
+- Explicit `story_writer` actors can draft, edit, request review, and preview publish gates, but cannot publish public stories.
+- No API key, tier, or issued scope model exists yet; role checks are internal request-level authority checks.
+
+## Public Sharing Decision For Beta
+
+Public beta stays status-only for now:
+
+- `draft` and `review` stories must 404 publicly.
+- `published` stories render publicly.
+- Story metadata is generated only through the published-story query.
+- Public story metadata is `noindex` during beta until launch posture is revisited.
+
+Do not add unlisted, family-only, comments, or takedown settings before the first beta review pass. If users need more nuance, add a dedicated sharing-settings model after GEN-45 is reviewed.
+
+## Versioning Decision For Beta
+
+Use lightweight review history now, not full draft versioning:
+
+- record publish previews, reviewer assignments, status changes, and publish confirmations;
+- include readiness score, blocker/warning counts, actor role, assignment, and human review note;
+- defer content diff/restore/version comparison until GEN-19 is explicitly chosen.
 
 ## Verification
 
@@ -60,6 +84,6 @@ For browser QA, inspect `/app/stories/[storyId]` and verify:
 
 - Decide whether public story pages need owner-controlled sharing settings beyond status.
 - Add role-aware credentials before exposing story writer or trusted publisher as API scopes.
-- Add audit history for publish preview and publish confirmation.
-- Add stronger living-person detection from relationship graph and source data.
-- Add reviewer assignment and second-review workflows once multiple operators are active.
+- Add stronger second-review workflows once multiple operators are active.
+- Implement issued API keys/scopes if external agents need direct story access.
+- Decide story slug and share-preview behavior after status-only beta sharing is accepted.

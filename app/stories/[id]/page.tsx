@@ -15,15 +15,57 @@ import {
   isConvexConfigured,
 } from "@/lib/convex/server";
 import { createPageMetadata } from "@/lib/seo";
-import { canRenderPublicStory } from "@/lib/stories/publicStoryPolicy";
-
-export const metadata: Metadata = createPageMetadata({
-  title: "Ancestor Story",
-  description: "A published ancestor story with supporting evidence and historical context.",
-  path: "/stories",
-});
+import { buildPublicStoryMetadata, canRenderPublicStory } from "@/lib/stories/publicStoryPolicy";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+
+  if (!isConvexConfigured()) {
+    return createPageMetadata({
+      title: "Ancestor Story",
+      description: "A published ancestor story with supporting evidence and historical context.",
+      path: `/stories/${id}`,
+    });
+  }
+
+  try {
+    const bundle = await getConvexClient().query(api.vault.getPublishedStory, {
+      storyId: id as Id<"stories">,
+    });
+    const storyMetadata = bundle
+      ? buildPublicStoryMetadata({
+          story: bundle.story,
+          person: bundle.person,
+        })
+      : buildPublicStoryMetadata({
+          story: { status: "draft", title: "Story not available" },
+          person: null,
+        });
+    return {
+      ...createPageMetadata({
+        title: storyMetadata.title,
+        description: storyMetadata.description,
+        path: `/stories/${id}`,
+      }),
+      robots: storyMetadata.robots,
+    };
+  } catch {
+    return {
+      ...createPageMetadata({
+        title: "Story not available",
+        description: "This story is not published.",
+        path: `/stories/${id}`,
+      }),
+      robots: { index: false, follow: false },
+    };
+  }
+}
 
 function formatEventDate(event: { date?: { original?: string; year?: number } }) {
   return event.date?.original || event.date?.year?.toString() || "Undated";

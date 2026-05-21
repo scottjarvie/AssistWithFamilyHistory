@@ -32,6 +32,7 @@ const expectedProtected = [
   "/api/people/abc/context-pack",
   "/api/import",
   "/api/process",
+  "/api/capabilities",
   "/api/convex/stats",
   "/api/operations/queue",
   "/api/operations/checks",

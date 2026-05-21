@@ -13,6 +13,7 @@ import {
   MapPinned,
   Milestone,
   ShieldCheck,
+  UserCheck,
   UserRound,
 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
@@ -21,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StoryEditorForm } from "@/components/vault/StoryEditorForm";
+import { StoryReviewAssignmentForm } from "@/components/vault/StoryReviewAssignmentForm";
 import { StoryStatusActions } from "@/components/vault/StoryStatusActions";
 import { VaultStateCard } from "@/components/vault/VaultStateCard";
 import {
@@ -55,6 +57,17 @@ const publishGateTone = {
 
 function formatEventDate(event: { date?: { original?: string; year?: number } }) {
   return event.date?.original || event.date?.year?.toString() || "Undated";
+}
+
+function formatReviewEventDate(value?: number) {
+  if (!value) return "Unknown time";
+  return new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
 }
 
 export default async function StoryReviewPage({
@@ -108,6 +121,7 @@ export default async function StoryReviewPage({
     historicalContext,
     relationships,
     provisionalRelatives,
+    reviewHistory = [],
   } = bundle;
   const publishReadiness = assessStoryPublishReadiness({
     story,
@@ -302,6 +316,24 @@ export default async function StoryReviewPage({
                   ))}
                 </div>
               ) : null}
+            </CardContent>
+          </Card>
+
+          <Card className="border-stone-200">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <UserCheck className="h-5 w-5 text-amber-700" />
+                Review Owner
+              </CardTitle>
+              <CardDescription>
+                Assign the person responsible for clearing gates before trusted publish.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <StoryReviewAssignmentForm
+                storyId={String(story._id)}
+                assignedReviewer={story.assignedReviewer}
+              />
             </CardContent>
           </Card>
 
@@ -521,6 +553,54 @@ export default async function StoryReviewPage({
                     {entry.topic.replace(/_/g, " ")} · {entry.timePeriod.startYear}-{entry.timePeriod.endYear}
                   </p>
                   <p className="mt-3 line-clamp-4 text-sm leading-6 text-stone-600">{entry.content}</p>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="mt-6">
+        <Card className="border-stone-200">
+          <CardHeader>
+            <CardTitle>Review History</CardTitle>
+            <CardDescription>
+              Publish previews, reviewer assignments, and status changes recorded for this story.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {reviewHistory.length === 0 ? (
+              <p className="text-sm text-stone-500">No review activity has been recorded yet.</p>
+            ) : (
+              reviewHistory.map((event) => (
+                <div key={String(event._id)} className="border border-stone-200 bg-stone-50 px-4 py-4">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="font-medium text-stone-900">{event.eventType.replace(/_/g, " ")}</p>
+                      <p className="mt-1 text-sm text-stone-600">
+                        {event.fromStatus && event.toStatus ? `${event.fromStatus} -> ${event.toStatus}` : "No status change"}
+                        {event.assignedTo ? ` · Assigned to ${event.assignedTo}` : ""}
+                      </p>
+                    </div>
+                    <p className="text-xs uppercase tracking-[0.14em] text-stone-500">
+                      {formatReviewEventDate(event.createdAt)}
+                    </p>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-stone-600">
+                    <span className="rounded-full bg-white px-2 py-1">actor: {event.actorRole}</span>
+                    {typeof event.readinessScore === "number" ? (
+                      <span className="rounded-full bg-white px-2 py-1">score: {event.readinessScore}%</span>
+                    ) : null}
+                    {typeof event.blockerCount === "number" ? (
+                      <span className="rounded-full bg-white px-2 py-1">blockers: {event.blockerCount}</span>
+                    ) : null}
+                    {typeof event.warningCount === "number" ? (
+                      <span className="rounded-full bg-white px-2 py-1">warnings: {event.warningCount}</span>
+                    ) : null}
+                  </div>
+                  {event.humanReviewNote ? (
+                    <p className="mt-3 text-sm leading-6 text-stone-700">{event.humanReviewNote}</p>
+                  ) : null}
                 </div>
               ))
             )}

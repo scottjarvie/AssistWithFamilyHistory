@@ -26,7 +26,7 @@ export function StoryStatusActions({
   async function previewPublishGates() {
     setPendingAction("preview");
     try {
-      const response = await fetch(`/api/stories/${storyId}/status?format=handoff`);
+      const response = await fetch(`/api/stories/${storyId}/status?format=handoff&record=true`);
       const payload = await response.json();
 
       if (!response.ok || !payload?.success) {

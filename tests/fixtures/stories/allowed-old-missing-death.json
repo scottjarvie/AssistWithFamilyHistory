@@ -1,0 +1,41 @@
+{
+  "story": {
+    "status": "review",
+    "title": "Old Enough Without Death Date",
+    "content": "This story has enough evidence, context, and narrative detail to be reviewed for public beta even though the source person lacks a death date. The birth year is old enough that the living-person risk clears the beta threshold. Reviewers should still prefer a death record when possible, but the missing death date alone should not block public publishing for a person born well over a century ago in a clearly historical setting.",
+    "citationIds": ["citation-1"]
+  },
+  "person": {
+    "displayName": "Samuel Oldham",
+    "living": false,
+    "birth": { "date": { "year": 1792, "original": "1792" } }
+  },
+  "readiness": {
+    "completionPercent": 100,
+    "requiredMissingCount": 0,
+    "criticalMissing": [],
+    "nextActions": []
+  },
+  "researchChecks": [
+    {
+      "checkKey": "timeline",
+      "status": "complete",
+      "applicability": "required",
+      "summary": "Timeline reviewed.",
+      "confidence": 0.9
+    }
+  ],
+  "contextCoverage": {
+    "count": 1,
+    "status": "covered",
+    "relatedPlaceCount": 1,
+    "placeCountWithContext": 1,
+    "missingPlaces": []
+  },
+  "evidence": [{ "source": { "title": "Parish register" }, "citations": ["citation-1"] }],
+  "events": [{ "type": "birth", "date": { "year": 1792 } }],
+  "places": [{ "name": "Kent" }],
+  "relationships": [],
+  "provisionalRelatives": [],
+  "publishWarnings": []
+}

@@ -22,6 +22,8 @@ export type StoryPublishSafetyInput = {
     living?: boolean;
     birth?: { date?: { year?: number; original?: string } };
     death?: { date?: { year?: number; original?: string } };
+    notes?: string;
+    tags?: string[];
   } | null;
   readiness?: {
     completionPercent?: number;
@@ -43,10 +45,28 @@ export type StoryPublishSafetyInput = {
     placeCountWithContext?: number;
     missingPlaces?: Array<{ name?: string }>;
   } | null;
-  evidence?: Array<{ citations?: unknown[] }>;
-  events?: unknown[];
+  evidence?: Array<{
+    source?: {
+      title?: string;
+      notes?: string;
+      publicationDate?: string;
+    };
+    citations?: unknown[];
+  }>;
+  events?: Array<{ type?: string; date?: { year?: number; original?: string }; endDate?: { year?: number } }>;
   places?: unknown[];
-  relationships?: unknown[];
+  relationships?: Array<{
+    type?: string;
+    childRelationType?: string;
+    relatedName?: string;
+    relatedPerson?: {
+      living?: boolean;
+      birth?: { date?: { year?: number; original?: string } };
+      death?: { date?: { year?: number; original?: string } };
+      notes?: string;
+      tags?: string[];
+    };
+  } | null>;
   provisionalRelatives?: Array<{
     displayName?: string;
     relationshipHint?: string;
@@ -79,6 +99,10 @@ export type StoryPublishReadiness = {
     relationships: number;
     provisionalRelatives: number;
   };
+  privacyRisk: {
+    isBlocked: boolean;
+    reasons: string[];
+  };
   recommendedNextActions: string[];
 };
 
@@ -102,19 +126,82 @@ function totalCitationCount(input: StoryPublishSafetyInput) {
   return Math.max(storyCitations, evidenceCitations);
 }
 
-function isProbablyLiving(input: StoryPublishSafetyInput) {
-  const person = input.person;
-  if (!person) return false;
-  if (person.living) return true;
+function includesPrivateSignal(value: string | undefined) {
+  if (!value) return false;
+  return /\b(private|living|do not publish|do-not-publish|sensitive|minor|confidential)\b/i.test(value);
+}
 
-  const deathYear = person.death?.date?.year;
-  if (deathYear) return false;
+function tagsIncludePrivateSignal(tags: string[] | undefined) {
+  return (tags ?? []).some((tag) => includesPrivateSignal(tag));
+}
 
+function ageFromBirthYear(birthYear: number | undefined, nowYear: number) {
+  return typeof birthYear === "number" ? nowYear - birthYear : null;
+}
+
+function getPersonLivingRiskReasons(
+  label: string,
+  person: StoryPublishSafetyInput["person"],
+  nowYear: number
+) {
+  const reasons: string[] = [];
+  if (!person) return reasons;
+
+  if (person.living) {
+    reasons.push(`${label} is marked living.`);
+  }
   const birthYear = person.birth?.date?.year;
-  if (!birthYear) return true;
+  const deathYear = person.death?.date?.year;
+  const age = ageFromBirthYear(birthYear, nowYear);
 
+  if (!deathYear && !birthYear) {
+    reasons.push(`${label} has no birth or death year to clear living-person risk.`);
+  } else if (!deathYear && age !== null && age < livingPrivacyAgeThreshold) {
+    reasons.push(`${label} has no death year and would be about ${age}.`);
+  }
+
+  if (includesPrivateSignal(person.notes) || tagsIncludePrivateSignal(person.tags)) {
+    reasons.push(`${label} has private or sensitive notes/tags.`);
+  }
+
+  return reasons;
+}
+
+export function assessStoryPrivacyRisk(input: StoryPublishSafetyInput) {
   const nowYear = input.nowYear ?? new Date().getFullYear();
-  return nowYear - birthYear < livingPrivacyAgeThreshold;
+  const reasons = getPersonLivingRiskReasons("Source person", input.person, nowYear);
+
+  for (const relationship of input.relationships ?? []) {
+    if (!relationship) continue;
+    const relatedPerson = relationship.relatedPerson;
+    const label = relationship.relatedName ? `Related person ${relationship.relatedName}` : "A related person";
+    const relationshipReasons = getPersonLivingRiskReasons(label, relatedPerson ?? null, nowYear);
+    for (const reason of relationshipReasons) {
+      reasons.push(reason);
+    }
+  }
+
+  for (const event of input.events ?? []) {
+    const year = event.endDate?.year ?? event.date?.year;
+    if (year && nowYear - year < livingPrivacyAgeThreshold && event.type !== "death" && event.type !== "burial") {
+      reasons.push(`A ${event.type || "life"} event is dated ${year}, which may involve living people.`);
+    }
+  }
+
+  for (const entry of input.evidence ?? []) {
+    if (includesPrivateSignal(entry.source?.title) || includesPrivateSignal(entry.source?.notes)) {
+      reasons.push(`Source "${entry.source?.title || "Untitled source"}" carries private/sensitive wording.`);
+    }
+    const publicationYear = Number(entry.source?.publicationDate?.match(/\d{4}/)?.[0]);
+    if (publicationYear && nowYear - publicationYear < 30) {
+      reasons.push(`Source "${entry.source?.title || "Untitled source"}" has a modern publication date (${publicationYear}).`);
+    }
+  }
+
+  return {
+    isBlocked: reasons.length > 0,
+    reasons: Array.from(new Set(reasons)).slice(0, 8),
+  };
 }
 
 function makeGate(
@@ -142,6 +229,7 @@ export function assessStoryPublishReadiness(input: StoryPublishSafetyInput): Sto
       check.applicability === "required" &&
       (check.status === "missing" || check.status === "needs_review" || check.status === "in_progress")
   );
+  const privacyRisk = assessStoryPrivacyRisk(input);
   const gates: StoryPublishGate[] = [];
 
   gates.push(
@@ -219,12 +307,12 @@ export function assessStoryPublishReadiness(input: StoryPublishSafetyInput): Sto
   );
 
   gates.push(
-    isProbablyLiving(input)
+    privacyRisk.isBlocked
       ? makeGate(
           "privacy_living_status",
           "Private or living risk",
           "blocker",
-          "This person is marked living or lacks enough death/age evidence to clear public sharing.",
+          privacyRisk.reasons.join(" "),
           "trusted_publisher"
         )
       : makeGate(
@@ -335,6 +423,7 @@ export function assessStoryPublishReadiness(input: StoryPublishSafetyInput): Sto
       relationships: input.relationships?.length ?? 0,
       provisionalRelatives,
     },
+    privacyRisk,
     recommendedNextActions,
   };
 }

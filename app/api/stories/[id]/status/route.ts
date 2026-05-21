@@ -3,8 +3,13 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { getConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
 import { requireHumanReviewConfirmation } from "@/lib/operations/reviewGates";
+import {
+  getActionForStatusChange,
+  requireStoryAction,
+  resolveStoryActor,
+} from "@/lib/stories/capabilities";
 import { buildStoryHandoffPacket } from "@/lib/stories/handoff";
-import { assessStoryPublishReadiness } from "@/lib/stories/publishSafety";
+import { assessStoryPublishReadiness, type StoryPublishReadiness } from "@/lib/stories/publishSafety";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
 function isStoryStatus(value: unknown): value is "draft" | "review" | "published" {
@@ -50,6 +55,48 @@ function buildPublishPreview(bundle: NonNullable<Awaited<ReturnType<typeof getSt
   return { publishReadiness, handoffPacket };
 }
 
+function toAuditSnapshot(readiness: StoryPublishReadiness) {
+  return {
+    canPublish: readiness.canPublish,
+    status: readiness.status,
+    score: readiness.score,
+    summary: readiness.summary,
+    blockers: readiness.blockers,
+    warnings: readiness.warnings,
+    provenance: readiness.provenance,
+    recommendedNextActions: readiness.recommendedNextActions,
+  };
+}
+
+async function recordReviewEvent(params: {
+  vaultOwnerId: string;
+  storyId: string;
+  eventType: "publish_preview" | "status_change" | "publish_confirmation";
+  actorRole: "first_party_owner" | "story_writer" | "reviewer" | "trusted_publisher" | "unknown";
+  actorName?: string;
+  fromStatus?: "draft" | "review" | "published";
+  toStatus?: "draft" | "review" | "published";
+  reviewerName?: string;
+  humanReviewNote?: string;
+  publishReadiness?: StoryPublishReadiness;
+}) {
+  return getConvexClient().mutation(api.vaultMutations.recordStoryReviewEvent, {
+    vaultOwnerId: params.vaultOwnerId,
+    storyId: params.storyId as Id<"stories">,
+    eventType: params.eventType,
+    actorRole: params.actorRole,
+    actorName: params.actorName,
+    fromStatus: params.fromStatus,
+    toStatus: params.toStatus,
+    reviewerName: params.reviewerName,
+    humanReviewNote: params.humanReviewNote,
+    readinessSnapshot: params.publishReadiness ? toAuditSnapshot(params.publishReadiness) : undefined,
+    blockerCount: params.publishReadiness?.blockers.length,
+    warningCount: params.publishReadiness?.warnings.length,
+    readinessScore: params.publishReadiness?.score,
+  });
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -70,10 +117,27 @@ export async function GET(
 
     const preview = buildPublishPreview(bundle);
     const format = request.nextUrl.searchParams.get("format");
+    const shouldRecord = request.nextUrl.searchParams.get("record") === "true";
+    const actor = resolveStoryActor(request);
+
+    if (shouldRecord) {
+      await recordReviewEvent({
+        vaultOwnerId,
+        storyId: id,
+        eventType: "publish_preview",
+        actorRole: actor.role,
+        actorName: actor.name,
+        fromStatus: bundle.story.status,
+        toStatus: bundle.story.status,
+        publishReadiness: preview.publishReadiness,
+      });
+    }
 
     return NextResponse.json({
       success: true,
       preview: true,
+      recorded: shouldRecord,
+      actor,
       storyStatus: bundle.story.status,
       publishReadiness: preview.publishReadiness,
       handoffPacket: format === "handoff" ? preview.handoffPacket : undefined,
@@ -96,13 +160,20 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
+    const actor = resolveStoryActor(request, body);
 
     if (!isStoryStatus(body.status)) {
       return NextResponse.json({ error: "Invalid story status" }, { status: 400 });
     }
 
+    const denied = requireStoryAction(actor.role, getActionForStatusChange(body.status));
+    if (denied) {
+      return NextResponse.json(denied, { status: 403 });
+    }
+
     const { vaultOwnerId } = await getVaultAccessContext();
     let publishReadiness;
+    let fromStatus: "draft" | "review" | "published" | undefined;
 
     if (body.status === "published") {
       const bundle = await getStoryBundle(vaultOwnerId, id);
@@ -111,6 +182,7 @@ export async function PATCH(
         return NextResponse.json({ error: "Story not found" }, { status: 404 });
       }
 
+      fromStatus = bundle.story.status;
       publishReadiness = buildPublishPreview(bundle).publishReadiness;
       if (!publishReadiness.canPublish) {
         return NextResponse.json(
@@ -141,13 +213,32 @@ export async function PATCH(
       }
     }
 
+    if (!fromStatus) {
+      const bundle = await getStoryBundle(vaultOwnerId, id);
+      fromStatus = bundle?.story.status;
+    }
+
     const result = await getConvexClient().mutation(api.vaultMutations.updateStoryStatus, {
       vaultOwnerId,
       storyId: id as Id<"stories">,
       status: body.status,
     });
 
-    return NextResponse.json({ success: true, publishReadiness, ...result });
+    await recordReviewEvent({
+      vaultOwnerId,
+      storyId: id,
+      eventType: body.status === "published" ? "publish_confirmation" : "status_change",
+      actorRole: actor.role,
+      actorName: actor.name,
+      fromStatus,
+      toStatus: body.status,
+      reviewerName: typeof body.reviewerName === "string" ? body.reviewerName.trim() : undefined,
+      humanReviewNote:
+        typeof body.humanReviewNote === "string" ? body.humanReviewNote.trim() : undefined,
+      publishReadiness,
+    });
+
+    return NextResponse.json({ success: true, actor, publishReadiness, ...result });
   } catch (error) {
     const issue = getConvexRuntimeIssue(error);
     return NextResponse.json({ error: issue.title, details: issue.description }, { status: issue.statusCode });

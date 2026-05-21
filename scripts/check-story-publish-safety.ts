@@ -30,6 +30,31 @@ const expectations: FixtureExpectation[] = [
     canPublish: false,
     requiredBlockers: ["provisional_relatives"],
   },
+  {
+    file: "allowed-old-missing-death.json",
+    canPublish: true,
+    requiredBlockers: [],
+  },
+  {
+    file: "blocked-modern-relative.json",
+    canPublish: false,
+    requiredBlockers: ["privacy_living_status"],
+  },
+  {
+    file: "blocked-private-notes.json",
+    canPublish: false,
+    requiredBlockers: ["privacy_living_status"],
+  },
+  {
+    file: "blocked-modern-source.json",
+    canPublish: false,
+    requiredBlockers: ["privacy_living_status"],
+  },
+  {
+    file: "blocked-young-family-event.json",
+    canPublish: false,
+    requiredBlockers: ["privacy_living_status"],
+  },
 ];
 
 function readFixture(file: string): StoryPublishSafetyInput {
@@ -56,6 +81,10 @@ for (const expectation of expectations) {
 
   if (readiness.provenance.citations < 0 || readiness.score < 0 || readiness.score > 100) {
     failures.push(`${expectation.file}: readiness metrics are outside expected bounds`);
+  }
+
+  if (blockerKeys.has("privacy_living_status") && readiness.privacyRisk.reasons.length === 0) {
+    failures.push(`${expectation.file}: privacy blockers must include explainable reasons`);
   }
 }
 

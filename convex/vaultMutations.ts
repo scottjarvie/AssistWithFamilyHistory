@@ -86,6 +86,24 @@ const historicalContextTopicValidator = v.union(
   v.literal("other")
 );
 
+const storyStatusValidator = v.union(v.literal("draft"), v.literal("review"), v.literal("published"));
+
+const storyReviewActorRoleValidator = v.union(
+  v.literal("first_party_owner"),
+  v.literal("story_writer"),
+  v.literal("reviewer"),
+  v.literal("trusted_publisher"),
+  v.literal("unknown")
+);
+
+const storyReviewEventTypeValidator = v.union(
+  v.literal("publish_preview"),
+  v.literal("status_change"),
+  v.literal("publish_confirmation"),
+  v.literal("assignment"),
+  v.literal("draft_edit")
+);
+
 export const upsertPerson = mutation({
   args: {
     vaultOwnerId: v.string(),
@@ -693,7 +711,7 @@ export const updateStoryStatus = mutation({
   args: {
     vaultOwnerId: v.string(),
     storyId: v.id("stories"),
-    status: v.union(v.literal("draft"), v.literal("review"), v.literal("published")),
+    status: storyStatusValidator,
   },
   handler: async (ctx, args) => {
     const story = await ctx.db.get(args.storyId);
@@ -701,9 +719,22 @@ export const updateStoryStatus = mutation({
       throw new Error("Story not found");
     }
 
+    const now = Date.now();
     await ctx.db.patch(args.storyId, {
       status: args.status,
-      updatedAt: Date.now(),
+      reviewRequestedAt:
+        args.status === "review" && story.status === "draft"
+          ? now
+          : story.reviewRequestedAt,
+      reviewedAt:
+        args.status === "published"
+          ? now
+          : story.reviewedAt,
+      lastPublishedAt:
+        args.status === "published"
+          ? now
+          : story.lastPublishedAt,
+      updatedAt: now,
     });
 
     return { storyId: args.storyId, status: args.status };
@@ -738,6 +769,105 @@ export const updateStoryDraft = mutation({
     });
 
     return { storyId: args.storyId, updatedAt: now };
+  },
+});
+
+export const assignStoryReviewer = mutation({
+  args: {
+    vaultOwnerId: v.string(),
+    storyId: v.id("stories"),
+    assignedReviewer: v.string(),
+    actorRole: storyReviewActorRoleValidator,
+    actorName: v.optional(v.string()),
+    note: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const story = await ctx.db.get(args.storyId);
+    if (!story || !matchesVaultOwner(story.vaultOwnerId, vaultOwnerId)) {
+      throw new Error("Story not found");
+    }
+
+    const now = Date.now();
+    const assignedReviewer = args.assignedReviewer.trim();
+    await ctx.db.patch(args.storyId, {
+      assignedReviewer,
+      reviewRequestedAt: story.reviewRequestedAt ?? now,
+      updatedAt: now,
+    });
+
+    const eventId = await ctx.db.insert("storyReviewEvents", {
+      vaultOwnerId,
+      storyId: args.storyId,
+      personId: story.personId,
+      eventType: "assignment",
+      fromStatus: story.status,
+      toStatus: story.status,
+      actorRole: args.actorRole,
+      actorName: args.actorName,
+      assignedTo: assignedReviewer,
+      humanReviewNote: args.note,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return { storyId: args.storyId, eventId, assignedReviewer, updatedAt: now };
+  },
+});
+
+export const recordStoryReviewEvent = mutation({
+  args: {
+    vaultOwnerId: v.string(),
+    storyId: v.id("stories"),
+    eventType: storyReviewEventTypeValidator,
+    fromStatus: v.optional(storyStatusValidator),
+    toStatus: v.optional(storyStatusValidator),
+    actorRole: storyReviewActorRoleValidator,
+    actorName: v.optional(v.string()),
+    assignedTo: v.optional(v.string()),
+    reviewerName: v.optional(v.string()),
+    humanReviewNote: v.optional(v.string()),
+    readinessSnapshot: v.optional(v.any()),
+    blockerCount: v.optional(v.number()),
+    warningCount: v.optional(v.number()),
+    readinessScore: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const story = await ctx.db.get(args.storyId);
+    if (!story || !matchesVaultOwner(story.vaultOwnerId, vaultOwnerId)) {
+      throw new Error("Story not found");
+    }
+
+    const now = Date.now();
+    const eventId = await ctx.db.insert("storyReviewEvents", {
+      vaultOwnerId,
+      storyId: args.storyId,
+      personId: story.personId,
+      eventType: args.eventType,
+      fromStatus: args.fromStatus,
+      toStatus: args.toStatus,
+      actorRole: args.actorRole,
+      actorName: args.actorName,
+      assignedTo: args.assignedTo,
+      reviewerName: args.reviewerName,
+      humanReviewNote: args.humanReviewNote,
+      readinessSnapshot: args.readinessSnapshot,
+      blockerCount: args.blockerCount,
+      warningCount: args.warningCount,
+      readinessScore: args.readinessScore,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    if (args.eventType === "publish_preview") {
+      await ctx.db.patch(args.storyId, {
+        lastPublishPreviewAt: now,
+        updatedAt: now,
+      });
+    }
+
+    return { storyId: args.storyId, eventId, updatedAt: now };
   },
 });
 

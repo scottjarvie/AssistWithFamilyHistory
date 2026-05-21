@@ -1,0 +1,51 @@
+{
+  "story": {
+    "status": "review",
+    "title": "Modern Source Risk",
+    "content": "This draft has a well-formed narrative and enough source coverage for review, but one source is modern and explicitly sensitive. The privacy gate should stop public publishing until a reviewer confirms the source can be summarized publicly without exposing private living-family context.",
+    "citationIds": ["citation-1"]
+  },
+  "person": {
+    "displayName": "Clara Nelson",
+    "living": false,
+    "birth": { "date": { "year": 1910, "original": "1910" } },
+    "death": { "date": { "year": 1998, "original": "1998" } }
+  },
+  "readiness": {
+    "completionPercent": 100,
+    "requiredMissingCount": 0,
+    "criticalMissing": [],
+    "nextActions": []
+  },
+  "researchChecks": [
+    {
+      "checkKey": "timeline",
+      "status": "complete",
+      "applicability": "required",
+      "summary": "Timeline reviewed.",
+      "confidence": 0.9
+    }
+  ],
+  "contextCoverage": {
+    "count": 1,
+    "status": "covered",
+    "relatedPlaceCount": 1,
+    "placeCountWithContext": 1,
+    "missingPlaces": []
+  },
+  "evidence": [
+    {
+      "source": {
+        "title": "Private family interview",
+        "notes": "Sensitive living family details",
+        "publicationDate": "2024"
+      },
+      "citations": ["citation-1"]
+    }
+  ],
+  "events": [{ "type": "death", "date": { "year": 1998 } }],
+  "places": [{ "name": "Rexburg" }],
+  "relationships": [],
+  "provisionalRelatives": [],
+  "publishWarnings": []
+}

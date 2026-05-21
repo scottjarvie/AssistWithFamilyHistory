@@ -831,6 +831,12 @@ export default defineSchema({
     
     // Publishing
     publishedToHive: v.optional(v.string()),    // Hive permlink if published
+    assignedReviewer: v.optional(v.string()),
+    reviewRequestedAt: v.optional(v.number()),
+    reviewedAt: v.optional(v.number()),
+    lastPublishPreviewAt: v.optional(v.number()),
+    lastPublishedAt: v.optional(v.number()),
+    unpublishReason: v.optional(v.string()),
     
     // Organization
     tags: v.optional(v.array(v.string())),
@@ -845,6 +851,46 @@ export default defineSchema({
     .index("by_status", ["status"])
     .index("by_type", ["type"])
     .index("by_generated_by", ["generatedBy"]),
+
+  storyReviewEvents: defineTable({
+    vaultOwnerId: v.optional(v.string()),
+    storyId: v.id("stories"),
+    personId: v.optional(v.id("persons")),
+    eventType: v.union(
+      v.literal("publish_preview"),
+      v.literal("status_change"),
+      v.literal("publish_confirmation"),
+      v.literal("assignment"),
+      v.literal("draft_edit")
+    ),
+    fromStatus: v.optional(
+      v.union(v.literal("draft"), v.literal("review"), v.literal("published"))
+    ),
+    toStatus: v.optional(
+      v.union(v.literal("draft"), v.literal("review"), v.literal("published"))
+    ),
+    actorRole: v.union(
+      v.literal("first_party_owner"),
+      v.literal("story_writer"),
+      v.literal("reviewer"),
+      v.literal("trusted_publisher"),
+      v.literal("unknown")
+    ),
+    actorName: v.optional(v.string()),
+    assignedTo: v.optional(v.string()),
+    reviewerName: v.optional(v.string()),
+    humanReviewNote: v.optional(v.string()),
+    readinessSnapshot: v.optional(v.any()),
+    blockerCount: v.optional(v.number()),
+    warningCount: v.optional(v.number()),
+    readinessScore: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner", ["vaultOwnerId"])
+    .index("by_story", ["storyId"])
+    .index("by_story_created", ["storyId", "createdAt"])
+    .index("by_event_type", ["eventType"]),
 
   provisionalRelatives: defineTable({
     vaultOwnerId: v.optional(v.string()),

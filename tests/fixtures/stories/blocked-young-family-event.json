@@ -1,0 +1,42 @@
+{
+  "story": {
+    "status": "review",
+    "title": "Young Family Event Risk",
+    "content": "This story looks ready at first because it has a clear narrative, attached source evidence, and enough contextual research. It should still be blocked because a recent non-death life event can expose living family context and requires a trusted publisher to clear private details first.",
+    "citationIds": ["citation-1"]
+  },
+  "person": {
+    "displayName": "Helen Brooks",
+    "living": false,
+    "birth": { "date": { "year": 1908, "original": "1908" } },
+    "death": { "date": { "year": 1992, "original": "1992" } }
+  },
+  "readiness": {
+    "completionPercent": 100,
+    "requiredMissingCount": 0,
+    "criticalMissing": [],
+    "nextActions": []
+  },
+  "researchChecks": [
+    {
+      "checkKey": "timeline",
+      "status": "complete",
+      "applicability": "required",
+      "summary": "Timeline reviewed.",
+      "confidence": 0.9
+    }
+  ],
+  "contextCoverage": {
+    "count": 1,
+    "status": "covered",
+    "relatedPlaceCount": 1,
+    "placeCountWithContext": 1,
+    "missingPlaces": []
+  },
+  "evidence": [{ "source": { "title": "Family newsletter" }, "citations": ["citation-1"] }],
+  "events": [{ "type": "residence", "date": { "year": 2018 } }],
+  "places": [{ "name": "Mesa" }],
+  "relationships": [],
+  "provisionalRelatives": [],
+  "publishWarnings": []
+}

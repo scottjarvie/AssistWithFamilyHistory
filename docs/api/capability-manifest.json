@@ -17,6 +17,17 @@
   },
   "routes": [
     {
+      "route": "/api/capabilities",
+      "methods": ["GET"],
+      "capability": "capability_discovery",
+      "environment": "browser-or-local-api",
+      "agentSupport": "future-read-only",
+      "reviewLevel": "owner-scoped-read",
+      "risk": "low",
+      "scopes": ["read_only_assistant", "story_writer", "trusted_operator"],
+      "notes": "Returns current internal capability actions for the requesting actor role. Story capabilities distinguish story_writer preview/draft access from trusted publisher public publish authority."
+    },
+    {
       "route": "/api/context-reports",
       "methods": ["POST"],
       "capability": "context_report_create",
@@ -215,6 +226,17 @@
       "notes": "Owner-protected story edit. Story writer scope can change title/content/type/tags while preserving review workflow."
     },
     {
+      "route": "/api/stories/[id]/review",
+      "methods": ["PATCH"],
+      "capability": "story_review_assignment",
+      "environment": "browser-or-local-api",
+      "agentSupport": "restricted",
+      "reviewLevel": "reviewer-or-trusted-publisher",
+      "risk": "medium",
+      "scopes": ["trusted_operator"],
+      "notes": "Assigns a reviewer and records an owner-scoped story review event. Explicit story_writer role is denied reviewer assignment."
+    },
+    {
       "route": "/api/stories/[id]/status",
       "methods": ["GET", "PATCH"],
       "capability": "story_publish_preview_and_status_change",
@@ -223,7 +245,7 @@
       "reviewLevel": "publish-safety-gated",
       "risk": "high",
       "scopes": ["story_writer", "trusted_operator"],
-      "notes": "GET returns side-effect-free publish readiness and optional format=handoff packet. PATCH to published is blocked unless evidence, context, privacy/living-risk, provisional-relative, story-strength, and review-status gates pass plus explicit human review confirmation. story_writer may move draft to review; trusted_operator is required for publish."
+      "notes": "GET returns publish readiness and optional format=handoff packet; use record=true to store a publish-preview audit snapshot. PATCH to published is blocked unless evidence, context, privacy/living-risk, provisional-relative, story-strength, and review-status gates pass plus explicit human review confirmation. Explicit story_writer role can preview/request review but is denied publish; trusted_operator/trusted publisher authority is required for agent publishing."
     }
   ]
 }

@@ -25,6 +25,7 @@ type VaultSnapshot = {
   researchLog: Doc<"researchLog">[];
   documents: Doc<"documents">[];
   stories: Doc<"stories">[];
+  storyReviewEvents: Doc<"storyReviewEvents">[];
   historicalContext: Doc<"historicalContext">[];
   researchChecks: Doc<"researchChecks">[];
   provisionalRelatives: Doc<"provisionalRelatives">[];
@@ -56,6 +57,7 @@ async function getVaultSnapshot(ctx: QueryCtx, vaultOwnerId: string): Promise<Va
     researchLog,
     documents,
     stories,
+    storyReviewEvents,
     historicalContext,
     researchChecks,
     provisionalRelatives,
@@ -74,6 +76,7 @@ async function getVaultSnapshot(ctx: QueryCtx, vaultOwnerId: string): Promise<Va
     ctx.db.query("researchLog").collect(),
     ctx.db.query("documents").collect(),
     ctx.db.query("stories").collect(),
+    ctx.db.query("storyReviewEvents").collect(),
     ctx.db.query("historicalContext").collect(),
     ctx.db.query("researchChecks").collect(),
     ctx.db.query("provisionalRelatives").collect(),
@@ -94,6 +97,7 @@ async function getVaultSnapshot(ctx: QueryCtx, vaultOwnerId: string): Promise<Va
     researchLog: owned(researchLog),
     documents: owned(documents),
     stories: owned(stories),
+    storyReviewEvents: owned(storyReviewEvents),
     historicalContext: owned(historicalContext),
     researchChecks: owned(researchChecks),
     provisionalRelatives: owned(provisionalRelatives),
@@ -444,6 +448,9 @@ function buildStoryBundle(snapshot: VaultSnapshot, story: Doc<"stories">) {
         : null;
     }).filter(Boolean) ?? [],
     provisionalRelatives: sortByTimestampDesc(operations?.provisionalRelatives ?? []),
+    reviewHistory: sortByTimestampDesc(
+      snapshot.storyReviewEvents.filter((entry) => entry.storyId === story._id)
+    ).slice(0, 12),
     historicalContext: contextCoverage?.entries.slice(0, 8) ?? [],
     relatedStories: person
       ? sortByTimestampDesc(

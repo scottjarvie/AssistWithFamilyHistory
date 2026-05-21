@@ -33,6 +33,7 @@ These are planning terms only. They are not implemented scopes yet.
 
 | Route | Methods | Primary behavior | Owner boundary | API status | Risk / notes |
 | --- | --- | --- | --- | --- | --- |
+| `/api/capabilities` | GET | Return internal capability actions for the requesting actor role | Protected route; no vault data read | Internal now; future agent-discovery candidate | Story capabilities distinguish writer/reviewer/trusted publisher actions |
 | `/api/context-reports` | POST | Create historical context report for owner vault | Uses `getVaultAccessContext()` | Internal now; future research-operator candidate | Write route; needs context validation and provenance expectations before agent support |
 | `/api/convex/documents` | GET | Read owner documents, optionally by person/type | Uses `getVaultAccessContext()` | Internal now; future read-only candidate | Sensitive derived artifacts; no OpenAPI/capability doc yet |
 | `/api/convex/people` | GET | Read people explorer from Convex vault | Uses `getVaultAccessContext()` | Internal now; future read-only candidate | Owner-scoped read |
@@ -51,7 +52,8 @@ These are planning terms only. They are not implemented scopes yet.
 | `/api/people/[id]/stories` | POST | Save story draft for person and refresh research checks | Uses `getVaultAccessContext()` | Internal now; future story-writer candidate | Write route; lower risk than publish, but story-writer scope must preserve provenance and cannot publish |
 | `/api/process` | POST | Submit prompt/data to OpenRouter with client or server key | Protected by required-auth middleware, does not use vault owner | Internal AI utility | High privacy/abuse risk; should not become broad public API without quotas/disclosure |
 | `/api/stories/[id]` | PATCH | Update story title/content/type/tags | Uses `getVaultAccessContext()` and Convex owner checks | Internal now; future story-writer candidate | Owner-protected write; content changes should keep story in draft/review until gates pass |
-| `/api/stories/[id]/status` | GET, PATCH | Preview publish readiness or change story status between draft/review/published | Uses `getVaultAccessContext()` and Convex owner checks | Internal now; future story-writer/trusted-operator candidate | GET is side-effect-free and supports `?format=handoff`; publish PATCH is blocked by safety gates and explicit human review confirmation |
+| `/api/stories/[id]/review` | PATCH | Assign a story reviewer and record review history | Uses `getVaultAccessContext()` and Convex owner checks | Internal now; future reviewer/trusted-operator candidate | Explicit `story_writer` role is denied reviewer assignment |
+| `/api/stories/[id]/status` | GET, PATCH | Preview publish readiness or change story status between draft/review/published | Uses `getVaultAccessContext()` and Convex owner checks | Internal now; future story-writer/trusted-operator candidate | GET supports `?format=handoff`; `?record=true` stores a publish-preview audit snapshot; publish PATCH is blocked by capability, safety gates, and explicit human review confirmation |
 
 ## Current Gaps
 
@@ -61,7 +63,8 @@ These are planning terms only. They are not implemented scopes yet.
 - No `/me`, `/capabilities`, `/openapi`, or `/usage` first-success path exists.
 - Legacy raw/contextualized document routes blur read/write semantics; see `GEN-40`.
 - Anonymous preview behavior needs product/security decision before public beta; see `GEN-39`.
-- Story writer vs trusted publisher scopes are documented but not enforced as separate API credentials yet.
+- Story writer vs trusted publisher authority is enforced for explicit agent roles, but issued API keys/scopes are not implemented yet.
+- Public beta is status-only for now: `published` means publicly renderable, while draft/review 404. Slugs and richer sharing settings remain separate work.
 
 ## Completion Policy For Feature Work
 
