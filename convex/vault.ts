@@ -443,6 +443,7 @@ function buildStoryBundle(snapshot: VaultSnapshot, story: Doc<"stories">) {
           }
         : null;
     }).filter(Boolean) ?? [],
+    provisionalRelatives: sortByTimestampDesc(operations?.provisionalRelatives ?? []),
     historicalContext: contextCoverage?.entries.slice(0, 8) ?? [],
     relatedStories: person
       ? sortByTimestampDesc(

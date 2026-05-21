@@ -7,10 +7,12 @@ import {
   BookOpen,
   CheckCircle2,
   CircleAlert,
+  ClipboardCheck,
   ExternalLink,
   FileText,
   MapPinned,
   Milestone,
+  ShieldCheck,
   UserRound,
 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
@@ -28,6 +30,7 @@ import {
   isConvexConfigured,
 } from "@/lib/convex/server";
 import { createPageMetadata } from "@/lib/seo";
+import { assessStoryPublishReadiness } from "@/lib/stories/publishSafety";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
 export const metadata: Metadata = createPageMetadata({
@@ -42,6 +45,12 @@ const statusTone = {
   draft: "bg-stone-100 text-stone-700 hover:bg-stone-100",
   review: "bg-amber-100 text-amber-800 hover:bg-amber-100",
   published: "bg-emerald-100 text-emerald-800 hover:bg-emerald-100",
+};
+
+const publishGateTone = {
+  blocker: "border-red-200 bg-red-50 text-red-900",
+  warning: "border-amber-200 bg-amber-50 text-amber-900",
+  passed: "border-emerald-200 bg-emerald-50 text-emerald-900",
 };
 
 function formatEventDate(event: { date?: { original?: string; year?: number } }) {
@@ -98,11 +107,30 @@ export default async function StoryReviewPage({
     publishWarnings,
     historicalContext,
     relationships,
+    provisionalRelatives,
   } = bundle;
+  const publishReadiness = assessStoryPublishReadiness({
+    story,
+    person,
+    readiness,
+    researchChecks,
+    contextCoverage,
+    evidence,
+    events,
+    places,
+    relationships,
+    provisionalRelatives,
+    publishWarnings,
+  });
   const blockers = researchChecks
     .filter((check) => check.status !== "complete" && check.status !== "not_applicable")
     .slice(0, 6);
   const linkedRelationships = relationships.filter((relationship) => relationship !== null);
+  const workflowSteps = [
+    { key: "draft", label: "Draft" },
+    { key: "review", label: "Review" },
+    { key: "published", label: "Published" },
+  ] as const;
 
   return (
     <div className="p-4 sm:p-8">
@@ -127,7 +155,11 @@ export default async function StoryReviewPage({
             </p>
           </div>
           <div className="flex flex-col gap-3 lg:items-end">
-            <StoryStatusActions storyId={String(story._id)} status={story.status} />
+            <StoryStatusActions
+              storyId={String(story._id)}
+              status={story.status}
+              publishReadiness={publishReadiness}
+            />
             <div className="flex flex-wrap gap-2">
               {person ? (
                 <Button asChild variant="outline" size="sm">
@@ -147,6 +179,31 @@ export default async function StoryReviewPage({
               ) : null}
             </div>
           </div>
+        </div>
+        <div className="mt-6 grid gap-3 border-t border-stone-200 pt-5 md:grid-cols-3">
+          {workflowSteps.map((step, index) => {
+            const isActive = story.status === step.key;
+            const isComplete =
+              (story.status === "review" && step.key === "draft") ||
+              (story.status === "published" && step.key !== "published");
+
+            return (
+              <div
+                key={step.key}
+                className={`border px-4 py-3 ${isActive || isComplete ? "border-amber-300 bg-amber-50" : "border-stone-200 bg-stone-50"}`}
+              >
+                <p className="text-xs font-medium uppercase text-stone-500">Step {index + 1}</p>
+                <p className="mt-1 font-semibold text-stone-900">{step.label}</p>
+                <p className="mt-1 text-sm text-stone-600">
+                  {step.key === "draft"
+                    ? "Writer prepares a grounded draft."
+                    : step.key === "review"
+                      ? "Reviewer clears evidence, privacy, and family-graph risks."
+                      : "Trusted publisher confirms the public status change."}
+                </p>
+              </div>
+            );
+          })}
         </div>
       </section>
 
@@ -168,6 +225,86 @@ export default async function StoryReviewPage({
         </article>
 
         <aside className="space-y-5">
+          <Card className={publishReadiness.canPublish ? "border-emerald-200 bg-emerald-50/40" : "border-red-200 bg-red-50/40"}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShieldCheck className={publishReadiness.canPublish ? "h-5 w-5 text-emerald-700" : "h-5 w-5 text-red-700"} />
+                Publish Gate
+              </CardTitle>
+              <CardDescription>
+                {publishReadiness.summary}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-3 gap-2 text-center text-sm">
+                <div className="border border-stone-200 bg-white px-2 py-3">
+                  <p className="font-semibold text-stone-900">{publishReadiness.score}%</p>
+                  <p className="text-xs text-stone-500">Score</p>
+                </div>
+                <div className="border border-stone-200 bg-white px-2 py-3">
+                  <p className="font-semibold text-red-800">{publishReadiness.blockers.length}</p>
+                  <p className="text-xs text-stone-500">Blockers</p>
+                </div>
+                <div className="border border-stone-200 bg-white px-2 py-3">
+                  <p className="font-semibold text-amber-800">{publishReadiness.warnings.length}</p>
+                  <p className="text-xs text-stone-500">Warnings</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {publishReadiness.checks.map((gate) => (
+                  <div key={gate.key} className={`border px-3 py-3 ${publishGateTone[gate.severity]}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-sm font-medium">{gate.label}</p>
+                      <span className="text-xs uppercase">{gate.severity}</span>
+                    </div>
+                    <p className="mt-1 text-sm leading-6 opacity-80">{gate.detail}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-stone-200">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ClipboardCheck className="h-5 w-5 text-amber-700" />
+                Story Provenance
+              </CardTitle>
+              <CardDescription>
+                The support packet a writer, reviewer, or publisher should inspect.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-2 gap-2 text-center text-sm">
+                <div className="bg-stone-50 px-3 py-3">
+                  <p className="font-semibold text-stone-900">{publishReadiness.provenance.evidenceGroups}</p>
+                  <p className="text-xs text-stone-500">Sources</p>
+                </div>
+                <div className="bg-stone-50 px-3 py-3">
+                  <p className="font-semibold text-stone-900">{publishReadiness.provenance.citations}</p>
+                  <p className="text-xs text-stone-500">Citations</p>
+                </div>
+                <div className="bg-stone-50 px-3 py-3">
+                  <p className="font-semibold text-stone-900">{publishReadiness.provenance.events}</p>
+                  <p className="text-xs text-stone-500">Events</p>
+                </div>
+                <div className="bg-stone-50 px-3 py-3">
+                  <p className="font-semibold text-stone-900">{publishReadiness.provenance.contextReports}</p>
+                  <p className="text-xs text-stone-500">Context</p>
+                </div>
+              </div>
+              {publishReadiness.recommendedNextActions.length > 0 ? (
+                <div className="space-y-2">
+                  {publishReadiness.recommendedNextActions.slice(0, 4).map((action) => (
+                    <p key={action} className="rounded-md bg-stone-50 px-3 py-2 text-sm text-stone-700">
+                      {action}
+                    </p>
+                  ))}
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+
           <Card className="border-amber-200 bg-amber-50/50">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

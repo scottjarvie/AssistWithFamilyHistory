@@ -1,0 +1,41 @@
+{
+  "story": {
+    "status": "review",
+    "title": "Recent Family Story",
+    "content": "This draft has enough narrative length and evidence to look publishable, but the source person is still marked living. Public publishing must stop here because a private or living-person risk overrides other story readiness signals, even when the writer has context and citations prepared for review.",
+    "citationIds": ["citation-1"]
+  },
+  "person": {
+    "displayName": "Living Person",
+    "living": true,
+    "birth": { "date": { "year": 1984, "original": "1984" } }
+  },
+  "readiness": {
+    "completionPercent": 100,
+    "requiredMissingCount": 0,
+    "criticalMissing": [],
+    "nextActions": []
+  },
+  "researchChecks": [
+    {
+      "checkKey": "timeline",
+      "status": "complete",
+      "applicability": "required",
+      "summary": "Timeline attached.",
+      "confidence": 0.9
+    }
+  ],
+  "contextCoverage": {
+    "count": 1,
+    "status": "covered",
+    "relatedPlaceCount": 1,
+    "placeCountWithContext": 1,
+    "missingPlaces": []
+  },
+  "evidence": [{ "citations": ["citation-1"] }],
+  "events": [{ "type": "birth" }],
+  "places": [{ "name": "Salt Lake City" }],
+  "relationships": [],
+  "provisionalRelatives": [],
+  "publishWarnings": []
+}

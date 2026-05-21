@@ -15,6 +15,7 @@ import {
   isConvexConfigured,
 } from "@/lib/convex/server";
 import { createPageMetadata } from "@/lib/seo";
+import { canRenderPublicStory } from "@/lib/stories/publicStoryPolicy";
 
 export const metadata: Metadata = createPageMetadata({
   title: "Ancestor Story",
@@ -68,7 +69,7 @@ export default async function PublicStoryPage({
     throw error;
   }
 
-  if (!bundle) notFound();
+  if (!bundle || !canRenderPublicStory(bundle.story.status)) notFound();
 
   const { story, person, evidence, events, places, media, relationships, historicalContext } = bundle;
   const linkedRelationships = relationships.filter((relationship) => relationship !== null);

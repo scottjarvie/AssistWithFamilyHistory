@@ -1,0 +1,48 @@
+{
+  "story": {
+    "status": "review",
+    "title": "Family Circle Draft",
+    "content": "This story draft has linked citations, clear context, and enough narrative substance for a reviewer to inspect. It still depends on a family relationship that has not been resolved in the vault graph. Public publishing should wait until the provisional relative is promoted, merged into an existing person, or dismissed by a reviewer.",
+    "citationIds": ["citation-1"]
+  },
+  "person": {
+    "displayName": "Ellen Park",
+    "living": false,
+    "birth": { "date": { "year": 1890, "original": "1890" } },
+    "death": { "date": { "year": 1978, "original": "1978" } }
+  },
+  "readiness": {
+    "completionPercent": 100,
+    "requiredMissingCount": 0,
+    "criticalMissing": [],
+    "nextActions": []
+  },
+  "researchChecks": [
+    {
+      "checkKey": "relationships",
+      "status": "complete",
+      "applicability": "required",
+      "summary": "Known relationships reviewed.",
+      "confidence": 0.91
+    }
+  ],
+  "contextCoverage": {
+    "count": 1,
+    "status": "covered",
+    "relatedPlaceCount": 1,
+    "placeCountWithContext": 1,
+    "missingPlaces": []
+  },
+  "evidence": [{ "citations": ["citation-1"] }],
+  "events": [{ "type": "birth" }, { "type": "death" }],
+  "places": [{ "name": "Ogden" }],
+  "relationships": [{ "type": "ParentChild" }],
+  "provisionalRelatives": [
+    {
+      "displayName": "Possible Brother Park",
+      "relationshipHint": "brother",
+      "mergeState": "provisional"
+    }
+  ],
+  "publishWarnings": []
+}

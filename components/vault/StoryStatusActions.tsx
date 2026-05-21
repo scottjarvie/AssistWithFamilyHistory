@@ -3,23 +3,64 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ExternalLink, Eye, Loader2, RotateCcw } from "lucide-react";
+import { ClipboardCheck, ExternalLink, Eye, Loader2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import type { StoryPublishReadiness } from "@/lib/stories/publishSafety";
 
 type StoryStatus = "draft" | "review" | "published";
+type PendingAction = StoryStatus | "preview";
 
 export function StoryStatusActions({
   storyId,
   status,
+  publishReadiness,
 }: {
   storyId: string;
   status: StoryStatus;
+  publishReadiness?: Pick<StoryPublishReadiness, "canPublish" | "summary" | "blockers">;
 }) {
   const router = useRouter();
-  const [pendingStatus, setPendingStatus] = useState<StoryStatus | null>(null);
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+
+  async function previewPublishGates() {
+    setPendingAction("preview");
+    try {
+      const response = await fetch(`/api/stories/${storyId}/status?format=handoff`);
+      const payload = await response.json();
+
+      if (!response.ok || !payload?.success) {
+        throw new Error(payload?.error || "Unable to preview publish gates");
+      }
+
+      const readiness = payload.publishReadiness as StoryPublishReadiness | undefined;
+      if (!readiness) {
+        throw new Error("Publish preview did not return readiness details");
+      }
+
+      if (readiness.canPublish) {
+        toast.success("Publish gates are clear for trusted publisher review");
+      } else {
+        toast.error(readiness.summary, {
+          description: readiness.blockers.slice(0, 2).map((blocker) => blocker.label).join(", "),
+        });
+      }
+
+      return readiness;
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to preview publish gates");
+      return null;
+    } finally {
+      setPendingAction(null);
+    }
+  }
 
   async function updateStatus(nextStatus: StoryStatus) {
+    if (nextStatus === "published") {
+      const readiness = await previewPublishGates();
+      if (!readiness?.canPublish) return;
+    }
+
     if (
       nextStatus === "published" &&
       !window.confirm("Publish this story publicly? Confirm that a human reviewed evidence, privacy, and story quality.")
@@ -27,7 +68,7 @@ export function StoryStatusActions({
       return;
     }
 
-    setPendingStatus(nextStatus);
+    setPendingAction(nextStatus);
     try {
       const response = await fetch(`/api/stories/${storyId}/status`, {
         method: "PATCH",
@@ -52,23 +93,36 @@ export function StoryStatusActions({
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to update story status");
     } finally {
-      setPendingStatus(null);
+      setPendingAction(null);
     }
   }
+
+  const publishBlocked = status !== "published" && publishReadiness?.canPublish === false;
+  const pending = pendingAction !== null;
 
   return (
     <div className="flex flex-wrap gap-3">
       {status === "draft" ? (
-        <Button onClick={() => updateStatus("review")} disabled={pendingStatus !== null} className="bg-stone-900 hover:bg-stone-800">
-          {pendingStatus === "review" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
+        <Button onClick={() => updateStatus("review")} disabled={pending} className="bg-stone-900 hover:bg-stone-800">
+          {pendingAction === "review" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
           Mark ready for review
         </Button>
       ) : null}
       {status !== "published" ? (
-        <Button onClick={() => updateStatus("published")} disabled={pendingStatus !== null} className="bg-amber-700 hover:bg-amber-800">
-          {pendingStatus === "published" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
-          Publish public page
-        </Button>
+        <>
+          <Button onClick={previewPublishGates} disabled={pending} variant="outline">
+            {pendingAction === "preview" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardCheck className="h-4 w-4" />}
+            Preview publish gates
+          </Button>
+          <Button
+            onClick={() => updateStatus("published")}
+            disabled={pending || publishBlocked}
+            className="bg-amber-700 hover:bg-amber-800 disabled:bg-stone-300"
+          >
+            {pendingAction === "published" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
+            Publish public page
+          </Button>
+        </>
       ) : (
         <>
           <Button asChild className="bg-amber-700 hover:bg-amber-800">
@@ -77,12 +131,15 @@ export function StoryStatusActions({
               Open public page
             </Link>
           </Button>
-          <Button onClick={() => updateStatus("review")} disabled={pendingStatus !== null} variant="outline">
-            {pendingStatus === "review" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+          <Button onClick={() => updateStatus("review")} disabled={pending} variant="outline">
+            {pendingAction === "review" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
             Unpublish to review
           </Button>
         </>
       )}
+      {publishBlocked ? (
+        <p className="basis-full text-xs text-amber-800">{publishReadiness?.summary}</p>
+      ) : null}
     </div>
   );
 }

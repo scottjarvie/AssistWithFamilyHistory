@@ -13,6 +13,8 @@
     "check:agent-quality-gates": "tsx scripts/check-agent-quality-gates.ts",
     "check:operations-handoff": "tsx scripts/check-operations-handoff.ts",
     "check:review-gates": "tsx scripts/check-review-gates.ts",
+    "check:story-publish": "tsx scripts/check-story-publish-safety.ts",
+    "check:public-story-policy": "tsx scripts/check-public-story-policy.ts",
     "build:extension": "tsx scripts/build-extension.ts",
     "check:extension": "tsx scripts/check-extension-runtime.ts",
     "check:familysearch-capture": "tsx scripts/check-familysearch-capture.ts",

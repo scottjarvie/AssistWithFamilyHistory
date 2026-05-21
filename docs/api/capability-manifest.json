@@ -190,7 +190,7 @@
       "reviewLevel": "quality-gated",
       "risk": "medium",
       "scopes": ["story_writer"],
-      "notes": "Draft save is lower risk than publish but should keep provenance."
+      "notes": "Draft save is lower risk than publish but should keep provenance. Story writer scope can create or revise drafts, not publish."
     },
     {
       "route": "/api/process",
@@ -212,18 +212,18 @@
       "reviewLevel": "quality-gated",
       "risk": "medium",
       "scopes": ["story_writer"],
-      "notes": "Owner-protected story edit."
+      "notes": "Owner-protected story edit. Story writer scope can change title/content/type/tags while preserving review workflow."
     },
     {
       "route": "/api/stories/[id]/status",
-      "methods": ["PATCH"],
-      "capability": "story_status_change",
-      "environment": "browser",
+      "methods": ["GET", "PATCH"],
+      "capability": "story_publish_preview_and_status_change",
+      "environment": "browser-or-local-api",
       "agentSupport": "restricted",
-      "reviewLevel": "trusted-human-before-publish",
+      "reviewLevel": "publish-safety-gated",
       "risk": "high",
       "scopes": ["story_writer", "trusted_operator"],
-      "notes": "Publish/review status needs safety gates before agent support."
+      "notes": "GET returns side-effect-free publish readiness and optional format=handoff packet. PATCH to published is blocked unless evidence, context, privacy/living-risk, provisional-relative, story-strength, and review-status gates pass plus explicit human review confirmation. story_writer may move draft to review; trusted_operator is required for publish."
     }
   ]
 }

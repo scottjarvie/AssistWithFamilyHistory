@@ -25,8 +25,8 @@ These are planning terms only. They are not implemented scopes yet.
 | Read-only assistant | Read owner-scoped people, context packs, stories, documents, queue summaries | Future candidate |
 | Import agent | Import user-provided capture packages; no provider crawling | Future candidate after intake hardening |
 | Research operator | Create tasks/checks and prepare handoffs | Future candidate after queue/runbook gates |
-| Story writer | Save drafts and change story status inside owner vault | Future candidate after publish safety work |
-| Trusted operator | Higher-risk merges, provisional-relative decisions, bulk operations | Future candidate; needs review gates |
+| Story writer | Save story drafts, revise story content, and request review inside owner vault | Future candidate; cannot publish public stories |
+| Trusted operator | Higher-risk merges, provisional-relative decisions, bulk operations, public story publish | Future candidate; requires review gates |
 | Admin/security tool | Cross-user or incident workflows | Not present |
 
 ## Route Table
@@ -48,10 +48,10 @@ These are planning terms only. They are not implemented scopes yet.
 | `/api/people/[id]/contextualized` | GET, POST | Read or save contextualized dossier; POST syncs document metadata | Uses `getVaultAccessContext()` | Internal/legacy browser workflow | Mixed artifact/doc workflow; see `GEN-40` for read/write contract cleanup |
 | `/api/people/[id]/raw` | GET | Read or generate raw evidence document and sync metadata | Uses `getVaultAccessContext()` | Internal/legacy browser workflow | GET can have generation/sync side effects; see `GEN-40` |
 | `/api/people/[id]/runs/[runId]/pack` | GET | Read stored evidence pack for a specific run | Uses `getVaultAccessContext()` | Internal/legacy read; future read-only candidate with caution | Sensitive source evidence; should stay owner-scoped |
-| `/api/people/[id]/stories` | POST | Save story draft for person and refresh research checks | Uses `getVaultAccessContext()` | Internal now; future story-writer candidate | Write route; publish safety and story quality gates should come first |
+| `/api/people/[id]/stories` | POST | Save story draft for person and refresh research checks | Uses `getVaultAccessContext()` | Internal now; future story-writer candidate | Write route; lower risk than publish, but story-writer scope must preserve provenance and cannot publish |
 | `/api/process` | POST | Submit prompt/data to OpenRouter with client or server key | Protected by required-auth middleware, does not use vault owner | Internal AI utility | High privacy/abuse risk; should not become broad public API without quotas/disclosure |
-| `/api/stories/[id]` | PATCH | Update story title/content/type/tags | Uses `getVaultAccessContext()` and Convex owner checks | Internal now; future story-writer candidate | Owner-protected write |
-| `/api/stories/[id]/status` | PATCH | Change story status between draft/review/published | Uses `getVaultAccessContext()` and Convex owner checks | Internal now; future story-writer/trusted-operator candidate | Publish action requires explicit human review confirmation |
+| `/api/stories/[id]` | PATCH | Update story title/content/type/tags | Uses `getVaultAccessContext()` and Convex owner checks | Internal now; future story-writer candidate | Owner-protected write; content changes should keep story in draft/review until gates pass |
+| `/api/stories/[id]/status` | GET, PATCH | Preview publish readiness or change story status between draft/review/published | Uses `getVaultAccessContext()` and Convex owner checks | Internal now; future story-writer/trusted-operator candidate | GET is side-effect-free and supports `?format=handoff`; publish PATCH is blocked by safety gates and explicit human review confirmation |
 
 ## Current Gaps
 
@@ -61,6 +61,7 @@ These are planning terms only. They are not implemented scopes yet.
 - No `/me`, `/capabilities`, `/openapi`, or `/usage` first-success path exists.
 - Legacy raw/contextualized document routes blur read/write semantics; see `GEN-40`.
 - Anonymous preview behavior needs product/security decision before public beta; see `GEN-39`.
+- Story writer vs trusted publisher scopes are documented but not enforced as separate API credentials yet.
 
 ## Completion Policy For Feature Work
 
