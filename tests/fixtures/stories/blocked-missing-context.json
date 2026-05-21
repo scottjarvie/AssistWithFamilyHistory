@@ -1,0 +1,45 @@
+{
+  "story": {
+    "status": "review",
+    "title": "Well Sourced But Context Missing",
+    "content": "This story has enough length and source evidence for a reviewer to inspect, but it intentionally lacks historical context coverage. It describes a move, household changes, and community life in terms that need place or era context before the story should become public. The fixture proves that citations alone are not enough for public beta publishing when the broader setting has not been reviewed.",
+    "citationIds": ["citation-1", "citation-2"]
+  },
+  "person": {
+    "displayName": "Louise Barrett",
+    "living": false,
+    "birth": { "date": { "year": 1875, "original": "1875" } },
+    "death": { "date": { "year": 1941, "original": "1941" } }
+  },
+  "readiness": {
+    "completionPercent": 90,
+    "requiredMissingCount": 0,
+    "criticalMissing": [],
+    "nextActions": ["Add place and era context before public review."]
+  },
+  "researchChecks": [
+    {
+      "checkKey": "source_coverage",
+      "status": "complete",
+      "applicability": "required",
+      "summary": "Source coverage is attached.",
+      "confidence": 0.93
+    }
+  ],
+  "contextCoverage": {
+    "count": 0,
+    "status": "missing",
+    "relatedPlaceCount": 2,
+    "placeCountWithContext": 0,
+    "missingPlaces": [{ "name": "Lancaster" }, { "name": "Philadelphia" }]
+  },
+  "evidence": [
+    { "source": { "title": "Census household" }, "citations": ["citation-1"] },
+    { "source": { "title": "Marriage register" }, "citations": ["citation-2"] }
+  ],
+  "events": [{ "type": "birth", "date": { "year": 1875 } }, { "type": "marriage", "date": { "year": 1898 } }],
+  "places": [{ "name": "Lancaster" }, { "name": "Philadelphia" }],
+  "relationships": [{ "type": "Couple" }],
+  "provisionalRelatives": [],
+  "publishWarnings": []
+}

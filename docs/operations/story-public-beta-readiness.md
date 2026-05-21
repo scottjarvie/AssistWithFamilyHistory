@@ -43,6 +43,7 @@ Partial place context is a warning, not a blocker, so reviewers can still publis
 - `GET /api/capabilities` tells agents what story actions the current role can perform.
 - Explicit `story_writer` actors can draft, edit, request review, and preview publish gates, but cannot publish public stories.
 - No API key, tier, or issued scope model exists yet; role checks are internal request-level authority checks.
+- `docs/api/story-agent-openapi-skeleton.yaml` is the current OpenAPI planning skeleton for story agents. Treat it as a capability contract draft, not as an external public API.
 
 ## Public Sharing Decision For Beta
 
@@ -69,11 +70,15 @@ Use lightweight review history now, not full draft versioning:
 Run:
 
 ```bash
+pnpm check:story-fixtures
 pnpm check:story-publish
 pnpm check:story-slugs
 pnpm check:public-story-policy
+pnpm check:public-story-e2e
+pnpm check:story-capabilities
 pnpm check:api-inventory
 pnpm check:protected-routes
+pnpm check:public-beta-launch
 ```
 
 For browser QA, inspect `/app/stories/[storyId]` and verify:
@@ -86,8 +91,7 @@ For browser QA, inspect `/app/stories/[storyId]` and verify:
 
 ## Remaining Beta Blockers
 
-- Decide whether public story pages need owner-controlled sharing settings beyond status.
-- Add role-aware credentials before exposing story writer or trusted publisher as API scopes.
-- Capture mobile screenshot baselines for Story Studio review and public story pages before public beta.
-- Implement issued API keys/scopes if external agents need direct story access.
-- Decide richer sharing controls after status-only beta sharing is accepted.
+- Run the GEN-23 production-data privacy/security sweep before broad beta.
+- Keep role-aware issued credentials out of the first beta unless external agents need direct API access.
+- Capture fresh mobile screenshot baselines when the Story Studio review UI changes materially.
+- Decide richer sharing controls only after status-only beta sharing is accepted.

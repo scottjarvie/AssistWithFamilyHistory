@@ -36,3 +36,12 @@ Use this before enabling search indexing or broad beta sharing for published sto
 - Check public stories for accidental inclusion of internal agent comments or provisional research language.
 - Verify takedown contact path is visible from public pages and privacy page.
 - Record the sweep date, reviewer, second reviewer if needed, and final indexing decision in the story audit history.
+
+## Endpoint And Data Surface Sweep
+
+- Public story pages: confirm draft/review stories 404, published stories render, slug URLs are canonical, and legacy ID routes redirect only for published stories.
+- OG images: confirm generated images and share text use only published story/person data and never private notes, review history, or unpublished draft text.
+- Story APIs: confirm `story_writer` can draft/edit/request review/preview, while `story:publish` requires trusted publisher or first-party owner authority.
+- Vault APIs: confirm private vault reads remain owner-scoped and are not reachable from public story identifiers.
+- Browser/FamilySearch Capture flows: confirm capture packages are user/browser initiated while provider API approval is pending, and that private/living warnings survive import review.
+- Agent handoff packets: confirm handoff output includes blockers, warnings, provenance, and next actions without exposing private review notes to public pages.

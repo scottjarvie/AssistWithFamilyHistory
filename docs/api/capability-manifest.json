@@ -15,6 +15,31 @@
     "trusted_operator": "Higher-risk merges, publish actions, and bulk operations.",
     "admin_security": "Cross-user, incident, or security workflows. Not present."
   },
+  "storyRoles": {
+    "story_writer": {
+      "actions": ["story:read", "story:draft", "story:edit", "story:request_review", "story:preview_publish"],
+      "publishAuthority": false,
+      "notes": "Can draft, edit, request review, and preview publish readiness. Cannot assign reviewers or publish public stories."
+    },
+    "reviewer": {
+      "actions": ["story:read", "story:edit", "story:request_review", "story:assign_reviewer", "story:preview_publish"],
+      "publishAuthority": false,
+      "notes": "Can inspect and assign review work, including second-review requirements. Cannot publish public stories."
+    },
+    "trusted_publisher": {
+      "actions": [
+        "story:read",
+        "story:edit",
+        "story:request_review",
+        "story:assign_reviewer",
+        "story:preview_publish",
+        "story:publish",
+        "story:unpublish"
+      ],
+      "publishAuthority": true,
+      "notes": "Can publish only after publish gates, required second approval, and human review confirmation pass. Public stories stay noindex by default through publicIndexing."
+    }
+  },
   "routes": [
     {
       "route": "/api/capabilities",

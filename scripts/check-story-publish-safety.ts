@@ -4,58 +4,15 @@ import { assessStoryPublishReadiness, type StoryPublishSafetyInput } from "../li
 
 type FixtureExpectation = {
   file: string;
-  canPublish: boolean;
-  requiredBlockers: string[];
+  expectedCanPublish: boolean;
+  expectedBlockers: string[];
 };
 
 const fixtureRoot = path.join(process.cwd(), "tests", "fixtures", "stories");
-const expectations: FixtureExpectation[] = [
-  {
-    file: "ready-review-story.json",
-    canPublish: true,
-    requiredBlockers: [],
-  },
-  {
-    file: "blocked-missing-evidence.json",
-    canPublish: false,
-    requiredBlockers: ["evidence", "context", "review_status", "story_context_strength"],
-  },
-  {
-    file: "blocked-living-risk.json",
-    canPublish: false,
-    requiredBlockers: ["privacy_living_status"],
-  },
-  {
-    file: "blocked-provisional-relative.json",
-    canPublish: false,
-    requiredBlockers: ["provisional_relatives"],
-  },
-  {
-    file: "allowed-old-missing-death.json",
-    canPublish: true,
-    requiredBlockers: [],
-  },
-  {
-    file: "blocked-modern-relative.json",
-    canPublish: false,
-    requiredBlockers: ["privacy_living_status"],
-  },
-  {
-    file: "blocked-private-notes.json",
-    canPublish: false,
-    requiredBlockers: ["privacy_living_status"],
-  },
-  {
-    file: "blocked-modern-source.json",
-    canPublish: false,
-    requiredBlockers: ["privacy_living_status"],
-  },
-  {
-    file: "blocked-young-family-event.json",
-    canPublish: false,
-    requiredBlockers: ["privacy_living_status"],
-  },
-];
+const manifest = JSON.parse(readFileSync(path.join(fixtureRoot, "manifest.json"), "utf8")) as {
+  fixtures: FixtureExpectation[];
+};
+const expectations = manifest.fixtures;
 
 function readFixture(file: string): StoryPublishSafetyInput {
   return JSON.parse(readFileSync(path.join(fixtureRoot, file), "utf8")) as StoryPublishSafetyInput;
@@ -67,13 +24,13 @@ for (const expectation of expectations) {
   const readiness = assessStoryPublishReadiness(readFixture(expectation.file));
   const blockerKeys = new Set(readiness.blockers.map((blocker) => blocker.key));
 
-  if (readiness.canPublish !== expectation.canPublish) {
+  if (readiness.canPublish !== expectation.expectedCanPublish) {
     failures.push(
-      `${expectation.file}: expected canPublish=${expectation.canPublish}, received ${readiness.canPublish}`
+      `${expectation.file}: expected canPublish=${expectation.expectedCanPublish}, received ${readiness.canPublish}`
     );
   }
 
-  for (const key of expectation.requiredBlockers) {
+  for (const key of expectation.expectedBlockers) {
     if (!blockerKeys.has(key)) {
       failures.push(`${expectation.file}: missing blocker ${key}`);
     }

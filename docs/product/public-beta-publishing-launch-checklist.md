@@ -38,3 +38,32 @@ Recommended current policy: launch beta with status-only sharing and `noindex` b
 ## Latest QA Pass
 
 See `docs/operations/public-beta-launch-qa-report.md` for the 2026-05-21 local-dev real-story QA pass covering slug redirects, public metadata, Open Graph image generation, review history, second approval, trusted publisher publish, and rollback to review.
+
+## Repeatable Agent Harness
+
+The repo-backed harness now tracks this launch route across:
+
+- GEN-3: fixture data for publishable, weak, living-risk, private-note, unresolved-relative, and missing-context story paths.
+- GEN-48: this checklist and final privacy sweep.
+- GEN-18: slug, redirect, metadata, Open Graph, and `noindex` checks.
+- GEN-44: review assignment, publish-preview snapshot, publisher note, second approval, and rollback history checks.
+- GEN-47: living/private-risk blockers from source person, graph, source, note, and event evidence.
+- GEN-46: story writer, reviewer, and trusted publisher capability/OpenAPI skeleton.
+- GEN-23: endpoint-and-data-surface privacy/security sweep.
+- GEN-45: status-only sharing plus `noindex` default.
+- GEN-19: lightweight review history unless fixture rollback tests prove full versioning is needed.
+
+Run the repeatable local checks before any broader beta publish pass:
+
+```bash
+pnpm check:story-fixtures
+pnpm check:story-publish
+pnpm check:story-slugs
+pnpm check:public-story-e2e
+pnpm check:story-capabilities
+pnpm check:api-inventory
+pnpm check:protected-routes
+pnpm check:public-beta-launch
+```
+
+Use `tests/fixtures/stories/manifest.json` as the source of truth for the fixture scenarios agents should exercise. Do not rely on a manually prepared dev vault when a fixture-backed check can cover the same risk.
