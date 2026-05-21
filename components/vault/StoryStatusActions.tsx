@@ -7,16 +7,19 @@ import { ClipboardCheck, ExternalLink, Eye, Loader2, RotateCcw } from "lucide-re
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import type { StoryPublishReadiness } from "@/lib/stories/publishSafety";
+import { publicStoryPath } from "@/lib/stories/slug";
 
 type StoryStatus = "draft" | "review" | "published";
 type PendingAction = StoryStatus | "preview";
 
 export function StoryStatusActions({
   storyId,
+  publicIdentifier,
   status,
   publishReadiness,
 }: {
   storyId: string;
+  publicIdentifier?: string;
   status: StoryStatus;
   publishReadiness?: Pick<StoryPublishReadiness, "canPublish" | "summary" | "blockers">;
 }) {
@@ -126,7 +129,7 @@ export function StoryStatusActions({
       ) : (
         <>
           <Button asChild className="bg-amber-700 hover:bg-amber-800">
-            <Link href={`/stories/${storyId}`} target="_blank">
+            <Link href={publicStoryPath(publicIdentifier ?? storyId)} target="_blank">
               <ExternalLink className="h-4 w-4" />
               Open public page
             </Link>

@@ -25,6 +25,7 @@ export async function PATCH(
 
     const assignedReviewer = typeof body.assignedReviewer === "string" ? body.assignedReviewer.trim() : "";
     const note = typeof body.note === "string" ? body.note.trim() : undefined;
+    const secondReviewer = typeof body.secondReviewer === "string" ? body.secondReviewer.trim() : undefined;
 
     if (!assignedReviewer) {
       return NextResponse.json({ error: "Reviewer name is required" }, { status: 400 });
@@ -35,6 +36,9 @@ export async function PATCH(
       vaultOwnerId,
       storyId: id as Id<"stories">,
       assignedReviewer,
+      secondReviewRequired: body.secondReviewRequired === true,
+      secondReviewer,
+      secondReviewApproved: body.secondReviewApproved === true,
       actorRole: actor.role,
       actorName: actor.name,
       note,

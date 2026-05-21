@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { VaultStateCard } from "@/components/vault/VaultStateCard";
 import { getConvexClient, getConvexRuntimeIssue, getConvexUnavailableState, isConvexConfigured } from "@/lib/convex/server";
 import { createPageMetadata } from "@/lib/seo";
+import { publicStoryPath } from "@/lib/stories/slug";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
 export const metadata: Metadata = createPageMetadata({
@@ -182,7 +183,7 @@ export default async function StoriesIndexPage({
                   </div>
                   {story.status === "published" ? (
                     <Button asChild variant="outline" size="sm">
-                      <Link href={`/stories/${story._id}`} target="_blank">
+                      <Link href={publicStoryPath(story.publicSlug ?? String(story._id))} target="_blank">
                         <ExternalLink className="h-4 w-4" />
                       </Link>
                     </Button>

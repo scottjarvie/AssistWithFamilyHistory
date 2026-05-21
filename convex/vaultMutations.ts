@@ -1,9 +1,11 @@
 import { v } from "convex/values";
-import { mutation } from "./_generated/server";
+import { mutation, type MutationCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
+import { buildStoryPublicSlug } from "../lib/stories/slug";
 import {
   buildProvisionalDedupeKey,
   filterByVaultOwner,
+  formatPersonName,
   inferResearchChecks,
   matchesVaultOwner,
   normalizeVaultOwnerId,
@@ -87,6 +89,22 @@ const historicalContextTopicValidator = v.union(
 );
 
 const storyStatusValidator = v.union(v.literal("draft"), v.literal("review"), v.literal("published"));
+
+async function buildStorySlugForPerson(
+  ctx: MutationCtx,
+  params: {
+    storyId: string;
+    title: string;
+    personId?: Doc<"stories">["personId"];
+  }
+) {
+  const person = params.personId ? await ctx.db.get(params.personId) : null;
+  return buildStoryPublicSlug({
+    storyId: params.storyId,
+    title: params.title,
+    personName: person ? formatPersonName(person) : undefined,
+  });
+}
 
 const storyReviewActorRoleValidator = v.union(
   v.literal("first_party_owner"),
@@ -682,6 +700,7 @@ export const upsertStoryDraft = mutation({
       citationIds: match?.citationIds ?? [],
       sourceFactIds: match?.sourceFactIds,
       status: args.status,
+      publicIndexing: match?.publicIndexing ?? "noindex" as const,
       generatedBy: args.generatedBy,
       promptUsed: args.promptUsed,
       modelUsed: args.modelUsed,
@@ -690,7 +709,15 @@ export const upsertStoryDraft = mutation({
     };
 
     if (match) {
-      await ctx.db.patch(match._id, payload);
+      const publicSlug = await buildStorySlugForPerson(ctx, {
+        storyId: String(match._id),
+        title: args.title,
+        personId: args.personId,
+      });
+      await ctx.db.patch(match._id, {
+        ...payload,
+        publicSlug: match.status === "published" ? match.publicSlug : publicSlug,
+      });
       return { storyId: match._id, created: false };
     }
 
@@ -701,6 +728,13 @@ export const upsertStoryDraft = mutation({
       type: args.type,
       ...payload,
       createdAt: now,
+    });
+    await ctx.db.patch(storyId, {
+      publicSlug: await buildStorySlugForPerson(ctx, {
+        storyId: String(storyId),
+        title: args.title,
+        personId: args.personId,
+      }),
     });
 
     return { storyId, created: true };
@@ -720,8 +754,18 @@ export const updateStoryStatus = mutation({
     }
 
     const now = Date.now();
+    const publicSlug =
+      story.publicSlug ??
+      (await buildStorySlugForPerson(ctx, {
+        storyId: String(story._id),
+        title: story.title,
+        personId: story.personId,
+      }));
+
     await ctx.db.patch(args.storyId, {
       status: args.status,
+      publicSlug,
+      publicIndexing: story.publicIndexing ?? "noindex",
       reviewRequestedAt:
         args.status === "review" && story.status === "draft"
           ? now
@@ -758,12 +802,22 @@ export const updateStoryDraft = mutation({
 
     const generatedBy = story.generatedBy === "ai" ? "ai_edited" : story.generatedBy;
     const now = Date.now();
+    const title = args.title.trim();
+    const shouldRefreshSlug = story.status !== "published";
+    const publicSlug = shouldRefreshSlug
+      ? await buildStorySlugForPerson(ctx, {
+          storyId: String(story._id),
+          title,
+          personId: story.personId,
+        })
+      : story.publicSlug;
 
     await ctx.db.patch(args.storyId, {
-      title: args.title.trim(),
+      title,
       content: args.content.trim(),
       type: args.type ?? story.type,
       tags: args.tags,
+      publicSlug,
       generatedBy,
       updatedAt: now,
     });
@@ -772,11 +826,44 @@ export const updateStoryDraft = mutation({
   },
 });
 
+export const backfillStoryPublicSlugs = mutation({
+  args: {
+    vaultOwnerId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const stories = filterByVaultOwner(await ctx.db.query("stories").collect(), vaultOwnerId);
+    const now = Date.now();
+    let updated = 0;
+
+    for (const story of stories) {
+      if (story.publicSlug && story.publicIndexing) continue;
+      await ctx.db.patch(story._id, {
+        publicSlug:
+          story.publicSlug ??
+          (await buildStorySlugForPerson(ctx, {
+            storyId: String(story._id),
+            title: story.title,
+            personId: story.personId,
+          })),
+        publicIndexing: story.publicIndexing ?? "noindex",
+        updatedAt: now,
+      });
+      updated += 1;
+    }
+
+    return { updated, checked: stories.length };
+  },
+});
+
 export const assignStoryReviewer = mutation({
   args: {
     vaultOwnerId: v.string(),
     storyId: v.id("stories"),
     assignedReviewer: v.string(),
+    secondReviewRequired: v.optional(v.boolean()),
+    secondReviewer: v.optional(v.string()),
+    secondReviewApproved: v.optional(v.boolean()),
     actorRole: storyReviewActorRoleValidator,
     actorName: v.optional(v.string()),
     note: v.optional(v.string()),
@@ -790,12 +877,24 @@ export const assignStoryReviewer = mutation({
 
     const now = Date.now();
     const assignedReviewer = args.assignedReviewer.trim();
+    const secondReviewer = args.secondReviewer?.trim();
+    const secondReviewRequired = args.secondReviewRequired ?? story.secondReviewRequired ?? false;
     await ctx.db.patch(args.storyId, {
       assignedReviewer,
+      secondReviewRequired,
+      secondReviewer: secondReviewRequired ? secondReviewer : undefined,
+      secondReviewedAt: secondReviewRequired
+        ? args.secondReviewApproved
+          ? story.secondReviewedAt ?? now
+          : undefined
+        : undefined,
       reviewRequestedAt: story.reviewRequestedAt ?? now,
       updatedAt: now,
     });
 
+    const secondReviewNote = secondReviewRequired
+      ? `Second approval${secondReviewer ? ` by ${secondReviewer}` : ""}${args.secondReviewApproved ? " marked complete" : " required"}.`
+      : undefined;
     const eventId = await ctx.db.insert("storyReviewEvents", {
       vaultOwnerId,
       storyId: args.storyId,
@@ -806,7 +905,7 @@ export const assignStoryReviewer = mutation({
       actorRole: args.actorRole,
       actorName: args.actorName,
       assignedTo: assignedReviewer,
-      humanReviewNote: args.note,
+      humanReviewNote: [args.note, secondReviewNote].filter(Boolean).join(" ") || undefined,
       createdAt: now,
       updatedAt: now,
     });

@@ -183,6 +183,17 @@ export async function PATCH(
       }
 
       fromStatus = bundle.story.status;
+      if (bundle.story.secondReviewRequired && !bundle.story.secondReviewedAt) {
+        return NextResponse.json(
+          {
+            error: "Second review required",
+            details:
+              "This story is marked high-risk and needs second reviewer approval before public publish.",
+          },
+          { status: 400 }
+        );
+      }
+
       publishReadiness = buildPublishPreview(bundle).publishReadiness;
       if (!publishReadiness.canPublish) {
         return NextResponse.json(

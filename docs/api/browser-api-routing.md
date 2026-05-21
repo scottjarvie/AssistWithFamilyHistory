@@ -23,9 +23,9 @@ The project intentionally uses both browser-led workflows and internal APIs. Do 
 | Provisional relative promote/merge | `/api/operations/provisional` | Browser with human review | Trusted-operator only, later | Requires explicit human review confirmation |
 | Capability discovery | `/api/capabilities` | Local API or browser | Future agent-discovery candidate | Returns current story actions for first-party, writer, reviewer, or trusted publisher roles |
 | Story draft save | Story Writer UI, `/api/people/[id]/stories` | Browser/internal API | Future story-writer candidate | Draft save is lower risk than publish, but still owner-scoped and provenance-sensitive |
-| Story review assignment | `/app/stories/[storyId]`, `/api/stories/[id]/review` | Browser/internal API | Future reviewer/trusted-operator candidate | Records reviewer assignment in story review history; explicit story_writer role is denied assignment |
-| Story edit/status | `/app/stories/[storyId]`, `/api/stories/*` | Browser/internal API | Future story-writer/trusted-operator candidate | `GET /api/stories/[id]/status` previews publish gates, `?format=handoff` returns the writer/reviewer packet, and `?record=true` stores preview snapshots; publish PATCH requires trusted publisher authority, safety gates, and explicit human review |
-| Public story view | `/stories/[id]` | Public browser route | Public read route, not private API | Only published stories should render |
+| Story review assignment | `/app/stories/[storyId]`, `/api/stories/[id]/review` | Browser/internal API | Future reviewer/trusted-operator candidate | Records reviewer assignment and optional second-review requirement in story review history; explicit story_writer role is denied assignment |
+| Story edit/status | `/app/stories/[storyId]`, `/api/stories/*` | Browser/internal API | Future story-writer/trusted-operator candidate | `GET /api/stories/[id]/status` previews publish gates, `?format=handoff` returns the writer/reviewer packet, and `?record=true` stores preview snapshots; publish PATCH requires trusted publisher authority, safety gates, required second approval when enabled, and explicit human review |
+| Public story view | `/stories/[id]` | Public browser route | Public read route, not private API | Only published stories render; readable slug URLs are canonical and legacy ID URLs redirect when a slug exists |
 | AI prompt processing | `/api/process` | Internal utility only | Research-needed | High privacy/abuse risk if externalized |
 
 ## Agent Environment Rules
@@ -67,7 +67,7 @@ FamilySearch capture remains browser/desktop and user-initiated while FamilySear
 
 The API should become a first-class product surface over time, but the first API work is classification and guardrails, not broad externalization.
 
-Operations queue writes, provisional merges, story publish actions, and AI prompt processing need stronger review gates before any external agent-facing API claim. Story publish now has internal gates and explicit-agent role checks, but story writer vs trusted publisher scopes are not yet issued API credentials.
+Operations queue writes, provisional merges, story publish actions, and AI prompt processing need stronger review gates before any external agent-facing API claim. Story publish now has internal gates, second-review controls, canonical public slugs, and explicit-agent role checks, but story writer vs trusted publisher scopes are not yet issued API credentials.
 
 ## Next API Artifacts
 

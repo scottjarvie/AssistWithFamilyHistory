@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import { buildStoryPublicSlug } from "../lib/stories/slug";
 import {
   buildOperationSummary,
   filterByVaultOwner,
@@ -397,6 +398,11 @@ function buildStoryBundle(snapshot: VaultSnapshot, story: Doc<"stories">) {
   const person = story.personId
     ? snapshot.people.find((entry) => entry._id === story.personId) ?? null
     : null;
+  const publicSlug = story.publicSlug ?? buildStoryPublicSlug({
+    storyId: String(story._id),
+    title: story.title,
+    personName: person ? formatPersonName(person) : undefined,
+  });
   const operations = person ? buildPersonOperations(snapshot, person) : null;
   const sourceRecords = person && operations
     ? getPersonSourceRecords(snapshot, person, operations.relatedEvents)
@@ -407,7 +413,11 @@ function buildStoryBundle(snapshot: VaultSnapshot, story: Doc<"stories">) {
   const researchChecks = operations?.checks ?? [];
 
   return {
-    story,
+    story: {
+      ...story,
+      publicSlug,
+      publicIndexing: story.publicIndexing ?? "noindex",
+    },
     person: person
       ? {
           ...person,
@@ -649,12 +659,19 @@ export const getStoriesIndex = query({
       const person = story.personId
         ? snapshot.people.find((entry) => entry._id === story.personId) ?? null
         : null;
+      const publicSlug = story.publicSlug ?? buildStoryPublicSlug({
+        storyId: String(story._id),
+        title: story.title,
+        personName: person ? formatPersonName(person) : undefined,
+      });
       const operations = person ? buildPersonOperations(snapshot, person) : null;
       const contextCoverage = person && operations ? buildContextCoverage(snapshot, person, operations) : null;
       const sourceCount = operations?.relatedSources.length ?? 0;
 
       return {
         ...story,
+        publicSlug,
+        publicIndexing: story.publicIndexing ?? "noindex",
         person: person
           ? {
               ...person,
@@ -705,6 +722,39 @@ export const getPublishedStory = query({
     const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(story.vaultOwnerId));
     const ownedStory = snapshot.stories.find((entry) => entry._id === story._id);
     return ownedStory ? buildStoryBundle(snapshot, ownedStory) : null;
+  },
+});
+
+export const getPublishedStoryByIdentifier = query({
+  args: {
+    storyIdentifier: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const identifier = args.storyIdentifier.trim();
+    if (!identifier) return null;
+
+    const slugMatch = await ctx.db
+      .query("stories")
+      .withIndex("by_public_slug", (q) => q.eq("publicSlug", identifier))
+      .first();
+    const normalizedStoryId = ctx.db.normalizeId("stories", identifier);
+    const idMatch = normalizedStoryId ? await ctx.db.get(normalizedStoryId) : null;
+    const candidate = slugMatch ?? idMatch;
+    if (!candidate || candidate.status !== "published") return null;
+
+    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(candidate.vaultOwnerId));
+    const ownedStory = snapshot.stories.find((entry) => entry._id === candidate._id);
+    if (!ownedStory) return null;
+
+    const bundle = buildStoryBundle(snapshot, ownedStory);
+    if (
+      identifier !== String(ownedStory._id) &&
+      identifier !== bundle.story.publicSlug
+    ) {
+      return null;
+    }
+
+    return bundle;
   },
 });
 

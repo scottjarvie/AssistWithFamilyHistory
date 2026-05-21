@@ -17,6 +17,7 @@
     "check:story-capabilities": "tsx scripts/check-story-capabilities.ts",
     "check:public-story-policy": "tsx scripts/check-public-story-policy.ts",
     "check:public-story-e2e": "tsx scripts/check-public-story-e2e.ts",
+    "check:story-slugs": "tsx scripts/check-story-slugs.ts",
     "build:extension": "tsx scripts/build-extension.ts",
     "check:extension": "tsx scripts/check-extension-runtime.ts",
     "check:familysearch-capture": "tsx scripts/check-familysearch-capture.ts",

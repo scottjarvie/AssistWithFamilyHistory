@@ -1,9 +1,8 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { BookOpen, FileText, MapPinned, Milestone, ShieldCheck, Users } from "lucide-react";
 import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MarketingNav } from "@/components/layout/MarketingNav";
@@ -16,6 +15,7 @@ import {
 } from "@/lib/convex/server";
 import { createPageMetadata } from "@/lib/seo";
 import { buildPublicStoryMetadata, canRenderPublicStory } from "@/lib/stories/publicStoryPolicy";
+import { publicStoryPath } from "@/lib/stories/slug";
 
 export const dynamic = "force-dynamic";
 
@@ -35,8 +35,8 @@ export async function generateMetadata({
   }
 
   try {
-    const bundle = await getConvexClient().query(api.vault.getPublishedStory, {
-      storyId: id as Id<"stories">,
+    const bundle = await getConvexClient().query(api.vault.getPublishedStoryByIdentifier, {
+      storyIdentifier: id,
     });
     const storyMetadata = bundle
       ? buildPublicStoryMetadata({
@@ -47,12 +47,22 @@ export async function generateMetadata({
           story: { status: "draft", title: "Story not available" },
           person: null,
         });
+    const canonicalPath = bundle?.story.publicSlug ? publicStoryPath(bundle.story.publicSlug) : `/stories/${id}`;
+    const metadata = createPageMetadata({
+      title: storyMetadata.title,
+      description: storyMetadata.description,
+      path: canonicalPath,
+    });
     return {
-      ...createPageMetadata({
-        title: storyMetadata.title,
-        description: storyMetadata.description,
-        path: `/stories/${id}`,
-      }),
+      ...metadata,
+      openGraph: {
+        ...metadata.openGraph,
+        images: [`${canonicalPath}/opengraph-image`],
+      },
+      twitter: {
+        ...metadata.twitter,
+        images: [`${canonicalPath}/opengraph-image`],
+      },
       robots: storyMetadata.robots,
     };
   } catch {
@@ -98,8 +108,8 @@ export default async function PublicStoryPage({
   let bundle;
 
   try {
-    bundle = await getConvexClient().query(api.vault.getPublishedStory, {
-      storyId: id as Id<"stories">,
+    bundle = await getConvexClient().query(api.vault.getPublishedStoryByIdentifier, {
+      storyIdentifier: id,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
@@ -114,6 +124,9 @@ export default async function PublicStoryPage({
   if (!bundle || !canRenderPublicStory(bundle.story.status)) notFound();
 
   const { story, person, evidence, events, places, media, relationships, historicalContext } = bundle;
+  if (story.publicSlug && id !== story.publicSlug) {
+    redirect(publicStoryPath(story.publicSlug));
+  }
   const linkedRelationships = relationships.filter((relationship) => relationship !== null);
 
   return (

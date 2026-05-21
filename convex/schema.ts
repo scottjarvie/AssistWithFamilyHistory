@@ -831,7 +831,12 @@ export default defineSchema({
     
     // Publishing
     publishedToHive: v.optional(v.string()),    // Hive permlink if published
+    publicSlug: v.optional(v.string()),
+    publicIndexing: v.optional(v.union(v.literal("noindex"), v.literal("index"))),
     assignedReviewer: v.optional(v.string()),
+    secondReviewRequired: v.optional(v.boolean()),
+    secondReviewer: v.optional(v.string()),
+    secondReviewedAt: v.optional(v.number()),
     reviewRequestedAt: v.optional(v.number()),
     reviewedAt: v.optional(v.number()),
     lastPublishPreviewAt: v.optional(v.number()),
@@ -849,6 +854,7 @@ export default defineSchema({
     .index("by_person", ["personId"])
     .index("by_relationship", ["relationshipId"])
     .index("by_status", ["status"])
+    .index("by_public_slug", ["publicSlug"])
     .index("by_type", ["type"])
     .index("by_generated_by", ["generatedBy"]),
 

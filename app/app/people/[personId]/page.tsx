@@ -24,6 +24,7 @@ import { VaultStateCard } from "@/components/vault/VaultStateCard";
 import { getConvexRuntimeIssue } from "@/lib/convex/server";
 import { getVaultAccessContext } from "@/lib/vault/server";
 import { ResearchChecksPanel } from "@/components/vault/ResearchChecksPanel";
+import { publicStoryPath } from "@/lib/stories/slug";
 
 interface PageProps {
   params: Promise<{ personId: string }>;
@@ -680,7 +681,7 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
                       </Button>
                       {story.status === "published" ? (
                         <Button asChild variant="outline" size="sm">
-                          <Link href={`/stories/${story._id}`} target="_blank">Open public page</Link>
+                          <Link href={publicStoryPath(story.publicSlug ?? String(story._id))} target="_blank">Open public page</Link>
                         </Button>
                       ) : null}
                     </div>

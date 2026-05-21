@@ -234,7 +234,7 @@
       "reviewLevel": "reviewer-or-trusted-publisher",
       "risk": "medium",
       "scopes": ["trusted_operator"],
-      "notes": "Assigns a reviewer and records an owner-scoped story review event. Explicit story_writer role is denied reviewer assignment."
+      "notes": "Assigns a reviewer, can require second approval for high-risk stories, and records an owner-scoped story review event. Explicit story_writer role is denied reviewer assignment."
     },
     {
       "route": "/api/stories/[id]/status",
@@ -245,7 +245,7 @@
       "reviewLevel": "publish-safety-gated",
       "risk": "high",
       "scopes": ["story_writer", "trusted_operator"],
-      "notes": "GET returns publish readiness and optional format=handoff packet; use record=true to store a publish-preview audit snapshot. PATCH to published is blocked unless evidence, context, privacy/living-risk, provisional-relative, story-strength, and review-status gates pass plus explicit human review confirmation. Explicit story_writer role can preview/request review but is denied publish; trusted_operator/trusted publisher authority is required for agent publishing."
+      "notes": "GET returns publish readiness and optional format=handoff packet; use record=true to store a publish-preview audit snapshot. PATCH to published is blocked unless evidence, context, privacy/living-risk, provisional-relative, story-strength, review-status, and required second-approval gates pass plus explicit human review confirmation. Explicit story_writer role can preview/request review but is denied publish; trusted_operator/trusted publisher authority is required for agent publishing."
     }
   ]
 }

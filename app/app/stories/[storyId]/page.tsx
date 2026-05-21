@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StoryEditorForm } from "@/components/vault/StoryEditorForm";
 import { StoryReviewAssignmentForm } from "@/components/vault/StoryReviewAssignmentForm";
+import { StoryReviewHistoryPanel } from "@/components/vault/StoryReviewHistoryPanel";
 import { StoryStatusActions } from "@/components/vault/StoryStatusActions";
 import { VaultStateCard } from "@/components/vault/VaultStateCard";
 import {
@@ -33,6 +34,7 @@ import {
 } from "@/lib/convex/server";
 import { createPageMetadata } from "@/lib/seo";
 import { assessStoryPublishReadiness } from "@/lib/stories/publishSafety";
+import { publicStoryPath } from "@/lib/stories/slug";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
 export const metadata: Metadata = createPageMetadata({
@@ -57,17 +59,6 @@ const publishGateTone = {
 
 function formatEventDate(event: { date?: { original?: string; year?: number } }) {
   return event.date?.original || event.date?.year?.toString() || "Undated";
-}
-
-function formatReviewEventDate(value?: number) {
-  if (!value) return "Unknown time";
-  return new Intl.DateTimeFormat("en", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(value));
 }
 
 export default async function StoryReviewPage({
@@ -171,6 +162,7 @@ export default async function StoryReviewPage({
           <div className="flex flex-col gap-3 lg:items-end">
             <StoryStatusActions
               storyId={String(story._id)}
+              publicIdentifier={story.publicSlug}
               status={story.status}
               publishReadiness={publishReadiness}
             />
@@ -185,7 +177,7 @@ export default async function StoryReviewPage({
               ) : null}
               {story.status === "published" ? (
                 <Button asChild variant="outline" size="sm">
-                  <Link href={`/stories/${story._id}`} target="_blank">
+                  <Link href={publicStoryPath(story.publicSlug ?? String(story._id))} target="_blank">
                     <ExternalLink className="h-4 w-4" />
                     Public page
                   </Link>
@@ -333,7 +325,20 @@ export default async function StoryReviewPage({
               <StoryReviewAssignmentForm
                 storyId={String(story._id)}
                 assignedReviewer={story.assignedReviewer}
+                secondReviewRequired={story.secondReviewRequired}
+                secondReviewer={story.secondReviewer}
+                secondReviewedAt={story.secondReviewedAt}
               />
+              {story.secondReviewRequired ? (
+                <div className="mt-4 border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
+                  <p className="font-medium">Second approval is required before publishing.</p>
+                  <p className="mt-1 text-xs leading-5">
+                    {story.secondReviewedAt
+                      ? "Second approval has been marked complete."
+                      : "Publishing remains blocked until second approval is marked complete."}
+                  </p>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
 
@@ -569,41 +574,12 @@ export default async function StoryReviewPage({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {reviewHistory.length === 0 ? (
-              <p className="text-sm text-stone-500">No review activity has been recorded yet.</p>
-            ) : (
-              reviewHistory.map((event) => (
-                <div key={String(event._id)} className="border border-stone-200 bg-stone-50 px-4 py-4">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <p className="font-medium text-stone-900">{event.eventType.replace(/_/g, " ")}</p>
-                      <p className="mt-1 text-sm text-stone-600">
-                        {event.fromStatus && event.toStatus ? `${event.fromStatus} -> ${event.toStatus}` : "No status change"}
-                        {event.assignedTo ? ` · Assigned to ${event.assignedTo}` : ""}
-                      </p>
-                    </div>
-                    <p className="text-xs uppercase tracking-[0.14em] text-stone-500">
-                      {formatReviewEventDate(event.createdAt)}
-                    </p>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-stone-600">
-                    <span className="rounded-full bg-white px-2 py-1">actor: {event.actorRole}</span>
-                    {typeof event.readinessScore === "number" ? (
-                      <span className="rounded-full bg-white px-2 py-1">score: {event.readinessScore}%</span>
-                    ) : null}
-                    {typeof event.blockerCount === "number" ? (
-                      <span className="rounded-full bg-white px-2 py-1">blockers: {event.blockerCount}</span>
-                    ) : null}
-                    {typeof event.warningCount === "number" ? (
-                      <span className="rounded-full bg-white px-2 py-1">warnings: {event.warningCount}</span>
-                    ) : null}
-                  </div>
-                  {event.humanReviewNote ? (
-                    <p className="mt-3 text-sm leading-6 text-stone-700">{event.humanReviewNote}</p>
-                  ) : null}
-                </div>
-              ))
-            )}
+            <StoryReviewHistoryPanel
+              events={reviewHistory.map((event) => ({
+                ...event,
+                _id: String(event._id),
+              }))}
+            />
           </CardContent>
         </Card>
       </section>
