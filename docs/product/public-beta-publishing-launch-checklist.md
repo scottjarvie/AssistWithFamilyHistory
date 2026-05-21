@@ -34,3 +34,7 @@ This checklist tracks the last blockers before public story publishing can move 
 ## Beta Decision
 
 Recommended current policy: launch beta with status-only sharing and `noindex` by default. Add search indexing story-by-story after a documented privacy sweep and reviewer approval.
+
+## Latest QA Pass
+
+See `docs/operations/public-beta-launch-qa-report.md` for the 2026-05-21 local-dev real-story QA pass covering slug redirects, public metadata, Open Graph image generation, review history, second approval, trusted publisher publish, and rollback to review.
