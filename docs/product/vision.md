@@ -1,10 +1,12 @@
 # Discover Their Stories - Vision & Goals
 
-*Last updated: 2026-02-02*
+*Last updated: 2026-05-20*
 
 ## The Big Picture
 
 **Discover Their Stories** isn't just genealogy software. It's about transforming family history from a names-and-dates collection exercise into a deep, meaningful connection with ancestors as *real people*.
+
+It is also an **AI family history lab**: an experimental product asking what modern AI can unlock for genealogy, ancestor context, research discovery, and story creation. Some ideas should become durable product surfaces. Others can stay in a clearly labeled experimental area while we learn whether they are useful.
 
 ### Core Philosophy
 
@@ -14,6 +16,7 @@ The goal isn't just to find records or add names to a family tree. It's to:
 
 - **Understand who your ancestors were** as people
 - **Build high-quality operating data** about people, places, events, sources, relationships, memories, and research decisions
+- **Amass useful context** from trusted sources, user notes, journals, documents, places, buildings, cemeteries, maps, and time-period research
 - **Use AI as a research partner** to organize evidence, find gaps, and suggest next steps
 - **Paint pictures of their lives** through context and storytelling
 - **Connect emotionally** with your heritage
@@ -37,12 +40,14 @@ A suite of AI-powered tools that help people:
 - Research their *time periods* — what was happening in the world?
 - Research their *religions* — what did they believe? How did they practice?
 - Research their *occupations* — what did a cooper or a milliner actually do?
+- Research the buildings, neighborhoods, cemeteries, migration paths, and local institutions that shaped daily life
 
 ### 3. Contextual Understanding
 - What was life like for them day-to-day?
 - What challenges did their generation face?
 - What opportunities did they have (or lack)?
 - What historical events shaped their lives?
+- What larger place, era, family, migration, religious, occupational, or community patterns help explain their choices?
 
 ### 4. Storytelling & Content Creation
 - **Stories** — Narrative accounts of ancestors' lives
@@ -58,6 +63,12 @@ A suite of AI-powered tools that help people:
 - Generate narrative drafts from raw evidence
 - Deep research assistance for historical context
 - Support side tools that help with the operating work required before a good story can be written
+
+### 6. Experimental Tooling
+- Try small tools quickly when they might improve research or storytelling
+- Keep unfinished experiments discoverable but clearly labeled as experimental
+- Promote tools into the main product only after they prove useful
+- Retire or hide experiments that do not help users understand ancestors or tell better stories
 
 ---
 
@@ -169,6 +180,8 @@ Output: Vivid description of what a typical day might have looked like
 - Integration with other genealogy sites (Ancestry, FindAGrave, etc.)
 - Collaboration features for family groups
 - Mobile app companion
+- Maps, heatmaps, statistics, timelines, and other visual ways to discover family patterns
+- Experimental feature surfaces for quick AI genealogy prototypes
 
 ---
 
@@ -191,6 +204,8 @@ Not vanity metrics — real impact:
 - AI News Daily workflow patterns might inform content generation here
 - Voice narration for stories could be powerful (ElevenLabs TTS)
 - Could generate "ancestor trading cards" with AI images
+- Consider a dedicated experimental tools area where beta features can be tried without implying they are polished
+- Maps and statistics can tell family stories too: where ancestors were born, died, buried, married, migrated, or clustered
 
 ---
 
