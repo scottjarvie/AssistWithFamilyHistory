@@ -6,7 +6,8 @@ import {
   getConvexRuntimeIssue,
   isConvexConfigured,
 } from "@/lib/convex/server";
-import { parseCapturePackage } from "@/lib/familysearch/capture";
+import { assessCapturePackageForImport, parseCapturePackage } from "@/lib/familysearch/capture";
+import { buildCaptureImportReview } from "@/lib/familysearch/importReview";
 import { importCapturePackageToConvex } from "@/lib/familysearch/importer";
 import {
   getPerson,
@@ -25,6 +26,36 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const parsed = parseCapturePackage(body);
     const { capture, legacyEvidencePack, compatibilityMode } = parsed;
+    const readiness = assessCapturePackageForImport(capture, { compatibilityMode });
+    const review = buildCaptureImportReview({ capture, readiness, compatibilityMode });
+    const isPreview = request.nextUrl.searchParams.get("preview") === "true";
+
+    if (isPreview) {
+      return NextResponse.json({
+        success: true,
+        preview: true,
+        canImport: readiness.canImport,
+        compatibilityMode,
+        personId: capture.person.familySearchId,
+        personName: capture.person.name,
+        pageType: capture.pageType,
+        sourceCount: capture.sources.length,
+        memoryCount: capture.memories.length,
+        validation: readiness,
+        review,
+      });
+    }
+
+    if (!readiness.canImport) {
+      return NextResponse.json(
+        {
+          error: "Capture package failed import safety checks",
+          validation: readiness,
+          review,
+        },
+        { status: 400 }
+      );
+    }
 
     const personId = capture.person.familySearchId;
     const runId = new Date(capture.capturedAt).toISOString().replace(/[:.]/g, "-");
@@ -77,7 +108,7 @@ export async function POST(request: NextRequest) {
     }
 
     const backendStatus = backendIssue ?? getConvexReadyStatus();
-    const responseWarnings = [...(importResult?.warnings ?? [])];
+    const responseWarnings = [...readiness.warnings, ...(importResult?.warnings ?? [])];
 
     if (backendIssue) {
       responseWarnings.push(
@@ -96,6 +127,11 @@ export async function POST(request: NextRequest) {
       importRunId: importResult?.importRunId ?? null,
       mergeStatus: importResult?.mergeStatus ?? "partial",
       warnings: responseWarnings,
+      validation: readiness,
+      review: {
+        ...review,
+        warnings: responseWarnings,
+      },
       backendState: backendStatus.state,
       backendTitle: backendStatus.title,
       backendDescription: backendStatus.description,

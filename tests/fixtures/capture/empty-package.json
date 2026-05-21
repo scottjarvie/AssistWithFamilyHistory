@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "2.0",
+  "captureId": "fixture-empty-package",
+  "capturedAt": "2026-05-21T12:00:00.000Z",
+  "extractorVersion": "2.0.0",
+  "extractionDurationMs": 300,
+  "pageType": "sources",
+  "pageUrl": "https://www.familysearch.org/en/tree/person/sources/KWCJ-4XD",
+  "pageTitle": "Sources | FamilySearch",
+  "uiLocale": "en",
+  "person": {
+    "familySearchId": "KWCJ-4XD",
+    "name": "John Jarvie"
+  },
+  "sources": [],
+  "memories": [],
+  "placeMentions": [],
+  "diagnostics": {
+    "mode": "standard",
+    "totalSources": 0,
+    "totalMemories": 0,
+    "expandedSections": 0,
+    "failedExpansions": 0,
+    "warnings": [],
+    "errors": []
+  }
+}

@@ -112,6 +112,7 @@ export function FeatureShowcase() {
                         <Link
                           href={feature.href}
                           className="inline-flex items-center gap-1 text-sm font-medium text-[#234d5e] hover:text-[#1f4554]"
+                          suppressHydrationWarning
                         >
                           {feature.name}
                           <ArrowRight className="h-3.5 w-3.5" />

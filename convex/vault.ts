@@ -846,21 +846,30 @@ export const getOperationsQueue = query({
 
     const direction = args.sortDirection === "asc" ? 1 : -1;
     rows.sort((a, b) => {
+      let primary = 0;
       switch (args.sortBy) {
         case "completion":
-          return direction * (a.completionPercent - b.completionPercent);
+          primary = direction * (a.completionPercent - b.completionPercent);
+          break;
         case "sourceCount":
-          return direction * (a.sourceCount - b.sourceCount);
+          primary = direction * (a.sourceCount - b.sourceCount);
+          break;
         case "storyReadiness":
-          return direction * (a.storyReadinessScore - b.storyReadinessScore);
+          primary = direction * (a.storyReadinessScore - b.storyReadinessScore);
+          break;
         case "newestImport":
-          return direction * ((a.latestImportAt ?? 0) - (b.latestImportAt ?? 0));
+          primary = direction * ((a.latestImportAt ?? 0) - (b.latestImportAt ?? 0));
+          break;
         case "lastTouched":
-          return direction * ((a.lastTouched ?? 0) - (b.lastTouched ?? 0));
+          primary = direction * ((a.lastTouched ?? 0) - (b.lastTouched ?? 0));
+          break;
         case "missingCritical":
         default:
-          return direction * (a.missingCritical.length - b.missingCritical.length);
+          primary = direction * (a.missingCritical.length - b.missingCritical.length);
       }
+
+      if (primary !== 0) return primary;
+      return `${a.rowType}:${a.displayName}:${a.id}`.localeCompare(`${b.rowType}:${b.displayName}:${b.id}`);
     });
 
     const visibleRows = args.limit ? rows.slice(0, args.limit) : rows;

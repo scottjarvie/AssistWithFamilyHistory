@@ -1,4 +1,6 @@
-# FamilySearch Data Extraction Scripts
+# FamilySearch Console Extractor Legacy Fallback
+
+The Chrome extension in `extension/` is the preferred FamilySearch source capture path. Use this console workflow only as a fallback for local/internal recovery, debugging, or pages the extension cannot yet capture. For the current operating rules, see `docs/importing/familysearch-source-capture-runbook.md`.
 
 A set of browser console scripts and Node.js importers to extract structured genealogical data from FamilySearch.org and import it into the Discover Their Stories Convex database.
 

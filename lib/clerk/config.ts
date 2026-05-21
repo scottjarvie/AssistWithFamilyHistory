@@ -19,6 +19,13 @@ export function isClerkEnabled() {
   );
 }
 
+export function isAnonymousVaultEnabled() {
+  return (
+    process.env.NEXT_PUBLIC_ALLOW_ANONYMOUS_VAULT === "true" ||
+    process.env.ALLOW_ANONYMOUS_VAULT === "true"
+  );
+}
+
 export function getClerkPublishableKey() {
   return isClerkEnabled() ? process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY : undefined;
 }

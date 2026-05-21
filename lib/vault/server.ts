@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { cookies } from "next/headers";
-import { isClerkEnabled } from "@/lib/clerk/config";
+import { isAnonymousVaultEnabled, isClerkEnabled } from "@/lib/clerk/config";
 import {
   DEFAULT_ANONYMOUS_VAULT_OWNER,
   DEFAULT_LOCAL_VAULT_OWNER,
@@ -55,6 +55,10 @@ export async function getVaultAccessContext(): Promise<VaultAccessContext> {
 
   const cookieStore = await cookies();
   const cookieOwner = cookieStore.get(VAULT_PREVIEW_COOKIE)?.value?.trim();
+
+  if (!isAnonymousVaultEnabled()) {
+    throw new Error("Authentication required for vault access. Set ALLOW_ANONYMOUS_VAULT=true only for explicit guest-preview deployments.");
+  }
 
   return {
     vaultOwnerId: cookieOwner || DEFAULT_ANONYMOUS_VAULT_OWNER,

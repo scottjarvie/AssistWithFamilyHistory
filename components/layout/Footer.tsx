@@ -34,22 +34,22 @@ export function Footer() {
           </div>
 
           <nav className="flex flex-wrap items-center justify-center gap-6 md:gap-8">
-            <Link href="/features" className="transition-colors hover:text-[#fff6e5]">
+            <Link href="/features" className="transition-colors hover:text-[#fff6e5]" suppressHydrationWarning>
               Features
             </Link>
-            <Link href="/extension" className="transition-colors hover:text-[#fff6e5]">
+            <Link href="/extension" className="transition-colors hover:text-[#fff6e5]" suppressHydrationWarning>
               Extension
             </Link>
-            <Link href="/about" className="transition-colors hover:text-[#fff6e5]">
+            <Link href="/about" className="transition-colors hover:text-[#fff6e5]" suppressHydrationWarning>
               About
             </Link>
-            <Link href="/roadmap" className="transition-colors hover:text-[#fff6e5]">
+            <Link href="/roadmap" className="transition-colors hover:text-[#fff6e5]" suppressHydrationWarning>
               Roadmap
             </Link>
-            <Link href="/privacy" className="transition-colors hover:text-[#fff6e5]">
+            <Link href="/privacy" className="transition-colors hover:text-[#fff6e5]" suppressHydrationWarning>
               Privacy
             </Link>
-            <Link href="/contact" className="transition-colors hover:text-[#fff6e5]">
+            <Link href="/contact" className="transition-colors hover:text-[#fff6e5]" suppressHydrationWarning>
               Contact
             </Link>
           </nav>

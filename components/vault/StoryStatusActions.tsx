@@ -20,12 +20,26 @@ export function StoryStatusActions({
   const [pendingStatus, setPendingStatus] = useState<StoryStatus | null>(null);
 
   async function updateStatus(nextStatus: StoryStatus) {
+    if (
+      nextStatus === "published" &&
+      !window.confirm("Publish this story publicly? Confirm that a human reviewed evidence, privacy, and story quality.")
+    ) {
+      return;
+    }
+
     setPendingStatus(nextStatus);
     try {
       const response = await fetch(`/api/stories/${storyId}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: nextStatus }),
+        body: JSON.stringify({
+          status: nextStatus,
+          humanReviewConfirmed: nextStatus === "published" ? true : undefined,
+          humanReviewNote:
+            nextStatus === "published"
+              ? "Human operator reviewed evidence, privacy, and story quality before public publish."
+              : undefined,
+        }),
       });
       const payload = await response.json();
 

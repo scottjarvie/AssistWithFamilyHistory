@@ -44,7 +44,7 @@ export function CTASection() {
               size="lg"
               className="h-[3.25rem] rounded-full bg-[#f8ebd5] px-8 text-base font-semibold text-[#1d3540] shadow-[0_20px_30px_-24px_#000] hover:bg-[#fff2df]"
             >
-              <Link href="/app" className="flex items-center gap-2">
+              <Link href="/app" className="flex items-center gap-2" suppressHydrationWarning>
                 Open the beta workspace
                 <ArrowRight className="h-4 w-4" />
               </Link>
@@ -55,7 +55,11 @@ export function CTASection() {
               size="lg"
               className="h-[3.25rem] rounded-full border-[#f3dfbe80] bg-transparent px-8 text-base text-[#fff4e1] hover:bg-[#f8ebd511] hover:text-[#fff4e1]"
             >
-              <Link href="mailto:features@discovertheirstories.com" className="flex items-center gap-2">
+              <Link
+                href="mailto:features@discovertheirstories.com"
+                className="flex items-center gap-2"
+                suppressHydrationWarning
+              >
                 Send beta feedback
                 <Mail className="h-4 w-4" />
               </Link>

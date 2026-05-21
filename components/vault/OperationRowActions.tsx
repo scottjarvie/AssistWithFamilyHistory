@@ -133,6 +133,8 @@ export function OperationRowActions({
         body: JSON.stringify({
           provisionalId,
           action: "promote",
+          humanReviewConfirmed: true,
+          humanReviewNote: "Human operator reviewed this provisional relative before promotion.",
         }),
       });
       const payload = await response.json().catch(() => null);
@@ -162,6 +164,8 @@ export function OperationRowActions({
           action: "merge",
           targetPersonIdentifier: target.routeId,
           anchorPersonIdentifier,
+          humanReviewConfirmed: true,
+          humanReviewNote: `Human operator reviewed this provisional relative before merging into ${target.displayName}.`,
         }),
       });
       const payload = await response.json().catch(() => null);
@@ -209,7 +213,7 @@ export function OperationRowActions({
             <DialogHeader>
               <DialogTitle>Merge provisional relative</DialogTitle>
               <DialogDescription>
-                Choose an existing canonical person from this vault. The provisional row will be marked as merged into that person.
+                Choose an existing canonical person from this vault. This is a human-review action because it changes the identity graph.
               </DialogDescription>
             </DialogHeader>
 

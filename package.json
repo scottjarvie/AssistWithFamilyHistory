@@ -8,7 +8,16 @@
     "build": "next build",
     "start": "next start --port 3443",
     "lint": "eslint",
+    "check:api-inventory": "tsx scripts/check-api-inventory.ts",
+    "check:capture-validation": "tsx scripts/check-capture-validation.ts",
+    "check:agent-quality-gates": "tsx scripts/check-agent-quality-gates.ts",
+    "check:operations-handoff": "tsx scripts/check-operations-handoff.ts",
+    "check:review-gates": "tsx scripts/check-review-gates.ts",
+    "build:extension": "tsx scripts/build-extension.ts",
+    "check:extension": "tsx scripts/check-extension-runtime.ts",
+    "check:familysearch-capture": "tsx scripts/check-familysearch-capture.ts",
     "smoke:routes": "bash scripts/smoke-routes.sh",
+    "check:protected-routes": "tsx scripts/check-protected-routes.ts",
     "check:person-identifiers": "tsx scripts/check-person-identifiers.ts"
   },
   "dependencies": {

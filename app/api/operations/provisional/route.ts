@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { api } from "@/convex/_generated/api";
 import { getConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
+import { requireHumanReviewConfirmation } from "@/lib/operations/reviewGates";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
 export async function POST(request: NextRequest) {
@@ -17,6 +18,23 @@ export async function POST(request: NextRequest) {
 
     if (!provisionalId || !action) {
       return NextResponse.json({ error: "Missing provisionalId or action" }, { status: 400 });
+    }
+
+    const reviewErrors = requireHumanReviewConfirmation({
+      actionName: `Provisional relative ${action}`,
+      confirmed: body.humanReviewConfirmed,
+      note: body.humanReviewNote,
+    });
+
+    if (reviewErrors.length > 0) {
+      return NextResponse.json(
+        {
+          error: "Human review gate failed",
+          details: reviewErrors.join(" "),
+          reviewErrors,
+        },
+        { status: 400 }
+      );
     }
 
     const client = getConvexClient();

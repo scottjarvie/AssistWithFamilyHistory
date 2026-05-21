@@ -33,6 +33,43 @@ type BackendStatus = {
   description: string;
 };
 
+type ImportPreview = {
+  canImport: boolean;
+  compatibilityMode: boolean;
+  personId: string;
+  personName: string;
+  pageType: string;
+  sourceCount: number;
+  memoryCount: number;
+  validation: {
+    errors: string[];
+    warnings: string[];
+  };
+  review?: CaptureImportReview;
+};
+
+type CaptureImportReview = {
+  reportVersion: string;
+  reviewedAt: string;
+  canImport: boolean;
+  recommendedAction: "merge" | "fix_package" | "human_review";
+  summary: string;
+  package: {
+    captureId: string;
+    schemaVersion: string;
+    compatibilityMode: boolean;
+    personId: string;
+    personName: string;
+    pageType: string;
+    pageUrl: string;
+    sourceCount: number;
+    memoryCount: number;
+    diagnosticsMode: string;
+  };
+  errors: string[];
+  warnings: string[];
+};
+
 export default function ImportsPage() {
   const [recentImports, setRecentImports] = useState<RecentImport[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -41,6 +78,8 @@ export default function ImportsPage() {
   const [importing, setImporting] = useState(false);
   const [backendStatus, setBackendStatus] = useState<BackendStatus | null>(null);
   const [lastImportWarnings, setLastImportWarnings] = useState<string[]>([]);
+  const [previewResult, setPreviewResult] = useState<ImportPreview | null>(null);
+  const [previewPayload, setPreviewPayload] = useState<unknown | null>(null);
 
   async function loadRecentImports() {
     try {
@@ -83,18 +122,32 @@ export default function ImportsPage() {
     loadRecentImports();
   }, []);
 
-  async function handleImport() {
+  function parseImportJson() {
     if (!importJson.trim()) {
       toast.error("Paste a FamilySearch capture package first.");
-      return;
+      return null;
     }
+
+    try {
+      return JSON.parse(importJson);
+    } catch {
+      setImportError("Invalid JSON format");
+      toast.error("Invalid JSON format");
+      return null;
+    }
+  }
+
+  async function handlePreview() {
+    const parsed = parseImportJson();
+    if (!parsed) return;
 
     setImporting(true);
     setImportError(null);
+    setPreviewResult(null);
+    setPreviewPayload(null);
 
     try {
-      const parsed = JSON.parse(importJson);
-      const response = await fetch("/api/import", {
+      const response = await fetch("/api/import?preview=true", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -104,7 +157,62 @@ export default function ImportsPage() {
       const payload = await response.json();
 
       if (!response.ok || !payload?.success) {
-        const message = payload?.error || "Import failed";
+        const validationErrors = Array.isArray(payload?.validation?.errors)
+          ? payload.validation.errors.join(" ")
+          : "";
+        const message = [payload?.error || "Import preview failed", validationErrors].filter(Boolean).join(": ");
+        setImportError(message);
+        toast.error(message);
+        return;
+      }
+
+      setPreviewResult(payload);
+      setPreviewPayload(parsed);
+      if (payload.canImport) {
+        toast.success("Capture package is ready for review");
+      } else {
+        toast.warning("Capture package has blocking validation errors");
+      }
+    } catch {
+      const message = "Import preview failed";
+      setImportError(message);
+      toast.error(message);
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function copyReviewReport() {
+    if (!previewResult?.review) return;
+
+    await navigator.clipboard.writeText(JSON.stringify(previewResult.review, null, 2));
+    toast.success("Copied validation report");
+  }
+
+  async function handleImport() {
+    if (!previewResult?.canImport || !previewPayload) {
+      toast.error("Review the capture package before merging it into the vault.");
+      return;
+    }
+
+    setImporting(true);
+    setImportError(null);
+
+    try {
+      const response = await fetch("/api/import", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(previewPayload),
+      });
+      const payload = await response.json();
+
+      if (!response.ok || !payload?.success) {
+        const validationErrors = Array.isArray(payload?.validation?.errors)
+          ? payload.validation.errors.join(" ")
+          : "";
+        const message = [payload?.error || "Import failed", validationErrors].filter(Boolean).join(": ");
         setImportError(message);
         toast.error(message);
         return;
@@ -125,6 +233,8 @@ export default function ImportsPage() {
       }
       setDialogOpen(false);
       setImportJson("");
+      setPreviewPayload(null);
+      setPreviewResult(null);
       loadRecentImports();
     } catch (error) {
       const message = error instanceof SyntaxError ? "Invalid JSON format" : "Import failed";
@@ -293,6 +403,8 @@ export default function ImportsPage() {
               onChange={(event) => {
                 setImportJson(event.target.value);
                 setImportError(null);
+                setPreviewResult(null);
+                setPreviewPayload(null);
               }}
               placeholder='{"schemaVersion":"2.0", ...}'
               className="min-h-[260px] font-mono text-sm"
@@ -302,9 +414,68 @@ export default function ImportsPage() {
                 {importError}
               </div>
             ) : null}
+            {previewResult ? (
+              <div
+                className={
+                  previewResult.canImport
+                    ? "rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950"
+                    : "rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+                }
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-medium">
+                      {previewResult.personName || "Unknown person"} · {previewResult.personId || "No FamilySearch ID"}
+                    </p>
+                    <p className="mt-1">
+                      {previewResult.pageType} capture · {previewResult.sourceCount} sources ·{" "}
+                      {previewResult.memoryCount} memories
+                    </p>
+                  </div>
+                  <Badge variant={previewResult.canImport ? "secondary" : "destructive"}>
+                    {previewResult.canImport ? "Ready to merge" : "Blocked"}
+                  </Badge>
+                </div>
+                {previewResult.review?.summary ? (
+                  <p className="mt-3 font-medium">{previewResult.review.summary}</p>
+                ) : null}
+                {previewResult.validation.errors.length > 0 ? (
+                  <div className="mt-3 space-y-1">
+                    {previewResult.validation.errors.map((error) => (
+                      <p key={error}>{error}</p>
+                    ))}
+                  </div>
+                ) : null}
+                {previewResult.validation.warnings.length > 0 ? (
+                  <div className="mt-3 space-y-1">
+                    {previewResult.validation.warnings.map((warning) => (
+                      <p key={warning}>{warning}</p>
+                    ))}
+                  </div>
+                ) : null}
+                {previewResult.review ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={copyReviewReport}
+                    className="mt-3 bg-white/70"
+                  >
+                    Copy Validation Report
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
             <div className="flex flex-wrap gap-3">
-              <Button onClick={handleImport} disabled={importing} className="bg-amber-700 hover:bg-amber-800">
-                {importing ? "Importing..." : "Import into Vault"}
+              <Button onClick={handlePreview} disabled={importing} className="bg-amber-700 hover:bg-amber-800">
+                {importing ? "Checking..." : "Review Package"}
+              </Button>
+              <Button
+                onClick={handleImport}
+                disabled={importing || !previewResult?.canImport}
+                variant="outline"
+              >
+                {importing ? "Merging..." : "Merge into Vault"}
               </Button>
               <Button asChild variant="outline">
                 <Link href="/app/people">

@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "2.0",
+  "captureId": "fixture-missing-person",
+  "capturedAt": "2026-05-21T12:00:00.000Z",
+  "extractorVersion": "2.0.0",
+  "extractionDurationMs": 1200,
+  "pageType": "sources",
+  "pageUrl": "https://www.familysearch.org/en/tree/person/sources/KWCJ-4XD",
+  "pageTitle": "Sources | FamilySearch",
+  "uiLocale": "en",
+  "person": {
+    "familySearchId": "",
+    "name": ""
+  },
+  "sources": [
+    {
+      "id": "S1",
+      "orderIndex": 0,
+      "sourceKey": "missing-person-source-key",
+      "sourceType": "record",
+      "title": "Missing Person Source",
+      "tags": [],
+      "indexed": { "fields": [], "textBlocks": [] },
+      "rawText": "Missing person source text.",
+      "expanded": true,
+      "expansionAttempts": 1,
+      "expansionSucceeded": true,
+      "relatedPeople": [],
+      "placeMentions": [],
+      "outboundUrls": []
+    }
+  ],
+  "memories": [],
+  "placeMentions": [],
+  "diagnostics": {
+    "mode": "standard",
+    "totalSources": 1,
+    "totalMemories": 0,
+    "expandedSections": 1,
+    "failedExpansions": 0,
+    "warnings": [],
+    "errors": []
+  }
+}

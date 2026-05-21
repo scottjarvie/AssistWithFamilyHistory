@@ -103,6 +103,13 @@ export default async function OperationsPage({ searchParams }: { searchParams: S
       params.staleOnly === "true" ||
       params.missingCheck
   );
+  const handoffParams = new URLSearchParams();
+  handoffParams.set("format", "handoff");
+  for (const [key, value] of Object.entries(params)) {
+    if (typeof value === "string" && value) {
+      handoffParams.set(key, value);
+    }
+  }
   const isGuestVault = accessContext.mode === "anonymous";
   const sessionLabel =
     accessContext.mode === "user"
@@ -147,6 +154,12 @@ export default async function OperationsPage({ searchParams }: { searchParams: S
                     <Link href="/app/imports">
                       <Upload className="h-4 w-4" />
                       Import capture package
+                    </Link>
+                  </Button>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href={`/api/operations/queue?${handoffParams.toString()}`} target="_blank">
+                      <Bot className="h-4 w-4" />
+                      Export agent handoff
                     </Link>
                   </Button>
                 </div>

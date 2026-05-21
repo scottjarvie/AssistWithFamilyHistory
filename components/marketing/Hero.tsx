@@ -34,7 +34,7 @@ export function Hero() {
               asChild
               className="h-12 rounded-full bg-[#234d5e] px-6 text-[#f7f3e8] hover:bg-[#1f4554]"
             >
-              <Link href="/app">
+              <Link href="/app" suppressHydrationWarning>
                 Enter the beta workspace
                 <ArrowRight className="h-4 w-4" />
               </Link>
@@ -44,7 +44,7 @@ export function Hero() {
               variant="outline"
               className="h-12 rounded-full border-[#9f5a2d66] bg-[#fffaf2aa] px-6 text-[#573d2a] hover:bg-[#f4e5ca]"
             >
-              <Link href="/roadmap">See what is being built</Link>
+              <Link href="/roadmap" suppressHydrationWarning>See what is being built</Link>
             </Button>
           </div>
 

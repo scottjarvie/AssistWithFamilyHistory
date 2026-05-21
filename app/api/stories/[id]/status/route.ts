@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { getConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
+import { requireHumanReviewConfirmation } from "@/lib/operations/reviewGates";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
 function isStoryStatus(value: unknown): value is "draft" | "review" | "published" {
@@ -23,6 +24,25 @@ export async function PATCH(
 
     if (!isStoryStatus(body.status)) {
       return NextResponse.json({ error: "Invalid story status" }, { status: 400 });
+    }
+
+    if (body.status === "published") {
+      const reviewErrors = requireHumanReviewConfirmation({
+        actionName: "Publishing a public story",
+        confirmed: body.humanReviewConfirmed,
+        note: body.humanReviewNote,
+      });
+
+      if (reviewErrors.length > 0) {
+        return NextResponse.json(
+          {
+            error: "Human review gate failed",
+            details: reviewErrors.join(" "),
+            reviewErrors,
+          },
+          { status: 400 }
+        );
+      }
     }
 
     const { vaultOwnerId } = await getVaultAccessContext();

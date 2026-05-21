@@ -1,0 +1,62 @@
+{
+  "schemaVersion": "2.0",
+  "captureId": "fixture-duplicate-source-key-warning",
+  "capturedAt": "2026-05-21T12:00:00.000Z",
+  "extractorVersion": "2.0.0",
+  "extractionDurationMs": 1200,
+  "pageType": "sources",
+  "pageUrl": "https://www.familysearch.org/en/tree/person/sources/KWCJ-4XD",
+  "pageTitle": "Sources | FamilySearch",
+  "uiLocale": "en",
+  "person": {
+    "familySearchId": "KWCJ-4XD",
+    "name": "John Jarvie",
+    "birthDate": "1890",
+    "deathDate": "1960"
+  },
+  "sources": [
+    {
+      "id": "S1",
+      "orderIndex": 0,
+      "sourceKey": "duplicate-key",
+      "sourceType": "record",
+      "title": "Duplicate Source One",
+      "tags": [],
+      "indexed": { "fields": [], "textBlocks": [] },
+      "rawText": "Source one.",
+      "expanded": true,
+      "expansionAttempts": 1,
+      "expansionSucceeded": true,
+      "relatedPeople": [],
+      "placeMentions": [],
+      "outboundUrls": []
+    },
+    {
+      "id": "S2",
+      "orderIndex": 1,
+      "sourceKey": "duplicate-key",
+      "sourceType": "record",
+      "title": "Duplicate Source Two",
+      "tags": [],
+      "indexed": { "fields": [], "textBlocks": [] },
+      "rawText": "Source two.",
+      "expanded": true,
+      "expansionAttempts": 1,
+      "expansionSucceeded": true,
+      "relatedPeople": [],
+      "placeMentions": [],
+      "outboundUrls": []
+    }
+  ],
+  "memories": [],
+  "placeMentions": [],
+  "diagnostics": {
+    "mode": "standard",
+    "totalSources": 2,
+    "totalMemories": 0,
+    "expandedSections": 2,
+    "failedExpansions": 0,
+    "warnings": [],
+    "errors": []
+  }
+}

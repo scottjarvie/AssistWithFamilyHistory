@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "2.0",
+  "captureId": "fixture-valid-source-v2",
+  "capturedAt": "2026-05-21T12:00:00.000Z",
+  "extractorVersion": "2.0.0",
+  "extractionDurationMs": 1200,
+  "pageType": "sources",
+  "pageUrl": "https://www.familysearch.org/en/tree/person/sources/KWCJ-4XD",
+  "pageTitle": "Sources | FamilySearch",
+  "uiLocale": "en",
+  "person": {
+    "familySearchId": "KWCJ-4XD",
+    "name": "John Jarvie",
+    "birthDate": "3 February 1890",
+    "deathDate": "1960"
+  },
+  "sources": [
+    {
+      "id": "S1",
+      "orderIndex": 0,
+      "sourceKey": "fixture-source-key-1",
+      "sourceType": "record",
+      "title": "1920 United States Census",
+      "tags": [],
+      "indexed": {
+        "fields": [
+          { "label": "Name", "value": "John Jarvie" },
+          { "label": "Event Place", "value": "Salt Lake City, Utah, United States" }
+        ],
+        "textBlocks": []
+      },
+      "rawText": "John Jarvie in the 1920 United States Census.",
+      "expanded": true,
+      "expansionAttempts": 1,
+      "expansionSucceeded": true,
+      "relatedPeople": [],
+      "placeMentions": [],
+      "outboundUrls": []
+    }
+  ],
+  "memories": [],
+  "placeMentions": [],
+  "diagnostics": {
+    "mode": "standard",
+    "totalSources": 1,
+    "totalMemories": 0,
+    "expandedSections": 1,
+    "failedExpansions": 0,
+    "warnings": [],
+    "errors": []
+  }
+}

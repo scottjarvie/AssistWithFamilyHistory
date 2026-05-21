@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "fixture-legacy-pack-v1",
+  "capturedAt": "2026-05-21T12:00:00.000Z",
+  "extractorVersion": "1.0.0",
+  "extractionDurationMs": 700,
+  "sourceUrl": "https://www.familysearch.org/en/tree/person/sources/KWCJ-4XD",
+  "pageTitle": "Sources | FamilySearch",
+  "uiLocale": "en",
+  "person": {
+    "familySearchId": "KWCJ-4XD",
+    "name": "John Jarvie",
+    "birthDate": "1890",
+    "deathDate": "1960"
+  },
+  "sources": [
+    {
+      "id": "S1",
+      "orderIndex": 0,
+      "sourceKey": "legacy-source-key-1",
+      "sourceType": "record",
+      "title": "Legacy Source",
+      "tags": [],
+      "indexed": {
+        "fields": [{ "label": "Name", "value": "John Jarvie" }],
+        "textBlocks": []
+      },
+      "rawText": "Legacy source text.",
+      "expanded": true,
+      "expansionAttempts": 1,
+      "expansionSucceeded": true
+    }
+  ],
+  "diagnostics": {
+    "mode": "standard",
+    "totalSources": 1,
+    "expandedSections": 1,
+    "failedExpansions": 0,
+    "warnings": [],
+    "errors": []
+  }
+}

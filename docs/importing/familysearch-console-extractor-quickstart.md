@@ -1,5 +1,7 @@
 # FamilySearch Extractor - Quick Start
 
+The Chrome extension in `extension/` is the preferred source capture path. Use this console flow only as a legacy fallback after checking `docs/importing/familysearch-source-capture-runbook.md`.
+
 ## 🎯 One-Minute Guide
 
 ### Extract Person Data
