@@ -380,7 +380,15 @@ export default async function OperationsPage({ searchParams }: { searchParams: S
                       personIdentifier={row.personIdentifier}
                       provisionalId={row.rowType === "provisional" ? row.id : undefined}
                       anchorPersonIdentifier={row.anchorPersonIdentifier || undefined}
+                      displayName={row.displayName}
                       missingCritical={row.missingCritical}
+                      nextActions={row.nextActions}
+                      sourceCount={row.sourceCount}
+                      memoryCount={row.memoryCount}
+                      documentCount={row.documentCount}
+                      contextReportCount={row.contextReportCount}
+                      storyWorkflow={row.storyWorkflow}
+                      staleChecksCount={row.staleChecksCount}
                     />
                   </td>
                 </tr>

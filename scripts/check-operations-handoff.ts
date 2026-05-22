@@ -1,4 +1,5 @@
 import { buildOperationsHandoffPacket } from "@/lib/operations/handoff";
+import { readFileSync } from "node:fs";
 
 const packet = buildOperationsHandoffPacket(
   {
@@ -41,10 +42,44 @@ const packet = buildOperationsHandoffPacket(
 
 assert(packet.rows[0].handoff.recommendedAgent === "story-writer", "Ready row should route to story writer.");
 assert(
+  packet.rows[0].routes.contextPack === "/api/people/KWCJ-4XD/context-pack?format=markdown",
+  "Person handoff should include context-pack route.",
+);
+assert(
+  packet.rows[0].handoff.prompt.includes("John Jarvie"),
+  "Person handoff should include a paste-ready prompt.",
+);
+assert(
   packet.rows[1].handoff.reviewLevel === "human-review-required",
   "Provisional row should require human review.",
 );
+assert(
+  packet.rows[1].routes.anchorWorkspace === "/app/people/KWCJ-4XD",
+  "Provisional handoff should include anchor workspace route.",
+);
+assert(
+  packet.rows[1].handoff.prompt.includes("Do not execute"),
+  "Provisional handoff should warn against irreversible graph changes.",
+);
 assert(JSON.stringify(packet).includes("2026-05-21"), "Packet should include deterministic generatedAt.");
+
+const operationActionsSource = readFileSync("components/vault/OperationRowActions.tsx", "utf8");
+const provisionalRouteSource = readFileSync("app/api/operations/provisional/route.ts", "utf8");
+
+for (const token of [
+  "Clipboard unavailable",
+  "handoffDialogOpen",
+  "reviewNoteReady",
+  "Human review required",
+  "Minimum 20 characters",
+]) {
+  assert(operationActionsSource.includes(token), `Operation row actions missing ${token}`);
+}
+
+assert(
+  provisionalRouteSource.includes("requireHumanReviewConfirmation"),
+  "Provisional API route must enforce human review confirmation.",
+);
 
 console.log("Operations handoff checks passed.");
 

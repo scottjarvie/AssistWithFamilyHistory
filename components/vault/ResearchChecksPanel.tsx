@@ -11,8 +11,11 @@ type CheckRecord = {
   checkKey: string;
   status: "missing" | "in_progress" | "complete" | "not_applicable" | "needs_review";
   applicability: "required" | "recommended" | "not_applicable" | "unknown";
+  completionSource?: string;
+  confidence?: number;
   summary?: string;
   notes?: string;
+  lastReviewedAt?: number;
 };
 
 export function ResearchChecksPanel({
@@ -111,6 +114,7 @@ export function ResearchChecksPanel({
       <div className="grid gap-4">
         {checks.map((check) => {
           const draft = drafts[check.checkKey];
+          const stale = isStaleCheck(check);
           return (
             <Card key={check.checkKey} className="border-stone-200">
               <CardContent className="grid gap-4 p-4 md:grid-cols-[1.2fr_180px_1fr_auto] md:items-start">
@@ -119,6 +123,24 @@ export function ResearchChecksPanel({
                   <p className="mt-1 text-sm text-stone-500">
                     {check.applicability} {check.summary ? `· ${check.summary}` : ""}
                   </p>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                    <span className="rounded-full bg-stone-100 px-2.5 py-1 text-stone-600">
+                      Source: {formatCompletionSource(check.completionSource)}
+                    </span>
+                    <span className="rounded-full bg-stone-100 px-2.5 py-1 text-stone-600">
+                      Reviewed: {formatReviewedAt(check.lastReviewedAt)}
+                    </span>
+                    {typeof check.confidence === "number" ? (
+                      <span className="rounded-full bg-stone-100 px-2.5 py-1 text-stone-600">
+                        Confidence: {Math.round(check.confidence * 100)}%
+                      </span>
+                    ) : null}
+                    {stale ? (
+                      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-800">
+                        Stale review
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
                 <select
                   value={draft.status}
@@ -178,4 +200,19 @@ export function ResearchChecksPanel({
       </Card>
     </div>
   );
+}
+
+function isStaleCheck(check: CheckRecord) {
+  if (!check.lastReviewedAt) return false;
+  if (check.status === "missing" || check.status === "needs_review") return false;
+  return check.lastReviewedAt < Date.now() - 1000 * 60 * 60 * 24 * 45;
+}
+
+function formatCompletionSource(source: CheckRecord["completionSource"]) {
+  return source ? source.replace(/_/g, " ") : "inferred";
+}
+
+function formatReviewedAt(timestamp?: number) {
+  if (!timestamp) return "not recorded";
+  return new Date(timestamp).toLocaleDateString();
 }

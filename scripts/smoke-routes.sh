@@ -3,40 +3,44 @@ set -euo pipefail
 
 BASE_URL="${BASE_URL:-http://127.0.0.1:3443}"
 
-ROUTES=(
-  "/"
-  "/features"
-  "/extension"
-  "/app"
-  "/app/imports"
-  "/app/operations"
-  "/app/people"
-  "/app/places"
-  "/app/research"
-  "/app/story-writer"
-  "/app/settings"
-  "/app/source-docs"
+ROUTE_GATES=(
+  "Public marketing|/"
+  "Public marketing|/features"
+  "Public marketing|/extension"
+  "App shell|/app"
+  "Intake|/app/imports"
+  "Operations|/app/operations"
+  "People and places|/app/people"
+  "People and places|/app/places"
+  "Research and story tools|/app/research"
+  "Research and story tools|/app/story-writer"
+  "Research and story tools|/app/source-docs"
+  "Settings|/app/settings"
+  "API health|/api/capabilities"
+  "API health|/api/convex/stats"
 )
 
 if [[ -n "${PERSON_ROUTE_ID:-}" ]]; then
-  ROUTES+=("/app/people/${PERSON_ROUTE_ID}")
+  ROUTE_GATES+=("People and places|/app/people/${PERSON_ROUTE_ID}")
 else
-  echo "Skipping person-workspace smoke route. Set PERSON_ROUTE_ID to include /app/people/<id>."
+  echo "[People and places] Skipping person-workspace smoke route. Set PERSON_ROUTE_ID to include /app/people/<id>."
 fi
 
 echo "Running route smoke checks against ${BASE_URL}"
 
-for route in "${ROUTES[@]}"; do
+for entry in "${ROUTE_GATES[@]}"; do
+  gate="${entry%%|*}"
+  route="${entry#*|}"
   code="$(curl -s -L -o /dev/null -w "%{http_code}" "${BASE_URL}${route}")"
   if [[ "${code}" == "000" ]]; then
-    echo "Route check failed: dev server is not reachable at ${BASE_URL}. Start it with 'pnpm dev'."
+    echo "[${gate}] Route check failed: dev server is not reachable at ${BASE_URL}. Start it with 'pnpm dev'."
     exit 1
   fi
   if [[ "${code}" != "200" ]]; then
-    echo "Route check failed: ${route} returned ${code}"
+    echo "[${gate}] Route check failed: ${route} returned ${code}"
     exit 1
   fi
-  echo "Route OK: ${route}"
+  echo "[${gate}] OK: ${route}"
 done
 
 echo "Smoke checks passed"

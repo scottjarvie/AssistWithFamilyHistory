@@ -578,6 +578,34 @@ export const upsertMedia = mutation({
     sourceId: v.optional(v.id("sources")),
     familySearchUrl: v.optional(v.string()),
     importKey: v.optional(v.string()),
+    privacyLevel: v.optional(
+      v.union(
+        v.literal("private"),
+        v.literal("family_review"),
+        v.literal("publish_candidate"),
+        v.literal("public_source")
+      )
+    ),
+    reviewStatus: v.optional(
+      v.union(
+        v.literal("unreviewed"),
+        v.literal("reviewed"),
+        v.literal("redacted"),
+        v.literal("rejected")
+      )
+    ),
+    rightsStatus: v.optional(
+      v.union(
+        v.literal("unknown"),
+        v.literal("owned"),
+        v.literal("permitted"),
+        v.literal("public_domain"),
+        v.literal("restricted")
+      )
+    ),
+    aiUseAllowed: v.optional(v.boolean()),
+    privacyReviewNote: v.optional(v.string()),
+    reviewedAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -1378,9 +1406,11 @@ export const promoteProvisionalRelative = mutation({
   args: {
     vaultOwnerId: v.string(),
     provisionalId: v.id("provisionalRelatives"),
+    humanReviewNote: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const now = Date.now();
     const provisional = await ctx.db.get(args.provisionalId);
     if (!provisional || !matchesVaultOwner(provisional.vaultOwnerId, vaultOwnerId)) {
       throw new Error("Provisional relative not found");
@@ -1398,6 +1428,9 @@ export const promoteProvisionalRelative = mutation({
           vaultOwnerId
         )[0] ?? null
       : null;
+    if (existingPerson && existingPerson._id === provisional.anchorPersonId) {
+      throw new Error("Provisional relative resolves to the anchor person and cannot be promoted");
+    }
 
     const target =
       existingPerson ||
@@ -1412,15 +1445,35 @@ export const promoteProvisionalRelative = mutation({
         living: false,
         researchStatus: "not_started",
         notes: provisional.notes,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
+        createdAt: now,
+        updatedAt: now,
       }));
 
     const canonicalPersonId = typeof target === "object" ? target._id : target;
     await ctx.db.patch(args.provisionalId, {
       mergeState: "promoted",
       canonicalPersonId,
-      updatedAt: Date.now(),
+      updatedAt: now,
+    });
+    await ctx.db.insert("researchLog", {
+      vaultOwnerId,
+      entityType: "person",
+      entityId: canonicalPersonId,
+      activityType: "other",
+      status: "done",
+      summary: `Promoted provisional relative: ${provisional.displayName}`,
+      details: [
+        `Provisional ID: ${String(args.provisionalId)}`,
+        `Anchor person ID: ${String(provisional.anchorPersonId)}`,
+        provisional.relationshipHint ? `Relationship hint: ${provisional.relationshipHint}` : null,
+        provisional.familySearchId ? `FamilySearch ID: ${provisional.familySearchId}` : null,
+        `Evidence count: ${provisional.evidenceCount}`,
+        args.humanReviewNote ? `Human review note: ${args.humanReviewNote}` : "Human review note: not recorded",
+      ].filter(Boolean).join("\n"),
+      outputRefs: [`provisionalRelative:${String(args.provisionalId)}`],
+      createdAt: now,
+      updatedAt: now,
+      completedAt: now,
     });
 
     return { personId: canonicalPersonId };
@@ -1432,9 +1485,11 @@ export const mergeProvisionalRelative = mutation({
     vaultOwnerId: v.string(),
     provisionalId: v.id("provisionalRelatives"),
     targetPersonId: v.id("persons"),
+    humanReviewNote: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const now = Date.now();
     const provisional = await ctx.db.get(args.provisionalId);
     const target = await ctx.db.get(args.targetPersonId);
     if (
@@ -1451,11 +1506,35 @@ export const mergeProvisionalRelative = mutation({
     if (provisional.anchorPersonId === args.targetPersonId) {
       throw new Error("Choose a different canonical person than the anchor person");
     }
+    if (provisional.familySearchId && target.fsId && provisional.familySearchId !== target.fsId) {
+      throw new Error("Target FamilySearch ID does not match this provisional relative");
+    }
 
     await ctx.db.patch(args.provisionalId, {
       mergeState: "merged",
       canonicalPersonId: args.targetPersonId,
-      updatedAt: Date.now(),
+      updatedAt: now,
+    });
+    await ctx.db.insert("researchLog", {
+      vaultOwnerId,
+      entityType: "person",
+      entityId: args.targetPersonId,
+      activityType: "other",
+      status: "done",
+      summary: `Merged provisional relative into ${formatPersonName(target)}`,
+      details: [
+        `Provisional relative: ${provisional.displayName}`,
+        `Provisional ID: ${String(args.provisionalId)}`,
+        `Anchor person ID: ${String(provisional.anchorPersonId)}`,
+        provisional.relationshipHint ? `Relationship hint: ${provisional.relationshipHint}` : null,
+        provisional.familySearchId ? `FamilySearch ID: ${provisional.familySearchId}` : null,
+        `Evidence count: ${provisional.evidenceCount}`,
+        args.humanReviewNote ? `Human review note: ${args.humanReviewNote}` : "Human review note: not recorded",
+      ].filter(Boolean).join("\n"),
+      outputRefs: [`provisionalRelative:${String(args.provisionalId)}`],
+      createdAt: now,
+      updatedAt: now,
+      completedAt: now,
     });
 
     return { success: true };
