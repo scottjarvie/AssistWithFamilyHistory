@@ -45,6 +45,19 @@ const storyWorkflowValidator = v.union(
 async function getVaultSnapshot(ctx: QueryCtx, vaultOwnerId: string): Promise<VaultSnapshot> {
   const owned = <T extends { vaultOwnerId?: string }>(rows: T[]) => filterByVaultOwner(rows, vaultOwnerId);
 
+  // GEN-70: use by_owner indexes instead of full-table scans. All 20 tables
+  // queried below have a `by_owner` index defined in convex/schema.ts. The
+  // `owned()` JS filter at the return is now defense-in-depth (should be
+  // redundant after the index) — kept because correctness is cheap and the
+  // predicate also normalizes the `vaultOwnerId` cookie path.
+  const byOwner = <T extends string>(table: T) =>
+    ctx.db
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .query(table as any)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .withIndex("by_owner" as any, (q: any) => q.eq("vaultOwnerId", vaultOwnerId))
+      .collect();
+
   const [
     people,
     relationships,
@@ -67,26 +80,26 @@ async function getVaultSnapshot(ctx: QueryCtx, vaultOwnerId: string): Promise<Va
     researchChecks,
     provisionalRelatives,
   ] = await Promise.all([
-    ctx.db.query("persons").collect(),
-    ctx.db.query("relationships").collect(),
-    ctx.db.query("events").collect(),
-    ctx.db.query("personEvents").collect(),
-    ctx.db.query("places").collect(),
-    ctx.db.query("sources").collect(),
-    ctx.db.query("citations").collect(),
-    ctx.db.query("citationLinks").collect(),
-    ctx.db.query("sourceFacts").collect(),
-    ctx.db.query("media").collect(),
-    ctx.db.query("contextItems").collect(),
-    ctx.db.query("importRuns").collect(),
-    ctx.db.query("researchTasks").collect(),
-    ctx.db.query("researchLog").collect(),
-    ctx.db.query("documents").collect(),
-    ctx.db.query("stories").collect(),
-    ctx.db.query("storyReviewEvents").collect(),
-    ctx.db.query("historicalContext").collect(),
-    ctx.db.query("researchChecks").collect(),
-    ctx.db.query("provisionalRelatives").collect(),
+    byOwner("persons"),
+    byOwner("relationships"),
+    byOwner("events"),
+    byOwner("personEvents"),
+    byOwner("places"),
+    byOwner("sources"),
+    byOwner("citations"),
+    byOwner("citationLinks"),
+    byOwner("sourceFacts"),
+    byOwner("media"),
+    byOwner("contextItems"),
+    byOwner("importRuns"),
+    byOwner("researchTasks"),
+    byOwner("researchLog"),
+    byOwner("documents"),
+    byOwner("stories"),
+    byOwner("storyReviewEvents"),
+    byOwner("historicalContext"),
+    byOwner("researchChecks"),
+    byOwner("provisionalRelatives"),
   ]);
 
   return {
