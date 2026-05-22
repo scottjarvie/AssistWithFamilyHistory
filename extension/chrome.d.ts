@@ -15,6 +15,8 @@ type ChromeExtensionMessage = Record<string, unknown> & {
   error?: unknown;
   pacing?: unknown;
   state?: unknown;
+  // GEN-74: consent assertion carried on START_EXTRACTION messages.
+  consentAcknowledged?: boolean;
 };
 
 type ChromeEvent<TListener> = {
@@ -57,6 +59,7 @@ declare const chrome: {
       ) => void
     >;
     query(queryInfo: Record<string, unknown>): Promise<Array<{ id?: number; url?: string }>>;
+    get(tabId: number): Promise<{ id?: number; url?: string }>;
     sendMessage(tabId: number, message: ChromeExtensionMessage): Promise<unknown>;
   };
 };

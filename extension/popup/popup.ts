@@ -166,16 +166,23 @@ elements.consentCheck.addEventListener("change", () => {
 });
 
 elements.extractBtn.addEventListener("click", async () => {
+  // GEN-74: assert consent locally, then pass `consentAcknowledged: true` to
+  // the service worker so the compliance boundary is enforced where
+  // capture actually starts, not only via the UI button state.
+  if (!elements.consentCheck.checked) {
+    return;
+  }
   showState("extracting");
   elements.progressFill.style.width = "0%";
   elements.progressStatus.textContent = "Starting extraction...";
-  
+
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (tab?.id) {
-    chrome.runtime.sendMessage({ 
+    chrome.runtime.sendMessage({
       type: "START_EXTRACTION",
       mode: isAdminMode ? "admin" : "standard",
       tabId: tab.id,
+      consentAcknowledged: true,
     });
   }
 });

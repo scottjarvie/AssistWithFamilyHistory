@@ -51,7 +51,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             sendResponse(extractionState);
             break;
         case "START_EXTRACTION":
-            startExtensionExtraction(message.mode || "standard", message.tabId || sender.tab?.id);
+            // GEN-74: defense-in-depth on the capture-initiation boundary. The
+            // popup disables its Extract button until the consent checkbox is
+            // checked, but the service worker is the place compliance must live.
+            // Reject any START_EXTRACTION that doesn't explicitly assert consent,
+            // doesn't carry a recognized mode, or doesn't come from a tab whose
+            // URL is a FamilySearch person sources/memories page. Also reject if
+            // another extraction is already active.
+            if (message.consentAcknowledged !== true) {
+                console.warn("START_EXTRACTION rejected: consent not acknowledged");
+                sendResponse({ error: "consent_not_acknowledged" });
+                break;
+            }
+            if (message.mode !== "standard" && message.mode !== "admin") {
+                console.warn("START_EXTRACTION rejected: unknown mode", message.mode);
+                sendResponse({ error: "invalid_mode" });
+                break;
+            }
+            if (extractionState.status === "extracting" ||
+                extractionState.status === "expanding" ||
+                extractionState.status === "building") {
+                console.warn("START_EXTRACTION rejected: extraction already active");
+                sendResponse({ error: "extraction_already_active" });
+                break;
+            }
+            startExtensionExtraction(message.mode, message.tabId || sender.tab?.id);
             sendResponse({ success: true });
             break;
         case "CANCEL_EXTRACTION":
@@ -76,6 +100,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 async function startExtensionExtraction(mode, tabId) {
     if (!tabId) {
         console.error("No tab ID provided");
+        return;
+    }
+    // GEN-74: verify the active tab URL matches a FamilySearch person
+    // sources/memories page. The popup checks this, but defense-in-depth
+    // confirms it at the service-worker boundary too.
+    try {
+        const tab = await chrome.tabs.get(tabId);
+        const url = tab?.url ?? "";
+        const isAllowedPath = /^https:\/\/(www\.)?familysearch\.org\/.*\/tree\/person\/(sources|memories)\//.test(url);
+        if (!isAllowedPath) {
+            console.warn("START_EXTRACTION rejected: tab URL is not a FamilySearch person sources/memories page", url);
+            return;
+        }
+    }
+    catch (error) {
+        console.warn("START_EXTRACTION rejected: unable to verify tab URL", error);
         return;
     }
     activeExtractionTabId = tabId;
