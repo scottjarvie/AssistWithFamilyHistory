@@ -567,6 +567,132 @@ function buildStoryBundle(
   };
 }
 
+// Public story DTO — explicit allowlist of fields safe to return to an
+// unauthenticated client over the public Convex query surface
+// (`getPublishedStory`, `getPublishedStoryByIdentifier`).
+//
+// Do NOT add `contextCoverage`, `readiness`, `researchChecks`,
+// `publishWarnings`, `provisionalRelatives`, `reviewHistory`, full source
+// citation bodies, or full `relatedPerson` Docs to this shape. Those are
+// reviewer-facing internal data. If a future public surface needs more,
+// add a narrowly-scoped field here with a comment explaining why it's safe.
+export function buildPublicStoryBundle(
+  snapshot: VaultSnapshot,
+  story: Doc<"stories">
+) {
+  const person = story.personId
+    ? snapshot.people.find((entry) => entry._id === story.personId) ?? null
+    : null;
+  const publicSlug = story.publicSlug ?? buildStoryPublicSlug({
+    storyId: String(story._id),
+    title: story.title,
+    personName: person ? formatPersonName(person) : undefined,
+  });
+  const operations = person ? buildPersonOperations(snapshot, person) : null;
+  const sourceRecords = person && operations
+    ? getPersonSourceRecords(snapshot, person, operations.relatedEvents)
+    : { citations: [], groupedSources: [] };
+  const contextCoverage = person && operations
+    ? buildContextCoverage(snapshot, person, operations)
+    : null;
+
+  return {
+    // Story — title, content, status, slug, indexing only. NOT internal
+    // workflow fields like `publishWarnings`, `lastReviewerNote`, etc.
+    story: {
+      _id: story._id,
+      title: story.title,
+      content: story.content,
+      status: story.status,
+      publicSlug,
+      publicIndexing: story.publicIndexing ?? "noindex" as const,
+    },
+    // Person — display projection only. NOT `living`, `birth`/`death` notes,
+    // tags, or research notes.
+    person: person
+      ? {
+          _id: person._id,
+          displayName: formatPersonName(person),
+          routeId: person.fsId || String(person._id),
+          lifespan: getPersonLifespan(person),
+        }
+      : null,
+    // Evidence — source title + citation count only. NOT raw citation text,
+    // confidence scores, page numbers, or repository links.
+    evidence: sourceRecords.groupedSources.slice(0, 8).map((entry) => ({
+      source: {
+        _id: entry.source._id,
+        title: entry.source.title,
+      },
+      citations: entry.citations.slice(0, 3).map((citation) => ({
+        _id: citation._id,
+      })),
+    })),
+    // Events — type + date only, capped at 8. NOT notes, citationIds,
+    // or full place objects.
+    events: (operations?.relatedEvents ?? [])
+      .slice()
+      .sort((a, b) => (a.date?.year ?? 0) - (b.date?.year ?? 0))
+      .slice(0, 8)
+      .map((event) => ({
+        _id: event._id,
+        type: event.type,
+        date: event.date
+          ? {
+              original: event.date.original,
+              year: event.date.year,
+            }
+          : undefined,
+        endDate: event.endDate
+          ? {
+              original: event.endDate.original,
+              year: event.endDate.year,
+            }
+          : undefined,
+      })),
+    // Places — display fields only. NOT temporal descriptions, parent IDs,
+    // FamilySearch IDs, or notes.
+    places: (operations?.relatedPlaces ?? []).slice(0, 8).map((place) => ({
+      _id: place._id,
+      fullName: place.fullName,
+      name: place.name,
+      type: place.type,
+    })),
+    // Media — public-gated subset, title only. NOT URLs, descriptions,
+    // FamilySearch URLs, attribution metadata, or privacy fields.
+    media: sortByTimestampDesc(
+      (operations?.relatedMedia ?? []).filter(isPublicStoryMedia)
+    ).slice(0, 6).map((item) => ({
+      _id: item._id,
+      title: item.title,
+    })),
+    // Relationships — `relatedName` only, no full `relatedPerson` Doc.
+    // The public page only needs the display string.
+    relationships: (operations?.relatedRelationships ?? []).map((relationship) => {
+      if (!person) return null;
+      const relatedId = relationship.person1 === person._id ? relationship.person2 : relationship.person1;
+      const relatedPerson = snapshot.people.find((entry) => entry._id === relatedId);
+      return relatedPerson
+        ? {
+            _id: relationship._id,
+            type: relationship.type,
+            relatedName: formatPersonName(relatedPerson),
+          }
+        : null;
+    }).filter((entry): entry is NonNullable<typeof entry> => entry !== null),
+    // Historical context — strict public gate (publishableEntries), display
+    // fields only. NOT review/privacy/AI flags, full categoryBlocks, or
+    // sources arrays.
+    historicalContext: (contextCoverage?.publishableEntries ?? []).slice(0, 8).map((entry) => ({
+      _id: entry._id,
+      title: entry.title,
+      topic: entry.topic,
+      timePeriod: entry.timePeriod,
+      content: entry.content,
+    })),
+  };
+}
+
 function buildPeopleRows(snapshot: VaultSnapshot) {
   return snapshot.people.map((person) => {
     const operations = buildPersonOperations(snapshot, person);
@@ -819,7 +945,10 @@ export const getPublishedStory = query({
 
     const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(story.vaultOwnerId));
     const ownedStory = snapshot.stories.find((entry) => entry._id === story._id);
-    return ownedStory ? buildStoryBundle(snapshot, ownedStory, { publicView: true }) : null;
+    // GEN-77: use buildPublicStoryBundle (explicit field allowlist) instead
+    // of the older internal bundle, which only gated 2 of 12 fields and
+    // returned reviewer-only data on the public query response.
+    return ownedStory ? buildPublicStoryBundle(snapshot, ownedStory) : null;
   },
 });
 
@@ -844,7 +973,8 @@ export const getPublishedStoryByIdentifier = query({
     const ownedStory = snapshot.stories.find((entry) => entry._id === candidate._id);
     if (!ownedStory) return null;
 
-    const bundle = buildStoryBundle(snapshot, ownedStory, { publicView: true });
+    // GEN-77: public DTO with explicit field allowlist.
+    const bundle = buildPublicStoryBundle(snapshot, ownedStory);
     if (
       identifier !== String(ownedStory._id) &&
       identifier !== bundle.story.publicSlug

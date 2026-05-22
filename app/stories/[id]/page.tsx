@@ -127,6 +127,8 @@ export default async function PublicStoryPage({
   if (story.publicSlug && id !== story.publicSlug) {
     redirect(publicStoryPath(story.publicSlug));
   }
+  // GEN-77: buildPublicStoryBundle already filters out null relationships,
+  // but keep a defensive filter in case the DTO evolves.
   const linkedRelationships = relationships.filter((relationship) => relationship !== null);
 
   return (
