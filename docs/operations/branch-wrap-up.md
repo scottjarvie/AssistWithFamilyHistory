@@ -87,6 +87,17 @@ Full doc: `docs/context/place-era-research-packs.md` ("Gate Semantics By Surface
 
 GEN-62 through GEN-68 were filed during this audit pass as follow-up issues for things found mid-audit; six are closed, two have explicit reasons for staying open.
 
+## Deferred Linear hygiene (MCP unreachable at wrap-up)
+
+The Linear MCP was unreachable during the final hygiene pass (2026-05-22 ~13:10 EDT, `net::ERR_FAILED` on every call). The following Linear-side reviews are deferred until the MCP recovers:
+
+- **GEN-19** (In Review per Codex) — verify against current branch state and either close or update with a verification note.
+- **GEN-45** (In Review per Codex) — same.
+- **GEN-24, GEN-25, GEN-26, GEN-28, GEN-30** — audit acceptance criteria and confirm `decision-needed` / `pm-review` tagging is correct for PM/UX-decision items.
+- **Cross-check**: every issue touched in this branch (GEN-31, GEN-60, GEN-61, GEN-62, GEN-63, GEN-64, GEN-65, GEN-66, GEN-67, GEN-48, GEN-68) already has a verification comment posted while the MCP was up — no follow-up needed there.
+
+All branch-side work is complete; only the Linear UI/MCP audits remain.
+
 ## What this branch deliberately did NOT do
 
 - **Not pushed to origin.** Repository policy is to commit but not push without explicit instruction.
