@@ -7,7 +7,7 @@
     "dev": "next dev --webpack --port 3443",
     "build": "next build",
     "start": "next start --port 3443",
-    "test": "tsx scripts/test-vault-core.ts && tsx scripts/check-import-regression.ts",
+    "test": "tsx scripts/test-vault-core.ts && tsx scripts/test-context-gates.ts && tsx scripts/check-import-regression.ts",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "verify": "bash scripts/verify.sh",
