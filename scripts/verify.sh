@@ -46,6 +46,7 @@ steps=(
   "check:protected-routes"
   "check:person-identifiers"
   "check:convex-visibility"
+  "check:safelink-suppression"
   "build"
 )
 

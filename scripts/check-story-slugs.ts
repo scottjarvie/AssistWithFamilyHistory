@@ -75,6 +75,14 @@ if (!publicRoute.includes("redirect(publicStoryPath(story.publicSlug))")) {
   failures.push("Legacy ID route should redirect to the canonical slug when available");
 }
 
+// GEN-75: third-party auditor proved by mutation that swapping the public
+// route from getPublishedStoryByIdentifier → getPublishedStory was not
+// caught. Without this assertion, slug+legacy-ID compatibility could
+// silently regress while the contract check stays green.
+if (!publicRoute.includes("getPublishedStoryByIdentifier")) {
+  failures.push("Public story route must use getPublishedStoryByIdentifier (the identifier-aware query) so legacy ID URLs redirect to the canonical slug");
+}
+
 if (!ogRoute.includes("getPublishedStoryByIdentifier") || !ogRoute.includes("buildPublicStorySharePreview")) {
   failures.push("Story OG route must use only published story data");
 }
