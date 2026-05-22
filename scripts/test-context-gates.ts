@@ -14,6 +14,7 @@ import assert from "node:assert/strict";
 import {
   isContextPackEligibleContextItem,
   isContextPackEligibleHistoricalContext,
+  isContextPackEligibleMedia,
   isPublishablePublicHistoricalContext,
 } from "@/convex/vault";
 import { assessStoryPublishReadiness, type StoryPublishSafetyInput } from "@/lib/stories/publishSafety";
@@ -139,6 +140,50 @@ assert.equal(
   ),
   false,
   "ContextItem gate: unreviewed must block even when non-private + aiAllowed"
+);
+
+// -- 1c. Media AI gate (GEN-72) -----------------------------------------
+
+type MediaEntry = Parameters<typeof isContextPackEligibleMedia>[0];
+
+function media(overrides: Partial<MediaEntry>): MediaEntry {
+  return {
+    _id: "fixture" as MediaEntry["_id"],
+    _creationTime: 0,
+    vaultOwnerId: "fixture",
+    title: "fixture",
+    type: "photo",
+    createdAt: 0,
+    updatedAt: 0,
+    ...overrides,
+  } as MediaEntry;
+}
+
+assert.equal(
+  isContextPackEligibleMedia(
+    media({ reviewStatus: "reviewed", privacyLevel: "family_review", aiUseAllowed: true })
+  ),
+  true,
+  "Media AI gate: reviewed + family_review + aiAllowed should pass"
+);
+assert.equal(
+  isContextPackEligibleMedia(
+    media({ reviewStatus: "reviewed", privacyLevel: "family_review", aiUseAllowed: false })
+  ),
+  false,
+  "Media AI gate: aiUseAllowed:false must block (the GEN-72 fix)"
+);
+assert.equal(
+  isContextPackEligibleMedia(
+    media({ reviewStatus: "reviewed", privacyLevel: "private", aiUseAllowed: true })
+  ),
+  false,
+  "Media AI gate: private must block"
+);
+assert.equal(
+  isContextPackEligibleMedia(media({})),
+  false,
+  "Media AI gate: missing fields default to NOT eligible"
 );
 
 // -- 2. Publish safety with publishableCount ----------------------------

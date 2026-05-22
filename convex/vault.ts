@@ -336,8 +336,20 @@ function buildContextCoverage(
       .filter((entry) => entry.placeId)
       .map((entry) => String(entry.placeId))
   );
+  // GEN-72: AI surfaces need a stricter "missing places" — coverage from
+  // the AI-eligible subset only, not from any-context-exists. A place with
+  // only unreviewed/private context should count as missing from the AI's
+  // perspective because that's what the AI actually receives.
+  const aiPlaceIdsWithContext = new Set(
+    aiEligibleEntries
+      .filter((entry) => entry.placeId)
+      .map((entry) => String(entry.placeId))
+  );
   const missingPlaces = operations.relatedPlaces.filter(
     (place) => !placeIdsWithContext.has(String(place._id))
+  );
+  const aiMissingPlaces = operations.relatedPlaces.filter(
+    (place) => !aiPlaceIdsWithContext.has(String(place._id))
   );
   const topics = Array.from(new Set(entries.map((entry) => entry.topic)));
 
@@ -351,7 +363,13 @@ function buildContextCoverage(
     topics,
     relatedPlaceCount: operations.relatedPlaces.length,
     placeCountWithContext: placeIdsWithContext.size,
+    aiPlaceCountWithContext: aiPlaceIdsWithContext.size,
     missingPlaces: missingPlaces.map((place) => ({
+      _id: place._id,
+      name: place.fullName || place.name,
+      type: place.type,
+    })),
+    aiMissingPlaces: aiMissingPlaces.map((place) => ({
       _id: place._id,
       name: place.fullName || place.name,
       type: place.type,
@@ -440,6 +458,21 @@ function buildPublishWarnings(params: {
   }
 
   return warnings;
+}
+
+// GEN-72: AI gate for media. `isPublicStoryMedia` is intentionally stricter
+// (requires `rightsStatus` to be known-non-restricted) because it controls
+// what renders on a public story page. The AI gate is comparable in privacy
+// posture but does not require rights clearance — the AI is the owner's own
+// model. Both require `aiUseAllowed === true`.
+export function isContextPackEligibleMedia(item: Doc<"media">) {
+  const reviewStatus = item.reviewStatus ?? "unreviewed";
+  const privacyLevel = item.privacyLevel ?? "private";
+  return (
+    item.aiUseAllowed === true &&
+    (reviewStatus === "reviewed" || reviewStatus === "redacted") &&
+    privacyLevel !== "private"
+  );
 }
 
 function isPublicStoryMedia(item: Doc<"media">) {
@@ -1549,7 +1582,10 @@ export const getContextPack = query({
         })),
       unresolvedProvisionalRelatives: workspace.provisionalRelatives.length,
       unresolvedImportWarnings: workspace.importRuns.flatMap((run) => run.warnings).slice(0, 12),
-      missingContextPlaces: workspace.contextCoverage.missingPlaces,
+      // GEN-72: use AI-aware missing-places signal in the AI export so the
+      // AI sees "place X has no usable context" when X only has unreviewed
+      // rows. Human surfaces still use `missingPlaces` (unfiltered).
+      missingContextPlaces: workspace.contextCoverage.aiMissingPlaces,
       mediaNeedingPrivacyReview: workspace.media
         .filter((item) => !isPublicStoryMedia(item) || item.aiUseAllowed !== true)
         .slice(0, 12)
@@ -1572,7 +1608,10 @@ export const getContextPack = query({
       places: workspace.places,
       provisionalRelatives: workspace.provisionalRelatives,
       sources: workspace.sources,
-      memories: workspace.media,
+      // GEN-72: filter media by AI eligibility (reviewed/redacted +
+      // non-private + aiUseAllowed=true). Items the user opted out of AI
+      // use must not ship to the AI context-pack export.
+      memories: workspace.media.filter(isContextPackEligibleMedia),
       sourceFacts: workspace.sourceFacts,
       reviewedContextItems: workspace.contextItems.filter(isContextPackEligibleContextItem),
       documents: workspace.documents,
