@@ -45,12 +45,17 @@ When you do ask, explain the technical question in plain language and state the 
 
 ## Verification Baseline
 
-Use the smallest meaningful verification for the route, but default to:
+Use the smallest meaningful verification for the route. For a full check the single command is:
 
-- `pnpm test`
+- `pnpm verify` — runs typecheck, lint, test, every `check:*` contract, and the production build in one pass. ~24s. Logs at `/tmp/dts-verify-*.log` per step if anything fails.
+
+For targeted work pick from:
+
+- `pnpm typecheck` — TypeScript only (`tsc --noEmit`), faster than `pnpm build`
 - `pnpm lint`
-- `pnpm build`
-- targeted checks such as `pnpm check:familysearch-capture`, `pnpm check:capture-validation`, `pnpm check:operations-handoff`, or `pnpm check:agent-quality-gates`
+- `pnpm test` — vault core + context-gate tests + import regression
+- `pnpm build` — full Next.js build (also runs typecheck)
+- targeted contracts such as `pnpm check:familysearch-capture`, `pnpm check:capture-validation`, `pnpm check:operations-handoff`, `pnpm check:agent-quality-gates`, `pnpm check:context-pack-contract`, or `pnpm check:place-era-packs`
 - `BASE_URL=http://127.0.0.1:3443 pnpm smoke:routes` after starting the local app
 
 For UI work, run browser checks on desktop and mobile breakpoints where relevant, inspect console errors, and note what changed visually.

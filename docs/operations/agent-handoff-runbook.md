@@ -74,7 +74,7 @@ Context packs should be used as the supporting evidence bundle, not as a final s
 
 ## Verification
 
-Run:
+For changes to operations handoff or context-pack surface, run the targeted contracts:
 
 ```bash
 pnpm check:agent-quality-gates
@@ -83,5 +83,12 @@ pnpm check:context-pack-contract
 pnpm check:api-inventory
 pnpm check:protected-routes
 pnpm lint
+pnpm typecheck
 pnpm build
+```
+
+Or run the full repo verification in one command:
+
+```bash
+pnpm verify
 ```
