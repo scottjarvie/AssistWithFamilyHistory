@@ -137,8 +137,11 @@ export default async function StoryReviewPage({
   const linkedRelationships = relationships.filter((relationship) => relationship !== null);
   const attachedContextPackIds = new Set((story.contextPackIds ?? []).map((id) => String(id)));
   const attachedContextPacks = historicalContext.filter((entry) => attachedContextPackIds.has(String(entry._id)));
-  const provenanceContextPacks =
-    attachedContextPackIds.size > 0 ? attachedContextPacks : historicalContext.filter((entry) => entry.packType);
+  // Provenance and "available now" are different signals. A draft saved
+  // before contextPackIds tracking landed has 0 recorded packs even when
+  // the person currently has typed packs available — those are not provenance.
+  const hasRecordedProvenance = attachedContextPackIds.size > 0;
+  const availableContextPacks = historicalContext.filter((entry) => entry.packType);
   const workflowSteps = [
     { key: "draft", label: "Draft" },
     { key: "review", label: "Review" },
@@ -303,8 +306,8 @@ export default async function StoryReviewPage({
                   <p className="text-xs text-stone-500">Events</p>
                 </div>
                 <div className="bg-stone-50 px-3 py-3">
-                  <p className="font-semibold text-stone-900">{provenanceContextPacks.length}</p>
-                  <p className="text-xs text-stone-500">Packs</p>
+                  <p className="font-semibold text-stone-900">{attachedContextPacks.length}</p>
+                  <p className="text-xs text-stone-500">{hasRecordedProvenance ? "Packs attached" : "Packs recorded"}</p>
                 </div>
               </div>
               {publishReadiness.recommendedNextActions.length > 0 ? (
@@ -323,20 +326,19 @@ export default async function StoryReviewPage({
             <CardHeader>
               <CardTitle>Research Pack Provenance</CardTitle>
               <CardDescription>
-                Background packs available to the writer when this draft was saved.
+                {hasRecordedProvenance
+                  ? "Research packs the writer attached when this draft was saved."
+                  : "No research packs were recorded for this draft. Currently available packs are listed for reference only."}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {provenanceContextPacks.length === 0 ? (
-                <p className="rounded-md bg-stone-50 px-3 py-3 text-sm text-stone-600">
-                  No reviewed AI-allowed research packs are attached to this draft.
-                </p>
-              ) : (
-                provenanceContextPacks.map((entry) => (
+              {hasRecordedProvenance ? (
+                attachedContextPacks.map((entry) => (
                   <div key={String(entry._id)} className="rounded-md border border-stone-200 px-3 py-3">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="secondary">{formatPackLabel(entry.packType)}</Badge>
                       {entry.templateVersion ? <Badge variant="outline">{entry.templateVersion}</Badge> : null}
+                      <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">attached</Badge>
                     </div>
                     <p className="mt-2 text-sm font-medium text-stone-900">{entry.title}</p>
                     <p className="mt-1 text-xs text-stone-500">
@@ -344,6 +346,32 @@ export default async function StoryReviewPage({
                     </p>
                   </div>
                 ))
+              ) : availableContextPacks.length === 0 ? (
+                <p className="rounded-md bg-stone-50 px-3 py-3 text-sm text-stone-600">
+                  No research packs were recorded for this draft, and none are currently available for this person.
+                </p>
+              ) : (
+                <>
+                  <p className="rounded-md bg-stone-50 px-3 py-3 text-sm text-stone-600">
+                    No research packs were recorded for this draft (saved before pack provenance was tracked).
+                  </p>
+                  <p className="px-1 text-xs uppercase tracking-[0.16em] text-stone-400">
+                    Currently available for this person
+                  </p>
+                  {availableContextPacks.map((entry) => (
+                    <div key={String(entry._id)} className="rounded-md border border-dashed border-stone-200 px-3 py-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="secondary">{formatPackLabel(entry.packType)}</Badge>
+                        {entry.templateVersion ? <Badge variant="outline">{entry.templateVersion}</Badge> : null}
+                        <Badge variant="outline">available, not attached</Badge>
+                      </div>
+                      <p className="mt-2 text-sm font-medium text-stone-900">{entry.title}</p>
+                      <p className="mt-1 text-xs text-stone-500">
+                        {entry.reviewStatus ?? "unreviewed"} · {entry.privacyLevel ?? "private"} · AI {entry.aiUseAllowed ? "allowed" : "blocked"}
+                      </p>
+                    </div>
+                  ))}
+                </>
               )}
               <p className="rounded-md bg-amber-50 px-3 py-3 text-xs leading-5 text-amber-900">
                 Research packs are background context. Person-specific claims still need source facts or citations.

@@ -33,6 +33,12 @@ for (const token of [
   "sourcedClaims",
   "Synthesis:",
   "Person-specific claims still need source facts or citations",
+  // GEN-65: provenance fallback must distinguish "attached at save time"
+  // from "currently available" so a draft saved before tracking landed
+  // can't be confused with a draft that recorded its own provenance.
+  "hasRecordedProvenance",
+  "saved before pack provenance was tracked",
+  "available, not attached",
 ]) {
   assert(storyReviewSource.includes(token), `Story review is missing ${token}`);
 }
