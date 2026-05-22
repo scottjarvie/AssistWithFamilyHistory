@@ -19,6 +19,7 @@ This directory keeps project documentation out of the repository root and separa
 - [External audit prompt](operations/external-audit-prompt.md)
 - [Claude self-audit report](operations/claude-self-audit-report.md)
 - [Audit comparison — self vs third-party](operations/audit-comparison.md)
+- [Hydration mismatch notes (SafeLink workaround)](operations/hydration-mismatch-notes.md)
 - [Public story privacy sweep checklist](operations/public-story-privacy-sweep-checklist.md)
 - [Public beta launch QA report](operations/public-beta-launch-qa-report.md)
 - [Story mobile QA baselines](operations/story-mobile-qa-baselines.md)

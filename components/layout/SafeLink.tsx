@@ -17,7 +17,9 @@ import { forwardRef } from "react";
  * forget for new links and the suppression is only documented in one place.
  *
  * If we ever isolate the root-cause extension or attribute, replace this
- * with a targeted fix and remove SafeLink.
+ * with a targeted fix and remove SafeLink. Investigation notes,
+ * candidate extensions, and the human-driven repro plan are documented
+ * in `docs/operations/hydration-mismatch-notes.md` (GEN-76).
  */
 export const SafeLink = forwardRef(function SafeLink(
   { children, ...props }: LinkProps & {
