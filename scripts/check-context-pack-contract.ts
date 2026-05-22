@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 
 const contextPackSource = readFileSync("convex/vault.ts", "utf8");
+const storyReviewSource = readFileSync("app/app/stories/[storyId]/page.tsx", "utf8");
 
 for (const token of [
   "evidenceTrace",
@@ -23,6 +24,17 @@ for (const token of [
   "categoryBlocks",
 ]) {
   assert(contextPackSource.includes(token), `Context pack is missing ${token}`);
+}
+
+for (const token of [
+  "Research Pack Provenance",
+  "contextPackIds",
+  "categoryBlocks",
+  "sourcedClaims",
+  "Synthesis:",
+  "Person-specific claims still need source facts or citations",
+]) {
+  assert(storyReviewSource.includes(token), `Story review is missing ${token}`);
 }
 
 console.log("Context pack contract checks passed.");

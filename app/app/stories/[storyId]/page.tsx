@@ -61,6 +61,10 @@ function formatEventDate(event: { date?: { original?: string; year?: number } })
   return event.date?.original || event.date?.year?.toString() || "Undated";
 }
 
+function formatPackLabel(value?: string) {
+  return value ? value.replace(/_/g, " ") : "untyped context";
+}
+
 export default async function StoryReviewPage({
   params,
 }: {
@@ -131,6 +135,10 @@ export default async function StoryReviewPage({
     .filter((check) => check.status !== "complete" && check.status !== "not_applicable")
     .slice(0, 6);
   const linkedRelationships = relationships.filter((relationship) => relationship !== null);
+  const attachedContextPackIds = new Set((story.contextPackIds ?? []).map((id) => String(id)));
+  const attachedContextPacks = historicalContext.filter((entry) => attachedContextPackIds.has(String(entry._id)));
+  const provenanceContextPacks =
+    attachedContextPackIds.size > 0 ? attachedContextPacks : historicalContext.filter((entry) => entry.packType);
   const workflowSteps = [
     { key: "draft", label: "Draft" },
     { key: "review", label: "Review" },
@@ -295,8 +303,8 @@ export default async function StoryReviewPage({
                   <p className="text-xs text-stone-500">Events</p>
                 </div>
                 <div className="bg-stone-50 px-3 py-3">
-                  <p className="font-semibold text-stone-900">{publishReadiness.provenance.contextReports}</p>
-                  <p className="text-xs text-stone-500">Context</p>
+                  <p className="font-semibold text-stone-900">{provenanceContextPacks.length}</p>
+                  <p className="text-xs text-stone-500">Packs</p>
                 </div>
               </div>
               {publishReadiness.recommendedNextActions.length > 0 ? (
@@ -308,6 +316,38 @@ export default async function StoryReviewPage({
                   ))}
                 </div>
               ) : null}
+            </CardContent>
+          </Card>
+
+          <Card className="border-stone-200">
+            <CardHeader>
+              <CardTitle>Research Pack Provenance</CardTitle>
+              <CardDescription>
+                Background packs available to the writer when this draft was saved.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {provenanceContextPacks.length === 0 ? (
+                <p className="rounded-md bg-stone-50 px-3 py-3 text-sm text-stone-600">
+                  No reviewed AI-allowed research packs are attached to this draft.
+                </p>
+              ) : (
+                provenanceContextPacks.map((entry) => (
+                  <div key={String(entry._id)} className="rounded-md border border-stone-200 px-3 py-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="secondary">{formatPackLabel(entry.packType)}</Badge>
+                      {entry.templateVersion ? <Badge variant="outline">{entry.templateVersion}</Badge> : null}
+                    </div>
+                    <p className="mt-2 text-sm font-medium text-stone-900">{entry.title}</p>
+                    <p className="mt-1 text-xs text-stone-500">
+                      {entry.reviewStatus ?? "unreviewed"} · {entry.privacyLevel ?? "private"} · AI {entry.aiUseAllowed ? "allowed" : "blocked"}
+                    </p>
+                  </div>
+                ))
+              )}
+              <p className="rounded-md bg-amber-50 px-3 py-3 text-xs leading-5 text-amber-900">
+                Research packs are background context. Person-specific claims still need source facts or citations.
+              </p>
             </CardContent>
           </Card>
 
@@ -553,11 +593,48 @@ export default async function StoryReviewPage({
             ) : (
               historicalContext.map((entry) => (
                 <div key={String(entry._id)} className="border border-stone-200 px-4 py-4">
-                  <p className="font-medium text-stone-900">{entry.title}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="secondary">{formatPackLabel(entry.packType)}</Badge>
+                    {entry.templateVersion ? <Badge variant="outline">{entry.templateVersion}</Badge> : null}
+                    {attachedContextPackIds.has(String(entry._id)) ? <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">attached</Badge> : null}
+                  </div>
+                  <p className="mt-3 font-medium text-stone-900">{entry.title}</p>
                   <p className="mt-1 text-sm text-stone-500">
                     {entry.topic.replace(/_/g, " ")} · {entry.timePeriod.startYear}-{entry.timePeriod.endYear}
                   </p>
+                  <p className="mt-2 text-xs uppercase tracking-[0.16em] text-stone-400">
+                    {entry.reviewStatus ?? "unreviewed"} · {entry.privacyLevel ?? "private"} · AI {entry.aiUseAllowed ? "allowed" : "blocked"}
+                  </p>
                   <p className="mt-3 line-clamp-4 text-sm leading-6 text-stone-600">{entry.content}</p>
+                  {entry.categoryBlocks?.length ? (
+                    <div className="mt-4 space-y-3">
+                      {entry.categoryBlocks.map((block) => (
+                        <div key={block.category} className="rounded-md bg-stone-50 px-3 py-3">
+                          <p className="text-xs font-medium uppercase tracking-[0.16em] text-stone-500">
+                            {block.category.replace(/_/g, " ")}
+                          </p>
+                          {block.summary ? <p className="mt-2 text-sm leading-6 text-stone-700">{block.summary}</p> : null}
+                          {block.sourcedClaims.length > 0 ? (
+                            <div className="mt-3 space-y-2">
+                              {block.sourcedClaims.map((claim) => (
+                                <div key={`${block.category}-${claim.text}`} className="border-l-2 border-amber-300 pl-3">
+                                  <p className="text-sm leading-6 text-stone-700">{claim.text}</p>
+                                  <p className="mt-1 text-xs text-stone-500">
+                                    {claim.confidence} confidence{claim.sourceRefs.length > 0 ? ` · ${claim.sourceRefs.join("; ")}` : ""}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                          {block.synthesisNotes ? (
+                            <p className="mt-3 rounded-md bg-white px-3 py-2 text-sm leading-6 text-stone-600">
+                              Synthesis: {block.synthesisNotes}
+                            </p>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ))
             )}
