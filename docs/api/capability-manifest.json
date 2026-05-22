@@ -64,6 +64,17 @@
       "notes": "Write route; needs provenance and context validation before agent support."
     },
     {
+      "route": "/api/context-items",
+      "methods": ["POST"],
+      "capability": "loose_context_create",
+      "environment": "browser-or-local-api",
+      "agentSupport": "restricted",
+      "reviewLevel": "quality-gated",
+      "risk": "medium",
+      "scopes": ["research_operator"],
+      "notes": "Creates review-first person context items. AI use is denied unless the context is reviewed and non-private."
+    },
+    {
       "route": "/api/convex/documents",
       "methods": ["GET"],
       "capability": "documents_read",
@@ -106,6 +117,17 @@
       "risk": "high",
       "scopes": ["capture_validate", "capture_merge"],
       "notes": "Use ?preview=true for side-effect-free validation. FamilySearch provider API access is pending; browser/user-initiated packages only."
+    },
+    {
+      "route": "/api/media/review",
+      "methods": ["POST"],
+      "capability": "media_privacy_review",
+      "environment": "browser",
+      "agentSupport": "restricted",
+      "reviewLevel": "trusted-human-review",
+      "risk": "high",
+      "scopes": ["trusted_operator"],
+      "notes": "Updates privacy, review, rights, AI-use, and review notes. AI use requires reviewed, non-private media with usable rights."
     },
     {
       "route": "/api/operations/checks",

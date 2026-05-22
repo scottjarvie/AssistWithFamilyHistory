@@ -39,6 +39,8 @@ const expectedProtected = [
   "/api/stories/abc",
   "/api/stories/abc/status",
   "/api/context-reports",
+  "/api/context-items",
+  "/api/media/review",
 ];
 
 const expectedPublic = [

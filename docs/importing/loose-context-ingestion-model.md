@@ -20,9 +20,9 @@ This is a design boundary. Do not implement schema changes from this note until 
 | `historicalContext` | Place/time/topic context | Not person-owned loose material |
 | `persons.notes` | Small internal note | Should not become the ingestion bucket |
 
-## Proposed Conceptual Model
+## Implemented Conceptual Model
 
-Introduce a future `contextItems` style model rather than overloading existing fields.
+Use the implemented `contextItems` model rather than overloading existing fields.
 
 Suggested fields:
 
@@ -36,7 +36,7 @@ Suggested fields:
 - `evidenceRole`: raw_material, researcher_conclusion, generated_summary, editorial_note
 - `linkedPeople`, `linkedPlaces`, `linkedEvents`, `linkedStories`, `linkedSources`
 - `reviewStatus`: unreviewed, reviewed, disputed, redacted, rejected
-- `aiUseAllowed`: yes/no/review_required
+- `aiUseAllowed`: boolean
 
 ## Attachment Rules
 
@@ -48,7 +48,7 @@ Suggested fields:
 
 ## UX Proposal
 
-The first UI should be a simple review-first intake drawer or page:
+The first UI is the person workspace Research tab:
 
 1. Add material.
 2. Choose item type and privacy level.
@@ -63,10 +63,9 @@ Do not bury this inside one text area on the person record.
 
 Recommended implementation issues:
 
-- Add `contextItems` schema and owner-scoped queries/mutations.
-- Add loose-context intake UI with privacy/review fields.
+- Continue expanding context-item links beyond the first person-scoped intake surface.
+- Add richer filtering once context items become numerous.
 - Add artifact upload/local-file retention path for notes and documents.
-- Add context-pack inclusion rules for reviewed context items.
 - Add AI redaction and disclosure gates for loose context.
 
 ## Verification
@@ -77,4 +76,5 @@ Before implementation, confirm the data model against:
 - `app/api/people/[id]/context-pack`
 - Story Writer prompt construction
 - Privacy and AI redaction checks
+- `pnpm check:loose-context`
 - Public story publish gates

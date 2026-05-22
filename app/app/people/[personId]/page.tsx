@@ -24,6 +24,8 @@ import { VaultStateCard } from "@/components/vault/VaultStateCard";
 import { getConvexRuntimeIssue } from "@/lib/convex/server";
 import { getVaultAccessContext } from "@/lib/vault/server";
 import { ResearchChecksPanel } from "@/components/vault/ResearchChecksPanel";
+import { MediaPrivacyReviewPanel } from "@/components/vault/MediaPrivacyReviewPanel";
+import { ContextItemsPanel } from "@/components/vault/ContextItemsPanel";
 import { publicStoryPath } from "@/lib/stories/slug";
 
 interface PageProps {
@@ -89,6 +91,9 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
       summary: check.summary,
     }));
   const currentStory = workspace.stories[0] ?? null;
+  const sourceFacts = workspace.sourceFacts ?? [];
+  const contextItems = workspace.contextItems ?? [];
+  const media = workspace.media ?? [];
 
   return (
     <div className="p-4 sm:p-8">
@@ -435,6 +440,35 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
 
         <TabsContent value="sources">
           <div className="grid gap-4">
+            {sourceFacts.length > 0 ? (
+              <Card className="border-stone-200 bg-stone-50/60">
+                <CardHeader>
+                  <CardTitle>Source-backed facts</CardTitle>
+                  <CardDescription>Indexed fields captured as citation-backed candidates. Conflicts require review before canonical facts change.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-3 md:grid-cols-2">
+                  {(sourceFacts as Array<{
+                    _id: string;
+                    factType: string;
+                    label: string;
+                    value: string;
+                    confidence: string;
+                    status: string;
+                    conflictReason?: string;
+                  }>).slice(0, 12).map((fact) => (
+                    <div key={fact._id} className="rounded-md border border-stone-200 bg-white px-4 py-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="font-medium text-stone-900">{fact.factType.replace(/_/g, " ")}</p>
+                        <Badge variant={fact.status === "conflict" ? "destructive" : "secondary"}>{fact.status}</Badge>
+                      </div>
+                      <p className="mt-2 text-sm text-stone-600">{fact.label}: {fact.value}</p>
+                      <p className="mt-1 text-xs text-stone-500">Confidence: {fact.confidence}</p>
+                      {fact.conflictReason ? <p className="mt-2 text-xs text-amber-800">{fact.conflictReason}</p> : null}
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            ) : null}
             {(workspace.sources as Array<{
               source: { _id: string; title: string; type: string; url?: string };
               citations: Array<{ page?: string; extractedText?: string; editedText?: string }>;
@@ -594,34 +628,16 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
         </TabsContent>
 
         <TabsContent value="memories">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {workspace.media.length === 0 ? (
-              <EmptyWorkspaceState
-                title="No memories imported yet"
-                description="Import a FamilySearch memories capture to enrich this person with photos, scans, and media for later story writing."
-                actionHref="/app/imports"
-                actionLabel="Import Memories"
-              />
-            ) : (
-              workspace.media.map((item) => (
-                <Card key={String(item._id)} className="border-stone-200">
-                  <CardHeader>
-                    <CardTitle className="text-lg">{item.title}</CardTitle>
-                    <CardDescription>{item.type}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {item.url ? (
-                      <div className="overflow-hidden rounded-2xl border border-stone-200 bg-stone-100">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={item.url} alt={item.title} className="h-48 w-full object-cover" />
-                      </div>
-                    ) : null}
-                    {item.description ? <p className="text-sm text-stone-600">{item.description}</p> : null}
-                  </CardContent>
-                </Card>
-              ))
-            )}
-          </div>
+          {media.length === 0 ? (
+            <EmptyWorkspaceState
+              title="No memories imported yet"
+              description="Import a FamilySearch memories capture to enrich this person with photos, scans, and media for later story writing."
+              actionHref="/app/imports"
+              actionLabel="Import Memories"
+            />
+          ) : (
+            <MediaPrivacyReviewPanel media={media} />
+          )}
         </TabsContent>
 
         <TabsContent value="documents">
@@ -758,6 +774,10 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
               />
             </CardContent>
           </Card>
+
+          <div className="mt-5">
+            <ContextItemsPanel personIdentifier={routeId} contextItems={contextItems} />
+          </div>
         </TabsContent>
       </Tabs>
     </div>
