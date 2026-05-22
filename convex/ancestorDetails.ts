@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { query } from "./_generated/server";
+import { internalQuery as query } from "./_generated/server";
 
 /**
  * Get comprehensive details for an ancestor including:
