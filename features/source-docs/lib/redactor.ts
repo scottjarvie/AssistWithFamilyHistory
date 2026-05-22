@@ -21,15 +21,27 @@ import type { EvidencePack, Source } from "./schemas";
 const EMAIL_PATTERN = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g;
 const PHONE_PATTERN = /\b(\+?1?[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g;
 const SSN_PATTERN = /\b\d{3}[-.\s]?\d{2}[-.\s]?\d{4}\b/g;
+const ADDRESS_PATTERN = /\b\d{2,6}\s+[A-Za-z0-9.'-]+(?:\s+[A-Za-z0-9.'-]+){0,5}\s+(?:Street|St\.?|Avenue|Ave\.?|Road|Rd\.?|Drive|Dr\.?|Lane|Ln\.?|Court|Ct\.?|Circle|Cir\.?|Boulevard|Blvd\.?|Way|Place|Pl\.)\b(?:\s*(?:Apt|Apartment|Unit|Suite|Ste)\.?\s*[A-Za-z0-9-]+)?/gi;
 
 // Living indicators
 const LIVING_INDICATORS = [
   "living",
   "private",
   "current address",
+  "home address",
+  "mailing address",
   "contact info",
+  "contact information",
   "phone number",
   "email address",
+  "text me",
+  "cell phone",
+  "living relative",
+  "living cousin",
+  "living grandchild",
+  "private note",
+  "do not publish",
+  "unlisted",
 ];
 
 export interface RedactionResult {
@@ -194,6 +206,19 @@ function redactText(
       });
       result = result.replace(ssn, "[SSN REDACTED]");
     }
+  }
+
+  // Redact street addresses after narrower identifiers so phone/SSN spans do not interfere.
+  const addresses = text.match(ADDRESS_PATTERN) || [];
+  for (const address of addresses) {
+    redactions.push({
+      sourceId,
+      field,
+      originalValue: address,
+      redactedValue: "[ADDRESS REDACTED]",
+      type: "address",
+    });
+    result = result.replace(address, "[ADDRESS REDACTED]");
   }
 
   return { text: result, redactions };

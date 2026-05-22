@@ -9,6 +9,9 @@ const files = {
   schema: read("convex/schema.ts"),
   importer: read("lib/familysearch/importer.ts"),
   vault: read("convex/vault.ts"),
+  mediaReview: read("components/vault/MediaPrivacyReviewPanel.tsx"),
+  safeLog: read("lib/server/safeLog.ts"),
+  convexServer: read("lib/convex/server.ts"),
 };
 
 assert(files.processRoute.includes("privacyAcknowledged"), "AI process route must require privacy acknowledgement.");
@@ -28,6 +31,10 @@ assert(files.importer.includes("aiUseAllowed: false"), "FamilySearch memories mu
 assert(files.vault.includes("isPublicStoryMedia"), "Public story media filter is missing.");
 assert(files.vault.includes("media_privacy_review"), "Publish warnings must include media privacy review.");
 assert(files.vault.includes("mediaNeedingPrivacyReview"), "Context packs must expose media privacy review state.");
+assert(files.mediaReview.includes("Media review saved"), "Media privacy review UI is missing.");
+assert(files.safeLog.includes("SECRET_LIKE"), "Safe server logging must filter sensitive fields.");
+assert(files.openRouter.includes("logServerFailure"), "OpenRouter failures must produce safe server logs.");
+assert(files.convexServer.includes("logServerFailure"), "Convex runtime failures must produce safe server logs.");
 
 console.log("Privacy and AI safety checks passed.");
 

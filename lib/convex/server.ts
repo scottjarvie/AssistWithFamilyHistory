@@ -1,4 +1,5 @@
 import { ConvexHttpClient } from "convex/browser";
+import { logServerFailure } from "@/lib/server/safeLog";
 
 export type ConvexBackendState = "ready" | "missing" | "stale" | "error";
 
@@ -69,6 +70,10 @@ export function getConvexRuntimeIssue(error?: unknown): ConvexRuntimeIssue {
   }
 
   const message = error instanceof Error ? error.message : "Unknown Convex error";
+  logServerFailure("convex.runtime_failure", {
+    route: "convex",
+    configured: Boolean(getConvexUrl()),
+  }, error);
 
   if (
     /Could not find (public )?function/i.test(message) ||

@@ -37,6 +37,16 @@ Only the user should authenticate FamilySearch. The agent can continue after the
 
 Do not ask for or store the FamilySearch password, session cookies, 2FA codes, or account recovery details.
 
+## Live Page Shape Validation
+
+The authenticated browser flow was validated against FamilySearch person sources and memories routes on May 21, 2026:
+
+- Sources route: `/en/tree/person/sources/<FAMILYSEARCH_ID>`
+- Memories route: `/en/tree/person/memories/<FAMILYSEARCH_ID>`
+- Both pages expose the same person header, tab navigation, visible counts, and source/memory list content expected by the capture runbook.
+
+Do not persist live FamilySearch page content into repo fixtures. Use live validation for selectors, page accessibility, and route assumptions only unless the user explicitly exports a reviewed capture package.
+
 ## First Capture Queue
 
 Fill this table before the live session or during the authenticated session. Keep it small for the first pass: three to five people is enough.
