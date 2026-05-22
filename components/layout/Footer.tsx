@@ -15,7 +15,7 @@
  * Last Updated: Initial setup
  */
 
-import Link from "next/link";
+import { SafeLink } from "@/components/layout/SafeLink";
 import { Compass } from "lucide-react";
 
 export function Footer() {
@@ -34,24 +34,24 @@ export function Footer() {
           </div>
 
           <nav className="flex flex-wrap items-center justify-center gap-6 md:gap-8">
-            <Link href="/features" className="transition-colors hover:text-[#fff6e5]" suppressHydrationWarning>
+            <SafeLink href="/features" className="transition-colors hover:text-[#fff6e5]">
               Features
-            </Link>
-            <Link href="/extension" className="transition-colors hover:text-[#fff6e5]" suppressHydrationWarning>
+            </SafeLink>
+            <SafeLink href="/extension" className="transition-colors hover:text-[#fff6e5]">
               Extension
-            </Link>
-            <Link href="/about" className="transition-colors hover:text-[#fff6e5]" suppressHydrationWarning>
+            </SafeLink>
+            <SafeLink href="/about" className="transition-colors hover:text-[#fff6e5]">
               About
-            </Link>
-            <Link href="/roadmap" className="transition-colors hover:text-[#fff6e5]" suppressHydrationWarning>
+            </SafeLink>
+            <SafeLink href="/roadmap" className="transition-colors hover:text-[#fff6e5]">
               Roadmap
-            </Link>
-            <Link href="/privacy" className="transition-colors hover:text-[#fff6e5]" suppressHydrationWarning>
+            </SafeLink>
+            <SafeLink href="/privacy" className="transition-colors hover:text-[#fff6e5]">
               Privacy
-            </Link>
-            <Link href="/contact" className="transition-colors hover:text-[#fff6e5]" suppressHydrationWarning>
+            </SafeLink>
+            <SafeLink href="/contact" className="transition-colors hover:text-[#fff6e5]">
               Contact
-            </Link>
+            </SafeLink>
           </nav>
 
           <p className="max-w-xs text-sm leading-6 text-[#b8a987]">

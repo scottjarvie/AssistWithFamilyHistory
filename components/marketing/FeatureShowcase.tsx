@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { SafeLink } from "@/components/layout/SafeLink";
 import { ArrowRight, CheckCircle2, Clock3, Search } from "lucide-react";
 
 type StageStatus = "working" | "in-progress" | "exploring";
@@ -109,14 +109,13 @@ export function FeatureShowcase() {
                   >
                     <div className="flex items-center justify-between gap-2">
                       {feature.href ? (
-                        <Link
+                        <SafeLink
                           href={feature.href}
                           className="inline-flex items-center gap-1 text-sm font-medium text-[#234d5e] hover:text-[#1f4554]"
-                          suppressHydrationWarning
                         >
                           {feature.name}
                           <ArrowRight className="h-3.5 w-3.5" />
-                        </Link>
+                        </SafeLink>
                       ) : (
                         <span className="text-sm font-medium text-[#24323e]">{feature.name}</span>
                       )}

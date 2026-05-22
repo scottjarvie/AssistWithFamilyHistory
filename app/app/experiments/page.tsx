@@ -1,5 +1,5 @@
-import Link from "next/link";
 import type { Metadata } from "next";
+import { SafeLink } from "@/components/layout/SafeLink";
 import {
   ArrowRight,
   Beaker,
@@ -132,10 +132,10 @@ function ExperimentCard({ experiment }: { experiment: ExperimentDefinition }) {
           </div>
           {launchAvailable && experiment.launch.href ? (
             <Button asChild className="bg-amber-700 hover:bg-amber-800">
-              <Link href={experiment.launch.href} suppressHydrationWarning>
+              <SafeLink href={experiment.launch.href}>
                 Open
                 <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
+              </SafeLink>
             </Button>
           ) : (
             <Badge variant="secondary" className="gap-1.5">
