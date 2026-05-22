@@ -276,7 +276,7 @@ function overlapsPersonYears(
 // flagged for AI use may flow into the context-pack export consumed by
 // Story Writer and other AI surfaces. This is *not* a visibility gate — the
 // human reviewer needs to see the unreviewed and private rows to act on them.
-function isContextPackEligibleHistoricalContext(entry: Doc<"historicalContext">) {
+export function isContextPackEligibleHistoricalContext(entry: Doc<"historicalContext">) {
   const privacyLevel = entry.privacyLevel ?? "private";
   const reviewStatus = entry.reviewStatus ?? "unreviewed";
 
@@ -291,7 +291,7 @@ function isContextPackEligibleHistoricalContext(entry: Doc<"historicalContext">)
 // AI use inside the vault (e.g. family_review) but still must not appear on a
 // public story page until it carries an explicit publish-candidate or
 // public-source privacy level and a reviewed status.
-function isPublishablePublicHistoricalContext(entry: Doc<"historicalContext">) {
+export function isPublishablePublicHistoricalContext(entry: Doc<"historicalContext">) {
   const privacyLevel = entry.privacyLevel ?? "private";
   const reviewStatus = entry.reviewStatus ?? "unreviewed";
 
