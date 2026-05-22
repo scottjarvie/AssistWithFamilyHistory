@@ -16,6 +16,7 @@ This directory keeps project documentation out of the repository root and separa
 - [Agent operations and handoff runbook](operations/agent-handoff-runbook.md)
 - [Product health gates and person route QA](operations/product-health-gates.md)
 - [Branch wrap-up — codex/foundation-route-long-hardening](operations/branch-wrap-up.md)
+- [External audit prompt](operations/external-audit-prompt.md)
 - [Public story privacy sweep checklist](operations/public-story-privacy-sweep-checklist.md)
 - [Public beta launch QA report](operations/public-beta-launch-qa-report.md)
 - [Story mobile QA baselines](operations/story-mobile-qa-baselines.md)
