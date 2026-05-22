@@ -40,6 +40,15 @@
       "notes": "Blocks well sourced stories when historical/place context has not been reviewed."
     },
     {
+      "id": "context-recorded-not-publishable",
+      "file": "blocked-context-not-publishable.json",
+      "category": "missing-context",
+      "storyId": "fixture-context-not-publishable-0011",
+      "expectedCanPublish": false,
+      "expectedBlockers": ["context"],
+      "notes": "Blocks publishing when historical context exists but none has reached publish_candidate or public_source privacy yet (publishableCount=0, count>0). Asserts the gate split added in commit 9246cb2."
+    },
+    {
       "id": "unresolved-provisional-relative",
       "file": "blocked-provisional-relative.json",
       "category": "unresolved-relative",
