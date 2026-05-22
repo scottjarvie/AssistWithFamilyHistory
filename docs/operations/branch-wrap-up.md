@@ -87,16 +87,30 @@ Full doc: `docs/context/place-era-research-packs.md` ("Gate Semantics By Surface
 
 GEN-62 through GEN-68 were filed during this audit pass as follow-up issues for things found mid-audit; six are closed, two have explicit reasons for staying open.
 
-## Deferred Linear hygiene (MCP unreachable at wrap-up)
+## Linear hygiene (caught up 2026-05-22)
 
-The Linear MCP was unreachable during the final hygiene pass (2026-05-22 ~13:10 EDT, `net::ERR_FAILED` on every call). The following Linear-side reviews are deferred until the MCP recovers:
+Linear MCP was briefly unreachable (`net::ERR_FAILED`) mid-pass, then recovered. Full Linear catch-up done:
 
-- **GEN-19** (In Review per Codex) — verify against current branch state and either close or update with a verification note.
-- **GEN-45** (In Review per Codex) — same.
-- **GEN-24, GEN-25, GEN-26, GEN-28, GEN-30** — audit acceptance criteria and confirm `decision-needed` / `pm-review` tagging is correct for PM/UX-decision items.
-- **Cross-check**: every issue touched in this branch (GEN-31, GEN-60, GEN-61, GEN-62, GEN-63, GEN-64, GEN-65, GEN-66, GEN-67, GEN-48, GEN-68) already has a verification comment posted while the MCP was up — no follow-up needed there.
+- **GEN-19, GEN-45** (Codex's `In Review` items) — verification comments posted confirming the branch state matches the documented beta decisions; both ready for the PM to close.
+- **GEN-24, GEN-25, GEN-26, GEN-28, GEN-30** — audited; all five are correctly tagged `decision-needed` + `pm-review` + `agent:me`, with clear PM-question / agent-prep / acceptance-criteria structure. No agent action needed.
+- **Cross-check**: every issue touched in this branch (GEN-31, GEN-60, GEN-61, GEN-62, GEN-63, GEN-64, GEN-65, GEN-66, GEN-67, GEN-48, GEN-68) has a verification comment posted.
 
-All branch-side work is complete; only the Linear UI/MCP audits remain.
+## New Linear issues filed from the self-audit (2026-05-22)
+
+Self-audit report at `docs/operations/claude-self-audit-report.md`. Findings filed as new issues:
+
+| Issue | Severity | What |
+| --- | --- | --- |
+| **GEN-69** | Blocker | Unscoped Convex public functions across 7 files leak data across vault owners |
+| **GEN-70** | High | `getVaultSnapshot` does full table scans; `by_owner` indexes exist but unused |
+| **GEN-71** | High | `isContextPackEligibleContextItem` ignores `aiUseAllowed` flag |
+| **GEN-72** | Medium | AI context-pack export bypasses media + missingPlaces filters |
+| **GEN-73** | Medium | Add Convex visibility check to `pnpm verify` (guardrail for GEN-69) |
+| **GEN-74** | Low | Service worker consent: defense-in-depth on START_EXTRACTION |
+| **GEN-75** | Low | Add test that SafeLink actually suppresses hydration warnings |
+| **GEN-76** | Low | Identify root cause of anchor hydration warning; remove SafeLink workaround |
+
+Recommended order of operations: **GEN-69 → GEN-70 → GEN-71 → GEN-72 → GEN-73**, then the Lows. Estimated ~3 hours to resolve all High+/Blocker findings.
 
 ## What this branch deliberately did NOT do
 
