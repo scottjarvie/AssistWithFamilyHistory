@@ -16,6 +16,7 @@
  */
 
 import { OpenRouterConfig, AIResponse } from "./types";
+import { sanitizeAiProviderError } from "./privacy";
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 
@@ -57,10 +58,9 @@ export async function chatCompletion({
     });
 
     if (!response.ok) {
-      const error = await response.text();
       return {
         success: false,
-        error: `OpenRouter API error: ${response.status} - ${error}`,
+        error: sanitizeAiProviderError(response.status),
       };
     }
 
@@ -87,10 +87,10 @@ export async function chatCompletion({
         totalTokens: data.usage?.total_tokens ?? 0,
       },
     };
-  } catch (error) {
+  } catch {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error occurred",
+      error: "AI provider request failed. Check connectivity or use manual prompt export.",
     };
   }
 }

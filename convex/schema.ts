@@ -529,6 +529,36 @@ export default defineSchema({
     
     // FamilySearch integration
     familySearchUrl: v.optional(v.string()),
+
+    // Privacy and publishing review
+    privacyLevel: v.optional(
+      v.union(
+        v.literal("private"),
+        v.literal("family_review"),
+        v.literal("publish_candidate"),
+        v.literal("public_source")
+      )
+    ),
+    reviewStatus: v.optional(
+      v.union(
+        v.literal("unreviewed"),
+        v.literal("reviewed"),
+        v.literal("redacted"),
+        v.literal("rejected")
+      )
+    ),
+    rightsStatus: v.optional(
+      v.union(
+        v.literal("unknown"),
+        v.literal("owned"),
+        v.literal("permitted"),
+        v.literal("public_domain"),
+        v.literal("restricted")
+      )
+    ),
+    aiUseAllowed: v.optional(v.boolean()),
+    privacyReviewNote: v.optional(v.string()),
+    reviewedAt: v.optional(v.number()),
     
     // Metadata
     createdAt: v.number(),

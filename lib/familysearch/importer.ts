@@ -604,6 +604,12 @@ async function importMemory(
     personIds: [args.personId as never],
     familySearchUrl: args.memory.familySearchUrl || args.memory.memoryUrl,
     importKey: `fs-memory:${args.personFsId}:${args.memory.id}`,
+    privacyLevel: "private",
+    reviewStatus: "unreviewed",
+    rightsStatus: "unknown",
+    aiUseAllowed: false,
+    privacyReviewNote:
+      "Imported from FamilySearch memories. Review contributor/privacy signals and rights before AI use or publication.",
   });
 }
 

@@ -306,6 +306,7 @@ function buildPublishWarnings(params: {
   checks: ReturnType<typeof inferResearchChecks>;
   contextCoverage: ReturnType<typeof buildContextCoverage> | null;
   sourceCount: number;
+  media?: Doc<"media">[];
   storyStatus?: Doc<"stories">["status"];
 }) {
   const requiredKeys = new Set([
@@ -365,7 +366,30 @@ function buildPublishWarnings(params: {
     });
   }
 
+  const unreviewedMedia = (params.media ?? []).filter((item) => !isPublicStoryMedia(item));
+  if (unreviewedMedia.length > 0) {
+    warnings.push({
+      key: "media_privacy_review",
+      label: "Media privacy and rights review",
+      status: "needs_review",
+      detail: `${unreviewedMedia.length} linked memor${unreviewedMedia.length === 1 ? "y" : "ies"} or media item${unreviewedMedia.length === 1 ? "" : "s"} are private, unreviewed, or rights-restricted and will not appear publicly.`,
+    });
+  }
+
   return warnings;
+}
+
+function isPublicStoryMedia(item: Doc<"media">) {
+  const reviewStatus = item.reviewStatus ?? "unreviewed";
+  const privacyLevel = item.privacyLevel ?? "private";
+  const rightsStatus = item.rightsStatus ?? "unknown";
+
+  return (
+    reviewStatus === "reviewed" &&
+    (privacyLevel === "publish_candidate" || privacyLevel === "public_source") &&
+    rightsStatus !== "restricted" &&
+    rightsStatus !== "unknown"
+  );
 }
 
 function getStoryWorkflowStatus(params: {
@@ -394,7 +418,11 @@ function getStoryWorkflowStatus(params: {
   return "ready_to_draft" as const;
 }
 
-function buildStoryBundle(snapshot: VaultSnapshot, story: Doc<"stories">) {
+function buildStoryBundle(
+  snapshot: VaultSnapshot,
+  story: Doc<"stories">,
+  options: { publicView?: boolean } = {}
+) {
   const person = story.personId
     ? snapshot.people.find((entry) => entry._id === story.personId) ?? null
     : null;
@@ -433,6 +461,7 @@ function buildStoryBundle(snapshot: VaultSnapshot, story: Doc<"stories">) {
       checks: researchChecks,
       contextCoverage,
       sourceCount: sourceRecords.groupedSources.length,
+      media: operations?.relatedMedia ?? [],
       storyStatus: story.status,
     }),
     evidence: sourceRecords.groupedSources.slice(0, 8).map((entry) => ({
@@ -444,7 +473,11 @@ function buildStoryBundle(snapshot: VaultSnapshot, story: Doc<"stories">) {
       .sort((a, b) => (a.date?.year ?? 0) - (b.date?.year ?? 0))
       .slice(0, 8),
     places: (operations?.relatedPlaces ?? []).slice(0, 8),
-    media: sortByTimestampDesc(operations?.relatedMedia ?? []).slice(0, 6),
+    media: sortByTimestampDesc(
+      options.publicView
+        ? (operations?.relatedMedia ?? []).filter(isPublicStoryMedia)
+        : (operations?.relatedMedia ?? [])
+    ).slice(0, 6),
     relationships: operations?.relatedRelationships.map((relationship) => {
       if (!person) return null;
       const relatedId = relationship.person1 === person._id ? relationship.person2 : relationship.person1;
@@ -688,6 +721,7 @@ export const getStoriesIndex = query({
           checks: operations?.checks ?? [],
           contextCoverage,
           sourceCount,
+          media: operations?.relatedMedia ?? [],
           storyStatus: story.status,
         }),
         evidenceCount: sourceCount,
@@ -721,7 +755,7 @@ export const getPublishedStory = query({
 
     const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(story.vaultOwnerId));
     const ownedStory = snapshot.stories.find((entry) => entry._id === story._id);
-    return ownedStory ? buildStoryBundle(snapshot, ownedStory) : null;
+    return ownedStory ? buildStoryBundle(snapshot, ownedStory, { publicView: true }) : null;
   },
 });
 
@@ -746,7 +780,7 @@ export const getPublishedStoryByIdentifier = query({
     const ownedStory = snapshot.stories.find((entry) => entry._id === candidate._id);
     if (!ownedStory) return null;
 
-    const bundle = buildStoryBundle(snapshot, ownedStory);
+    const bundle = buildStoryBundle(snapshot, ownedStory, { publicView: true });
     if (
       identifier !== String(ownedStory._id) &&
       identifier !== bundle.story.publicSlug
@@ -1243,6 +1277,12 @@ export const getResearchOverview = query({
   },
 });
 
+function truncateText(value: string | undefined, maxLength: number) {
+  if (!value) return undefined;
+  const compact = value.replace(/\s+/g, " ").trim();
+  return compact.length <= maxLength ? compact : `${compact.slice(0, maxLength - 3)}...`;
+}
+
 export const getContextPack = query({
   args: {
     vaultOwnerId: v.string(),
@@ -1252,6 +1292,66 @@ export const getContextPack = query({
     const workspace = await assemblePersonWorkspace(ctx, normalizeVaultOwnerId(args.vaultOwnerId), args.personIdentifier);
     if (!workspace) return null;
 
+    const evidenceTrace = workspace.sources.map((entry) => ({
+      sourceId: entry.source._id,
+      title: entry.source.title,
+      type: entry.source.type,
+      repository: entry.source.repository,
+      url: entry.source.url,
+      citationCount: entry.citations.length,
+      supportedClaims: entry.citations.slice(0, 8).map((citation) => ({
+        citationId: citation._id,
+        field: citation.field || "general",
+        confidence: citation.confidence,
+        isEvidence: citation.isEvidence,
+        page: citation.page,
+        text: truncateText(citation.editedText || citation.extractedText || citation.notes, 240),
+      })),
+    }));
+    const storyClaimReadiness = {
+      evidenceSources: workspace.sources.length,
+      citedClaims: workspace.citations.length,
+      openRequiredChecks: workspace.researchChecks
+        .filter(
+          (check) =>
+            check.applicability === "required" &&
+            (check.status === "missing" || check.status === "needs_review")
+        )
+        .map((check) => ({
+          checkKey: check.checkKey,
+          status: check.status,
+          summary: check.summary,
+          completionSource: check.completionSource,
+          lastReviewedAt: check.lastReviewedAt,
+        })),
+      staleChecks: workspace.researchChecks
+        .filter(
+          (check) =>
+            check.lastReviewedAt &&
+            check.lastReviewedAt < Date.now() - 1000 * 60 * 60 * 24 * 45 &&
+            check.status !== "missing" &&
+            check.status !== "needs_review"
+        )
+        .map((check) => ({
+          checkKey: check.checkKey,
+          status: check.status,
+          lastReviewedAt: check.lastReviewedAt,
+        })),
+      unresolvedProvisionalRelatives: workspace.provisionalRelatives.length,
+      unresolvedImportWarnings: workspace.importRuns.flatMap((run) => run.warnings).slice(0, 12),
+      missingContextPlaces: workspace.contextCoverage.missingPlaces,
+      mediaNeedingPrivacyReview: workspace.media
+        .filter((item) => !isPublicStoryMedia(item) || item.aiUseAllowed !== true)
+        .slice(0, 12)
+        .map((item) => ({
+          mediaId: item._id,
+          title: item.title,
+          privacyLevel: item.privacyLevel ?? "private",
+          reviewStatus: item.reviewStatus ?? "unreviewed",
+          rightsStatus: item.rightsStatus ?? "unknown",
+          aiUseAllowed: item.aiUseAllowed === true,
+        })),
+    };
     const structured = {
       person: workspace.person,
       stats: workspace.stats,
@@ -1266,8 +1366,10 @@ export const getContextPack = query({
       documents: workspace.documents,
       historicalContext: workspace.contextCoverage.entries,
       stories: workspace.stories,
+      evidenceTrace,
+      storyClaimReadiness,
       openResearchTasks: workspace.researchTasks.filter((task) => task.status !== "done"),
-      unresolvedConflicts: workspace.importRuns.flatMap((run) => run.warnings).slice(0, 12),
+      unresolvedConflicts: storyClaimReadiness.unresolvedImportWarnings,
       recentImports: workspace.importRuns.slice(0, 5),
     };
 
@@ -1288,8 +1390,19 @@ export const getContextPack = query({
       "## Operations",
       "",
       ...workspace.researchChecks.map(
-        (check) => `- ${check.checkKey}: ${check.status} (${check.applicability})`
+        (check) =>
+          `- ${check.checkKey}: ${check.status} (${check.applicability}, source: ${check.completionSource}, reviewed: ${check.lastReviewedAt ? new Date(check.lastReviewedAt).toISOString() : "not recorded"})${check.summary ? ` - ${check.summary}` : ""}`
       ),
+      "",
+      "## Story Claim Readiness",
+      "",
+      `- Evidence sources: ${storyClaimReadiness.evidenceSources}`,
+      `- Cited claims: ${storyClaimReadiness.citedClaims}`,
+      `- Open required checks: ${storyClaimReadiness.openRequiredChecks.map((check) => check.checkKey).join(", ") || "None"}`,
+      `- Stale checks: ${storyClaimReadiness.staleChecks.map((check) => check.checkKey).join(", ") || "None"}`,
+      `- Provisional relatives needing review: ${storyClaimReadiness.unresolvedProvisionalRelatives}`,
+      `- Missing context places: ${storyClaimReadiness.missingContextPlaces.map((place) => place.name).join("; ") || "None"}`,
+      `- Media/privacy review needed: ${storyClaimReadiness.mediaNeedingPrivacyReview.map((item) => item.title).join("; ") || "None"}`,
       "",
       "## Timeline",
       "",
@@ -1325,11 +1438,29 @@ export const getContextPack = query({
       "",
       "## Sources",
       "",
-      ...workspace.sources.map((entry) => `- ${entry.source.title}`),
+      ...evidenceTrace.map(
+        (entry) =>
+          `- ${entry.title} (${entry.type}${entry.repository ? `, ${entry.repository}` : ""}) - ${entry.citationCount} citation${entry.citationCount === 1 ? "" : "s"}`
+      ),
+      "",
+      "## Evidence Trace",
+      "",
+      ...(evidenceTrace.length > 0
+        ? evidenceTrace.flatMap((entry) => [
+            `### ${entry.title}`,
+            ...entry.supportedClaims.map(
+              (claim) =>
+                `- ${claim.field}: ${claim.confidence}${claim.text ? ` - ${claim.text}` : ""}`
+            ),
+          ])
+        : ["- No source-backed claims are linked yet."]),
       "",
       "## Memories",
       "",
-      ...workspace.media.map((item) => `- ${item.title}`),
+      ...workspace.media.map(
+        (item) =>
+          `- ${item.title} (privacy: ${item.privacyLevel ?? "private"}, review: ${item.reviewStatus ?? "unreviewed"}, rights: ${item.rightsStatus ?? "unknown"}, AI use: ${item.aiUseAllowed === true ? "allowed" : "blocked"})`
+      ),
       "",
       "## Open Research Questions",
       "",

@@ -33,6 +33,7 @@ import { redactEvidencePack, getRedactionSummary } from "@/features/source-docs/
 import { ExportPromptDialog } from "@/features/source-docs/components/ExportPromptDialog";
 import { ImportResultsDialog } from "@/features/source-docs/components/ImportResultsDialog";
 import { buildExportPrompt, SYSTEM_PROMPTS } from "@/lib/ai/promptBuilder";
+import { getAiPrivacyDisclosure } from "@/lib/ai/privacy";
 import { generateContextualizedDocument } from "@/features/source-docs/lib/contextualizedDocGenerator";
 
 interface PageProps {
@@ -267,6 +268,10 @@ export default function AIProcessingPage({ params }: PageProps) {
       toast.error("Please set your OpenRouter API key in Settings");
       return;
     }
+    if (!useRedacted && hasLivingIndicators) {
+      toast.error("Use redacted data before sending living-person indicators to OpenRouter.");
+      return;
+    }
 
     let stageInput: unknown;
     if (stage === "normalize") {
@@ -311,6 +316,8 @@ export default function AIProcessingPage({ params }: PageProps) {
           model: settings.selectedModel,
           apiKey: settings.openRouterApiKey,
           systemPrompt: SYSTEM_PROMPTS[stage],
+          privacyAcknowledged: true,
+          redactionMode: useRedacted ? "redacted" : "original_reviewed",
         }),
       });
 
@@ -453,6 +460,10 @@ export default function AIProcessingPage({ params }: PageProps) {
           <CardDescription>{redactionSummary}</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="space-y-3">
+            <p className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-600">
+              {getAiPrivacyDisclosure(useRedacted ? "redacted" : "original_reviewed")}
+            </p>
           <div className="flex flex-wrap items-center gap-3">
             <Button
               variant={useRedacted ? "default" : "outline"}
@@ -465,6 +476,7 @@ export default function AIProcessingPage({ params }: PageProps) {
             <Button variant={!useRedacted ? "default" : "outline"} onClick={() => setUseRedacted(false)}>
               Use Original Data
             </Button>
+          </div>
           </div>
         </CardContent>
       </Card>

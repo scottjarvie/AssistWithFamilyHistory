@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Copy, Loader2, Save, Sparkles } from "lucide-react";
+import { AlertTriangle, ArrowRight, Copy, Loader2, Save, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { STORY_WRITER_MODES, STORY_WRITER_SYSTEM_PROMPT, buildStoryWriterPrompt, getStoryTitle, type StoryWriterMode } from "@/lib/ai/storyWriter";
+import { getAiPrivacyDisclosure } from "@/lib/ai/privacy";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,12 +17,24 @@ type ContextPackResponse = {
     person: {
       displayName: string;
       fsId?: string;
+      living?: boolean;
     };
     stats: {
       sources: number;
       memories: number;
       places: number;
       imports: number;
+    };
+    storyClaimReadiness?: {
+      unresolvedProvisionalRelatives?: number;
+      unresolvedImportWarnings?: string[];
+      mediaNeedingPrivacyReview?: Array<{
+        title: string;
+        privacyLevel: string;
+        reviewStatus: string;
+        rightsStatus: string;
+        aiUseAllowed: boolean;
+      }>;
     };
   };
   markdown: string;
@@ -87,8 +100,15 @@ export function StoryWriterStudio({ personId }: { personId: string }) {
     const prompt = buildStoryWriterPrompt(mode, contextPack.structured.person.displayName);
     const fullPrompt = `${STORY_WRITER_SYSTEM_PROMPT}\n\n${prompt}\n\nCONTEXT PACK:\n${contextPack.markdown}`;
 
-    await navigator.clipboard.writeText(fullPrompt);
-    toast.success("Story Writer prompt copied");
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error("Clipboard API unavailable");
+      }
+      await navigator.clipboard.writeText(fullPrompt);
+      toast.success("Story Writer prompt copied");
+    } catch {
+      toast.error("Clipboard unavailable. Select and copy the generated prompt manually from a supported browser.");
+    }
   }
 
   async function handleGenerate() {
@@ -97,6 +117,14 @@ export function StoryWriterStudio({ personId }: { personId: string }) {
     const settings = getSettings();
     if (!settings.openRouterApiKey) {
       toast.error("Add an OpenRouter API key in Settings or use Copy Prompt for manual generation.");
+      return;
+    }
+    if (contextPack.structured.person.living) {
+      toast.error("Story Writer will not send living-person context to OpenRouter.");
+      return;
+    }
+    if ((contextPack.structured.storyClaimReadiness?.mediaNeedingPrivacyReview?.length ?? 0) > 0) {
+      toast.error("Review media privacy and AI-use permissions before sending this context to OpenRouter.");
       return;
     }
 
@@ -114,6 +142,8 @@ export function StoryWriterStudio({ personId }: { personId: string }) {
           apiKey: settings.openRouterApiKey,
           model: settings.selectedModel,
           systemPrompt: STORY_WRITER_SYSTEM_PROMPT,
+          privacyAcknowledged: true,
+          redactionMode: "original_reviewed",
         }),
       });
       const payload = await response.json();
@@ -191,6 +221,18 @@ export function StoryWriterStudio({ personId }: { personId: string }) {
   }
 
   const personName = contextPack.structured.person.displayName;
+  const privacyWarnings = [
+    contextPack.structured.person.living ? "This person is marked living. Use manual review; in-app AI generation is blocked." : null,
+    (contextPack.structured.storyClaimReadiness?.unresolvedProvisionalRelatives ?? 0) > 0
+      ? "Unresolved provisional relatives are present. Keep relationship claims tentative."
+      : null,
+    (contextPack.structured.storyClaimReadiness?.unresolvedImportWarnings?.length ?? 0) > 0
+      ? "Import warnings are present. Review them before treating the context pack as clean."
+      : null,
+    (contextPack.structured.storyClaimReadiness?.mediaNeedingPrivacyReview?.length ?? 0) > 0
+      ? "Media or memory items still need privacy, rights, or AI-use review. In-app AI generation is blocked."
+      : null,
+  ].filter(Boolean);
 
   return (
     <div className="space-y-6">
@@ -218,6 +260,27 @@ export function StoryWriterStudio({ personId }: { personId: string }) {
           </div>
         </div>
       </section>
+
+      <Card className="border-amber-200 bg-amber-50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-amber-950">
+            <AlertTriangle className="h-5 w-5" />
+            AI Privacy Review
+          </CardTitle>
+          <CardDescription className="text-amber-900">
+            {getAiPrivacyDisclosure("original_reviewed")}
+          </CardDescription>
+        </CardHeader>
+        {privacyWarnings.length > 0 ? (
+          <CardContent className="space-y-2 text-sm text-amber-950">
+            {privacyWarnings.map((warning) => (
+              <p key={warning} className="rounded-xl border border-amber-200 bg-white/60 px-3 py-2">
+                {warning}
+              </p>
+            ))}
+          </CardContent>
+        ) : null}
+      </Card>
 
       <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
         <Card className="border-stone-200">

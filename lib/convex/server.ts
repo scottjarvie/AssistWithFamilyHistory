@@ -87,7 +87,8 @@ export function getConvexRuntimeIssue(error?: unknown): ConvexRuntimeIssue {
   return {
     state: "error",
     title: "Vault backend request failed",
-    description: message,
+    description:
+      "The vault backend could not complete the request. Refresh and try again, or check local Convex logs if you are developing.",
     statusCode: 503,
   };
 }
