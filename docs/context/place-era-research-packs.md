@@ -72,9 +72,21 @@ categoryBlocks: Array<{
 }>;
 ```
 
-The context-pack query should only include research packs that are reviewed, non-private, and allowed for AI use when the destination is AI-assisted writing.
-
 Story drafts saved from Story Writer may record the eligible `historicalContext` IDs in `contextPackIds` so reviewers can see which background packs were available at generation time.
+
+## Gate Semantics By Surface
+
+The pack metadata gates apply differently to each surface. The AI context-pack export only includes research packs that are reviewed, non-private, and allowed for AI use; the public story page applies an even stricter publish gate; the human-facing surfaces (person workspace, vault audit, story publish-readiness signal, story workflow status) stay unfiltered so the reviewer can act on unreviewed and private rows.
+
+| Surface | Filter applied | Where |
+| --- | --- | --- |
+| AI context-pack export (markdown and structured) | `aiUseAllowed === true` ∧ `reviewStatus ∈ {reviewed, redacted}` ∧ `privacyLevel ≠ private` | `isContextPackEligibleHistoricalContext` → `contextCoverage.aiEligibleEntries` |
+| Public story page bundle | `privacyLevel ∈ {publish_candidate, public_source}` ∧ `reviewStatus ∈ {reviewed, redacted}` | `isPublishablePublicHistoricalContext` → `contextCoverage.publishableEntries` |
+| Person workspace UI, vault audit, story publish-readiness signal, story workflow status | unfiltered | `contextCoverage.entries` / `count` |
+
+The human-facing surfaces stay unfiltered on purpose: a reviewer needs to see unreviewed and private rows in order to promote, redact, or reject them. If those rows disappeared from the person workspace and audit, the review work the gate is built around would be invisible. The publish-safety check uses `publishableCount` when available so the public gate stays strict even though the count is unfiltered.
+
+When adding a new surface that may consume historical context, choose explicitly: the AI gate, the public gate, or neither. Do not add a fourth filter at the data layer.
 
 ## Attachment Rules
 
@@ -107,6 +119,8 @@ Keep context public only when it is public history or reviewed archive context. 
 - unreviewed media or contributor metadata.
 
 Story Writer may use reviewed packs for setting, constraints, and texture. It should avoid implying unsupported personal experience. Prefer careful phrasing such as "would have lived in a town shaped by..." when the connection is contextual rather than evidenced.
+
+See `docs/operations/agent-handoff-runbook.md` for the broader review and handoff workflow that surrounds these gates.
 
 ## Template Catalog
 
