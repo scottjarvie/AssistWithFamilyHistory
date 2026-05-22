@@ -46,28 +46,54 @@ export function ContextReportForm({
   const [toYear, setToYear] = useState(String(endYear || 1950));
   const [content, setContent] = useState("");
   const [sources, setSources] = useState("");
-  const [privacyLevel, setPrivacyLevel] = useState("family_review");
-  const [reviewStatus, setReviewStatus] = useState("reviewed");
-  const [aiUseAllowed, setAiUseAllowed] = useState(true);
+  // Safe defaults: a context report is unreviewed and private until the
+  // author explicitly promotes it. This matches the upsert mutation's own
+  // defaults and prevents a stub Save from instantly becoming AI-eligible.
+  const [privacyLevel, setPrivacyLevel] = useState("private");
+  const [reviewStatus, setReviewStatus] = useState("unreviewed");
+  const [aiUseAllowed, setAiUseAllowed] = useState(false);
   const [categorySummaries, setCategorySummaries] = useState<Record<ResearchPackCategory, string>>(
     Object.fromEntries(localityEraBriefCategories.map((entry) => [entry.category, ""])) as Record<ResearchPackCategory, string>
   );
   const [categorySynthesisNotes, setCategorySynthesisNotes] = useState<Record<ResearchPackCategory, string>>(
     Object.fromEntries(localityEraBriefCategories.map((entry) => [entry.category, ""])) as Record<ResearchPackCategory, string>
   );
+  // One claim per line of free text. The form-level `sources` list applies
+  // to every claim in the submission; per-claim source refs can be edited
+  // later as the UI grows.
+  const [categoryClaimLines, setCategoryClaimLines] = useState<Record<ResearchPackCategory, string>>(
+    Object.fromEntries(localityEraBriefCategories.map((entry) => [entry.category, ""])) as Record<ResearchPackCategory, string>
+  );
+  const [categoryClaimConfidence, setCategoryClaimConfidence] = useState<Record<ResearchPackCategory, "high" | "medium" | "low">>(
+    Object.fromEntries(localityEraBriefCategories.map((entry) => [entry.category, "medium"])) as Record<ResearchPackCategory, "high" | "medium" | "low">
+  );
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
     setSaving(true);
     try {
+      const sharedSourceRefs = sources
+        .split("\n")
+        .map((source) => source.trim())
+        .filter(Boolean);
       const categoryBlocks = localityEraBriefCategories
-        .map((entry) => ({
-          category: entry.category,
-          summary: categorySummaries[entry.category]?.trim() || "",
-          sourcedClaims: [],
-          synthesisNotes: categorySynthesisNotes[entry.category]?.trim() || undefined,
-        }))
-        .filter((entry) => entry.summary || entry.synthesisNotes);
+        .map((entry) => {
+          const claimTexts = (categoryClaimLines[entry.category] || "")
+            .split("\n")
+            .map((line) => line.trim())
+            .filter(Boolean);
+          return {
+            category: entry.category,
+            summary: categorySummaries[entry.category]?.trim() || "",
+            sourcedClaims: claimTexts.map((text) => ({
+              text,
+              sourceRefs: sharedSourceRefs,
+              confidence: categoryClaimConfidence[entry.category] || "medium",
+            })),
+            synthesisNotes: categorySynthesisNotes[entry.category]?.trim() || undefined,
+          };
+        })
+        .filter((entry) => entry.summary || entry.synthesisNotes || entry.sourcedClaims.length > 0);
       const response = await fetch("/api/context-reports", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -101,6 +127,12 @@ export function ContextReportForm({
       );
       setCategorySynthesisNotes(
         Object.fromEntries(localityEraBriefCategories.map((entry) => [entry.category, ""])) as Record<ResearchPackCategory, string>
+      );
+      setCategoryClaimLines(
+        Object.fromEntries(localityEraBriefCategories.map((entry) => [entry.category, ""])) as Record<ResearchPackCategory, string>
+      );
+      setCategoryClaimConfidence(
+        Object.fromEntries(localityEraBriefCategories.map((entry) => [entry.category, "medium"])) as Record<ResearchPackCategory, "high" | "medium" | "low">
       );
       router.refresh();
     } catch (error) {
@@ -234,6 +266,43 @@ export function ContextReportForm({
                   className="min-h-24 bg-white text-sm leading-6"
                   placeholder="Optional synthesis wording or caution for Story Writer."
                 />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <div className="flex items-end gap-2">
+                  <div className="flex-1 space-y-2">
+                    <Label htmlFor={`context-pack-${entry.category}-claims`}>Sourced claims (one per line)</Label>
+                    <Textarea
+                      id={`context-pack-${entry.category}-claims`}
+                      value={categoryClaimLines[entry.category]}
+                      onChange={(event) =>
+                        setCategoryClaimLines((current) => ({
+                          ...current,
+                          [entry.category]: event.target.value,
+                        }))
+                      }
+                      className="min-h-20 bg-white text-sm leading-6"
+                      placeholder="Each line becomes a claim backed by the sources below."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor={`context-pack-${entry.category}-confidence`}>Confidence</Label>
+                    <select
+                      id={`context-pack-${entry.category}-confidence`}
+                      value={categoryClaimConfidence[entry.category]}
+                      onChange={(event) =>
+                        setCategoryClaimConfidence((current) => ({
+                          ...current,
+                          [entry.category]: event.target.value as "high" | "medium" | "low",
+                        }))
+                      }
+                      className="h-9 rounded-md border border-stone-200 bg-white px-3 text-sm text-stone-700"
+                    >
+                      <option value="high">high</option>
+                      <option value="medium">medium</option>
+                      <option value="low">low</option>
+                    </select>
+                  </div>
+                </div>
               </div>
             </div>
           ))}
