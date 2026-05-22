@@ -14,6 +14,13 @@ for (const token of [
   "aiUseAllowed",
   "Media/privacy review needed",
   "missingContextPlaces",
+  "isContextPackEligibleHistoricalContext",
+  "entry.aiUseAllowed === true",
+  "reviewStatus === \"reviewed\" || reviewStatus === \"redacted\"",
+  "privacyLevel !== \"private\"",
+  "Research pack:",
+  "Review/privacy:",
+  "categoryBlocks",
 ]) {
   assert(contextPackSource.includes(token), `Context pack is missing ${token}`);
 }

@@ -272,6 +272,17 @@ function overlapsPersonYears(
   return entry.timePeriod.endYear >= startYear && entry.timePeriod.startYear <= endYear;
 }
 
+function isContextPackEligibleHistoricalContext(entry: Doc<"historicalContext">) {
+  const privacyLevel = entry.privacyLevel ?? "private";
+  const reviewStatus = entry.reviewStatus ?? "unreviewed";
+
+  return (
+    entry.aiUseAllowed === true &&
+    (reviewStatus === "reviewed" || reviewStatus === "redacted") &&
+    privacyLevel !== "private"
+  );
+}
+
 function buildContextCoverage(
   snapshot: VaultSnapshot,
   person: Doc<"persons">,
@@ -280,6 +291,7 @@ function buildContextCoverage(
   const placeIds = new Set(operations.relatedPlaces.map((place) => String(place._id)));
   const entries = sortByTimestampDesc(
     snapshot.historicalContext.filter((entry) => {
+      if (!isContextPackEligibleHistoricalContext(entry)) return false;
       if (!overlapsPersonYears(entry, person)) return false;
       return !entry.placeId || placeIds.has(String(entry.placeId));
     })
@@ -1452,10 +1464,21 @@ export const getContextPack = query({
       "## Historical and Local Context",
       "",
       ...(workspace.contextCoverage.entries.length > 0
-        ? workspace.contextCoverage.entries.map(
-            (entry) =>
-              `- ${entry.title} (${entry.topic.replace(/_/g, " ")}, ${entry.timePeriod.startYear}-${entry.timePeriod.endYear})`
-          )
+        ? workspace.contextCoverage.entries.flatMap((entry) => [
+            `- ${entry.title} (${entry.topic.replace(/_/g, " ")}, ${entry.timePeriod.startYear}-${entry.timePeriod.endYear})`,
+            `  - Review/privacy: ${entry.reviewStatus ?? "unreviewed"} / ${entry.privacyLevel ?? "private"}; AI use: ${entry.aiUseAllowed === true ? "allowed" : "blocked"}`,
+            entry.packType
+              ? `  - Research pack: ${entry.packType}${entry.templateVersion ? ` (${entry.templateVersion})` : ""}`
+              : `  - Research pack: untyped historical context`,
+            ...(entry.categoryBlocks ?? []).flatMap((block) => [
+              `  - ${block.category.replace(/_/g, " ")}: ${block.summary}`,
+              ...block.sourcedClaims.map(
+                (claim) =>
+                  `    - ${claim.confidence}: ${claim.text}${claim.sourceRefs.length > 0 ? ` [${claim.sourceRefs.join("; ")}]` : ""}`
+              ),
+              ...(block.synthesisNotes ? [`    - Synthesis: ${block.synthesisNotes}`] : []),
+            ]),
+          ])
         : ["- No historical, place, era, church, building, news, or locality context reports linked yet."]),
       "",
       "## Sources",

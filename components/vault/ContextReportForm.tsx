@@ -8,6 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  LOCALITY_ERA_TEMPLATE_VERSION,
+  localityEraBriefCategories,
+  type ResearchPackCategory,
+} from "@/lib/context/researchPacks";
 
 const CONTEXT_TOPICS = [
   "daily_life",
@@ -41,11 +46,28 @@ export function ContextReportForm({
   const [toYear, setToYear] = useState(String(endYear || 1950));
   const [content, setContent] = useState("");
   const [sources, setSources] = useState("");
+  const [privacyLevel, setPrivacyLevel] = useState("family_review");
+  const [reviewStatus, setReviewStatus] = useState("reviewed");
+  const [aiUseAllowed, setAiUseAllowed] = useState(true);
+  const [categorySummaries, setCategorySummaries] = useState<Record<ResearchPackCategory, string>>(
+    Object.fromEntries(localityEraBriefCategories.map((entry) => [entry.category, ""])) as Record<ResearchPackCategory, string>
+  );
+  const [categorySynthesisNotes, setCategorySynthesisNotes] = useState<Record<ResearchPackCategory, string>>(
+    Object.fromEntries(localityEraBriefCategories.map((entry) => [entry.category, ""])) as Record<ResearchPackCategory, string>
+  );
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
     setSaving(true);
     try {
+      const categoryBlocks = localityEraBriefCategories
+        .map((entry) => ({
+          category: entry.category,
+          summary: categorySummaries[entry.category]?.trim() || "",
+          sourcedClaims: [],
+          synthesisNotes: categorySynthesisNotes[entry.category]?.trim() || undefined,
+        }))
+        .filter((entry) => entry.summary || entry.synthesisNotes);
       const response = await fetch("/api/context-reports", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -57,6 +79,12 @@ export function ContextReportForm({
           endYear: toYear,
           content,
           sources,
+          packType: "locality_era_brief",
+          templateVersion: LOCALITY_ERA_TEMPLATE_VERSION,
+          privacyLevel,
+          reviewStatus,
+          aiUseAllowed,
+          categoryBlocks,
         }),
       });
       const payload = await response.json();
@@ -68,6 +96,12 @@ export function ContextReportForm({
       toast.success("Context report saved");
       setContent("");
       setSources("");
+      setCategorySummaries(
+        Object.fromEntries(localityEraBriefCategories.map((entry) => [entry.category, ""])) as Record<ResearchPackCategory, string>
+      );
+      setCategorySynthesisNotes(
+        Object.fromEntries(localityEraBriefCategories.map((entry) => [entry.category, ""])) as Record<ResearchPackCategory, string>
+      );
       router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to save context report");
@@ -111,6 +145,47 @@ export function ContextReportForm({
         </div>
       </div>
 
+      <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+        <div className="space-y-2">
+          <Label htmlFor="context-privacy">Privacy</Label>
+          <select
+            id="context-privacy"
+            value={privacyLevel}
+            onChange={(event) => setPrivacyLevel(event.target.value)}
+            className="h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-sm text-stone-700"
+          >
+            <option value="private">private</option>
+            <option value="family_review">family review</option>
+            <option value="publish_candidate">publish candidate</option>
+            <option value="public_source">public source</option>
+          </select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="context-review">Review</Label>
+          <select
+            id="context-review"
+            value={reviewStatus}
+            onChange={(event) => setReviewStatus(event.target.value)}
+            className="h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-sm text-stone-700"
+          >
+            <option value="unreviewed">unreviewed</option>
+            <option value="reviewed">reviewed</option>
+            <option value="disputed">disputed</option>
+            <option value="redacted">redacted</option>
+            <option value="rejected">rejected</option>
+          </select>
+        </div>
+        <label className="flex h-9 items-center gap-2 self-end rounded-md border border-stone-200 px-3 text-sm text-stone-700">
+          <input
+            type="checkbox"
+            checked={aiUseAllowed}
+            onChange={(event) => setAiUseAllowed(event.target.checked)}
+            className="h-4 w-4 accent-amber-700"
+          />
+          AI use allowed
+        </label>
+      </div>
+
       <div className="space-y-2">
         <Label htmlFor="context-content">Research report</Label>
         <Textarea
@@ -120,6 +195,49 @@ export function ContextReportForm({
           className="min-h-52 text-sm leading-6"
           placeholder="Paste or write the researched context about this place, era, church, building, economy, migration pattern, or local history."
         />
+      </div>
+
+      <div className="space-y-3 rounded-xl border border-stone-200 bg-stone-50 p-4">
+        <div>
+          <p className="text-sm font-medium text-stone-900">Locality Era Brief</p>
+          <p className="mt-1 text-xs text-stone-500">{LOCALITY_ERA_TEMPLATE_VERSION}</p>
+        </div>
+        <div className="grid gap-3">
+          {localityEraBriefCategories.map((entry) => (
+            <div key={entry.category} className="grid gap-2 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor={`context-pack-${entry.category}`}>{entry.label}</Label>
+                <Textarea
+                  id={`context-pack-${entry.category}`}
+                  value={categorySummaries[entry.category]}
+                  onChange={(event) =>
+                    setCategorySummaries((current) => ({
+                      ...current,
+                      [entry.category]: event.target.value,
+                    }))
+                  }
+                  className="min-h-24 bg-white text-sm leading-6"
+                  placeholder={entry.prompt}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor={`context-pack-${entry.category}-synthesis`}>Story-safe notes</Label>
+                <Textarea
+                  id={`context-pack-${entry.category}-synthesis`}
+                  value={categorySynthesisNotes[entry.category]}
+                  onChange={(event) =>
+                    setCategorySynthesisNotes((current) => ({
+                      ...current,
+                      [entry.category]: event.target.value,
+                    }))
+                  }
+                  className="min-h-24 bg-white text-sm leading-6"
+                  placeholder="Optional synthesis wording or caution for Story Writer."
+                />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="space-y-2">

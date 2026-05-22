@@ -947,6 +947,7 @@ export default defineSchema({
     content: v.string(),                        // Markdown or rich text
     citationIds: v.array(v.id("citations")),    // Which sources support this story
     sourceFactIds: v.optional(v.array(v.string())), // Which specific facts were used
+    contextPackIds: v.optional(v.array(v.id("historicalContext"))),
     
     // Status
     status: v.union(
@@ -1132,6 +1133,63 @@ export default defineSchema({
     title: v.string(),
     content: v.string(),                        // Markdown
     sources: v.array(v.string()),               // URLs or references
+
+    // Research-pack metadata and AI/story gates
+    packType: v.optional(
+      v.union(
+        v.literal("locality_era_brief"),
+        v.literal("region_era"),
+        v.literal("occupation_era"),
+        v.literal("religion_community"),
+        v.literal("migration_corridor"),
+        v.literal("building_institution"),
+        v.literal("local_event"),
+        v.literal("cemetery_burial")
+      )
+    ),
+    templateVersion: v.optional(v.string()),
+    privacyLevel: v.optional(
+      v.union(
+        v.literal("private"),
+        v.literal("family_review"),
+        v.literal("publish_candidate"),
+        v.literal("public_source")
+      )
+    ),
+    reviewStatus: v.optional(
+      v.union(
+        v.literal("unreviewed"),
+        v.literal("reviewed"),
+        v.literal("disputed"),
+        v.literal("redacted"),
+        v.literal("rejected")
+      )
+    ),
+    aiUseAllowed: v.optional(v.boolean()),
+    categoryBlocks: v.optional(
+      v.array(
+        v.object({
+          category: v.union(
+            v.literal("scope"),
+            v.literal("place_summary"),
+            v.literal("daily_life"),
+            v.literal("institutions"),
+            v.literal("migration_work_religion"),
+            v.literal("evidence_limits"),
+            v.literal("story_synthesis")
+          ),
+          summary: v.string(),
+          sourcedClaims: v.array(
+            v.object({
+              text: v.string(),
+              sourceRefs: v.array(v.string()),
+              confidence: v.union(v.literal("high"), v.literal("medium"), v.literal("low")),
+            })
+          ),
+          synthesisNotes: v.optional(v.string()),
+        })
+      )
+    ),
     
     // Metadata
     createdAt: v.number(),

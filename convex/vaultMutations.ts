@@ -88,6 +88,40 @@ const historicalContextTopicValidator = v.union(
   v.literal("other")
 );
 
+const researchPackTypeValidator = v.union(
+  v.literal("locality_era_brief"),
+  v.literal("region_era"),
+  v.literal("occupation_era"),
+  v.literal("religion_community"),
+  v.literal("migration_corridor"),
+  v.literal("building_institution"),
+  v.literal("local_event"),
+  v.literal("cemetery_burial")
+);
+
+const researchPackCategoryValidator = v.union(
+  v.literal("scope"),
+  v.literal("place_summary"),
+  v.literal("daily_life"),
+  v.literal("institutions"),
+  v.literal("migration_work_religion"),
+  v.literal("evidence_limits"),
+  v.literal("story_synthesis")
+);
+
+const researchPackCategoryBlockValidator = v.object({
+  category: researchPackCategoryValidator,
+  summary: v.string(),
+  sourcedClaims: v.array(
+    v.object({
+      text: v.string(),
+      sourceRefs: v.array(v.string()),
+      confidence: v.union(v.literal("high"), v.literal("medium"), v.literal("low")),
+    })
+  ),
+  synthesisNotes: v.optional(v.string()),
+});
+
 const storyStatusValidator = v.union(v.literal("draft"), v.literal("review"), v.literal("published"));
 
 const sourceFactTypeValidator = v.union(
@@ -913,6 +947,7 @@ export const upsertStoryDraft = mutation({
     promptUsed: v.optional(v.string()),
     modelUsed: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
+    contextPackIds: v.optional(v.array(v.id("historicalContext"))),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -935,6 +970,7 @@ export const upsertStoryDraft = mutation({
       content: args.content,
       citationIds: match?.citationIds ?? [],
       sourceFactIds: match?.sourceFactIds,
+      contextPackIds: args.contextPackIds ?? match?.contextPackIds,
       status: args.status,
       publicIndexing: match?.publicIndexing ?? "noindex" as const,
       generatedBy: args.generatedBy,
@@ -1218,6 +1254,12 @@ export const upsertHistoricalContext = mutation({
     title: v.string(),
     content: v.string(),
     sources: v.array(v.string()),
+    packType: v.optional(researchPackTypeValidator),
+    templateVersion: v.optional(v.string()),
+    privacyLevel: v.optional(privacyLevelValidator),
+    reviewStatus: v.optional(contextReviewStatusValidator),
+    aiUseAllowed: v.optional(v.boolean()),
+    categoryBlocks: v.optional(v.array(researchPackCategoryBlockValidator)),
   },
   handler: async (ctx, args) => {
     const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
@@ -1246,6 +1288,23 @@ export const upsertHistoricalContext = mutation({
       title: args.title.trim(),
       content: args.content.trim(),
       sources: args.sources.map((source) => source.trim()).filter(Boolean),
+      packType: args.packType,
+      templateVersion: args.templateVersion?.trim() || undefined,
+      privacyLevel: args.privacyLevel ?? "private" as const,
+      reviewStatus: args.reviewStatus ?? "unreviewed" as const,
+      aiUseAllowed: args.aiUseAllowed ?? false,
+      categoryBlocks: args.categoryBlocks?.map((block) => ({
+        category: block.category,
+        summary: block.summary.trim(),
+        sourcedClaims: block.sourcedClaims
+          .map((claim) => ({
+            text: claim.text.trim(),
+            sourceRefs: claim.sourceRefs.map((sourceRef) => sourceRef.trim()).filter(Boolean),
+            confidence: claim.confidence,
+          }))
+          .filter((claim) => claim.text.length > 0),
+        synthesisNotes: block.synthesisNotes?.trim() || undefined,
+      })).filter((block) => block.summary.length > 0 || block.sourcedClaims.length > 0 || block.synthesisNotes),
       updatedAt: now,
     };
 
@@ -1276,6 +1335,8 @@ export const upsertHistoricalContext = mutation({
       `Years: ${payload.timePeriod.startYear}-${payload.timePeriod.endYear}`,
       payload.placeId ? `Place ID: ${payload.placeId}` : "Vault-wide context",
       payload.sources.length > 0 ? `Sources: ${payload.sources.join("; ")}` : "Sources: none recorded",
+      payload.packType ? `Pack type: ${payload.packType}` : "Pack type: untyped context report",
+      `Review: ${payload.reviewStatus}; privacy: ${payload.privacyLevel}; AI use: ${payload.aiUseAllowed ? "allowed" : "blocked"}`,
     ].join("\n");
 
     if (logEntry) {

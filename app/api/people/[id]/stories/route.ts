@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { getConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
 import type { StoryWriterMode } from "@/lib/ai/storyWriter";
 import { getVaultAccessContext } from "@/lib/vault/server";
@@ -47,6 +48,13 @@ export async function POST(
     const promptUsed = typeof body.promptUsed === "string" ? body.promptUsed : undefined;
     const modelUsed = typeof body.modelUsed === "string" ? body.modelUsed : undefined;
     const mode = isStoryWriterMode(body.mode) ? body.mode : null;
+    const contextPackIds = Array.isArray(body.contextPackIds)
+      ? body.contextPackIds
+          .filter((contextPackId: unknown): contextPackId is string => typeof contextPackId === "string")
+          .map((contextPackId: string) => contextPackId.trim())
+          .filter(Boolean)
+          .slice(0, 12)
+      : undefined;
     const generatedBy =
       body.generatedBy === "human" || body.generatedBy === "ai_edited" ? body.generatedBy : "ai";
 
@@ -79,6 +87,7 @@ export async function POST(
       promptUsed,
       modelUsed,
       tags: ["story-writer", mode],
+      contextPackIds: contextPackIds as Id<"historicalContext">[] | undefined,
     });
 
     await client.mutation(api.researchLog.upsert, {

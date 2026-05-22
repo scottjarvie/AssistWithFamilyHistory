@@ -8,6 +8,30 @@ export type ResearchPackType =
   | "local_event"
   | "cemetery_burial";
 
+export type ResearchPackCategory =
+  | "scope"
+  | "place_summary"
+  | "daily_life"
+  | "institutions"
+  | "migration_work_religion"
+  | "evidence_limits"
+  | "story_synthesis";
+
+export type ResearchPackClaimConfidence = "high" | "medium" | "low";
+
+export type ResearchPackSourcedClaim = {
+  text: string;
+  sourceRefs: string[];
+  confidence: ResearchPackClaimConfidence;
+};
+
+export type ResearchPackCategoryBlock = {
+  category: ResearchPackCategory;
+  summary: string;
+  sourcedClaims: ResearchPackSourcedClaim[];
+  synthesisNotes?: string;
+};
+
 export type ResearchPackAttachment = {
   target: "place" | "person" | "story" | "source" | "context_item";
   rule: string;
@@ -30,6 +54,49 @@ export type ResearchPackTemplate = {
 };
 
 export const FIRST_USEFUL_RESEARCH_PACK_ID = "locality-era-brief";
+export const LOCALITY_ERA_TEMPLATE_VERSION = "locality-era/v1";
+
+export const localityEraBriefCategories = [
+  {
+    category: "scope",
+    label: "Scope and time window",
+    prompt: "Define the place, target years, and why this pack matters to the linked person or story.",
+  },
+  {
+    category: "place_summary",
+    label: "Place summary",
+    prompt: "Summarize the place, its size, geography, governance, and nearby communities during the period.",
+  },
+  {
+    category: "daily_life",
+    label: "Daily life",
+    prompt: "Capture work rhythms, home life, education, transport, health, weather, and material conditions.",
+  },
+  {
+    category: "institutions",
+    label: "Local institutions",
+    prompt: "Note churches, schools, civic bodies, courts, newspapers, railways, cemeteries, or record offices.",
+  },
+  {
+    category: "migration_work_religion",
+    label: "Migration, work, religion, or community patterns",
+    prompt: "Explain patterns that shaped the local community without turning them into person-level claims.",
+  },
+  {
+    category: "evidence_limits",
+    label: "Evidence limits",
+    prompt: "List uncertainty, missing sources, broad context, and claims that must not be over-applied.",
+  },
+  {
+    category: "story_synthesis",
+    label: "Story-safe synthesis",
+    prompt: "Write cautious background language a story writer can use without implying unsupported experience.",
+  },
+] satisfies Array<{
+  category: ResearchPackCategory;
+  label: string;
+  prompt: string;
+}>;
 
 export const researchPackTemplates = [
   {

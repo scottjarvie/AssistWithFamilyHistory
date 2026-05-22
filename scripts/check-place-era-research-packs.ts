@@ -2,7 +2,10 @@ import { readFileSync } from "fs";
 import path from "path";
 import {
   FIRST_USEFUL_RESEARCH_PACK_ID,
+  LOCALITY_ERA_TEMPLATE_VERSION,
+  localityEraBriefCategories,
   researchPackTemplates,
+  type ResearchPackCategory,
   type ResearchPackTemplate,
   type ResearchPackType,
 } from "../lib/context/researchPacks";
@@ -20,6 +23,15 @@ const expectedTypes: ResearchPackType[] = [
 
 const failures: string[] = [];
 const ids = new Set<string>();
+const expectedLocalityCategories: ResearchPackCategory[] = [
+  "scope",
+  "place_summary",
+  "daily_life",
+  "institutions",
+  "migration_work_religion",
+  "evidence_limits",
+  "story_synthesis",
+];
 
 function requireList(template: ResearchPackTemplate, key: keyof ResearchPackTemplate) {
   const value = template[key];
@@ -68,6 +80,16 @@ if (firstUsefulTemplates.length !== 1) {
   failures.push(`Expected exactly one first-useful template, found ${firstUsefulTemplates.length}`);
 } else if (firstUsefulTemplates[0].id !== FIRST_USEFUL_RESEARCH_PACK_ID) {
   failures.push(`First useful template must be ${FIRST_USEFUL_RESEARCH_PACK_ID}`);
+}
+
+if (LOCALITY_ERA_TEMPLATE_VERSION !== "locality-era/v1") {
+  failures.push("Locality Era Brief template version must remain explicit");
+}
+
+for (const category of expectedLocalityCategories) {
+  if (!localityEraBriefCategories.some((entry) => entry.category === category)) {
+    failures.push(`Missing locality era category ${category}`);
+  }
 }
 
 const doc = readFileSync(path.join(process.cwd(), "docs/context/place-era-research-packs.md"), "utf8");

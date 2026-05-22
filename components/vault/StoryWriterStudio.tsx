@@ -25,6 +25,15 @@ type ContextPackResponse = {
       places: number;
       imports: number;
     };
+    historicalContext?: Array<{
+      _id: string;
+      title: string;
+      packType?: string;
+      templateVersion?: string;
+      privacyLevel?: string;
+      reviewStatus?: string;
+      aiUseAllowed?: boolean;
+    }>;
     storyClaimReadiness?: {
       unresolvedProvisionalRelatives?: number;
       unresolvedImportWarnings?: string[];
@@ -184,6 +193,7 @@ export function StoryWriterStudio({ personId }: { personId: string }) {
           promptUsed,
           modelUsed: lastModelUsed,
           generatedBy: lastModelUsed === "manual" ? "human" : "ai",
+          contextPackIds: contextPack.structured.historicalContext?.map((entry) => entry._id) ?? [],
         }),
       });
       const payload = await response.json();
@@ -221,6 +231,12 @@ export function StoryWriterStudio({ personId }: { personId: string }) {
   }
 
   const personName = contextPack.structured.person.displayName;
+  const researchPackCount = contextPack.structured.historicalContext?.length ?? 0;
+  const researchPackLabels =
+    contextPack.structured.historicalContext
+      ?.map((entry) => entry.title)
+      .slice(0, 3)
+      .join("; ") || "None";
   const privacyWarnings = [
     contextPack.structured.person.living ? "This person is marked living. Use manual review; in-app AI generation is blocked." : null,
     (contextPack.structured.storyClaimReadiness?.unresolvedProvisionalRelatives ?? 0) > 0
@@ -250,7 +266,7 @@ export function StoryWriterStudio({ personId }: { personId: string }) {
               ["Sources", contextPack.structured.stats.sources],
               ["Memories", contextPack.structured.stats.memories],
               ["Places", contextPack.structured.stats.places],
-              ["Imports", contextPack.structured.stats.imports],
+              ["Packs", researchPackCount],
             ].map(([label, value]) => (
               <div key={label} className="rounded-2xl bg-stone-50 px-4 py-4 text-center">
                 <p className="text-xs uppercase tracking-[0.2em] text-stone-400">{label}</p>
@@ -280,6 +296,20 @@ export function StoryWriterStudio({ personId }: { personId: string }) {
             ))}
           </CardContent>
         ) : null}
+      </Card>
+
+      <Card className="border-stone-200">
+        <CardHeader>
+          <CardTitle>Research Packs</CardTitle>
+          <CardDescription>
+            {researchPackCount > 0
+              ? researchPackLabels
+              : "No reviewed AI-allowed locality or historical context packs are available for this person."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="text-sm leading-6 text-stone-600">
+          Research packs provide background setting only. Person-specific claims still need source-backed facts or citations before publication.
+        </CardContent>
       </Card>
 
       <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">

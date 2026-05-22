@@ -34,32 +34,34 @@ Use the existing `historicalContext` table for the first implementation.
 - `title`: human-readable pack title.
 - `content`: reviewed Markdown research report.
 - `sources`: public URLs, archive references, books, or reviewed source notes used for the context.
+- `packType`: typed research-pack kind, starting with `locality_era_brief`.
+- `templateVersion`: explicit template version, currently `locality-era/v1`.
+- `privacyLevel`, `reviewStatus`, and `aiUseAllowed`: gates that decide whether the pack can enter AI-assisted context packs.
+- `categoryBlocks`: structured sections that separate source-backed summaries from story-safe synthesis notes.
 
 Use `contextItems` for person-specific notes, private family material, unreviewed memories, or researcher conclusions that should not become broadly reusable place context.
 
 Do not add a dedicated `researchPacks` table until the app needs multiple linked sections, pack versions, or per-pack review workflow. The typed templates in `lib/context/researchPacks.ts` are the contract for that future migration.
 
-## Future Structured Metadata
+## Structured Metadata
 
-When this moves from contract to implementation, enrich `historicalContext` instead of creating a new storage surface first:
+The current implementation enriches `historicalContext` instead of creating a second storage surface:
 
 ```ts
 packType: "locality_era_brief";
-templateVersion: "place-era/v1";
+templateVersion: "locality-era/v1";
 privacyLevel: "private" | "family_review" | "publish_candidate" | "public_source";
 reviewStatus: "unreviewed" | "reviewed" | "disputed" | "redacted" | "rejected";
 aiUseAllowed: boolean;
 categoryBlocks: Array<{
   category:
-    | "place_identity"
-    | "era_overview"
+    | "scope"
+    | "place_summary"
     | "daily_life"
-    | "occupation_economy"
-    | "religion_community"
-    | "migration_transport"
-    | "buildings_institutions"
-    | "local_events"
-    | "evidence_limits";
+    | "institutions"
+    | "migration_work_religion"
+    | "evidence_limits"
+    | "story_synthesis";
   summary: string;
   sourcedClaims: Array<{
     text: string;
@@ -71,6 +73,8 @@ categoryBlocks: Array<{
 ```
 
 The context-pack query should only include research packs that are reviewed, non-private, and allowed for AI use when the destination is AI-assisted writing.
+
+Story drafts saved from Story Writer may record the eligible `historicalContext` IDs in `contextPackIds` so reviewers can see which background packs were available at generation time.
 
 ## Attachment Rules
 
@@ -121,9 +125,9 @@ Each template must define required inputs, research questions, output sections, 
 
 ## Implementation Follow-Ups
 
-The first implementation route should:
+Further routes should:
 
-- add a guided place workspace flow that can prefill a `town-era-context` report from linked events;
-- show template labels in the Add Context Report form;
-- add context-pack formatting that separates sourced context from AI synthesis notes;
-- add Story Writer prompt language that treats packs as background unless source-backed facts support a person-specific claim.
+- add a guided place workspace flow that can prefill Locality Era Brief sections from linked events and source facts;
+- add explicit sourced-claim editing inside each category block instead of source lists only;
+- show context-pack provenance and `contextPackIds` in story review screens;
+- add a dedicated research-pack review queue if multiple operators start authoring packs in parallel.
