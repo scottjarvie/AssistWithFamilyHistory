@@ -1,8 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { Loader2, Save } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,27 @@ const CONTEXT_TOPICS = [
   "disaster",
   "other",
 ];
+
+// Per-claim editor row. sourceRefs is a list of source strings (a subset of
+// the form-level sources) — stored as strings so they survive if the user
+// edits or reorders the form-level sources list mid-session.
+type ClaimRow = {
+  text: string;
+  sourceRefs: string[];
+  confidence: "high" | "medium" | "low";
+};
+
+function emptyClaimsByCategory(): Record<ResearchPackCategory, ClaimRow[]> {
+  return Object.fromEntries(
+    localityEraBriefCategories.map((entry) => [entry.category, [] as ClaimRow[]])
+  ) as Record<ResearchPackCategory, ClaimRow[]>;
+}
+
+function emptyStringsByCategory(): Record<ResearchPackCategory, string> {
+  return Object.fromEntries(
+    localityEraBriefCategories.map((entry) => [entry.category, ""])
+  ) as Record<ResearchPackCategory, string>;
+}
 
 export function ContextReportForm({
   placeId,
@@ -53,43 +74,83 @@ export function ContextReportForm({
   const [reviewStatus, setReviewStatus] = useState("unreviewed");
   const [aiUseAllowed, setAiUseAllowed] = useState(false);
   const [categorySummaries, setCategorySummaries] = useState<Record<ResearchPackCategory, string>>(
-    Object.fromEntries(localityEraBriefCategories.map((entry) => [entry.category, ""])) as Record<ResearchPackCategory, string>
+    emptyStringsByCategory()
   );
   const [categorySynthesisNotes, setCategorySynthesisNotes] = useState<Record<ResearchPackCategory, string>>(
-    Object.fromEntries(localityEraBriefCategories.map((entry) => [entry.category, ""])) as Record<ResearchPackCategory, string>
+    emptyStringsByCategory()
   );
-  // One claim per line of free text. The form-level `sources` list applies
-  // to every claim in the submission; per-claim source refs can be edited
-  // later as the UI grows.
-  const [categoryClaimLines, setCategoryClaimLines] = useState<Record<ResearchPackCategory, string>>(
-    Object.fromEntries(localityEraBriefCategories.map((entry) => [entry.category, ""])) as Record<ResearchPackCategory, string>
-  );
-  const [categoryClaimConfidence, setCategoryClaimConfidence] = useState<Record<ResearchPackCategory, "high" | "medium" | "low">>(
-    Object.fromEntries(localityEraBriefCategories.map((entry) => [entry.category, "medium"])) as Record<ResearchPackCategory, "high" | "medium" | "low">
+  // Per-claim rows. Each claim carries its own subset of the form-level
+  // sources so different claims in the same category can cite different
+  // refs (the schema supports this; v1 collapsed all claims to the same
+  // form-level list).
+  const [categoryClaims, setCategoryClaims] = useState<Record<ResearchPackCategory, ClaimRow[]>>(
+    emptyClaimsByCategory()
   );
   const [saving, setSaving] = useState(false);
+
+  const parsedSources = useMemo(
+    () =>
+      sources
+        .split("\n")
+        .map((source) => source.trim())
+        .filter(Boolean),
+    [sources]
+  );
+
+  function addClaim(category: ResearchPackCategory) {
+    setCategoryClaims((current) => ({
+      ...current,
+      // New claims default to inheriting all current form-level sources so
+      // the fast path stays "type a claim, hit Save." The author can toggle
+      // chips off to scope a claim to a subset.
+      [category]: [...current[category], { text: "", sourceRefs: [...parsedSources], confidence: "medium" }],
+    }));
+  }
+
+  function removeClaim(category: ResearchPackCategory, index: number) {
+    setCategoryClaims((current) => ({
+      ...current,
+      [category]: current[category].filter((_, i) => i !== index),
+    }));
+  }
+
+  function updateClaim(category: ResearchPackCategory, index: number, partial: Partial<ClaimRow>) {
+    setCategoryClaims((current) => ({
+      ...current,
+      [category]: current[category].map((row, i) => (i === index ? { ...row, ...partial } : row)),
+    }));
+  }
+
+  function toggleSourceRef(category: ResearchPackCategory, index: number, source: string) {
+    setCategoryClaims((current) => ({
+      ...current,
+      [category]: current[category].map((row, i) => {
+        if (i !== index) return row;
+        const has = row.sourceRefs.includes(source);
+        return {
+          ...row,
+          sourceRefs: has ? row.sourceRefs.filter((ref) => ref !== source) : [...row.sourceRefs, source],
+        };
+      }),
+    }));
+  }
 
   async function handleSave() {
     setSaving(true);
     try {
-      const sharedSourceRefs = sources
-        .split("\n")
-        .map((source) => source.trim())
-        .filter(Boolean);
       const categoryBlocks = localityEraBriefCategories
         .map((entry) => {
-          const claimTexts = (categoryClaimLines[entry.category] || "")
-            .split("\n")
-            .map((line) => line.trim())
-            .filter(Boolean);
+          const claims = (categoryClaims[entry.category] || [])
+            .map((row) => ({
+              text: row.text.trim(),
+              sourceRefs: row.sourceRefs.map((ref) => ref.trim()).filter(Boolean),
+              confidence: row.confidence,
+            }))
+            .filter((row) => row.text.length > 0);
           return {
             category: entry.category,
             summary: categorySummaries[entry.category]?.trim() || "",
-            sourcedClaims: claimTexts.map((text) => ({
-              text,
-              sourceRefs: sharedSourceRefs,
-              confidence: categoryClaimConfidence[entry.category] || "medium",
-            })),
+            sourcedClaims: claims,
             synthesisNotes: categorySynthesisNotes[entry.category]?.trim() || undefined,
           };
         })
@@ -122,18 +183,9 @@ export function ContextReportForm({
       toast.success("Context report saved");
       setContent("");
       setSources("");
-      setCategorySummaries(
-        Object.fromEntries(localityEraBriefCategories.map((entry) => [entry.category, ""])) as Record<ResearchPackCategory, string>
-      );
-      setCategorySynthesisNotes(
-        Object.fromEntries(localityEraBriefCategories.map((entry) => [entry.category, ""])) as Record<ResearchPackCategory, string>
-      );
-      setCategoryClaimLines(
-        Object.fromEntries(localityEraBriefCategories.map((entry) => [entry.category, ""])) as Record<ResearchPackCategory, string>
-      );
-      setCategoryClaimConfidence(
-        Object.fromEntries(localityEraBriefCategories.map((entry) => [entry.category, "medium"])) as Record<ResearchPackCategory, "high" | "medium" | "low">
-      );
+      setCategorySummaries(emptyStringsByCategory());
+      setCategorySynthesisNotes(emptyStringsByCategory());
+      setCategoryClaims(emptyClaimsByCategory());
       router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to save context report");
@@ -235,77 +287,146 @@ export function ContextReportForm({
           <p className="mt-1 text-xs text-stone-500">{LOCALITY_ERA_TEMPLATE_VERSION}</p>
         </div>
         <div className="grid gap-3">
-          {localityEraBriefCategories.map((entry) => (
-            <div key={entry.category} className="grid gap-2 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor={`context-pack-${entry.category}`}>{entry.label}</Label>
-                <Textarea
-                  id={`context-pack-${entry.category}`}
-                  value={categorySummaries[entry.category]}
-                  onChange={(event) =>
-                    setCategorySummaries((current) => ({
-                      ...current,
-                      [entry.category]: event.target.value,
-                    }))
-                  }
-                  className="min-h-24 bg-white text-sm leading-6"
-                  placeholder={entry.prompt}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor={`context-pack-${entry.category}-synthesis`}>Story-safe notes</Label>
-                <Textarea
-                  id={`context-pack-${entry.category}-synthesis`}
-                  value={categorySynthesisNotes[entry.category]}
-                  onChange={(event) =>
-                    setCategorySynthesisNotes((current) => ({
-                      ...current,
-                      [entry.category]: event.target.value,
-                    }))
-                  }
-                  className="min-h-24 bg-white text-sm leading-6"
-                  placeholder="Optional synthesis wording or caution for Story Writer."
-                />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <div className="flex items-end gap-2">
-                  <div className="flex-1 space-y-2">
-                    <Label htmlFor={`context-pack-${entry.category}-claims`}>Sourced claims (one per line)</Label>
+          {localityEraBriefCategories.map((entry) => {
+            const claims = categoryClaims[entry.category];
+            return (
+              <div key={entry.category} className="space-y-3 border-t border-stone-200 pt-3 first:border-t-0 first:pt-0">
+                <div className="grid gap-2 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor={`context-pack-${entry.category}`}>{entry.label}</Label>
                     <Textarea
-                      id={`context-pack-${entry.category}-claims`}
-                      value={categoryClaimLines[entry.category]}
+                      id={`context-pack-${entry.category}`}
+                      value={categorySummaries[entry.category]}
                       onChange={(event) =>
-                        setCategoryClaimLines((current) => ({
+                        setCategorySummaries((current) => ({
                           ...current,
                           [entry.category]: event.target.value,
                         }))
                       }
-                      className="min-h-20 bg-white text-sm leading-6"
-                      placeholder="Each line becomes a claim backed by the sources below."
+                      className="min-h-24 bg-white text-sm leading-6"
+                      placeholder={entry.prompt}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor={`context-pack-${entry.category}-confidence`}>Confidence</Label>
-                    <select
-                      id={`context-pack-${entry.category}-confidence`}
-                      value={categoryClaimConfidence[entry.category]}
+                    <Label htmlFor={`context-pack-${entry.category}-synthesis`}>Story-safe notes</Label>
+                    <Textarea
+                      id={`context-pack-${entry.category}-synthesis`}
+                      value={categorySynthesisNotes[entry.category]}
                       onChange={(event) =>
-                        setCategoryClaimConfidence((current) => ({
+                        setCategorySynthesisNotes((current) => ({
                           ...current,
-                          [entry.category]: event.target.value as "high" | "medium" | "low",
+                          [entry.category]: event.target.value,
                         }))
                       }
-                      className="h-9 rounded-md border border-stone-200 bg-white px-3 text-sm text-stone-700"
-                    >
-                      <option value="high">high</option>
-                      <option value="medium">medium</option>
-                      <option value="low">low</option>
-                    </select>
+                      className="min-h-24 bg-white text-sm leading-6"
+                      placeholder="Optional synthesis wording or caution for Story Writer."
+                    />
                   </div>
                 </div>
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <Label>Sourced claims</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => addClaim(entry.category)}
+                    >
+                      <Plus className="mr-1 h-3.5 w-3.5" />
+                      Add claim
+                    </Button>
+                  </div>
+                  {claims.length === 0 ? (
+                    <p className="rounded-md border border-dashed border-stone-200 bg-white px-3 py-3 text-xs leading-5 text-stone-500">
+                      No claims yet. Add a claim to record a specific assertion with its supporting source refs.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {claims.map((claim, index) => (
+                        <div
+                          key={index}
+                          className="space-y-2 rounded-md border border-stone-200 bg-white p-3"
+                        >
+                          <div className="flex gap-2">
+                            <Textarea
+                              value={claim.text}
+                              onChange={(event) => updateClaim(entry.category, index, { text: event.target.value })}
+                              className="min-h-16 flex-1 text-sm leading-6"
+                              placeholder="The town economy was shaped by quarrying through the 1880s."
+                            />
+                            <div className="flex flex-col gap-2">
+                              <select
+                                value={claim.confidence}
+                                onChange={(event) =>
+                                  updateClaim(entry.category, index, {
+                                    confidence: event.target.value as "high" | "medium" | "low",
+                                  })
+                                }
+                                className="h-9 rounded-md border border-stone-200 bg-white px-2 text-xs text-stone-700"
+                                aria-label="Confidence"
+                              >
+                                <option value="high">high</option>
+                                <option value="medium">medium</option>
+                                <option value="low">low</option>
+                              </select>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeClaim(entry.category, index)}
+                                aria-label="Remove claim"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                          {parsedSources.length === 0 ? (
+                            <p className="text-xs text-stone-500">
+                              Add sources below to attach refs to this claim.
+                            </p>
+                          ) : (
+                            <div className="flex flex-wrap gap-1.5">
+                              {parsedSources.map((source) => {
+                                const selected = claim.sourceRefs.includes(source);
+                                return (
+                                  <button
+                                    key={source}
+                                    type="button"
+                                    onClick={() => toggleSourceRef(entry.category, index, source)}
+                                    className={
+                                      "rounded-full border px-2 py-0.5 text-[11px] " +
+                                      (selected
+                                        ? "border-amber-300 bg-amber-50 text-amber-800"
+                                        : "border-stone-200 bg-white text-stone-500 hover:bg-stone-50")
+                                    }
+                                  >
+                                    {source.length > 36 ? source.slice(0, 33) + "…" : source}
+                                  </button>
+                                );
+                              })}
+                              {claim.sourceRefs
+                                .filter((ref) => !parsedSources.includes(ref))
+                                .map((orphan) => (
+                                  <button
+                                    key={`orphan-${orphan}`}
+                                    type="button"
+                                    onClick={() => toggleSourceRef(entry.category, index, orphan)}
+                                    className="rounded-full border border-stone-200 bg-stone-100 px-2 py-0.5 text-[11px] text-stone-500 line-through"
+                                    title="This source was removed from the form-level list. Click to drop it from this claim."
+                                  >
+                                    {orphan.length > 36 ? orphan.slice(0, 33) + "…" : orphan}
+                                  </button>
+                                ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
