@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { Doc } from "./_generated/dataModel";
 import { filterByVaultOwner, matchesVaultOwner, normalizeVaultOwnerId } from "./vaultCore";
 
@@ -227,8 +227,10 @@ export const unlinkFromTarget = mutation({
   },
 });
 
-// Update a citation
-export const update = mutation({
+// Update a citation. GEN-73: internal-only — no `vaultOwnerId` arg, so it
+// must not be callable from public clients. Update through the owner-aware
+// vaultMutations surface instead.
+export const update = internalMutation({
   args: {
     id: v.id("citations"),
     sourceId: v.optional(v.id("sources")),
@@ -261,8 +263,8 @@ export const update = mutation({
   },
 });
 
-// Delete a citation
-export const remove = mutation({
+// Delete a citation. GEN-73: internal-only — no `vaultOwnerId` arg.
+export const remove = internalMutation({
   args: { id: v.id("citations") },
   handler: async (ctx, args) => {
     // Delete all citation links first

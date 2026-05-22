@@ -39,7 +39,8 @@
     "check:place-era-packs": "tsx scripts/check-place-era-research-packs.ts",
     "smoke:routes": "bash scripts/smoke-routes.sh",
     "check:protected-routes": "tsx scripts/check-protected-routes.ts",
-    "check:person-identifiers": "tsx scripts/check-person-identifiers.ts"
+    "check:person-identifiers": "tsx scripts/check-person-identifiers.ts",
+    "check:convex-visibility": "tsx scripts/check-convex-visibility.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.38.2",

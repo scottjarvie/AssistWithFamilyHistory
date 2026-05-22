@@ -45,6 +45,7 @@ steps=(
   "check:place-era-packs"
   "check:protected-routes"
   "check:person-identifiers"
+  "check:convex-visibility"
   "build"
 )
 
