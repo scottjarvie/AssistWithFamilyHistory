@@ -9,6 +9,8 @@
     "start": "next start --port 3443",
     "test": "tsx scripts/test-vault-core.ts && tsx scripts/check-import-regression.ts",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "verify": "bash scripts/verify.sh",
     "check:api-inventory": "tsx scripts/check-api-inventory.ts",
     "check:capture-validation": "tsx scripts/check-capture-validation.ts",
     "check:intake-envelope": "tsx scripts/check-intake-envelope.ts",
