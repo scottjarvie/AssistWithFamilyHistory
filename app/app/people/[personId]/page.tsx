@@ -246,6 +246,11 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
                   <div className="border border-stone-200 bg-stone-50 px-3 py-4">
                     <p className="text-2xl font-semibold text-stone-900">{workspace.contextCoverage.count}</p>
                     <p className="text-xs text-stone-500">context reports</p>
+                    {workspace.contextCoverage.count > 0 ? (
+                      <p className="mt-2 text-[11px] uppercase tracking-[0.14em] text-stone-400">
+                        {workspace.contextCoverage.aiEligibleCount} reviewed for AI · {workspace.contextCoverage.publishableCount} publish-ready
+                      </p>
+                    ) : null}
                   </div>
                   <div className="border border-stone-200 bg-stone-50 px-3 py-4">
                     <p className="text-2xl font-semibold text-stone-900">
@@ -260,14 +265,38 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
                       This person has genealogy data, but no linked contextual research reports yet. Add place and era context from the relevant place workspaces before treating the story as ready.
                     </div>
                   ) : (
-                    workspace.contextCoverage.entries.slice(0, 4).map((entry) => (
-                      <div key={String(entry._id)} className="border border-stone-200 px-4 py-3">
-                        <p className="font-medium text-stone-900">{entry.title}</p>
-                        <p className="mt-1 text-sm text-stone-500">
-                          {entry.topic.replace(/_/g, " ")} · {entry.timePeriod.startYear}-{entry.timePeriod.endYear}
-                        </p>
-                      </div>
-                    ))
+                    workspace.contextCoverage.entries.slice(0, 4).map((entry) => {
+                      const reviewStatus = entry.reviewStatus ?? "unreviewed";
+                      const privacyLevel = entry.privacyLevel ?? "private";
+                      const aiAllowed = entry.aiUseAllowed === true;
+                      const reviewTone =
+                        reviewStatus === "reviewed" || reviewStatus === "redacted"
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                          : reviewStatus === "disputed" || reviewStatus === "rejected"
+                            ? "border-rose-200 bg-rose-50 text-rose-800"
+                            : "border-amber-200 bg-amber-50 text-amber-800";
+                      const privacyTone =
+                        privacyLevel === "public_source" || privacyLevel === "publish_candidate"
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                          : privacyLevel === "private"
+                            ? "border-rose-200 bg-rose-50 text-rose-800"
+                            : "border-stone-200 bg-stone-50 text-stone-700";
+                      return (
+                        <div key={String(entry._id)} className="border border-stone-200 px-4 py-3">
+                          <p className="font-medium text-stone-900">{entry.title}</p>
+                          <p className="mt-1 text-sm text-stone-500">
+                            {entry.topic.replace(/_/g, " ")} · {entry.timePeriod.startYear}-{entry.timePeriod.endYear}
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            <Badge variant="outline" className={reviewTone}>{reviewStatus}</Badge>
+                            <Badge variant="outline" className={privacyTone}>{privacyLevel.replace(/_/g, " ")}</Badge>
+                            <Badge variant="outline" className={aiAllowed ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-stone-200 bg-stone-50 text-stone-600"}>
+                              AI {aiAllowed ? "allowed" : "blocked"}
+                            </Badge>
+                          </div>
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               </CardContent>
