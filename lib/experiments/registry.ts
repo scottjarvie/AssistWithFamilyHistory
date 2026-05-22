@@ -62,7 +62,7 @@ export const experimentDefinitions = [
       "Context packs should cite public history sources or reviewed vault context.",
       "Generated context should remain separate from evidence-backed person facts.",
     ],
-    reviewSignals: ["Pack template approved", "Attachment model defined", "Context-pack output reviewed"],
+    reviewSignals: ["Locality-era template defined", "Attachment model defined", "Context-pack output reviewed"],
   },
   {
     id: "timeline-builder",

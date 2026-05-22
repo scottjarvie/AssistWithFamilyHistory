@@ -30,6 +30,7 @@ This directory keeps project documentation out of the repository root and separa
 - [Convex deployment checklist](deployment/convex-checklist.md)
 - [FamilySearch console extractor](importing/familysearch-console-extractor.md)
 - [FamilySearch console extractor quickstart](importing/familysearch-console-extractor-quickstart.md)
+- [Place and era research packs](context/place-era-research-packs.md)
 
 ## Archive
 
