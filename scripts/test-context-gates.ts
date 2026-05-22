@@ -12,6 +12,7 @@
 
 import assert from "node:assert/strict";
 import {
+  isContextPackEligibleContextItem,
   isContextPackEligibleHistoricalContext,
   isPublishablePublicHistoricalContext,
 } from "@/convex/vault";
@@ -86,6 +87,58 @@ assert.equal(
   ),
   false,
   "Publish gate: unreviewed should NOT pass even with public_source"
+);
+
+// -- 1b. ContextItem AI gate (GEN-71) -----------------------------------
+
+type ContextItemEntry = Parameters<typeof isContextPackEligibleContextItem>[0];
+
+function ctxItem(overrides: Partial<ContextItemEntry>): ContextItemEntry {
+  return {
+    _id: "fixture" as ContextItemEntry["_id"],
+    _creationTime: 0,
+    vaultOwnerId: "fixture",
+    title: "fixture",
+    itemType: "note",
+    evidenceRole: "raw_material",
+    content: "fixture",
+    personIds: [],
+    privacyLevel: "private",
+    reviewStatus: "unreviewed",
+    aiUseAllowed: false,
+    createdAt: 0,
+    updatedAt: 0,
+    ...overrides,
+  } as ContextItemEntry;
+}
+
+assert.equal(
+  isContextPackEligibleContextItem(
+    ctxItem({ reviewStatus: "reviewed", privacyLevel: "family_review", aiUseAllowed: true })
+  ),
+  true,
+  "ContextItem gate: reviewed + family_review + aiAllowed should pass"
+);
+assert.equal(
+  isContextPackEligibleContextItem(
+    ctxItem({ reviewStatus: "reviewed", privacyLevel: "family_review", aiUseAllowed: false })
+  ),
+  false,
+  "ContextItem gate: aiUseAllowed:false must block even when reviewed + non-private (the GEN-71 fix)"
+);
+assert.equal(
+  isContextPackEligibleContextItem(
+    ctxItem({ reviewStatus: "reviewed", privacyLevel: "private", aiUseAllowed: true })
+  ),
+  false,
+  "ContextItem gate: private must block even when reviewed + aiAllowed"
+);
+assert.equal(
+  isContextPackEligibleContextItem(
+    ctxItem({ reviewStatus: "unreviewed", privacyLevel: "family_review", aiUseAllowed: true })
+  ),
+  false,
+  "ContextItem gate: unreviewed must block even when non-private + aiAllowed"
 );
 
 // -- 2. Publish safety with publishableCount ----------------------------

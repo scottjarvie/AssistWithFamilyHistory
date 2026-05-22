@@ -442,10 +442,13 @@ function isPublicStoryMedia(item: Doc<"media">) {
   );
 }
 
-function isContextPackEligibleContextItem(item: Doc<"contextItems">) {
+// GEN-71: contextItems schema requires `aiUseAllowed: v.boolean()` (non-optional).
+// The earlier gate ignored it, silently bypassing the user's explicit AI opt-out
+// for loose context. Now mirrors the historicalContext AI gate shape.
+export function isContextPackEligibleContextItem(item: Doc<"contextItems">) {
   const reviewed = item.reviewStatus === "reviewed" || item.reviewStatus === "redacted";
   const notPrivate = item.privacyLevel !== "private";
-  return reviewed && notPrivate;
+  return item.aiUseAllowed === true && reviewed && notPrivate;
 }
 
 function getStoryWorkflowStatus(params: {
