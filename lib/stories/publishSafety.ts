@@ -40,6 +40,12 @@ export type StoryPublishSafetyInput = {
   }>;
   contextCoverage?: {
     count?: number;
+    // Filtered subset cleared for AI-assisted writing (reviewed + non-private + aiUseAllowed).
+    aiEligibleCount?: number;
+    // Filtered subset cleared for public publication (publish_candidate or
+    // public_source privacy, reviewed status). When provided, the publish
+    // gate requires this rather than the raw `count`.
+    publishableCount?: number;
     status?: string;
     relatedPlaceCount?: number;
     placeCountWithContext?: number;
@@ -220,6 +226,13 @@ export function assessStoryPublishReadiness(input: StoryPublishSafetyInput): Sto
   const citations = totalCitationCount(input);
   const requiredMissingCount = normalizeCount(input.readiness?.requiredMissingCount);
   const contextReports = normalizeCount(input.contextCoverage?.count);
+  // When the caller can distinguish publishable from recorded context, gate
+  // public publication on the publishable count. Falling back to `contextReports`
+  // preserves behavior for callers that haven't been updated yet.
+  const publishableContextReports =
+    input.contextCoverage?.publishableCount !== undefined
+      ? normalizeCount(input.contextCoverage.publishableCount)
+      : contextReports;
   const provisionalRelatives = (input.provisionalRelatives ?? []).filter(
     (relative) => relative.mergeState === undefined || relative.mergeState === "provisional"
   ).length;
@@ -287,7 +300,7 @@ export function assessStoryPublishReadiness(input: StoryPublishSafetyInput): Sto
   );
 
   gates.push(
-    contextReports > 0
+    publishableContextReports > 0
       ? makeGate(
           "context",
           "Historical context",
@@ -297,13 +310,21 @@ export function assessStoryPublishReadiness(input: StoryPublishSafetyInput): Sto
             : "Historical context is linked to the story's person and places.",
           missingContextPlaces > 0 ? "researcher" : "reviewer"
         )
-      : makeGate(
-          "context",
-          "Historical context",
-          "blocker",
-          "Add at least one place, era, locality, church, building, or news context report before publishing.",
-          "researcher"
-        )
+      : contextReports > 0
+        ? makeGate(
+            "context",
+            "Historical context",
+            "blocker",
+            `${contextReports} context report${contextReports === 1 ? "" : "s"} exist for this person but none are reviewed at publish-candidate or public-source privacy yet. Promote at least one before publishing.`,
+            "researcher"
+          )
+        : makeGate(
+            "context",
+            "Historical context",
+            "blocker",
+            "Add at least one place, era, locality, church, building, or news context report before publishing.",
+            "researcher"
+          )
   );
 
   gates.push(

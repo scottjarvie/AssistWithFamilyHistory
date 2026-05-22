@@ -272,6 +272,10 @@ function overlapsPersonYears(
   return entry.timePeriod.endYear >= startYear && entry.timePeriod.startYear <= endYear;
 }
 
+// AI-export gate: only research packs explicitly reviewed, non-private, and
+// flagged for AI use may flow into the context-pack export consumed by
+// Story Writer and other AI surfaces. This is *not* a visibility gate — the
+// human reviewer needs to see the unreviewed and private rows to act on them.
 function isContextPackEligibleHistoricalContext(entry: Doc<"historicalContext">) {
   const privacyLevel = entry.privacyLevel ?? "private";
   const reviewStatus = entry.reviewStatus ?? "unreviewed";
@@ -283,19 +287,37 @@ function isContextPackEligibleHistoricalContext(entry: Doc<"historicalContext">)
   );
 }
 
+// Public-publish gate: stricter than AI eligibility. A row may be allowed for
+// AI use inside the vault (e.g. family_review) but still must not appear on a
+// public story page until it carries an explicit publish-candidate or
+// public-source privacy level and a reviewed status.
+function isPublishablePublicHistoricalContext(entry: Doc<"historicalContext">) {
+  const privacyLevel = entry.privacyLevel ?? "private";
+  const reviewStatus = entry.reviewStatus ?? "unreviewed";
+
+  return (
+    (privacyLevel === "publish_candidate" || privacyLevel === "public_source") &&
+    (reviewStatus === "reviewed" || reviewStatus === "redacted")
+  );
+}
+
 function buildContextCoverage(
   snapshot: VaultSnapshot,
   person: Doc<"persons">,
   operations: ReturnType<typeof buildPersonOperations>
 ) {
   const placeIds = new Set(operations.relatedPlaces.map((place) => String(place._id)));
+  // `entries` is the full set of context the human reviewer needs to see for
+  // this person. AI-eligibility and public-publish gates are derived below
+  // and applied only at their respective boundaries.
   const entries = sortByTimestampDesc(
     snapshot.historicalContext.filter((entry) => {
-      if (!isContextPackEligibleHistoricalContext(entry)) return false;
       if (!overlapsPersonYears(entry, person)) return false;
       return !entry.placeId || placeIds.has(String(entry.placeId));
     })
   );
+  const aiEligibleEntries = entries.filter(isContextPackEligibleHistoricalContext);
+  const publishableEntries = entries.filter(isPublishablePublicHistoricalContext);
   const placeIdsWithContext = new Set(
     entries
       .filter((entry) => entry.placeId)
@@ -309,6 +331,10 @@ function buildContextCoverage(
   return {
     entries,
     count: entries.length,
+    aiEligibleEntries,
+    aiEligibleCount: aiEligibleEntries.length,
+    publishableEntries,
+    publishableCount: publishableEntries.length,
     topics,
     relatedPlaceCount: operations.relatedPlaces.length,
     placeCountWithContext: placeIdsWithContext.size,
@@ -524,7 +550,13 @@ function buildStoryBundle(
     reviewHistory: sortByTimestampDesc(
       snapshot.storyReviewEvents.filter((entry) => entry.storyId === story._id)
     ).slice(0, 12),
-    historicalContext: contextCoverage?.entries.slice(0, 8) ?? [],
+    // Story review (internal) sees every entry that overlaps this person so
+    // the reviewer can act on unreviewed/private rows. Public story pages get
+    // a stricter publish gate so family_review or unreviewed packs never leak
+    // to readers.
+    historicalContext: options.publicView
+      ? contextCoverage?.publishableEntries.slice(0, 8) ?? []
+      : contextCoverage?.entries.slice(0, 8) ?? [],
     relatedStories: person
       ? sortByTimestampDesc(
           snapshot.stories.filter(
@@ -1398,7 +1430,10 @@ export const getContextPack = query({
       sourceFacts: workspace.sourceFacts,
       reviewedContextItems: workspace.contextItems.filter(isContextPackEligibleContextItem),
       documents: workspace.documents,
-      historicalContext: workspace.contextCoverage.entries,
+      // AI surface: only ship reviewed, non-private, AI-allowed packs to the
+      // structured context bundle. Unreviewed/private rows stay visible on
+      // human-facing surfaces (person workspace, audit) via `entries`.
+      historicalContext: workspace.contextCoverage.aiEligibleEntries,
       stories: workspace.stories,
       evidenceTrace,
       storyClaimReadiness,
@@ -1463,8 +1498,8 @@ export const getContextPack = query({
       "",
       "## Historical and Local Context",
       "",
-      ...(workspace.contextCoverage.entries.length > 0
-        ? workspace.contextCoverage.entries.flatMap((entry) => [
+      ...(workspace.contextCoverage.aiEligibleEntries.length > 0
+        ? workspace.contextCoverage.aiEligibleEntries.flatMap((entry) => [
             `- ${entry.title} (${entry.topic.replace(/_/g, " ")}, ${entry.timePeriod.startYear}-${entry.timePeriod.endYear})`,
             `  - Review/privacy: ${entry.reviewStatus ?? "unreviewed"} / ${entry.privacyLevel ?? "private"}; AI use: ${entry.aiUseAllowed === true ? "allowed" : "blocked"}`,
             entry.packType
