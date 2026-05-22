@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import { SafeLink, SafeAnchor } from "@/components/layout/SafeLink";
 import {
   ArrowLeft,
   ArrowRight,
@@ -97,14 +97,13 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
 
   return (
     <div className="p-4 sm:p-8">
-      <Link
+      <SafeLink
         href="/app/people"
         className="mb-5 inline-flex items-center gap-2 text-sm text-stone-500 hover:text-stone-900"
-        suppressHydrationWarning
       >
         <ArrowLeft className="h-4 w-4" />
         Back to People
-      </Link>
+      </SafeLink>
 
       <section className="rounded-[2rem] border border-stone-200 bg-white px-6 py-6 shadow-sm sm:px-8">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
@@ -121,13 +120,13 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
               <Button asChild className="bg-amber-700 hover:bg-amber-800">
-                <Link href={`/app/people/${routeId}/ai`} suppressHydrationWarning>Run AI Analysis</Link>
+                <SafeLink href={`/app/people/${routeId}/ai`}>Run AI Analysis</SafeLink>
               </Button>
               <Button asChild variant="outline">
-                <a href={`/api/people/${routeId}/context-pack?format=markdown`} suppressHydrationWarning>Download Context Pack</a>
+                <SafeAnchor href={`/api/people/${routeId}/context-pack?format=markdown`}>Download Context Pack</SafeAnchor>
               </Button>
               <Button asChild variant="outline">
-                <a href={`/api/people/${routeId}/context-pack`} suppressHydrationWarning>Structured JSON</a>
+                <SafeAnchor href={`/api/people/${routeId}/context-pack`}>Structured JSON</SafeAnchor>
               </Button>
             </div>
           </div>
@@ -192,14 +191,14 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
                 </div>
                 <div className="mt-5 flex flex-wrap gap-3">
                   <Button asChild className="bg-amber-700 hover:bg-amber-800">
-                    <Link href={`/app/people/${routeId}/story-writer`} suppressHydrationWarning>Draft from context pack</Link>
+                    <SafeLink href={`/app/people/${routeId}/story-writer`}>Draft from context pack</SafeLink>
                   </Button>
                   <Button asChild variant="outline">
-                    <Link href="/app/stories" suppressHydrationWarning>Open Story Studio</Link>
+                    <SafeLink href="/app/stories">Open Story Studio</SafeLink>
                   </Button>
                   {currentStory ? (
                     <Button asChild variant="outline">
-                      <Link href={`/app/stories/${currentStory._id}`} suppressHydrationWarning>Review latest saved story</Link>
+                      <SafeLink href={`/app/stories/${currentStory._id}`}>Review latest saved story</SafeLink>
                     </Button>
                   ) : null}
                 </div>
@@ -420,15 +419,14 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
                 },
               ].map((action) =>
                 action.available ? (
-                  <a
+                  <SafeAnchor
                     key={action.label}
                     href={action.href}
-                    suppressHydrationWarning
                     className="rounded-2xl border border-stone-200 bg-white px-4 py-4 transition hover:border-amber-300 hover:bg-amber-50/70"
                   >
                     <p className="font-medium text-stone-900">{action.label}</p>
                     <p className="mt-2 text-sm leading-6 text-stone-500">{action.description}</p>
-                  </a>
+                  </SafeAnchor>
                 ) : (
                   <div
                     key={action.label}
@@ -498,10 +496,10 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
                       </div>
                       {entry.source.url ? (
                         <Button asChild variant="outline" size="sm">
-                          <a href={entry.source.url} target="_blank" rel="noreferrer" suppressHydrationWarning>
+                          <SafeAnchor href={entry.source.url} target="_blank" rel="noreferrer">
                             Open Source
                             <ArrowRight className="ml-2 h-4 w-4" />
-                          </a>
+                          </SafeAnchor>
                         </Button>
                       ) : null}
                     </div>
@@ -619,14 +617,14 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
               />
             ) : (
               (workspace.places as Array<{ _id: string; fullName?: string; name?: string; type?: string }>).map((place) => (
-                <Link key={place._id} href={`/app/places/${place._id}`} suppressHydrationWarning>
+                <SafeLink key={place._id} href={`/app/places/${place._id}`}>
                   <Card className="h-full border-stone-200 transition hover:border-amber-300 hover:bg-amber-50/30">
                     <CardHeader>
                       <CardTitle>{place.fullName || place.name || "Unknown place"}</CardTitle>
                       <CardDescription>{place.type || "place"}</CardDescription>
                     </CardHeader>
                   </Card>
-                </Link>
+                </SafeLink>
               ))
             )}
           </div>
@@ -657,10 +655,10 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
             <CardContent className="space-y-4">
               <div className="flex flex-wrap gap-3">
                 <Button asChild variant="outline">
-                  <Link href={`/app/people/${personId}/raw`} suppressHydrationWarning>Raw Evidence Document</Link>
+                  <SafeLink href={`/app/people/${personId}/raw`}>Raw Evidence Document</SafeLink>
                 </Button>
                 <Button asChild variant="outline">
-                  <Link href={`/app/people/${personId}/contextualized`} suppressHydrationWarning>Contextualized Dossier</Link>
+                  <SafeLink href={`/app/people/${personId}/contextualized`}>Contextualized Dossier</SafeLink>
                 </Button>
               </div>
               <DocumentsViewer personId={workspace.person.fsId || String(workspace.person._id)} />
@@ -677,7 +675,7 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
               </CardHeader>
               <CardContent>
                 <Button asChild className="bg-amber-700 hover:bg-amber-800">
-                  <Link href={`/app/people/${routeId}/story-writer`} suppressHydrationWarning>Open Story Writer</Link>
+                  <SafeLink href={`/app/people/${routeId}/story-writer`}>Open Story Writer</SafeLink>
                 </Button>
               </CardContent>
             </Card>
@@ -698,11 +696,11 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
                     <p className="whitespace-pre-wrap text-sm text-stone-600">{story.content}</p>
                     <div className="flex flex-wrap gap-3">
                       <Button asChild variant="outline" size="sm">
-                        <Link href={`/app/stories/${story._id}`} suppressHydrationWarning>Review in Story Studio</Link>
+                        <SafeLink href={`/app/stories/${story._id}`}>Review in Story Studio</SafeLink>
                       </Button>
                       {story.status === "published" ? (
                         <Button asChild variant="outline" size="sm">
-                          <Link href={publicStoryPath(story.publicSlug ?? String(story._id))} target="_blank" suppressHydrationWarning>Open public page</Link>
+                          <SafeLink href={publicStoryPath(story.publicSlug ?? String(story._id))} target="_blank">Open public page</SafeLink>
                         </Button>
                       ) : null}
                     </div>
@@ -807,7 +805,7 @@ function EmptyWorkspaceState({
         <p className="mt-2 max-w-xl text-sm leading-6 text-stone-500">{description}</p>
         {actionHref && actionLabel ? (
           <Button asChild variant="outline" className="mt-5">
-            <Link href={actionHref} suppressHydrationWarning>{actionLabel}</Link>
+            <SafeLink href={actionHref}>{actionLabel}</SafeLink>
           </Button>
         ) : null}
       </CardContent>
