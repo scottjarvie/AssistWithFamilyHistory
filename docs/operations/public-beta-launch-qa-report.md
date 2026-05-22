@@ -73,3 +73,43 @@ The active vault did not initially have a publishable story. The only story was 
 - This was a local/dev fixture-style QA candidate, not a production-data privacy sweep.
 - GEN-23 still needs broader privacy/security review before wider beta.
 - GEN-3 should still create reusable fixture data in the repo so future agents do not have to prepare dev-vault QA data manually.
+
+## 2026-05-22 — Re-verification after context-gate split
+
+A follow-up audit pass landed eight commits between Codex's `0f9e2d0` and `89dba57`, including the AI/publish gate split in `buildContextCoverage` (commit `9246cb2`). Re-running the GEN-48 contract gates and route smoke against the resulting branch to confirm the launch surface still holds:
+
+### Code-side gate verification
+
+- The public story bundle continues to use `publishableEntries` (strict gate: `privacyLevel ∈ {publish_candidate, public_source} ∧ reviewStatus ∈ {reviewed, redacted}`). The internal review page sees `entries` (unfiltered) so the reviewer can act on unreviewed/private rows, but the public route bundle is gated separately — confirmed in `convex/vault.ts` `buildStoryBundle` at the `options.publicView` branch.
+- `publicStoryPolicy.buildPublicStoryMetadata` still defaults to `noindex` unless `publicIndexing === "index"`. No change to the policy.
+- `assessStoryPublishReadiness` was extended to consume `publishableCount` when the bundle supplies it (commit `9246cb2`). New blocker message: "X context report(s) exist for this person but none are reviewed at publish-candidate or public-source privacy yet" — a strict gate that did not exist before.
+- The GEN-65 Story Review fallback that exposes "currently available" packs to a draft without `contextPackIds` runs only on the internal review page (`app/app/stories/[storyId]/page.tsx`). The public route (`app/stories/[id]/page.tsx`) does not consult that branch.
+
+### Re-run gates
+
+All public-story and privacy gates pass on the current branch:
+
+- `pnpm check:public-story-policy` ✅
+- `pnpm check:public-story-e2e` ✅
+- `pnpm check:public-beta-launch` ✅
+- `pnpm check:story-publish` ✅
+- `pnpm check:story-slugs` ✅
+- `pnpm check:story-capabilities` ✅
+- `pnpm check:privacy-ai-safety` ✅
+- `pnpm check:review-gates` ✅
+- `pnpm check:story-fixtures` ✅
+- `pnpm check:protected-routes` ✅
+- `pnpm lint`, `pnpm test`, `pnpm build` ✅
+- `BASE_URL=http://127.0.0.1:3443 PERSON_ROUTE_ID=KWCJ-4XD pnpm smoke:routes` ✅ (17/17 routes)
+
+### Route probes
+
+The Codex QA candidate `m174j3nwcsf1wacdkxsrv5kzfd83tn9a` was rolled back to `review`, so:
+
+- `/stories/<rolled-back-id>` returns 404 (expected — the policy gate fires before render).
+- `/stories/nonexistent-slug` returns 404 (404 fallback works).
+- All 17 protected route smokes pass against `KWCJ-4XD`.
+
+### Production-data sweep status
+
+Still **not done**. This requires a logged-in session against a real owner vault with reviewed published stories, not the local dev fixture. Per the privacy sweep checklist `docs/operations/public-story-privacy-sweep-checklist.md`, the production-data section ("Sample recent imported FamilySearch Capture records for private notes and living-person indicators") needs a human operator with the right access. Keep GEN-48 In Review until that pass happens.
