@@ -1,14 +1,37 @@
+/**
+ * Story slug/share contract check.
+ *
+ * Two assertion styles, labeled inline:
+ *
+ * 1. Behavioral: imports the real helper functions and exercises them
+ *    against fixture inputs. A refactor that preserves observable behavior
+ *    will NOT break these.
+ *
+ * 2. Structural integration: string-match against `convex/` schema/queries
+ *    and `app/stories/[id]/*` routes to assert *that the integration
+ *    exists* (e.g. "the public route redirects to canonical slug"). These
+ *    cannot be expressed as pure-function behavior, and a full e2e would
+ *    overlap with `pnpm smoke:routes`. The string match is intentional and
+ *    catches "file X stopped using function Y" — a real regression.
+ *
+ * See GEN-63 for the broader contract-check pattern.
+ */
+
 import { readFileSync } from "fs";
 import path from "path";
 import { buildStoryPublicSlug, getStoryIdSuffix, publicStoryPath, slugifyStoryPart } from "../lib/stories/slug";
 import { buildPublicStoryMetadata, buildPublicStorySharePreview } from "../lib/stories/publicStoryPolicy";
 
 const failures: string[] = [];
+
+// -- 2. Structural integration sources -----------------------------------
 const schema = readFileSync(path.join(process.cwd(), "convex", "schema.ts"), "utf8");
 const vaultQuery = readFileSync(path.join(process.cwd(), "convex", "vault.ts"), "utf8");
 const vaultMutations = readFileSync(path.join(process.cwd(), "convex", "vaultMutations.ts"), "utf8");
 const publicRoute = readFileSync(path.join(process.cwd(), "app", "stories", "[id]", "page.tsx"), "utf8");
 const ogRoute = readFileSync(path.join(process.cwd(), "app", "stories", "[id]", "opengraph-image.tsx"), "utf8");
+
+// -- 1. Behavioral assertions --------------------------------------------
 
 if (slugifyStoryPart("Élodie & John: A Family Story!") !== "elodie-john-a-family-story") {
   failures.push("Slugify should normalize accents and punctuation");
