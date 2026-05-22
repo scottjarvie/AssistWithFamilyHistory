@@ -20,7 +20,9 @@ type VaultSnapshot = {
   sources: Doc<"sources">[];
   citations: Doc<"citations">[];
   citationLinks: Doc<"citationLinks">[];
+  sourceFacts: Doc<"sourceFacts">[];
   media: Doc<"media">[];
+  contextItems: Doc<"contextItems">[];
   importRuns: Doc<"importRuns">[];
   researchTasks: Doc<"researchTasks">[];
   researchLog: Doc<"researchLog">[];
@@ -52,7 +54,9 @@ async function getVaultSnapshot(ctx: QueryCtx, vaultOwnerId: string): Promise<Va
     sources,
     citations,
     citationLinks,
+    sourceFacts,
     media,
+    contextItems,
     importRuns,
     researchTasks,
     researchLog,
@@ -71,7 +75,9 @@ async function getVaultSnapshot(ctx: QueryCtx, vaultOwnerId: string): Promise<Va
     ctx.db.query("sources").collect(),
     ctx.db.query("citations").collect(),
     ctx.db.query("citationLinks").collect(),
+    ctx.db.query("sourceFacts").collect(),
     ctx.db.query("media").collect(),
+    ctx.db.query("contextItems").collect(),
     ctx.db.query("importRuns").collect(),
     ctx.db.query("researchTasks").collect(),
     ctx.db.query("researchLog").collect(),
@@ -92,7 +98,9 @@ async function getVaultSnapshot(ctx: QueryCtx, vaultOwnerId: string): Promise<Va
     sources: owned(sources),
     citations: owned(citations),
     citationLinks: owned(citationLinks),
+    sourceFacts: owned(sourceFacts),
     media: owned(media),
+    contextItems: owned(contextItems),
     importRuns: owned(importRuns),
     researchTasks: owned(researchTasks),
     researchLog: owned(researchLog),
@@ -192,6 +200,8 @@ function buildPersonOperations(snapshot: VaultSnapshot, person: Doc<"persons">) 
     (relationship) => relationship.person1 === person._id || relationship.person2 === person._id
   );
   const personMedia = snapshot.media.filter((item) => item.personIds.includes(person._id));
+  const personContextItems = snapshot.contextItems.filter((item) => item.personIds.includes(person._id));
+  const personSourceFacts = snapshot.sourceFacts.filter((item) => item.personId === person._id);
   const personStories = snapshot.stories.filter((story) => story.personId === person._id);
   const personPlaces = getPersonPlaces(person, personEvents, snapshot.places);
   const personDocuments = snapshot.documents.filter(
@@ -237,6 +247,8 @@ function buildPersonOperations(snapshot: VaultSnapshot, person: Doc<"persons">) 
     relatedEvents: personEvents,
     relatedRelationships: personRelationships,
     relatedMedia: personMedia,
+    relatedContextItems: personContextItems,
+    relatedSourceFacts: personSourceFacts,
     relatedStories: personStories,
     relatedPlaces: personPlaces,
     relatedDocuments: personDocuments,
@@ -390,6 +402,12 @@ function isPublicStoryMedia(item: Doc<"media">) {
     rightsStatus !== "restricted" &&
     rightsStatus !== "unknown"
   );
+}
+
+function isContextPackEligibleContextItem(item: Doc<"contextItems">) {
+  const reviewed = item.reviewStatus === "reviewed" || item.reviewStatus === "redacted";
+  const notPrivate = item.privacyLevel !== "private";
+  return reviewed && notPrivate;
 }
 
 function getStoryWorkflowStatus(params: {
@@ -594,6 +612,7 @@ async function assemblePersonWorkspace(
     ),
     importRuns: operations.relatedImportRuns,
     sources: sourceRecords.groupedSources,
+    sourceFacts: sortByTimestampDesc(operations.relatedSourceFacts),
     citations: sourceRecords.citations,
     events: operations.relatedEvents,
     timeline: [...operations.relatedEvents].sort(
@@ -611,6 +630,7 @@ async function assemblePersonWorkspace(
         : null;
     }).filter(Boolean),
     media: sortByTimestampDesc(operations.relatedMedia),
+    contextItems: sortByTimestampDesc(operations.relatedContextItems),
     places: operations.relatedPlaces,
     contextCoverage,
     provisionalRelatives: sortByTimestampDesc(operations.provisionalRelatives),
@@ -1363,6 +1383,8 @@ export const getContextPack = query({
       provisionalRelatives: workspace.provisionalRelatives,
       sources: workspace.sources,
       memories: workspace.media,
+      sourceFacts: workspace.sourceFacts,
+      reviewedContextItems: workspace.contextItems.filter(isContextPackEligibleContextItem),
       documents: workspace.documents,
       historicalContext: workspace.contextCoverage.entries,
       stories: workspace.stories,
@@ -1454,6 +1476,24 @@ export const getContextPack = query({
             ),
           ])
         : ["- No source-backed claims are linked yet."]),
+      "",
+      "## Source-Backed Facts",
+      "",
+      ...(workspace.sourceFacts.length > 0
+        ? workspace.sourceFacts.slice(0, 24).map(
+            (fact) =>
+              `- ${fact.factType}: ${fact.value} (${fact.label}, ${fact.confidence}, ${fact.status})${fact.conflictReason ? ` - ${fact.conflictReason}` : ""}`
+          )
+        : ["- No indexed source facts have been extracted yet."]),
+      "",
+      "## Reviewed Loose Context",
+      "",
+      ...(workspace.contextItems.filter(isContextPackEligibleContextItem).length > 0
+        ? workspace.contextItems.filter(isContextPackEligibleContextItem).slice(0, 12).map(
+            (item) =>
+              `- ${item.title} (${item.itemType}, ${item.evidenceRole}, AI use: ${item.aiUseAllowed ? "allowed" : "blocked"})`
+          )
+        : ["- No reviewed loose-context items are eligible for context packs yet."]),
       "",
       "## Memories",
       "",

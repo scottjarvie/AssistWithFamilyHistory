@@ -79,6 +79,17 @@ Recommended implementation issues:
 - Add provider-specific dedupe key policy.
 - Add rights/privacy review for uploaded and provider-linked media.
 
+## Current Envelope Fixtures
+
+The repo now includes a provider-neutral intake envelope contract in `lib/intake/envelope.ts`.
+
+Fixtures:
+
+- `tests/fixtures/intake/familysearch-envelope.json`
+- `tests/fixtures/intake/gedcom-envelope.json`
+
+The FamilySearch browser capture adapter is represented by `familySearchCaptureToIntakeEnvelope`. New providers should target the envelope first, then use a separate review/merge layer to write canonical Convex records.
+
 ## Verification
 
 Run before and after provider-neutral intake work:
@@ -87,5 +98,6 @@ Run before and after provider-neutral intake work:
 pnpm check:familysearch-readiness-contract
 pnpm check:capture-validation
 pnpm check:familysearch-capture
+pnpm check:intake-envelope
 pnpm lint
 ```

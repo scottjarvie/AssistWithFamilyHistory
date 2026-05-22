@@ -90,6 +90,74 @@ const historicalContextTopicValidator = v.union(
 
 const storyStatusValidator = v.union(v.literal("draft"), v.literal("review"), v.literal("published"));
 
+const sourceFactTypeValidator = v.union(
+  v.literal("name"),
+  v.literal("sex"),
+  v.literal("birth"),
+  v.literal("death"),
+  v.literal("marriage"),
+  v.literal("census_residence"),
+  v.literal("residence"),
+  v.literal("occupation"),
+  v.literal("other")
+);
+
+const sourceFactStatusValidator = v.union(
+  v.literal("candidate"),
+  v.literal("accepted"),
+  v.literal("conflict"),
+  v.literal("rejected")
+);
+
+const contextItemTypeValidator = v.union(
+  v.literal("note"),
+  v.literal("document_ref"),
+  v.literal("research_snippet"),
+  v.literal("memory_note"),
+  v.literal("place_context"),
+  v.literal("building_context"),
+  v.literal("generated_summary"),
+  v.literal("other")
+);
+
+const contextEvidenceRoleValidator = v.union(
+  v.literal("raw_material"),
+  v.literal("researcher_conclusion"),
+  v.literal("generated_summary"),
+  v.literal("lead_or_hint"),
+  v.literal("background_context")
+);
+
+const privacyLevelValidator = v.union(
+  v.literal("private"),
+  v.literal("family_review"),
+  v.literal("publish_candidate"),
+  v.literal("public_source")
+);
+
+const mediaReviewStatusValidator = v.union(
+  v.literal("unreviewed"),
+  v.literal("reviewed"),
+  v.literal("redacted"),
+  v.literal("rejected")
+);
+
+const contextReviewStatusValidator = v.union(
+  v.literal("unreviewed"),
+  v.literal("reviewed"),
+  v.literal("disputed"),
+  v.literal("redacted"),
+  v.literal("rejected")
+);
+
+const rightsStatusValidator = v.union(
+  v.literal("unknown"),
+  v.literal("owned"),
+  v.literal("permitted"),
+  v.literal("public_domain"),
+  v.literal("restricted")
+);
+
 async function buildStorySlugForPerson(
   ctx: MutationCtx,
   params: {
@@ -648,6 +716,146 @@ export const upsertMedia = mutation({
     });
 
     return { mediaId, created: true };
+  },
+});
+
+export const upsertSourceFact = mutation({
+  args: {
+    vaultOwnerId: v.string(),
+    personId: v.id("persons"),
+    sourceId: v.id("sources"),
+    citationId: v.id("citations"),
+    importKey: v.string(),
+    factType: sourceFactTypeValidator,
+    label: v.string(),
+    value: v.string(),
+    date: v.optional(v.string()),
+    place: v.optional(v.string()),
+    confidence: v.union(v.literal("high"), v.literal("medium"), v.literal("low")),
+    status: sourceFactStatusValidator,
+    conflictReason: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const matches = await ctx.db
+      .query("sourceFacts")
+      .withIndex("by_import_key", (q) => q.eq("importKey", args.importKey))
+      .collect();
+    const existing = filterByVaultOwner(matches, vaultOwnerId)[0] ?? null;
+    const payload = {
+      ...args,
+      vaultOwnerId,
+      updatedAt: now,
+    };
+
+    if (existing) {
+      await ctx.db.patch(existing._id, payload);
+      return { sourceFactId: existing._id, created: false };
+    }
+
+    const sourceFactId = await ctx.db.insert("sourceFacts", {
+      ...payload,
+      createdAt: now,
+    });
+    return { sourceFactId, created: true };
+  },
+});
+
+export const reviewMedia = mutation({
+  args: {
+    vaultOwnerId: v.string(),
+    mediaId: v.id("media"),
+    privacyLevel: privacyLevelValidator,
+    reviewStatus: mediaReviewStatusValidator,
+    rightsStatus: rightsStatusValidator,
+    aiUseAllowed: v.boolean(),
+    privacyReviewNote: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const media = await ctx.db.get(args.mediaId);
+    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    if (!media || !matchesVaultOwner(media.vaultOwnerId, vaultOwnerId)) {
+      throw new Error("Media item not found");
+    }
+
+    await ctx.db.patch(args.mediaId, {
+      privacyLevel: args.privacyLevel,
+      reviewStatus: args.reviewStatus,
+      rightsStatus: args.rightsStatus,
+      aiUseAllowed: args.aiUseAllowed,
+      privacyReviewNote: args.privacyReviewNote,
+      reviewedAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+
+    return { mediaId: args.mediaId };
+  },
+});
+
+export const upsertContextItemForPerson = mutation({
+  args: {
+    vaultOwnerId: v.string(),
+    personIdentifier: v.string(),
+    title: v.string(),
+    itemType: contextItemTypeValidator,
+    evidenceRole: contextEvidenceRoleValidator,
+    content: v.string(),
+    sourceLabel: v.optional(v.string()),
+    sourceUrl: v.optional(v.string()),
+    provenanceNote: v.optional(v.string()),
+    privacyLevel: privacyLevelValidator,
+    reviewStatus: contextReviewStatusValidator,
+    aiUseAllowed: v.boolean(),
+    reviewNote: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const normalizedPersonId = ctx.db.normalizeId("persons", args.personIdentifier);
+    const person =
+      (normalizedPersonId ? await ctx.db.get(normalizedPersonId) : null) ??
+      filterByVaultOwner(
+        await ctx.db
+          .query("persons")
+          .withIndex("by_fsId", (q) => q.eq("fsId", args.personIdentifier))
+          .collect(),
+        vaultOwnerId
+      )[0] ??
+      null;
+
+    if (!person || !matchesVaultOwner(person.vaultOwnerId, vaultOwnerId)) {
+      throw new Error("Person not found");
+    }
+
+    const now = Date.now();
+    const contextItemId = await ctx.db.insert("contextItems", {
+      vaultOwnerId,
+      title: args.title,
+      itemType: args.itemType,
+      evidenceRole: args.evidenceRole,
+      content: args.content,
+      sourceLabel: args.sourceLabel,
+      sourceUrl: args.sourceUrl,
+      provenanceNote: args.provenanceNote,
+      primaryPersonId: person._id,
+      personIds: [person._id],
+      placeIds: [],
+      eventIds: [],
+      storyIds: [],
+      sourceIds: [],
+      privacyLevel: args.privacyLevel,
+      reviewStatus: args.reviewStatus,
+      aiUseAllowed: args.aiUseAllowed,
+      reviewNote: args.reviewNote,
+      reviewedAt:
+        args.reviewStatus === "reviewed" || args.reviewStatus === "redacted"
+          ? now
+          : undefined,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return { contextItemId };
   },
 });
 

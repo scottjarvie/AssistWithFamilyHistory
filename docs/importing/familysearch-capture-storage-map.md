@@ -77,6 +77,7 @@ The importer may auto-merge:
 - The primary person shell by `person.familySearchId`.
 - Source containers by `fs-source:<personFsId>:<sourceKey>`.
 - Evidence citations by `fs-citation:<personFsId>:<sourceKey>`.
+- Indexed source fields as citation-backed `sourceFacts` review candidates.
 - Event rows when the source title/indexed fields clearly imply a supported event type.
 - Places by normalized full name.
 - Related people and relationships only when the related person has a FamilySearch ID and the role is an obvious spouse, parent, or child.
@@ -92,6 +93,8 @@ The importer must not auto-merge:
 - Top-level place mentions without a linking model.
 - Source-indexed fields into canonical person facts beyond the current header birth/death fields without regression coverage.
 - Any data from an admin-mode or warning-heavy capture without visible human review.
+
+Source-backed facts are linked to the person, source, and citation. Conflicting source values create review work instead of silently overwriting canonical birth/death/name fields.
 
 ## Review And Follow-Up Gaps
 
@@ -111,6 +114,7 @@ Run after changing this contract or importer behavior:
 pnpm check:familysearch-readiness-contract
 pnpm check:capture-validation
 pnpm check:familysearch-capture
+pnpm check:source-facts
 pnpm check:api-inventory
 pnpm lint
 ```

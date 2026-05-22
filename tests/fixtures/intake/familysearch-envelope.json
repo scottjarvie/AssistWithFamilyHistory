@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "1.0",
+  "provider": "familysearch",
+  "providerRecordId": "fixture-familysearch-capture",
+  "capturedAt": "2026-05-21T12:00:00.000Z",
+  "subject": {
+    "externalId": "ABCD-123",
+    "name": "Alex Morgan",
+    "birthDate": "1890",
+    "deathDate": "1960"
+  },
+  "sources": [
+    {
+      "providerSourceId": "S1",
+      "sourceKey": "fs-source-1",
+      "title": "1910 Census",
+      "url": "https://www.familysearch.org/ark:/fixture",
+      "evidenceText": "Fictional census evidence for Alex Morgan.",
+      "indexedFields": [
+        { "label": "Name", "value": "Alex Morgan" },
+        { "label": "Event Place", "value": "Fictional County, Utah, United States" }
+      ]
+    }
+  ],
+  "relatedPeople": [
+    {
+      "name": "Jordan Morgan",
+      "role": "Spouse",
+      "sourceKey": "fs-source-1"
+    }
+  ],
+  "places": [
+    {
+      "name": "Fictional County",
+      "fullName": "Fictional County, Utah, United States",
+      "role": "Event Place",
+      "sourceKey": "fs-source-1"
+    }
+  ],
+  "media": [
+    {
+      "providerMediaId": "M1",
+      "title": "Fictional portrait",
+      "mediaType": "image/jpeg",
+      "privacySignal": "unknown",
+      "rightsSignal": "unknown"
+    }
+  ],
+  "diagnostics": {
+    "warnings": [],
+    "errors": [],
+    "rawArtifactRefs": [
+      "artifacts/capture/fixture-familysearch-capture.json"
+    ]
+  }
+}

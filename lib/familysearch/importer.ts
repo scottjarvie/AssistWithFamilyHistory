@@ -1,6 +1,7 @@
 import type { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
 import type { CaptureMemory, CapturePackage, CaptureSource } from "@/lib/familysearch/capture";
+import { extractFactsFromSource, findSourceFactConflicts } from "@/lib/familysearch/sourceFacts";
 
 type ImportArtifactPaths = {
   capturePackagePath?: string;
@@ -80,6 +81,12 @@ export async function importCapturePackageToConvex({
   };
 
   const placeCache = new Map<string, NormalizedPlace>();
+  const factConflicts = new Map(
+    findSourceFactConflicts(
+      capture,
+      capture.sources.flatMap((source) => extractFactsFromSource(source))
+    ).map((conflict) => [conflict.factKey, conflict])
+  );
 
   for (const source of capture.sources) {
     counts.sources += 1;
@@ -118,6 +125,25 @@ export async function importCapturePackageToConvex({
       targetId: personId,
       field: "imported_source",
     });
+
+    for (const fact of extractFactsFromSource(source)) {
+      const conflict = factConflicts.get(fact.factKey);
+      await client.mutation(api.vaultMutations.upsertSourceFact, {
+        vaultOwnerId,
+        personId: personResult.personId,
+        sourceId: sourceResult.sourceId,
+        citationId: citationResult.citationId,
+        importKey: `fs-fact:${capture.person.familySearchId}:${fact.factKey}`,
+        factType: fact.factType,
+        label: fact.label,
+        value: fact.value,
+        date: fact.date,
+        place: fact.place,
+        confidence: conflict ? "low" : fact.confidence,
+        status: conflict ? "conflict" : "candidate",
+        conflictReason: conflict?.reason,
+      });
+    }
 
     const sourcePlaces = source.placeMentions.length > 0 ? source.placeMentions : extractPlaceMentions(source);
     for (const placeMention of sourcePlaces) {
@@ -242,6 +268,21 @@ export async function importCapturePackageToConvex({
       type: "verification",
       title: "Review import warnings",
       description: warnings.join(" "),
+      priority: "high",
+    });
+  }
+
+  if (factConflicts.size > 0) {
+    await client.mutation(api.vaultMutations.ensureResearchTask, {
+      vaultOwnerId,
+      personId: personResult.personId,
+      type: "conflict_resolution",
+      title: "Review source-backed fact conflicts",
+      description: Array.from(factConflicts.values())
+        .map((conflict) =>
+          `${conflict.factType}: source says "${conflict.importedValue}" while the current person fact is "${conflict.canonicalValue || "unknown"}".`
+        )
+        .join(" "),
       priority: "high",
     });
   }

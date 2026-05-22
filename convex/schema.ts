@@ -490,6 +490,52 @@ export default defineSchema({
     .index("by_citation_and_target", ["citationId", "targetType", "targetId"]),
 
   /**
+   * SOURCE FACTS
+   * Citation-backed facts extracted from indexed source fields.
+   *
+   * These are candidates for review and traceability. They do not silently
+   * overwrite canonical person fields.
+   */
+  sourceFacts: defineTable({
+    vaultOwnerId: v.optional(v.string()),
+    personId: v.id("persons"),
+    sourceId: v.id("sources"),
+    citationId: v.id("citations"),
+    importKey: v.string(),
+    factType: v.union(
+      v.literal("name"),
+      v.literal("sex"),
+      v.literal("birth"),
+      v.literal("death"),
+      v.literal("marriage"),
+      v.literal("census_residence"),
+      v.literal("residence"),
+      v.literal("occupation"),
+      v.literal("other")
+    ),
+    label: v.string(),
+    value: v.string(),
+    date: v.optional(v.string()),
+    place: v.optional(v.string()),
+    confidence: v.union(v.literal("high"), v.literal("medium"), v.literal("low")),
+    status: v.union(
+      v.literal("candidate"),
+      v.literal("accepted"),
+      v.literal("conflict"),
+      v.literal("rejected")
+    ),
+    conflictReason: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner", ["vaultOwnerId"])
+    .index("by_person", ["personId"])
+    .index("by_source", ["sourceId"])
+    .index("by_citation", ["citationId"])
+    .index("by_import_key", ["importKey"])
+    .index("by_status", ["status"]),
+
+  /**
    * MEDIA
    * Photos, documents, scans, videos, audio
    */
@@ -568,6 +614,65 @@ export default defineSchema({
     .index("by_type", ["type"])
     .index("by_source", ["sourceId"])
     .index("by_import_key", ["importKey"]),
+
+  /**
+   * CONTEXT ITEMS
+   * Loose, review-first context: notes, snippets, documents, cemetery/building
+   * details, research clues, and generated summaries.
+   */
+  contextItems: defineTable({
+    vaultOwnerId: v.optional(v.string()),
+    title: v.string(),
+    itemType: v.union(
+      v.literal("note"),
+      v.literal("document_ref"),
+      v.literal("research_snippet"),
+      v.literal("memory_note"),
+      v.literal("place_context"),
+      v.literal("building_context"),
+      v.literal("generated_summary"),
+      v.literal("other")
+    ),
+    evidenceRole: v.union(
+      v.literal("raw_material"),
+      v.literal("researcher_conclusion"),
+      v.literal("generated_summary"),
+      v.literal("lead_or_hint"),
+      v.literal("background_context")
+    ),
+    content: v.string(),
+    sourceLabel: v.optional(v.string()),
+    sourceUrl: v.optional(v.string()),
+    provenanceNote: v.optional(v.string()),
+    primaryPersonId: v.optional(v.id("persons")),
+    personIds: v.array(v.id("persons")),
+    placeIds: v.optional(v.array(v.id("places"))),
+    eventIds: v.optional(v.array(v.id("events"))),
+    storyIds: v.optional(v.array(v.id("stories"))),
+    sourceIds: v.optional(v.array(v.id("sources"))),
+    privacyLevel: v.union(
+      v.literal("private"),
+      v.literal("family_review"),
+      v.literal("publish_candidate"),
+      v.literal("public_source")
+    ),
+    reviewStatus: v.union(
+      v.literal("unreviewed"),
+      v.literal("reviewed"),
+      v.literal("disputed"),
+      v.literal("redacted"),
+      v.literal("rejected")
+    ),
+    aiUseAllowed: v.boolean(),
+    reviewNote: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    reviewedAt: v.optional(v.number()),
+  })
+    .index("by_owner", ["vaultOwnerId"])
+    .index("by_primary_person", ["primaryPersonId"])
+    .index("by_review_status", ["reviewStatus"])
+    .index("by_privacy", ["privacyLevel"]),
 
   /**
    * IMPORT RUNS
