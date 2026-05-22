@@ -29,6 +29,8 @@ FamilySearch source capture is a core intake front door for the Research Vault. 
 
 ## Standard Capture Flow
 
+For the first logged-in restart session, use `docs/importing/familysearch-live-capture-pilot.md` as the pilot checklist and run one-person-at-a-time capture.
+
 1. Load the unpacked extension from `extension/`.
 2. Open the FamilySearch person sources page for one person.
 3. Confirm the page shows the expected person and source count.
@@ -96,6 +98,13 @@ Future API work should be treated as a separate product surface:
 - Agent handoff: agents need a capability manifest that says browser capture is manual/user-mediated.
 - Security/abuse risk: provider scraping, credential misuse, private person leakage, duplicate poisoning, and merge-by-default behavior are the major risks.
 
+See also:
+
+- `docs/importing/familysearch-live-capture-pilot.md` for the login-ready pilot checklist, first queue template, stop rules, and capture handoff format.
+- `docs/importing/familysearch-capture-storage-map.md` for the capture-to-vault field contract.
+- `docs/importing/familysearch-provider-api-readiness.md` for the future approved-provider boundary.
+- `docs/importing/source-neutral-intake-boundary.md` for non-FamilySearch and GEDCOM planning.
+
 ## Verification Checklist
 
 Run local checks after changing extension or capture intake behavior:
@@ -104,6 +113,8 @@ Run local checks after changing extension or capture intake behavior:
 pnpm build:extension
 pnpm check:extension
 pnpm check:familysearch-capture
+pnpm check:familysearch-readiness-contract
+pnpm check:familysearch-live-pilot
 pnpm check:api-inventory
 pnpm check:protected-routes
 pnpm lint

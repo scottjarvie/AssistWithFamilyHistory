@@ -16,7 +16,7 @@ The project intentionally uses both browser-led workflows and internal APIs. Do 
 | Capture package import | `/app/imports`, `/api/import` | Local app/repo; browser for UI QA | Future import-agent candidate | Import only user-provided capture packages for now |
 | Vault people explorer | `/app/people`, `/api/convex/people` | Browser or local API read | Future read-only assistant candidate | Owner-scoped private data |
 | Person workspace | `/app/people/[personId]`, related APIs | Browser for full UX; API for selected reads | Future read-only/context-pack candidate | Context pack is likely the best first agent-facing read surface |
-| Raw/contextualized documents | `/app/people/[id]/raw`, `/app/people/[id]/contextualized`, legacy APIs | Browser/internal only | Research-needed | Legacy routes blur read/write semantics; see `GEN-40` |
+| Raw/contextualized documents | `/app/people/[id]/raw`, `/app/people/[id]/contextualized`, legacy APIs | Browser/internal only | Research-needed | Legacy routes blur read/write semantics; see `docs/api/legacy-document-route-boundary.md` |
 | Context pack export | `/api/people/[id]/context-pack` | Local API read or browser | Strong future agent candidate | Needs provenance and weak-claim clarity before broad support |
 | Operations queue read | `/app/operations`, `/api/operations/queue`, `/api/operations/queue?format=handoff` | Browser or local API read | Future read-only/handoff candidate | Handoff export is internal/private and owner-scoped |
 | Research checks/tasks | `/api/operations/checks`, `/api/operations/tasks` | Browser/internal API only | Future research-operator candidate | Needs `GEN-38` runbook and quality gates |

@@ -4,7 +4,7 @@ This project can use agents for meaningful work, but the operations surface shou
 
 ## Current Safe Order
 
-1. Read queue and context packs.
+1. Read queue, row handoff exports, and context packs.
 2. Validate capture packages and import warnings.
 3. Draft research tasks and check recommendations.
 4. Mark research checks only when evidence and notes are explicit.
@@ -14,8 +14,9 @@ This project can use agents for meaningful work, but the operations surface shou
 ## Agent-Ready Surfaces
 
 - `/api/operations/queue`: read-only queue and filters.
-- `/api/operations/queue?format=handoff`: compact JSON handoff packet with recommended agent type, review level, and reason per row.
-- `/api/people/[id]/context-pack`: read-only person context package.
+- `/api/operations/queue?format=handoff`: compact JSON handoff packet with recommended agent type, review level, prompt, routes, and reason per row.
+- `/app/operations`: each row exposes a copyable handoff with routes, evidence counts, missing checks, next actions, and review rule.
+- `/api/people/[id]/context-pack`: read-only person context package with evidence trace, story-claim readiness, open checks, context gaps, sources, and unresolved import warnings.
 - `/api/import`: future import-agent candidate for user-provided capture packages only.
 - `/api/operations/checks`: limited research-check write surface with quality gates for `completionSource: "ai_agent"`.
 
@@ -47,6 +48,8 @@ These actions require explicit human review confirmation at the API layer:
 
 Agents may prepare recommendations, evidence summaries, and handoff packets for these actions, but they should not execute the final state change without a human operator.
 
+When a human operator does promote or merge a provisional relative through the app, the API requires an explicit review note and writes a research-log entry against the resolved canonical person.
+
 ## Handoff Packet
 
 When an agent finishes a queue row, it should leave:
@@ -58,6 +61,8 @@ When an agent finishes a queue row, it should leave:
 - Open questions.
 - Verification command or browser flow used.
 - Whether the next action is human review, another agent, or product/PM decision.
+
+Context packs should be used as the supporting evidence bundle, not as a final source of truth. They separate source-backed claims, inferred readiness checks, generated/stored story text, and open questions so the next agent can see which claims are supported and which are still weak.
 
 ## API Impact
 
@@ -73,6 +78,8 @@ Run:
 
 ```bash
 pnpm check:agent-quality-gates
+pnpm check:operations-handoff
+pnpm check:context-pack-contract
 pnpm check:api-inventory
 pnpm check:protected-routes
 pnpm lint

@@ -193,7 +193,7 @@
       "reviewLevel": "internal-only",
       "risk": "medium",
       "scopes": ["read_only_assistant", "story_writer"],
-      "notes": "Mixed read/write document workflow; split side effects before agent support."
+      "notes": "Mixed read/write document workflow documented in docs/api/legacy-document-route-boundary.md. Keep internal until method semantics are split."
     },
     {
       "route": "/api/people/[id]/raw",
@@ -204,7 +204,7 @@
       "reviewLevel": "internal-only",
       "risk": "medium",
       "scopes": ["read_only_assistant"],
-      "notes": "GET may generate/sync artifacts; split side effects before agent support."
+      "notes": "GET may generate/sync artifacts as documented in docs/api/legacy-document-route-boundary.md. Keep internal until method semantics are split."
     },
     {
       "route": "/api/people/[id]/runs/[runId]/pack",

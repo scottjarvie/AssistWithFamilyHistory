@@ -46,8 +46,8 @@ These are planning terms only. They are not implemented scopes yet.
 | `/api/people` | GET | Read local artifact-backed person list | Uses `getVaultAccessContext()` | Internal/legacy read | Reads local raw artifact index, not full Convex people explorer |
 | `/api/people/[id]` | GET | Resolve person metadata, stored runs, latest run, vault-only status | Uses `getVaultAccessContext()` | Internal/legacy read | Owner-scoped bridge across Convex and local artifacts |
 | `/api/people/[id]/context-pack` | GET | Read JSON or Markdown AI context pack | Uses `getVaultAccessContext()` | Strong future read-only/agent-handoff candidate | Sensitive; should expose provenance/weak-claim details before broad agent use |
-| `/api/people/[id]/contextualized` | GET, POST | Read or save contextualized dossier; POST syncs document metadata | Uses `getVaultAccessContext()` | Internal/legacy browser workflow | Mixed artifact/doc workflow; see `GEN-40` for read/write contract cleanup |
-| `/api/people/[id]/raw` | GET | Read or generate raw evidence document and sync metadata | Uses `getVaultAccessContext()` | Internal/legacy browser workflow | GET can have generation/sync side effects; see `GEN-40` |
+| `/api/people/[id]/contextualized` | GET, POST | Read or save contextualized dossier; POST syncs document metadata | Uses `getVaultAccessContext()` | Internal/legacy browser workflow | Mixed artifact/doc workflow; see [`legacy-document-route-boundary.md`](legacy-document-route-boundary.md). Keep out of read-only agent scopes until method semantics are split |
+| `/api/people/[id]/raw` | GET | Read or generate raw evidence document and sync metadata | Uses `getVaultAccessContext()` | Internal/legacy browser workflow | GET can have generation/sync side effects; see [`legacy-document-route-boundary.md`](legacy-document-route-boundary.md). Keep out of read-only agent scopes until method semantics are split |
 | `/api/people/[id]/runs/[runId]/pack` | GET | Read stored evidence pack for a specific run | Uses `getVaultAccessContext()` | Internal/legacy read; future read-only candidate with caution | Sensitive source evidence; should stay owner-scoped |
 | `/api/people/[id]/stories` | POST | Save story draft for person and refresh research checks | Uses `getVaultAccessContext()` | Internal now; future story-writer candidate | Write route; lower risk than publish, but story-writer scope must preserve provenance and cannot publish |
 | `/api/process` | POST | Submit prompt/data to OpenRouter with client or server key | Protected by required-auth middleware, does not use vault owner | Internal AI utility | High privacy/abuse risk; should not become broad public API without quotas/disclosure |
@@ -61,7 +61,7 @@ These are planning terms only. They are not implemented scopes yet.
 - Machine-readable capability manifest exists, but it is still internal planning rather than a public contract.
 - No API key model, scopes, tiers, quotas, request IDs, or usage endpoint exists.
 - No `/me`, `/capabilities`, `/openapi`, or `/usage` first-success path exists.
-- Legacy raw/contextualized document routes blur read/write semantics; see `GEN-40`.
+- Legacy raw/contextualized document routes blur read/write semantics and are documented as internal legacy browser workflows in [`legacy-document-route-boundary.md`](legacy-document-route-boundary.md).
 - Anonymous preview behavior needs product/security decision before public beta; see `GEN-39`.
 - Story writer vs trusted publisher authority is enforced for explicit agent roles, but issued API keys/scopes are not implemented yet.
 - Public beta is status-only for now: `published` means publicly renderable, while draft/review 404. Readable slugs and noindex/index metadata exist; richer sharing settings remain separate work.
