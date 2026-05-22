@@ -37,6 +37,7 @@ import {
   TableProperties,
   ExternalLink,
   Gauge,
+  FlaskConical,
   type LucideIcon
 } from "lucide-react";
 import { useState } from "react";
@@ -143,6 +144,16 @@ const navSections: NavSection[] = [
       },
     ],
   },
+  {
+    label: "Lab",
+    items: [
+      {
+        href: "/app/experiments",
+        label: "Experiments",
+        icon: FlaskConical,
+      },
+    ],
+  },
 ];
 
 interface SidebarAccessProps {
@@ -162,7 +173,7 @@ export function AppMobileNav({ accountMode, vaultOwnerId, clerkEnabled }: Sideba
   return (
     <header className="sticky top-0 z-30 border-b border-stone-800 bg-stone-900 text-white md:hidden">
       <div className="flex h-16 items-center justify-between px-4">
-        <Link href="/" className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2" suppressHydrationWarning>
           <div className="w-8 h-8 bg-amber-700 rounded-lg flex items-center justify-center flex-shrink-0">
             <BookOpen className="w-5 h-5 text-white" />
           </div>
@@ -187,7 +198,7 @@ export function AppMobileNav({ accountMode, vaultOwnerId, clerkEnabled }: Sideba
               </SheetDescription>
             </SheetHeader>
             <div className="p-4 border-b border-stone-800">
-              <Link href="/" className="flex items-center gap-2">
+              <Link href="/" className="flex items-center gap-2" suppressHydrationWarning>
                 <div className="w-8 h-8 bg-amber-700 rounded-lg flex items-center justify-center flex-shrink-0">
                   <BookOpen className="w-5 h-5 text-white" />
                 </div>
@@ -213,6 +224,7 @@ export function AppMobileNav({ accountMode, vaultOwnerId, clerkEnabled }: Sideba
                           <SheetClose asChild>
                             <Link
                               href={item.href}
+                              suppressHydrationWarning
                               className={cn(
                                 "flex items-center gap-3 rounded-lg px-3 py-2.5",
                                 isActive(item.href, item.exact)
@@ -234,6 +246,7 @@ export function AppMobileNav({ accountMode, vaultOwnerId, clerkEnabled }: Sideba
                 <SheetClose asChild>
                   <Link
                     href="/app/settings"
+                    suppressHydrationWarning
                     className={cn(
                       "flex items-center gap-3 rounded-lg px-3 py-2.5",
                       isActive("/app/settings")
@@ -279,7 +292,7 @@ export function AppSidebar({ accountMode, vaultOwnerId, clerkEnabled }: SidebarA
     >
       {/* Logo */}
       <div className="p-4 border-b border-stone-800">
-        <Link href="/" className="flex items-center gap-3">
+        <Link href="/" className="flex items-center gap-3" suppressHydrationWarning>
           <div className="w-8 h-8 bg-amber-700 rounded-lg flex items-center justify-center flex-shrink-0">
             <BookOpen className="w-5 h-5 text-white" />
           </div>
@@ -305,6 +318,7 @@ export function AppSidebar({ accountMode, vaultOwnerId, clerkEnabled }: SidebarA
                 <li key={item.href}>
                   <Link
                     href={item.comingSoon ? "#" : item.href}
+                    suppressHydrationWarning
                     className={cn(
                       "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
                       isActive(item.href, item.exact)
@@ -337,6 +351,7 @@ export function AppSidebar({ accountMode, vaultOwnerId, clerkEnabled }: SidebarA
       <div className="border-t border-stone-800 p-2">
         <Link
           href="/app/settings"
+          suppressHydrationWarning
           className={cn(
             "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
             isActive("/app/settings")

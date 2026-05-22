@@ -33,6 +33,7 @@
     "check:familysearch-capture": "tsx scripts/check-familysearch-capture.ts",
     "check:familysearch-readiness-contract": "tsx scripts/check-familysearch-readiness-contract.ts",
     "check:familysearch-live-pilot": "tsx scripts/check-familysearch-live-pilot.ts",
+    "check:experimental-tools": "tsx scripts/check-experimental-tools.ts",
     "smoke:routes": "bash scripts/smoke-routes.sh",
     "check:protected-routes": "tsx scripts/check-protected-routes.ts",
     "check:person-identifiers": "tsx scripts/check-person-identifiers.ts"

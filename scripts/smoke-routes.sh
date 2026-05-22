@@ -15,6 +15,7 @@ ROUTE_GATES=(
   "Research and story tools|/app/research"
   "Research and story tools|/app/story-writer"
   "Research and story tools|/app/source-docs"
+  "Research and story tools|/app/experiments"
   "Settings|/app/settings"
   "API health|/api/capabilities"
   "API health|/api/convex/stats"
