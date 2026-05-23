@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
+import { SafeLink as Link } from "@/components/layout/SafeLink";
 import { z } from "zod";
 import { toast } from "sonner";
 import {

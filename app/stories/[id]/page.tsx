@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { SafeLink as Link } from "@/components/layout/SafeLink";
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { BookOpen, FileText, MapPinned, Milestone, ShieldCheck, Users } from "lucide-react";

@@ -13,7 +13,7 @@ import {
   MousePointer,
   Upload
 } from "lucide-react";
-import Link from "next/link";
+import { SafeLink as Link } from "@/components/layout/SafeLink";
 import { createPageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = createPageMetadata({

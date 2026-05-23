@@ -1,6 +1,18 @@
 # Hydration Mismatch Notes (`SafeLink` workaround)
 
-Last updated: 2026-05-22 (GEN-76)
+Last updated: 2026-05-22 (GEN-76 — root cause confirmed)
+
+## Root cause (confirmed 2026-05-22 via live browser test)
+
+**Confirmed extension**: `Keychainify` (or any extension that adds the `keychainify-checked` class to anchor elements).
+
+**Injected attribute**: `class` is mutated by appending the token `keychainify-checked` (whitespace-separated) to whatever className React rendered.
+
+**Effect**: every `<a>` element on a page that Keychainify scans gets `keychainify-checked` added to its class list client-side. React's hydration sees the className differ from the SSR snapshot and emits the warning.
+
+**How it was found**: ran `pnpm dev`, opened `http://127.0.0.1:3443/app/audit` in Chrome via the Claude in Chrome MCP, queried `document.querySelectorAll('a[data-slot="button"]')` and inspected `className`. Every anchor carried `keychainify-checked`. The warning's `+`/`-` diff showed the same className text on both sides because the truncation hid the appended token.
+
+**Confidence**: high. The token name is unique to this extension; no React/Next code path emits it.
 
 ## What we know
 

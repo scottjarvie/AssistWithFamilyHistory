@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { SafeLink as Link } from "@/components/layout/SafeLink";
 import type { Metadata } from "next";
 import { AlertTriangle, ArrowRight, Database, FileSearch, Landmark, ScrollText, type LucideIcon } from "lucide-react";
 import { api } from "@/convex/_generated/api";

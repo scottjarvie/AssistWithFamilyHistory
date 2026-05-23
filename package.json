@@ -41,7 +41,8 @@
     "check:protected-routes": "tsx scripts/check-protected-routes.ts",
     "check:person-identifiers": "tsx scripts/check-person-identifiers.ts",
     "check:convex-visibility": "tsx scripts/check-convex-visibility.ts",
-    "check:safelink-suppression": "tsx scripts/check-safelink-suppression.ts"
+    "check:safelink-suppression": "tsx scripts/check-safelink-suppression.ts",
+    "check:no-plain-next-link": "tsx scripts/check-no-plain-next-link.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.38.2",

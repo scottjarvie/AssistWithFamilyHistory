@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use } from "react";
 import { useSearchParams } from "next/navigation";
-import Link from "next/link";
+import { SafeLink as Link } from "@/components/layout/SafeLink";
 import { toast } from "sonner";
 import { ArrowLeft, Copy, Download, Check, FileText, AlertTriangle } from "lucide-react";
 

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { SafeLink as Link } from "@/components/layout/SafeLink";
 import type { Metadata } from "next";
 import { ArrowRight, BookOpen, CheckCircle2, Clock3, ExternalLink, PenLine } from "lucide-react";
 import { api } from "@/convex/_generated/api";

@@ -29,7 +29,7 @@ import {
   FileText,
   AlertTriangle
 } from "lucide-react";
-import Link from "next/link";
+import { SafeLink as Link } from "@/components/layout/SafeLink";
 import { toast } from "sonner";
 import { EvidencePack } from "@/features/source-docs/lib/schemas";
 import { generateRawDocument } from "@/features/source-docs/lib/rawDocGenerator";

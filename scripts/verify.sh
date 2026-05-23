@@ -47,6 +47,7 @@ steps=(
   "check:person-identifiers"
   "check:convex-visibility"
   "check:safelink-suppression"
+  "check:no-plain-next-link"
   "build"
 )
 

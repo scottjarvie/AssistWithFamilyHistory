@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { SafeLink as Link } from "@/components/layout/SafeLink";
 import { Bot, Filter, FolderSearch, Gauge, LogIn, Search, Sparkles, TableProperties, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

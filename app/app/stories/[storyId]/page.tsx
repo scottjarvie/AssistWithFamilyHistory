@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { SafeLink as Link } from "@/components/layout/SafeLink";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import {

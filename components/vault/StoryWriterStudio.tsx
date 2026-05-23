@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { SafeLink as Link } from "@/components/layout/SafeLink";
 import { AlertTriangle, ArrowRight, Copy, Loader2, Save, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { STORY_WRITER_MODES, STORY_WRITER_SYSTEM_PROMPT, buildStoryWriterPrompt, getStoryTitle, type StoryWriterMode } from "@/lib/ai/storyWriter";

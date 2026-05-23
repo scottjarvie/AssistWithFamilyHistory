@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { SafeLink as Link } from "@/components/layout/SafeLink";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Copy, Loader2, Search, ShieldAlert } from "lucide-react";

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { SafeLink as Link } from "@/components/layout/SafeLink";
 import type { Metadata } from "next";
 import { ArrowRight, BookOpen } from "lucide-react";
 import { Badge } from "@/components/ui/badge";

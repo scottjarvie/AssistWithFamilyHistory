@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { SafeLink as Link } from "@/components/layout/SafeLink";
 import { AlertTriangle, ArrowRight, CheckCircle2, ClipboardList, FileUp, FolderSync, Images, ScrollText } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
