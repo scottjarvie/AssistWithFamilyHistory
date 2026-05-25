@@ -29,6 +29,22 @@ fi
 
 echo "Running route smoke checks against ${BASE_URL}"
 
+# Routes that depend on optional services (e.g. Convex) and may return 503
+# "service not configured" instead of 200 when the env isn't set up. Used
+# in CI where NEXT_PUBLIC_CONVEX_URL is intentionally absent.
+CONVEX_OPTIONAL_ROUTES=(
+  "/api/convex/stats"
+)
+
+contains() {
+  local needle="$1"
+  shift
+  for x in "$@"; do
+    [[ "$x" == "$needle" ]] && return 0
+  done
+  return 1
+}
+
 for entry in "${ROUTE_GATES[@]}"; do
   gate="${entry%%|*}"
   route="${entry#*|}"
@@ -37,11 +53,16 @@ for entry in "${ROUTE_GATES[@]}"; do
     echo "[${gate}] Route check failed: dev server is not reachable at ${BASE_URL}. Start it with 'pnpm dev'."
     exit 1
   fi
-  if [[ "${code}" != "200" ]]; then
-    echo "[${gate}] Route check failed: ${route} returned ${code}"
-    exit 1
+  if [[ "${code}" == "200" ]]; then
+    echo "[${gate}] OK: ${route}"
+    continue
   fi
-  echo "[${gate}] OK: ${route}"
+  if [[ "${code}" == "503" ]] && contains "${route}" "${CONVEX_OPTIONAL_ROUTES[@]}"; then
+    echo "[${gate}] OK (Convex not configured): ${route}"
+    continue
+  fi
+  echo "[${gate}] Route check failed: ${route} returned ${code}"
+  exit 1
 done
 
 echo "Smoke checks passed"
