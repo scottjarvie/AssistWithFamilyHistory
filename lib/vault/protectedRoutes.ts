@@ -10,6 +10,7 @@ export const PROTECTED_ROUTE_PATTERNS = [
   "/api/context-reports(.*)",
   "/api/context-items(.*)",
   "/api/media(.*)",
+  "/api/vault(.*)",
 ] as const;
 
 const PROTECTED_PATH_PREFIXES = [
@@ -24,6 +25,7 @@ const PROTECTED_PATH_PREFIXES = [
   "/api/context-reports",
   "/api/context-items",
   "/api/media",
+  "/api/vault",
 ] as const;
 
 export function isProtectedAppPath(pathname: string) {

@@ -23,6 +23,7 @@ import type * as researchLog from "../researchLog.js";
 import type * as sources from "../sources.js";
 import type * as vault from "../vault.js";
 import type * as vaultCore from "../vaultCore.js";
+import type * as vaultMigration from "../vaultMigration.js";
 import type * as vaultMutations from "../vaultMutations.js";
 
 import type {
@@ -47,6 +48,7 @@ declare const fullApi: ApiFromModules<{
   sources: typeof sources;
   vault: typeof vault;
   vaultCore: typeof vaultCore;
+  vaultMigration: typeof vaultMigration;
   vaultMutations: typeof vaultMutations;
 }>;
 
