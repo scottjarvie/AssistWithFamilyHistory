@@ -29,8 +29,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build
-        run: pnpm build
+      # pnpm verify runs typecheck + lint + test + 28 contract checks + build
+      # in a single deterministic pass (~25s locally). Catches the contract
+      # regressions that smoke alone misses.
+      - name: Verify (typecheck + lint + test + checks + build)
+        run: pnpm verify
 
       - name: Start app
         run: |

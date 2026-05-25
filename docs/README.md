@@ -8,6 +8,7 @@ This directory keeps project documentation out of the repository root and separa
 - [AI family history lab](product/ai-family-history-lab.md)
 - [Product map](product/product-map.md)
 - [Route audit](product/route-audit.md)
+- [Timeline Builder proposal (GEN-24)](product/timeline-builder-proposal.md)
 - [Agent workflow](agent-workflow.md)
 - [API route inventory](api/route-inventory.md)
 - [Browser tool and API routing](api/browser-api-routing.md)
