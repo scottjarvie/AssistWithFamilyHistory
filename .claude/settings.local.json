@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p /Users/scottjarvie/.claude/projects/-Users-scottjarvie-IDE-discover-their-stories/memory)"
+    ]
+  }
+}

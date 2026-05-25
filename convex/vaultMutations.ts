@@ -1,9 +1,11 @@
 import { v } from "convex/values";
-import { mutation } from "./_generated/server";
+import { mutation, type MutationCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
+import { buildStoryPublicSlug } from "../lib/stories/slug";
 import {
   buildProvisionalDedupeKey,
   filterByVaultOwner,
+  formatPersonName,
   inferResearchChecks,
   matchesVaultOwner,
   normalizeVaultOwnerId,
@@ -56,6 +58,170 @@ const researchCheckSourceValidator = v.union(
   v.literal("user"),
   v.literal("ai_agent"),
   v.literal("import")
+);
+
+const storyTypeValidator = v.union(
+  v.literal("biography"),
+  v.literal("day_in_life"),
+  v.literal("historical_context"),
+  v.literal("migration_story"),
+  v.literal("family_narrative"),
+  v.literal("anecdote"),
+  v.literal("timeline"),
+  v.literal("letter"),
+  v.literal("interview"),
+  v.literal("research_summary"),
+  v.literal("custom")
+);
+
+const historicalContextTopicValidator = v.union(
+  v.literal("daily_life"),
+  v.literal("economy"),
+  v.literal("religion"),
+  v.literal("politics"),
+  v.literal("migration"),
+  v.literal("health"),
+  v.literal("technology"),
+  v.literal("culture"),
+  v.literal("war"),
+  v.literal("disaster"),
+  v.literal("other")
+);
+
+const researchPackTypeValidator = v.union(
+  v.literal("locality_era_brief"),
+  v.literal("region_era"),
+  v.literal("occupation_era"),
+  v.literal("religion_community"),
+  v.literal("migration_corridor"),
+  v.literal("building_institution"),
+  v.literal("local_event"),
+  v.literal("cemetery_burial")
+);
+
+const researchPackCategoryValidator = v.union(
+  v.literal("scope"),
+  v.literal("place_summary"),
+  v.literal("daily_life"),
+  v.literal("institutions"),
+  v.literal("migration_work_religion"),
+  v.literal("evidence_limits"),
+  v.literal("story_synthesis")
+);
+
+const researchPackCategoryBlockValidator = v.object({
+  category: researchPackCategoryValidator,
+  summary: v.string(),
+  sourcedClaims: v.array(
+    v.object({
+      text: v.string(),
+      sourceRefs: v.array(v.string()),
+      confidence: v.union(v.literal("high"), v.literal("medium"), v.literal("low")),
+    })
+  ),
+  synthesisNotes: v.optional(v.string()),
+});
+
+const storyStatusValidator = v.union(v.literal("draft"), v.literal("review"), v.literal("published"));
+
+const sourceFactTypeValidator = v.union(
+  v.literal("name"),
+  v.literal("sex"),
+  v.literal("birth"),
+  v.literal("death"),
+  v.literal("marriage"),
+  v.literal("census_residence"),
+  v.literal("residence"),
+  v.literal("occupation"),
+  v.literal("other")
+);
+
+const sourceFactStatusValidator = v.union(
+  v.literal("candidate"),
+  v.literal("accepted"),
+  v.literal("conflict"),
+  v.literal("rejected")
+);
+
+const contextItemTypeValidator = v.union(
+  v.literal("note"),
+  v.literal("document_ref"),
+  v.literal("research_snippet"),
+  v.literal("memory_note"),
+  v.literal("place_context"),
+  v.literal("building_context"),
+  v.literal("generated_summary"),
+  v.literal("other")
+);
+
+const contextEvidenceRoleValidator = v.union(
+  v.literal("raw_material"),
+  v.literal("researcher_conclusion"),
+  v.literal("generated_summary"),
+  v.literal("lead_or_hint"),
+  v.literal("background_context")
+);
+
+const privacyLevelValidator = v.union(
+  v.literal("private"),
+  v.literal("family_review"),
+  v.literal("publish_candidate"),
+  v.literal("public_source")
+);
+
+const mediaReviewStatusValidator = v.union(
+  v.literal("unreviewed"),
+  v.literal("reviewed"),
+  v.literal("redacted"),
+  v.literal("rejected")
+);
+
+const contextReviewStatusValidator = v.union(
+  v.literal("unreviewed"),
+  v.literal("reviewed"),
+  v.literal("disputed"),
+  v.literal("redacted"),
+  v.literal("rejected")
+);
+
+const rightsStatusValidator = v.union(
+  v.literal("unknown"),
+  v.literal("owned"),
+  v.literal("permitted"),
+  v.literal("public_domain"),
+  v.literal("restricted")
+);
+
+async function buildStorySlugForPerson(
+  ctx: MutationCtx,
+  params: {
+    storyId: string;
+    title: string;
+    personId?: Doc<"stories">["personId"];
+  }
+) {
+  const person = params.personId ? await ctx.db.get(params.personId) : null;
+  return buildStoryPublicSlug({
+    storyId: params.storyId,
+    title: params.title,
+    personName: person ? formatPersonName(person) : undefined,
+  });
+}
+
+const storyReviewActorRoleValidator = v.union(
+  v.literal("first_party_owner"),
+  v.literal("story_writer"),
+  v.literal("reviewer"),
+  v.literal("trusted_publisher"),
+  v.literal("unknown")
+);
+
+const storyReviewEventTypeValidator = v.union(
+  v.literal("publish_preview"),
+  v.literal("status_change"),
+  v.literal("publish_confirmation"),
+  v.literal("assignment"),
+  v.literal("draft_edit")
 );
 
 export const upsertPerson = mutation({
@@ -514,6 +680,34 @@ export const upsertMedia = mutation({
     sourceId: v.optional(v.id("sources")),
     familySearchUrl: v.optional(v.string()),
     importKey: v.optional(v.string()),
+    privacyLevel: v.optional(
+      v.union(
+        v.literal("private"),
+        v.literal("family_review"),
+        v.literal("publish_candidate"),
+        v.literal("public_source")
+      )
+    ),
+    reviewStatus: v.optional(
+      v.union(
+        v.literal("unreviewed"),
+        v.literal("reviewed"),
+        v.literal("redacted"),
+        v.literal("rejected")
+      )
+    ),
+    rightsStatus: v.optional(
+      v.union(
+        v.literal("unknown"),
+        v.literal("owned"),
+        v.literal("permitted"),
+        v.literal("public_domain"),
+        v.literal("restricted")
+      )
+    ),
+    aiUseAllowed: v.optional(v.boolean()),
+    privacyReviewNote: v.optional(v.string()),
+    reviewedAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -556,6 +750,146 @@ export const upsertMedia = mutation({
     });
 
     return { mediaId, created: true };
+  },
+});
+
+export const upsertSourceFact = mutation({
+  args: {
+    vaultOwnerId: v.string(),
+    personId: v.id("persons"),
+    sourceId: v.id("sources"),
+    citationId: v.id("citations"),
+    importKey: v.string(),
+    factType: sourceFactTypeValidator,
+    label: v.string(),
+    value: v.string(),
+    date: v.optional(v.string()),
+    place: v.optional(v.string()),
+    confidence: v.union(v.literal("high"), v.literal("medium"), v.literal("low")),
+    status: sourceFactStatusValidator,
+    conflictReason: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const matches = await ctx.db
+      .query("sourceFacts")
+      .withIndex("by_import_key", (q) => q.eq("importKey", args.importKey))
+      .collect();
+    const existing = filterByVaultOwner(matches, vaultOwnerId)[0] ?? null;
+    const payload = {
+      ...args,
+      vaultOwnerId,
+      updatedAt: now,
+    };
+
+    if (existing) {
+      await ctx.db.patch(existing._id, payload);
+      return { sourceFactId: existing._id, created: false };
+    }
+
+    const sourceFactId = await ctx.db.insert("sourceFacts", {
+      ...payload,
+      createdAt: now,
+    });
+    return { sourceFactId, created: true };
+  },
+});
+
+export const reviewMedia = mutation({
+  args: {
+    vaultOwnerId: v.string(),
+    mediaId: v.id("media"),
+    privacyLevel: privacyLevelValidator,
+    reviewStatus: mediaReviewStatusValidator,
+    rightsStatus: rightsStatusValidator,
+    aiUseAllowed: v.boolean(),
+    privacyReviewNote: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const media = await ctx.db.get(args.mediaId);
+    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    if (!media || !matchesVaultOwner(media.vaultOwnerId, vaultOwnerId)) {
+      throw new Error("Media item not found");
+    }
+
+    await ctx.db.patch(args.mediaId, {
+      privacyLevel: args.privacyLevel,
+      reviewStatus: args.reviewStatus,
+      rightsStatus: args.rightsStatus,
+      aiUseAllowed: args.aiUseAllowed,
+      privacyReviewNote: args.privacyReviewNote,
+      reviewedAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+
+    return { mediaId: args.mediaId };
+  },
+});
+
+export const upsertContextItemForPerson = mutation({
+  args: {
+    vaultOwnerId: v.string(),
+    personIdentifier: v.string(),
+    title: v.string(),
+    itemType: contextItemTypeValidator,
+    evidenceRole: contextEvidenceRoleValidator,
+    content: v.string(),
+    sourceLabel: v.optional(v.string()),
+    sourceUrl: v.optional(v.string()),
+    provenanceNote: v.optional(v.string()),
+    privacyLevel: privacyLevelValidator,
+    reviewStatus: contextReviewStatusValidator,
+    aiUseAllowed: v.boolean(),
+    reviewNote: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const normalizedPersonId = ctx.db.normalizeId("persons", args.personIdentifier);
+    const person =
+      (normalizedPersonId ? await ctx.db.get(normalizedPersonId) : null) ??
+      filterByVaultOwner(
+        await ctx.db
+          .query("persons")
+          .withIndex("by_fsId", (q) => q.eq("fsId", args.personIdentifier))
+          .collect(),
+        vaultOwnerId
+      )[0] ??
+      null;
+
+    if (!person || !matchesVaultOwner(person.vaultOwnerId, vaultOwnerId)) {
+      throw new Error("Person not found");
+    }
+
+    const now = Date.now();
+    const contextItemId = await ctx.db.insert("contextItems", {
+      vaultOwnerId,
+      title: args.title,
+      itemType: args.itemType,
+      evidenceRole: args.evidenceRole,
+      content: args.content,
+      sourceLabel: args.sourceLabel,
+      sourceUrl: args.sourceUrl,
+      provenanceNote: args.provenanceNote,
+      primaryPersonId: person._id,
+      personIds: [person._id],
+      placeIds: [],
+      eventIds: [],
+      storyIds: [],
+      sourceIds: [],
+      privacyLevel: args.privacyLevel,
+      reviewStatus: args.reviewStatus,
+      aiUseAllowed: args.aiUseAllowed,
+      reviewNote: args.reviewNote,
+      reviewedAt:
+        args.reviewStatus === "reviewed" || args.reviewStatus === "redacted"
+          ? now
+          : undefined,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return { contextItemId };
   },
 });
 
@@ -605,19 +939,7 @@ export const upsertStoryDraft = mutation({
   args: {
     vaultOwnerId: v.string(),
     personId: v.id("persons"),
-    type: v.union(
-      v.literal("biography"),
-      v.literal("day_in_life"),
-      v.literal("historical_context"),
-      v.literal("migration_story"),
-      v.literal("family_narrative"),
-      v.literal("anecdote"),
-      v.literal("timeline"),
-      v.literal("letter"),
-      v.literal("interview"),
-      v.literal("research_summary"),
-      v.literal("custom")
-    ),
+    type: storyTypeValidator,
     title: v.string(),
     content: v.string(),
     status: v.union(v.literal("draft"), v.literal("review"), v.literal("published")),
@@ -625,6 +947,7 @@ export const upsertStoryDraft = mutation({
     promptUsed: v.optional(v.string()),
     modelUsed: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
+    contextPackIds: v.optional(v.array(v.id("historicalContext"))),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -647,7 +970,9 @@ export const upsertStoryDraft = mutation({
       content: args.content,
       citationIds: match?.citationIds ?? [],
       sourceFactIds: match?.sourceFactIds,
+      contextPackIds: args.contextPackIds ?? match?.contextPackIds,
       status: args.status,
+      publicIndexing: match?.publicIndexing ?? "noindex" as const,
       generatedBy: args.generatedBy,
       promptUsed: args.promptUsed,
       modelUsed: args.modelUsed,
@@ -656,7 +981,15 @@ export const upsertStoryDraft = mutation({
     };
 
     if (match) {
-      await ctx.db.patch(match._id, payload);
+      const publicSlug = await buildStorySlugForPerson(ctx, {
+        storyId: String(match._id),
+        title: args.title,
+        personId: args.personId,
+      });
+      await ctx.db.patch(match._id, {
+        ...payload,
+        publicSlug: match.status === "published" ? match.publicSlug : publicSlug,
+      });
       return { storyId: match._id, created: false };
     }
 
@@ -668,8 +1001,369 @@ export const upsertStoryDraft = mutation({
       ...payload,
       createdAt: now,
     });
+    await ctx.db.patch(storyId, {
+      publicSlug: await buildStorySlugForPerson(ctx, {
+        storyId: String(storyId),
+        title: args.title,
+        personId: args.personId,
+      }),
+    });
 
     return { storyId, created: true };
+  },
+});
+
+export const updateStoryStatus = mutation({
+  args: {
+    vaultOwnerId: v.string(),
+    storyId: v.id("stories"),
+    status: storyStatusValidator,
+  },
+  handler: async (ctx, args) => {
+    const story = await ctx.db.get(args.storyId);
+    if (!story || !matchesVaultOwner(story.vaultOwnerId, args.vaultOwnerId)) {
+      throw new Error("Story not found");
+    }
+
+    const now = Date.now();
+    const publicSlug =
+      story.publicSlug ??
+      (await buildStorySlugForPerson(ctx, {
+        storyId: String(story._id),
+        title: story.title,
+        personId: story.personId,
+      }));
+
+    await ctx.db.patch(args.storyId, {
+      status: args.status,
+      publicSlug,
+      publicIndexing: story.publicIndexing ?? "noindex",
+      reviewRequestedAt:
+        args.status === "review" && story.status === "draft"
+          ? now
+          : story.reviewRequestedAt,
+      reviewedAt:
+        args.status === "published"
+          ? now
+          : story.reviewedAt,
+      lastPublishedAt:
+        args.status === "published"
+          ? now
+          : story.lastPublishedAt,
+      updatedAt: now,
+    });
+
+    return { storyId: args.storyId, status: args.status };
+  },
+});
+
+export const updateStoryDraft = mutation({
+  args: {
+    vaultOwnerId: v.string(),
+    storyId: v.id("stories"),
+    title: v.string(),
+    content: v.string(),
+    type: v.optional(storyTypeValidator),
+    tags: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, args) => {
+    const story = await ctx.db.get(args.storyId);
+    if (!story || !matchesVaultOwner(story.vaultOwnerId, args.vaultOwnerId)) {
+      throw new Error("Story not found");
+    }
+
+    const generatedBy = story.generatedBy === "ai" ? "ai_edited" : story.generatedBy;
+    const now = Date.now();
+    const title = args.title.trim();
+    const shouldRefreshSlug = story.status !== "published";
+    const publicSlug = shouldRefreshSlug
+      ? await buildStorySlugForPerson(ctx, {
+          storyId: String(story._id),
+          title,
+          personId: story.personId,
+        })
+      : story.publicSlug;
+
+    await ctx.db.patch(args.storyId, {
+      title,
+      content: args.content.trim(),
+      type: args.type ?? story.type,
+      tags: args.tags,
+      publicSlug,
+      generatedBy,
+      updatedAt: now,
+    });
+
+    return { storyId: args.storyId, updatedAt: now };
+  },
+});
+
+export const backfillStoryPublicSlugs = mutation({
+  args: {
+    vaultOwnerId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const stories = filterByVaultOwner(await ctx.db.query("stories").collect(), vaultOwnerId);
+    const now = Date.now();
+    let updated = 0;
+
+    for (const story of stories) {
+      if (story.publicSlug && story.publicIndexing) continue;
+      await ctx.db.patch(story._id, {
+        publicSlug:
+          story.publicSlug ??
+          (await buildStorySlugForPerson(ctx, {
+            storyId: String(story._id),
+            title: story.title,
+            personId: story.personId,
+          })),
+        publicIndexing: story.publicIndexing ?? "noindex",
+        updatedAt: now,
+      });
+      updated += 1;
+    }
+
+    return { updated, checked: stories.length };
+  },
+});
+
+export const assignStoryReviewer = mutation({
+  args: {
+    vaultOwnerId: v.string(),
+    storyId: v.id("stories"),
+    assignedReviewer: v.string(),
+    secondReviewRequired: v.optional(v.boolean()),
+    secondReviewer: v.optional(v.string()),
+    secondReviewApproved: v.optional(v.boolean()),
+    actorRole: storyReviewActorRoleValidator,
+    actorName: v.optional(v.string()),
+    note: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const story = await ctx.db.get(args.storyId);
+    if (!story || !matchesVaultOwner(story.vaultOwnerId, vaultOwnerId)) {
+      throw new Error("Story not found");
+    }
+
+    const now = Date.now();
+    const assignedReviewer = args.assignedReviewer.trim();
+    const secondReviewer = args.secondReviewer?.trim();
+    const secondReviewRequired = args.secondReviewRequired ?? story.secondReviewRequired ?? false;
+    await ctx.db.patch(args.storyId, {
+      assignedReviewer,
+      secondReviewRequired,
+      secondReviewer: secondReviewRequired ? secondReviewer : undefined,
+      secondReviewedAt: secondReviewRequired
+        ? args.secondReviewApproved
+          ? story.secondReviewedAt ?? now
+          : undefined
+        : undefined,
+      reviewRequestedAt: story.reviewRequestedAt ?? now,
+      updatedAt: now,
+    });
+
+    const secondReviewNote = secondReviewRequired
+      ? `Second approval${secondReviewer ? ` by ${secondReviewer}` : ""}${args.secondReviewApproved ? " marked complete" : " required"}.`
+      : undefined;
+    const eventId = await ctx.db.insert("storyReviewEvents", {
+      vaultOwnerId,
+      storyId: args.storyId,
+      personId: story.personId,
+      eventType: "assignment",
+      fromStatus: story.status,
+      toStatus: story.status,
+      actorRole: args.actorRole,
+      actorName: args.actorName,
+      assignedTo: assignedReviewer,
+      humanReviewNote: [args.note, secondReviewNote].filter(Boolean).join(" ") || undefined,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return { storyId: args.storyId, eventId, assignedReviewer, updatedAt: now };
+  },
+});
+
+export const recordStoryReviewEvent = mutation({
+  args: {
+    vaultOwnerId: v.string(),
+    storyId: v.id("stories"),
+    eventType: storyReviewEventTypeValidator,
+    fromStatus: v.optional(storyStatusValidator),
+    toStatus: v.optional(storyStatusValidator),
+    actorRole: storyReviewActorRoleValidator,
+    actorName: v.optional(v.string()),
+    assignedTo: v.optional(v.string()),
+    reviewerName: v.optional(v.string()),
+    humanReviewNote: v.optional(v.string()),
+    readinessSnapshot: v.optional(v.any()),
+    blockerCount: v.optional(v.number()),
+    warningCount: v.optional(v.number()),
+    readinessScore: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const story = await ctx.db.get(args.storyId);
+    if (!story || !matchesVaultOwner(story.vaultOwnerId, vaultOwnerId)) {
+      throw new Error("Story not found");
+    }
+
+    const now = Date.now();
+    const eventId = await ctx.db.insert("storyReviewEvents", {
+      vaultOwnerId,
+      storyId: args.storyId,
+      personId: story.personId,
+      eventType: args.eventType,
+      fromStatus: args.fromStatus,
+      toStatus: args.toStatus,
+      actorRole: args.actorRole,
+      actorName: args.actorName,
+      assignedTo: args.assignedTo,
+      reviewerName: args.reviewerName,
+      humanReviewNote: args.humanReviewNote,
+      readinessSnapshot: args.readinessSnapshot,
+      blockerCount: args.blockerCount,
+      warningCount: args.warningCount,
+      readinessScore: args.readinessScore,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    if (args.eventType === "publish_preview") {
+      await ctx.db.patch(args.storyId, {
+        lastPublishPreviewAt: now,
+        updatedAt: now,
+      });
+    }
+
+    return { storyId: args.storyId, eventId, updatedAt: now };
+  },
+});
+
+export const upsertHistoricalContext = mutation({
+  args: {
+    vaultOwnerId: v.string(),
+    placeId: v.optional(v.id("places")),
+    timePeriod: v.object({
+      startYear: v.number(),
+      endYear: v.number(),
+    }),
+    topic: historicalContextTopicValidator,
+    title: v.string(),
+    content: v.string(),
+    sources: v.array(v.string()),
+    packType: v.optional(researchPackTypeValidator),
+    templateVersion: v.optional(v.string()),
+    privacyLevel: v.optional(privacyLevelValidator),
+    reviewStatus: v.optional(contextReviewStatusValidator),
+    aiUseAllowed: v.optional(v.boolean()),
+    categoryBlocks: v.optional(v.array(researchPackCategoryBlockValidator)),
+  },
+  handler: async (ctx, args) => {
+    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const now = Date.now();
+    const candidates = args.placeId
+      ? await ctx.db
+          .query("historicalContext")
+          .withIndex("by_place", (q) => q.eq("placeId", args.placeId))
+          .collect()
+      : await ctx.db.query("historicalContext").collect();
+    const existing =
+      filterByVaultOwner(candidates, vaultOwnerId).find(
+        (entry) =>
+          entry.placeId === args.placeId &&
+          entry.topic === args.topic &&
+          entry.title.trim().toLowerCase() === args.title.trim().toLowerCase() &&
+          entry.timePeriod.startYear === args.timePeriod.startYear &&
+          entry.timePeriod.endYear === args.timePeriod.endYear
+      ) ?? null;
+
+    const payload = {
+      vaultOwnerId,
+      placeId: args.placeId,
+      timePeriod: args.timePeriod,
+      topic: args.topic,
+      title: args.title.trim(),
+      content: args.content.trim(),
+      sources: args.sources.map((source) => source.trim()).filter(Boolean),
+      packType: args.packType,
+      templateVersion: args.templateVersion?.trim() || undefined,
+      privacyLevel: args.privacyLevel ?? "private" as const,
+      reviewStatus: args.reviewStatus ?? "unreviewed" as const,
+      aiUseAllowed: args.aiUseAllowed ?? false,
+      categoryBlocks: args.categoryBlocks?.map((block) => ({
+        category: block.category,
+        summary: block.summary.trim(),
+        sourcedClaims: block.sourcedClaims
+          .map((claim) => ({
+            text: claim.text.trim(),
+            sourceRefs: claim.sourceRefs.map((sourceRef) => sourceRef.trim()).filter(Boolean),
+            confidence: claim.confidence,
+          }))
+          .filter((claim) => claim.text.length > 0),
+        synthesisNotes: block.synthesisNotes?.trim() || undefined,
+      })).filter((block) => block.summary.length > 0 || block.sourcedClaims.length > 0 || block.synthesisNotes),
+      updatedAt: now,
+    };
+
+    const historicalContextId = existing
+      ? existing._id
+      : await ctx.db.insert("historicalContext", {
+          ...payload,
+          createdAt: now,
+        });
+
+    if (existing) {
+      await ctx.db.patch(existing._id, payload);
+    }
+
+    const logMatches = await ctx.db
+      .query("researchLog")
+      .withIndex("by_entity_activity", (q) =>
+        q
+          .eq("entityType", "historicalContext")
+          .eq("entityId", historicalContextId)
+          .eq("activityType", "context_research")
+      )
+      .collect();
+    const logEntry = filterByVaultOwner(logMatches, vaultOwnerId)[0] ?? null;
+    const summary = `Context report: ${payload.title}`;
+    const details = [
+      `Topic: ${payload.topic.replace(/_/g, " ")}`,
+      `Years: ${payload.timePeriod.startYear}-${payload.timePeriod.endYear}`,
+      payload.placeId ? `Place ID: ${payload.placeId}` : "Vault-wide context",
+      payload.sources.length > 0 ? `Sources: ${payload.sources.join("; ")}` : "Sources: none recorded",
+      payload.packType ? `Pack type: ${payload.packType}` : "Pack type: untyped context report",
+      `Review: ${payload.reviewStatus}; privacy: ${payload.privacyLevel}; AI use: ${payload.aiUseAllowed ? "allowed" : "blocked"}`,
+    ].join("\n");
+
+    if (logEntry) {
+      await ctx.db.patch(logEntry._id, {
+        status: "done",
+        summary,
+        details,
+        completedAt: now,
+        updatedAt: now,
+      });
+    } else {
+      await ctx.db.insert("researchLog", {
+        vaultOwnerId,
+        entityType: "historicalContext",
+        entityId: historicalContextId,
+        activityType: "context_research",
+        status: "done",
+        summary,
+        details,
+        outputRefs: [`historicalContext:${String(historicalContextId)}`],
+        createdAt: now,
+        updatedAt: now,
+        completedAt: now,
+      });
+    }
+
+    return { historicalContextId, created: !existing };
   },
 });
 
@@ -981,9 +1675,11 @@ export const promoteProvisionalRelative = mutation({
   args: {
     vaultOwnerId: v.string(),
     provisionalId: v.id("provisionalRelatives"),
+    humanReviewNote: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const now = Date.now();
     const provisional = await ctx.db.get(args.provisionalId);
     if (!provisional || !matchesVaultOwner(provisional.vaultOwnerId, vaultOwnerId)) {
       throw new Error("Provisional relative not found");
@@ -1001,6 +1697,9 @@ export const promoteProvisionalRelative = mutation({
           vaultOwnerId
         )[0] ?? null
       : null;
+    if (existingPerson && existingPerson._id === provisional.anchorPersonId) {
+      throw new Error("Provisional relative resolves to the anchor person and cannot be promoted");
+    }
 
     const target =
       existingPerson ||
@@ -1015,15 +1714,35 @@ export const promoteProvisionalRelative = mutation({
         living: false,
         researchStatus: "not_started",
         notes: provisional.notes,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
+        createdAt: now,
+        updatedAt: now,
       }));
 
     const canonicalPersonId = typeof target === "object" ? target._id : target;
     await ctx.db.patch(args.provisionalId, {
       mergeState: "promoted",
       canonicalPersonId,
-      updatedAt: Date.now(),
+      updatedAt: now,
+    });
+    await ctx.db.insert("researchLog", {
+      vaultOwnerId,
+      entityType: "person",
+      entityId: canonicalPersonId,
+      activityType: "other",
+      status: "done",
+      summary: `Promoted provisional relative: ${provisional.displayName}`,
+      details: [
+        `Provisional ID: ${String(args.provisionalId)}`,
+        `Anchor person ID: ${String(provisional.anchorPersonId)}`,
+        provisional.relationshipHint ? `Relationship hint: ${provisional.relationshipHint}` : null,
+        provisional.familySearchId ? `FamilySearch ID: ${provisional.familySearchId}` : null,
+        `Evidence count: ${provisional.evidenceCount}`,
+        args.humanReviewNote ? `Human review note: ${args.humanReviewNote}` : "Human review note: not recorded",
+      ].filter(Boolean).join("\n"),
+      outputRefs: [`provisionalRelative:${String(args.provisionalId)}`],
+      createdAt: now,
+      updatedAt: now,
+      completedAt: now,
     });
 
     return { personId: canonicalPersonId };
@@ -1035,9 +1754,11 @@ export const mergeProvisionalRelative = mutation({
     vaultOwnerId: v.string(),
     provisionalId: v.id("provisionalRelatives"),
     targetPersonId: v.id("persons"),
+    humanReviewNote: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const now = Date.now();
     const provisional = await ctx.db.get(args.provisionalId);
     const target = await ctx.db.get(args.targetPersonId);
     if (
@@ -1054,11 +1775,35 @@ export const mergeProvisionalRelative = mutation({
     if (provisional.anchorPersonId === args.targetPersonId) {
       throw new Error("Choose a different canonical person than the anchor person");
     }
+    if (provisional.familySearchId && target.fsId && provisional.familySearchId !== target.fsId) {
+      throw new Error("Target FamilySearch ID does not match this provisional relative");
+    }
 
     await ctx.db.patch(args.provisionalId, {
       mergeState: "merged",
       canonicalPersonId: args.targetPersonId,
-      updatedAt: Date.now(),
+      updatedAt: now,
+    });
+    await ctx.db.insert("researchLog", {
+      vaultOwnerId,
+      entityType: "person",
+      entityId: args.targetPersonId,
+      activityType: "other",
+      status: "done",
+      summary: `Merged provisional relative into ${formatPersonName(target)}`,
+      details: [
+        `Provisional relative: ${provisional.displayName}`,
+        `Provisional ID: ${String(args.provisionalId)}`,
+        `Anchor person ID: ${String(provisional.anchorPersonId)}`,
+        provisional.relationshipHint ? `Relationship hint: ${provisional.relationshipHint}` : null,
+        provisional.familySearchId ? `FamilySearch ID: ${provisional.familySearchId}` : null,
+        `Evidence count: ${provisional.evidenceCount}`,
+        args.humanReviewNote ? `Human review note: ${args.humanReviewNote}` : "Human review note: not recorded",
+      ].filter(Boolean).join("\n"),
+      outputRefs: [`provisionalRelative:${String(args.provisionalId)}`],
+      createdAt: now,
+      updatedAt: now,
+      completedAt: now,
     });
 
     return { success: true };

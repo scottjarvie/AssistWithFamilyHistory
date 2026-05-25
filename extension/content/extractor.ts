@@ -125,7 +125,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       break;
     case "START_EXTRACT":
       extractionCancelled = false;
-      void startExtraction(message.pacing || {});
+      void runPageExtraction((message.pacing || {}) as PacingConfig);
       sendResponse({ success: true });
       break;
     case "CANCEL_EXTRACT":
@@ -172,7 +172,7 @@ function getPageInfo(): PageInfo {
   };
 }
 
-async function startExtraction(pacing: PacingConfig) {
+async function runPageExtraction(pacing: PacingConfig) {
   const startTime = Date.now();
   const pageInfo = getPageInfo();
 

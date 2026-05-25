@@ -20,7 +20,7 @@
 import { MarketingNav } from "@/components/layout/MarketingNav";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
+import { SafeLink as Link } from "@/components/layout/SafeLink";
 import { ArrowRight, FileText, Brain, Download, CheckCircle } from "lucide-react";
 import type { Metadata } from "next";
 import { createPageMetadata } from "@/lib/seo";

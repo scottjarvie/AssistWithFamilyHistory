@@ -1,0 +1,52 @@
+{
+  "story": {
+    "status": "review",
+    "title": "A Grounded Life In The Valley",
+    "content": "Mary grew up in a farming valley where the church register, census returns, and land records all place her family in the same community for more than forty years. The story draft ties her childhood, marriage, migration, and later household to dated records and to local context about the valley economy. It avoids private living-person details and limits interpretation to claims supported by the attached evidence packet.",
+    "citationIds": ["citation-1", "citation-2"]
+  },
+  "person": {
+    "displayName": "Mary Jensen",
+    "living": false,
+    "birth": { "date": { "year": 1882, "original": "1882" } },
+    "death": { "date": { "year": 1961, "original": "1961" } }
+  },
+  "readiness": {
+    "completionPercent": 100,
+    "requiredMissingCount": 0,
+    "criticalMissing": [],
+    "nextActions": []
+  },
+  "researchChecks": [
+    {
+      "checkKey": "birth_record",
+      "status": "complete",
+      "applicability": "required",
+      "summary": "Birth evidence attached.",
+      "confidence": 0.94
+    },
+    {
+      "checkKey": "death_record",
+      "status": "complete",
+      "applicability": "required",
+      "summary": "Death evidence attached.",
+      "confidence": 0.95
+    }
+  ],
+  "contextCoverage": {
+    "count": 2,
+    "status": "covered",
+    "relatedPlaceCount": 2,
+    "placeCountWithContext": 2,
+    "missingPlaces": []
+  },
+  "evidence": [
+    { "citations": ["citation-1"] },
+    { "citations": ["citation-2"] }
+  ],
+  "events": [{ "type": "birth" }, { "type": "marriage" }, { "type": "death" }],
+  "places": [{ "name": "Cache Valley" }, { "name": "Logan" }],
+  "relationships": [{ "type": "Couple" }],
+  "provisionalRelatives": [],
+  "publishWarnings": []
+}

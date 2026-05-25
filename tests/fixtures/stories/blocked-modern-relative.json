@@ -1,0 +1,51 @@
+{
+  "story": {
+    "status": "review",
+    "title": "Modern Family Relationship",
+    "content": "This story is otherwise ready because it has evidence, context, and enough narrative detail for a public beta review. It should still be blocked because a closely related person in the graph appears to be living or young enough that publishing family context could expose private family details.",
+    "citationIds": ["citation-1"]
+  },
+  "person": {
+    "displayName": "Robert Carter",
+    "living": false,
+    "birth": { "date": { "year": 1930, "original": "1930" } },
+    "death": { "date": { "year": 2010, "original": "2010" } }
+  },
+  "readiness": {
+    "completionPercent": 100,
+    "requiredMissingCount": 0,
+    "criticalMissing": [],
+    "nextActions": []
+  },
+  "researchChecks": [
+    {
+      "checkKey": "relationships",
+      "status": "complete",
+      "applicability": "required",
+      "summary": "Relationships reviewed.",
+      "confidence": 0.9
+    }
+  ],
+  "contextCoverage": {
+    "count": 1,
+    "status": "covered",
+    "relatedPlaceCount": 1,
+    "placeCountWithContext": 1,
+    "missingPlaces": []
+  },
+  "evidence": [{ "source": { "title": "Obituary clipping" }, "citations": ["citation-1"] }],
+  "events": [{ "type": "death", "date": { "year": 2010 } }],
+  "places": [{ "name": "Denver" }],
+  "relationships": [
+    {
+      "type": "ParentChild",
+      "relatedName": "Living Carter",
+      "relatedPerson": {
+        "living": true,
+        "birth": { "date": { "year": 1975, "original": "1975" } }
+      }
+    }
+  ],
+  "provisionalRelatives": [],
+  "publishWarnings": []
+}

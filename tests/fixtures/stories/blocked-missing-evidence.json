@@ -1,0 +1,42 @@
+{
+  "story": {
+    "status": "draft",
+    "title": "Unsupported Sketch",
+    "content": "A short draft with no evidence.",
+    "citationIds": []
+  },
+  "person": {
+    "displayName": "Thomas Reed",
+    "living": false,
+    "birth": { "date": { "year": 1870, "original": "1870" } },
+    "death": { "date": { "year": 1932, "original": "1932" } }
+  },
+  "readiness": {
+    "completionPercent": 45,
+    "requiredMissingCount": 2,
+    "criticalMissing": ["birth_record", "relationships"],
+    "nextActions": ["Attach source records before review."]
+  },
+  "researchChecks": [
+    {
+      "checkKey": "birth_record",
+      "status": "missing",
+      "applicability": "required",
+      "summary": "No birth source attached.",
+      "confidence": 0.2
+    }
+  ],
+  "contextCoverage": {
+    "count": 0,
+    "status": "missing",
+    "relatedPlaceCount": 1,
+    "placeCountWithContext": 0,
+    "missingPlaces": [{ "name": "Unknown County" }]
+  },
+  "evidence": [],
+  "events": [],
+  "places": [{ "name": "Unknown County" }],
+  "relationships": [],
+  "provisionalRelatives": [],
+  "publishWarnings": []
+}

@@ -16,6 +16,8 @@
  */
 
 import { OpenRouterConfig, AIResponse } from "./types";
+import { sanitizeAiProviderError } from "./privacy";
+import { logServerFailure } from "@/lib/server/safeLog";
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 
@@ -57,10 +59,15 @@ export async function chatCompletion({
     });
 
     if (!response.ok) {
-      const error = await response.text();
+      logServerFailure("openrouter.chat_completion_failed", {
+        provider: "openrouter",
+        route: "chatCompletion",
+        status: response.status,
+        model: config.model,
+      });
       return {
         success: false,
-        error: `OpenRouter API error: ${response.status} - ${error}`,
+        error: sanitizeAiProviderError(response.status),
       };
     }
 
@@ -88,9 +95,14 @@ export async function chatCompletion({
       },
     };
   } catch (error) {
+    logServerFailure("openrouter.chat_completion_error", {
+      provider: "openrouter",
+      route: "chatCompletion",
+      model: config.model,
+    }, error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error occurred",
+      error: "AI provider request failed. Check connectivity or use manual prompt export.",
     };
   }
 }
@@ -120,6 +132,12 @@ export async function* streamChatCompletion({
   });
 
   if (!response.ok) {
+    logServerFailure("openrouter.stream_failed", {
+      provider: "openrouter",
+      route: "streamChatCompletion",
+      status: response.status,
+      model: config.model,
+    });
     throw new Error(`OpenRouter API error: ${response.status}`);
   }
 

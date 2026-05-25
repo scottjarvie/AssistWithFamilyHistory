@@ -490,6 +490,52 @@ export default defineSchema({
     .index("by_citation_and_target", ["citationId", "targetType", "targetId"]),
 
   /**
+   * SOURCE FACTS
+   * Citation-backed facts extracted from indexed source fields.
+   *
+   * These are candidates for review and traceability. They do not silently
+   * overwrite canonical person fields.
+   */
+  sourceFacts: defineTable({
+    vaultOwnerId: v.optional(v.string()),
+    personId: v.id("persons"),
+    sourceId: v.id("sources"),
+    citationId: v.id("citations"),
+    importKey: v.string(),
+    factType: v.union(
+      v.literal("name"),
+      v.literal("sex"),
+      v.literal("birth"),
+      v.literal("death"),
+      v.literal("marriage"),
+      v.literal("census_residence"),
+      v.literal("residence"),
+      v.literal("occupation"),
+      v.literal("other")
+    ),
+    label: v.string(),
+    value: v.string(),
+    date: v.optional(v.string()),
+    place: v.optional(v.string()),
+    confidence: v.union(v.literal("high"), v.literal("medium"), v.literal("low")),
+    status: v.union(
+      v.literal("candidate"),
+      v.literal("accepted"),
+      v.literal("conflict"),
+      v.literal("rejected")
+    ),
+    conflictReason: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner", ["vaultOwnerId"])
+    .index("by_person", ["personId"])
+    .index("by_source", ["sourceId"])
+    .index("by_citation", ["citationId"])
+    .index("by_import_key", ["importKey"])
+    .index("by_status", ["status"]),
+
+  /**
    * MEDIA
    * Photos, documents, scans, videos, audio
    */
@@ -529,6 +575,36 @@ export default defineSchema({
     
     // FamilySearch integration
     familySearchUrl: v.optional(v.string()),
+
+    // Privacy and publishing review
+    privacyLevel: v.optional(
+      v.union(
+        v.literal("private"),
+        v.literal("family_review"),
+        v.literal("publish_candidate"),
+        v.literal("public_source")
+      )
+    ),
+    reviewStatus: v.optional(
+      v.union(
+        v.literal("unreviewed"),
+        v.literal("reviewed"),
+        v.literal("redacted"),
+        v.literal("rejected")
+      )
+    ),
+    rightsStatus: v.optional(
+      v.union(
+        v.literal("unknown"),
+        v.literal("owned"),
+        v.literal("permitted"),
+        v.literal("public_domain"),
+        v.literal("restricted")
+      )
+    ),
+    aiUseAllowed: v.optional(v.boolean()),
+    privacyReviewNote: v.optional(v.string()),
+    reviewedAt: v.optional(v.number()),
     
     // Metadata
     createdAt: v.number(),
@@ -538,6 +614,65 @@ export default defineSchema({
     .index("by_type", ["type"])
     .index("by_source", ["sourceId"])
     .index("by_import_key", ["importKey"]),
+
+  /**
+   * CONTEXT ITEMS
+   * Loose, review-first context: notes, snippets, documents, cemetery/building
+   * details, research clues, and generated summaries.
+   */
+  contextItems: defineTable({
+    vaultOwnerId: v.optional(v.string()),
+    title: v.string(),
+    itemType: v.union(
+      v.literal("note"),
+      v.literal("document_ref"),
+      v.literal("research_snippet"),
+      v.literal("memory_note"),
+      v.literal("place_context"),
+      v.literal("building_context"),
+      v.literal("generated_summary"),
+      v.literal("other")
+    ),
+    evidenceRole: v.union(
+      v.literal("raw_material"),
+      v.literal("researcher_conclusion"),
+      v.literal("generated_summary"),
+      v.literal("lead_or_hint"),
+      v.literal("background_context")
+    ),
+    content: v.string(),
+    sourceLabel: v.optional(v.string()),
+    sourceUrl: v.optional(v.string()),
+    provenanceNote: v.optional(v.string()),
+    primaryPersonId: v.optional(v.id("persons")),
+    personIds: v.array(v.id("persons")),
+    placeIds: v.optional(v.array(v.id("places"))),
+    eventIds: v.optional(v.array(v.id("events"))),
+    storyIds: v.optional(v.array(v.id("stories"))),
+    sourceIds: v.optional(v.array(v.id("sources"))),
+    privacyLevel: v.union(
+      v.literal("private"),
+      v.literal("family_review"),
+      v.literal("publish_candidate"),
+      v.literal("public_source")
+    ),
+    reviewStatus: v.union(
+      v.literal("unreviewed"),
+      v.literal("reviewed"),
+      v.literal("disputed"),
+      v.literal("redacted"),
+      v.literal("rejected")
+    ),
+    aiUseAllowed: v.boolean(),
+    reviewNote: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    reviewedAt: v.optional(v.number()),
+  })
+    .index("by_owner", ["vaultOwnerId"])
+    .index("by_primary_person", ["primaryPersonId"])
+    .index("by_review_status", ["reviewStatus"])
+    .index("by_privacy", ["privacyLevel"]),
 
   /**
    * IMPORT RUNS
@@ -812,6 +947,7 @@ export default defineSchema({
     content: v.string(),                        // Markdown or rich text
     citationIds: v.array(v.id("citations")),    // Which sources support this story
     sourceFactIds: v.optional(v.array(v.string())), // Which specific facts were used
+    contextPackIds: v.optional(v.array(v.id("historicalContext"))),
     
     // Status
     status: v.union(
@@ -831,6 +967,17 @@ export default defineSchema({
     
     // Publishing
     publishedToHive: v.optional(v.string()),    // Hive permlink if published
+    publicSlug: v.optional(v.string()),
+    publicIndexing: v.optional(v.union(v.literal("noindex"), v.literal("index"))),
+    assignedReviewer: v.optional(v.string()),
+    secondReviewRequired: v.optional(v.boolean()),
+    secondReviewer: v.optional(v.string()),
+    secondReviewedAt: v.optional(v.number()),
+    reviewRequestedAt: v.optional(v.number()),
+    reviewedAt: v.optional(v.number()),
+    lastPublishPreviewAt: v.optional(v.number()),
+    lastPublishedAt: v.optional(v.number()),
+    unpublishReason: v.optional(v.string()),
     
     // Organization
     tags: v.optional(v.array(v.string())),
@@ -843,8 +990,49 @@ export default defineSchema({
     .index("by_person", ["personId"])
     .index("by_relationship", ["relationshipId"])
     .index("by_status", ["status"])
+    .index("by_public_slug", ["publicSlug"])
     .index("by_type", ["type"])
     .index("by_generated_by", ["generatedBy"]),
+
+  storyReviewEvents: defineTable({
+    vaultOwnerId: v.optional(v.string()),
+    storyId: v.id("stories"),
+    personId: v.optional(v.id("persons")),
+    eventType: v.union(
+      v.literal("publish_preview"),
+      v.literal("status_change"),
+      v.literal("publish_confirmation"),
+      v.literal("assignment"),
+      v.literal("draft_edit")
+    ),
+    fromStatus: v.optional(
+      v.union(v.literal("draft"), v.literal("review"), v.literal("published"))
+    ),
+    toStatus: v.optional(
+      v.union(v.literal("draft"), v.literal("review"), v.literal("published"))
+    ),
+    actorRole: v.union(
+      v.literal("first_party_owner"),
+      v.literal("story_writer"),
+      v.literal("reviewer"),
+      v.literal("trusted_publisher"),
+      v.literal("unknown")
+    ),
+    actorName: v.optional(v.string()),
+    assignedTo: v.optional(v.string()),
+    reviewerName: v.optional(v.string()),
+    humanReviewNote: v.optional(v.string()),
+    readinessSnapshot: v.optional(v.any()),
+    blockerCount: v.optional(v.number()),
+    warningCount: v.optional(v.number()),
+    readinessScore: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner", ["vaultOwnerId"])
+    .index("by_story", ["storyId"])
+    .index("by_story_created", ["storyId", "createdAt"])
+    .index("by_event_type", ["eventType"]),
 
   provisionalRelatives: defineTable({
     vaultOwnerId: v.optional(v.string()),
@@ -945,6 +1133,63 @@ export default defineSchema({
     title: v.string(),
     content: v.string(),                        // Markdown
     sources: v.array(v.string()),               // URLs or references
+
+    // Research-pack metadata and AI/story gates
+    packType: v.optional(
+      v.union(
+        v.literal("locality_era_brief"),
+        v.literal("region_era"),
+        v.literal("occupation_era"),
+        v.literal("religion_community"),
+        v.literal("migration_corridor"),
+        v.literal("building_institution"),
+        v.literal("local_event"),
+        v.literal("cemetery_burial")
+      )
+    ),
+    templateVersion: v.optional(v.string()),
+    privacyLevel: v.optional(
+      v.union(
+        v.literal("private"),
+        v.literal("family_review"),
+        v.literal("publish_candidate"),
+        v.literal("public_source")
+      )
+    ),
+    reviewStatus: v.optional(
+      v.union(
+        v.literal("unreviewed"),
+        v.literal("reviewed"),
+        v.literal("disputed"),
+        v.literal("redacted"),
+        v.literal("rejected")
+      )
+    ),
+    aiUseAllowed: v.optional(v.boolean()),
+    categoryBlocks: v.optional(
+      v.array(
+        v.object({
+          category: v.union(
+            v.literal("scope"),
+            v.literal("place_summary"),
+            v.literal("daily_life"),
+            v.literal("institutions"),
+            v.literal("migration_work_religion"),
+            v.literal("evidence_limits"),
+            v.literal("story_synthesis")
+          ),
+          summary: v.string(),
+          sourcedClaims: v.array(
+            v.object({
+              text: v.string(),
+              sourceRefs: v.array(v.string()),
+              confidence: v.union(v.literal("high"), v.literal("medium"), v.literal("low")),
+            })
+          ),
+          synthesisNotes: v.optional(v.string()),
+        })
+      )
+    ),
     
     // Metadata
     createdAt: v.number(),

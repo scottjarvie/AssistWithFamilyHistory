@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "fixture-redaction-risk",
+  "capturedAt": "2026-05-21T12:00:00.000Z",
+  "extractorVersion": "2.0.0",
+  "extractionDurationMs": 100,
+  "sourceUrl": "https://www.familysearch.org/en/tree/person/sources/ABCD-123",
+  "pageTitle": "Sources | FamilySearch",
+  "uiLocale": "en",
+  "person": {
+    "familySearchId": "ABCD-123",
+    "name": "Alex Morgan",
+    "birthDate": "1890",
+    "deathDate": "1960"
+  },
+  "sources": [
+    {
+      "id": "S1",
+      "orderIndex": 0,
+      "sourceKey": "redaction-risk-source",
+      "sourceType": "record",
+      "title": "Private note with living relative",
+      "date": "2020",
+      "citation": "Contact living cousin at alex@example.test or 801-555-0199.",
+      "tags": [],
+      "indexed": {
+        "fields": [
+          { "label": "Current Address", "value": "1234 Fictional Valley Road Apt 5" },
+          { "label": "Private Note", "value": "Do not publish living grandchild details." }
+        ],
+        "textBlocks": [
+          "SSN-style value 123-45-6789 should redact, but record date 12-31-1899 should not."
+        ]
+      },
+      "rawText": "Mailing address: 99 Example Street. Text me before sharing.",
+      "expanded": true,
+      "expansionAttempts": 1,
+      "expansionSucceeded": true
+    }
+  ],
+  "diagnostics": {
+    "mode": "standard",
+    "totalSources": 1,
+    "expandedSections": 1,
+    "failedExpansions": 0,
+    "warnings": [],
+    "errors": []
+  }
+}

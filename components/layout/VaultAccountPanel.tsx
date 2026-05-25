@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { SafeLink as Link } from "@/components/layout/SafeLink";
 import { UserButton, useUser } from "@clerk/nextjs";
 import { HardDriveDownload, LogIn, ShieldCheck, UserRound, UserRoundPlus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";

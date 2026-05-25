@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "2.0",
+  "captureId": "fixture-living-private-warning",
+  "capturedAt": "2026-05-21T12:00:00.000Z",
+  "extractorVersion": "2.0.0",
+  "extractionDurationMs": 1200,
+  "pageType": "sources",
+  "pageUrl": "https://www.familysearch.org/en/tree/person/sources/ABCD-123",
+  "pageTitle": "Sources | FamilySearch",
+  "uiLocale": "en",
+  "person": {
+    "familySearchId": "ABCD-123",
+    "name": "Private Person",
+    "birthDate": "1985"
+  },
+  "sources": [
+    {
+      "id": "S1",
+      "orderIndex": 0,
+      "sourceKey": "living-source-key",
+      "sourceType": "record",
+      "title": "Modern Record",
+      "tags": [],
+      "indexed": { "fields": [], "textBlocks": [] },
+      "rawText": "Modern private-risk source text.",
+      "expanded": true,
+      "expansionAttempts": 1,
+      "expansionSucceeded": true,
+      "relatedPeople": [],
+      "placeMentions": [],
+      "outboundUrls": []
+    }
+  ],
+  "memories": [],
+  "placeMentions": [],
+  "diagnostics": {
+    "mode": "standard",
+    "totalSources": 1,
+    "totalMemories": 0,
+    "expandedSections": 1,
+    "failedExpansions": 0,
+    "warnings": [],
+    "errors": []
+  }
+}

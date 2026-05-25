@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { SafeLink as Link } from "@/components/layout/SafeLink";
 import { ArrowLeft } from "lucide-react";
 import { StoryWriterStudio } from "@/components/vault/StoryWriterStudio";
 

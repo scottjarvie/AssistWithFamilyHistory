@@ -1,5 +1,10 @@
 import { v } from "convex/values";
-import { mutation } from "./_generated/server";
+// GEN-73: helpers.ts exports orchestration mutations that don't accept
+// vaultOwnerId. They were never called from the app surface (verified by
+// grep). Internalize the whole file via alias so existing `mutation({...})`
+// syntax still compiles but the underlying functions are not publicly
+// callable.
+import { internalMutation as mutation } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 
 /**

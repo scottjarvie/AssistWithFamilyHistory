@@ -1,0 +1,280 @@
+openapi: 3.1.0
+info:
+  title: Discover Their Stories Story Agent API Skeleton
+  version: 2026-05-21
+  summary: Internal planning skeleton for story writer, reviewer, and trusted publisher agents.
+  description: >
+    This is not a public API contract yet. It documents the first-party beta
+    story workflow so future issued API keys/scopes can preserve current safety
+    behavior instead of inventing a broader publish surface.
+servers:
+  - url: https://discover-their-stories.example.com
+    description: Placeholder production origin
+  - url: http://localhost:3443
+    description: Local development
+security:
+  - ClerkSession: []
+  - AgentScopeHeader: []
+tags:
+  - name: Story capabilities
+  - name: Story review
+  - name: Story publishing
+paths:
+  /api/capabilities:
+    get:
+      tags: [Story capabilities]
+      summary: Discover story actions available to the current actor.
+      description: >
+        Agents should call this before attempting story edits, review assignment,
+        publish preview, or publish. The response distinguishes story_writer,
+        reviewer, trusted_publisher, and first_party_owner authority.
+      parameters:
+        - $ref: "#/components/parameters/AgentScopeHeader"
+        - $ref: "#/components/parameters/AgentNameHeader"
+      responses:
+        "200":
+          description: Capability response for the resolved actor.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CapabilitiesResponse"
+  /api/stories/{id}:
+    patch:
+      tags: [Story review]
+      summary: Edit story title, content, type, tags, or draft fields.
+      description: >
+        story_writer can edit drafts and review candidates. Editing must keep
+        provenance visible to reviewers and must not publish a story.
+      parameters:
+        - $ref: "#/components/parameters/StoryId"
+        - $ref: "#/components/parameters/AgentScopeHeader"
+        - $ref: "#/components/parameters/AgentNameHeader"
+      responses:
+        "200":
+          description: Story updated.
+        "403":
+          $ref: "#/components/responses/CapabilityDenied"
+  /api/stories/{id}/review:
+    patch:
+      tags: [Story review]
+      summary: Assign reviewer and optional second-review requirement.
+      description: >
+        Reviewer assignment is restricted to reviewer, trusted_publisher, or
+        first-party owner authority. story_writer must not assign reviewers.
+      parameters:
+        - $ref: "#/components/parameters/StoryId"
+        - $ref: "#/components/parameters/AgentScopeHeader"
+        - $ref: "#/components/parameters/AgentNameHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                assignedReviewer:
+                  type: string
+                secondReviewRequired:
+                  type: boolean
+                secondReviewer:
+                  type: string
+                secondReviewApproved:
+                  type: boolean
+      responses:
+        "200":
+          description: Reviewer assignment recorded in story review history.
+        "403":
+          $ref: "#/components/responses/CapabilityDenied"
+  /api/stories/{id}/status:
+    get:
+      tags: [Story publishing]
+      summary: Preview publish readiness or return a handoff packet.
+      description: >
+        story_writer can preview publish gates and hand off to review, but
+        story_writer cannot perform story:publish. Use format=handoff for
+        writer/reviewer/publisher packets. Use record=true to store a
+        publish-preview audit snapshot.
+      parameters:
+        - $ref: "#/components/parameters/StoryId"
+        - $ref: "#/components/parameters/AgentScopeHeader"
+        - $ref: "#/components/parameters/AgentNameHeader"
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [readiness, handoff]
+        - name: record
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Publish readiness preview or handoff packet.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishPreviewResponse"
+    patch:
+      tags: [Story publishing]
+      summary: Change story workflow status.
+      description: >
+        Moving to published requires story:publish authority, passing publish
+        gates, any required second approval, and a human review confirmation.
+        story_writer and reviewer roles must receive 403 if they attempt to
+        publish. trusted_publisher and first_party_owner can publish only after
+        gates pass.
+      parameters:
+        - $ref: "#/components/parameters/StoryId"
+        - $ref: "#/components/parameters/AgentScopeHeader"
+        - $ref: "#/components/parameters/AgentNameHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [draft, review, published]
+                humanReviewConfirmed:
+                  type: boolean
+                humanReviewNote:
+                  type: string
+                actorRole:
+                  $ref: "#/components/schemas/StoryActorRole"
+                actorName:
+                  type: string
+      responses:
+        "200":
+          description: Status change recorded in story review history.
+        "400":
+          description: Publish gates, second approval, or human confirmation failed.
+        "403":
+          $ref: "#/components/responses/CapabilityDenied"
+components:
+  securitySchemes:
+    ClerkSession:
+      type: http
+      scheme: bearer
+      description: Current first-party session model when REQUIRE_AUTH is enabled.
+    AgentScopeHeader:
+      type: apiKey
+      in: header
+      name: x-dts-agent-scope
+      description: >
+        Internal planning header for role simulation. Replace with issued,
+        owner-scoped API keys before external agents get direct API access.
+  parameters:
+    StoryId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Internal story ID.
+    AgentScopeHeader:
+      name: x-dts-agent-scope
+      in: header
+      schema:
+        $ref: "#/components/schemas/StoryActorRole"
+      description: Internal role simulation header.
+    AgentNameHeader:
+      name: x-dts-agent-name
+      in: header
+      schema:
+        type: string
+      description: Optional actor label for review history and audit notes.
+  responses:
+    CapabilityDenied:
+      description: Actor role lacks the required story action.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [error, requiredAction, role, allowedActions]
+            properties:
+              error:
+                type: string
+                example: Story capability denied
+              details:
+                type: string
+              requiredAction:
+                type: string
+                example: story:publish
+              role:
+                $ref: "#/components/schemas/StoryActorRole"
+              allowedActions:
+                type: array
+                items:
+                  type: string
+  schemas:
+    StoryActorRole:
+      type: string
+      enum: [first_party_owner, story_writer, reviewer, trusted_publisher, unknown]
+    StoryAction:
+      type: string
+      enum:
+        - story:read
+        - story:draft
+        - story:edit
+        - story:request_review
+        - story:assign_reviewer
+        - story:preview_publish
+        - story:publish
+        - story:unpublish
+    CapabilitiesResponse:
+      type: object
+      required: [success, schemaVersion, actor, capabilities]
+      properties:
+        success:
+          type: boolean
+        schemaVersion:
+          type: string
+        actor:
+          type: object
+          properties:
+            role:
+              $ref: "#/components/schemas/StoryActorRole"
+            name:
+              type: string
+            source:
+              type: string
+        capabilities:
+          type: object
+          properties:
+            story:
+              type: object
+              properties:
+                role:
+                  $ref: "#/components/schemas/StoryActorRole"
+                actions:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/StoryAction"
+                notes:
+                  type: string
+    PublishPreviewResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        readiness:
+          type: object
+          properties:
+            canPublish:
+              type: boolean
+            score:
+              type: integer
+            blockers:
+              type: array
+              items:
+                type: object
+            warnings:
+              type: array
+              items:
+                type: object
+        handoff:
+          type: object
+          description: Present when format=handoff.

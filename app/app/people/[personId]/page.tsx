@@ -1,9 +1,11 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import { SafeLink, SafeAnchor } from "@/components/layout/SafeLink";
 import {
   ArrowLeft,
   ArrowRight,
   BookOpen,
+  CheckCircle2,
+  CircleAlert,
   Files,
   Globe2,
   ImageIcon,
@@ -22,6 +24,9 @@ import { VaultStateCard } from "@/components/vault/VaultStateCard";
 import { getConvexRuntimeIssue } from "@/lib/convex/server";
 import { getVaultAccessContext } from "@/lib/vault/server";
 import { ResearchChecksPanel } from "@/components/vault/ResearchChecksPanel";
+import { MediaPrivacyReviewPanel } from "@/components/vault/MediaPrivacyReviewPanel";
+import { ContextItemsPanel } from "@/components/vault/ContextItemsPanel";
+import { publicStoryPath } from "@/lib/stories/slug";
 
 interface PageProps {
   params: Promise<{ personId: string }>;
@@ -68,13 +73,37 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
 
   const routeId = workspace.person.routeId || personId;
   const hasStoredRuns = workspace.importRuns.length > 0;
+  const storyCheckLabels: Record<string, string> = {
+    biography: "Biography or draft",
+    timeline: "Timeline coverage",
+    relationships: "Relationships",
+    birth_record: "Birth evidence",
+    death_record: "Death evidence",
+    memories: "Memories",
+    place_context: "Place context",
+  };
+  const storyReadinessChecks = workspace.researchChecks
+    .filter((check) => Object.keys(storyCheckLabels).includes(check.checkKey))
+    .map((check) => ({
+      key: check.checkKey,
+      label: storyCheckLabels[check.checkKey] || check.checkKey.replace(/_/g, " "),
+      status: check.status,
+      summary: check.summary,
+    }));
+  const currentStory = workspace.stories[0] ?? null;
+  const sourceFacts = workspace.sourceFacts ?? [];
+  const contextItems = workspace.contextItems ?? [];
+  const media = workspace.media ?? [];
 
   return (
     <div className="p-4 sm:p-8">
-      <Link href="/app/people" className="mb-5 inline-flex items-center gap-2 text-sm text-stone-500 hover:text-stone-900">
+      <SafeLink
+        href="/app/people"
+        className="mb-5 inline-flex items-center gap-2 text-sm text-stone-500 hover:text-stone-900"
+      >
         <ArrowLeft className="h-4 w-4" />
         Back to People
-      </Link>
+      </SafeLink>
 
       <section className="rounded-[2rem] border border-stone-200 bg-white px-6 py-6 shadow-sm sm:px-8">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
@@ -91,13 +120,13 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
               <Button asChild className="bg-amber-700 hover:bg-amber-800">
-                <Link href={`/app/people/${routeId}/ai`}>Run AI Analysis</Link>
+                <SafeLink href={`/app/people/${routeId}/ai`}>Run AI Analysis</SafeLink>
               </Button>
               <Button asChild variant="outline">
-                <a href={`/api/people/${routeId}/context-pack?format=markdown`}>Download Context Pack</a>
+                <SafeAnchor href={`/api/people/${routeId}/context-pack?format=markdown`}>Download Context Pack</SafeAnchor>
               </Button>
               <Button asChild variant="outline">
-                <a href={`/api/people/${routeId}/context-pack`}>Structured JSON</a>
+                <SafeAnchor href={`/api/people/${routeId}/context-pack`}>Structured JSON</SafeAnchor>
               </Button>
             </div>
           </div>
@@ -128,6 +157,152 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
         </TabsList>
 
         <TabsContent value="overview">
+          <section className="mb-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <Card className="border-stone-200 bg-white">
+              <CardHeader>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <CardTitle className="text-2xl">Story Readiness</CardTitle>
+                    <CardDescription>
+                      The overview starts with whether this person is ready to draft or publish, then keeps the operating data within reach.
+                    </CardDescription>
+                  </div>
+                  <div className="text-left sm:text-right">
+                    <p className="text-4xl font-semibold text-stone-900">{workspace.operations.completionPercent}%</p>
+                    <p className="text-xs uppercase tracking-[0.18em] text-stone-400">coverage</p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {storyReadinessChecks.map((check) => (
+                    <div key={check.key} className="border border-stone-200 bg-stone-50 px-3 py-3">
+                      <div className="flex items-center gap-2">
+                        {check.status === "complete" ? (
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        ) : (
+                          <CircleAlert className="h-4 w-4 text-amber-700" />
+                        )}
+                        <p className="text-sm font-medium text-stone-900">{check.label}</p>
+                      </div>
+                      <p className="mt-2 text-xs leading-5 text-stone-500">{check.summary || check.status}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <Button asChild className="bg-amber-700 hover:bg-amber-800">
+                    <SafeLink href={`/app/people/${routeId}/story-writer`}>Draft from context pack</SafeLink>
+                  </Button>
+                  <Button asChild variant="outline">
+                    <SafeLink href="/app/stories">Open Story Studio</SafeLink>
+                  </Button>
+                  {currentStory ? (
+                    <Button asChild variant="outline">
+                      <SafeLink href={`/app/stories/${currentStory._id}`}>Review latest saved story</SafeLink>
+                    </Button>
+                  ) : null}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-stone-200 bg-white">
+              <CardHeader>
+                <CardTitle>Life Sketch Preview</CardTitle>
+                <CardDescription>Quick story frame before diving into dense tabs.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm leading-6 text-stone-600">
+                <p>
+                  <span className="font-medium text-stone-900">{workspace.person.displayName}</span>
+                  {workspace.person.birth?.date?.original ? ` was born ${workspace.person.birth.date.original}` : " has an unknown birth date"}
+                  {workspace.person.birth?.place?.original ? ` in ${workspace.person.birth.place.original}` : ""}.
+                  {workspace.person.death?.date?.original ? ` Death is recorded as ${workspace.person.death.date.original}` : ""}
+                  {workspace.person.death?.place?.original ? ` in ${workspace.person.death.place.original}` : ""}.
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    ["Events", workspace.stats.events],
+                    ["Relationships", workspace.relationships.length],
+                    ["Stories", workspace.stats.stories],
+                    ["Context", workspace.stats.contextReports],
+                  ].map(([label, value]) => (
+                    <div key={label} className="border border-stone-200 px-3 py-3">
+                      <p className="text-lg font-semibold text-stone-900">{value}</p>
+                      <p className="text-xs text-stone-500">{label}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-stone-200 bg-white xl:col-span-2">
+              <CardHeader>
+                <CardTitle>Contextual Research</CardTitle>
+                <CardDescription>
+                  The non-genealogy research that helps turn names, dates, and places into a story: churches, buildings, local history, eras, migration, news, and daily life.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4 lg:grid-cols-[260px_1fr]">
+                <div className="grid grid-cols-2 gap-2 text-center text-sm lg:grid-cols-1">
+                  <div className="border border-stone-200 bg-stone-50 px-3 py-4">
+                    <p className="text-2xl font-semibold text-stone-900">{workspace.contextCoverage.count}</p>
+                    <p className="text-xs text-stone-500">context reports</p>
+                    {workspace.contextCoverage.count > 0 ? (
+                      <p className="mt-2 text-[11px] uppercase tracking-[0.14em] text-stone-400">
+                        {workspace.contextCoverage.aiEligibleCount} reviewed for AI · {workspace.contextCoverage.publishableCount} publish-ready
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="border border-stone-200 bg-stone-50 px-3 py-4">
+                    <p className="text-2xl font-semibold text-stone-900">
+                      {workspace.contextCoverage.placeCountWithContext}/{workspace.contextCoverage.relatedPlaceCount}
+                    </p>
+                    <p className="text-xs text-stone-500">places covered</p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  {workspace.contextCoverage.entries.length === 0 ? (
+                    <div className="rounded-md border border-dashed border-stone-200 px-4 py-6 text-sm leading-6 text-stone-500">
+                      This person has genealogy data, but no linked contextual research reports yet. Add place and era context from the relevant place workspaces before treating the story as ready.
+                    </div>
+                  ) : (
+                    workspace.contextCoverage.entries.slice(0, 4).map((entry) => {
+                      const reviewStatus = entry.reviewStatus ?? "unreviewed";
+                      const privacyLevel = entry.privacyLevel ?? "private";
+                      const aiAllowed = entry.aiUseAllowed === true;
+                      const reviewTone =
+                        reviewStatus === "reviewed" || reviewStatus === "redacted"
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                          : reviewStatus === "disputed" || reviewStatus === "rejected"
+                            ? "border-rose-200 bg-rose-50 text-rose-800"
+                            : "border-amber-200 bg-amber-50 text-amber-800";
+                      const privacyTone =
+                        privacyLevel === "public_source" || privacyLevel === "publish_candidate"
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                          : privacyLevel === "private"
+                            ? "border-rose-200 bg-rose-50 text-rose-800"
+                            : "border-stone-200 bg-stone-50 text-stone-700";
+                      return (
+                        <div key={String(entry._id)} className="border border-stone-200 px-4 py-3">
+                          <p className="font-medium text-stone-900">{entry.title}</p>
+                          <p className="mt-1 text-sm text-stone-500">
+                            {entry.topic.replace(/_/g, " ")} · {entry.timePeriod.startYear}-{entry.timePeriod.endYear}
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            <Badge variant="outline" className={reviewTone}>{reviewStatus}</Badge>
+                            <Badge variant="outline" className={privacyTone}>{privacyLevel.replace(/_/g, " ")}</Badge>
+                            <Badge variant="outline" className={aiAllowed ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-stone-200 bg-stone-50 text-stone-600"}>
+                              AI {aiAllowed ? "allowed" : "blocked"}
+                            </Badge>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+
           <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
             <Card className="border-stone-200">
               <CardHeader>
@@ -273,14 +448,14 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
                 },
               ].map((action) =>
                 action.available ? (
-                  <a
+                  <SafeAnchor
                     key={action.label}
                     href={action.href}
                     className="rounded-2xl border border-stone-200 bg-white px-4 py-4 transition hover:border-amber-300 hover:bg-amber-50/70"
                   >
                     <p className="font-medium text-stone-900">{action.label}</p>
                     <p className="mt-2 text-sm leading-6 text-stone-500">{action.description}</p>
-                  </a>
+                  </SafeAnchor>
                 ) : (
                   <div
                     key={action.label}
@@ -297,6 +472,35 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
 
         <TabsContent value="sources">
           <div className="grid gap-4">
+            {sourceFacts.length > 0 ? (
+              <Card className="border-stone-200 bg-stone-50/60">
+                <CardHeader>
+                  <CardTitle>Source-backed facts</CardTitle>
+                  <CardDescription>Indexed fields captured as citation-backed candidates. Conflicts require review before canonical facts change.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-3 md:grid-cols-2">
+                  {(sourceFacts as Array<{
+                    _id: string;
+                    factType: string;
+                    label: string;
+                    value: string;
+                    confidence: string;
+                    status: string;
+                    conflictReason?: string;
+                  }>).slice(0, 12).map((fact) => (
+                    <div key={fact._id} className="rounded-md border border-stone-200 bg-white px-4 py-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="font-medium text-stone-900">{fact.factType.replace(/_/g, " ")}</p>
+                        <Badge variant={fact.status === "conflict" ? "destructive" : "secondary"}>{fact.status}</Badge>
+                      </div>
+                      <p className="mt-2 text-sm text-stone-600">{fact.label}: {fact.value}</p>
+                      <p className="mt-1 text-xs text-stone-500">Confidence: {fact.confidence}</p>
+                      {fact.conflictReason ? <p className="mt-2 text-xs text-amber-800">{fact.conflictReason}</p> : null}
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            ) : null}
             {(workspace.sources as Array<{
               source: { _id: string; title: string; type: string; url?: string };
               citations: Array<{ page?: string; extractedText?: string; editedText?: string }>;
@@ -321,10 +525,10 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
                       </div>
                       {entry.source.url ? (
                         <Button asChild variant="outline" size="sm">
-                          <a href={entry.source.url} target="_blank" rel="noreferrer">
+                          <SafeAnchor href={entry.source.url} target="_blank" rel="noreferrer">
                             Open Source
                             <ArrowRight className="ml-2 h-4 w-4" />
-                          </a>
+                          </SafeAnchor>
                         </Button>
                       ) : null}
                     </div>
@@ -442,48 +646,30 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
               />
             ) : (
               (workspace.places as Array<{ _id: string; fullName?: string; name?: string; type?: string }>).map((place) => (
-                <Link key={place._id} href={`/app/places/${place._id}`}>
+                <SafeLink key={place._id} href={`/app/places/${place._id}`}>
                   <Card className="h-full border-stone-200 transition hover:border-amber-300 hover:bg-amber-50/30">
                     <CardHeader>
                       <CardTitle>{place.fullName || place.name || "Unknown place"}</CardTitle>
                       <CardDescription>{place.type || "place"}</CardDescription>
                     </CardHeader>
                   </Card>
-                </Link>
+                </SafeLink>
               ))
             )}
           </div>
         </TabsContent>
 
         <TabsContent value="memories">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {workspace.media.length === 0 ? (
-              <EmptyWorkspaceState
-                title="No memories imported yet"
-                description="Import a FamilySearch memories capture to enrich this person with photos, scans, and media for later story writing."
-                actionHref="/app/imports"
-                actionLabel="Import Memories"
-              />
-            ) : (
-              workspace.media.map((item) => (
-                <Card key={String(item._id)} className="border-stone-200">
-                  <CardHeader>
-                    <CardTitle className="text-lg">{item.title}</CardTitle>
-                    <CardDescription>{item.type}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {item.url ? (
-                      <div className="overflow-hidden rounded-2xl border border-stone-200 bg-stone-100">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={item.url} alt={item.title} className="h-48 w-full object-cover" />
-                      </div>
-                    ) : null}
-                    {item.description ? <p className="text-sm text-stone-600">{item.description}</p> : null}
-                  </CardContent>
-                </Card>
-              ))
-            )}
-          </div>
+          {media.length === 0 ? (
+            <EmptyWorkspaceState
+              title="No memories imported yet"
+              description="Import a FamilySearch memories capture to enrich this person with photos, scans, and media for later story writing."
+              actionHref="/app/imports"
+              actionLabel="Import Memories"
+            />
+          ) : (
+            <MediaPrivacyReviewPanel media={media} />
+          )}
         </TabsContent>
 
         <TabsContent value="documents">
@@ -498,10 +684,10 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
             <CardContent className="space-y-4">
               <div className="flex flex-wrap gap-3">
                 <Button asChild variant="outline">
-                  <Link href={`/app/people/${personId}/raw`}>Raw Evidence Document</Link>
+                  <SafeLink href={`/app/people/${personId}/raw`}>Raw Evidence Document</SafeLink>
                 </Button>
                 <Button asChild variant="outline">
-                  <Link href={`/app/people/${personId}/contextualized`}>Contextualized Dossier</Link>
+                  <SafeLink href={`/app/people/${personId}/contextualized`}>Contextualized Dossier</SafeLink>
                 </Button>
               </div>
               <DocumentsViewer personId={workspace.person.fsId || String(workspace.person._id)} />
@@ -518,7 +704,7 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
               </CardHeader>
               <CardContent>
                 <Button asChild className="bg-amber-700 hover:bg-amber-800">
-                  <Link href={`/app/people/${routeId}/story-writer`}>Open Story Writer</Link>
+                  <SafeLink href={`/app/people/${routeId}/story-writer`}>Open Story Writer</SafeLink>
                 </Button>
               </CardContent>
             </Card>
@@ -535,8 +721,18 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
                     <CardTitle>{story.title}</CardTitle>
                     <CardDescription>{story.type.replace(/_/g, " ")} · {story.status}</CardDescription>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="space-y-4">
                     <p className="whitespace-pre-wrap text-sm text-stone-600">{story.content}</p>
+                    <div className="flex flex-wrap gap-3">
+                      <Button asChild variant="outline" size="sm">
+                        <SafeLink href={`/app/stories/${story._id}`}>Review in Story Studio</SafeLink>
+                      </Button>
+                      {story.status === "published" ? (
+                        <Button asChild variant="outline" size="sm">
+                          <SafeLink href={publicStoryPath(story.publicSlug ?? String(story._id))} target="_blank">Open public page</SafeLink>
+                        </Button>
+                      ) : null}
+                    </div>
                   </CardContent>
                 </Card>
               ))
@@ -610,6 +806,10 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
               />
             </CardContent>
           </Card>
+
+          <div className="mt-5">
+            <ContextItemsPanel personIdentifier={routeId} contextItems={contextItems} />
+          </div>
         </TabsContent>
       </Tabs>
     </div>
@@ -634,7 +834,7 @@ function EmptyWorkspaceState({
         <p className="mt-2 max-w-xl text-sm leading-6 text-stone-500">{description}</p>
         {actionHref && actionLabel ? (
           <Button asChild variant="outline" className="mt-5">
-            <Link href={actionHref}>{actionLabel}</Link>
+            <SafeLink href={actionHref}>{actionLabel}</SafeLink>
           </Button>
         ) : null}
       </CardContent>

@@ -17,7 +17,7 @@
 // State types
 type UIState = "notOnPage" | "ready" | "extracting" | "complete" | "error";
 
-interface ExtractionState {
+interface PopupExtractionState {
   status: string;
   currentStep: number;
   totalSteps: number;
@@ -27,7 +27,7 @@ interface ExtractionState {
   mode: string;
 }
 
-interface PageInfo {
+interface PopupPageInfo {
   personId: string;
   personName: string;
   birthDate?: string;
@@ -81,7 +81,7 @@ function showState(state: UIState) {
 async function init() {
   // Check for admin mode
   const settings = await chrome.storage.local.get("adminMode");
-  isAdminMode = settings.adminMode || false;
+  isAdminMode = settings.adminMode === true;
   elements.adminBadge.style.display = isAdminMode ? "block" : "none";
 
   // Get current tab
@@ -94,21 +94,21 @@ async function init() {
 
   // Get page info from content script
   try {
-    const response = await chrome.tabs.sendMessage(tab.id!, { type: "GET_PAGE_INFO" });
+    const response = await chrome.tabs.sendMessage(tab.id!, { type: "GET_PAGE_INFO" }) as PopupPageInfo | undefined;
     if (response?.onCapturePage) {
       displayPageInfo(response);
       
       // Check extraction state
-      const state = await chrome.runtime.sendMessage({ type: "GET_STATE" });
+      const state = await chrome.runtime.sendMessage({ type: "GET_STATE" }) as PopupExtractionState | undefined;
       if (state?.status === "extracting" || state?.status === "expanding") {
         showState("extracting");
-        updateProgress(state);
+        updatePopupProgress(state);
       } else if (state?.status === "complete") {
         const stored = await chrome.storage.local.get(["lastCapturePackage", "lastEvidencePack"]);
         const latestCapture = stored.lastCapturePackage || stored.lastEvidencePack;
         if (latestCapture) {
           lastCapturePackage = latestCapture;
-          showComplete(latestCapture);
+          showComplete(latestCapture as { sources?: unknown[]; memories?: unknown[] });
         }
       } else {
         showState("ready");
@@ -122,7 +122,7 @@ async function init() {
 }
 
 // Display page info
-function displayPageInfo(info: PageInfo) {
+function displayPageInfo(info: PopupPageInfo) {
   elements.personName.textContent = info.personName || "Unknown Person";
   
   const dates: string[] = [];
@@ -135,7 +135,7 @@ function displayPageInfo(info: PageInfo) {
 }
 
 // Update progress
-function updateProgress(state: ExtractionState) {
+function updatePopupProgress(state: PopupExtractionState) {
   const progress = state.totalSteps > 0 
     ? Math.round((state.currentStep / state.totalSteps) * 100) 
     : 0;
@@ -166,15 +166,23 @@ elements.consentCheck.addEventListener("change", () => {
 });
 
 elements.extractBtn.addEventListener("click", async () => {
+  // GEN-74: assert consent locally, then pass `consentAcknowledged: true` to
+  // the service worker so the compliance boundary is enforced where
+  // capture actually starts, not only via the UI button state.
+  if (!elements.consentCheck.checked) {
+    return;
+  }
   showState("extracting");
   elements.progressFill.style.width = "0%";
   elements.progressStatus.textContent = "Starting extraction...";
-  
+
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (tab?.id) {
-    chrome.runtime.sendMessage({ 
+    chrome.runtime.sendMessage({
       type: "START_EXTRACTION",
       mode: isAdminMode ? "admin" : "standard",
+      tabId: tab.id,
+      consentAcknowledged: true,
     });
   }
 });
@@ -236,12 +244,12 @@ chrome.runtime.onMessage.addListener((message) => {
       if (currentState !== "extracting") {
         showState("extracting");
       }
-      updateProgress(state);
+      updatePopupProgress(state);
     } else if (state.status === "complete") {
       chrome.storage.local.get(["lastCapturePackage", "lastEvidencePack"]).then((stored) => {
         const latestCapture = stored.lastCapturePackage || stored.lastEvidencePack;
         if (latestCapture) {
-          showComplete(latestCapture);
+          showComplete(latestCapture as { sources?: unknown[]; memories?: unknown[] });
         }
       });
     } else if (state.status === "error") {

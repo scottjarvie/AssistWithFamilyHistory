@@ -27,6 +27,15 @@ interface ExtractionState {
   mode: "standard" | "admin";
 }
 
+const ICON_PATHS = {
+  "16": "icons/icon16.svg",
+  "32": "icons/icon32.svg",
+  "48": "icons/icon48.svg",
+  "128": "icons/icon128.svg",
+};
+
+let activeExtractionTabId: number | undefined;
+
 let extractionState: ExtractionState = {
   status: "idle",
   currentStep: 0,
@@ -59,7 +68,36 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       break;
 
     case "START_EXTRACTION":
-      startExtraction(message.mode || "standard", sender.tab?.id);
+      // GEN-74: defense-in-depth on the capture-initiation boundary. The
+      // popup disables its Extract button until the consent checkbox is
+      // checked, but the service worker is the place compliance must live.
+      // Reject any START_EXTRACTION that doesn't explicitly assert consent,
+      // doesn't carry a recognized mode, or doesn't come from a tab whose
+      // URL is a FamilySearch person sources/memories page. Also reject if
+      // another extraction is already active.
+      if (message.consentAcknowledged !== true) {
+        console.warn("START_EXTRACTION rejected: consent not acknowledged");
+        sendResponse({ error: "consent_not_acknowledged" });
+        break;
+      }
+      if (message.mode !== "standard" && message.mode !== "admin") {
+        console.warn("START_EXTRACTION rejected: unknown mode", message.mode);
+        sendResponse({ error: "invalid_mode" });
+        break;
+      }
+      if (
+        extractionState.status === "extracting" ||
+        extractionState.status === "expanding" ||
+        extractionState.status === "building"
+      ) {
+        console.warn("START_EXTRACTION rejected: extraction already active");
+        sendResponse({ error: "extraction_already_active" });
+        break;
+      }
+      startExtensionExtraction(
+        message.mode,
+        message.tabId || sender.tab?.id
+      );
       sendResponse({ success: true });
       break;
 
@@ -69,7 +107,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       break;
 
     case "UPDATE_PROGRESS":
-      updateProgress(message.data);
+      updateExtractionProgress(message.data as Partial<ExtractionState>);
       break;
 
     case "EXTRACTION_COMPLETE":
@@ -77,7 +115,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       break;
 
     case "EXTRACTION_ERROR":
-      handleError(message.error);
+      handleError(typeof message.error === "string" ? message.error : "Unknown extraction error");
       break;
 
     default:
@@ -88,11 +126,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 // Start extraction
-async function startExtraction(mode: "standard" | "admin", tabId?: number) {
+async function startExtensionExtraction(mode: "standard" | "admin", tabId?: number) {
   if (!tabId) {
     console.error("No tab ID provided");
     return;
   }
+
+  // GEN-74: verify the active tab URL matches a FamilySearch person
+  // sources/memories page. The popup checks this, but defense-in-depth
+  // confirms it at the service-worker boundary too.
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    const url = tab?.url ?? "";
+    const isAllowedPath =
+      /^https:\/\/(www\.)?familysearch\.org\/.*\/tree\/person\/(sources|memories)\//.test(url);
+    if (!isAllowedPath) {
+      console.warn("START_EXTRACTION rejected: tab URL is not a FamilySearch person sources/memories page", url);
+      return;
+    }
+  } catch (error) {
+    console.warn("START_EXTRACTION rejected: unable to verify tab URL", error);
+    return;
+  }
+
+  activeExtractionTabId = tabId;
 
   extractionState = {
     status: "extracting",
@@ -111,7 +168,10 @@ async function startExtraction(mode: "standard" | "admin", tabId?: number) {
   try {
     await chrome.tabs.sendMessage(tabId, {
       type: "START_EXTRACT",
-      pacing: PACING[mode],
+      pacing: {
+        ...PACING[mode],
+        mode,
+      },
     });
   } catch (error) {
     handleError(`Failed to start extraction: ${error}`);
@@ -122,10 +182,16 @@ async function startExtraction(mode: "standard" | "admin", tabId?: number) {
 function cancelExtraction() {
   extractionState.status = "cancelled";
   broadcastState();
+
+  if (activeExtractionTabId) {
+    chrome.tabs.sendMessage(activeExtractionTabId, { type: "CANCEL_EXTRACT" }).catch(() => {
+      // The content script might already be gone.
+    });
+  }
 }
 
 // Update progress
-function updateProgress(data: Partial<ExtractionState>) {
+function updateExtractionProgress(data: Partial<ExtractionState>) {
   extractionState = { ...extractionState, ...data };
   broadcastState();
 }
@@ -133,6 +199,7 @@ function updateProgress(data: Partial<ExtractionState>) {
 // Complete extraction
 function completeExtraction(capturePackage: unknown) {
   extractionState.status = "complete";
+  activeExtractionTabId = undefined;
   broadcastState();
 
   // Store the latest capture package temporarily for download/copy actions.
@@ -147,6 +214,7 @@ function completeExtraction(capturePackage: unknown) {
 function handleError(error: string) {
   extractionState.status = "error";
   extractionState.errors.push(error);
+  activeExtractionTabId = undefined;
   broadcastState();
 }
 
@@ -167,22 +235,24 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       tab.url.includes("familysearch.org/tree/person") && 
       (tab.url.includes("sources") || tab.url.includes("memories"));
     
-    // Update extension icon based on page
+    const title = isFamilySearchCapture
+      ? "Capture FamilySearch sources or memories"
+      : "Open a FamilySearch person sources or memories page";
+
+    // Keep icon assets aligned with manifest paths. Status differences are shown
+    // through the action title until separate inactive icons exist.
     chrome.action.setIcon({
       tabId,
-      path: isFamilySearchCapture ? {
-        "16": "icons/icon16.png",
-        "32": "icons/icon32.png",
-        "48": "icons/icon48.png",
-        "128": "icons/icon128.png",
-      } : {
-        "16": "icons/icon16-inactive.png",
-        "32": "icons/icon32-inactive.png",
-        "48": "icons/icon48-inactive.png",
-        "128": "icons/icon128-inactive.png",
-      },
+      path: ICON_PATHS,
     }).catch(() => {
-      // Icons might not exist yet
+      // Some browser versions are stricter about runtime icon formats.
+    });
+
+    chrome.action.setTitle({
+      tabId,
+      title,
+    }).catch(() => {
+      // Non-fatal browser API failure.
     });
   }
 });

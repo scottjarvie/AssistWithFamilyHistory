@@ -1,0 +1,93 @@
+# API Route Inventory
+
+Last updated: 2026-05-21
+
+## Purpose
+
+This inventory classifies every current `app/api/**/route.ts` surface. The machine-readable companion is [`capability-manifest.json`](capability-manifest.json).
+
+Discover Their Stories has useful internal APIs, but they are not yet a public or stable agent API. Treat them as internal app routes unless this inventory says otherwise. Future OpenAPI and capability docs should start from this table.
+
+## Owner And Auth Baseline
+
+All `/api/**` routes are in the protected route set when `REQUIRE_AUTH=true`.
+
+Every owner-scoped route should resolve the active owner with `getVaultAccessContext()` and pass `vaultOwnerId` into file storage, Convex queries, and Convex mutations.
+
+The public non-API route `/stories/[id]` is intentionally outside this inventory. It is public by design, resolves readable slugs or legacy story IDs, redirects IDs to canonical slugs when available, and only returns stories with status `published`.
+
+## Capability Presets To Consider Later
+
+These are planning terms only. They are not implemented scopes yet.
+
+| Preset | Meaning | Current status |
+| --- | --- | --- |
+| Read-only assistant | Read owner-scoped people, context packs, stories, documents, queue summaries | Future candidate |
+| Import agent | Import user-provided capture packages; no provider crawling | Future candidate after intake hardening |
+| Research operator | Create tasks/checks and prepare handoffs | Future candidate after queue/runbook gates |
+| Story writer | Save story drafts, revise story content, and request review inside owner vault | Future candidate; cannot publish public stories |
+| Trusted operator | Higher-risk merges, provisional-relative decisions, bulk operations, public story publish | Future candidate; requires review gates |
+| Admin/security tool | Cross-user or incident workflows | Not present |
+
+## Route Table
+
+| Route | Methods | Primary behavior | Owner boundary | API status | Risk / notes |
+| --- | --- | --- | --- | --- | --- |
+| `/api/capabilities` | GET | Return internal capability actions for the requesting actor role | Protected route; no vault data read | Internal now; future agent-discovery candidate | Story capabilities distinguish writer/reviewer/trusted publisher actions |
+| `/api/context-items` | POST | Create review-first loose context item for a person | Uses `getVaultAccessContext()` | Internal now; future research-operator candidate | Write route; AI use is blocked unless context is reviewed and non-private |
+| `/api/context-reports` | POST | Create historical context report for owner vault | Uses `getVaultAccessContext()` | Internal now; future research-operator candidate | Write route; needs context validation and provenance expectations before agent support |
+| `/api/convex/documents` | GET | Read owner documents, optionally by person/type | Uses `getVaultAccessContext()` | Internal now; future read-only candidate | Sensitive derived artifacts; no OpenAPI/capability doc yet |
+| `/api/convex/people` | GET | Read people explorer from Convex vault | Uses `getVaultAccessContext()` | Internal now; future read-only candidate | Owner-scoped read |
+| `/api/convex/stats` | GET | Read dashboard/vault stats | Uses `getVaultAccessContext()` | Internal now; future read-only candidate | Low write risk, still private vault metadata |
+| `/api/import` | POST | Preview or merge FamilySearch capture package artifacts; `?preview=true` validates without saving/merging | Uses `getVaultAccessContext()` | Internal now; future import-agent candidate | High data-integrity risk; provider API access is pending; browser/user-initiated capture only; future scopes should split validate from merge |
+| `/api/media/review` | POST | Update media privacy, review, rights, AI-use, and review note fields | Uses `getVaultAccessContext()` and Convex owner checks | Internal now; future trusted-operator candidate | Privacy-sensitive write route; AI use requires reviewed, non-private media with usable rights |
+| `/api/operations/checks` | POST | Upsert research check state for a person | Uses `getVaultAccessContext()` | Internal now; future research-operator candidate | Write route; `completionSource: "ai_agent"` requires summary, notes, and confidence gates |
+| `/api/operations/provisional` | POST | Promote or merge provisional relatives | Uses `getVaultAccessContext()` and Convex owner checks | Internal only for now | High data-integrity risk; requires explicit human review confirmation |
+| `/api/operations/queue` | GET | Read operations queue with filters/sorting; `?format=handoff` exports agent handoff packet | Uses `getVaultAccessContext()` | Future read-only/handoff candidate | Stable tie-break sorting and handoff export exist; still internal/private |
+| `/api/operations/tasks` | POST | Create research task, optionally linked to person | Uses `getVaultAccessContext()` | Internal now; future research-operator candidate | Write route; acceptable candidate after runbook gates |
+| `/api/people` | GET | Read local artifact-backed person list | Uses `getVaultAccessContext()` | Internal/legacy read | Reads local raw artifact index, not full Convex people explorer |
+| `/api/people/[id]` | GET | Resolve person metadata, stored runs, latest run, vault-only status | Uses `getVaultAccessContext()` | Internal/legacy read | Owner-scoped bridge across Convex and local artifacts |
+| `/api/people/[id]/context-pack` | GET | Read JSON or Markdown AI context pack | Uses `getVaultAccessContext()` | Strong future read-only/agent-handoff candidate | Sensitive; should expose provenance/weak-claim details before broad agent use |
+| `/api/people/[id]/contextualized` | GET, POST | Read or save contextualized dossier; POST syncs document metadata | Uses `getVaultAccessContext()` | Internal/legacy browser workflow | Mixed artifact/doc workflow; see [`legacy-document-route-boundary.md`](legacy-document-route-boundary.md). Keep out of read-only agent scopes until method semantics are split |
+| `/api/people/[id]/raw` | GET | Read or generate raw evidence document and sync metadata | Uses `getVaultAccessContext()` | Internal/legacy browser workflow | GET can have generation/sync side effects; see [`legacy-document-route-boundary.md`](legacy-document-route-boundary.md). Keep out of read-only agent scopes until method semantics are split |
+| `/api/people/[id]/runs/[runId]/pack` | GET | Read stored evidence pack for a specific run | Uses `getVaultAccessContext()` | Internal/legacy read; future read-only candidate with caution | Sensitive source evidence; should stay owner-scoped |
+| `/api/people/[id]/stories` | POST | Save story draft for person and refresh research checks | Uses `getVaultAccessContext()` | Internal now; future story-writer candidate | Write route; lower risk than publish, but story-writer scope must preserve provenance and cannot publish |
+| `/api/process` | POST | Submit prompt/data to OpenRouter with client or server key | Protected by required-auth middleware, does not use vault owner | Internal AI utility | High privacy/abuse risk; should not become broad public API without quotas/disclosure |
+| `/api/stories/[id]` | PATCH | Update story title/content/type/tags | Uses `getVaultAccessContext()` and Convex owner checks | Internal now; future story-writer candidate | Owner-protected write; content changes should keep story in draft/review until gates pass |
+| `/api/stories/[id]/review` | PATCH | Assign a story reviewer, optionally require second approval, and record review history | Uses `getVaultAccessContext()` and Convex owner checks | Internal now; future reviewer/trusted-operator candidate | Explicit `story_writer` role is denied reviewer assignment |
+| `/api/stories/[id]/status` | GET, PATCH | Preview publish readiness or change story status between draft/review/published | Uses `getVaultAccessContext()` and Convex owner checks | Internal now; future story-writer/trusted-operator candidate | GET supports `?format=handoff`; `?record=true` stores a publish-preview audit snapshot; publish PATCH is blocked by capability, safety gates, required second approval, and explicit human review confirmation |
+
+## Current Gaps
+
+- No OpenAPI document exists.
+- Machine-readable capability manifest exists, but it is still internal planning rather than a public contract.
+- No API key model, scopes, tiers, quotas, request IDs, or usage endpoint exists.
+- No `/me`, `/capabilities`, `/openapi`, or `/usage` first-success path exists.
+- Legacy raw/contextualized document routes blur read/write semantics and are documented as internal legacy browser workflows in [`legacy-document-route-boundary.md`](legacy-document-route-boundary.md).
+- Anonymous preview behavior needs product/security decision before public beta; see `GEN-39`.
+- Story writer vs trusted publisher authority is enforced for explicit agent roles, but issued API keys/scopes are not implemented yet.
+- Public beta is status-only for now: `published` means publicly renderable, while draft/review 404. Readable slugs and noindex/index metadata exist; richer sharing settings remain separate work.
+
+## Completion Policy For Feature Work
+
+Any issue that touches these routes or creates a new route should include:
+
+```markdown
+## API impact
+
+- API impact: none / read / write / admin / docs-only / unknown
+- API parity: now / next / browser-only / agent-first / research-needed
+- Endpoint changes:
+- Scope/tier impact:
+- OpenAPI/capability manifest impact:
+- SDK/CLI/docs impact:
+- Security/abuse/privacy risk:
+- Verification plan:
+```
+
+Run this after adding or removing API routes:
+
+```bash
+pnpm check:api-inventory
+pnpm check:protected-routes
+```

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { SafeLink as Link } from "@/components/layout/SafeLink";
 import { Bot, Filter, FolderSearch, Gauge, LogIn, Search, Sparkles, TableProperties, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ type SearchParams = Promise<{
   q?: string;
   type?: string;
   storyStatus?: string;
+  storyWorkflow?: string;
   staleOnly?: string;
   sortBy?: string;
   sortDirection?: string;
@@ -64,6 +65,14 @@ export default async function OperationsPage({ searchParams }: { searchParams: S
         params.storyStatus === "has_story" || params.storyStatus === "no_story"
           ? params.storyStatus
           : undefined,
+      storyWorkflow:
+        params.storyWorkflow === "needs_genealogy_evidence" ||
+        params.storyWorkflow === "needs_context_research" ||
+        params.storyWorkflow === "ready_to_draft" ||
+        params.storyWorkflow === "ready_to_review" ||
+        params.storyWorkflow === "published"
+          ? params.storyWorkflow
+          : undefined,
       staleOnly: params.staleOnly === "true" ? true : undefined,
       sortBy:
         params.sortBy === "completion" ||
@@ -90,9 +99,17 @@ export default async function OperationsPage({ searchParams }: { searchParams: S
     params.q ||
       params.type ||
       params.storyStatus ||
+      params.storyWorkflow ||
       params.staleOnly === "true" ||
       params.missingCheck
   );
+  const handoffParams = new URLSearchParams();
+  handoffParams.set("format", "handoff");
+  for (const [key, value] of Object.entries(params)) {
+    if (typeof value === "string" && value) {
+      handoffParams.set(key, value);
+    }
+  }
   const isGuestVault = accessContext.mode === "anonymous";
   const sessionLabel =
     accessContext.mode === "user"
@@ -139,6 +156,12 @@ export default async function OperationsPage({ searchParams }: { searchParams: S
                       Import capture package
                     </Link>
                   </Button>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href={`/api/operations/queue?${handoffParams.toString()}`} target="_blank">
+                      <Bot className="h-4 w-4" />
+                      Export agent handoff
+                    </Link>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -163,7 +186,7 @@ export default async function OperationsPage({ searchParams }: { searchParams: S
 
       <section className="mb-6">
         <form className="rounded-[1.75rem] border border-stone-200 bg-white p-4 shadow-sm">
-          <div className="grid gap-3 xl:grid-cols-[1.1fr_180px_180px_180px_190px_130px_130px_auto]">
+          <div className="grid gap-3 xl:grid-cols-[1.1fr_170px_180px_190px_170px_190px_120px_120px_auto]">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
               <Input
@@ -179,9 +202,17 @@ export default async function OperationsPage({ searchParams }: { searchParams: S
               <option value="provisional">Provisional relatives</option>
             </select>
             <select name="storyStatus" defaultValue={params.storyStatus || ""} className="h-10 rounded-md border border-stone-200 bg-white px-3 text-sm text-stone-700">
-              <option value="">Any story state</option>
-              <option value="has_story">Has story</option>
-              <option value="no_story">No story</option>
+              <option value="">Any saved story state</option>
+              <option value="has_story">Has saved draft/page</option>
+              <option value="no_story">No saved draft yet</option>
+            </select>
+            <select name="storyWorkflow" defaultValue={params.storyWorkflow || ""} className="h-10 rounded-md border border-stone-200 bg-white px-3 text-sm text-stone-700">
+              <option value="">Any readiness</option>
+              <option value="needs_genealogy_evidence">Needs genealogy</option>
+              <option value="needs_context_research">Needs context</option>
+              <option value="ready_to_draft">Ready to draft</option>
+              <option value="ready_to_review">Ready to review</option>
+              <option value="published">Published</option>
             </select>
             <select name="missingCheck" defaultValue={params.missingCheck || ""} className="h-10 rounded-md border border-stone-200 bg-white px-3 text-sm text-stone-700">
               <option value="">Any missing check</option>
@@ -198,7 +229,7 @@ export default async function OperationsPage({ searchParams }: { searchParams: S
               <option value="completion">Sort: Completion</option>
               <option value="lastTouched">Sort: Last touched</option>
               <option value="sourceCount">Sort: Source count</option>
-              <option value="storyReadiness">Sort: Story readiness</option>
+              <option value="storyReadiness">Sort: Draft/publish readiness</option>
               <option value="newestImport">Sort: Newest import</option>
             </select>
             <select name="sortDirection" defaultValue={params.sortDirection || "desc"} className="h-10 rounded-md border border-stone-200 bg-white px-3 text-sm text-stone-700">
@@ -248,10 +279,10 @@ export default async function OperationsPage({ searchParams }: { searchParams: S
               <Gauge className="h-5 w-5 text-amber-700" />
               <CardTitle>Progress Logic</CardTitle>
             </div>
-            <CardDescription>Coverage is intentionally opinionated, not just a raw count of attached records.</CardDescription>
+            <CardDescription>Story readiness means ready to draft or publish, not simply having any story.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-stone-600">
-            <p>Required checks drive completion more than optional ones, stale work is flagged separately, and stories/documents feed the same operations view instead of living in a silo.</p>
+            <p>Required checks drive readiness more than optional ones, stale work is flagged separately, and saved stories add signal only after evidence coverage is strong enough to support drafting or publishing.</p>
           </CardContent>
         </Card>
       </section>
@@ -266,6 +297,7 @@ export default async function OperationsPage({ searchParams }: { searchParams: S
                 <th className="px-4 py-4 font-medium">Places</th>
                 <th className="px-4 py-4 font-medium">Coverage</th>
                 <th className="px-4 py-4 font-medium">Evidence</th>
+                <th className="px-4 py-4 font-medium">Story State</th>
                 <th className="px-4 py-4 font-medium">Missing Checks</th>
                 <th className="px-4 py-4 font-medium">Next Action</th>
                 <th className="px-4 py-4 font-medium">Actions</th>
@@ -308,7 +340,13 @@ export default async function OperationsPage({ searchParams }: { searchParams: S
                     <p>{row.sourceCount} sources</p>
                     <p>{row.memoryCount} memories</p>
                     <p>{row.documentCount} documents</p>
+                    <p>{row.contextReportCount} context</p>
                     <p>{row.storyCount} stories</p>
+                  </td>
+                  <td className="px-4 py-4">
+                    <Badge variant="outline" className="border-stone-200 text-stone-700">
+                      {row.storyWorkflow.replace(/_/g, " ")}
+                    </Badge>
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex flex-wrap gap-2">
@@ -342,7 +380,15 @@ export default async function OperationsPage({ searchParams }: { searchParams: S
                       personIdentifier={row.personIdentifier}
                       provisionalId={row.rowType === "provisional" ? row.id : undefined}
                       anchorPersonIdentifier={row.anchorPersonIdentifier || undefined}
+                      displayName={row.displayName}
                       missingCritical={row.missingCritical}
+                      nextActions={row.nextActions}
+                      sourceCount={row.sourceCount}
+                      memoryCount={row.memoryCount}
+                      documentCount={row.documentCount}
+                      contextReportCount={row.contextReportCount}
+                      storyWorkflow={row.storyWorkflow}
+                      staleChecksCount={row.staleChecksCount}
                     />
                   </td>
                 </tr>

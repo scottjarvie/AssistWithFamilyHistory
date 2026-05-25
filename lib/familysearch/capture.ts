@@ -95,6 +95,12 @@ export interface ParsedCapturePackage {
   legacyEvidencePack?: EvidencePack;
 }
 
+export interface CaptureImportReadiness {
+  canImport: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
 export function parseCapturePackage(input: unknown): ParsedCapturePackage {
   const captureResult = CapturePackageSchema.safeParse(input);
   if (captureResult.success) {
@@ -121,6 +127,107 @@ export function parseCapturePackage(input: unknown): ParsedCapturePackage {
     capture,
     compatibilityMode: true,
     legacyEvidencePack: legacyResult.data,
+  };
+}
+
+export function assessCapturePackageForImport(
+  capture: CapturePackage,
+  options: { compatibilityMode?: boolean } = {}
+): CaptureImportReadiness {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  const familySearchId = capture.person.familySearchId.trim();
+  if (!familySearchId) {
+    errors.push("Capture package is missing the FamilySearch person ID.");
+  } else if (!/^[A-Z0-9]{4}-[A-Z0-9]{3}$/i.test(familySearchId)) {
+    warnings.push(`FamilySearch person ID has an unexpected shape: ${familySearchId}.`);
+  }
+
+  if (!capture.person.name.trim()) {
+    errors.push("Capture package is missing the person name.");
+  }
+
+  const capturedAtMs = Date.parse(capture.capturedAt);
+  if (Number.isNaN(capturedAtMs)) {
+    errors.push("Capture package has an invalid capturedAt timestamp.");
+  } else if (capturedAtMs > Date.now() + 10 * 60 * 1000) {
+    errors.push("Capture package capturedAt timestamp is in the future.");
+  }
+
+  const pageUrl = parseUrl(capture.pageUrl);
+  if (!pageUrl) {
+    errors.push("Capture package pageUrl is not a valid URL.");
+  } else if (!pageUrl.hostname.endsWith("familysearch.org")) {
+    errors.push("Capture package pageUrl must come from familysearch.org.");
+  } else if (!pageUrl.pathname.includes("/tree/person/")) {
+    errors.push("Capture package pageUrl is not a FamilySearch person page.");
+  } else if (capture.pageType === "sources" && !pageUrl.pathname.includes("/sources/")) {
+    warnings.push("Capture is marked as sources, but the pageUrl does not include /sources/.");
+  } else if (capture.pageType === "memories" && !pageUrl.pathname.includes("/memories/")) {
+    warnings.push("Capture is marked as memories, but the pageUrl does not include /memories/.");
+  }
+
+  if (capture.sources.length === 0 && capture.memories.length === 0) {
+    errors.push("Capture package contains no sources or memories.");
+  }
+
+  if (capture.pageType === "sources" && capture.sources.length === 0) {
+    warnings.push("Source capture has no sources. Confirm the FamilySearch page truly had no attached sources.");
+  }
+
+  if (capture.pageType === "memories" && capture.memories.length === 0) {
+    warnings.push("Memory capture has no memories. Confirm the FamilySearch page truly had no attached memories.");
+  }
+
+  if (capture.diagnostics.totalSources !== capture.sources.length) {
+    warnings.push(
+      `Diagnostics totalSources (${capture.diagnostics.totalSources}) does not match captured sources (${capture.sources.length}).`
+    );
+  }
+
+  if (capture.diagnostics.totalMemories !== capture.memories.length) {
+    warnings.push(
+      `Diagnostics totalMemories (${capture.diagnostics.totalMemories}) does not match captured memories (${capture.memories.length}).`
+    );
+  }
+
+  if (capture.diagnostics.mode === "admin") {
+    warnings.push("Capture package was produced in admin mode and needs explicit review before merge.");
+  }
+
+  if (capture.diagnostics.failedExpansions > 0) {
+    warnings.push(`${capture.diagnostics.failedExpansions} source expansion(s) failed during capture.`);
+  }
+
+  const sourceKeys = new Set<string>();
+  for (const source of capture.sources) {
+    if (!source.title.trim()) {
+      warnings.push(`Source ${source.id || source.orderIndex} is missing a title.`);
+    }
+    if (sourceKeys.has(source.sourceKey)) {
+      warnings.push(`Duplicate sourceKey detected: ${source.sourceKey}.`);
+    }
+    sourceKeys.add(source.sourceKey);
+
+    if (source.webPageUrl && !parseUrl(source.webPageUrl)) {
+      warnings.push(`Source ${source.id || source.sourceKey} has an invalid webPageUrl.`);
+    }
+  }
+
+  const birthYear = parseYear(capture.person.birthDate);
+  if (!capture.person.deathDate && (!birthYear || birthYear > new Date().getFullYear() - 110)) {
+    warnings.push("Person may be living or private; review before importing or exposing generated work.");
+  }
+
+  if (options.compatibilityMode) {
+    warnings.push("Legacy evidence-pack compatibility mode was used; v2 capture diagnostics may be incomplete.");
+  }
+
+  return {
+    canImport: errors.length === 0,
+    errors,
+    warnings,
   };
 }
 
@@ -197,6 +304,19 @@ export function toLegacyEvidencePack(capture: CapturePackage): EvidencePack {
       errors: capture.diagnostics.errors,
     },
   };
+}
+
+function parseUrl(value: string) {
+  try {
+    return new URL(value);
+  } catch {
+    return null;
+  }
+}
+
+function parseYear(value?: string) {
+  const match = value?.match(/\b(1[5-9]\d{2}|20\d{2})\b/);
+  return match ? Number(match[1]) : null;
 }
 
 function stripCaptureSource(source: CaptureSource): Source {

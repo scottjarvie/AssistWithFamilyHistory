@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { api } from "@/convex/_generated/api";
 import { getConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
+import { requireHumanReviewConfirmation } from "@/lib/operations/reviewGates";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
 export async function POST(request: NextRequest) {
@@ -14,9 +15,27 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const provisionalId = typeof body.provisionalId === "string" ? body.provisionalId : "";
     const action = body.action === "promote" || body.action === "merge" ? body.action : null;
+    const humanReviewNote = typeof body.humanReviewNote === "string" ? body.humanReviewNote.trim() : undefined;
 
     if (!provisionalId || !action) {
       return NextResponse.json({ error: "Missing provisionalId or action" }, { status: 400 });
+    }
+
+    const reviewErrors = requireHumanReviewConfirmation({
+      actionName: `Provisional relative ${action}`,
+      confirmed: body.humanReviewConfirmed,
+      note: body.humanReviewNote,
+    });
+
+    if (reviewErrors.length > 0) {
+      return NextResponse.json(
+        {
+          error: "Human review gate failed",
+          details: reviewErrors.join(" "),
+          reviewErrors,
+        },
+        { status: 400 }
+      );
     }
 
     const client = getConvexClient();
@@ -24,6 +43,7 @@ export async function POST(request: NextRequest) {
       const result = await client.mutation(api.vaultMutations.promoteProvisionalRelative, {
         vaultOwnerId,
         provisionalId: provisionalId as never,
+        humanReviewNote,
       });
       return NextResponse.json({ success: true, ...result });
     }
@@ -60,6 +80,7 @@ export async function POST(request: NextRequest) {
       vaultOwnerId,
       provisionalId: provisionalId as never,
       targetPersonId: workspace.person._id,
+      humanReviewNote,
     });
     return NextResponse.json(result);
   } catch (error) {

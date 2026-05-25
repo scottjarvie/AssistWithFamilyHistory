@@ -19,8 +19,8 @@
 
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { SafeLink } from "@/components/layout/SafeLink";
 import { 
   BookOpen, 
   LayoutDashboard, 
@@ -35,6 +35,9 @@ import {
   MapPinned,
   ClipboardList,
   TableProperties,
+  ExternalLink,
+  Gauge,
+  FlaskConical,
   type LucideIcon
 } from "lucide-react";
 import { useState } from "react";
@@ -65,7 +68,7 @@ type NavSection = {
 
 const navSections: NavSection[] = [
   {
-    label: "Workspace",
+    label: "Workflow",
     items: [
       {
         href: "/app",
@@ -76,7 +79,7 @@ const navSections: NavSection[] = [
     ],
   },
   {
-    label: "Research Vault",
+    label: "Vault",
     items: [
       {
         href: "/app/people",
@@ -96,7 +99,7 @@ const navSections: NavSection[] = [
     ],
   },
   {
-    label: "Research Work",
+    label: "Research Queue",
     items: [
       {
         href: "/app/operations",
@@ -108,15 +111,30 @@ const navSections: NavSection[] = [
         label: "Research Log",
         icon: ClipboardList,
       },
+      {
+        href: "/app/audit",
+        label: "Vault Audit",
+        icon: Gauge,
+      },
     ],
   },
   {
-    label: "Stories & Tools",
+    label: "Story Studio",
     items: [
+      {
+        href: "/app/stories",
+        label: "Story Studio",
+        icon: BookOpen,
+      },
       {
         href: "/app/story-writer",
         label: "Story Writer",
         icon: PenTool,
+      },
+      {
+        href: "/app/stories?status=published",
+        label: "Published Stories",
+        icon: ExternalLink,
       },
       {
         href: "/app/timeline",
@@ -126,16 +144,26 @@ const navSections: NavSection[] = [
       },
     ],
   },
+  {
+    label: "Lab",
+    items: [
+      {
+        href: "/app/experiments",
+        label: "Experiments",
+        icon: FlaskConical,
+      },
+    ],
+  },
 ];
 
 interface SidebarAccessProps {
   accountMode: "user" | "local" | "anonymous";
   vaultOwnerId: string;
+  clerkEnabled: boolean;
 }
 
-export function AppMobileNav({ accountMode, vaultOwnerId }: SidebarAccessProps) {
+export function AppMobileNav({ accountMode, vaultOwnerId, clerkEnabled }: SidebarAccessProps) {
   const pathname = usePathname();
-  const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 
   const isActive = (href: string, exact?: boolean) => {
     if (exact) return pathname === href;
@@ -145,12 +173,12 @@ export function AppMobileNav({ accountMode, vaultOwnerId }: SidebarAccessProps) 
   return (
     <header className="sticky top-0 z-30 border-b border-stone-800 bg-stone-900 text-white md:hidden">
       <div className="flex h-16 items-center justify-between px-4">
-        <Link href="/" className="flex items-center gap-2">
+        <SafeLink href="/" className="flex items-center gap-2">
           <div className="w-8 h-8 bg-amber-700 rounded-lg flex items-center justify-center flex-shrink-0">
             <BookOpen className="w-5 h-5 text-white" />
           </div>
           <span className="font-semibold text-sm">Discover Their Stories</span>
-        </Link>
+        </SafeLink>
 
         <Sheet>
           <SheetTrigger asChild>
@@ -170,12 +198,12 @@ export function AppMobileNav({ accountMode, vaultOwnerId }: SidebarAccessProps) 
               </SheetDescription>
             </SheetHeader>
             <div className="p-4 border-b border-stone-800">
-              <Link href="/" className="flex items-center gap-2">
+              <SafeLink href="/" className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-amber-700 rounded-lg flex items-center justify-center flex-shrink-0">
                   <BookOpen className="w-5 h-5 text-white" />
                 </div>
                 <span className="font-semibold text-sm">Discover Their Stories</span>
-              </Link>
+              </SafeLink>
             </div>
             <nav className="flex-1 py-4 px-2">
               {navSections.map((section) => (
@@ -194,7 +222,7 @@ export function AppMobileNav({ accountMode, vaultOwnerId }: SidebarAccessProps) 
                           </span>
                         ) : (
                           <SheetClose asChild>
-                            <Link
+                            <SafeLink
                               href={item.href}
                               className={cn(
                                 "flex items-center gap-3 rounded-lg px-3 py-2.5",
@@ -205,7 +233,7 @@ export function AppMobileNav({ accountMode, vaultOwnerId }: SidebarAccessProps) 
                             >
                               <item.icon className="w-5 h-5 flex-shrink-0" />
                               <span>{item.label}</span>
-                            </Link>
+                            </SafeLink>
                           </SheetClose>
                         )}
                       </li>
@@ -215,7 +243,7 @@ export function AppMobileNav({ accountMode, vaultOwnerId }: SidebarAccessProps) 
               ))}
               <div className="mt-4 border-t border-stone-800 pt-4">
                 <SheetClose asChild>
-                  <Link
+                  <SafeLink
                     href="/app/settings"
                     className={cn(
                       "flex items-center gap-3 rounded-lg px-3 py-2.5",
@@ -226,7 +254,7 @@ export function AppMobileNav({ accountMode, vaultOwnerId }: SidebarAccessProps) 
                   >
                     <Settings className="w-5 h-5 flex-shrink-0" />
                     <span>Settings</span>
-                  </Link>
+                  </SafeLink>
                 </SheetClose>
                 <div className="mt-3">
                   <VaultAccountPanel
@@ -244,10 +272,9 @@ export function AppMobileNav({ accountMode, vaultOwnerId }: SidebarAccessProps) 
   );
 }
 
-export function AppSidebar({ accountMode, vaultOwnerId }: SidebarAccessProps) {
+export function AppSidebar({ accountMode, vaultOwnerId, clerkEnabled }: SidebarAccessProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
-  const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 
   const isActive = (href: string, exact?: boolean) => {
     if (exact) return pathname === href;
@@ -263,14 +290,14 @@ export function AppSidebar({ accountMode, vaultOwnerId }: SidebarAccessProps) {
     >
       {/* Logo */}
       <div className="p-4 border-b border-stone-800">
-        <Link href="/" className="flex items-center gap-3">
+        <SafeLink href="/" className="flex items-center gap-3">
           <div className="w-8 h-8 bg-amber-700 rounded-lg flex items-center justify-center flex-shrink-0">
             <BookOpen className="w-5 h-5 text-white" />
           </div>
           {!collapsed && (
             <span className="font-semibold text-sm">Discover Their Stories</span>
           )}
-        </Link>
+        </SafeLink>
       </div>
 
       {/* Navigation */}
@@ -287,7 +314,7 @@ export function AppSidebar({ accountMode, vaultOwnerId }: SidebarAccessProps) {
             <ul className="space-y-1 px-2">
               {section.items.map((item) => (
                 <li key={item.href}>
-                  <Link
+                  <SafeLink
                     href={item.comingSoon ? "#" : item.href}
                     className={cn(
                       "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
@@ -309,7 +336,7 @@ export function AppSidebar({ accountMode, vaultOwnerId }: SidebarAccessProps) {
                         Soon
                       </span>
                     )}
-                  </Link>
+                  </SafeLink>
                 </li>
               ))}
             </ul>
@@ -319,7 +346,7 @@ export function AppSidebar({ accountMode, vaultOwnerId }: SidebarAccessProps) {
 
       {/* Settings */}
       <div className="border-t border-stone-800 p-2">
-        <Link
+        <SafeLink
           href="/app/settings"
           className={cn(
             "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
@@ -331,7 +358,7 @@ export function AppSidebar({ accountMode, vaultOwnerId }: SidebarAccessProps) {
         >
           <Settings className="w-5 h-5 flex-shrink-0" />
           {!collapsed && <span>Settings</span>}
-        </Link>
+        </SafeLink>
         <div className="mt-3">
           <VaultAccountPanel
             clerkEnabled={clerkEnabled}

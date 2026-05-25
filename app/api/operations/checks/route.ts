@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { api } from "@/convex/_generated/api";
 import { getConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
+import { validateAgentResearchCheckUpdate } from "@/lib/operations/agentQualityGate";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
 function isStatus(value: unknown): value is "missing" | "in_progress" | "complete" | "not_applicable" | "needs_review" {
@@ -41,9 +42,30 @@ export async function POST(request: NextRequest) {
     const applicability = isApplicability(body.applicability) ? body.applicability : undefined;
     const completionSource = isCompletionSource(body.completionSource) ? body.completionSource : "user";
     const notes = typeof body.notes === "string" ? body.notes.trim() : undefined;
+    const summary = typeof body.summary === "string" ? body.summary.trim() : undefined;
+    const confidence = typeof body.confidence === "number" ? body.confidence : 0.95;
 
     if (!personIdentifier || !checkKey || !status) {
       return NextResponse.json({ error: "Missing personIdentifier, checkKey, or status" }, { status: 400 });
+    }
+
+    const qualityGateErrors = validateAgentResearchCheckUpdate({
+      completionSource,
+      status,
+      confidence,
+      summary,
+      notes,
+    });
+
+    if (qualityGateErrors.length > 0) {
+      return NextResponse.json(
+        {
+          error: "Agent quality gate failed",
+          details: qualityGateErrors.join(" "),
+          qualityGateErrors,
+        },
+        { status: 400 }
+      );
     }
 
     const client = getConvexClient();
@@ -65,8 +87,8 @@ export async function POST(request: NextRequest) {
       status,
       applicability: applicability || existing?.applicability || "recommended",
       completionSource,
-      confidence: typeof body.confidence === "number" ? body.confidence : 0.95,
-      summary: typeof body.summary === "string" ? body.summary : existing?.summary,
+      confidence,
+      summary: summary || existing?.summary,
       notes: notes || existing?.notes,
       linkedSourceIds: existing?.linkedSourceIds || [],
       linkedPlaceIds: existing?.linkedPlaceIds || [],

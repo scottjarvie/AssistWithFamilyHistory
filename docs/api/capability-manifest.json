@@ -1,0 +1,298 @@
+{
+  "schemaVersion": "2026-05-21",
+  "status": "internal-planning",
+  "defaultPolicy": {
+    "ownerBoundary": "All private app APIs must resolve owner context before reading or writing vault data.",
+    "authBaseline": "Protected by middleware when REQUIRE_AUTH=true; local development may run without Clerk. Anonymous vaults require ALLOW_ANONYMOUS_VAULT=true.",
+    "publicApi": false
+  },
+  "scopePresets": {
+    "read_only_assistant": "Owner-scoped reads for people, context packs, queue summaries, stories, and documents.",
+    "capture_validate": "Validate user-provided capture packages without saving or merging.",
+    "capture_merge": "Merge user-provided capture packages after review.",
+    "research_operator": "Create tasks and update checks with evidence-backed notes.",
+    "story_writer": "Save story drafts inside an owner vault.",
+    "trusted_operator": "Higher-risk merges, publish actions, and bulk operations.",
+    "admin_security": "Cross-user, incident, or security workflows. Not present."
+  },
+  "storyRoles": {
+    "story_writer": {
+      "actions": ["story:read", "story:draft", "story:edit", "story:request_review", "story:preview_publish"],
+      "publishAuthority": false,
+      "notes": "Can draft, edit, request review, and preview publish readiness. Cannot assign reviewers or publish public stories."
+    },
+    "reviewer": {
+      "actions": ["story:read", "story:edit", "story:request_review", "story:assign_reviewer", "story:preview_publish"],
+      "publishAuthority": false,
+      "notes": "Can inspect and assign review work, including second-review requirements. Cannot publish public stories."
+    },
+    "trusted_publisher": {
+      "actions": [
+        "story:read",
+        "story:edit",
+        "story:request_review",
+        "story:assign_reviewer",
+        "story:preview_publish",
+        "story:publish",
+        "story:unpublish"
+      ],
+      "publishAuthority": true,
+      "notes": "Can publish only after publish gates, required second approval, and human review confirmation pass. Public stories stay noindex by default through publicIndexing."
+    }
+  },
+  "routes": [
+    {
+      "route": "/api/capabilities",
+      "methods": ["GET"],
+      "capability": "capability_discovery",
+      "environment": "browser-or-local-api",
+      "agentSupport": "future-read-only",
+      "reviewLevel": "owner-scoped-read",
+      "risk": "low",
+      "scopes": ["read_only_assistant", "story_writer", "trusted_operator"],
+      "notes": "Returns current internal capability actions for the requesting actor role. Story capabilities distinguish story_writer preview/draft access from trusted publisher public publish authority."
+    },
+    {
+      "route": "/api/context-reports",
+      "methods": ["POST"],
+      "capability": "context_report_create",
+      "environment": "local-api-or-browser",
+      "agentSupport": "restricted",
+      "reviewLevel": "human-review",
+      "risk": "medium",
+      "scopes": ["research_operator"],
+      "notes": "Write route; needs provenance and context validation before agent support."
+    },
+    {
+      "route": "/api/context-items",
+      "methods": ["POST"],
+      "capability": "loose_context_create",
+      "environment": "browser-or-local-api",
+      "agentSupport": "restricted",
+      "reviewLevel": "quality-gated",
+      "risk": "medium",
+      "scopes": ["research_operator"],
+      "notes": "Creates review-first person context items. AI use is denied unless the context is reviewed and non-private."
+    },
+    {
+      "route": "/api/convex/documents",
+      "methods": ["GET"],
+      "capability": "documents_read",
+      "environment": "local-api",
+      "agentSupport": "future-read-only",
+      "reviewLevel": "owner-scoped-read",
+      "risk": "medium",
+      "scopes": ["read_only_assistant"],
+      "notes": "Sensitive derived artifacts."
+    },
+    {
+      "route": "/api/convex/people",
+      "methods": ["GET"],
+      "capability": "people_read",
+      "environment": "local-api",
+      "agentSupport": "future-read-only",
+      "reviewLevel": "owner-scoped-read",
+      "risk": "low",
+      "scopes": ["read_only_assistant"],
+      "notes": "Owner-scoped people explorer data."
+    },
+    {
+      "route": "/api/convex/stats",
+      "methods": ["GET"],
+      "capability": "vault_stats_read",
+      "environment": "local-api",
+      "agentSupport": "future-read-only",
+      "reviewLevel": "owner-scoped-read",
+      "risk": "low",
+      "scopes": ["read_only_assistant"],
+      "notes": "Private vault metadata."
+    },
+    {
+      "route": "/api/import",
+      "methods": ["POST"],
+      "capability": "capture_import",
+      "environment": "browser-or-local-api",
+      "agentSupport": "future-import-agent",
+      "reviewLevel": "preview-before-merge",
+      "risk": "high",
+      "scopes": ["capture_validate", "capture_merge"],
+      "notes": "Use ?preview=true for side-effect-free validation. FamilySearch provider API access is pending; browser/user-initiated packages only."
+    },
+    {
+      "route": "/api/media/review",
+      "methods": ["POST"],
+      "capability": "media_privacy_review",
+      "environment": "browser",
+      "agentSupport": "restricted",
+      "reviewLevel": "trusted-human-review",
+      "risk": "high",
+      "scopes": ["trusted_operator"],
+      "notes": "Updates privacy, review, rights, AI-use, and review notes. AI use requires reviewed, non-private media with usable rights."
+    },
+    {
+      "route": "/api/operations/checks",
+      "methods": ["POST"],
+      "capability": "research_check_update",
+      "environment": "browser-or-local-api",
+      "agentSupport": "guarded-write",
+      "reviewLevel": "quality-gated",
+      "risk": "medium",
+      "scopes": ["research_operator"],
+      "notes": "completionSource=ai_agent requires summary, notes, and confidence gates."
+    },
+    {
+      "route": "/api/operations/provisional",
+      "methods": ["POST"],
+      "capability": "provisional_relative_resolve",
+      "environment": "browser",
+      "agentSupport": "not-supported",
+      "reviewLevel": "trusted-human-only",
+      "risk": "high",
+      "scopes": ["trusted_operator"],
+      "notes": "Promote/merge affects identity graph. Keep human-only until stronger gates exist."
+    },
+    {
+      "route": "/api/operations/queue",
+      "methods": ["GET"],
+      "capability": "operations_queue_read",
+      "environment": "browser-or-local-api",
+      "agentSupport": "future-read-only",
+      "reviewLevel": "owner-scoped-read",
+      "risk": "medium",
+      "scopes": ["read_only_assistant", "research_operator"],
+      "notes": "Best first queue handoff surface after deterministic export."
+    },
+    {
+      "route": "/api/operations/tasks",
+      "methods": ["POST"],
+      "capability": "research_task_create",
+      "environment": "browser-or-local-api",
+      "agentSupport": "future-research-operator",
+      "reviewLevel": "quality-gated",
+      "risk": "medium",
+      "scopes": ["research_operator"],
+      "notes": "Needs task-quality requirements before broad agent use."
+    },
+    {
+      "route": "/api/people",
+      "methods": ["GET"],
+      "capability": "legacy_people_artifacts_read",
+      "environment": "local-api",
+      "agentSupport": "legacy-internal",
+      "reviewLevel": "owner-scoped-read",
+      "risk": "medium",
+      "scopes": ["read_only_assistant"],
+      "notes": "Local artifact-backed bridge, not canonical people API."
+    },
+    {
+      "route": "/api/people/[id]",
+      "methods": ["GET"],
+      "capability": "person_artifact_runs_read",
+      "environment": "local-api",
+      "agentSupport": "legacy-internal",
+      "reviewLevel": "owner-scoped-read",
+      "risk": "medium",
+      "scopes": ["read_only_assistant"],
+      "notes": "Bridge across Convex and local artifacts."
+    },
+    {
+      "route": "/api/people/[id]/context-pack",
+      "methods": ["GET"],
+      "capability": "person_context_pack_read",
+      "environment": "local-api",
+      "agentSupport": "future-read-only",
+      "reviewLevel": "owner-scoped-read",
+      "risk": "medium",
+      "scopes": ["read_only_assistant", "research_operator", "story_writer"],
+      "notes": "Strongest future agent handoff read surface."
+    },
+    {
+      "route": "/api/people/[id]/contextualized",
+      "methods": ["GET", "POST"],
+      "capability": "legacy_contextualized_document",
+      "environment": "browser-or-local-api",
+      "agentSupport": "legacy-internal",
+      "reviewLevel": "internal-only",
+      "risk": "medium",
+      "scopes": ["read_only_assistant", "story_writer"],
+      "notes": "Mixed read/write document workflow documented in docs/api/legacy-document-route-boundary.md. Keep internal until method semantics are split."
+    },
+    {
+      "route": "/api/people/[id]/raw",
+      "methods": ["GET"],
+      "capability": "legacy_raw_document",
+      "environment": "browser-or-local-api",
+      "agentSupport": "legacy-internal",
+      "reviewLevel": "internal-only",
+      "risk": "medium",
+      "scopes": ["read_only_assistant"],
+      "notes": "GET may generate/sync artifacts as documented in docs/api/legacy-document-route-boundary.md. Keep internal until method semantics are split."
+    },
+    {
+      "route": "/api/people/[id]/runs/[runId]/pack",
+      "methods": ["GET"],
+      "capability": "evidence_pack_read",
+      "environment": "local-api",
+      "agentSupport": "future-read-only",
+      "reviewLevel": "owner-scoped-read",
+      "risk": "medium",
+      "scopes": ["read_only_assistant", "research_operator"],
+      "notes": "Sensitive source evidence."
+    },
+    {
+      "route": "/api/people/[id]/stories",
+      "methods": ["POST"],
+      "capability": "story_draft_save",
+      "environment": "browser-or-local-api",
+      "agentSupport": "future-story-writer",
+      "reviewLevel": "quality-gated",
+      "risk": "medium",
+      "scopes": ["story_writer"],
+      "notes": "Draft save is lower risk than publish but should keep provenance. Story writer scope can create or revise drafts, not publish."
+    },
+    {
+      "route": "/api/process",
+      "methods": ["POST"],
+      "capability": "ai_prompt_process",
+      "environment": "internal-api",
+      "agentSupport": "not-supported",
+      "reviewLevel": "internal-only",
+      "risk": "high",
+      "scopes": [],
+      "notes": "High privacy/abuse/cost risk; no broad externalization without quotas and disclosure."
+    },
+    {
+      "route": "/api/stories/[id]",
+      "methods": ["PATCH"],
+      "capability": "story_edit",
+      "environment": "browser-or-local-api",
+      "agentSupport": "future-story-writer",
+      "reviewLevel": "quality-gated",
+      "risk": "medium",
+      "scopes": ["story_writer"],
+      "notes": "Owner-protected story edit. Story writer scope can change title/content/type/tags while preserving review workflow."
+    },
+    {
+      "route": "/api/stories/[id]/review",
+      "methods": ["PATCH"],
+      "capability": "story_review_assignment",
+      "environment": "browser-or-local-api",
+      "agentSupport": "restricted",
+      "reviewLevel": "reviewer-or-trusted-publisher",
+      "risk": "medium",
+      "scopes": ["trusted_operator"],
+      "notes": "Assigns a reviewer, can require second approval for high-risk stories, and records an owner-scoped story review event. Explicit story_writer role is denied reviewer assignment."
+    },
+    {
+      "route": "/api/stories/[id]/status",
+      "methods": ["GET", "PATCH"],
+      "capability": "story_publish_preview_and_status_change",
+      "environment": "browser-or-local-api",
+      "agentSupport": "restricted",
+      "reviewLevel": "publish-safety-gated",
+      "risk": "high",
+      "scopes": ["story_writer", "trusted_operator"],
+      "notes": "GET returns publish readiness and optional format=handoff packet; use record=true to store a publish-preview audit snapshot. PATCH to published is blocked unless evidence, context, privacy/living-risk, provisional-relative, story-strength, review-status, and required second-approval gates pass plus explicit human review confirmation. Explicit story_writer role can preview/request review but is denied publish; trusted_operator/trusted publisher authority is required for agent publishing."
+    }
+  ]
+}

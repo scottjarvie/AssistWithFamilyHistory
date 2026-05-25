@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { ArrowRight, FileUp, FolderSync, Images, ScrollText } from "lucide-react";
+import { SafeLink as Link } from "@/components/layout/SafeLink";
+import { AlertTriangle, ArrowRight, CheckCircle2, ClipboardList, FileUp, FolderSync, Images, ScrollText } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,45 @@ type BackendStatus = {
   description: string;
 };
 
+type ImportPreview = {
+  canImport: boolean;
+  compatibilityMode: boolean;
+  personId: string;
+  personName: string;
+  pageType: string;
+  sourceCount: number;
+  memoryCount: number;
+  validation: {
+    errors: string[];
+    warnings: string[];
+  };
+  review?: CaptureImportReview;
+};
+
+type ImportTone = "ready" | "warning" | "blocked";
+
+type CaptureImportReview = {
+  reportVersion: string;
+  reviewedAt: string;
+  canImport: boolean;
+  recommendedAction: "merge" | "fix_package" | "human_review";
+  summary: string;
+  package: {
+    captureId: string;
+    schemaVersion: string;
+    compatibilityMode: boolean;
+    personId: string;
+    personName: string;
+    pageType: string;
+    pageUrl: string;
+    sourceCount: number;
+    memoryCount: number;
+    diagnosticsMode: string;
+  };
+  errors: string[];
+  warnings: string[];
+};
+
 export default function ImportsPage() {
   const [recentImports, setRecentImports] = useState<RecentImport[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -41,6 +80,8 @@ export default function ImportsPage() {
   const [importing, setImporting] = useState(false);
   const [backendStatus, setBackendStatus] = useState<BackendStatus | null>(null);
   const [lastImportWarnings, setLastImportWarnings] = useState<string[]>([]);
+  const [previewResult, setPreviewResult] = useState<ImportPreview | null>(null);
+  const [previewPayload, setPreviewPayload] = useState<unknown | null>(null);
 
   async function loadRecentImports() {
     try {
@@ -83,18 +124,32 @@ export default function ImportsPage() {
     loadRecentImports();
   }, []);
 
-  async function handleImport() {
+  function parseImportJson() {
     if (!importJson.trim()) {
       toast.error("Paste a FamilySearch capture package first.");
-      return;
+      return null;
     }
+
+    try {
+      return JSON.parse(importJson);
+    } catch {
+      setImportError("Invalid JSON format");
+      toast.error("Invalid JSON format");
+      return null;
+    }
+  }
+
+  async function handlePreview() {
+    const parsed = parseImportJson();
+    if (!parsed) return;
 
     setImporting(true);
     setImportError(null);
+    setPreviewResult(null);
+    setPreviewPayload(null);
 
     try {
-      const parsed = JSON.parse(importJson);
-      const response = await fetch("/api/import", {
+      const response = await fetch("/api/import?preview=true", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -104,7 +159,62 @@ export default function ImportsPage() {
       const payload = await response.json();
 
       if (!response.ok || !payload?.success) {
-        const message = payload?.error || "Import failed";
+        const validationErrors = Array.isArray(payload?.validation?.errors)
+          ? payload.validation.errors.join(" ")
+          : "";
+        const message = [payload?.error || "Import preview failed", validationErrors].filter(Boolean).join(": ");
+        setImportError(message);
+        toast.error(message);
+        return;
+      }
+
+      setPreviewResult(payload);
+      setPreviewPayload(parsed);
+      if (payload.canImport) {
+        toast.success("Capture package is ready for review");
+      } else {
+        toast.warning("Capture package has blocking validation errors");
+      }
+    } catch {
+      const message = "Import preview failed";
+      setImportError(message);
+      toast.error(message);
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function copyReviewReport() {
+    if (!previewResult?.review) return;
+
+    await navigator.clipboard.writeText(JSON.stringify(previewResult.review, null, 2));
+    toast.success("Copied validation report");
+  }
+
+  async function handleImport() {
+    if (!previewResult?.canImport || !previewPayload) {
+      toast.error("Review the capture package before merging it into the vault.");
+      return;
+    }
+
+    setImporting(true);
+    setImportError(null);
+
+    try {
+      const response = await fetch("/api/import", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(previewPayload),
+      });
+      const payload = await response.json();
+
+      if (!response.ok || !payload?.success) {
+        const validationErrors = Array.isArray(payload?.validation?.errors)
+          ? payload.validation.errors.join(" ")
+          : "";
+        const message = [payload?.error || "Import failed", validationErrors].filter(Boolean).join(": ");
         setImportError(message);
         toast.error(message);
         return;
@@ -125,6 +235,8 @@ export default function ImportsPage() {
       }
       setDialogOpen(false);
       setImportJson("");
+      setPreviewPayload(null);
+      setPreviewResult(null);
       loadRecentImports();
     } catch (error) {
       const message = error instanceof SyntaxError ? "Invalid JSON format" : "Import failed";
@@ -134,6 +246,8 @@ export default function ImportsPage() {
       setImporting(false);
     }
   }
+
+  const previewDiagnostics = previewResult ? getPreviewDiagnostics(previewResult) : null;
 
   return (
     <div className="p-4 sm:p-8">
@@ -218,39 +332,59 @@ export default function ImportsPage() {
                 No capture packages imported yet.
               </div>
             ) : (
-              recentImports.map((run) => (
-                <Link
-                  key={run._id}
-                  href={`/app/people/${run.personRouteId || run.personFsId}`}
-                  className="block rounded-2xl border border-stone-200 px-4 py-4 transition hover:border-amber-300 hover:bg-amber-50/30"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-medium text-stone-900">{run.personName}</p>
-                      <p className="text-sm text-stone-500">{run.pageTypes.join(" + ")}</p>
+              recentImports.map((run) => {
+                const diagnostics = getRecentImportDiagnostics(run);
+                const DiagnosticsIcon = diagnostics.tone === "ready" ? CheckCircle2 : AlertTriangle;
+
+                return (
+                  <div key={run._id} className="rounded-2xl border border-stone-200 px-4 py-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <Link
+                          href={`/app/people/${run.personRouteId || run.personFsId}`}
+                          className="font-medium text-stone-900 hover:text-amber-800"
+                        >
+                          {run.personName}
+                        </Link>
+                        <p className="text-sm text-stone-500">{run.pageTypes.join(" + ")}</p>
+                      </div>
+                      <Badge variant={run.mergeStatus === "partial" ? "destructive" : "secondary"}>
+                        {run.mergeStatus}
+                      </Badge>
                     </div>
-                    <Badge variant={run.mergeStatus === "partial" ? "destructive" : "secondary"}>
-                      {run.mergeStatus}
-                    </Badge>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-4 text-sm text-stone-500">
-                    <span>{run.counts.sources} sources</span>
-                    <span>{run.counts.memories} memories</span>
-                    <span>{run.counts.warnings} warnings</span>
-                    <span>{new Date(run.importedAt).toLocaleDateString()}</span>
-                  </div>
-                  {run.warnings.length > 0 ? (
-                    <div className="mt-3 space-y-2 rounded-2xl border border-amber-200 bg-amber-50/70 px-3 py-3 text-sm text-amber-950">
-                      {run.warnings.slice(0, 2).map((warning) => (
-                        <p key={warning}>{warning}</p>
-                      ))}
-                      {run.warnings.length > 2 ? (
-                        <p className="text-amber-800">+ {run.warnings.length - 2} more warning(s)</p>
-                      ) : null}
+                    <div className="mt-3 flex flex-wrap gap-4 text-sm text-stone-500">
+                      <span>{run.counts.sources} sources</span>
+                      <span>{run.counts.memories} memories</span>
+                      <span>{run.counts.warnings} warnings</span>
+                      <span>{new Date(run.importedAt).toLocaleDateString()}</span>
                     </div>
-                  ) : null}
-                </Link>
-              ))
+                    <div className={`mt-3 rounded-2xl border px-3 py-3 text-sm ${diagnosticsClasses(diagnostics.tone)}`}>
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex gap-2">
+                          <DiagnosticsIcon className="mt-0.5 h-4 w-4 shrink-0" />
+                          <div>
+                            <p className="font-medium">{diagnostics.title}</p>
+                            <p className="mt-1 leading-6">{diagnostics.description}</p>
+                          </div>
+                        </div>
+                        <Button asChild size="sm" variant="outline" className="shrink-0 bg-white/70">
+                          <Link href={diagnostics.href}>{diagnostics.linkLabel}</Link>
+                        </Button>
+                      </div>
+                    </div>
+                    {run.warnings.length > 0 ? (
+                      <div className="mt-3 space-y-2 rounded-2xl border border-amber-200 bg-amber-50/70 px-3 py-3 text-sm text-amber-950">
+                        {run.warnings.slice(0, 2).map((warning) => (
+                          <p key={warning}>{warning}</p>
+                        ))}
+                        {run.warnings.length > 2 ? (
+                          <p className="text-amber-800">+ {run.warnings.length - 2} more warning(s)</p>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })
             )}
           </CardContent>
         </Card>
@@ -266,6 +400,20 @@ export default function ImportsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
+              <div className="mb-3 flex flex-col gap-3 rounded-2xl border border-amber-200 bg-white/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex gap-3">
+                  <ClipboardList className="mt-0.5 h-5 w-5 shrink-0 text-amber-800" />
+                  <div>
+                    <p className="font-medium text-amber-950">Next action: review the generated work queue</p>
+                    <p className="mt-1 text-sm text-amber-900">
+                      Import warnings create review work. Check operations before using this import for story drafting.
+                    </p>
+                  </div>
+                </div>
+                <Button asChild size="sm" variant="outline" className="bg-white/80">
+                  <Link href="/app/operations?sortBy=newestImport">Open Operations</Link>
+                </Button>
+              </div>
               {lastImportWarnings.map((warning) => (
                 <div
                   key={warning}
@@ -280,42 +428,162 @@ export default function ImportsPage() {
       ) : null}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-h-[min(88vh,760px)] max-w-3xl grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0">
           <DialogHeader>
-            <DialogTitle>Import FamilySearch Capture</DialogTitle>
-            <DialogDescription>
+            <div className="px-6 pt-6">
+              <DialogTitle>Import FamilySearch Capture</DialogTitle>
+              <DialogDescription className="mt-2 pr-8">
               Paste either a v2 capture package or a legacy source capture artifact. The importer will save raw artifacts and merge structured data into the vault.
-            </DialogDescription>
+              </DialogDescription>
+            </div>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="min-h-0 space-y-4 overflow-y-auto px-6 pb-4">
             <Textarea
               value={importJson}
               onChange={(event) => {
                 setImportJson(event.target.value);
                 setImportError(null);
+                setPreviewResult(null);
+                setPreviewPayload(null);
               }}
               placeholder='{"schemaVersion":"2.0", ...}'
-              className="min-h-[260px] font-mono text-sm"
+              className="max-h-[42vh] min-h-[220px] resize-y overflow-y-auto font-mono text-sm"
             />
             {importError ? (
               <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {importError}
               </div>
             ) : null}
-            <div className="flex flex-wrap gap-3">
-              <Button onClick={handleImport} disabled={importing} className="bg-amber-700 hover:bg-amber-800">
-                {importing ? "Importing..." : "Import into Vault"}
-              </Button>
-              <Button asChild variant="outline">
-                <Link href="/app/people">
-                  Go to People Explorer
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            </div>
+            {previewResult && previewDiagnostics ? (
+              <div className={`rounded-xl border px-4 py-3 text-sm ${diagnosticsClasses(previewDiagnostics.tone)}`}>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-medium">
+                      {previewResult.personName || "Unknown person"} · {previewResult.personId || "No FamilySearch ID"}
+                    </p>
+                    <p className="mt-1">
+                      {previewResult.pageType} capture · {previewResult.sourceCount} sources ·{" "}
+                      {previewResult.memoryCount} memories
+                    </p>
+                  </div>
+                  <Badge variant={previewDiagnostics.tone === "blocked" ? "destructive" : "secondary"}>
+                    {previewDiagnostics.title}
+                  </Badge>
+                </div>
+                <div className="mt-3 flex gap-2">
+                  {previewDiagnostics.tone === "ready" ? (
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                  ) : (
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  )}
+                  <p>{previewDiagnostics.description}</p>
+                </div>
+                {previewResult.review?.summary ? (
+                  <p className="mt-3 font-medium">{previewResult.review.summary}</p>
+                ) : null}
+                {previewResult.validation.errors.length > 0 ? (
+                  <div className="mt-3 space-y-1">
+                    <p className="font-medium">Blocking errors</p>
+                    {previewResult.validation.errors.map((error) => (
+                      <p key={error}>{error}</p>
+                    ))}
+                  </div>
+                ) : null}
+                {previewResult.validation.warnings.length > 0 ? (
+                  <div className="mt-3 space-y-1">
+                    <p className="font-medium">Review warnings</p>
+                    {previewResult.validation.warnings.map((warning) => (
+                      <p key={warning}>{warning}</p>
+                    ))}
+                  </div>
+                ) : null}
+                {previewResult.review ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={copyReviewReport}
+                    className="mt-3 bg-white/70"
+                  >
+                    Copy Validation Report
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap gap-3 border-t bg-white px-6 py-4">
+            <Button onClick={handlePreview} disabled={importing} className="bg-amber-700 hover:bg-amber-800">
+              {importing ? "Checking..." : "Review Package"}
+            </Button>
+            <Button
+              onClick={handleImport}
+              disabled={importing || !previewResult?.canImport}
+              variant="outline"
+            >
+              {importing ? "Merging..." : "Merge into Vault"}
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/app/people">
+                Go to People Explorer
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
     </div>
   );
+}
+
+function getRecentImportDiagnostics(run: RecentImport) {
+  const warningCount = run.counts.warnings || run.warnings.length;
+  if (run.mergeStatus === "partial" || warningCount > 0) {
+    return {
+      tone: "warning" as ImportTone,
+      title: "Review needed",
+      description:
+        "Warnings were preserved for research review. Check the person workspace and operations queue before treating this import as clean.",
+      href: `/app/operations?q=${encodeURIComponent(run.personName || run.personFsId)}`,
+      linkLabel: "Review in Operations",
+    };
+  }
+
+  return {
+    tone: "ready" as ImportTone,
+    title: "Merged cleanly",
+    description: "No warnings were reported for this import. Continue from the person workspace.",
+    href: `/app/people/${run.personRouteId || run.personFsId}`,
+    linkLabel: "Open Workspace",
+  };
+}
+
+function getPreviewDiagnostics(preview: ImportPreview) {
+  const action = preview.review?.recommendedAction;
+  if (!preview.canImport || action === "fix_package") {
+    return {
+      tone: "blocked" as ImportTone,
+      title: "Fix package before import",
+      description: "Blocking validation errors must be resolved before any artifact save or vault merge.",
+    };
+  }
+
+  if (action === "human_review" || preview.validation.warnings.length > 0) {
+    return {
+      tone: "warning" as ImportTone,
+      title: "Human review before merge",
+      description: "The package can import, but warnings should be reviewed before it becomes trusted vault context.",
+    };
+  }
+
+  return {
+    tone: "ready" as ImportTone,
+    title: "Ready to merge",
+    description: "No blocking errors or review warnings were reported by the preview.",
+  };
+}
+
+function diagnosticsClasses(tone: ImportTone) {
+  if (tone === "ready") return "border-emerald-200 bg-emerald-50 text-emerald-950";
+  if (tone === "warning") return "border-amber-200 bg-amber-50 text-amber-950";
+  return "border-red-200 bg-red-50 text-red-800";
 }

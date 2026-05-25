@@ -1,6 +1,6 @@
 # Route Audit
 
-Date: 2026-05-13
+Date: 2026-05-22
 
 ## App Route Map
 
@@ -14,6 +14,7 @@ Date: 2026-05-13
 | `/app/operations` | Research Operations | Cross-vault research queue | Keep primary; label as Research Queue in navigation. |
 | `/app/research` | Research Operations, AI Research Assistant | Open tasks and research log | Keep primary; label as Research Log in navigation. |
 | `/app/story-writer` | Story Studio | Person picker for story drafting | Keep primary. |
+| `/app/experiments` | Experimental Tools Lab | Registry-driven beta/prototype surface with maturity, visibility, data, and privacy labels | Keep protected; promote only inside the app lab navigation. |
 | `/app/people/[personId]/story-writer` | Story Studio | Person-specific story drafting workspace | Keep primary. |
 | `/app/people/[personId]/raw` | Derived Artifacts | Raw evidence document view | Keep as person subview. |
 | `/app/people/[personId]/contextualized` | AI Research Assistant | AI-assisted dossier view | Keep as person subview. |
@@ -38,10 +39,11 @@ Date: 2026-05-13
 - Removed legacy redirect routes `/app/source-docs` and `/app/tools` from the sitemap.
 - Grouped app sidebar navigation into Workspace, Research Vault, Research Work, and Stories & Tools.
 - Renamed the sidebar labels for `/app/operations` and `/app/research` to Research Queue and Research Log.
+- Added `/app/experiments` as the protected experimental tools lab while preserving `/app/tools` as a legacy redirect.
 
 ## Next Structural Work
 
 - Add a dedicated Story Studio/shareable ancestor story area when saved story outputs are ready to become first-class pages.
 - Introduce broader feature modules for new work instead of expanding `features/source-docs/`.
+- Graduate lab experiments only after privacy gates, owner-scoped data requirements, and PM direction are explicit.
 - Eventually migrate raw/contextualized source-doc internals into a research-vault or research-assistant module while preserving route redirects.
-

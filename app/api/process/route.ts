@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { chatCompletion } from "@/lib/ai/openrouter";
+import { getAiPrivacyDisclosure, type AiRedactionMode } from "@/lib/ai/privacy";
 
 type ProcessRequestBody = {
   prompt?: unknown;
@@ -7,11 +8,18 @@ type ProcessRequestBody = {
   model?: unknown;
   apiKey?: unknown;
   systemPrompt?: unknown;
+  privacyAcknowledged?: unknown;
+  redactionMode?: unknown;
 };
+
+function isRedactionMode(value: unknown): value is AiRedactionMode {
+  return value === "redacted" || value === "original_reviewed" || value === "not_applicable";
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const { prompt, data, model, apiKey, systemPrompt } = (await request.json()) as ProcessRequestBody;
+    const body = (await request.json()) as ProcessRequestBody;
+    const { prompt, data, model, apiKey, systemPrompt } = body;
 
     if (typeof prompt !== "string" || !prompt.trim()) {
       return NextResponse.json(
@@ -19,6 +27,27 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    if (data !== undefined && body.privacyAcknowledged !== true) {
+      return NextResponse.json(
+        {
+          error: "AI privacy acknowledgement required",
+          details: "External AI requests with vault data must declare the redaction mode and explicit review acknowledgement.",
+        },
+        { status: 400 }
+      );
+    }
+    if (data !== undefined && !isRedactionMode(body.redactionMode)) {
+      return NextResponse.json(
+        {
+          error: "AI redaction mode required",
+          details: "External AI requests with vault data must declare whether the payload is redacted or human-reviewed original data.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const redactionMode = isRedactionMode(body.redactionMode) ? body.redactionMode : "not_applicable";
 
     // Determine API Key: Client provided > Server Env > Fail
     const token =
@@ -65,11 +94,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       content: response.data,
       usage: response.usage,
+      privacy: {
+        redactionMode,
+        disclosure: getAiPrivacyDisclosure(redactionMode),
+      },
     });
 
-  } catch (error: unknown) {
+  } catch {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Request processing failed" },
+      { error: "Request processing failed" },
       { status: 500 }
     );
   }

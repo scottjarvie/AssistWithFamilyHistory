@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { api } from "@/convex/_generated/api";
 import { getConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
+import { buildOperationsHandoffPacket } from "@/lib/operations/handoff";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
 export async function GET(request: NextRequest) {
@@ -57,6 +58,13 @@ export async function GET(request: NextRequest) {
           : undefined,
     });
 
+    if (searchParams.get("format") === "handoff") {
+      return NextResponse.json({
+        success: true,
+        handoff: buildOperationsHandoffPacket(payload),
+      });
+    }
+
     return NextResponse.json({
       success: true,
       ...payload,
@@ -76,4 +84,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-

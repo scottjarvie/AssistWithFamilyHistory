@@ -1,19 +1,14 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { isAnonymousVaultEnabled, isClerkEnabled } from "@/lib/clerk/config";
 import { VAULT_PREVIEW_COOKIE } from "@/lib/vault/constants";
+import { PROTECTED_ROUTE_PATTERNS } from "@/lib/vault/protectedRoutes";
 
-const isProtectedRoute = createRouteMatcher([
-  "/app(.*)",
-  "/api/people(.*)",
-  "/api/import(.*)",
-  "/api/process(.*)",
-  "/api/convex(.*)",
-]);
+const isProtectedRoute = createRouteMatcher([...PROTECTED_ROUTE_PATTERNS]);
 
-const hasClerkKeys = Boolean(
-  process.env.CLERK_SECRET_KEY && process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-);
+const hasClerkKeys = isClerkEnabled();
 const requireAuth = process.env.REQUIRE_AUTH === "true";
+const allowAnonymousVault = isAnonymousVaultEnabled();
 
 const legacyHosts = new Set([
   "tell-their-stories.vercel.app",
@@ -41,12 +36,12 @@ const authMiddleware = clerkMiddleware(
 
     const authState = await auth();
 
-    if (requireAuth && isProtectedRoute(req)) {
+    if ((requireAuth || !allowAnonymousVault) && isProtectedRoute(req)) {
       await auth.protect();
       return;
     }
 
-    if (!authState.userId) {
+    if (!authState.userId && allowAnonymousVault) {
       const guestOwner = getGuestVaultOwner(
         req.cookies.get(VAULT_PREVIEW_COOKIE)?.value
       );

@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "2.0",
+  "captureId": "fixture-valid-memories-v2",
+  "capturedAt": "2026-05-21T12:00:00.000Z",
+  "extractorVersion": "2.0.0",
+  "extractionDurationMs": 900,
+  "pageType": "memories",
+  "pageUrl": "https://www.familysearch.org/en/tree/person/memories/KWCJ-4XD",
+  "pageTitle": "Memories | FamilySearch",
+  "uiLocale": "en",
+  "person": {
+    "familySearchId": "KWCJ-4XD",
+    "name": "John Jarvie",
+    "birthDate": "1890",
+    "deathDate": "1960"
+  },
+  "sources": [],
+  "memories": [
+    {
+      "id": "memory-1",
+      "title": "Portrait of John Jarvie",
+      "description": "A reviewed family photo.",
+      "mediaType": "image/jpeg",
+      "thumbnailUrl": "https://www.familysearch.org/photos/images/fixture",
+      "memoryUrl": "https://www.familysearch.org/photos/artifacts/fixture",
+      "familySearchUrl": "https://www.familysearch.org/photos/artifacts/fixture",
+      "relatedPeople": [
+        {
+          "familySearchId": "KWCJ-4XD",
+          "name": "John Jarvie",
+          "role": "subject"
+        }
+      ],
+      "placeMentions": []
+    }
+  ],
+  "placeMentions": [],
+  "diagnostics": {
+    "mode": "standard",
+    "totalSources": 0,
+    "totalMemories": 1,
+    "expandedSections": 0,
+    "failedExpansions": 0,
+    "warnings": [],
+    "errors": []
+  }
+}

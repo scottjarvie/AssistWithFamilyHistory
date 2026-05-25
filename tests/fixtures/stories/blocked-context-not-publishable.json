@@ -1,0 +1,52 @@
+{
+  "story": {
+    "status": "review",
+    "title": "Context Recorded But Not Yet Publish-Ready",
+    "content": "This story has enough length and source evidence for a reviewer to inspect, and historical context reports exist for the relevant places. The fixture proves that recorded context alone is not enough for public publishing — the context must reach publish_candidate or public_source privacy with reviewed or redacted status before the public story page is allowed to render it. Without that promotion, the public surface would silently strip the context and the publish gate should keep the draft in review.",
+    "citationIds": ["citation-1", "citation-2", "citation-3"]
+  },
+  "person": {
+    "displayName": "Helena Reilly",
+    "living": false,
+    "birth": { "date": { "year": 1862, "original": "1862" } },
+    "death": { "date": { "year": 1928, "original": "1928" } }
+  },
+  "readiness": {
+    "completionPercent": 95,
+    "requiredMissingCount": 0,
+    "criticalMissing": [],
+    "nextActions": ["Promote at least one context report to publish_candidate or public_source before publishing."]
+  },
+  "researchChecks": [
+    {
+      "checkKey": "source_coverage",
+      "status": "complete",
+      "applicability": "required",
+      "summary": "Source coverage is attached.",
+      "confidence": 0.95
+    }
+  ],
+  "contextCoverage": {
+    "count": 4,
+    "publishableCount": 0,
+    "aiEligibleCount": 1,
+    "status": "partial",
+    "relatedPlaceCount": 2,
+    "placeCountWithContext": 2,
+    "missingPlaces": []
+  },
+  "evidence": [
+    { "source": { "title": "1880 Census" }, "citations": ["citation-1"] },
+    { "source": { "title": "Marriage register" }, "citations": ["citation-2"] },
+    { "source": { "title": "Cemetery record" }, "citations": ["citation-3"] }
+  ],
+  "events": [
+    { "type": "birth", "date": { "year": 1862 } },
+    { "type": "marriage", "date": { "year": 1884 } },
+    { "type": "death", "date": { "year": 1928 } }
+  ],
+  "places": [{ "name": "Boston" }, { "name": "Salem" }],
+  "relationships": [{ "type": "Couple" }],
+  "provisionalRelatives": [],
+  "publishWarnings": []
+}

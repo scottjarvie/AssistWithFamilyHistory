@@ -1,0 +1,106 @@
+{
+  "schemaVersion": "2026-05-21",
+  "route": "Repo-Backed Fixture And Agent QA Harness",
+  "linearIssues": ["GEN-3", "GEN-48", "GEN-18", "GEN-44", "GEN-47", "GEN-46", "GEN-23", "GEN-45", "GEN-19"],
+  "fixtures": [
+    {
+      "id": "publishable-review-story",
+      "file": "ready-review-story.json",
+      "category": "publishable",
+      "storyId": "fixture-ready-story-0001",
+      "expectedCanPublish": true,
+      "expectedBlockers": [],
+      "notes": "Baseline ready story for slug, metadata, publish preview, and trusted publisher checks."
+    },
+    {
+      "id": "weak-story-missing-evidence",
+      "file": "blocked-missing-evidence.json",
+      "category": "weak-story",
+      "storyId": "fixture-weak-story-0002",
+      "expectedCanPublish": false,
+      "expectedBlockers": ["evidence", "context", "review_status", "story_context_strength"],
+      "notes": "Catches unsupported drafts before review or public status changes."
+    },
+    {
+      "id": "living-source-person",
+      "file": "blocked-living-risk.json",
+      "category": "living-risk",
+      "storyId": "fixture-living-story-0003",
+      "expectedCanPublish": false,
+      "expectedBlockers": ["privacy_living_status"],
+      "notes": "Blocks explicit living-person risk even when the story otherwise looks ready."
+    },
+    {
+      "id": "missing-context-coverage",
+      "file": "blocked-missing-context.json",
+      "category": "missing-context",
+      "storyId": "fixture-missing-context-0010",
+      "expectedCanPublish": false,
+      "expectedBlockers": ["context"],
+      "notes": "Blocks well sourced stories when historical/place context has not been reviewed."
+    },
+    {
+      "id": "context-recorded-not-publishable",
+      "file": "blocked-context-not-publishable.json",
+      "category": "missing-context",
+      "storyId": "fixture-context-not-publishable-0011",
+      "expectedCanPublish": false,
+      "expectedBlockers": ["context"],
+      "notes": "Blocks publishing when historical context exists but none has reached publish_candidate or public_source privacy yet (publishableCount=0, count>0). Asserts the gate split added in commit 9246cb2."
+    },
+    {
+      "id": "unresolved-provisional-relative",
+      "file": "blocked-provisional-relative.json",
+      "category": "unresolved-relative",
+      "storyId": "fixture-relative-story-0004",
+      "expectedCanPublish": false,
+      "expectedBlockers": ["provisional_relatives"],
+      "notes": "Prevents public stories from relying on unresolved graph claims."
+    },
+    {
+      "id": "old-missing-death-date",
+      "file": "allowed-old-missing-death.json",
+      "category": "old-missing-death",
+      "storyId": "fixture-old-story-0005",
+      "expectedCanPublish": true,
+      "expectedBlockers": [],
+      "notes": "Confirms missing death date alone is not a blocker for a clearly historical person."
+    },
+    {
+      "id": "modern-related-person",
+      "file": "blocked-modern-relative.json",
+      "category": "living-risk",
+      "storyId": "fixture-modern-relative-0006",
+      "expectedCanPublish": false,
+      "expectedBlockers": ["privacy_living_status"],
+      "notes": "Blocks living or probably living risk from nearby relatives in the graph."
+    },
+    {
+      "id": "private-person-notes",
+      "file": "blocked-private-notes.json",
+      "category": "private-note",
+      "storyId": "fixture-private-note-0007",
+      "expectedCanPublish": false,
+      "expectedBlockers": ["privacy_living_status"],
+      "notes": "Blocks private/sensitive notes and tags before public publishing."
+    },
+    {
+      "id": "modern-sensitive-source",
+      "file": "blocked-modern-source.json",
+      "category": "private-source",
+      "storyId": "fixture-modern-source-0008",
+      "expectedCanPublish": false,
+      "expectedBlockers": ["privacy_living_status"],
+      "notes": "Blocks modern/private source evidence from leaking into public share surfaces."
+    },
+    {
+      "id": "young-family-event",
+      "file": "blocked-young-family-event.json",
+      "category": "living-risk",
+      "storyId": "fixture-young-family-0009",
+      "expectedCanPublish": false,
+      "expectedBlockers": ["privacy_living_status"],
+      "notes": "Blocks recent non-death family events that may expose living family context."
+    }
+  ]
+}

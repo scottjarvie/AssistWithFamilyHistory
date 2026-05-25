@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "1.0",
+  "provider": "gedcom",
+  "providerRecordId": "I0001",
+  "capturedAt": "2026-05-21T12:05:00.000Z",
+  "subject": {
+    "externalId": "I0001",
+    "name": "Casey Rivera",
+    "birthDate": "abt 1888",
+    "deathDate": "1952"
+  },
+  "sources": [
+    {
+      "sourceKey": "gedcom-S0001",
+      "title": "Rivera family register",
+      "evidenceText": "Fictional GEDCOM source note.",
+      "indexedFields": [
+        { "label": "Birth", "value": "abt 1888" },
+        { "label": "Birth Place", "value": "Example Parish, Example Country" }
+      ]
+    }
+  ],
+  "relatedPeople": [
+    {
+      "externalId": "I0002",
+      "name": "Riley Rivera",
+      "role": "Parent",
+      "sourceKey": "gedcom-S0001"
+    }
+  ],
+  "places": [
+    {
+      "name": "Example Parish",
+      "fullName": "Example Parish, Example Country",
+      "role": "Birth Place",
+      "sourceKey": "gedcom-S0001"
+    }
+  ],
+  "media": [],
+  "diagnostics": {
+    "warnings": [
+      "GEDCOM fixture has no media."
+    ],
+    "errors": [],
+    "rawArtifactRefs": [
+      "fixtures/rivera-family.ged"
+    ]
+  }
+}
