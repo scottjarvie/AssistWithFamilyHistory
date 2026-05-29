@@ -46,6 +46,7 @@ steps=(
   "check:protected-routes"
   "check:person-identifiers"
   "check:convex-visibility"
+  "check:owned-tables-parity"
   "check:safelink-suppression"
   "check:no-plain-next-link"
   "build"

@@ -54,8 +54,80 @@ const OWNED_TABLES = [
   "historicalContext",
 ] as const satisfies readonly TableNames[];
 
-const GUEST_PREFIX = "guest_";
-const USER_PREFIX = "user_";
+export const GUEST_PREFIX = "guest_";
+export const USER_PREFIX = "user_";
+
+export type MigrationResult = { total: number; perTable: Record<string, number> };
+
+/**
+ * Pure guard for the migrate-guest invariants. Throws on any violation, returns
+ * void on success. Exported so the unit tests can assert the guard logic
+ * without a Convex runtime. The mutation calls this before touching the db.
+ *
+ *   - `fromVaultOwnerId` MUST be a `guest_*` id (the cookie format).
+ *   - `toVaultOwnerId` MUST be a `user_*` id (the Clerk user id prefix).
+ *   - The two ids must differ.
+ */
+export function assertMigrationOwners(fromVaultOwnerId: string, toVaultOwnerId: string): void {
+  if (!fromVaultOwnerId.startsWith(GUEST_PREFIX)) {
+    throw new Error(
+      `migrateGuestVault: fromVaultOwnerId must start with "${GUEST_PREFIX}" (got ${fromVaultOwnerId.slice(0, 8)}…)`,
+    );
+  }
+  if (!toVaultOwnerId.startsWith(USER_PREFIX)) {
+    throw new Error(
+      `migrateGuestVault: toVaultOwnerId must start with "${USER_PREFIX}" (got ${toVaultOwnerId.slice(0, 8)}…)`,
+    );
+  }
+  if (fromVaultOwnerId === toVaultOwnerId) {
+    throw new Error("migrateGuestVault: from and to vault owners are identical");
+  }
+}
+
+/**
+ * Minimal db surface the re-tag loop needs. The Convex `ctx.db` satisfies this
+ * structurally; the tests pass a fake implementation backed by seeded rows.
+ */
+export type RetagDb = {
+  query: (table: string) => {
+    withIndex: (
+      indexName: string,
+      filter: (q: { eq: (field: string, value: string) => unknown }) => unknown,
+    ) => { collect: () => Promise<Array<{ _id: unknown }>> };
+  };
+  patch: (id: unknown, fields: { vaultOwnerId: string }) => Promise<unknown>;
+};
+
+/**
+ * Pure decision/loop for the migration: for each owned table, re-tag the rows
+ * owned by `fromVaultOwnerId` to `toVaultOwnerId` and tally counts. No guards
+ * here — callers must run `assertMigrationOwners` first. Exported so tests can
+ * drive it with a fake db and assert exact per-table counts and the total.
+ */
+export async function retagGuestRows(
+  db: RetagDb,
+  fromVaultOwnerId: string,
+  toVaultOwnerId: string,
+  tables: readonly string[] = OWNED_TABLES,
+): Promise<MigrationResult> {
+  const perTable: Record<string, number> = {};
+  let total = 0;
+
+  for (const table of tables) {
+    const rows = await db
+      .query(table)
+      .withIndex("by_owner", (q) => q.eq("vaultOwnerId", fromVaultOwnerId))
+      .collect();
+
+    for (const row of rows) {
+      await db.patch(row._id, { vaultOwnerId: toVaultOwnerId });
+    }
+    perTable[table] = rows.length;
+    total += rows.length;
+  }
+
+  return { total, perTable };
+}
 
 export const migrateGuestVault = mutation({
   args: {
@@ -63,38 +135,15 @@ export const migrateGuestVault = mutation({
     toVaultOwnerId: v.string(),
   },
   handler: async (ctx, { fromVaultOwnerId, toVaultOwnerId }) => {
-    if (!fromVaultOwnerId.startsWith(GUEST_PREFIX)) {
-      throw new Error(
-        `migrateGuestVault: fromVaultOwnerId must start with "${GUEST_PREFIX}" (got ${fromVaultOwnerId.slice(0, 8)}…)`,
-      );
-    }
-    if (!toVaultOwnerId.startsWith(USER_PREFIX)) {
-      throw new Error(
-        `migrateGuestVault: toVaultOwnerId must start with "${USER_PREFIX}" (got ${toVaultOwnerId.slice(0, 8)}…)`,
-      );
-    }
-    if (fromVaultOwnerId === toVaultOwnerId) {
-      throw new Error("migrateGuestVault: from and to vault owners are identical");
-    }
+    assertMigrationOwners(fromVaultOwnerId, toVaultOwnerId);
 
-    const perTable: Record<string, number> = {};
-    let total = 0;
-
-    for (const table of OWNED_TABLES) {
-      const rows = await ctx.db
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .query(table as any)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .withIndex("by_owner" as any, (q: any) => q.eq("vaultOwnerId", fromVaultOwnerId))
-        .collect();
-
-      for (const row of rows) {
-        await ctx.db.patch(row._id, { vaultOwnerId: toVaultOwnerId });
-      }
-      perTable[table] = rows.length;
-      total += rows.length;
-    }
-
-    return { total, perTable };
+    // ctx.db structurally satisfies RetagDb; the casts keep the index/table
+    // names loose the same way the original inline loop did.
+    return retagGuestRows(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ctx.db as any,
+      fromVaultOwnerId,
+      toVaultOwnerId,
+    );
   },
 });

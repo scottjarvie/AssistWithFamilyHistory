@@ -7,7 +7,7 @@
     "dev": "next dev --webpack --port 3443",
     "build": "next build",
     "start": "next start --port 3443",
-    "test": "tsx scripts/test-vault-core.ts && tsx scripts/test-context-gates.ts && tsx scripts/check-import-regression.ts",
+    "test": "tsx scripts/test-vault-core.ts && tsx scripts/test-vault-migration.ts && tsx scripts/test-context-gates.ts && tsx scripts/check-import-regression.ts",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "verify": "bash scripts/verify.sh",
@@ -41,6 +41,7 @@
     "check:protected-routes": "tsx scripts/check-protected-routes.ts",
     "check:person-identifiers": "tsx scripts/check-person-identifiers.ts",
     "check:convex-visibility": "tsx scripts/check-convex-visibility.ts",
+    "check:owned-tables-parity": "tsx scripts/check-owned-tables-parity.ts",
     "check:safelink-suppression": "tsx scripts/check-safelink-suppression.ts",
     "check:no-plain-next-link": "tsx scripts/check-no-plain-next-link.ts"
   },

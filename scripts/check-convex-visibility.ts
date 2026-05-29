@@ -32,6 +32,14 @@ const PUBLIC_UNSCOPED_ALLOWLIST: Record<string, string> = {
     "Public story render path; gated by status==published + buildPublicStoryBundle DTO.",
   "vault.ts:getPublishedStoryByIdentifier":
     "Public story render path; gated by status==published + buildPublicStoryBundle DTO.",
+  // Guest->user migration. Owner scoping lives in the extracted pure helpers
+  // assertMigrationOwners (guest_/user_ prefix + must-differ guards) and
+  // retagGuestRows (by_owner index reads), so the literal "vaultOwnerId" no
+  // longer appears in the thin handler body. GEN-88 will internalize / auth-bind
+  // this (bind toVaultOwnerId to the authenticated caller); until then it stays
+  // public because the API route invokes it via the public client.
+  "vaultMigration.ts:migrateGuestVault":
+    "Owner re-tag scoped via assertMigrationOwners + retagGuestRows (by_owner); to be internalized/auth-bound in GEN-88.",
 };
 
 const failures: string[] = [];
