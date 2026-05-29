@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getConvexClient, getConvexUnavailableState, isConvexConfigured } from "@/lib/convex/server";
+import { getAuthedConvexClient, getConvexUnavailableState, isConvexConfigured } from "@/lib/convex/server";
 import { api } from "@/convex/_generated/api";
 import type { FunctionReturnType } from "convex/server";
 import { DocumentsViewer } from "@/components/DocumentsViewer";
@@ -49,7 +49,7 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
   }
 
   const { personId } = await params;
-  const client = getConvexClient();
+  const client = await getAuthedConvexClient();
   const { vaultOwnerId } = await getVaultAccessContext();
   let workspace;
 

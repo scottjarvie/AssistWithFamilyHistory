@@ -24,7 +24,7 @@ import {
   saveRawDocument,
   isLocalFsEnabled,
 } from "@/lib/storage/fileStorage";
-import { getConvexClient, isConvexConfigured } from "@/lib/convex/server";
+import { getAuthedConvexClient, getConvexClient, isConvexConfigured } from "@/lib/convex/server";
 import { generateRawDocument } from "@/features/source-docs/lib/rawDocGenerator";
 import { EvidencePackSchema } from "@/features/source-docs/lib/schemas";
 import { resolveImportRunForStoredRun } from "@/lib/familysearch/importRunResolver";
@@ -71,7 +71,7 @@ export async function GET(
 
     if (isConvexConfigured() && storagePersonId) {
       try {
-        const existingDoc = await getConvexClient().query(api.documents.getDocument, {
+        const existingDoc = await (await getAuthedConvexClient()).query(api.documents.getDocument, {
           vaultOwnerId,
           personId: storagePersonId,
           type: "CST",

@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { ContextReportForm } from "@/components/vault/ContextReportForm";
 import { VaultStateCard } from "@/components/vault/VaultStateCard";
 import {
-  getConvexClient,
+  getAuthedConvexClient,
   getConvexRuntimeIssue,
   getConvexUnavailableState,
   isConvexConfigured,
@@ -34,7 +34,7 @@ export default async function PlaceWorkspacePage({ params }: PageProps) {
   }
 
   const { placeId } = await params;
-  const client = getConvexClient();
+  const client = await getAuthedConvexClient();
   const { vaultOwnerId } = await getVaultAccessContext();
   let workspace;
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "node:crypto";
 import { api } from "@/convex/_generated/api";
-import { getConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
+import { getAuthedConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
 export async function GET(
@@ -26,7 +26,7 @@ export async function GET(
   try {
     const { id: personIdentifier } = await params;
     const format = request.nextUrl.searchParams.get("format") || "json";
-    const client = getConvexClient();
+    const client = await getAuthedConvexClient();
     const { vaultOwnerId } = await getVaultAccessContext();
     const contextPack = await client.query(api.vault.getContextPack, {
       vaultOwnerId,

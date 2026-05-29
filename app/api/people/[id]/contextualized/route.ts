@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "node:crypto";
 import { api } from "@/convex/_generated/api";
-import { getConvexClient, isConvexConfigured } from "@/lib/convex/server";
+import { getAuthedConvexClient, getConvexClient, isConvexConfigured } from "@/lib/convex/server";
 import {
   getContextualizedDocument,
   getLatestRun,
@@ -48,7 +48,7 @@ export async function GET(
 
     if (isConvexConfigured() && storagePersonId) {
       try {
-        const existingDoc = await getConvexClient().query(api.documents.getDocument, {
+        const existingDoc = await (await getAuthedConvexClient()).query(api.documents.getDocument, {
           vaultOwnerId,
           personId: storagePersonId,
           type: "PS",

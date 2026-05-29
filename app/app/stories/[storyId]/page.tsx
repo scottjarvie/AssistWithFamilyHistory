@@ -27,7 +27,7 @@ import { StoryReviewHistoryPanel } from "@/components/vault/StoryReviewHistoryPa
 import { StoryStatusActions } from "@/components/vault/StoryStatusActions";
 import { VaultStateCard } from "@/components/vault/VaultStateCard";
 import {
-  getConvexClient,
+  getAuthedConvexClient,
   getConvexRuntimeIssue,
   getConvexUnavailableState,
   isConvexConfigured,
@@ -84,10 +84,11 @@ export default async function StoryReviewPage({
 
   const { storyId } = await params;
   const { vaultOwnerId } = await getVaultAccessContext();
+  const client = await getAuthedConvexClient();
   let bundle;
 
   try {
-    bundle = await getConvexClient().query(api.vault.getStoryReview, {
+    bundle = await client.query(api.vault.getStoryReview, {
       vaultOwnerId,
       storyId: storyId as Id<"stories">,
     });

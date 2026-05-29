@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { createPageMetadata } from "@/lib/seo";
 import { VaultStateCard } from "@/components/vault/VaultStateCard";
 import {
-  getConvexClient,
+  getAuthedConvexClient,
   getConvexRuntimeIssue,
   getConvexUnavailableState,
   isConvexConfigured,
@@ -36,7 +36,7 @@ export default async function DashboardPage() {
     );
   }
 
-  const client = getConvexClient();
+  const client = await getAuthedConvexClient();
   const { vaultOwnerId } = await getVaultAccessContext();
   let summary;
 

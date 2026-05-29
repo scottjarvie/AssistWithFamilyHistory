@@ -6,12 +6,12 @@
 
 import { NextResponse } from "next/server";
 import { api } from "@/convex/_generated/api";
-import { getConvexClient, getConvexReadyStatus, getConvexRuntimeIssue } from "@/lib/convex/server";
+import { getAuthedConvexClient, getConvexReadyStatus, getConvexRuntimeIssue } from "@/lib/convex/server";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
 export async function GET() {
   try {
-    const client = getConvexClient();
+    const client = await getAuthedConvexClient();
     const { vaultOwnerId } = await getVaultAccessContext();
     const peopleWithDocs = await client.query(api.vault.getPeopleExplorer, { vaultOwnerId });
     const ready = getConvexReadyStatus();

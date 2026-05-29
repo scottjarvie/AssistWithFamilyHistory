@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { VaultStateCard } from "@/components/vault/VaultStateCard";
 import { createPageMetadata } from "@/lib/seo";
 import {
-  getConvexClient,
+  getAuthedConvexClient,
   getConvexRuntimeIssue,
   getConvexUnavailableState,
   isConvexConfigured,
@@ -51,7 +51,7 @@ export default async function PeoplePage({
     );
   }
 
-  const client = getConvexClient();
+  const client = await getAuthedConvexClient();
   const { vaultOwnerId } = await getVaultAccessContext();
   let people;
 

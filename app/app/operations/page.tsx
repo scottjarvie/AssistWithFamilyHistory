@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { VaultStateCard } from "@/components/vault/VaultStateCard";
 import { createPageMetadata } from "@/lib/seo";
 import {
-  getConvexClient,
+  getAuthedConvexClient,
   getConvexRuntimeIssue,
   getConvexUnavailableState,
   isConvexConfigured,
@@ -60,7 +60,7 @@ export default async function OperationsPage({ searchParams }: { searchParams: S
     );
   }
 
-  const client = getConvexClient();
+  const client = await getAuthedConvexClient();
   const accessContext = await getVaultAccessContext();
   const { vaultOwnerId } = accessContext;
   let queue;
