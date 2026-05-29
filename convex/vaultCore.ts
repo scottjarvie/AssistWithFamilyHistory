@@ -49,6 +49,78 @@ export function filterByVaultOwner<T extends { vaultOwnerId?: string }>(
   return rows.filter((row) => matchesVaultOwner(row.vaultOwnerId, vaultOwnerId));
 }
 
+// ---------------------------------------------------------------------------
+// GEN-87 Phase 1 (SHADOW). The owner chokepoint.
+//
+// CARDINAL RULE: shadow observes, it NEVER enforces. resolveOwner always
+// returns the client-supplied owner (normalized). When a verified Clerk
+// identity is present AND disagrees with the supplied owner, we LOG a single
+// structured warning so we can measure how often the trusted-argument owner
+// diverges from the verified identity before any later phase flips on
+// enforcement. We do NOT throw, and we do NOT switch the owner. Switching or
+// throwing here is a LATER phase.
+// ---------------------------------------------------------------------------
+
+/**
+ * PURE owner comparison for the shadow phase. No ctx, fully unit-testable.
+ *
+ * - `owner` is ALWAYS normalizeVaultOwnerId(suppliedOwner). Shadow never
+ *   switches the owner regardless of the identity.
+ * - `mismatch` is true ONLY when an identity subject is actually present AND
+ *   its normalized form disagrees with the normalized supplied owner. For a
+ *   guest / Clerk-off caller (identitySubject null/undefined) there is nothing
+ *   to compare against, so mismatch is always false.
+ *
+ * Normalization is delegated to normalizeVaultOwnerId so the comparison stays
+ * consistent with matchesVaultOwner / the rest of the owner helpers.
+ */
+export function compareOwnerForShadow(
+  identitySubject: string | null | undefined,
+  suppliedOwner?: string | null
+): { owner: string; mismatch: boolean } {
+  const owner = normalizeVaultOwnerId(suppliedOwner);
+  if (identitySubject === null || identitySubject === undefined) {
+    return { owner, mismatch: false };
+  }
+  const mismatch = normalizeVaultOwnerId(identitySubject) !== owner;
+  return { owner, mismatch };
+}
+
+/**
+ * Truncate an owner/identity id for logging. We never log full ids in the
+ * shadow warning — only a short prefix that is enough to correlate without
+ * leaking the whole Clerk subject / vault owner.
+ */
+function truncateForShadowLog(value: string | null | undefined): string {
+  if (!value) return "<none>";
+  return value.length > 12 ? `${value.slice(0, 12)}…` : value;
+}
+
+/**
+ * The runtime owner chokepoint for Convex query/mutation handlers (SHADOW).
+ *
+ * Reads the verified identity via ctx.auth.getUserIdentity(), compares it to
+ * the client-supplied owner with the pure compareOwnerForShadow, and — only on
+ * a mismatch — emits ONE structured console.warn (truncated ids; Convex
+ * captures console output). It then returns the SUPPLIED owner (normalized)
+ * REGARDLESS. Shadow does not enforce: no throw, no owner switch.
+ *
+ * ctx is typed loosely so any QueryCtx / MutationCtx satisfies it.
+ */
+export async function resolveOwner(
+  ctx: { auth: { getUserIdentity: () => Promise<{ subject?: string } | null> } },
+  suppliedOwner?: string | null
+): Promise<string> {
+  const identity = await ctx.auth.getUserIdentity();
+  const result = compareOwnerForShadow(identity?.subject, suppliedOwner);
+  if (result.mismatch) {
+    console.warn(
+      `[shadow-owner-mismatch] identity=${truncateForShadowLog(identity?.subject)} supplied=${truncateForShadowLog(suppliedOwner)}`
+    );
+  }
+  return result.owner;
+}
+
 function hasSourceKeyword(sources: SourceRecord[], keywords: string[]) {
   return sources.some((source) => {
     const haystack = `${source.title} ${source.type} ${source.notes || ""}`.toLowerCase();

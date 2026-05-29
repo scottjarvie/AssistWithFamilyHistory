@@ -11,6 +11,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   buildOperationSummary,
+  compareOwnerForShadow,
   filterByVaultOwner,
   inferResearchChecks,
   matchesVaultOwner,
@@ -36,6 +37,56 @@ test("filterByVaultOwner returns only the owner's rows", () => {
     ).map((row) => row.value),
     [1]
   );
+});
+
+// GEN-87 Phase 1 (SHADOW): the pure owner-comparison chokepoint. These assert
+// the cardinal rule — the supplied owner is ALWAYS returned (shadow never
+// switches the owner); mismatch is observe-only and is true only when a
+// verified identity is present AND disagrees.
+test("compareOwnerForShadow: matching identity -> normalized supplied owner, no mismatch", () => {
+  assert.deepEqual(compareOwnerForShadow("user_X", "user_X"), {
+    owner: normalizeVaultOwnerId("user_X"),
+    mismatch: false,
+  });
+});
+
+test("compareOwnerForShadow: mismatching identity still returns the SUPPLIED owner (no switch), mismatch:true", () => {
+  assert.deepEqual(compareOwnerForShadow("user_X", "user_Y"), {
+    owner: normalizeVaultOwnerId("user_Y"),
+    mismatch: true,
+  });
+});
+
+test("compareOwnerForShadow: guest / null / undefined identity never mismatches", () => {
+  assert.deepEqual(compareOwnerForShadow(null, "guest_z"), {
+    owner: normalizeVaultOwnerId("guest_z"),
+    mismatch: false,
+  });
+  assert.deepEqual(compareOwnerForShadow(undefined, "guest_z"), {
+    owner: normalizeVaultOwnerId("guest_z"),
+    mismatch: false,
+  });
+});
+
+test("compareOwnerForShadow: normalization is consistent with matchesVaultOwner", () => {
+  // Undefined/empty supplied owner normalizes to the local-dev default. When the
+  // verified identity is that same default, there is no mismatch — same rule
+  // matchesVaultOwner uses.
+  assert.deepEqual(compareOwnerForShadow(undefined, undefined), {
+    owner: normalizeVaultOwnerId(undefined),
+    mismatch: false,
+  });
+  assert.deepEqual(compareOwnerForShadow(normalizeVaultOwnerId(undefined), undefined), {
+    owner: normalizeVaultOwnerId(undefined),
+    mismatch: false,
+  });
+  // A present identity that differs from the normalized (defaulted) supplied
+  // owner is a mismatch, mirroring matchesVaultOwner returning false.
+  assert.equal(matchesVaultOwner(undefined, "user_X"), false);
+  assert.deepEqual(compareOwnerForShadow("user_X", undefined), {
+    owner: normalizeVaultOwnerId(undefined),
+    mismatch: true,
+  });
 });
 
 test("buildOperationSummary aggregates required/recommended/critical and next actions", () => {

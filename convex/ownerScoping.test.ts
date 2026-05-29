@@ -26,6 +26,7 @@ import { v } from "convex/values";
 import schema from "./schema";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { resolveOwner } from "./vaultCore";
 
 // Pass the module map explicitly so convex-test can find the function modules
 // regardless of cwd (this file sits in convex/, the default functions dir).
@@ -415,5 +416,38 @@ describe("migrateGuestVault (real mutation)", () => {
         toVaultOwnerId: "guest_dddddddd-0000-0000-0000-000000000000", // not a user_ id
       })
     ).rejects.toThrow(/must start with "user_"/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 4. GEN-87 P1-SHADOW — resolveOwner runs the real ctx.auth.getUserIdentity()
+//    path and proves the cardinal rule: it ALWAYS returns the supplied owner
+//    and NEVER enforces (no throw, no owner switch), even when the verified
+//    identity disagrees. This is the only place the real Convex identity ctx
+//    drives resolveOwner; the pure compareOwnerForShadow rules are covered in
+//    scripts/test-vault-core.ts.
+// ---------------------------------------------------------------------------
+
+describe("resolveOwner (shadow chokepoint, real ctx.auth identity)", () => {
+  test("identity present + DIFFERENT supplied owner -> returns the supplied owner (no enforce)", async () => {
+    const t = convexTest(schema, modules);
+    const owner = await t
+      .withIdentity({ subject: "user_X" })
+      .run((ctx) => resolveOwner(ctx, "user_Y"));
+    expect(owner).toBe("user_Y");
+  });
+
+  test("identity present + MATCHING supplied owner -> returns that owner", async () => {
+    const t = convexTest(schema, modules);
+    const owner = await t
+      .withIdentity({ subject: "user_X" })
+      .run((ctx) => resolveOwner(ctx, "user_X"));
+    expect(owner).toBe("user_X");
+  });
+
+  test("no identity (guest / Clerk off) -> returns the supplied owner", async () => {
+    const t = convexTest(schema, modules);
+    const owner = await t.run((ctx) => resolveOwner(ctx, "guest_z"));
+    expect(owner).toBe("guest_z");
   });
 });
