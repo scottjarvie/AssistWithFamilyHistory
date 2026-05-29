@@ -25,6 +25,21 @@ import { DEFAULT_LOCAL_VAULT_OWNER } from "@/lib/vault/constants";
 // Base data directory
 const DATA_DIR = path.join(process.cwd(), "data", "source-docs", "people");
 
+/**
+ * Whether local-filesystem persistence is enabled.
+ *
+ * Convex is the canonical store (GEN-91). The local `data/` tree is a
+ * dev-only convenience mirror. In production (Vercel) the filesystem is
+ * ephemeral and must never be a source of truth, so FS writes are skipped
+ * there. Set DTS_LOCAL_FS=1 to force-enable, or DTS_LOCAL_FS=0 to force-disable.
+ */
+export function isLocalFsEnabled(): boolean {
+  const flag = process.env.DTS_LOCAL_FS;
+  if (flag === "1" || flag === "true") return true;
+  if (flag === "0" || flag === "false") return false;
+  return process.env.NODE_ENV !== "production";
+}
+
 function resolveVaultOwnerDir(vaultOwnerId?: string) {
   return (vaultOwnerId || DEFAULT_LOCAL_VAULT_OWNER).replace(/[^a-zA-Z0-9_-]/g, "_");
 }
@@ -108,6 +123,7 @@ export async function getPerson(personId: string, vaultOwnerId?: string): Promis
  * Save a person's metadata
  */
 export async function savePerson(person: PersonMetadata, vaultOwnerId?: string): Promise<void> {
+  if (!isLocalFsEnabled()) return;
   const personDir = getPersonDir(person.familySearchId, vaultOwnerId);
   await ensureDir(personDir);
   const personPath = path.join(personDir, "person.json");
@@ -169,6 +185,7 @@ export async function getLatestRun(personId: string, vaultOwnerId?: string): Pro
  * Set the latest run pointer
  */
 export async function setLatestRun(personId: string, runId: string, vaultOwnerId?: string): Promise<void> {
+  if (!isLocalFsEnabled()) return;
   const latestPath = path.join(getPersonDir(personId, vaultOwnerId), "latest.json");
   const pointer: LatestPointer = {
     runId,
@@ -187,11 +204,12 @@ export async function saveEvidencePack(
   vaultOwnerId?: string
 ): Promise<string> {
   const runDir = getRunDir(personId, runId, vaultOwnerId);
+  if (!isLocalFsEnabled()) return runDir;
   await ensureDir(runDir);
-  
+
   const packPath = path.join(runDir, "evidence-pack.json");
   await fs.writeFile(packPath, JSON.stringify(evidencePack, null, 2));
-  
+
   return runDir;
 }
 
@@ -205,9 +223,10 @@ export async function saveCapturePackage(
   vaultOwnerId?: string
 ): Promise<string> {
   const runDir = getRunDir(personId, runId, vaultOwnerId);
+  const capturePath = path.join(runDir, "capture-package.json");
+  if (!isLocalFsEnabled()) return capturePath;
   await ensureDir(runDir);
 
-  const capturePath = path.join(runDir, "capture-package.json");
   await fs.writeFile(capturePath, JSON.stringify(capturePackage, null, 2));
 
   return capturePath;
@@ -248,6 +267,7 @@ export async function saveRawDocument(
   markdown: string,
   vaultOwnerId?: string
 ): Promise<void> {
+  if (!isLocalFsEnabled()) return;
   const runDir = getRunDir(personId, runId, vaultOwnerId);
   await ensureDir(runDir);
   const docPath = path.join(runDir, "raw-document.md");
@@ -279,6 +299,7 @@ export async function saveContextualizedDocument(
   markdown: string,
   vaultOwnerId?: string
 ): Promise<void> {
+  if (!isLocalFsEnabled()) return;
   const runDir = getRunDir(personId, runId, vaultOwnerId);
   await ensureDir(runDir);
   const docPath = path.join(runDir, "contextualized.md");
@@ -312,6 +333,7 @@ export async function saveAIStageOutput(
   data: unknown,
   vaultOwnerId?: string
 ): Promise<void> {
+  if (!isLocalFsEnabled()) return;
   const stageDir = path.join(getRunDir(personId, runId, vaultOwnerId), "ai-stages", stage);
   await ensureDir(stageDir);
   const filePath = path.join(stageDir, filename);

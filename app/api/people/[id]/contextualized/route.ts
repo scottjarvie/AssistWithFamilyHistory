@@ -5,6 +5,7 @@ import {
   getContextualizedDocument,
   getLatestRun,
   saveContextualizedDocument,
+  isLocalFsEnabled,
 } from "@/lib/storage/fileStorage";
 import { resolveImportRunForStoredRun } from "@/lib/familysearch/importRunResolver";
 import { getVaultAccessContext } from "@/lib/vault/server";
@@ -40,9 +41,27 @@ export async function GET(
       });
     }
 
-    const markdown = storagePersonId
-      ? await getContextualizedDocument(storagePersonId, runId, vaultOwnerId)
-      : null;
+    // Convex is the canonical store (GEN-91). Prefer the mirrored Person Sheet
+    // artifact; only fall back to the local filesystem in dev.
+    let markdown: string | null = null;
+
+    if (isConvexConfigured() && storagePersonId) {
+      try {
+        const existingDoc = await getConvexClient().query(api.documents.getDocument, {
+          vaultOwnerId,
+          personId: storagePersonId,
+          type: "PS",
+        });
+        markdown = existingDoc?.contentMarkdown ?? null;
+      } catch (error) {
+        console.error("Failed to read contextualized dossier from Convex:", error);
+      }
+    }
+
+    if (!markdown && isLocalFsEnabled() && storagePersonId) {
+      markdown = await getContextualizedDocument(storagePersonId, runId, vaultOwnerId);
+    }
+
     if (!markdown) {
       return NextResponse.json({
         success: false,
