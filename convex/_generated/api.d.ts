@@ -20,6 +20,7 @@ import type * as places from "../places.js";
 import type * as rateLimits from "../rateLimits.js";
 import type * as relationships from "../relationships.js";
 import type * as researchLog from "../researchLog.js";
+import type * as researchTasks from "../researchTasks.js";
 import type * as sources from "../sources.js";
 import type * as vault from "../vault.js";
 import type * as vaultCore from "../vaultCore.js";
@@ -45,6 +46,7 @@ declare const fullApi: ApiFromModules<{
   rateLimits: typeof rateLimits;
   relationships: typeof relationships;
   researchLog: typeof researchLog;
+  researchTasks: typeof researchTasks;
   sources: typeof sources;
   vault: typeof vault;
   vaultCore: typeof vaultCore;
