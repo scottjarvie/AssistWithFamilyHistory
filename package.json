@@ -18,6 +18,7 @@
     "check:source-facts": "tsx scripts/check-source-facts.ts",
     "check:redaction-fixtures": "tsx scripts/check-redaction-fixtures.ts",
     "check:loose-context": "tsx scripts/check-loose-context-contract.ts",
+    "check:context-taxonomy": "tsx scripts/check-context-taxonomy.ts",
     "check:import-regression": "tsx scripts/check-import-regression.ts",
     "check:agent-quality-gates": "tsx scripts/check-agent-quality-gates.ts",
     "check:operations-handoff": "tsx scripts/check-operations-handoff.ts",
