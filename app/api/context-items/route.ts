@@ -1,27 +1,65 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { api } from "@/convex/_generated/api";
 import { getConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
-const ITEM_TYPES = new Set([
-  "note",
-  "document_ref",
-  "research_snippet",
-  "memory_note",
-  "place_context",
-  "building_context",
-  "generated_summary",
-  "other",
-]);
-const EVIDENCE_ROLES = new Set([
-  "raw_material",
-  "researcher_conclusion",
-  "generated_summary",
-  "lead_or_hint",
-  "background_context",
-]);
-const PRIVACY_LEVELS = new Set(["private", "family_review", "publish_candidate", "public_source"]);
-const REVIEW_STATUSES = new Set(["unreviewed", "reviewed", "disputed", "redacted", "rejected"]);
+// GEN-94: zod request-body contract. Enums narrow into the Convex mutation arg
+// types. `.catch(default)` preserves the prior behavior where an
+// unknown/invalid enum value silently fell back to its default rather than
+// rejecting the request.
+const ItemTypeEnum = z
+  .enum([
+    "note",
+    "document_ref",
+    "research_snippet",
+    "memory_note",
+    "place_context",
+    "building_context",
+    "generated_summary",
+    "other",
+  ])
+  .catch("note");
+const EvidenceRoleEnum = z
+  .enum([
+    "raw_material",
+    "researcher_conclusion",
+    "generated_summary",
+    "lead_or_hint",
+    "background_context",
+  ])
+  .catch("raw_material");
+const PrivacyLevelEnum = z
+  .enum(["private", "family_review", "publish_candidate", "public_source"])
+  .catch("private");
+const ReviewStatusEnum = z
+  .enum(["unreviewed", "reviewed", "disputed", "redacted", "rejected"])
+  .catch("unreviewed");
+
+// Trim and coerce empty strings to undefined so optional text fields match the
+// prior hand-rolled `body.x?.trim() || undefined` behavior.
+const optionalTrimmed = z
+  .string()
+  .optional()
+  .transform((value) => {
+    const trimmed = value?.trim();
+    return trimmed ? trimmed : undefined;
+  });
+
+const RequestSchema = z.object({
+  personIdentifier: z.string().transform((value) => value.trim()),
+  title: z.string().transform((value) => value.trim()),
+  content: z.string().transform((value) => value.trim()),
+  itemType: ItemTypeEnum.optional(),
+  evidenceRole: EvidenceRoleEnum.optional(),
+  privacyLevel: PrivacyLevelEnum.optional(),
+  reviewStatus: ReviewStatusEnum.optional(),
+  aiUseAllowed: z.boolean().optional(),
+  sourceLabel: optionalTrimmed,
+  sourceUrl: optionalTrimmed,
+  provenanceNote: optionalTrimmed,
+  reviewNote: optionalTrimmed,
+});
 
 export async function POST(request: NextRequest) {
   if (!isConvexConfigured()) {
@@ -31,15 +69,20 @@ export async function POST(request: NextRequest) {
 
   try {
     const { vaultOwnerId } = await getVaultAccessContext();
-    const body = await request.json();
-    const personIdentifier = typeof body.personIdentifier === "string" ? body.personIdentifier.trim() : "";
-    const title = typeof body.title === "string" ? body.title.trim() : "";
-    const content = typeof body.content === "string" ? body.content.trim() : "";
-    const itemType = ITEM_TYPES.has(body.itemType) ? body.itemType : "note";
-    const evidenceRole = EVIDENCE_ROLES.has(body.evidenceRole) ? body.evidenceRole : "raw_material";
-    const privacyLevel = PRIVACY_LEVELS.has(body.privacyLevel) ? body.privacyLevel : "private";
-    const reviewStatus = REVIEW_STATUSES.has(body.reviewStatus) ? body.reviewStatus : "unreviewed";
-    const aiUseAllowed = body.aiUseAllowed === true;
+    const parsed = RequestSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Missing person, title, or content", issues: parsed.error.issues },
+        { status: 400 }
+      );
+    }
+
+    const { personIdentifier, title, content } = parsed.data;
+    const itemType = parsed.data.itemType ?? "note";
+    const evidenceRole = parsed.data.evidenceRole ?? "raw_material";
+    const privacyLevel = parsed.data.privacyLevel ?? "private";
+    const reviewStatus = parsed.data.reviewStatus ?? "unreviewed";
+    const aiUseAllowed = parsed.data.aiUseAllowed === true;
 
     if (!personIdentifier || !title || !content) {
       return NextResponse.json({ error: "Missing person, title, or content" }, { status: 400 });
@@ -60,13 +103,13 @@ export async function POST(request: NextRequest) {
       content,
       itemType,
       evidenceRole,
-      sourceLabel: typeof body.sourceLabel === "string" ? body.sourceLabel.trim() || undefined : undefined,
-      sourceUrl: typeof body.sourceUrl === "string" ? body.sourceUrl.trim() || undefined : undefined,
-      provenanceNote: typeof body.provenanceNote === "string" ? body.provenanceNote.trim() || undefined : undefined,
+      sourceLabel: parsed.data.sourceLabel,
+      sourceUrl: parsed.data.sourceUrl,
+      provenanceNote: parsed.data.provenanceNote,
       privacyLevel,
       reviewStatus,
       aiUseAllowed,
-      reviewNote: typeof body.reviewNote === "string" ? body.reviewNote.trim() || undefined : undefined,
+      reviewNote: parsed.data.reviewNote,
     });
 
     return NextResponse.json({ success: true, ...result });

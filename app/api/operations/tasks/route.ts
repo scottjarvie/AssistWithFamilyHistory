@@ -1,11 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { api } from "@/convex/_generated/api";
 import { getConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
-function isPriority(value: unknown): value is "high" | "medium" | "low" {
-  return value === "high" || value === "medium" || value === "low";
-}
+// GEN-94: zod request-body contract. Priority narrows to the Convex mutation
+// arg type; `.catch("medium")` preserves the prior fallback-on-invalid
+// behavior. personIdentifier falls back to personFsId as before.
+const PriorityEnum = z.enum(["high", "medium", "low"]).catch("medium");
+
+const RequestSchema = z.object({
+  personIdentifier: z.string().optional(),
+  personFsId: z.string().optional(),
+  title: z.string().transform((value) => value.trim()),
+  description: z.string().optional().transform((value) => {
+    const trimmed = value?.trim();
+    return trimmed ? trimmed : undefined;
+  }),
+  priority: PriorityEnum.optional(),
+});
 
 export async function POST(request: NextRequest) {
   if (!isConvexConfigured()) {
@@ -15,16 +28,17 @@ export async function POST(request: NextRequest) {
 
   try {
     const { vaultOwnerId } = await getVaultAccessContext();
-    const body = await request.json();
-    const personIdentifier =
-      typeof body.personIdentifier === "string"
-        ? body.personIdentifier
-        : typeof body.personFsId === "string"
-          ? body.personFsId
-          : undefined;
-    const title = typeof body.title === "string" ? body.title.trim() : "";
-    const description = typeof body.description === "string" ? body.description.trim() : undefined;
-    const priority = isPriority(body.priority) ? body.priority : "medium";
+    const parsed = RequestSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Missing task title", issues: parsed.error.issues },
+        { status: 400 }
+      );
+    }
+
+    const personIdentifier = parsed.data.personIdentifier ?? parsed.data.personFsId ?? undefined;
+    const { title, description } = parsed.data;
+    const priority = parsed.data.priority ?? "medium";
 
     if (!title) {
       return NextResponse.json({ error: "Missing task title" }, { status: 400 });

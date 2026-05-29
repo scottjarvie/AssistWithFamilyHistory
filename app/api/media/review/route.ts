@@ -1,11 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { getConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
-const PRIVACY_LEVELS = new Set(["private", "family_review", "publish_candidate", "public_source"]);
-const REVIEW_STATUSES = new Set(["unreviewed", "reviewed", "redacted", "rejected"]);
-const RIGHTS_STATUSES = new Set(["unknown", "owned", "permitted", "public_domain", "restricted"]);
+// GEN-94: zod request-body contract. Enums narrow into the Convex mutation arg
+// types and preserve the exact accepted values the hand-rolled Sets allowed.
+const PrivacyLevelEnum = z.enum(["private", "family_review", "publish_candidate", "public_source"]);
+const ReviewStatusEnum = z.enum(["unreviewed", "reviewed", "redacted", "rejected"]);
+const RightsStatusEnum = z.enum(["unknown", "owned", "permitted", "public_domain", "restricted"]);
+
+const RequestSchema = z.object({
+  mediaId: z.string().min(1),
+  privacyLevel: PrivacyLevelEnum,
+  reviewStatus: ReviewStatusEnum,
+  rightsStatus: RightsStatusEnum,
+  aiUseAllowed: z.boolean().optional(),
+  privacyReviewNote: z.string().optional(),
+});
 
 export async function POST(request: NextRequest) {
   if (!isConvexConfigured()) {
@@ -15,18 +28,17 @@ export async function POST(request: NextRequest) {
 
   try {
     const { vaultOwnerId } = await getVaultAccessContext();
-    const body = await request.json();
-    const mediaId = typeof body.mediaId === "string" ? body.mediaId : "";
-    const privacyLevel = PRIVACY_LEVELS.has(body.privacyLevel) ? body.privacyLevel : null;
-    const reviewStatus = REVIEW_STATUSES.has(body.reviewStatus) ? body.reviewStatus : null;
-    const rightsStatus = RIGHTS_STATUSES.has(body.rightsStatus) ? body.rightsStatus : null;
-    const aiUseAllowed = body.aiUseAllowed === true;
-    const privacyReviewNote =
-      typeof body.privacyReviewNote === "string" ? body.privacyReviewNote.trim() : undefined;
-
-    if (!mediaId || !privacyLevel || !reviewStatus || !rightsStatus) {
-      return NextResponse.json({ error: "Missing media review fields" }, { status: 400 });
+    const parsed = RequestSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Missing media review fields", issues: parsed.error.issues },
+        { status: 400 }
+      );
     }
+
+    const { mediaId, privacyLevel, reviewStatus, rightsStatus } = parsed.data;
+    const aiUseAllowed = parsed.data.aiUseAllowed === true;
+    const privacyReviewNote = parsed.data.privacyReviewNote?.trim() || undefined;
 
     if (aiUseAllowed && (privacyLevel === "private" || reviewStatus !== "reviewed" || rightsStatus === "unknown" || rightsStatus === "restricted")) {
       return NextResponse.json(
@@ -38,7 +50,7 @@ export async function POST(request: NextRequest) {
     const client = getConvexClient();
     const result = await client.mutation(api.vaultMutations.reviewMedia, {
       vaultOwnerId,
-      mediaId,
+      mediaId: mediaId as Id<"media">,
       privacyLevel,
       reviewStatus,
       rightsStatus,

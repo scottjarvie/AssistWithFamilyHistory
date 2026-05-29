@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { getConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
-const STORY_TYPES = new Set([
+// GEN-94: zod request-body contract. The story type enum narrows into the
+// Convex mutation arg type. Invalid/absent type falls back to undefined to
+// preserve prior behavior; tags are trimmed and emptied as before.
+const StoryTypeEnum = z.enum([
   "biography",
   "day_in_life",
   "historical_context",
@@ -18,6 +22,23 @@ const STORY_TYPES = new Set([
   "custom",
 ]);
 
+const RequestSchema = z.object({
+  title: z.string().transform((value) => value.trim()),
+  content: z.string().transform((value) => value.trim()),
+  type: StoryTypeEnum.optional().catch(undefined),
+  tags: z
+    .array(z.unknown())
+    .optional()
+    .transform((value) =>
+      Array.isArray(value)
+        ? value
+            .filter((tag): tag is string => typeof tag === "string")
+            .map((tag) => tag.trim())
+            .filter(Boolean)
+        : undefined
+    ),
+});
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -29,16 +50,15 @@ export async function PATCH(
 
   try {
     const { id } = await params;
-    const body = await request.json();
-    const title = typeof body.title === "string" ? body.title.trim() : "";
-    const content = typeof body.content === "string" ? body.content.trim() : "";
-    const type = typeof body.type === "string" && STORY_TYPES.has(body.type) ? body.type : undefined;
-    const tags: string[] | undefined = Array.isArray(body.tags)
-      ? (body.tags as unknown[])
-          .filter((tag): tag is string => typeof tag === "string")
-          .map((tag: string) => tag.trim())
-          .filter(Boolean)
-      : undefined;
+    const parsed = RequestSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Story title and content are required", issues: parsed.error.issues },
+        { status: 400 }
+      );
+    }
+
+    const { title, content, type, tags } = parsed.data;
 
     if (!title || !content) {
       return NextResponse.json({ error: "Story title and content are required" }, { status: 400 });

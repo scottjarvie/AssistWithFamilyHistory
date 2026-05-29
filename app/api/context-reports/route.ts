@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { getConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
@@ -8,11 +9,13 @@ import {
   type ResearchPackCategory,
   type ResearchPackCategoryBlock,
   type ResearchPackClaimConfidence,
-  type ResearchPackType,
 } from "@/lib/context/researchPacks";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
-const CONTEXT_TOPICS = new Set([
+// GEN-94: enums narrow into the Convex mutation arg types. The nested
+// categoryBlocks/sources parsing is preserved below (parseCategoryBlocks)
+// since it is bespoke shaping logic, not flat validation.
+const ContextTopicEnum = z.enum([
   "daily_life",
   "economy",
   "religion",
@@ -26,7 +29,7 @@ const CONTEXT_TOPICS = new Set([
   "other",
 ]);
 
-const RESEARCH_PACK_TYPES = new Set<ResearchPackType>([
+const ResearchPackTypeEnum = z.enum([
   "locality_era_brief",
   "region_era",
   "occupation_era",
@@ -37,13 +40,35 @@ const RESEARCH_PACK_TYPES = new Set<ResearchPackType>([
   "cemetery_burial",
 ]);
 
+const PrivacyLevelEnum = z.enum(["private", "family_review", "publish_candidate", "public_source"]);
+const ReviewStatusEnum = z.enum(["unreviewed", "reviewed", "disputed", "redacted", "rejected"]);
+
 const RESEARCH_PACK_CATEGORIES = new Set<ResearchPackCategory>(
   localityEraBriefCategories.map((entry) => entry.category)
 );
 
 const CLAIM_CONFIDENCE = new Set<ResearchPackClaimConfidence>(["high", "medium", "low"]);
-const PRIVACY_LEVELS = new Set(["private", "family_review", "publish_candidate", "public_source"]);
-const REVIEW_STATUSES = new Set(["unreviewed", "reviewed", "disputed", "redacted", "rejected"]);
+
+// Flat request fields. Enum fields use `.catch(undefined)` / fallback-on-
+// invalid to preserve prior behavior where an unrecognized value silently
+// fell back to a default rather than rejecting the request. Year fields are
+// coerced from arbitrary input to mirror the prior `Number(body.x)` and are
+// validated as finite below.
+const RequestSchema = z.object({
+  title: z.string().transform((value) => value.trim()),
+  content: z.string().transform((value) => value.trim()),
+  topic: ContextTopicEnum.optional().catch(undefined),
+  startYear: z.coerce.number().optional().catch(undefined),
+  endYear: z.coerce.number().optional().catch(undefined),
+  placeId: z.string().optional(),
+  packType: ResearchPackTypeEnum.optional().catch(undefined),
+  templateVersion: z.string().optional(),
+  privacyLevel: PrivacyLevelEnum.optional().catch(undefined),
+  reviewStatus: ReviewStatusEnum.optional().catch(undefined),
+  aiUseAllowed: z.boolean().optional(),
+  categoryBlocks: z.unknown().optional(),
+  sources: z.union([z.string(), z.array(z.unknown())]).optional(),
+});
 
 function parseCategoryBlocks(value: unknown): ResearchPackCategoryBlock[] | undefined {
   if (!Array.isArray(value)) return undefined;
@@ -101,37 +126,34 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = await request.json();
-    const title = typeof body.title === "string" ? body.title.trim() : "";
-    const content = typeof body.content === "string" ? body.content.trim() : "";
-    const topic = typeof body.topic === "string" && CONTEXT_TOPICS.has(body.topic) ? body.topic : "other";
-    const startYear = Number(body.startYear);
-    const endYear = Number(body.endYear);
-    const placeId = typeof body.placeId === "string" && body.placeId.trim() ? body.placeId.trim() : undefined;
-    const packType =
-      typeof body.packType === "string" && RESEARCH_PACK_TYPES.has(body.packType as ResearchPackType)
-        ? body.packType as ResearchPackType
-        : undefined;
+    const parsed = RequestSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Title, content, start year, and end year are required", issues: parsed.error.issues },
+        { status: 400 }
+      );
+    }
+
+    const { title, content } = parsed.data;
+    const topic = parsed.data.topic ?? "other";
+    const startYear = parsed.data.startYear ?? NaN;
+    const endYear = parsed.data.endYear ?? NaN;
+    const placeId = parsed.data.placeId?.trim() || undefined;
+    const packType = parsed.data.packType;
     const templateVersion =
-      typeof body.templateVersion === "string" && body.templateVersion.trim()
-        ? body.templateVersion.trim()
+      parsed.data.templateVersion?.trim()
+        ? parsed.data.templateVersion.trim()
         : packType === "locality_era_brief"
           ? LOCALITY_ERA_TEMPLATE_VERSION
           : undefined;
-    const privacyLevel =
-      typeof body.privacyLevel === "string" && PRIVACY_LEVELS.has(body.privacyLevel)
-        ? body.privacyLevel as "private" | "family_review" | "publish_candidate" | "public_source"
-        : undefined;
-    const reviewStatus =
-      typeof body.reviewStatus === "string" && REVIEW_STATUSES.has(body.reviewStatus)
-        ? body.reviewStatus as "unreviewed" | "reviewed" | "disputed" | "redacted" | "rejected"
-        : undefined;
-    const aiUseAllowed = typeof body.aiUseAllowed === "boolean" ? body.aiUseAllowed : undefined;
-    const categoryBlocks = parseCategoryBlocks(body.categoryBlocks);
-    const sources: string[] = typeof body.sources === "string"
-      ? body.sources.split("\n").map((source: string) => source.trim()).filter(Boolean)
-      : Array.isArray(body.sources)
-        ? (body.sources as unknown[])
+    const privacyLevel = parsed.data.privacyLevel;
+    const reviewStatus = parsed.data.reviewStatus;
+    const aiUseAllowed = parsed.data.aiUseAllowed;
+    const categoryBlocks = parseCategoryBlocks(parsed.data.categoryBlocks);
+    const sources: string[] = typeof parsed.data.sources === "string"
+      ? parsed.data.sources.split("\n").map((source: string) => source.trim()).filter(Boolean)
+      : Array.isArray(parsed.data.sources)
+        ? parsed.data.sources
             .filter((source): source is string => typeof source === "string")
             .map((source: string) => source.trim())
             .filter(Boolean)
