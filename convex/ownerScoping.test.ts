@@ -450,4 +450,40 @@ describe("resolveOwner (shadow chokepoint, real ctx.auth identity)", () => {
     const owner = await t.run((ctx) => resolveOwner(ctx, "guest_z"));
     expect(owner).toBe("guest_z");
   });
+
+  // Stage B: a public query whose owner now flows through resolveOwner must
+  // still serve the SUPPLIED owner's data, even when the verified identity
+  // belongs to a DIFFERENT owner. Shadow logs the mismatch but never switches
+  // the owner or blocks the read — that is the cardinal "no enforcement" rule.
+  test("wired getPersonWorkspace under a MISMATCHED identity still returns the supplied owner's data (shadow does not enforce)", async () => {
+    const t = convexTest(schema, modules);
+    const a = await seedOwner(t, OWNER_A, "A");
+    await seedOwner(t, OWNER_B, "B");
+
+    // Caller is verified as OWNER_B but asks for OWNER_A's vault + A's person.
+    const ws = await t.withIdentity({ subject: OWNER_B }).query(api.vault.getPersonWorkspace, {
+      vaultOwnerId: OWNER_A,
+      personIdentifier: String(a.primary),
+    });
+
+    // NOT blocked: the workspace resolves to A's person...
+    expect(ws).not.toBeNull();
+    if (!ws) return;
+    expect(String(ws.person._id)).toBe(String(a.primary));
+    expect(ws.person.name.given).toBe("PrimaryA");
+
+    // ...and every owner-stamped row is A's, NOT the verified B identity's.
+    const ownerStamped = [
+      ...ws.media,
+      ...ws.contextItems,
+      ...ws.stories,
+      ...ws.sources.map((s) => s.source),
+      ...ws.relatedPeople,
+    ];
+    expect(ownerStamped.length).toBeGreaterThan(0);
+    for (const row of ownerStamped) {
+      expect(row.vaultOwnerId).toBe(OWNER_A);
+    }
+    expect(ws.relatedPeople.some((p) => p.name.given === "RelativeB")).toBe(false);
+  });
 });

@@ -8,7 +8,7 @@ import {
   formatPersonName,
   inferResearchChecks,
   matchesVaultOwner,
-  normalizeVaultOwnerId,
+  resolveOwner,
 } from "./vaultCore";
 
 const dateValidator = v.object({
@@ -244,7 +244,7 @@ export const upsertPerson = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     let existing: Doc<"persons"> | null = null;
 
     if (args.fsId) {
@@ -338,7 +338,7 @@ export const upsertSource = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     let existing: Doc<"sources"> | null = null;
 
     if (args.fsId) {
@@ -405,7 +405,7 @@ export const upsertCitation = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     let existing: Doc<"citations"> | null = null;
 
     if (args.importKey) {
@@ -500,7 +500,7 @@ export const upsertEvent = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     let existing: Doc<"events"> | null = null;
 
     if (args.importKey) {
@@ -565,7 +565,7 @@ export const upsertPersonEvent = mutation({
         q.eq("personId", args.personId).eq("eventId", args.eventId)
       )
       .collect();
-    const existing = filterByVaultOwner(existingRows, normalizeVaultOwnerId(args.vaultOwnerId))[0] ?? null;
+    const existing = filterByVaultOwner(existingRows, await resolveOwner(ctx, args.vaultOwnerId))[0] ?? null;
 
     if (existing) {
       await ctx.db.patch(existing._id, { role: args.role });
@@ -607,7 +607,7 @@ export const upsertRelationship = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     let existing: Doc<"relationships"> | null = null;
 
     if (args.familySearchId) {
@@ -713,7 +713,7 @@ export const upsertMedia = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     let existing: Doc<"media"> | null = null;
 
     if (args.familySearchUrl) {
@@ -775,7 +775,7 @@ export const upsertSourceFact = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const matches = await ctx.db
       .query("sourceFacts")
       .withIndex("by_import_key", (q) => q.eq("importKey", args.importKey))
@@ -812,7 +812,7 @@ export const reviewMedia = mutation({
   },
   handler: async (ctx, args) => {
     const media = await ctx.db.get(args.mediaId);
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     if (!media || !matchesVaultOwner(media.vaultOwnerId, vaultOwnerId)) {
       throw new Error("Media item not found");
     }
@@ -848,7 +848,7 @@ export const upsertContextItemForPerson = mutation({
     reviewNote: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const normalizedPersonId = ctx.db.normalizeId("persons", args.personIdentifier);
     const person =
       (normalizedPersonId ? await ctx.db.get(normalizedPersonId) : null) ??
@@ -919,7 +919,7 @@ export const ensureResearchTask = mutation({
       .query("researchTasks")
       .withIndex("by_person", (q) => q.eq("personId", args.personId))
       .collect();
-    const existing = filterByVaultOwner(existingRows, normalizeVaultOwnerId(args.vaultOwnerId));
+    const existing = filterByVaultOwner(existingRows, await resolveOwner(ctx, args.vaultOwnerId));
 
     const match = existing.find((task) => task.title === args.title && task.status !== "done");
     if (match) {
@@ -955,11 +955,12 @@ export const upsertStoryDraft = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const existingRows = await ctx.db
       .query("stories")
       .withIndex("by_person", (q) => q.eq("personId", args.personId))
       .collect();
-    const existing = filterByVaultOwner(existingRows, normalizeVaultOwnerId(args.vaultOwnerId));
+    const existing = filterByVaultOwner(existingRows, vaultOwnerId);
 
     const match =
       existing.find(
@@ -998,7 +999,7 @@ export const upsertStoryDraft = mutation({
     }
 
     const storyId = await ctx.db.insert("stories", {
-      vaultOwnerId: normalizeVaultOwnerId(args.vaultOwnerId),
+      vaultOwnerId,
       personId: args.personId,
       relationshipId: undefined,
       type: args.type,
@@ -1107,7 +1108,7 @@ export const backfillStoryPublicSlugs = mutation({
     vaultOwnerId: v.string(),
   },
   handler: async (ctx, args) => {
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const stories = filterByVaultOwner(await ctx.db.query("stories").collect(), vaultOwnerId);
     const now = Date.now();
     let updated = 0;
@@ -1145,7 +1146,7 @@ export const assignStoryReviewer = mutation({
     note: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const story = await ctx.db.get(args.storyId);
     if (!story || !matchesVaultOwner(story.vaultOwnerId, vaultOwnerId)) {
       throw new Error("Story not found");
@@ -1208,7 +1209,7 @@ export const recordStoryReviewEvent = mutation({
     readinessScore: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const story = await ctx.db.get(args.storyId);
     if (!story || !matchesVaultOwner(story.vaultOwnerId, vaultOwnerId)) {
       throw new Error("Story not found");
@@ -1266,7 +1267,7 @@ export const upsertHistoricalContext = mutation({
     categoryBlocks: v.optional(v.array(researchPackCategoryBlockValidator)),
   },
   handler: async (ctx, args) => {
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const now = Date.now();
     const candidates = args.placeId
       ? await ctx.db
@@ -1388,7 +1389,7 @@ export const upsertProvisionalRelative = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const dedupeKey = buildProvisionalDedupeKey({
       vaultOwnerId,
       anchorPersonId: args.anchorPersonId,
@@ -1463,14 +1464,15 @@ export const upsertResearchCheck = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const existingRows = await ctx.db
       .query("researchChecks")
       .withIndex("by_person_check", (q) => q.eq("personId", args.personId).eq("checkKey", args.checkKey))
       .collect();
-    const existing = filterByVaultOwner(existingRows, normalizeVaultOwnerId(args.vaultOwnerId))[0] ?? null;
+    const existing = filterByVaultOwner(existingRows, vaultOwnerId)[0] ?? null;
 
     const payload = {
-      vaultOwnerId: normalizeVaultOwnerId(args.vaultOwnerId),
+      vaultOwnerId,
       personFsId: args.personFsId,
       status: args.status,
       applicability: args.applicability,
@@ -1507,7 +1509,7 @@ export const bulkRefreshResearchChecks = mutation({
     source: researchCheckSourceValidator,
   },
   handler: async (ctx, args) => {
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const now = Date.now();
     const person = await ctx.db.get(args.personId);
     if (!person || !matchesVaultOwner(person.vaultOwnerId, vaultOwnerId)) {
@@ -1743,7 +1745,7 @@ export const createResearchTask = mutation({
   handler: async (ctx, args) => {
     const now = Date.now();
     const taskId = await ctx.db.insert("researchTasks", {
-      vaultOwnerId: normalizeVaultOwnerId(args.vaultOwnerId),
+      vaultOwnerId: await resolveOwner(ctx, args.vaultOwnerId),
       personId: args.personId,
       type: "other",
       title: args.title,
@@ -1765,7 +1767,7 @@ export const promoteProvisionalRelative = mutation({
     humanReviewNote: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const now = Date.now();
     const provisional = await ctx.db.get(args.provisionalId);
     if (!provisional || !matchesVaultOwner(provisional.vaultOwnerId, vaultOwnerId)) {
@@ -1844,7 +1846,7 @@ export const mergeProvisionalRelative = mutation({
     humanReviewNote: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const now = Date.now();
     const provisional = await ctx.db.get(args.provisionalId);
     const target = await ctx.db.get(args.targetPersonId);

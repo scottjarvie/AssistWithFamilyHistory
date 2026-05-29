@@ -9,6 +9,7 @@ import {
   inferResearchChecks,
   matchesVaultOwner,
   normalizeVaultOwnerId,
+  resolveOwner,
   sortByTimestampDesc,
 } from "./vaultCore";
 
@@ -1491,7 +1492,7 @@ export const getPeopleExplorer = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
+    const snapshot = await getVaultSnapshot(ctx, await resolveOwner(ctx, args.vaultOwnerId));
     const search = args.search?.trim().toLowerCase();
 
     const rows = buildPeopleRows(snapshot).filter((person) => {
@@ -1524,7 +1525,7 @@ export const getPersonWorkspace = query({
     // GEN-92: per-person loader — fetches only this person's related rows.
     return assemblePersonWorkspaceScoped(
       ctx,
-      normalizeVaultOwnerId(args.vaultOwnerId),
+      await resolveOwner(ctx, args.vaultOwnerId),
       args.personIdentifier
     );
   },
@@ -1535,7 +1536,7 @@ export const getStoriesIndex = query({
     vaultOwnerId: v.string(),
   },
   handler: async (ctx, args) => {
-    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
+    const snapshot = await getVaultSnapshot(ctx, await resolveOwner(ctx, args.vaultOwnerId));
     const index = buildSnapshotIndex(snapshot);
     return sortByTimestampDesc(snapshot.stories).map((story) => {
       const person = story.personId
@@ -1596,7 +1597,7 @@ export const getStoryReview = query({
     // full-snapshot buildStoryBundle on the fixture vault.
     const snapshot = await loadStoryScopedSnapshot(
       ctx,
-      normalizeVaultOwnerId(args.vaultOwnerId),
+      await resolveOwner(ctx, args.vaultOwnerId),
       args.storyId
     );
     if (!snapshot) return null;
@@ -1665,7 +1666,7 @@ export const getPersonResearchChecks = query({
     // GEN-92: per-person loader — fetches only this person's related rows.
     const workspace = await assemblePersonWorkspaceScoped(
       ctx,
-      normalizeVaultOwnerId(args.vaultOwnerId),
+      await resolveOwner(ctx, args.vaultOwnerId),
       args.personIdentifier
     );
     return workspace?.researchChecks ?? [];
@@ -1678,7 +1679,7 @@ export const getProvisionalRelatives = query({
     personIdentifier: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
+    const snapshot = await getVaultSnapshot(ctx, await resolveOwner(ctx, args.vaultOwnerId));
     if (!args.personIdentifier) {
       return sortByTimestampDesc(snapshot.provisionalRelatives);
     }
@@ -1714,7 +1715,7 @@ export const getOperationsQueue = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
+    const snapshot = await getVaultSnapshot(ctx, await resolveOwner(ctx, args.vaultOwnerId));
     const peopleRows = buildPeopleRows(snapshot).map((row) => ({
       rowType: "person" as const,
       id: row.routeId,
@@ -1866,7 +1867,7 @@ export const getOperationsSummary = query({
     vaultOwnerId: v.string(),
   },
   handler: async (ctx, args) => {
-    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
+    const snapshot = await getVaultSnapshot(ctx, await resolveOwner(ctx, args.vaultOwnerId));
     const rows = buildPeopleRows(snapshot);
     return {
       people: rows.length,
@@ -1886,7 +1887,7 @@ export const getVaultAudit = query({
     vaultOwnerId: v.string(),
   },
   handler: async (ctx, args) => {
-    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
+    const snapshot = await getVaultSnapshot(ctx, await resolveOwner(ctx, args.vaultOwnerId));
     const peopleRows = buildPeopleRows(snapshot);
     const storyWorkflowCounts = peopleRows.reduce<Record<string, number>>((totals, row) => {
       totals[row.storyWorkflow] = (totals[row.storyWorkflow] || 0) + 1;
@@ -1961,7 +1962,7 @@ export const getContextCoverage = query({
     // scripts/test-context-coverage-parity.ts deep-equals the two paths.
     const snapshot = await loadPersonScopedSnapshot(
       ctx,
-      normalizeVaultOwnerId(args.vaultOwnerId),
+      await resolveOwner(ctx, args.vaultOwnerId),
       args.personIdentifier
     );
     if (!snapshot) return null;
@@ -1980,7 +1981,7 @@ export const getStoryReadinessCandidates = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
+    const snapshot = await getVaultSnapshot(ctx, await resolveOwner(ctx, args.vaultOwnerId));
     const rows = buildPeopleRows(snapshot)
       .filter((row) => !args.storyWorkflow || row.storyWorkflow === args.storyWorkflow)
       .sort((a, b) => b.storyReadinessScore - a.storyReadinessScore)
@@ -2008,7 +2009,7 @@ export const getPlacesExplorer = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
+    const snapshot = await getVaultSnapshot(ctx, await resolveOwner(ctx, args.vaultOwnerId));
     const search = args.search?.trim().toLowerCase();
     const rows = snapshot.places.filter((place) => {
       if (!search) return true;
@@ -2036,7 +2037,7 @@ export const getPlaceWorkspace = query({
     placeId: v.id("places"),
   },
   handler: async (ctx, args) => {
-    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
+    const snapshot = await getVaultSnapshot(ctx, await resolveOwner(ctx, args.vaultOwnerId));
     const place = snapshot.places.find((entry) => entry._id === args.placeId);
     if (!place) return null;
 
@@ -2099,7 +2100,7 @@ export const getDashboardSummary = query({
     vaultOwnerId: v.string(),
   },
   handler: async (ctx, args) => {
-    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
+    const snapshot = await getVaultSnapshot(ctx, await resolveOwner(ctx, args.vaultOwnerId));
     const peopleRows = buildPeopleRows(snapshot);
     const personById = new Map(snapshot.people.map((person) => [String(person._id), person]));
 
@@ -2139,7 +2140,7 @@ export const getResearchOverview = query({
     vaultOwnerId: v.string(),
   },
   handler: async (ctx, args) => {
-    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
+    const snapshot = await getVaultSnapshot(ctx, await resolveOwner(ctx, args.vaultOwnerId));
     const personById = new Map(snapshot.people.map((person) => [String(person._id), person]));
 
     return {
@@ -2173,7 +2174,7 @@ export const getContextPack = query({
     // GEN-92: per-person loader — fetches only this person's related rows.
     const workspace = await assemblePersonWorkspaceScoped(
       ctx,
-      normalizeVaultOwnerId(args.vaultOwnerId),
+      await resolveOwner(ctx, args.vaultOwnerId),
       args.personIdentifier
     );
     if (!workspace) return null;
