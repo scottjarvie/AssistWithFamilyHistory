@@ -7,6 +7,7 @@ import {
   filterByVaultOwner,
   formatPersonName,
   inferResearchChecks,
+  matchesVaultOwner,
   normalizeVaultOwnerId,
   sortByTimestampDesc,
 } from "./vaultCore";
@@ -42,7 +43,9 @@ const storyWorkflowValidator = v.union(
   v.literal("published")
 );
 
-async function getVaultSnapshot(ctx: QueryCtx, vaultOwnerId: string): Promise<VaultSnapshot> {
+// Exported for the GEN-92 parity test (scripts/test-person-snapshot-parity.ts),
+// which deep-equals the full-snapshot assembly against the per-person loader.
+export async function getVaultSnapshot(ctx: QueryCtx, vaultOwnerId: string): Promise<VaultSnapshot> {
   const owned = <T extends { vaultOwnerId?: string }>(rows: T[]) => filterByVaultOwner(rows, vaultOwnerId);
 
   // GEN-70: use by_owner indexes instead of full-table scans. All 20 tables
@@ -991,12 +994,19 @@ function buildPeopleRows(snapshot: VaultSnapshot) {
   });
 }
 
-async function assemblePersonWorkspace(
-  ctx: QueryCtx,
-  vaultOwnerId: string,
+// GEN-92: the assembly body, decoupled from how the snapshot was loaded. It
+// reads ONLY person-relevant subsets of each snapshot array (per-person Map
+// lookups in buildPersonOperations, `.filter(... === person._id)` for tasks/
+// log, `snapshot.people.find(relatedId)` for relationship counterparts). That
+// is what makes the per-person loader (loadPersonScopedSnapshot) safe: a
+// snapshot containing exactly this person's related rows produces byte-identical
+// output to the full snapshot, as long as each array is in the same order the
+// `by_owner` index would return (ascending `_creationTime`). The parity test
+// (scripts/test-person-snapshot-parity.ts) proves this for both paths.
+export function assemblePersonWorkspaceFromSnapshot(
+  snapshot: VaultSnapshot,
   personIdentifier: string
 ) {
-  const snapshot = await getVaultSnapshot(ctx, vaultOwnerId);
   const person = getPersonByIdentifier(snapshot, personIdentifier);
   if (!person) return null;
 
@@ -1070,6 +1080,299 @@ async function assemblePersonWorkspace(
   };
 }
 
+// GEN-92: order each table the way `withIndex("by_owner").collect()` would —
+// ascending `_creationTime` (the by_owner index is [vaultOwnerId, _creationTime]
+// and all rows share the same owner). Several assembly steps are order-sensitive
+// on equal timestamps (stable sortByTimestampDesc, citationLinkOrder, the
+// per-person bucket Maps), so matching this order is what guarantees the scoped
+// snapshot yields byte-identical output to the full snapshot.
+function byCreationTime<T extends { _creationTime: number }>(rows: T[]): T[] {
+  return [...rows].sort((a, b) => a._creationTime - b._creationTime);
+}
+
+async function findPersonByIdentifier(
+  ctx: QueryCtx,
+  vaultOwnerId: string,
+  personIdentifier: string
+): Promise<Doc<"persons"> | null> {
+  // Mirror getPersonByIdentifier: match on fsId OR document _id, scoped to owner.
+  const normalizedId = ctx.db.normalizeId("persons", personIdentifier);
+  if (normalizedId) {
+    const byId = await ctx.db.get(normalizedId);
+    if (byId && matchesVaultOwner(byId.vaultOwnerId, vaultOwnerId)) return byId;
+  }
+  const byFsId = await ctx.db
+    .query("persons")
+    .withIndex("by_fsId", (q) => q.eq("fsId", personIdentifier))
+    .collect();
+  return (
+    byFsId.find((person) => matchesVaultOwner(person.vaultOwnerId, vaultOwnerId)) ?? null
+  );
+}
+
+// GEN-92: load ONLY the rows a single-person workspace consumes, instead of the
+// whole vault (getVaultSnapshot collects all ~20 owner tables). Returns a
+// VaultSnapshot whose arrays are restricted to this person's related rows but
+// ordered identically to the full snapshot, so assemblePersonWorkspaceFromSnapshot
+// produces the same output. Tables without a person-scoped index (media,
+// contextItems, historicalContext) are still read owner-wide and filtered in JS;
+// every other (and larger) relational table is index-narrowed to this person.
+export async function loadPersonScopedSnapshot(
+  ctx: QueryCtx,
+  vaultOwnerId: string,
+  personIdentifier: string
+): Promise<VaultSnapshot | null> {
+  const owned = <T extends { vaultOwnerId?: string }>(rows: T[]) =>
+    filterByVaultOwner(rows, vaultOwnerId);
+
+  const person = await findPersonByIdentifier(ctx, vaultOwnerId, personIdentifier);
+  if (!person) return null;
+
+  const personId = person._id;
+  const personIdStr = String(personId);
+  const personKey = person.fsId || personIdStr; // documents.personId convention
+
+  // Relationships where this person is person1 or person2 (by_person* indexes).
+  const [relAsPerson1, relAsPerson2] = await Promise.all([
+    ctx.db
+      .query("relationships")
+      .withIndex("by_person1", (q) => q.eq("person1", personId))
+      .collect(),
+    ctx.db
+      .query("relationships")
+      .withIndex("by_person2", (q) => q.eq("person2", personId))
+      .collect(),
+  ]);
+  const relationshipSet = new Set<Doc<"relationships">>();
+  for (const rel of [...relAsPerson1, ...relAsPerson2]) {
+    if (matchesVaultOwner(rel.vaultOwnerId, vaultOwnerId)) relationshipSet.add(rel);
+  }
+  const relationships = owned(Array.from(relationshipSet));
+
+  // personEvents for this person, then the referenced events by id.
+  const personEvents = owned(
+    await ctx.db
+      .query("personEvents")
+      .withIndex("by_person", (q) => q.eq("personId", personId))
+      .collect()
+  );
+  const eventIds = Array.from(new Set(personEvents.map((link) => String(link.eventId))));
+  const events = owned(
+    (
+      await Promise.all(
+        eventIds.map((id) => {
+          const eid = ctx.db.normalizeId("events", id);
+          return eid ? ctx.db.get(eid) : Promise.resolve(null);
+        })
+      )
+    ).filter(Boolean) as Doc<"events">[]
+  );
+
+  // citationLinks: this person (by_target person) + each related event (by_target event).
+  const eventLinkResults = await Promise.all(
+    events.map((event) =>
+      ctx.db
+        .query("citationLinks")
+        .withIndex("by_target", (q) =>
+          q.eq("targetType", "event").eq("targetId", String(event._id))
+        )
+        .collect()
+    )
+  );
+  const personLinks = await ctx.db
+    .query("citationLinks")
+    .withIndex("by_target", (q) =>
+      q.eq("targetType", "person").eq("targetId", personIdStr)
+    )
+    .collect();
+  const linkSet = new Set<Doc<"citationLinks">>();
+  for (const link of [personLinks, ...eventLinkResults].flat()) {
+    if (matchesVaultOwner(link.vaultOwnerId, vaultOwnerId)) linkSet.add(link);
+  }
+  const citationLinks = owned(Array.from(linkSet));
+
+  // citations referenced by those links, then their sources.
+  const citationIds = Array.from(new Set(citationLinks.map((link) => String(link.citationId))));
+  const citations = owned(
+    (
+      await Promise.all(
+        citationIds.map((id) => {
+          const cid = ctx.db.normalizeId("citations", id);
+          return cid ? ctx.db.get(cid) : Promise.resolve(null);
+        })
+      )
+    ).filter(Boolean) as Doc<"citations">[]
+  );
+  const sourceIds = Array.from(new Set(citations.map((citation) => String(citation.sourceId))));
+  const sources = owned(
+    (
+      await Promise.all(
+        sourceIds.map((id) => {
+          const sid = ctx.db.normalizeId("sources", id);
+          return sid ? ctx.db.get(sid) : Promise.resolve(null);
+        })
+      )
+    ).filter(Boolean) as Doc<"sources">[]
+  );
+
+  // places resolved by id from the person's birth/death + the related events
+  // (getPersonPlaces only ever looks these up).
+  const placeIds = new Set<string>();
+  if (person.birth?.place?.placeId) placeIds.add(String(person.birth.place.placeId));
+  if (person.death?.place?.placeId) placeIds.add(String(person.death.place.placeId));
+  for (const event of events) {
+    if (event.place?.placeId) placeIds.add(String(event.place.placeId));
+  }
+  const places = owned(
+    (
+      await Promise.all(
+        Array.from(placeIds).map((id) => {
+          const pid = ctx.db.normalizeId("places", id);
+          return pid ? ctx.db.get(pid) : Promise.resolve(null);
+        })
+      )
+    ).filter(Boolean) as Doc<"places">[]
+  );
+
+  // Per-person index-narrowed tables.
+  const [
+    sourceFacts,
+    stories,
+    documents,
+    importRunsByPerson,
+    importRunsByFsId,
+    researchTasks,
+    researchLogByPerson,
+    researchChecks,
+    provisionalRelatives,
+  ] = await Promise.all([
+    ctx.db
+      .query("sourceFacts")
+      .withIndex("by_person", (q) => q.eq("personId", personId))
+      .collect(),
+    ctx.db
+      .query("stories")
+      .withIndex("by_person", (q) => q.eq("personId", personId))
+      .collect(),
+    ctx.db
+      .query("documents")
+      .withIndex("by_personId", (q) => q.eq("personId", personKey))
+      .collect(),
+    ctx.db
+      .query("importRuns")
+      .withIndex("by_person", (q) => q.eq("personId", personId))
+      .collect(),
+    person.fsId
+      ? ctx.db
+          .query("importRuns")
+          .withIndex("by_person_fsId", (q) => q.eq("personFsId", person.fsId as string))
+          .collect()
+      : Promise.resolve([] as Doc<"importRuns">[]),
+    ctx.db
+      .query("researchTasks")
+      .withIndex("by_person", (q) => q.eq("personId", personId))
+      .collect(),
+    ctx.db
+      .query("researchLog")
+      .withIndex("by_entity", (q) => q.eq("entityType", "person").eq("entityId", personId))
+      .collect(),
+    ctx.db
+      .query("researchChecks")
+      .withIndex("by_person", (q) => q.eq("personId", personId))
+      .collect(),
+    ctx.db
+      .query("provisionalRelatives")
+      .withIndex("by_anchor", (q) => q.eq("anchorPersonId", personId))
+      .collect(),
+  ]);
+
+  const importRunSet = new Set<Doc<"importRuns">>();
+  for (const run of [...importRunsByPerson, ...importRunsByFsId]) {
+    if (matchesVaultOwner(run.vaultOwnerId, vaultOwnerId)) importRunSet.add(run);
+  }
+  const importRuns = owned(Array.from(importRunSet));
+
+  // Tables without a person index — read owner-wide, then narrow in JS to keep
+  // the assembled output identical to the full snapshot.
+  const [allMedia, allContextItems, historicalContextRows] = await Promise.all([
+    ctx.db
+      .query("media")
+      .withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId))
+      .collect(),
+    ctx.db
+      .query("contextItems")
+      .withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId))
+      .collect(),
+    ctx.db
+      .query("historicalContext")
+      .withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId))
+      .collect(),
+  ]);
+  const media = owned(allMedia).filter((item) =>
+    item.personIds.some((id) => String(id) === personIdStr)
+  );
+  const contextItems = owned(allContextItems).filter((item) =>
+    item.personIds.some((id) => String(id) === personIdStr)
+  );
+  const historicalContext = owned(historicalContextRows);
+
+  // Related people: the relationship counterparts (relatedPeople + relationship
+  // mapping look these up via snapshot.people.find). Include the target person.
+  const relatedPersonIds = new Set<string>();
+  for (const rel of relationships) {
+    const otherId = rel.person1 === personId ? rel.person2 : rel.person1;
+    relatedPersonIds.add(String(otherId));
+  }
+  relatedPersonIds.delete(personIdStr);
+  const relatedPeopleDocs = (
+    await Promise.all(
+      Array.from(relatedPersonIds).map((id) => {
+        const pid = ctx.db.normalizeId("persons", id);
+        return pid ? ctx.db.get(pid) : Promise.resolve(null);
+      })
+    )
+  ).filter(
+    (doc): doc is Doc<"persons"> => doc !== null && matchesVaultOwner(doc.vaultOwnerId, vaultOwnerId)
+  );
+  const people = byCreationTime([person, ...relatedPeopleDocs]);
+
+  return {
+    people,
+    relationships: byCreationTime(relationships),
+    events: byCreationTime(events),
+    personEvents: byCreationTime(personEvents),
+    places: byCreationTime(places),
+    sources: byCreationTime(sources),
+    citations: byCreationTime(citations),
+    citationLinks: byCreationTime(citationLinks),
+    sourceFacts: byCreationTime(owned(sourceFacts)),
+    media: byCreationTime(media),
+    contextItems: byCreationTime(contextItems),
+    importRuns: byCreationTime(importRuns),
+    researchTasks: byCreationTime(owned(researchTasks)),
+    researchLog: byCreationTime(owned(researchLogByPerson)),
+    documents: byCreationTime(owned(documents)),
+    stories: byCreationTime(owned(stories)),
+    // storyReviewEvents is unused by the person workspace assembly (only the
+    // story bundle reads it). Keep empty to preserve the snapshot shape.
+    storyReviewEvents: [],
+    historicalContext: byCreationTime(historicalContext),
+    researchChecks: byCreationTime(owned(researchChecks)),
+    provisionalRelatives: byCreationTime(owned(provisionalRelatives)),
+  };
+}
+
+// GEN-92: per-person assembly entry point used by the single-person consumers.
+async function assemblePersonWorkspaceScoped(
+  ctx: QueryCtx,
+  vaultOwnerId: string,
+  personIdentifier: string
+) {
+  const snapshot = await loadPersonScopedSnapshot(ctx, vaultOwnerId, personIdentifier);
+  if (!snapshot) return null;
+  return assemblePersonWorkspaceFromSnapshot(snapshot, personIdentifier);
+}
+
 export const getPeopleExplorer = query({
   args: {
     vaultOwnerId: v.string(),
@@ -1116,7 +1419,12 @@ export const getPersonWorkspace = query({
     personIdentifier: v.string(),
   },
   handler: async (ctx, args) => {
-    return assemblePersonWorkspace(ctx, normalizeVaultOwnerId(args.vaultOwnerId), args.personIdentifier);
+    // GEN-92: per-person loader — fetches only this person's related rows.
+    return assemblePersonWorkspaceScoped(
+      ctx,
+      normalizeVaultOwnerId(args.vaultOwnerId),
+      args.personIdentifier
+    );
   },
 });
 
@@ -1241,7 +1549,8 @@ export const getPersonResearchChecks = query({
     personIdentifier: v.string(),
   },
   handler: async (ctx, args) => {
-    const workspace = await assemblePersonWorkspace(
+    // GEN-92: per-person loader — fetches only this person's related rows.
+    const workspace = await assemblePersonWorkspaceScoped(
       ctx,
       normalizeVaultOwnerId(args.vaultOwnerId),
       args.personIdentifier
@@ -1733,7 +2042,12 @@ export const getContextPack = query({
     personIdentifier: v.string(),
   },
   handler: async (ctx, args) => {
-    const workspace = await assemblePersonWorkspace(ctx, normalizeVaultOwnerId(args.vaultOwnerId), args.personIdentifier);
+    // GEN-92: per-person loader — fetches only this person's related rows.
+    const workspace = await assemblePersonWorkspaceScoped(
+      ctx,
+      normalizeVaultOwnerId(args.vaultOwnerId),
+      args.personIdentifier
+    );
     if (!workspace) return null;
 
     const evidenceTrace = workspace.sources.map((entry) => ({
