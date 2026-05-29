@@ -4,8 +4,13 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { getConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
 import {
+  CONTEXT_REPORT_PRIVACY_LEVELS,
+  CONTEXT_REPORT_REVIEW_STATUSES,
+  CONTEXT_REPORT_TOPICS,
   LOCALITY_ERA_TEMPLATE_VERSION,
-  localityEraBriefCategories,
+  RESEARCH_PACK_CATEGORIES,
+  RESEARCH_PACK_CLAIM_CONFIDENCES,
+  RESEARCH_PACK_TYPES,
   type ResearchPackCategory,
   type ResearchPackCategoryBlock,
   type ResearchPackClaimConfidence,
@@ -15,39 +20,18 @@ import { getVaultAccessContext } from "@/lib/vault/server";
 // GEN-94: enums narrow into the Convex mutation arg types. The nested
 // categoryBlocks/sources parsing is preserved below (parseCategoryBlocks)
 // since it is bespoke shaping logic, not flat validation.
-const ContextTopicEnum = z.enum([
-  "daily_life",
-  "economy",
-  "religion",
-  "politics",
-  "migration",
-  "health",
-  "technology",
-  "culture",
-  "war",
-  "disaster",
-  "other",
-]);
+// GEN-102D: the accepted value sets come from the shared source of truth in
+// lib/context/researchPacks.ts so there is no per-route re-listing or casting.
+const ContextTopicEnum = z.enum(CONTEXT_REPORT_TOPICS);
 
-const ResearchPackTypeEnum = z.enum([
-  "locality_era_brief",
-  "region_era",
-  "occupation_era",
-  "religion_community",
-  "migration_corridor",
-  "building_institution",
-  "local_event",
-  "cemetery_burial",
-]);
+const ResearchPackTypeEnum = z.enum(RESEARCH_PACK_TYPES);
 
-const PrivacyLevelEnum = z.enum(["private", "family_review", "publish_candidate", "public_source"]);
-const ReviewStatusEnum = z.enum(["unreviewed", "reviewed", "disputed", "redacted", "rejected"]);
+const PrivacyLevelEnum = z.enum(CONTEXT_REPORT_PRIVACY_LEVELS);
+const ReviewStatusEnum = z.enum(CONTEXT_REPORT_REVIEW_STATUSES);
 
-const RESEARCH_PACK_CATEGORIES = new Set<ResearchPackCategory>(
-  localityEraBriefCategories.map((entry) => entry.category)
-);
+const RESEARCH_PACK_CATEGORY_SET = new Set<ResearchPackCategory>(RESEARCH_PACK_CATEGORIES);
 
-const CLAIM_CONFIDENCE = new Set<ResearchPackClaimConfidence>(["high", "medium", "low"]);
+const CLAIM_CONFIDENCE = new Set<ResearchPackClaimConfidence>(RESEARCH_PACK_CLAIM_CONFIDENCES);
 
 // Flat request fields. Enum fields use `.catch(undefined)` / fallback-on-
 // invalid to preserve prior behavior where an unrecognized value silently
@@ -79,7 +63,7 @@ function parseCategoryBlocks(value: unknown): ResearchPackCategoryBlock[] | unde
     if (!entry || typeof entry !== "object") continue;
     const raw = entry as Record<string, unknown>;
     const category =
-      typeof raw.category === "string" && RESEARCH_PACK_CATEGORIES.has(raw.category as ResearchPackCategory)
+      typeof raw.category === "string" && RESEARCH_PACK_CATEGORY_SET.has(raw.category as ResearchPackCategory)
         ? raw.category as ResearchPackCategory
         : null;
     if (!category) continue;
