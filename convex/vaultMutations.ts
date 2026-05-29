@@ -611,9 +611,11 @@ export const upsertRelationship = mutation({
     let existing: Doc<"relationships"> | null = null;
 
     if (args.familySearchId) {
-      const rows = filterByVaultOwner(await ctx.db.query("relationships").collect(), vaultOwnerId);
-      existing =
-        rows.find((relationship) => relationship.familySearchId === args.familySearchId) || null;
+      const rows = await ctx.db
+        .query("relationships")
+        .withIndex("by_familySearchId", (q) => q.eq("familySearchId", args.familySearchId))
+        .collect();
+      existing = filterByVaultOwner(rows, vaultOwnerId)[0] ?? null;
     }
 
     if (!existing && args.importKey) {
@@ -715,9 +717,11 @@ export const upsertMedia = mutation({
     let existing: Doc<"media"> | null = null;
 
     if (args.familySearchUrl) {
-      const allMedia = filterByVaultOwner(await ctx.db.query("media").collect(), vaultOwnerId);
-      existing =
-        allMedia.find((media) => media.familySearchUrl === args.familySearchUrl) || null;
+      const rows = await ctx.db
+        .query("media")
+        .withIndex("by_familySearchUrl", (q) => q.eq("familySearchUrl", args.familySearchUrl))
+        .collect();
+      existing = filterByVaultOwner(rows, vaultOwnerId)[0] ?? null;
     }
 
     if (!existing && args.importKey) {
