@@ -18,6 +18,7 @@ steps=(
   "typecheck"
   "lint"
   "test"
+  "test:convex"
   "check:api-inventory"
   "check:capture-validation"
   "check:intake-envelope"
