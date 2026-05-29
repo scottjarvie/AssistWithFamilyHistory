@@ -6,6 +6,7 @@
  * mutation is built from (assertMigrationOwners, retagGuestRows) without a
  * Convex runtime, mirroring the dependency-injection style of test-vault-core.ts.
  */
+import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   assertMigrationOwners,
@@ -18,19 +19,21 @@ import {
 const GUEST = "guest_aaaaaaaa-1111-2222-3333-444444444444";
 const USER = "user_2abcDEF";
 
-// Happy path: a guest_ source and a user_ destination that differ -> no throw.
-assert.doesNotThrow(() => assertMigrationOwners(GUEST, USER));
+test("assertMigrationOwners enforces guest->user migration invariants", () => {
+  // Happy path: a guest_ source and a user_ destination that differ -> no throw.
+  assert.doesNotThrow(() => assertMigrationOwners(GUEST, USER));
 
-// from must be a guest_ id (a signed-in user cannot be the migration source).
-assert.throws(() => assertMigrationOwners(USER, USER), /must start with "guest_"/);
+  // from must be a guest_ id (a signed-in user cannot be the migration source).
+  assert.throws(() => assertMigrationOwners(USER, USER), /must start with "guest_"/);
 
-// to must be a user_ id (cannot migrate INTO another guest vault).
-assert.throws(() => assertMigrationOwners(GUEST, GUEST), /must start with "user_"/);
+  // to must be a user_ id (cannot migrate INTO another guest vault).
+  assert.throws(() => assertMigrationOwners(GUEST, GUEST), /must start with "user_"/);
 
-// from and to must differ: a guest_ id migrating to an identical guest_ id is
-// rejected by the user_ prefix guard before the equality guard, which is fine —
-// the invariant (you can't no-op-migrate a guest onto itself) still holds.
-assert.throws(() => assertMigrationOwners(GUEST, GUEST), /must start with "user_"/);
+  // from and to must differ: a guest_ id migrating to an identical guest_ id is
+  // rejected by the user_ prefix guard before the equality guard, which is fine —
+  // the invariant (you can't no-op-migrate a guest onto itself) still holds.
+  assert.throws(() => assertMigrationOwners(GUEST, GUEST), /must start with "user_"/);
+});
 
 // --- retagGuestRows: only the guest's rows move, counts are exact ---
 
@@ -89,7 +92,7 @@ const seed: Record<string, Row[]> = {
   media: [{ _id: "media:1", vaultOwnerId: otherGuest }], // none of this guest's rows
 };
 
-async function main() {
+test("retagGuestRows moves only the guest's rows with exact counts", async () => {
   const { db, tables, patched } = makeFakeDb(seed);
   const result = await retagGuestRows(db, GUEST, USER, ["persons", "sources", "media"]);
 
@@ -104,11 +107,4 @@ async function main() {
   assert.equal(tables.persons.find((r) => r._id === "persons:3")!.vaultOwnerId, USER); // unchanged (was already USER)
   assert.equal(tables.persons.find((r) => r._id === "persons:4")!.vaultOwnerId, otherGuest); // NOT stolen
   assert.equal(tables.media.find((r) => r._id === "media:1")!.vaultOwnerId, otherGuest); // NOT stolen
-
-  console.log("Vault migration test checks passed.");
-}
-
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
 });

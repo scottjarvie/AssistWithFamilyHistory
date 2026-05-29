@@ -27,6 +27,7 @@
  * storyReviewEvents and by_person on stories) are matched with eq()-contains
  * semantics, mirroring the real index runtime behavior.
  */
+import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import {
   getVaultSnapshot,
@@ -301,102 +302,110 @@ function coverageFromSnapshot(snapshot: Snapshot, identifier: string) {
 // Run both paths and deep-equal
 // ---------------------------------------------------------------------------
 
-async function main() {
-  const ctx = makeFakeCtx(tables);
-
-  // --- getContextCoverage parity (per-person loader) ---------------------
+// --- getContextCoverage parity (per-person loader) ---------------------
+describe("getContextCoverage scoped-loader parity", () => {
   for (const identifier of [TARGET, "KWCJ-RN4"]) {
-    const fullSnapshot = await getVaultSnapshot(ctx, OWNER);
-    const fullCoverage = coverageFromSnapshot(fullSnapshot, identifier);
+    test(`coverage is byte-identical to full snapshot for ${identifier}`, async () => {
+      const ctx = makeFakeCtx(tables);
+      const fullSnapshot = await getVaultSnapshot(ctx, OWNER);
+      const fullCoverage = coverageFromSnapshot(fullSnapshot, identifier);
 
-    const scopedSnapshot = await loadPersonScopedSnapshot(ctx, OWNER, identifier);
-    assert.ok(scopedSnapshot, `scoped snapshot should resolve for ${identifier}`);
-    const scopedCoverage = coverageFromSnapshot(scopedSnapshot, identifier);
+      const scopedSnapshot = await loadPersonScopedSnapshot(ctx, OWNER, identifier);
+      assert.ok(scopedSnapshot, `scoped snapshot should resolve for ${identifier}`);
+      const scopedCoverage = coverageFromSnapshot(scopedSnapshot, identifier);
 
-    assert.deepEqual(
-      scopedCoverage,
-      fullCoverage,
-      `getContextCoverage scoped output must be byte-identical to full-snapshot output for ${identifier}`
-    );
+      assert.deepEqual(
+        scopedCoverage,
+        fullCoverage,
+        `getContextCoverage scoped output must be byte-identical to full-snapshot output for ${identifier}`
+      );
 
-    // Sanity: coverage is non-trivial and excludes off-place / off-year context.
-    assert.ok(fullCoverage, "full coverage should be non-null");
-    assert.equal(fullCoverage!.count, 2, "two overlapping context entries (hc:1 place match + hc:2 no-place)");
-    assert.equal(fullCoverage!.relatedPlaceCount, 2, "two related places");
+      // Sanity: coverage is non-trivial and excludes off-place / off-year context.
+      assert.ok(fullCoverage, "full coverage should be non-null");
+      assert.equal(fullCoverage!.count, 2, "two overlapping context entries (hc:1 place match + hc:2 no-place)");
+      assert.equal(fullCoverage!.relatedPlaceCount, 2, "two related places");
+    });
   }
 
-  // Unknown person → null from both paths (handler returns null).
-  const missingScoped = await loadPersonScopedSnapshot(ctx, OWNER, "persons:999");
-  assert.equal(missingScoped, null, "unknown person → null scoped snapshot");
+  test("unknown person → null scoped snapshot", async () => {
+    const ctx = makeFakeCtx(tables);
+    // Unknown person → null from both paths (handler returns null).
+    const missingScoped = await loadPersonScopedSnapshot(ctx, OWNER, "persons:999");
+    assert.equal(missingScoped, null, "unknown person → null scoped snapshot");
+  });
+});
 
-  // --- getStoryReview / buildStoryBundle parity (story-scoped loader) -----
+// --- getStoryReview / buildStoryBundle parity (story-scoped loader) -----
+describe("getStoryReview / buildStoryBundle scoped-loader parity", () => {
   for (const storyId of [STORY_MAIN, STORY_OTHER]) {
-    const fullSnapshot = await getVaultSnapshot(ctx, OWNER);
-    const fullStory = fullSnapshot.stories.find((s) => s._id === storyId)!;
-    const fullBundle = buildStoryBundle(fullSnapshot, fullStory);
+    test(`story bundle is byte-identical to full snapshot for ${storyId}`, async () => {
+      const ctx = makeFakeCtx(tables);
+      const fullSnapshot = await getVaultSnapshot(ctx, OWNER);
+      const fullStory = fullSnapshot.stories.find((s) => s._id === storyId)!;
+      const fullBundle = buildStoryBundle(fullSnapshot, fullStory);
 
-    const scopedSnapshot = await loadStoryScopedSnapshot(ctx, OWNER, storyId as never);
-    assert.ok(scopedSnapshot, `story-scoped snapshot should resolve for ${storyId}`);
-    const scopedStory = scopedSnapshot!.stories.find((s) => s._id === storyId)!;
-    const scopedBundle = buildStoryBundle(scopedSnapshot!, scopedStory);
+      const scopedSnapshot = await loadStoryScopedSnapshot(ctx, OWNER, storyId as never);
+      assert.ok(scopedSnapshot, `story-scoped snapshot should resolve for ${storyId}`);
+      const scopedStory = scopedSnapshot!.stories.find((s) => s._id === storyId)!;
+      const scopedBundle = buildStoryBundle(scopedSnapshot!, scopedStory);
 
-    assert.deepEqual(
-      scopedBundle,
-      fullBundle,
-      `getStoryReview scoped bundle must be byte-identical to full-snapshot bundle for ${storyId}`
-    );
+      assert.deepEqual(
+        scopedBundle,
+        fullBundle,
+        `getStoryReview scoped bundle must be byte-identical to full-snapshot bundle for ${storyId}`
+      );
 
-    // Also prove the public view (publishView=true) path matches — buildStoryBundle
-    // reads the same snapshot fields, just with stricter filters.
-    const fullPublic = buildStoryBundle(fullSnapshot, fullStory, { publicView: true });
-    const scopedPublic = buildStoryBundle(scopedSnapshot!, scopedStory, { publicView: true });
-    assert.deepEqual(
-      scopedPublic,
-      fullPublic,
-      `getStoryReview scoped public bundle must be byte-identical for ${storyId}`
-    );
+      // Also prove the public view (publishView=true) path matches — buildStoryBundle
+      // reads the same snapshot fields, just with stricter filters.
+      const fullPublic = buildStoryBundle(fullSnapshot, fullStory, { publicView: true });
+      const scopedPublic = buildStoryBundle(scopedSnapshot!, scopedStory, { publicView: true });
+      assert.deepEqual(
+        scopedPublic,
+        fullPublic,
+        `getStoryReview scoped public bundle must be byte-identical for ${storyId}`
+      );
+    });
   }
 
-  // Targeted assertions on the SCOPED main-story bundle: the by_story narrowing
-  // must (a) include only this story's events, (b) exclude other stories' and
-  // the stranger's events, and (c) never leak a foreign-owner event that names
-  // this story. relatedStories must contain the person's OTHER story only.
-  const scopedMain = await loadStoryScopedSnapshot(ctx, OWNER, STORY_MAIN as never);
-  assert.ok(scopedMain, "scoped main story snapshot");
-  const mainStory = scopedMain!.stories.find((s) => s._id === STORY_MAIN)!;
-  const mainBundle = buildStoryBundle(scopedMain!, mainStory);
+  test("scoped main-story bundle narrows reviewHistory + relatedStories correctly", async () => {
+    const ctx = makeFakeCtx(tables);
+    // Targeted assertions on the SCOPED main-story bundle: the by_story narrowing
+    // must (a) include only this story's events, (b) exclude other stories' and
+    // the stranger's events, and (c) never leak a foreign-owner event that names
+    // this story. relatedStories must contain the person's OTHER story only.
+    const scopedMain = await loadStoryScopedSnapshot(ctx, OWNER, STORY_MAIN as never);
+    assert.ok(scopedMain, "scoped main story snapshot");
+    const mainStory = scopedMain!.stories.find((s) => s._id === STORY_MAIN)!;
+    const mainBundle = buildStoryBundle(scopedMain!, mainStory);
 
-  const reviewIds = mainBundle.reviewHistory.map((e) => e._id).sort();
-  assert.deepEqual(
-    reviewIds,
-    ["storyReviewEvents:1", "storyReviewEvents:2"],
-    "reviewHistory = this story's owned review events (others + foreign-owner excluded)"
-  );
-  assert.ok(
-    !reviewIds.includes("storyReviewEvents:5"),
-    "foreign-owner review event naming this story must never leak"
-  );
-  const relatedStoryIds = mainBundle.relatedStories.map((s) => s._id);
-  assert.deepEqual(
-    relatedStoryIds,
-    [STORY_OTHER],
-    "relatedStories = the person's OTHER stories only (stranger excluded, self excluded)"
-  );
-  assert.ok(mainBundle.person, "story bundle resolves the person");
-  assert.equal(mainBundle.person!._id, TARGET, "story bundle person is the target");
-  assert.ok(mainBundle.contextCoverage, "story bundle carries context coverage");
-  assert.equal(mainBundle.contextCoverage!.count, 2, "story bundle coverage matches person coverage");
+    const reviewIds = mainBundle.reviewHistory.map((e) => e._id).sort();
+    assert.deepEqual(
+      reviewIds,
+      ["storyReviewEvents:1", "storyReviewEvents:2"],
+      "reviewHistory = this story's owned review events (others + foreign-owner excluded)"
+    );
+    assert.ok(
+      !reviewIds.includes("storyReviewEvents:5"),
+      "foreign-owner review event naming this story must never leak"
+    );
+    const relatedStoryIds = mainBundle.relatedStories.map((s) => s._id);
+    assert.deepEqual(
+      relatedStoryIds,
+      [STORY_OTHER],
+      "relatedStories = the person's OTHER stories only (stranger excluded, self excluded)"
+    );
+    assert.ok(mainBundle.person, "story bundle resolves the person");
+    assert.equal(mainBundle.person!._id, TARGET, "story bundle person is the target");
+    assert.ok(mainBundle.contextCoverage, "story bundle carries context coverage");
+    assert.equal(mainBundle.contextCoverage!.count, 2, "story bundle coverage matches person coverage");
+  });
 
-  // Missing / foreign-owner story → null.
-  const missingStory = await loadStoryScopedSnapshot(ctx, OWNER, "stories:999" as never);
-  assert.equal(missingStory, null, "unknown story → null scoped snapshot");
-  const foreignStory = await loadStoryScopedSnapshot(ctx, "other-owner", STORY_MAIN as never);
-  assert.equal(foreignStory, null, "story owned by another vault → null for this owner");
-
-  console.log("Context-coverage / story-review parity checks passed.");
-}
-
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
+  test("missing / foreign-owner story → null scoped snapshot", async () => {
+    const ctx = makeFakeCtx(tables);
+    // Missing / foreign-owner story → null.
+    const missingStory = await loadStoryScopedSnapshot(ctx, OWNER, "stories:999" as never);
+    assert.equal(missingStory, null, "unknown story → null scoped snapshot");
+    const foreignStory = await loadStoryScopedSnapshot(ctx, "other-owner", STORY_MAIN as never);
+    assert.equal(foreignStory, null, "story owned by another vault → null for this owner");
+  });
 });

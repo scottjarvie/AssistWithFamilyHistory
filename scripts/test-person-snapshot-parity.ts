@@ -18,6 +18,7 @@
  * `withIndex(...).collect()` ordering — which is the invariant the scoped
  * loader relies on for identical output.
  */
+import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   getVaultSnapshot,
@@ -298,10 +299,10 @@ const tables: Record<string, AnyRow[]> = {
 // Run both paths and deep-equal
 // ---------------------------------------------------------------------------
 
-async function main() {
-  const ctx = makeFakeCtx(tables);
+for (const identifier of [TARGET, "KWCJ-RN4"]) {
+  test(`per-person loader is byte-identical to full snapshot for ${identifier}`, async () => {
+    const ctx = makeFakeCtx(tables);
 
-  for (const identifier of [TARGET, "KWCJ-RN4"]) {
     const fullSnapshot = await getVaultSnapshot(ctx, OWNER);
     const fullResult = assemblePersonWorkspaceFromSnapshot(fullSnapshot, identifier);
 
@@ -357,16 +358,12 @@ async function main() {
       !scopedMediaIds.includes("media:6") && !scopedContextIds.includes("contextItems:5"),
       "foreign-owner rows naming the target must never leak"
     );
-  }
+  });
+}
 
+test("a missing identifier returns null from the scoped loader", async () => {
+  const ctx = makeFakeCtx(tables);
   // A missing identifier returns null from both paths.
   const nullScoped = await loadPersonScopedSnapshot(ctx, OWNER, "persons:999");
   assert.equal(nullScoped, null, "unknown person → null scoped snapshot");
-
-  console.log("Person snapshot parity checks passed.");
-}
-
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
 });
