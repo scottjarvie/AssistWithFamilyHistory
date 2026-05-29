@@ -8,7 +8,6 @@
  * @module
  */
 
-import type * as ancestorDetails from "../ancestorDetails.js";
 import type * as citations from "../citations.js";
 import type * as documents from "../documents.js";
 import type * as events from "../events.js";
@@ -33,7 +32,6 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  ancestorDetails: typeof ancestorDetails;
   citations: typeof citations;
   documents: typeof documents;
   events: typeof events;
