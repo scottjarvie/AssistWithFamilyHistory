@@ -87,13 +87,15 @@ export function compareOwnerForShadow(
 }
 
 /**
- * Truncate an owner/identity id for logging. We never log full ids in the
- * shadow warning — only a short prefix that is enough to correlate without
- * leaking the whole Clerk subject / vault owner.
+ * Mask an owner/identity id for the shadow log. We only need to know a mismatch
+ * is happening — not exactly whose. Emit at most an 8-char prefix + ellipsis, so
+ * a full Clerk subject / vault-owner / guest id is never written to the logs
+ * (real ids are long; this also covers short ones rather than printing them
+ * whole). The signal that survives is "a mismatch occurred," which is the point.
  */
 function truncateForShadowLog(value: string | null | undefined): string {
   if (!value) return "<none>";
-  return value.length > 12 ? `${value.slice(0, 12)}…` : value;
+  return value.length > 8 ? `${value.slice(0, 8)}…` : `${value}…`;
 }
 
 /**
