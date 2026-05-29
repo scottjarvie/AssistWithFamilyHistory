@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Prose } from "@/components/prose/Prose";
+import { LifeTimeline, type TimelineEvent } from "@/components/viz/LifeTimeline";
 import { getAuthedConvexClient, getConvexUnavailableState, isConvexConfigured } from "@/lib/convex/server";
 import { api } from "@/convex/_generated/api";
 import type { FunctionReturnType } from "convex/server";
@@ -571,33 +572,13 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
               <CardDescription>Ordered life events and evidence-backed moments.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {(workspace.timeline as Array<{
-                _id: string;
-                type: string;
-                date?: { original?: string };
-                place?: { fullName?: string; name?: string };
-                description?: string;
-              }>).length === 0 ? (
+              {(workspace.timeline as TimelineEvent[]).length === 0 ? (
                 <EmptyWorkspaceState
                   title="No timeline events yet"
                   description="Imported sources usually create timeline moments automatically. If this stays empty, review the sources and place mentions for missing event clues."
                 />
               ) : (
-                (workspace.timeline as Array<{
-                  _id: string;
-                  type: string;
-                  date?: { original?: string };
-                  place?: { fullName?: string; name?: string };
-                  description?: string;
-                }>).map((event) => (
-                  <div key={String(event._id)} className="rounded-2xl border border-stone-200 px-4 py-4">
-                    <p className="font-medium text-stone-900">{event.type.replace(/_/g, " ")}</p>
-                    <p className="mt-1 text-sm text-stone-500">
-                      {event.date?.original || "Undated"} {event.place?.fullName ? `· ${event.place.fullName}` : event.place?.name ? `· ${event.place.name}` : ""}
-                    </p>
-                    {event.description ? <p className="mt-3 text-sm text-stone-600">{event.description}</p> : null}
-                  </div>
-                ))
+                <LifeTimeline events={workspace.timeline as TimelineEvent[]} />
               )}
             </CardContent>
           </Card>
