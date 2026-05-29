@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { api } from "@/convex/_generated/api";
-import { getConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
+import { getAuthedConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
 import { buildOperationsHandoffPacket } from "@/lib/operations/handoff";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
   try {
     const { vaultOwnerId } = await getVaultAccessContext();
     const searchParams = request.nextUrl.searchParams;
-    const client = getConvexClient();
+    const client = await getAuthedConvexClient();
     const payload = await client.query(api.vault.getOperationsQueue, {
       vaultOwnerId,
       search: searchParams.get("q") || undefined,

@@ -37,5 +37,5 @@
     "convex/**/*.ts",
     "convex/**/*.tsx"
   ],
-  "exclude": ["node_modules", "extension", "scripts"]
+  "exclude": ["node_modules", "extension", "scripts", "convex/**/*.test.ts"]
 }

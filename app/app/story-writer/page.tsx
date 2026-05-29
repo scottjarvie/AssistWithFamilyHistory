@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { VaultStateCard } from "@/components/vault/VaultStateCard";
 import { api } from "@/convex/_generated/api";
-import { getConvexClient, getConvexRuntimeIssue, getConvexUnavailableState, isConvexConfigured } from "@/lib/convex/server";
+import { getAuthedConvexClient, getConvexRuntimeIssue, getConvexUnavailableState, isConvexConfigured } from "@/lib/convex/server";
 import { createPageMetadata } from "@/lib/seo";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
@@ -31,7 +31,7 @@ export default async function StoryWriterPage() {
     );
   }
 
-  const client = getConvexClient();
+  const client = await getAuthedConvexClient();
   const { vaultOwnerId } = await getVaultAccessContext();
   let people;
 

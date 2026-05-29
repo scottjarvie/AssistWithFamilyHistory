@@ -15,9 +15,16 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import { api } from "@/convex/_generated/api";
-import { getLatestRun, getEvidencePack, getRawDocument, saveRawDocument } from "@/lib/storage/fileStorage";
-import { getConvexClient, isConvexConfigured } from "@/lib/convex/server";
+import {
+  getLatestRun,
+  getEvidencePack,
+  getRawDocument,
+  saveRawDocument,
+  isLocalFsEnabled,
+} from "@/lib/storage/fileStorage";
+import { getAuthedConvexClient, getConvexClient, isConvexConfigured } from "@/lib/convex/server";
 import { generateRawDocument } from "@/features/source-docs/lib/rawDocGenerator";
 import { EvidencePackSchema } from "@/features/source-docs/lib/schemas";
 import { resolveImportRunForStoredRun } from "@/lib/familysearch/importRunResolver";
@@ -58,17 +65,38 @@ export async function GET(
       );
     }
 
-    // Try to get existing raw document
-    let markdown = storagePersonId
-      ? await getRawDocument(storagePersonId, targetRunId, vaultOwnerId)
-      : null;
+    // Convex is the canonical store (GEN-91). Prefer the mirrored artifact from
+    // the documents table; only fall back to the local filesystem in dev.
+    let markdown: string | null = null;
+
+    if (isConvexConfigured() && storagePersonId) {
+      try {
+        const existingDoc = await (await getAuthedConvexClient()).query(api.documents.getDocument, {
+          vaultOwnerId,
+          personId: storagePersonId,
+          type: "CST",
+        });
+        markdown = existingDoc?.contentMarkdown ?? null;
+      } catch (error) {
+        console.error("Failed to read raw document from Convex:", error);
+      }
+    }
+
+    if (!markdown && isLocalFsEnabled() && storagePersonId) {
+      markdown = await getRawDocument(storagePersonId, targetRunId, vaultOwnerId);
+    }
+
+    // Track whether we generated the artifact on this request. We only mirror /
+    // refresh research checks for NEWLY generated artifacts — never on a pure
+    // cache-hit read (GEN-90).
+    let generated = false;
 
     if (!markdown) {
       // Generate from evidence pack
       const evidencePack = storagePersonId
         ? await getEvidencePack(storagePersonId, targetRunId, vaultOwnerId)
         : null;
-      
+
       if (!evidencePack) {
         return NextResponse.json(
           { error: "Evidence pack not found" },
@@ -78,7 +106,7 @@ export async function GET(
 
       // Validate and generate
       const parseResult = EvidencePackSchema.safeParse(evidencePack);
-      
+
       if (!parseResult.success) {
         return NextResponse.json(
           { error: "Invalid legacy source capture format" },
@@ -87,8 +115,9 @@ export async function GET(
       }
 
       markdown = generateRawDocument(parseResult.data);
+      generated = true;
 
-      // Save for future use
+      // Save for future use (local dev mirror only; gated inside saveRawDocument)
       if (storagePersonId) {
         await saveRawDocument(storagePersonId, targetRunId, markdown, vaultOwnerId);
       }
@@ -99,7 +128,9 @@ export async function GET(
 
     let backendWarning: string | undefined;
 
-    if (isConvexConfigured() && storagePersonId) {
+    // Only mirror into Convex + refresh research checks when the artifact was
+    // newly generated. A cache-hit read must not write (GEN-90).
+    if (generated && isConvexConfigured() && storagePersonId) {
       try {
         const client = getConvexClient();
         const importRun = await resolveImportRunForStoredRun({
@@ -147,12 +178,28 @@ export async function GET(
       }
     }
 
-    return NextResponse.json({
+    const jsonBody = JSON.stringify({
       success: true,
       markdown,
       personName,
       runId: targetRunId,
       backendWarning,
+    });
+    const cacheControl = "private, max-age=0, must-revalidate";
+    const etag = 'W/"' + createHash("sha1").update(jsonBody).digest("hex") + '"';
+    if (request.headers.get("if-none-match") === etag) {
+      return new NextResponse(null, {
+        status: 304,
+        headers: { ETag: etag, "Cache-Control": cacheControl },
+      });
+    }
+    return new NextResponse(jsonBody, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        ETag: etag,
+        "Cache-Control": cacheControl,
+      },
     });
 
   } catch (error) {

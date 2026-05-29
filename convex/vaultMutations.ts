@@ -8,7 +8,7 @@ import {
   formatPersonName,
   inferResearchChecks,
   matchesVaultOwner,
-  normalizeVaultOwnerId,
+  resolveOwner,
 } from "./vaultCore";
 
 const dateValidator = v.object({
@@ -244,7 +244,7 @@ export const upsertPerson = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     let existing: Doc<"persons"> | null = null;
 
     if (args.fsId) {
@@ -338,7 +338,7 @@ export const upsertSource = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     let existing: Doc<"sources"> | null = null;
 
     if (args.fsId) {
@@ -405,7 +405,7 @@ export const upsertCitation = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     let existing: Doc<"citations"> | null = null;
 
     if (args.importKey) {
@@ -500,7 +500,7 @@ export const upsertEvent = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     let existing: Doc<"events"> | null = null;
 
     if (args.importKey) {
@@ -565,7 +565,7 @@ export const upsertPersonEvent = mutation({
         q.eq("personId", args.personId).eq("eventId", args.eventId)
       )
       .collect();
-    const existing = filterByVaultOwner(existingRows, normalizeVaultOwnerId(args.vaultOwnerId))[0] ?? null;
+    const existing = filterByVaultOwner(existingRows, await resolveOwner(ctx, args.vaultOwnerId))[0] ?? null;
 
     if (existing) {
       await ctx.db.patch(existing._id, { role: args.role });
@@ -607,13 +607,15 @@ export const upsertRelationship = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     let existing: Doc<"relationships"> | null = null;
 
     if (args.familySearchId) {
-      const rows = filterByVaultOwner(await ctx.db.query("relationships").collect(), vaultOwnerId);
-      existing =
-        rows.find((relationship) => relationship.familySearchId === args.familySearchId) || null;
+      const rows = await ctx.db
+        .query("relationships")
+        .withIndex("by_familySearchId", (q) => q.eq("familySearchId", args.familySearchId))
+        .collect();
+      existing = filterByVaultOwner(rows, vaultOwnerId)[0] ?? null;
     }
 
     if (!existing && args.importKey) {
@@ -711,13 +713,15 @@ export const upsertMedia = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     let existing: Doc<"media"> | null = null;
 
     if (args.familySearchUrl) {
-      const allMedia = filterByVaultOwner(await ctx.db.query("media").collect(), vaultOwnerId);
-      existing =
-        allMedia.find((media) => media.familySearchUrl === args.familySearchUrl) || null;
+      const rows = await ctx.db
+        .query("media")
+        .withIndex("by_familySearchUrl", (q) => q.eq("familySearchUrl", args.familySearchUrl))
+        .collect();
+      existing = filterByVaultOwner(rows, vaultOwnerId)[0] ?? null;
     }
 
     if (!existing && args.importKey) {
@@ -771,7 +775,7 @@ export const upsertSourceFact = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const matches = await ctx.db
       .query("sourceFacts")
       .withIndex("by_import_key", (q) => q.eq("importKey", args.importKey))
@@ -808,7 +812,7 @@ export const reviewMedia = mutation({
   },
   handler: async (ctx, args) => {
     const media = await ctx.db.get(args.mediaId);
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     if (!media || !matchesVaultOwner(media.vaultOwnerId, vaultOwnerId)) {
       throw new Error("Media item not found");
     }
@@ -844,7 +848,7 @@ export const upsertContextItemForPerson = mutation({
     reviewNote: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const normalizedPersonId = ctx.db.normalizeId("persons", args.personIdentifier);
     const person =
       (normalizedPersonId ? await ctx.db.get(normalizedPersonId) : null) ??
@@ -915,7 +919,7 @@ export const ensureResearchTask = mutation({
       .query("researchTasks")
       .withIndex("by_person", (q) => q.eq("personId", args.personId))
       .collect();
-    const existing = filterByVaultOwner(existingRows, normalizeVaultOwnerId(args.vaultOwnerId));
+    const existing = filterByVaultOwner(existingRows, await resolveOwner(ctx, args.vaultOwnerId));
 
     const match = existing.find((task) => task.title === args.title && task.status !== "done");
     if (match) {
@@ -951,11 +955,12 @@ export const upsertStoryDraft = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const existingRows = await ctx.db
       .query("stories")
       .withIndex("by_person", (q) => q.eq("personId", args.personId))
       .collect();
-    const existing = filterByVaultOwner(existingRows, normalizeVaultOwnerId(args.vaultOwnerId));
+    const existing = filterByVaultOwner(existingRows, vaultOwnerId);
 
     const match =
       existing.find(
@@ -994,7 +999,7 @@ export const upsertStoryDraft = mutation({
     }
 
     const storyId = await ctx.db.insert("stories", {
-      vaultOwnerId: normalizeVaultOwnerId(args.vaultOwnerId),
+      vaultOwnerId,
       personId: args.personId,
       relationshipId: undefined,
       type: args.type,
@@ -1103,7 +1108,7 @@ export const backfillStoryPublicSlugs = mutation({
     vaultOwnerId: v.string(),
   },
   handler: async (ctx, args) => {
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const stories = filterByVaultOwner(await ctx.db.query("stories").collect(), vaultOwnerId);
     const now = Date.now();
     let updated = 0;
@@ -1141,7 +1146,7 @@ export const assignStoryReviewer = mutation({
     note: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const story = await ctx.db.get(args.storyId);
     if (!story || !matchesVaultOwner(story.vaultOwnerId, vaultOwnerId)) {
       throw new Error("Story not found");
@@ -1204,7 +1209,7 @@ export const recordStoryReviewEvent = mutation({
     readinessScore: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const story = await ctx.db.get(args.storyId);
     if (!story || !matchesVaultOwner(story.vaultOwnerId, vaultOwnerId)) {
       throw new Error("Story not found");
@@ -1262,7 +1267,7 @@ export const upsertHistoricalContext = mutation({
     categoryBlocks: v.optional(v.array(researchPackCategoryBlockValidator)),
   },
   handler: async (ctx, args) => {
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const now = Date.now();
     const candidates = args.placeId
       ? await ctx.db
@@ -1384,7 +1389,7 @@ export const upsertProvisionalRelative = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const dedupeKey = buildProvisionalDedupeKey({
       vaultOwnerId,
       anchorPersonId: args.anchorPersonId,
@@ -1459,14 +1464,15 @@ export const upsertResearchCheck = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const existingRows = await ctx.db
       .query("researchChecks")
       .withIndex("by_person_check", (q) => q.eq("personId", args.personId).eq("checkKey", args.checkKey))
       .collect();
-    const existing = filterByVaultOwner(existingRows, normalizeVaultOwnerId(args.vaultOwnerId))[0] ?? null;
+    const existing = filterByVaultOwner(existingRows, vaultOwnerId)[0] ?? null;
 
     const payload = {
-      vaultOwnerId: normalizeVaultOwnerId(args.vaultOwnerId),
+      vaultOwnerId,
       personFsId: args.personFsId,
       status: args.status,
       applicability: args.applicability,
@@ -1503,91 +1509,174 @@ export const bulkRefreshResearchChecks = mutation({
     source: researchCheckSourceValidator,
   },
   handler: async (ctx, args) => {
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const now = Date.now();
     const person = await ctx.db.get(args.personId);
     if (!person || !matchesVaultOwner(person.vaultOwnerId, vaultOwnerId)) {
       return { updated: 0 };
     }
 
+    // GEN-93: replace 13 full-table .collect() scans with indexed per-person
+    // reads. `inferResearchChecks` consumes every array only through
+    // order-insensitive reductions (.length / .some / .every / keyword scans /
+    // .includes) and the mutation loop matches existing checks by checkKey, so
+    // the index ordering of these reads does not change the computed output.
+    const personKey = person.fsId || String(person._id);
+    const personFsId = person.fsId;
+
     const [
-      relationships,
+      relationshipsAsPerson1,
+      relationshipsAsPerson2,
       personEvents,
-      events,
-      media,
-      documents,
-      stories,
-      importRuns,
-      researchChecks,
-      provisionalRelatives,
-      citationLinks,
-      citations,
-      sources,
-      places,
+      personMedia,
+      ownedDocuments,
+      ownedStoriesRaw,
+      importRunsByPerson,
+      importRunsByFsId,
+      ownedChecksRaw,
+      provisionalByAnchor,
+      personLinks,
     ] = await Promise.all([
-      ctx.db.query("relationships").collect(),
-      ctx.db.query("personEvents").collect(),
-      ctx.db.query("events").collect(),
-      ctx.db.query("media").collect(),
-      ctx.db.query("documents").collect(),
-      ctx.db.query("stories").collect(),
-      ctx.db.query("importRuns").collect(),
-      ctx.db.query("researchChecks").collect(),
-      ctx.db.query("provisionalRelatives").collect(),
-      ctx.db.query("citationLinks").collect(),
-      ctx.db.query("citations").collect(),
-      ctx.db.query("sources").collect(),
-      ctx.db.query("places").collect(),
+      ctx.db
+        .query("relationships")
+        .withIndex("by_person1", (q) => q.eq("person1", args.personId))
+        .collect(),
+      ctx.db
+        .query("relationships")
+        .withIndex("by_person2", (q) => q.eq("person2", args.personId))
+        .collect(),
+      ctx.db
+        .query("personEvents")
+        .withIndex("by_person", (q) => q.eq("personId", args.personId))
+        .collect(),
+      ctx.db
+        .query("media")
+        .withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId))
+        .collect(),
+      ctx.db
+        .query("documents")
+        .withIndex("by_personId", (q) => q.eq("personId", personKey))
+        .collect(),
+      ctx.db
+        .query("stories")
+        .withIndex("by_person", (q) => q.eq("personId", args.personId))
+        .collect(),
+      ctx.db
+        .query("importRuns")
+        .withIndex("by_person", (q) => q.eq("personId", args.personId))
+        .collect(),
+      // importRuns.personFsId is a non-optional string, so the original
+      // predicate `run.personFsId === person.fsId` can only match when
+      // person.fsId is defined. When undefined, there are no fsId matches.
+      personFsId
+        ? ctx.db
+            .query("importRuns")
+            .withIndex("by_person_fsId", (q) => q.eq("personFsId", personFsId))
+            .collect()
+        : Promise.resolve([] as Doc<"importRuns">[]),
+      ctx.db
+        .query("researchChecks")
+        .withIndex("by_person", (q) => q.eq("personId", args.personId))
+        .collect(),
+      ctx.db
+        .query("provisionalRelatives")
+        .withIndex("by_anchor", (q) => q.eq("anchorPersonId", args.personId))
+        .collect(),
+      ctx.db
+        .query("citationLinks")
+        .withIndex("by_target", (q) => q.eq("targetType", "person").eq("targetId", String(args.personId)))
+        .collect(),
     ]);
 
-    const ownedRelationships = filterByVaultOwner(relationships, vaultOwnerId).filter(
-      (relationship) => relationship.person1 === args.personId || relationship.person2 === args.personId
+    // Relationships: union of person1/person2 matches, deduped, owner-scoped.
+    const relationshipById = new Map<string, Doc<"relationships">>();
+    for (const relationship of [...relationshipsAsPerson1, ...relationshipsAsPerson2]) {
+      relationshipById.set(String(relationship._id), relationship);
+    }
+    const ownedRelationships = filterByVaultOwner(
+      Array.from(relationshipById.values()),
+      vaultOwnerId
     );
-    const ownedPersonEvents = filterByVaultOwner(personEvents, vaultOwnerId).filter(
-      (link) => link.personId === args.personId
+
+    const ownedPersonEvents = filterByVaultOwner(personEvents, vaultOwnerId);
+    // Resolve events by id from the person's event links (owner-scoped). Dedup
+    // by eventId so a person with multiple links to one event yields it once,
+    // matching the original events-table filter (a table is unique by _id).
+    const uniqueEventIds = Array.from(
+      new Set(ownedPersonEvents.map((link) => String(link.eventId)))
     );
-    const ownedEvents = filterByVaultOwner(events, vaultOwnerId).filter((event) =>
-      ownedPersonEvents.some((link) => link.eventId === event._id)
+    const ownedEvents = (
+      await Promise.all(
+        uniqueEventIds.map((id) => ctx.db.get(id as Doc<"events">["_id"]))
+      )
+    ).filter(
+      (event): event is Doc<"events"> =>
+        event !== null && matchesVaultOwner(event.vaultOwnerId, vaultOwnerId)
     );
-    const ownedMedia = filterByVaultOwner(media, vaultOwnerId).filter((item) =>
+
+    const ownedMedia = filterByVaultOwner(personMedia, vaultOwnerId).filter((item) =>
       item.personIds.includes(args.personId)
     );
-    const personKey = person.fsId || String(person._id);
-    const ownedDocuments = filterByVaultOwner(documents, vaultOwnerId).filter(
-      (document) => document.personId === personKey
-    );
-    const ownedStories = filterByVaultOwner(stories, vaultOwnerId).filter(
-      (story) => story.personId === args.personId
-    );
-    const ownedImportRuns = filterByVaultOwner(importRuns, vaultOwnerId).filter(
-      (run) => run.personId === args.personId || run.personFsId === person.fsId
-    );
-    const ownedChecks = filterByVaultOwner(researchChecks, vaultOwnerId).filter(
-      (check) => check.personId === args.personId
-    );
-    const ownedProvisional = filterByVaultOwner(provisionalRelatives, vaultOwnerId).filter(
-      (relative) => relative.anchorPersonId === args.personId && relative.mergeState === "provisional"
-    );
-    const ownedLinks = filterByVaultOwner(citationLinks, vaultOwnerId).filter((link) => {
-      if (link.targetType === "person" && link.targetId === String(args.personId)) return true;
-      if (link.targetType === "event") {
-        return ownedEvents.some((event) => String(event._id) === link.targetId);
+    const ownedStories = filterByVaultOwner(ownedStoriesRaw, vaultOwnerId);
+    const ownedImportRuns = (() => {
+      const byId = new Map<string, Doc<"importRuns">>();
+      for (const run of [...importRunsByPerson, ...importRunsByFsId]) {
+        byId.set(String(run._id), run);
       }
-      return false;
-    });
-    const ownedCitations = filterByVaultOwner(citations, vaultOwnerId).filter((citation) =>
-      ownedLinks.some((link) => link.citationId === citation._id)
+      return filterByVaultOwner(Array.from(byId.values()), vaultOwnerId);
+    })();
+    const ownedChecks = filterByVaultOwner(ownedChecksRaw, vaultOwnerId);
+    const ownedProvisional = filterByVaultOwner(provisionalByAnchor, vaultOwnerId).filter(
+      (relative) => relative.mergeState === "provisional"
     );
-    const ownedSources = filterByVaultOwner(sources, vaultOwnerId).filter((source) =>
-      ownedCitations.some((citation) => citation.sourceId === source._id)
+
+    // Citation links: person-target links read by index, plus event-target
+    // links for this person's events (read per event by index).
+    const eventLinkLists = await Promise.all(
+      ownedEvents.map((event) =>
+        ctx.db
+          .query("citationLinks")
+          .withIndex("by_target", (q) =>
+            q.eq("targetType", "event").eq("targetId", String(event._id))
+          )
+          .collect()
+      )
     );
+    const linkById = new Map<string, Doc<"citationLinks">>();
+    for (const link of [...personLinks, ...eventLinkLists.flat()]) {
+      linkById.set(String(link._id), link);
+    }
+    const ownedLinks = filterByVaultOwner(Array.from(linkById.values()), vaultOwnerId);
+
+    // Resolve citations by id from the gathered links (owner-scoped), then
+    // resolve sources by id from those citations.
+    const citationIds = Array.from(new Set(ownedLinks.map((link) => String(link.citationId))));
+    const ownedCitations = (
+      await Promise.all(citationIds.map((id) => ctx.db.get(id as Doc<"citations">["_id"])))
+    ).filter(
+      (citation): citation is Doc<"citations"> =>
+        citation !== null && matchesVaultOwner(citation.vaultOwnerId, vaultOwnerId)
+    );
+    const sourceIds = Array.from(new Set(ownedCitations.map((citation) => String(citation.sourceId))));
+    const ownedSources = (
+      await Promise.all(sourceIds.map((id) => ctx.db.get(id as Doc<"sources">["_id"])))
+    ).filter(
+      (source): source is Doc<"sources"> =>
+        source !== null && matchesVaultOwner(source.vaultOwnerId, vaultOwnerId)
+    );
+
     const placeIds = new Set(
       [person.birth?.place?.placeId, person.death?.place?.placeId, ...ownedEvents.map((event) => event.place?.placeId)]
         .filter(Boolean)
         .map(String)
     );
-    const ownedPlaces = filterByVaultOwner(places, vaultOwnerId).filter((place) =>
-      placeIds.has(String(place._id))
+    const ownedPlaces = (
+      await Promise.all(
+        Array.from(placeIds).map((id) => ctx.db.get(id as Doc<"places">["_id"]))
+      )
+    ).filter(
+      (place): place is Doc<"places"> =>
+        place !== null && matchesVaultOwner(place.vaultOwnerId, vaultOwnerId)
     );
 
     const inferred = inferResearchChecks({
@@ -1656,7 +1745,7 @@ export const createResearchTask = mutation({
   handler: async (ctx, args) => {
     const now = Date.now();
     const taskId = await ctx.db.insert("researchTasks", {
-      vaultOwnerId: normalizeVaultOwnerId(args.vaultOwnerId),
+      vaultOwnerId: await resolveOwner(ctx, args.vaultOwnerId),
       personId: args.personId,
       type: "other",
       title: args.title,
@@ -1678,7 +1767,7 @@ export const promoteProvisionalRelative = mutation({
     humanReviewNote: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const now = Date.now();
     const provisional = await ctx.db.get(args.provisionalId);
     if (!provisional || !matchesVaultOwner(provisional.vaultOwnerId, vaultOwnerId)) {
@@ -1757,7 +1846,7 @@ export const mergeProvisionalRelative = mutation({
     humanReviewNote: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const now = Date.now();
     const provisional = await ctx.db.get(args.provisionalId);
     const target = await ctx.db.get(args.targetPersonId);

@@ -52,7 +52,7 @@ Capture FamilySearch data, merge it into a canonical vault, and move from eviden
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 20 (see `.nvmrc`)
 - pnpm (recommended) or npm
 
 ### Installation
@@ -207,6 +207,8 @@ The `familySearchSync` table tracks:
 
 ## ⚙️ Configuration
 
+All environment variables are documented in [`.env.example`](.env.example) — copy it to `.env.local` and fill in your values. That file is the source of truth for variable names and defaults.
+
 ### OpenRouter API Key
 
 To use in-app AI processing:
@@ -229,18 +231,28 @@ For development/testing, enable Admin Mode in Settings:
 - No expansion caps
 - Testing features enabled
 
-### Optional Auth
+### Authentication (Clerk)
 
-Clerk can be configured for sign-in and user identity, but route protection is opt-in.
+Sign-in is powered by Clerk, and the auth posture is driven entirely by environment variables. The logic lives in `lib/clerk/config.ts` (the `isClerkEnabled` / `isAnonymousVaultEnabled` predicates) and the route gating lives in `proxy.ts` (the Next.js middleware export), **not** in a `middleware.ts` file. `.env.example` is the source of truth for the variable names.
 
-- Leave `REQUIRE_AUTH` unset for private/local vault use
-- Set `REQUIRE_AUTH=true` when you want `/app` and protected API routes to require sign-in
+**When is Clerk active?** `isClerkEnabled()` returns true only when all of these hold:
+
+- A publishable key starting with `pk_` (`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`) **and** a secret key starting with `sk_` (`CLERK_SECRET_KEY`) are both present. With the keys present, Clerk auto-enables.
+- Clerk is **not** explicitly disabled. Setting `DISABLE_CLERK=true` or `NEXT_PUBLIC_DISABLE_CLERK=true` turns Clerk off even when keys are present.
+- In **local development** (`NODE_ENV=development`), Clerk stays off unless you opt in with `ENABLE_CLERK_DEV=true` or `NEXT_PUBLIC_ENABLE_CLERK_DEV=true`. This keeps local work key-free by default; the dev opt-in does not affect deployed builds.
+
+**Route protection and guest vaults.** Gating in `proxy.ts` is governed by two more flags:
+
+- `REQUIRE_AUTH=true` forces sign-in on `/app` and protected API routes (the `PROTECTED_ROUTE_PATTERNS`).
+- `ALLOW_ANONYMOUS_VAULT` (or `NEXT_PUBLIC_ALLOW_ANONYMOUS_VAULT`) governs guest-vault posture. When anonymous vaults are **not** enabled, protected routes require sign-in. When enabled, signed-out visitors get a cookie-backed guest vault instead. Guest vaults are off by default — enable only for an explicit preview deployment.
+
+When Clerk keys are absent, `proxy.ts` short-circuits to a pass-through and no auth runs at all.
 
 ## 🛠️ Tech Stack
 
 | Category | Technology |
 |----------|------------|
-| Framework | Next.js 16 (App Router, Turbopack) |
+| Framework | Next.js 16 (App Router, webpack) |
 | Language | TypeScript 5 |
 | Styling | Tailwind CSS 4 |
 | Components | ShadCN UI |
@@ -257,7 +269,7 @@ Your data stays with you:
 - ✅ Nothing sent to external servers without explicit action
 - ✅ Sensitive information auto-redacted before AI processing
 - ✅ Export everything in readable formats (JSON, Markdown)
-- ✅ No account required, no tracking
+- ✅ Minimal tracking; sign-in is via Clerk and the auth posture is configurable (see [Authentication](#authentication-clerk)). Deployed beta requires sign-in by default.
 
 ## 📋 Compliance Note
 

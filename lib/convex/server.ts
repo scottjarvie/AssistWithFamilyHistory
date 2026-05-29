@@ -1,4 +1,6 @@
 import { ConvexHttpClient } from "convex/browser";
+import { auth } from "@clerk/nextjs/server";
+import { isClerkEnabled } from "@/lib/clerk/config";
 import { logServerFailure } from "@/lib/server/safeLog";
 
 export type ConvexBackendState = "ready" | "missing" | "stale" | "error";
@@ -26,6 +28,46 @@ export function getConvexClient(): ConvexHttpClient {
   }
 
   return new ConvexHttpClient(convexUrl);
+}
+
+// GEN-87 Option A (Phase 0 / shadow): return a ConvexHttpClient carrying the
+// caller's verified Clerk JWT (template "convex"), so Convex functions can read
+// the owner from ctx.auth.getUserIdentity() instead of a trusted argument. This
+// is INERT today — no Convex function reads getUserIdentity() and no call site
+// uses this client yet, so attaching the token changes no results. It exists so
+// the identity is flowing end-to-end before Phase 1 enforcement is wired.
+// Falls back to the unauthenticated client when Clerk is off or no user is
+// signed in (guests), preserving current behavior.
+export async function getAuthedConvexClient(): Promise<ConvexHttpClient> {
+  const client = getConvexClient();
+
+  // Only mint a "convex" template token in an environment actually configured
+  // for Convex auth — i.e. where CLERK_JWT_ISSUER_DOMAIN is set (the same gate
+  // that makes Convex trust the token; see auth.config.ts). This keeps the call
+  // a complete no-op anywhere the convex JWT template / issuer aren't set up
+  // (e.g. production until GEN-103 step E), so we never attempt — or error on —
+  // a getToken({template:"convex"}) the instance can't satisfy.
+  if (!isClerkEnabled() || !process.env.CLERK_JWT_ISSUER_DOMAIN) {
+    return client;
+  }
+
+  try {
+    const { getToken } = await auth();
+    const token = await getToken({ template: "convex" });
+    if (token) {
+      client.setAuth(token);
+    }
+  } catch (error) {
+    // Never break a read if token minting fails (e.g. dynamic-usage during
+    // static render, or no active session): fall through unauthenticated.
+    logServerFailure(
+      "convex.auth_token_mint_failed",
+      { route: "convex", configured: isConvexConfigured() },
+      error,
+    );
+  }
+
+  return client;
 }
 
 export function getConvexReadyStatus(): ConvexRuntimeIssue {

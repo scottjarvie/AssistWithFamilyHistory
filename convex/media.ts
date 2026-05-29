@@ -36,8 +36,12 @@ export const get = query({
 export const getByFsUrl = query({
   args: { familySearchUrl: v.string() },
   handler: async (ctx, args) => {
-    const all = await ctx.db.query("media").collect();
-    return all.find(m => m.familySearchUrl === args.familySearchUrl) || null;
+    return (
+      (await ctx.db
+        .query("media")
+        .withIndex("by_familySearchUrl", (q) => q.eq("familySearchUrl", args.familySearchUrl))
+        .first()) || null
+    );
   },
 });
 

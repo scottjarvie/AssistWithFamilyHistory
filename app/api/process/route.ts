@@ -1,6 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 import { chatCompletion } from "@/lib/ai/openrouter";
 import { getAiPrivacyDisclosure, type AiRedactionMode } from "@/lib/ai/privacy";
+import {
+  ALLOWED_MODELS,
+  DEFAULT_MODEL,
+  MAX_COMPLETION_TOKENS,
+  MAX_PROCESS_PAYLOAD_BYTES,
+} from "@/lib/ai/types";
+import { api } from "@/convex/_generated/api";
+import { getConvexClient, isConvexConfigured } from "@/lib/convex/server";
+import { getVaultAccessContext } from "@/lib/vault/server";
+
+// GEN-89-RL: per-vaultOwner rate limiting for the external-AI spend vector.
+//
+// Implemented as a Convex fixed-window counter (convex/rateLimits.ts) so the
+// limit is shared across all serverless isolates — an in-memory counter would
+// be useless here because each invocation may hit a fresh isolate.
+//
+// POLICY (tune these freely, Scott):
+//   - Window: 10 minutes, per (vaultOwner, "process").
+//   - Default cap: 30 requests / window when the caller supplies their OWN
+//     OpenRouter key (they pay for their own spend).
+//   - Stricter cap: 10 requests / window when the request falls back to the
+//     server OPENROUTER_API_KEY (this is OUR spend — guard it harder).
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+const RATE_LIMIT_DEFAULT = 30; // client supplied their own API key
+const RATE_LIMIT_SERVER_KEY = 10; // falling back to server-funded OPENROUTER_API_KEY
+const RATE_LIMIT_ACTION = "process";
 
 type ProcessRequestBody = {
   prompt?: unknown;
@@ -10,6 +36,7 @@ type ProcessRequestBody = {
   systemPrompt?: unknown;
   privacyAcknowledged?: unknown;
   redactionMode?: unknown;
+  maxTokens?: unknown;
 };
 
 function isRedactionMode(value: unknown): value is AiRedactionMode {
@@ -50,10 +77,8 @@ export async function POST(request: NextRequest) {
     const redactionMode = isRedactionMode(body.redactionMode) ? body.redactionMode : "not_applicable";
 
     // Determine API Key: Client provided > Server Env > Fail
-    const token =
-      typeof apiKey === "string" && apiKey.trim()
-        ? apiKey
-        : process.env.OPENROUTER_API_KEY;
+    const usingClientKey = typeof apiKey === "string" && apiKey.trim().length > 0;
+    const token = usingClientKey ? (apiKey as string) : process.env.OPENROUTER_API_KEY;
 
     if (!token) {
       return NextResponse.json(
@@ -62,15 +87,88 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // GEN-89-RL: throttle per vaultOwner BEFORE spending any tokens. Stricter
+    // cap when the request is funded by the server OPENROUTER_API_KEY. Best
+    // effort — if Convex isn't configured (e.g. local-only mode) we skip the
+    // limiter rather than block the request.
+    if (isConvexConfigured()) {
+      try {
+        const { vaultOwnerId } = await getVaultAccessContext();
+        const limit = usingClientKey ? RATE_LIMIT_DEFAULT : RATE_LIMIT_SERVER_KEY;
+        const verdict = await getConvexClient().mutation(
+          api.rateLimits.checkAndIncrementRateLimit,
+          {
+            vaultOwnerId,
+            action: RATE_LIMIT_ACTION,
+            limit,
+            windowMs: RATE_LIMIT_WINDOW_MS,
+          }
+        );
+        if (!verdict.allowed) {
+          const retryAfterSec = Math.ceil(verdict.retryAfterMs / 1000);
+          return NextResponse.json(
+            {
+              error: "Rate limit exceeded",
+              details: `Too many AI requests for this vault. Try again in ${retryAfterSec}s.`,
+              retryAfterMs: verdict.retryAfterMs,
+            },
+            { status: 429, headers: { "Retry-After": String(retryAfterSec) } }
+          );
+        }
+      } catch {
+        // Limiter unavailable (Convex transient error). Fail open: do not block
+        // legitimate AI requests on a counter outage.
+      }
+    }
+
+    // GEN-89: reject client-supplied models that are not on the allowlist.
+    // An omitted/blank model falls back to the current DEFAULT_MODEL.
+    let resolvedModel = DEFAULT_MODEL;
+    if (typeof model === "string" && model.trim()) {
+      if (!ALLOWED_MODELS.has(model)) {
+        return NextResponse.json(
+          {
+            error: "Unsupported model",
+            details: "The requested model is not on the allowlist for this endpoint.",
+          },
+          { status: 400 }
+        );
+      }
+      resolvedModel = model;
+    }
+
     const serializedData =
       typeof data === "string" ? data : data ? JSON.stringify(data, null, 2) : "";
+
+    // GEN-89: cap the combined prompt+data payload size BEFORE building the
+    // full prompt, measured in UTF-8 bytes (matches over-the-wire size).
+    const payloadBytes =
+      Buffer.byteLength(prompt, "utf8") + Buffer.byteLength(serializedData, "utf8");
+    if (payloadBytes > MAX_PROCESS_PAYLOAD_BYTES) {
+      return NextResponse.json(
+        {
+          error: "Payload too large",
+          details: `Combined prompt and data must not exceed ${MAX_PROCESS_PAYLOAD_BYTES} bytes.`,
+        },
+        { status: 413 }
+      );
+    }
+
     const fullPrompt = serializedData ? `${prompt}\n\nINPUT DATA:\n${serializedData}` : prompt;
+
+    // GEN-89: enforce a hard ceiling on requested completion tokens.
+    const requestedMaxTokens =
+      typeof body.maxTokens === "number" && Number.isFinite(body.maxTokens) && body.maxTokens > 0
+        ? Math.floor(body.maxTokens)
+        : MAX_COMPLETION_TOKENS;
+    const maxTokens = Math.min(requestedMaxTokens, MAX_COMPLETION_TOKENS);
 
     const response = await chatCompletion({
       config: {
         apiKey: token,
-        model: typeof model === "string" && model.trim() ? model : "anthropic/claude-3-sonnet",
+        model: resolvedModel,
         temperature: 0.3,
+        maxTokens,
       },
       messages: [
         {

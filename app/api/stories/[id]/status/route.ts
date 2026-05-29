@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { getConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
+import { getAuthedConvexClient, getConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
 import { requireHumanReviewConfirmation } from "@/lib/operations/reviewGates";
 import {
   getActionForStatusChange,
@@ -17,7 +17,8 @@ function isStoryStatus(value: unknown): value is "draft" | "review" | "published
 }
 
 async function getStoryBundle(vaultOwnerId: string, storyId: string) {
-  return getConvexClient().query(api.vault.getStoryReview, {
+  const client = await getAuthedConvexClient();
+  return client.query(api.vault.getStoryReview, {
     vaultOwnerId,
     storyId: storyId as Id<"stories">,
   });

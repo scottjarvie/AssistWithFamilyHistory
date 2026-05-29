@@ -293,6 +293,17 @@
       "risk": "high",
       "scopes": ["story_writer", "trusted_operator"],
       "notes": "GET returns publish readiness and optional format=handoff packet; use record=true to store a publish-preview audit snapshot. PATCH to published is blocked unless evidence, context, privacy/living-risk, provisional-relative, story-strength, review-status, and required second-approval gates pass plus explicit human review confirmation. Explicit story_writer role can preview/request review but is denied publish; trusted_operator/trusted publisher authority is required for agent publishing."
+    },
+    {
+      "route": "/api/vault/migrate-guest",
+      "methods": ["POST"],
+      "capability": "anonymous_vault_migration",
+      "environment": "browser-or-local-api",
+      "agentSupport": "not-supported",
+      "reviewLevel": "internal-only",
+      "risk": "low",
+      "scopes": [],
+      "notes": "GEN-83. One-shot trigger: when an authenticated user still has the anonymous-vault preview cookie set, re-tags every owner-scoped row from the guest UUID to their Clerk user id and deletes the cookie. No-ops when not signed in, no cookie, or Clerk/Convex not configured. Convex mutation enforces a guest_* source prefix and user_* destination prefix as defense in depth. Never exposed to external agents."
     }
   ]
 }

@@ -1,23 +1,72 @@
-export type ResearchPackType =
-  | "locality_era_brief"
-  | "region_era"
-  | "occupation_era"
-  | "religion_community"
-  | "migration_corridor"
-  | "building_institution"
-  | "local_event"
-  | "cemetery_burial";
+// GEN-102D: single source of truth. Each enum domain is defined once as an
+// `as const` array and the existing TypeScript union types are derived from it,
+// so consumers can import the runtime values (e.g. for z.enum validation) while
+// the exported type names stay identical. Keep these value sets in lockstep
+// with the matching Convex validators in convex/vaultMutations.ts.
 
-export type ResearchPackCategory =
-  | "scope"
-  | "place_summary"
-  | "daily_life"
-  | "institutions"
-  | "migration_work_religion"
-  | "evidence_limits"
-  | "story_synthesis";
+export const RESEARCH_PACK_TYPES = [
+  "locality_era_brief",
+  "region_era",
+  "occupation_era",
+  "religion_community",
+  "migration_corridor",
+  "building_institution",
+  "local_event",
+  "cemetery_burial",
+] as const;
 
-export type ResearchPackClaimConfidence = "high" | "medium" | "low";
+export type ResearchPackType = (typeof RESEARCH_PACK_TYPES)[number];
+
+export const RESEARCH_PACK_CATEGORIES = [
+  "scope",
+  "place_summary",
+  "daily_life",
+  "institutions",
+  "migration_work_religion",
+  "evidence_limits",
+  "story_synthesis",
+] as const;
+
+export type ResearchPackCategory = (typeof RESEARCH_PACK_CATEGORIES)[number];
+
+export const RESEARCH_PACK_CLAIM_CONFIDENCES = ["high", "medium", "low"] as const;
+
+export type ResearchPackClaimConfidence = (typeof RESEARCH_PACK_CLAIM_CONFIDENCES)[number];
+
+export const CONTEXT_REPORT_TOPICS = [
+  "daily_life",
+  "economy",
+  "religion",
+  "politics",
+  "migration",
+  "health",
+  "technology",
+  "culture",
+  "war",
+  "disaster",
+  "other",
+] as const;
+
+export type ContextReportTopic = (typeof CONTEXT_REPORT_TOPICS)[number];
+
+export const CONTEXT_REPORT_PRIVACY_LEVELS = [
+  "private",
+  "family_review",
+  "publish_candidate",
+  "public_source",
+] as const;
+
+export type ContextReportPrivacyLevel = (typeof CONTEXT_REPORT_PRIVACY_LEVELS)[number];
+
+export const CONTEXT_REPORT_REVIEW_STATUSES = [
+  "unreviewed",
+  "reviewed",
+  "disputed",
+  "redacted",
+  "rejected",
+] as const;
+
+export type ContextReportReviewStatus = (typeof CONTEXT_REPORT_REVIEW_STATUSES)[number];
 
 export type ResearchPackSourcedClaim = {
   text: string;

@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { VaultStateCard } from "@/components/vault/VaultStateCard";
-import { getConvexClient, getConvexRuntimeIssue, getConvexUnavailableState, isConvexConfigured } from "@/lib/convex/server";
+import { getAuthedConvexClient, getConvexRuntimeIssue, getConvexUnavailableState, isConvexConfigured } from "@/lib/convex/server";
 import { createPageMetadata } from "@/lib/seo";
 import { publicStoryPath } from "@/lib/stories/slug";
 import { getVaultAccessContext } from "@/lib/vault/server";
@@ -65,10 +65,11 @@ export default async function StoriesIndexPage({
   }
 
   const { vaultOwnerId } = await getVaultAccessContext();
+  const client = await getAuthedConvexClient();
   let stories;
 
   try {
-    stories = await getConvexClient().query(api.vault.getStoriesIndex, { vaultOwnerId });
+    stories = await client.query(api.vault.getStoriesIndex, { vaultOwnerId });
   } catch (error) {
     const issue = getConvexRuntimeIssue(error);
     return (

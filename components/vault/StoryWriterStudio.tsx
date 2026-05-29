@@ -10,44 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-
-type ContextPackResponse = {
-  success: boolean;
-  structured: {
-    person: {
-      displayName: string;
-      fsId?: string;
-      living?: boolean;
-    };
-    stats: {
-      sources: number;
-      memories: number;
-      places: number;
-      imports: number;
-    };
-    historicalContext?: Array<{
-      _id: string;
-      title: string;
-      packType?: string;
-      templateVersion?: string;
-      privacyLevel?: string;
-      reviewStatus?: string;
-      aiUseAllowed?: boolean;
-    }>;
-    storyClaimReadiness?: {
-      unresolvedProvisionalRelatives?: number;
-      unresolvedImportWarnings?: string[];
-      mediaNeedingPrivacyReview?: Array<{
-        title: string;
-        privacyLevel: string;
-        reviewStatus: string;
-        rightsStatus: string;
-        aiUseAllowed: boolean;
-      }>;
-    };
-  };
-  markdown: string;
-};
+import { ContextPackResponseSchema, type ContextPackResponse } from "@/lib/context/contextPackResponse";
 
 type LocalSettings = {
   openRouterApiKey?: string;
@@ -79,7 +42,10 @@ export function StoryWriterStudio({ personId }: { personId: string }) {
           throw new Error(payload?.error || "Failed to load context pack");
         }
 
-        setContextPack(payload);
+        // GEN-94: validate the response against the shared contract so any
+        // server/client drift throws here instead of silently producing an
+        // undefined privacy gate downstream.
+        setContextPack(ContextPackResponseSchema.parse(payload));
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : "Failed to load context pack");
       } finally {

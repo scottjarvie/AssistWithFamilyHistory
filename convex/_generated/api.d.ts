@@ -8,7 +8,6 @@
  * @module
  */
 
-import type * as ancestorDetails from "../ancestorDetails.js";
 import type * as citations from "../citations.js";
 import type * as documents from "../documents.js";
 import type * as events from "../events.js";
@@ -18,11 +17,13 @@ import type * as media from "../media.js";
 import type * as personEvents from "../personEvents.js";
 import type * as persons from "../persons.js";
 import type * as places from "../places.js";
+import type * as rateLimits from "../rateLimits.js";
 import type * as relationships from "../relationships.js";
 import type * as researchLog from "../researchLog.js";
 import type * as sources from "../sources.js";
 import type * as vault from "../vault.js";
 import type * as vaultCore from "../vaultCore.js";
+import type * as vaultMigration from "../vaultMigration.js";
 import type * as vaultMutations from "../vaultMutations.js";
 
 import type {
@@ -32,7 +33,6 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  ancestorDetails: typeof ancestorDetails;
   citations: typeof citations;
   documents: typeof documents;
   events: typeof events;
@@ -42,11 +42,13 @@ declare const fullApi: ApiFromModules<{
   personEvents: typeof personEvents;
   persons: typeof persons;
   places: typeof places;
+  rateLimits: typeof rateLimits;
   relationships: typeof relationships;
   researchLog: typeof researchLog;
   sources: typeof sources;
   vault: typeof vault;
   vaultCore: typeof vaultCore;
+  vaultMigration: typeof vaultMigration;
   vaultMutations: typeof vaultMutations;
 }>;
 

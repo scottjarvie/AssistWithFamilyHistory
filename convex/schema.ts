@@ -200,7 +200,8 @@ export default defineSchema({
     .index("by_type", ["type"])
     .index("by_type_person1", ["type", "person1"])     // Find all relationships of a type for person1
     .index("by_type_person2", ["type", "person2"])    // Find all relationships of a type for person2
-    .index("by_import_key", ["importKey"]),
+    .index("by_import_key", ["importKey"])
+    .index("by_familySearchId", ["familySearchId"]),
 
   /**
    * EVENTS
@@ -461,7 +462,6 @@ export default defineSchema({
     .index("by_owner", ["vaultOwnerId"])
     .index("by_source", ["sourceId"])
     .index("by_confidence", ["confidence"])
-    .index("by_evidence", ["isEvidence"])
     .index("by_import_key", ["importKey"]),
 
   /**
@@ -613,7 +613,8 @@ export default defineSchema({
     .index("by_owner", ["vaultOwnerId"])
     .index("by_type", ["type"])
     .index("by_source", ["sourceId"])
-    .index("by_import_key", ["importKey"]),
+    .index("by_import_key", ["importKey"])
+    .index("by_familySearchUrl", ["familySearchUrl"]),
 
   /**
    * CONTEXT ITEMS
@@ -670,9 +671,7 @@ export default defineSchema({
     reviewedAt: v.optional(v.number()),
   })
     .index("by_owner", ["vaultOwnerId"])
-    .index("by_primary_person", ["primaryPersonId"])
-    .index("by_review_status", ["reviewStatus"])
-    .index("by_privacy", ["privacyLevel"]),
+    .index("by_primary_person", ["primaryPersonId"]),
 
   /**
    * IMPORT RUNS
@@ -772,10 +771,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_owner", ["vaultOwnerId"])
-    .index("by_person", ["personId"])
-    .index("by_fs_person", ["fsPersonId"])
-    .index("by_status", ["syncStatus"])
-    .index("by_last_synced", ["lastSynced"]),
+    .index("by_person", ["personId"]),
 
   /**
    * RESEARCH TASKS
@@ -826,10 +822,7 @@ export default defineSchema({
   })
     .index("by_owner", ["vaultOwnerId"])
     .index("by_person", ["personId"])
-    .index("by_status", ["status"])
-    .index("by_priority", ["priority"])
-    .index("by_assignee", ["assignedTo"])
-    .index("by_ai_suggested", ["aiSuggested"]),
+    .index("by_status", ["status"]),
 
   /**
    * RESEARCH LOG
@@ -916,8 +909,7 @@ export default defineSchema({
   })
     .index("by_owner", ["vaultOwnerId"])
     .index("by_personId", ["personId"])
-    .index("by_personId_type", ["personId", "type"])
-    .index("by_importRunId", ["importRunId"]),
+    .index("by_personId_type", ["personId", "type"]),
 
   /**
    * STORIES
@@ -991,8 +983,7 @@ export default defineSchema({
     .index("by_relationship", ["relationshipId"])
     .index("by_status", ["status"])
     .index("by_public_slug", ["publicSlug"])
-    .index("by_type", ["type"])
-    .index("by_generated_by", ["generatedBy"]),
+    .index("by_type", ["type"]),
 
   storyReviewEvents: defineTable({
     vaultOwnerId: v.optional(v.string()),
@@ -1031,8 +1022,7 @@ export default defineSchema({
   })
     .index("by_owner", ["vaultOwnerId"])
     .index("by_story", ["storyId"])
-    .index("by_story_created", ["storyId", "createdAt"])
-    .index("by_event_type", ["eventType"]),
+    .index("by_story_created", ["storyId", "createdAt"]),
 
   provisionalRelatives: defineTable({
     vaultOwnerId: v.optional(v.string()),
@@ -1196,7 +1186,29 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_owner", ["vaultOwnerId"])
-    .index("by_place", ["placeId"])
-    .index("by_topic", ["topic"])
-    .index("by_time_period", ["timePeriod.startYear", "timePeriod.endYear"]),
+    .index("by_place", ["placeId"]),
+
+  /**
+   * RATE LIMITS (GEN-89-RL)
+   *
+   * Ephemeral per-vaultOwner request counters used to throttle expensive
+   * external-AI calls (OpenRouter spend protection). This is a fixed-window
+   * counter: each row holds the number of requests an owner made for a given
+   * `action` within the window that begins at `windowStart` (epoch ms).
+   *
+   * IMPORTANT: these are NOT user vault content — they are throwaway counters.
+   * Deliberately NOT part of OWNED_TABLES (convex/vaultMigration.ts) and the
+   * owner index is intentionally named "by_owner_window" (NOT "by_owner") so the
+   * owned-tables-parity check does not couple these counters to the vault
+   * migration set.
+   */
+  rateLimits: defineTable({
+    vaultOwnerId: v.string(),
+    action: v.string(),               // logical bucket, e.g. "process"
+    windowStart: v.number(),          // epoch ms at the start of the fixed window
+    count: v.number(),                // requests recorded in this window
+    updatedAt: v.number(),
+  })
+    // NOTE: not "by_owner" on purpose — see comment above.
+    .index("by_owner_window", ["vaultOwnerId", "action", "windowStart"]),
 });

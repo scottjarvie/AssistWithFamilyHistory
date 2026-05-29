@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { VaultStateCard } from "@/components/vault/VaultStateCard";
 import {
-  getConvexClient,
+  getAuthedConvexClient,
   getConvexRuntimeIssue,
   getConvexUnavailableState,
   isConvexConfigured,
@@ -45,10 +45,11 @@ export default async function VaultAuditPage() {
   }
 
   const { vaultOwnerId } = await getVaultAccessContext();
+  const client = await getAuthedConvexClient();
   let audit;
 
   try {
-    audit = await getConvexClient().query(api.vault.getVaultAudit, { vaultOwnerId });
+    audit = await client.query(api.vault.getVaultAudit, { vaultOwnerId });
   } catch (error) {
     const issue = getConvexRuntimeIssue(error);
     return (

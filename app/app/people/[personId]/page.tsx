@@ -17,8 +17,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getConvexClient, getConvexUnavailableState, isConvexConfigured } from "@/lib/convex/server";
+import { getAuthedConvexClient, getConvexUnavailableState, isConvexConfigured } from "@/lib/convex/server";
 import { api } from "@/convex/_generated/api";
+import type { FunctionReturnType } from "convex/server";
 import { DocumentsViewer } from "@/components/DocumentsViewer";
 import { VaultStateCard } from "@/components/vault/VaultStateCard";
 import { getConvexRuntimeIssue } from "@/lib/convex/server";
@@ -48,7 +49,7 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
   }
 
   const { personId } = await params;
-  const client = getConvexClient();
+  const client = await getAuthedConvexClient();
   const { vaultOwnerId } = await getVaultAccessContext();
   let workspace;
 
@@ -69,6 +70,21 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
 
   if (!workspace) {
     notFound();
+  }
+
+  // Documents (PS/CST) are loaded server-side here and passed into the
+  // DocumentsViewer as a prop. Previously the viewer re-fetched them over REST
+  // in a client useEffect, duplicating work the server can do during render.
+  const documentsPersonId = workspace.person.fsId || String(workspace.person._id);
+  let documents: FunctionReturnType<typeof api.documents.getDocumentsByPerson> = [];
+  let documentsError: string | null = null;
+  try {
+    documents = await client.query(api.documents.getDocumentsByPerson, {
+      vaultOwnerId,
+      personId: documentsPersonId,
+    });
+  } catch {
+    documentsError = "Could not load Convex documents";
   }
 
   const routeId = workspace.person.routeId || personId;
@@ -690,7 +706,7 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
                   <SafeLink href={`/app/people/${personId}/contextualized`}>Contextualized Dossier</SafeLink>
                 </Button>
               </div>
-              <DocumentsViewer personId={workspace.person.fsId || String(workspace.person._id)} />
+              <DocumentsViewer documents={documents} error={documentsError} />
             </CardContent>
           </Card>
         </TabsContent>

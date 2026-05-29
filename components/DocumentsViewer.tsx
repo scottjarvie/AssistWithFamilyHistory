@@ -1,16 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, Download, Copy, Check, AlertTriangle } from "lucide-react";
 
-interface DocumentsViewerProps {
-  personId: string;
-}
-
-interface DocumentRecord {
+export interface DocumentRecord {
   _id: string;
   type: "PS" | "CST";
   title: string;
@@ -18,66 +14,22 @@ interface DocumentRecord {
   updatedAt: string | number;
 }
 
-export function DocumentsViewer({ personId }: DocumentsViewerProps) {
-  const convexConfigured = Boolean(process.env.NEXT_PUBLIC_CONVEX_URL);
-  const [documents, setDocuments] = useState<DocumentRecord[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+interface DocumentsViewerProps {
+  /**
+   * Documents rendered on the server and passed in as a prop. The page already
+   * loads these alongside the vault snapshot, so the client component no longer
+   * re-fetches over REST — it only handles copy/download/tab interactions.
+   */
+  documents: DocumentRecord[];
+  /**
+   * Optional message when the documents store is unavailable (e.g. Convex not
+   * configured). When set, an "unavailable" state renders instead of the list.
+   */
+  error?: string | null;
+}
+
+export function DocumentsViewer({ documents, error = null }: DocumentsViewerProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-
-    async function fetchDocuments() {
-      if (!convexConfigured) {
-        if (mounted) {
-          setError(
-            "Documents storage isn't configured yet. Set NEXT_PUBLIC_CONVEX_URL to enable PS/CST documents."
-          );
-          setDocuments([]);
-        }
-        return;
-      }
-
-      try {
-        setError(null);
-        setDocuments(null);
-        const response = await fetch(
-          `/api/convex/documents?personId=${encodeURIComponent(personId)}`
-        );
-        const payload = await response.json().catch(() => null);
-
-        if (!response.ok) {
-          if (mounted) {
-            setError(payload?.error || "Could not load Convex documents");
-            setDocuments([]);
-          }
-          return;
-        }
-
-        if (!payload?.success) {
-          if (mounted) {
-            setError(payload?.error || "Could not load Convex documents");
-            setDocuments([]);
-          }
-          return;
-        }
-
-        if (mounted) {
-          setDocuments(payload.documents || []);
-        }
-      } catch (fetchError) {
-        if (mounted) {
-          setError(fetchError instanceof Error ? fetchError.message : "Could not load Convex documents");
-          setDocuments([]);
-        }
-      }
-    }
-
-    fetchDocuments();
-    return () => {
-      mounted = false;
-    };
-  }, [convexConfigured, personId]);
 
   const handleCopy = async (text: string, id: string) => {
     await navigator.clipboard.writeText(text);
@@ -96,10 +48,6 @@ export function DocumentsViewer({ personId }: DocumentsViewerProps) {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
-
-  if (!documents) {
-    return <div className="p-8 text-center text-stone-400">Loading documents...</div>;
-  }
 
   if (error) {
     return (

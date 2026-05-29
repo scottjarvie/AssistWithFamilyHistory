@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import { api } from "@/convex/_generated/api";
-import { getConvexClient, isConvexConfigured } from "@/lib/convex/server";
+import { getAuthedConvexClient, getConvexClient, isConvexConfigured } from "@/lib/convex/server";
 import {
   getContextualizedDocument,
   getLatestRun,
   saveContextualizedDocument,
+  isLocalFsEnabled,
 } from "@/lib/storage/fileStorage";
 import { resolveImportRunForStoredRun } from "@/lib/familysearch/importRunResolver";
 import { getVaultAccessContext } from "@/lib/vault/server";
@@ -40,9 +42,27 @@ export async function GET(
       });
     }
 
-    const markdown = storagePersonId
-      ? await getContextualizedDocument(storagePersonId, runId, vaultOwnerId)
-      : null;
+    // Convex is the canonical store (GEN-91). Prefer the mirrored Person Sheet
+    // artifact; only fall back to the local filesystem in dev.
+    let markdown: string | null = null;
+
+    if (isConvexConfigured() && storagePersonId) {
+      try {
+        const existingDoc = await (await getAuthedConvexClient()).query(api.documents.getDocument, {
+          vaultOwnerId,
+          personId: storagePersonId,
+          type: "PS",
+        });
+        markdown = existingDoc?.contentMarkdown ?? null;
+      } catch (error) {
+        console.error("Failed to read contextualized dossier from Convex:", error);
+      }
+    }
+
+    if (!markdown && isLocalFsEnabled() && storagePersonId) {
+      markdown = await getContextualizedDocument(storagePersonId, runId, vaultOwnerId);
+    }
+
     if (!markdown) {
       return NextResponse.json({
         success: false,
@@ -52,11 +72,27 @@ export async function GET(
       });
     }
 
-    return NextResponse.json({
+    const jsonBody = JSON.stringify({
       success: true,
       markdown,
       personName: storagePerson?.name || vaultPerson?.displayName || personIdentifier,
       runId,
+    });
+    const cacheControl = "private, max-age=0, must-revalidate";
+    const etag = 'W/"' + createHash("sha1").update(jsonBody).digest("hex") + '"';
+    if (request.headers.get("if-none-match") === etag) {
+      return new NextResponse(null, {
+        status: 304,
+        headers: { ETag: etag, "Cache-Control": cacheControl },
+      });
+    }
+    return new NextResponse(jsonBody, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        ETag: etag,
+        "Cache-Control": cacheControl,
+      },
     });
   } catch (error) {
     return NextResponse.json(

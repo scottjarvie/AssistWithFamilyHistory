@@ -15,6 +15,8 @@
  */
 
 import { AppMobileNav, AppSidebar } from "@/components/layout/AppSidebar";
+import { AppTopBar } from "@/components/layout/AppTopBar";
+import { GuestVaultMigrationGate } from "@/components/layout/GuestVaultMigrationGate";
 import { SafeLink } from "@/components/layout/SafeLink";
 import type { Metadata } from "next";
 import { isClerkEnabled } from "@/lib/clerk/config";
@@ -46,7 +48,13 @@ export default async function AppLayout({
         vaultOwnerId={accessContext.vaultOwnerId}
         clerkEnabled={isClerkEnabled()}
       />
+      {/* Only mount when Clerk is enabled: the gate calls useUser() (needs
+          ClerkProvider), and guest->signed-in migration is meaningless without
+          auth. Mounting it unconditionally crashed env-less prerenders (CI build)
+          and would crash any Clerk-disabled deploy at runtime. */}
+      {isClerkEnabled() && <GuestVaultMigrationGate />}
       <main className="min-h-screen pt-16 transition-all duration-300 md:ml-64 md:pt-0">
+        <AppTopBar clerkEnabled={isClerkEnabled()} />
         {children}
         <footer className="border-t border-stone-200 px-4 py-6 text-sm text-stone-500 md:px-8">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-2">
