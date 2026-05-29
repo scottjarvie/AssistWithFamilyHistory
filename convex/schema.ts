@@ -1187,4 +1187,28 @@ export default defineSchema({
   })
     .index("by_owner", ["vaultOwnerId"])
     .index("by_place", ["placeId"]),
+
+  /**
+   * RATE LIMITS (GEN-89-RL)
+   *
+   * Ephemeral per-vaultOwner request counters used to throttle expensive
+   * external-AI calls (OpenRouter spend protection). This is a fixed-window
+   * counter: each row holds the number of requests an owner made for a given
+   * `action` within the window that begins at `windowStart` (epoch ms).
+   *
+   * IMPORTANT: these are NOT user vault content — they are throwaway counters.
+   * Deliberately NOT part of OWNED_TABLES (convex/vaultMigration.ts) and the
+   * owner index is intentionally named "by_owner_window" (NOT "by_owner") so the
+   * owned-tables-parity check does not couple these counters to the vault
+   * migration set.
+   */
+  rateLimits: defineTable({
+    vaultOwnerId: v.string(),
+    action: v.string(),               // logical bucket, e.g. "process"
+    windowStart: v.number(),          // epoch ms at the start of the fixed window
+    count: v.number(),                // requests recorded in this window
+    updatedAt: v.number(),
+  })
+    // NOTE: not "by_owner" on purpose — see comment above.
+    .index("by_owner_window", ["vaultOwnerId", "action", "windowStart"]),
 });

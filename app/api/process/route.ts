@@ -7,13 +7,26 @@ import {
   MAX_COMPLETION_TOKENS,
   MAX_PROCESS_PAYLOAD_BYTES,
 } from "@/lib/ai/types";
+import { api } from "@/convex/_generated/api";
+import { getConvexClient, isConvexConfigured } from "@/lib/convex/server";
+import { getVaultAccessContext } from "@/lib/vault/server";
 
-// GEN-89 TODO (follow-up): add per-user rate limiting. We intentionally do NOT
-// use an in-memory counter here — this route runs on serverless and each
-// invocation may hit a fresh isolate, so an in-memory limiter is useless. The
-// real fix is a Convex-counter-based limiter (a mutation that increments a
-// per-vaultOwnerId/per-window counter document and rejects over the cap),
-// shared across all serverless instances. Tracked as a follow-up to GEN-89.
+// GEN-89-RL: per-vaultOwner rate limiting for the external-AI spend vector.
+//
+// Implemented as a Convex fixed-window counter (convex/rateLimits.ts) so the
+// limit is shared across all serverless isolates — an in-memory counter would
+// be useless here because each invocation may hit a fresh isolate.
+//
+// POLICY (tune these freely, Scott):
+//   - Window: 10 minutes, per (vaultOwner, "process").
+//   - Default cap: 30 requests / window when the caller supplies their OWN
+//     OpenRouter key (they pay for their own spend).
+//   - Stricter cap: 10 requests / window when the request falls back to the
+//     server OPENROUTER_API_KEY (this is OUR spend — guard it harder).
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+const RATE_LIMIT_DEFAULT = 30; // client supplied their own API key
+const RATE_LIMIT_SERVER_KEY = 10; // falling back to server-funded OPENROUTER_API_KEY
+const RATE_LIMIT_ACTION = "process";
 
 type ProcessRequestBody = {
   prompt?: unknown;
@@ -64,16 +77,48 @@ export async function POST(request: NextRequest) {
     const redactionMode = isRedactionMode(body.redactionMode) ? body.redactionMode : "not_applicable";
 
     // Determine API Key: Client provided > Server Env > Fail
-    const token =
-      typeof apiKey === "string" && apiKey.trim()
-        ? apiKey
-        : process.env.OPENROUTER_API_KEY;
+    const usingClientKey = typeof apiKey === "string" && apiKey.trim().length > 0;
+    const token = usingClientKey ? (apiKey as string) : process.env.OPENROUTER_API_KEY;
 
     if (!token) {
       return NextResponse.json(
         { error: "OpenRouter API Key not configured" },
         { status: 401 }
       );
+    }
+
+    // GEN-89-RL: throttle per vaultOwner BEFORE spending any tokens. Stricter
+    // cap when the request is funded by the server OPENROUTER_API_KEY. Best
+    // effort — if Convex isn't configured (e.g. local-only mode) we skip the
+    // limiter rather than block the request.
+    if (isConvexConfigured()) {
+      try {
+        const { vaultOwnerId } = await getVaultAccessContext();
+        const limit = usingClientKey ? RATE_LIMIT_DEFAULT : RATE_LIMIT_SERVER_KEY;
+        const verdict = await getConvexClient().mutation(
+          api.rateLimits.checkAndIncrementRateLimit,
+          {
+            vaultOwnerId,
+            action: RATE_LIMIT_ACTION,
+            limit,
+            windowMs: RATE_LIMIT_WINDOW_MS,
+          }
+        );
+        if (!verdict.allowed) {
+          const retryAfterSec = Math.ceil(verdict.retryAfterMs / 1000);
+          return NextResponse.json(
+            {
+              error: "Rate limit exceeded",
+              details: `Too many AI requests for this vault. Try again in ${retryAfterSec}s.`,
+              retryAfterMs: verdict.retryAfterMs,
+            },
+            { status: 429, headers: { "Retry-After": String(retryAfterSec) } }
+          );
+        }
+      } catch {
+        // Limiter unavailable (Convex transient error). Fail open: do not block
+        // legitimate AI requests on a counter outage.
+      }
     }
 
     // GEN-89: reject client-supplied models that are not on the allowlist.
