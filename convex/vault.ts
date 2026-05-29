@@ -126,6 +126,163 @@ async function getVaultSnapshot(ctx: QueryCtx, vaultOwnerId: string): Promise<Va
   };
 }
 
+// GEN-93: snapshot consumers used to re-filter the full snapshot arrays once
+// per person, making buildPeopleRows O(people * total-rows). We pre-bucket each
+// array by the personId/key it is filtered on into Maps a single time, then the
+// per-person helpers do O(1) Map lookups. Output is byte-identical to the prior
+// per-scan logic — these Maps preserve insertion order (matching Array.filter
+// order) and the id lookup Maps replace .find() with the same first-match.
+type SnapshotIndex = {
+  // events keyed by event _id (replaces snapshot.events.find in personEvents map)
+  eventById: Map<string, Doc<"events">>;
+  // personEvents grouped by personId
+  personEventsByPerson: Map<string, Doc<"personEvents">[]>;
+  // relationships grouped by each participating personId (person1 or person2)
+  relationshipsByPerson: Map<string, Doc<"relationships">[]>;
+  // media grouped by each personId in personIds[]
+  mediaByPerson: Map<string, Doc<"media">[]>;
+  // contextItems grouped by each personId in personIds[]
+  contextItemsByPerson: Map<string, Doc<"contextItems">[]>;
+  // sourceFacts grouped by personId
+  sourceFactsByPerson: Map<string, Doc<"sourceFacts">[]>;
+  // stories grouped by personId
+  storiesByPerson: Map<string, Doc<"stories">[]>;
+  // documents grouped by document.personId (which matches person.fsId || _id)
+  documentsByPersonKey: Map<string, Doc<"documents">[]>;
+  // importRuns grouped by run.personId
+  importRunsByPersonId: Map<string, Doc<"importRuns">[]>;
+  // importRuns grouped by run.personFsId
+  importRunsByPersonFsId: Map<string, Doc<"importRuns">[]>;
+  // researchChecks grouped by personId
+  researchChecksByPerson: Map<string, Doc<"researchChecks">[]>;
+  // provisionalRelatives grouped by anchorPersonId
+  provisionalByAnchor: Map<string, Doc<"provisionalRelatives">[]>;
+  // citationLinks grouped by targetId (covers both person and event targets)
+  citationLinksByTarget: Map<string, Doc<"citationLinks">[]>;
+  // original index of each citationLink in snapshot.citationLinks, so collected
+  // links can be re-sorted into the single-pass filter order (byte-identical).
+  citationLinkOrder: Map<Doc<"citationLinks">, number>;
+  // citations keyed by _id (replaces snapshot.citations.find)
+  citationById: Map<string, Doc<"citations">>;
+  // sources keyed by _id (replaces snapshot.sources.find)
+  sourceById: Map<string, Doc<"sources">>;
+};
+
+function pushToMap<K, V>(map: Map<K, V[]>, key: K, value: V) {
+  const existing = map.get(key);
+  if (existing) {
+    existing.push(value);
+  } else {
+    map.set(key, [value]);
+  }
+}
+
+function buildSnapshotIndex(snapshot: VaultSnapshot): SnapshotIndex {
+  const eventById = new Map<string, Doc<"events">>();
+  for (const event of snapshot.events) eventById.set(String(event._id), event);
+
+  const personEventsByPerson = new Map<string, Doc<"personEvents">[]>();
+  for (const link of snapshot.personEvents) {
+    pushToMap(personEventsByPerson, String(link.personId), link);
+  }
+
+  const relationshipsByPerson = new Map<string, Doc<"relationships">[]>();
+  for (const relationship of snapshot.relationships) {
+    pushToMap(relationshipsByPerson, String(relationship.person1), relationship);
+    // Avoid double-adding a self-relationship to the same bucket.
+    if (relationship.person2 !== relationship.person1) {
+      pushToMap(relationshipsByPerson, String(relationship.person2), relationship);
+    }
+  }
+
+  const mediaByPerson = new Map<string, Doc<"media">[]>();
+  for (const item of snapshot.media) {
+    const seen = new Set<string>();
+    for (const personId of item.personIds) {
+      const key = String(personId);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      pushToMap(mediaByPerson, key, item);
+    }
+  }
+
+  const contextItemsByPerson = new Map<string, Doc<"contextItems">[]>();
+  for (const item of snapshot.contextItems) {
+    const seen = new Set<string>();
+    for (const personId of item.personIds) {
+      const key = String(personId);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      pushToMap(contextItemsByPerson, key, item);
+    }
+  }
+
+  const sourceFactsByPerson = new Map<string, Doc<"sourceFacts">[]>();
+  for (const item of snapshot.sourceFacts) {
+    pushToMap(sourceFactsByPerson, String(item.personId), item);
+  }
+
+  const storiesByPerson = new Map<string, Doc<"stories">[]>();
+  for (const story of snapshot.stories) {
+    if (story.personId) pushToMap(storiesByPerson, String(story.personId), story);
+  }
+
+  const documentsByPersonKey = new Map<string, Doc<"documents">[]>();
+  for (const document of snapshot.documents) {
+    pushToMap(documentsByPersonKey, String(document.personId), document);
+  }
+
+  const importRunsByPersonId = new Map<string, Doc<"importRuns">[]>();
+  const importRunsByPersonFsId = new Map<string, Doc<"importRuns">[]>();
+  for (const run of snapshot.importRuns) {
+    if (run.personId) pushToMap(importRunsByPersonId, String(run.personId), run);
+    if (run.personFsId) pushToMap(importRunsByPersonFsId, String(run.personFsId), run);
+  }
+
+  const researchChecksByPerson = new Map<string, Doc<"researchChecks">[]>();
+  for (const check of snapshot.researchChecks) {
+    pushToMap(researchChecksByPerson, String(check.personId), check);
+  }
+
+  const provisionalByAnchor = new Map<string, Doc<"provisionalRelatives">[]>();
+  for (const relative of snapshot.provisionalRelatives) {
+    pushToMap(provisionalByAnchor, String(relative.anchorPersonId), relative);
+  }
+
+  const citationLinksByTarget = new Map<string, Doc<"citationLinks">[]>();
+  const citationLinkOrder = new Map<Doc<"citationLinks">, number>();
+  for (let i = 0; i < snapshot.citationLinks.length; i++) {
+    const link = snapshot.citationLinks[i];
+    pushToMap(citationLinksByTarget, String(link.targetId), link);
+    citationLinkOrder.set(link, i);
+  }
+
+  const citationById = new Map<string, Doc<"citations">>();
+  for (const citation of snapshot.citations) citationById.set(String(citation._id), citation);
+
+  const sourceById = new Map<string, Doc<"sources">>();
+  for (const source of snapshot.sources) sourceById.set(String(source._id), source);
+
+  return {
+    eventById,
+    personEventsByPerson,
+    relationshipsByPerson,
+    mediaByPerson,
+    contextItemsByPerson,
+    sourceFactsByPerson,
+    storiesByPerson,
+    documentsByPersonKey,
+    importRunsByPersonId,
+    importRunsByPersonFsId,
+    researchChecksByPerson,
+    provisionalByAnchor,
+    citationLinksByTarget,
+    citationLinkOrder,
+    citationById,
+    sourceById,
+  };
+}
+
 function getPersonByIdentifier(snapshot: VaultSnapshot, personIdentifier: string) {
   return (
     snapshot.people.find(
@@ -161,22 +318,42 @@ function getPersonPlaces(person: Doc<"persons">, events: Doc<"events">[], places
 }
 
 function getPersonSourceRecords(
-  snapshot: VaultSnapshot,
+  index: SnapshotIndex,
   person: Doc<"persons">,
   events: Doc<"events">[]
 ) {
-  const targetIds = new Set([String(person._id), ...events.map((event) => String(event._id))]);
-  const relevantLinks = snapshot.citationLinks.filter((link) => {
-    if (link.targetType === "person") return link.targetId === String(person._id);
-    if (link.targetType === "event") return targetIds.has(link.targetId);
-    return false;
-  });
+  // GEN-93: reconstruct the exact ordering of the prior full-array filter.
+  // The original scanned snapshot.citationLinks in order and kept any link
+  // whose target was this person (person links) or one of this person's events
+  // (event links). We gather the same links from the per-target bucket map and
+  // re-sort the collected links by their original snapshot.citationLinks index
+  // (precomputed once in index.citationLinkOrder) so the output is
+  // byte-identical to the single-pass filter.
+  const personIdStr = String(person._id);
+  const eventIds = new Set(events.map((event) => String(event._id)));
+
+  const candidateLinks: Doc<"citationLinks">[] = [];
+  const personLinks = index.citationLinksByTarget.get(personIdStr) ?? [];
+  for (const link of personLinks) {
+    if (link.targetType === "person") candidateLinks.push(link);
+  }
+  for (const eventId of eventIds) {
+    const eventLinks = index.citationLinksByTarget.get(eventId) ?? [];
+    for (const link of eventLinks) {
+      if (link.targetType === "event") candidateLinks.push(link);
+    }
+  }
+  // Restore original snapshot.citationLinks ordering for byte-identical output.
+  candidateLinks.sort(
+    (a, b) => (index.citationLinkOrder.get(a) ?? 0) - (index.citationLinkOrder.get(b) ?? 0)
+  );
+  const relevantLinks = candidateLinks;
 
   const citations = relevantLinks
     .map((link) => {
-      const citation = snapshot.citations.find((entry) => entry._id === link.citationId);
+      const citation = index.citationById.get(String(link.citationId));
       if (!citation) return null;
-      const source = snapshot.sources.find((entry) => entry._id === citation.sourceId);
+      const source = index.sourceById.get(String(citation.sourceId));
       return source
         ? {
             ...citation,
@@ -204,30 +381,45 @@ function getPersonSourceRecords(
   };
 }
 
-function buildPersonOperations(snapshot: VaultSnapshot, person: Doc<"persons">) {
-  const personEvents = snapshot.personEvents
-    .filter((link) => link.personId === person._id)
-    .map((link) => snapshot.events.find((event) => event._id === link.eventId))
+function buildPersonOperations(
+  snapshot: VaultSnapshot,
+  index: SnapshotIndex,
+  person: Doc<"persons">
+) {
+  // GEN-93: all per-person scans below now read from the pre-bucketed Maps in
+  // `index` (built once per snapshot) instead of re-filtering the full arrays.
+  const personIdStr = String(person._id);
+  const personEvents = (index.personEventsByPerson.get(personIdStr) ?? [])
+    .map((link) => index.eventById.get(String(link.eventId)))
     .filter(Boolean) as Doc<"events">[];
-  const personRelationships = snapshot.relationships.filter(
-    (relationship) => relationship.person1 === person._id || relationship.person2 === person._id
-  );
-  const personMedia = snapshot.media.filter((item) => item.personIds.includes(person._id));
-  const personContextItems = snapshot.contextItems.filter((item) => item.personIds.includes(person._id));
-  const personSourceFacts = snapshot.sourceFacts.filter((item) => item.personId === person._id);
-  const personStories = snapshot.stories.filter((story) => story.personId === person._id);
+  const personRelationships = index.relationshipsByPerson.get(personIdStr) ?? [];
+  const personMedia = index.mediaByPerson.get(personIdStr) ?? [];
+  const personContextItems = index.contextItemsByPerson.get(personIdStr) ?? [];
+  const personSourceFacts = index.sourceFactsByPerson.get(personIdStr) ?? [];
+  const personStories = index.storiesByPerson.get(personIdStr) ?? [];
   const personPlaces = getPersonPlaces(person, personEvents, snapshot.places);
-  const personDocuments = snapshot.documents.filter(
-    (document) => document.personId === (person.fsId || String(person._id))
-  );
+  const personDocuments = index.documentsByPersonKey.get(person.fsId || personIdStr) ?? [];
+  // Original union: run.personId === person._id || run.personFsId === person.fsId.
+  // Reconstruct from both buckets, dedup, and restore snapshot.importRuns order
+  // before sortByTimestampDesc (which is stable, so input order is preserved
+  // for equal timestamps — must match the original filter ordering exactly).
+  const importRunsSet = new Set<Doc<"importRuns">>();
+  for (const run of index.importRunsByPersonId.get(personIdStr) ?? []) {
+    importRunsSet.add(run);
+  }
+  if (person.fsId) {
+    for (const run of index.importRunsByPersonFsId.get(person.fsId) ?? []) {
+      importRunsSet.add(run);
+    }
+  }
   const personImportRuns = sortByTimestampDesc(
-    snapshot.importRuns.filter((run) => run.personId === person._id || run.personFsId === person.fsId)
+    snapshot.importRuns.filter((run) => importRunsSet.has(run))
   );
-  const personChecks = snapshot.researchChecks.filter((check) => check.personId === person._id);
-  const personProvisional = snapshot.provisionalRelatives.filter(
-    (relative) => relative.anchorPersonId === person._id && relative.mergeState === "provisional"
+  const personChecks = index.researchChecksByPerson.get(personIdStr) ?? [];
+  const personProvisional = (index.provisionalByAnchor.get(personIdStr) ?? []).filter(
+    (relative) => relative.mergeState === "provisional"
   );
-  const personSources = getPersonSourceRecords(snapshot, person, personEvents).groupedSources.map(
+  const personSources = getPersonSourceRecords(index, person, personEvents).groupedSources.map(
     (entry) => entry.source
   );
 
@@ -536,9 +728,10 @@ function buildStoryBundle(
     title: story.title,
     personName: person ? formatPersonName(person) : undefined,
   });
-  const operations = person ? buildPersonOperations(snapshot, person) : null;
+  const index = buildSnapshotIndex(snapshot);
+  const operations = person ? buildPersonOperations(snapshot, index, person) : null;
   const sourceRecords = person && operations
-    ? getPersonSourceRecords(snapshot, person, operations.relatedEvents)
+    ? getPersonSourceRecords(index, person, operations.relatedEvents)
     : { citations: [], groupedSources: [] };
   const contextCoverage = person && operations
     ? buildContextCoverage(snapshot, person, operations)
@@ -637,9 +830,10 @@ export function buildPublicStoryBundle(
     title: story.title,
     personName: person ? formatPersonName(person) : undefined,
   });
-  const operations = person ? buildPersonOperations(snapshot, person) : null;
+  const index = buildSnapshotIndex(snapshot);
+  const operations = person ? buildPersonOperations(snapshot, index, person) : null;
   const sourceRecords = person && operations
-    ? getPersonSourceRecords(snapshot, person, operations.relatedEvents)
+    ? getPersonSourceRecords(index, person, operations.relatedEvents)
     : { citations: [], groupedSources: [] };
   const contextCoverage = person && operations
     ? buildContextCoverage(snapshot, person, operations)
@@ -743,8 +937,12 @@ export function buildPublicStoryBundle(
 }
 
 function buildPeopleRows(snapshot: VaultSnapshot) {
+  // GEN-93: build the per-person bucket index ONCE for the whole snapshot, then
+  // reuse it across every person row. Previously each row re-filtered every
+  // snapshot array, making this O(people * total-rows).
+  const index = buildSnapshotIndex(snapshot);
   return snapshot.people.map((person) => {
-    const operations = buildPersonOperations(snapshot, person);
+    const operations = buildPersonOperations(snapshot, index, person);
     const contextCoverage = buildContextCoverage(snapshot, person, operations);
     const storyWorkflow = getStoryWorkflowStatus({ operations, contextCoverage });
     const latestImport = operations.relatedImportRuns[0] ?? null;
@@ -802,9 +1000,10 @@ async function assemblePersonWorkspace(
   const person = getPersonByIdentifier(snapshot, personIdentifier);
   if (!person) return null;
 
-  const operations = buildPersonOperations(snapshot, person);
+  const index = buildSnapshotIndex(snapshot);
+  const operations = buildPersonOperations(snapshot, index, person);
   const contextCoverage = buildContextCoverage(snapshot, person, operations);
-  const sourceRecords = getPersonSourceRecords(snapshot, person, operations.relatedEvents);
+  const sourceRecords = getPersonSourceRecords(index, person, operations.relatedEvents);
   const relatedPeople = new Map<string, Doc<"persons">>();
 
   for (const relationship of operations.relatedRelationships) {
@@ -927,6 +1126,7 @@ export const getStoriesIndex = query({
   },
   handler: async (ctx, args) => {
     const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
+    const index = buildSnapshotIndex(snapshot);
     return sortByTimestampDesc(snapshot.stories).map((story) => {
       const person = story.personId
         ? snapshot.people.find((entry) => entry._id === story.personId) ?? null
@@ -936,7 +1136,7 @@ export const getStoriesIndex = query({
         title: story.title,
         personName: person ? formatPersonName(person) : undefined,
       });
-      const operations = person ? buildPersonOperations(snapshot, person) : null;
+      const operations = person ? buildPersonOperations(snapshot, index, person) : null;
       const contextCoverage = person && operations ? buildContextCoverage(snapshot, person, operations) : null;
       const sourceCount = operations?.relatedSources.length ?? 0;
 
@@ -1330,7 +1530,8 @@ export const getContextCoverage = query({
     const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
     const person = getPersonByIdentifier(snapshot, args.personIdentifier);
     if (!person) return null;
-    const operations = buildPersonOperations(snapshot, person);
+    const index = buildSnapshotIndex(snapshot);
+    const operations = buildPersonOperations(snapshot, index, person);
     return buildContextCoverage(snapshot, person, operations);
   },
 });
