@@ -15,6 +15,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import { api } from "@/convex/_generated/api";
 import {
   getLatestRun,
@@ -177,12 +178,28 @@ export async function GET(
       }
     }
 
-    return NextResponse.json({
+    const jsonBody = JSON.stringify({
       success: true,
       markdown,
       personName,
       runId: targetRunId,
       backendWarning,
+    });
+    const cacheControl = "private, max-age=0, must-revalidate";
+    const etag = 'W/"' + createHash("sha1").update(jsonBody).digest("hex") + '"';
+    if (request.headers.get("if-none-match") === etag) {
+      return new NextResponse(null, {
+        status: 304,
+        headers: { ETag: etag, "Cache-Control": cacheControl },
+      });
+    }
+    return new NextResponse(jsonBody, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        ETag: etag,
+        "Cache-Control": cacheControl,
+      },
     });
 
   } catch (error) {
