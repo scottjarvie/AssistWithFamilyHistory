@@ -41,7 +41,13 @@ export function getConvexClient(): ConvexHttpClient {
 export async function getAuthedConvexClient(): Promise<ConvexHttpClient> {
   const client = getConvexClient();
 
-  if (!isClerkEnabled()) {
+  // Only mint a "convex" template token in an environment actually configured
+  // for Convex auth — i.e. where CLERK_JWT_ISSUER_DOMAIN is set (the same gate
+  // that makes Convex trust the token; see auth.config.ts). This keeps the call
+  // a complete no-op anywhere the convex JWT template / issuer aren't set up
+  // (e.g. production until GEN-103 step E), so we never attempt — or error on —
+  // a getToken({template:"convex"}) the instance can't satisfy.
+  if (!isClerkEnabled() || !process.env.CLERK_JWT_ISSUER_DOMAIN) {
     return client;
   }
 
