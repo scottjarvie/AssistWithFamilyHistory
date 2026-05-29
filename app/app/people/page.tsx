@@ -24,12 +24,20 @@ export const metadata: Metadata = createPageMetadata({
 
 export const dynamic = "force-dynamic";
 
+const PEOPLE_PAGE_SIZE = 50;
+
 export default async function PeoplePage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; page?: string }>;
 }) {
   const params = await searchParams;
+  const parsedPage = Number.parseInt(params.page ?? "1", 10);
+  const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+  // Cap how many rows we render. We request one extra row beyond the visible
+  // window so we can tell whether a "Load more" link should appear without a
+  // second query. Small vaults are unaffected (page 1 shows up to 50 people).
+  const visibleCount = PEOPLE_PAGE_SIZE * page;
 
   if (!isConvexConfigured()) {
     const issue = getConvexUnavailableState(
@@ -59,6 +67,7 @@ export default async function PeoplePage({
         params.status === "complete"
           ? params.status
           : undefined,
+      limit: visibleCount + 1,
     });
   } catch (error) {
     const issue = getConvexRuntimeIssue(error);
@@ -69,6 +78,13 @@ export default async function PeoplePage({
       </div>
     );
   }
+
+  const hasMore = people.length > visibleCount;
+  const visiblePeople = hasMore ? people.slice(0, visibleCount) : people;
+  const loadMoreParams = new URLSearchParams();
+  if (params.q) loadMoreParams.set("q", params.q);
+  if (params.status) loadMoreParams.set("status", params.status);
+  loadMoreParams.set("page", String(page + 1));
 
   return (
     <div className="p-4 sm:p-8">
@@ -108,14 +124,14 @@ export default async function PeoplePage({
       </form>
 
       <div className="grid gap-5 xl:grid-cols-2">
-        {people.length === 0 ? (
+        {visiblePeople.length === 0 ? (
           <Card className="col-span-full border-dashed">
             <CardContent className="py-14 text-center text-stone-500">
               No people match this filter yet. Try importing a FamilySearch capture or widening the search.
             </CardContent>
           </Card>
         ) : (
-          people.map((person) => (
+          visiblePeople.map((person) => (
             <Link key={String(person._id)} href={`/app/people/${person.routeId}`}>
               <Card className="h-full border-stone-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-lg">
                 <CardHeader>
@@ -175,6 +191,14 @@ export default async function PeoplePage({
           ))
         )}
       </div>
+
+      {hasMore ? (
+        <div className="mt-8 flex justify-center">
+          <Button asChild variant="outline">
+            <Link href={`/app/people?${loadMoreParams.toString()}`}>Load more people</Link>
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

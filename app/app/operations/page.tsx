@@ -34,10 +34,19 @@ type SearchParams = Promise<{
   sortBy?: string;
   sortDirection?: string;
   missingCheck?: string;
+  page?: string;
 }>;
+
+const OPERATIONS_PAGE_SIZE = 50;
 
 export default async function OperationsPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
+  const parsedPage = Number.parseInt(params.page ?? "1", 10);
+  const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+  // Cap rendered rows. The Convex query slices to `limit` and computes the
+  // summary over the visible rows, so the "Visible rows" stat stays consistent
+  // with what is shown. We request one extra row to detect a "Load more" link.
+  const visibleCount = OPERATIONS_PAGE_SIZE * page;
 
   if (!isConvexConfigured()) {
     const issue = getConvexUnavailableState(
@@ -85,6 +94,7 @@ export default async function OperationsPage({ searchParams }: { searchParams: S
           : "missingCritical",
       sortDirection: params.sortDirection === "asc" || params.sortDirection === "desc" ? params.sortDirection : "desc",
       missingCheck: params.missingCheck || undefined,
+      limit: visibleCount,
     });
   } catch (error) {
     const issue = getConvexRuntimeIssue(error);
@@ -103,6 +113,17 @@ export default async function OperationsPage({ searchParams }: { searchParams: S
       params.staleOnly === "true" ||
       params.missingCheck
   );
+  // If the query returned exactly the cap, there may be more rows on a next
+  // page. The summary is computed over only the visible rows, so it stays
+  // consistent with the table that is rendered.
+  const hasMore = queue.rows.length >= visibleCount;
+  const loadMoreParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (typeof value === "string" && value && key !== "page") {
+      loadMoreParams.set(key, value);
+    }
+  }
+  loadMoreParams.set("page", String(page + 1));
   const handoffParams = new URLSearchParams();
   handoffParams.set("format", "handoff");
   for (const [key, value] of Object.entries(params)) {
@@ -433,6 +454,14 @@ export default async function OperationsPage({ searchParams }: { searchParams: S
                 </Link>
               </Button>
             </div>
+          </div>
+        ) : null}
+
+        {hasMore ? (
+          <div className="flex justify-center px-6 py-6">
+            <Button asChild variant="outline">
+              <Link href={`/app/operations?${loadMoreParams.toString()}`}>Load more rows</Link>
+            </Button>
           </div>
         ) : null}
       </section>
