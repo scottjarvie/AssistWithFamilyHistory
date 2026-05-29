@@ -53,6 +53,28 @@
       "notes": "Returns current internal capability actions for the requesting actor role. Story capabilities distinguish story_writer preview/draft access from trusted publisher public publish authority."
     },
     {
+      "route": "/api/keys",
+      "methods": ["GET", "POST"],
+      "capability": "agent_api_key_management",
+      "environment": "browser-or-local-api",
+      "agentSupport": "not-supported",
+      "reviewLevel": "owner-scoped-write",
+      "risk": "high",
+      "scopes": [],
+      "notes": "Human-managed agent API keys. POST mints a key: the raw secret is generated + SHA-256-hashed server-side and returned exactly once; only the hash is stored. GET lists the owner's keys and never returns the hash. Agents do not mint keys; this is a signed-in human route."
+    },
+    {
+      "route": "/api/keys/[keyId]",
+      "methods": ["DELETE"],
+      "capability": "agent_api_key_revoke",
+      "environment": "browser-or-local-api",
+      "agentSupport": "not-supported",
+      "reviewLevel": "owner-scoped-write",
+      "risk": "high",
+      "scopes": [],
+      "notes": "Revoke one of the owner's API keys (idempotent). Owner-guarded in the Convex mutation via matchesVaultOwner."
+    },
+    {
       "route": "/api/context-reports",
       "methods": ["POST"],
       "capability": "context_report_create",

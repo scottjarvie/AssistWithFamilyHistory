@@ -1211,4 +1211,58 @@ export default defineSchema({
   })
     // NOTE: not "by_owner" on purpose — see comment above.
     .index("by_owner_window", ["vaultOwnerId", "action", "windowStart"]),
+
+  /**
+   * API KEYS (agent platform)
+   *
+   * Owner-scoped credentials that let an external AI agent act AS one vault
+   * owner without a Clerk browser session. The raw secret is shown ONCE at mint;
+   * only its SHA-256 hash is stored. `keyId` is the public, loggable prefix.
+   * Scopes (resource:action, see lib/auth/scopes.ts) decide what the key may
+   * attempt; the existing domain gates still decide what succeeds.
+   */
+  apiKeys: defineTable({
+    vaultOwnerId: v.string(),
+    keyId: v.string(),                 // public prefix, e.g. "dts_live_<hex>"
+    hashedSecret: v.string(),          // SHA-256(secret) hex; raw secret never stored
+    label: v.string(),
+    scopes: v.array(v.string()),
+    tier: v.union(v.literal("free"), v.literal("standard"), v.literal("trusted")),
+    status: v.union(v.literal("active"), v.literal("revoked")),
+    createdAt: v.number(),
+    lastUsedAt: v.optional(v.number()),
+    revokedAt: v.optional(v.number()),
+    expiresAt: v.optional(v.number()),
+    createdByUserId: v.optional(v.string()),
+  })
+    .index("by_owner", ["vaultOwnerId"])
+    .index("by_keyId", ["keyId"]),
+
+  /**
+   * AGENT ACTIVITY (agent platform)
+   *
+   * Append-only per-call audit/feed for agent (and key-authenticated) requests.
+   * Backs the future /usage endpoint and the human "watch what my agent is
+   * doing" view. `detail` is short and masked — never raw vault content.
+   */
+  agentActivity: defineTable({
+    vaultOwnerId: v.string(),
+    requestId: v.string(),
+    keyId: v.optional(v.string()),
+    principalKind: v.union(v.literal("user"), v.literal("api_key")),
+    route: v.string(),
+    method: v.string(),
+    scope: v.optional(v.string()),
+    outcome: v.union(
+      v.literal("ok"),
+      v.literal("denied"),
+      v.literal("rate_limited"),
+      v.literal("error"),
+    ),
+    statusCode: v.number(),
+    createdAt: v.number(),
+    detail: v.optional(v.string()),
+  })
+    .index("by_owner", ["vaultOwnerId"])
+    .index("by_owner_request", ["vaultOwnerId", "requestId"]),
 });

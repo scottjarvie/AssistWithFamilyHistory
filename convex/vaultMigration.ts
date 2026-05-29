@@ -52,6 +52,8 @@ const OWNED_TABLES = [
   "provisionalRelatives",
   "researchChecks",
   "historicalContext",
+  "apiKeys",
+  "agentActivity",
 ] as const satisfies readonly TableNames[];
 
 export const GUEST_PREFIX = "guest_";
