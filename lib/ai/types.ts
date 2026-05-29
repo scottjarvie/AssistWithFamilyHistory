@@ -59,6 +59,33 @@ export const AVAILABLE_MODELS: AIModel[] = [
   },
 ];
 
+/**
+ * GEN-89 — /api/process hardening.
+ *
+ * ALLOWED_MODELS is the server-side allowlist of model ids that /api/process
+ * will accept from a client. It is derived from the current AVAILABLE_MODELS
+ * ids above. Any client-supplied model not in this set is rejected with 400.
+ *
+ * DEFAULT_MODEL is used when the client omits a model. It MUST be one of the
+ * CURRENT ids below (the retired "anthropic/claude-3-sonnet" default has been
+ * removed).
+ *
+ * SCOTT: confirm this allowlist + the default model are what we want exposed
+ * to external AI requests. Add/remove ids in AVAILABLE_MODELS and the set
+ * derives automatically.
+ */
+export const ALLOWED_MODELS: ReadonlySet<string> = new Set(
+  AVAILABLE_MODELS.map((m) => m.id),
+);
+
+export const DEFAULT_MODEL = "openai/gpt-4o-mini";
+
+/** Hard ceiling on completion tokens for /api/process requests (GEN-89). */
+export const MAX_COMPLETION_TOKENS = 4096;
+
+/** Max combined prompt+data payload size in bytes for /api/process (GEN-89). */
+export const MAX_PROCESS_PAYLOAD_BYTES = 256_000;
+
 export interface ProcessingOptions {
   stage: "normalize" | "cluster" | "synthesize";
   model: string;
