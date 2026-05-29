@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MarketingNav } from "@/components/layout/MarketingNav";
 import { Footer } from "@/components/layout/Footer";
+import { Prose } from "@/components/prose/Prose";
 import {
   getConvexClient,
   getConvexRuntimeIssue,
@@ -155,7 +156,7 @@ export default async function PublicStoryPage({
               <BookOpen className="h-4 w-4" />
               Story
             </div>
-            <div className="whitespace-pre-wrap text-lg leading-9 text-[#2d2b26]">{story.content}</div>
+            <Prose markdown={story.content} variant="story" />
           </article>
 
           <aside className="space-y-5">

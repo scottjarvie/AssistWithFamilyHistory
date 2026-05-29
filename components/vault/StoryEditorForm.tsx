@@ -2,12 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Loader2, Save } from "lucide-react";
+import { Eye, EyeOff, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Prose } from "@/components/prose/Prose";
 
 const STORY_TYPES = [
   "biography",
@@ -40,6 +41,7 @@ export function StoryEditorForm({
   const [content, setContent] = useState(story.content);
   const [tags, setTags] = useState((story.tags || []).join(", "));
   const [saving, setSaving] = useState(false);
+  const [showPreview, setShowPreview] = useState(true);
 
   async function handleSave() {
     setSaving(true);
@@ -104,13 +106,36 @@ export function StoryEditorForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="story-content">Markdown story content</Label>
-        <Textarea
-          id="story-content"
-          value={content}
-          onChange={(event) => setContent(event.target.value)}
-          className="min-h-[520px] text-sm leading-6"
-        />
+        <div className="flex items-center justify-between">
+          <Label htmlFor="story-content">Markdown story content</Label>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowPreview((value) => !value)}
+            className="text-stone-600"
+          >
+            {showPreview ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            {showPreview ? "Hide preview" : "Show preview"}
+          </Button>
+        </div>
+        <div className={showPreview ? "grid gap-4 lg:grid-cols-2" : ""}>
+          <Textarea
+            id="story-content"
+            value={content}
+            onChange={(event) => setContent(event.target.value)}
+            className="min-h-[520px] text-sm leading-6"
+          />
+          {showPreview ? (
+            <div className="min-h-[520px] overflow-auto rounded-md border border-stone-200 bg-white px-5 py-4">
+              {content.trim() ? (
+                <Prose markdown={content} variant="compact" />
+              ) : (
+                <p className="text-sm text-stone-400">Start typing to see the rendered story…</p>
+              )}
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <Button onClick={handleSave} disabled={saving || !title.trim() || !content.trim()} className="bg-stone-900 hover:bg-stone-800">

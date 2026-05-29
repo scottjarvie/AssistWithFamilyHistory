@@ -25,6 +25,8 @@ steps=(
   "check:source-facts"
   "check:redaction-fixtures"
   "check:loose-context"
+  "check:context-taxonomy"
+  "check:no-raw-markdown-render"
   "check:import-regression"
   "check:agent-quality-gates"
   "check:operations-handoff"
