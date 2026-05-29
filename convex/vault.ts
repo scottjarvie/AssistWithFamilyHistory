@@ -180,7 +180,9 @@ function pushToMap<K, V>(map: Map<K, V[]>, key: K, value: V) {
   }
 }
 
-function buildSnapshotIndex(snapshot: VaultSnapshot): SnapshotIndex {
+// Exported for the GEN-92FU-COV parity test (the test reproduces the exact
+// getContextCoverage pipeline on both the scoped and full snapshots).
+export function buildSnapshotIndex(snapshot: VaultSnapshot): SnapshotIndex {
   const eventById = new Map<string, Doc<"events">>();
   for (const event of snapshot.events) eventById.set(String(event._id), event);
 
@@ -286,7 +288,7 @@ function buildSnapshotIndex(snapshot: VaultSnapshot): SnapshotIndex {
   };
 }
 
-function getPersonByIdentifier(snapshot: VaultSnapshot, personIdentifier: string) {
+export function getPersonByIdentifier(snapshot: VaultSnapshot, personIdentifier: string) {
   return (
     snapshot.people.find(
       (person) => person.fsId === personIdentifier || String(person._id) === personIdentifier
@@ -384,7 +386,7 @@ function getPersonSourceRecords(
   };
 }
 
-function buildPersonOperations(
+export function buildPersonOperations(
   snapshot: VaultSnapshot,
   index: SnapshotIndex,
   person: Doc<"persons">
@@ -509,7 +511,10 @@ export function isPublishablePublicHistoricalContext(entry: Doc<"historicalConte
   );
 }
 
-function buildContextCoverage(
+// Exported for the GEN-92FU-COV parity test
+// (scripts/test-context-coverage-parity.ts), which deep-equals the scoped-loader
+// coverage output against the full-snapshot output for getContextCoverage.
+export function buildContextCoverage(
   snapshot: VaultSnapshot,
   person: Doc<"persons">,
   operations: ReturnType<typeof buildPersonOperations>
@@ -718,7 +723,9 @@ function getStoryWorkflowStatus(params: {
   return "ready_to_draft" as const;
 }
 
-function buildStoryBundle(
+// Exported for the GEN-92FU-COV parity test, which deep-equals the
+// story-scoped-loader bundle against the full-snapshot bundle.
+export function buildStoryBundle(
   snapshot: VaultSnapshot,
   story: Doc<"stories">,
   options: { publicView?: boolean } = {}
@@ -1382,6 +1389,93 @@ async function assemblePersonWorkspaceScoped(
   return assemblePersonWorkspaceFromSnapshot(snapshot, personIdentifier);
 }
 
+// GEN-92FU-COV: story-scoped loader for getStoryReview/buildStoryBundle.
+// buildStoryBundle reads ONLY: (1) the story itself, (2) its person and that
+// person's full operations pipeline (events, places, sources, media,
+// historicalContext coverage, etc.), (3) relatedStories — OTHER stories of the
+// SAME person, and (4) this story's storyReviewEvents (by_story). Everything in
+// (2)+(3) is exactly what loadPersonScopedSnapshot already gathers for the
+// person (it collects all of the person's stories via by_person, so
+// relatedStories is covered). The only thing the person-scoped snapshot omits
+// is storyReviewEvents (it sets []), so we overlay just this story's review
+// events via the by_story index. A story with no personId has no person scope:
+// we still need the bare story row present so snapshot.stories.find resolves it
+// (buildStoryBundle then treats person as null and emits empty operations).
+export async function loadStoryScopedSnapshot(
+  ctx: QueryCtx,
+  vaultOwnerId: string,
+  storyId: Id<"stories">
+): Promise<VaultSnapshot | null> {
+  const story = await ctx.db.get(storyId);
+  if (!story || !matchesVaultOwner(story.vaultOwnerId, vaultOwnerId)) return null;
+
+  // storyReviewEvents for THIS story, owner-filtered (GEN-70 defense-in-depth),
+  // ordered ascending _creationTime to match the full snapshot's by_owner order
+  // before the bundle re-sorts with sortByTimestampDesc.
+  const reviewEvents = byCreationTime(
+    filterByVaultOwner(
+      await ctx.db
+        .query("storyReviewEvents")
+        .withIndex("by_story", (q) => q.eq("storyId", storyId))
+        .collect(),
+      vaultOwnerId
+    )
+  );
+
+  // Person-scoped snapshot supplies the person, operations, and relatedStories.
+  // A person-less story gets a minimal snapshot carrying just the story row.
+  let base: VaultSnapshot;
+  if (story.personId) {
+    const personScoped = await loadPersonScopedSnapshot(
+      ctx,
+      vaultOwnerId,
+      String(story.personId)
+    );
+    // If the person can't be resolved (orphaned personId), fall back to the
+    // minimal snapshot so the story is still reviewable.
+    base = personScoped ?? makeEmptyVaultSnapshot();
+  } else {
+    base = makeEmptyVaultSnapshot();
+  }
+
+  // Ensure the story itself is present (it always is for a person-linked story
+  // — by_person collects it — but be defensive for orphaned/person-less rows).
+  const stories = base.stories.some((entry) => entry._id === story._id)
+    ? base.stories
+    : byCreationTime([...base.stories, story]);
+
+  return {
+    ...base,
+    stories,
+    storyReviewEvents: reviewEvents,
+  };
+}
+
+function makeEmptyVaultSnapshot(): VaultSnapshot {
+  return {
+    people: [],
+    relationships: [],
+    events: [],
+    personEvents: [],
+    places: [],
+    sources: [],
+    citations: [],
+    citationLinks: [],
+    sourceFacts: [],
+    media: [],
+    contextItems: [],
+    importRuns: [],
+    researchTasks: [],
+    researchLog: [],
+    documents: [],
+    stories: [],
+    storyReviewEvents: [],
+    historicalContext: [],
+    researchChecks: [],
+    provisionalRelatives: [],
+  };
+}
+
 export const getPeopleExplorer = query({
   args: {
     vaultOwnerId: v.string(),
@@ -1495,7 +1589,18 @@ export const getStoryReview = query({
     storyId: v.id("stories"),
   },
   handler: async (ctx, args) => {
-    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
+    // GEN-92FU-COV: story-scoped loader instead of the whole vault.
+    // buildStoryBundle only ever reads this story, its person's scoped data,
+    // the person's other stories (relatedStories), and this story's
+    // storyReviewEvents — all of which loadStoryScopedSnapshot provides.
+    // scripts/test-context-coverage-parity.ts deep-equals this path against the
+    // full-snapshot buildStoryBundle on the fixture vault.
+    const snapshot = await loadStoryScopedSnapshot(
+      ctx,
+      normalizeVaultOwnerId(args.vaultOwnerId),
+      args.storyId
+    );
+    if (!snapshot) return null;
     const story = snapshot.stories.find((entry) => entry._id === args.storyId);
     return story ? buildStoryBundle(snapshot, story) : null;
   },
@@ -1845,7 +1950,22 @@ export const getContextCoverage = query({
     personIdentifier: v.string(),
   },
   handler: async (ctx, args) => {
-    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
+    // GEN-92FU-COV: per-person loader. getContextCoverage runs exactly the same
+    // three-step pipeline (buildSnapshotIndex -> buildPersonOperations ->
+    // buildContextCoverage) that assemblePersonWorkspaceFromSnapshot runs
+    // internally to produce its `contextCoverage` field. Since that workspace
+    // path is already proven byte-identical on the scoped snapshot
+    // (scripts/test-person-snapshot-parity.ts) and the coverage result depends
+    // only on this person's related rows (relatedPlaces + the owner-wide
+    // historicalContext, both of which the scoped loader preserves), reading the
+    // scoped snapshot here is behavior-identical to the full snapshot.
+    // scripts/test-context-coverage-parity.ts deep-equals the two paths.
+    const snapshot = await loadPersonScopedSnapshot(
+      ctx,
+      normalizeVaultOwnerId(args.vaultOwnerId),
+      args.personIdentifier
+    );
+    if (!snapshot) return null;
     const person = getPersonByIdentifier(snapshot, args.personIdentifier);
     if (!person) return null;
     const index = buildSnapshotIndex(snapshot);
