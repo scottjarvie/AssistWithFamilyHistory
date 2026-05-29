@@ -48,7 +48,15 @@ class FakeQuery {
     fn(builder);
     const eqs = builder.eqs;
     return new FakeQuery(this.rows, (row) =>
-      eqs.every(([field, value]) => valueAtPath(row, field) === value)
+      eqs.every(([field, value]) => {
+        const fieldValue = valueAtPath(row, field);
+        // GEN-92FU: Convex indexes array fields by element. When the indexed
+        // field is an array (e.g. media/contextItems.personIds), an eq() on it
+        // matches rows whose array CONTAINS the value, mirroring how
+        // `withIndex("by_person", q => q.eq("personIds", personId))` behaves.
+        if (Array.isArray(fieldValue)) return fieldValue.includes(value);
+        return fieldValue === value;
+      })
     );
   }
 
@@ -211,14 +219,33 @@ const tables: Record<string, AnyRow[]> = {
     row("sourceFacts:1", { personId: TARGET, sourceId: "sources:1", citationId: "citations:1", importKey: "k1", factType: "birth", label: "Birth", value: "1880", confidence: "high", status: "accepted", createdAt: t(), updatedAt: t() }),
     row("sourceFacts:2", { personId: STRANGER, sourceId: "sources:3", citationId: "citations:3", importKey: "k2", factType: "birth", label: "Birth", value: "1881", confidence: "low", status: "candidate", createdAt: t(), updatedAt: t() }),
   ],
+  // GEN-92FU: media/contextItems are now read via the by_person array-element
+  // index instead of owner-wide. These fixtures exercise the narrowing AND the
+  // GEN-70 cross-owner guard: (a) TARGET referenced among MULTIPLE people,
+  // (b) rows referencing ONLY other people (must be excluded), and
+  // (c) a DIFFERENT-owner row that names TARGET (by_person would surface it,
+  // but the owner filter must drop it so it never leaks).
   media: [
     row("media:1", { type: "photo", title: "John Portrait", personIds: [TARGET], privacyLevel: "publish_candidate", reviewStatus: "reviewed", rightsStatus: "owned", aiUseAllowed: true, createdAt: t(), updatedAt: t() }),
     row("media:2", { type: "photo", title: "Family Photo", personIds: [TARGET, SPOUSE], privacyLevel: "private", reviewStatus: "unreviewed", createdAt: t(), updatedAt: t() }),
     row("media:3", { type: "photo", title: "Stranger Photo", personIds: [STRANGER], createdAt: t(), updatedAt: t() }),
+    // (a) TARGET among MULTIPLE people (3-way) — must be included for TARGET.
+    row("media:4", { type: "photo", title: "Group Photo", personIds: [SPOUSE, TARGET, CHILD], privacyLevel: "family_review", reviewStatus: "reviewed", aiUseAllowed: true, createdAt: t(), updatedAt: t() }),
+    // (b) Only OTHER people (spouse+child, no target) — must be excluded for TARGET.
+    row("media:5", { type: "photo", title: "Spouse and Child", personIds: [SPOUSE, CHILD], privacyLevel: "private", reviewStatus: "unreviewed", createdAt: t(), updatedAt: t() }),
+    // (c) DIFFERENT owner but references TARGET — by_person surfaces it; the
+    //     owner filter MUST drop it so it never leaks into TARGET's workspace.
+    { _id: "media:6", _creationTime: t(), vaultOwnerId: "other-owner", type: "photo", title: "Foreign Owner Photo", personIds: [TARGET], privacyLevel: "private", reviewStatus: "unreviewed", createdAt: t(), updatedAt: t() } as AnyRow,
   ],
   contextItems: [
     row("contextItems:1", { title: "Note about John", itemType: "note", evidenceRole: "raw_material", content: "...", personIds: [TARGET], privacyLevel: "family_review", reviewStatus: "reviewed", aiUseAllowed: true, createdAt: t(), updatedAt: t() }),
     row("contextItems:2", { title: "Stranger note", itemType: "note", evidenceRole: "raw_material", content: "...", personIds: [STRANGER], privacyLevel: "private", reviewStatus: "unreviewed", aiUseAllowed: false, createdAt: t(), updatedAt: t() }),
+    // (a) TARGET among MULTIPLE people — must be included for TARGET.
+    row("contextItems:3", { title: "Shared family note", itemType: "note", evidenceRole: "raw_material", content: "...", personIds: [SPOUSE, TARGET], privacyLevel: "family_review", reviewStatus: "reviewed", aiUseAllowed: true, createdAt: t(), updatedAt: t() }),
+    // (b) Only OTHER people — must be excluded for TARGET.
+    row("contextItems:4", { title: "Spouse-only note", itemType: "note", evidenceRole: "raw_material", content: "...", personIds: [SPOUSE, CHILD], privacyLevel: "private", reviewStatus: "unreviewed", aiUseAllowed: false, createdAt: t(), updatedAt: t() }),
+    // (c) DIFFERENT owner but references TARGET — must be dropped by owner filter.
+    { _id: "contextItems:5", _creationTime: t(), vaultOwnerId: "other-owner", title: "Foreign owner note", itemType: "note", evidenceRole: "raw_material", content: "...", personIds: [TARGET], privacyLevel: "private", reviewStatus: "unreviewed", aiUseAllowed: false, createdAt: t(), updatedAt: t() } as AnyRow,
   ],
   importRuns: [
     row("importRuns:1", { personId: TARGET, personFsId: "KWCJ-RN4", personName: "John Jarvie", captureId: "c1", captureVersion: "1", pageTypes: ["person"], sourceUrls: [], capturedAt: t(), importedAt: t(), compatibilityMode: false, mergeStatus: "created", counts: { sources: 1, citations: 1, memories: 0, relationships: 2, places: 2, events: 3, warnings: 0 }, warnings: [], artifactPaths: {} }),
@@ -292,7 +319,11 @@ async function main() {
     assert.ok(fullResult, "full result should be non-null");
     assert.equal(fullResult!.relationships.length, 2, "two relationships for target");
     assert.equal(fullResult!.events.length, 3, "three events for target");
-    assert.equal(fullResult!.media.length, 2, "two media items for target");
+    // media:1 (target only), media:2 (target+spouse), media:4 (spouse+target+child);
+    // media:3 (stranger only), media:5 (spouse+child) and media:6 (foreign owner) excluded.
+    assert.equal(fullResult!.media.length, 3, "three media items for target");
+    // contextItems:1 (target only) + contextItems:3 (spouse+target); others excluded.
+    assert.equal(fullResult!.contextItems.length, 2, "two context items for target");
     assert.equal(fullResult!.stories.length, 1, "one story for target");
     assert.equal(fullResult!.importRuns.length, 2, "two import runs (personId + personFsId union)");
     assert.equal(fullResult!.provisionalRelatives.length, 1, "one provisional relative");
@@ -304,6 +335,27 @@ async function main() {
     assert.ok(
       fullResult!.relatedPeople.every((p) => p._id !== STRANGER),
       "stranger must not appear in relatedPeople"
+    );
+
+    // GEN-92FU: the by_person index narrowing must (a) include rows where TARGET
+    // is one of several people, (b) exclude other-people-only rows, and
+    // (c) never leak a foreign-owner row that happens to name TARGET. Assert on
+    // the SCOPED result so we prove the by_person path itself is correct.
+    const scopedMediaIds = scopedResult!.media.map((m) => m._id);
+    assert.deepEqual(
+      [...scopedMediaIds].sort(),
+      ["media:1", "media:2", "media:4"],
+      "scoped media = target's owned media (multi-person included, others/foreign excluded)"
+    );
+    const scopedContextIds = scopedResult!.contextItems.map((c) => c._id);
+    assert.deepEqual(
+      [...scopedContextIds].sort(),
+      ["contextItems:1", "contextItems:3"],
+      "scoped context items = target's owned items (multi-person included, others/foreign excluded)"
+    );
+    assert.ok(
+      !scopedMediaIds.includes("media:6") && !scopedContextIds.includes("contextItems:5"),
+      "foreign-owner rows naming the target must never leak"
     );
   }
 
