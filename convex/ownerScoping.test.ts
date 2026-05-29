@@ -12,14 +12,17 @@
  * Three groups:
  *   1. OWNER ISOLATION — the cross-tenant invariant, exercised through the real
  *      withIndex("by_owner") paths in vault.ts.
- *   2. ARRAY-INDEX REGRESSION — locks in the round-3 fix (media/contextItems read
- *      owner-wide + JS-filter by personIds) AND demonstrates, with a throwaway
- *      probe, that the WRONG `q.eq("personIds", scalar)` pattern returns zero
- *      rows in the real engine — proving convex-test catches the class of bug.
+ *   2. ARRAY-INDEX REGRESSION — runs the WRONG `.index(arrayField) + q.eq(scalar)`
+ *      pattern on the real engine (via a throwaway probe schema that has the bad
+ *      index) and asserts it returns ZERO rows — the round-3 bug — while the
+ *      owner-wide + JS element-contains path returns the row. Fails if Convex
+ *      ever changes that semantics, so the limitation is locked into the suite.
  *   3. MIGRATION RUNTIME — runs the real migrateGuestVault mutation end-to-end.
  */
 import { describe, expect, test } from "vitest";
 import { convexTest } from "convex-test";
+import { defineSchema, defineTable } from "convex/server";
+import { v } from "convex/values";
 import schema from "./schema";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
@@ -170,6 +173,18 @@ describe("owner isolation (real withIndex(by_owner) paths)", () => {
     const t = convexTest(schema, modules);
     const a = await seedOwner(t, OWNER_A, "A");
     await seedOwner(t, OWNER_B, "B");
+    // Adversarial cross-reference: B-owned media + contextItem that (wrongly)
+    // list A's person in personIds[]. The owner filter must still drop them from
+    // A's workspace. Without this seed a pure owner-filter leak on these array
+    // tables would be invisible, because the JS .some(personId) filter alone
+    // would never pull a B-row that only names B's own people.
+    await t.run(async (ctx) => {
+      await ctx.db.insert("media", mediaFields(OWNER_B, "Photo-B-crossref", [a.primary]));
+      await ctx.db.insert(
+        "contextItems",
+        contextItemFields(OWNER_B, "Note-B-crossref", [a.primary])
+      );
+    });
 
     const ws = await t.query(api.vault.getPersonWorkspace, {
       vaultOwnerId: OWNER_A,
@@ -195,12 +210,29 @@ describe("owner isolation (real withIndex(by_owner) paths)", () => {
     expect(ws.media.some((m) => m.title === "Photo-B")).toBe(false);
     expect(ws.stories.some((s) => s.title === "Story-B")).toBe(false);
     expect(ws.relatedPeople.some((p) => p.name.given === "RelativeB")).toBe(false);
+    // The B-owned cross-reference rows must NOT surface even though they name A's
+    // person — only the owner filter stops them (the JS personIds filter would
+    // otherwise match). This is the assertion that makes the media/contextItems
+    // leak coverage real.
+    expect(ws.media.some((m) => m.title === "Photo-B-crossref")).toBe(false);
+    expect(ws.contextItems.some((c) => c.title === "Note-B-crossref")).toBe(false);
   });
 
   test("getContextPack ships NO row from another owner", async () => {
     const t = convexTest(schema, modules);
     const a = await seedOwner(t, OWNER_A, "A");
     await seedOwner(t, OWNER_B, "B");
+    // Adversarial cross-reference (see getPersonWorkspace test): a B-owned,
+    // AI-eligible media + contextItem naming A's person. getContextPack feeds
+    // media -> memories and contextItems -> reviewedContextItems, so an owner-filter
+    // leak would ship B's private rows to the external-LLM context pack. Assert it doesn't.
+    await t.run(async (ctx) => {
+      await ctx.db.insert("media", mediaFields(OWNER_B, "Photo-B-crossref", [a.primary]));
+      await ctx.db.insert(
+        "contextItems",
+        contextItemFields(OWNER_B, "Note-B-crossref", [a.primary])
+      );
+    });
 
     const pack = await t.query(api.vault.getContextPack, {
       vaultOwnerId: OWNER_A,
@@ -216,6 +248,11 @@ describe("owner isolation (real withIndex(by_owner) paths)", () => {
       expect(entry.vaultOwnerId).toBe(OWNER_A);
     }
     expect(pack.structured.memories.some((m) => m.title === "Photo-B")).toBe(false);
+    // The B-owned cross-reference rows (which name A's person) must not ship.
+    expect(pack.structured.memories.some((m) => m.title === "Photo-B-crossref")).toBe(false);
+    expect(pack.structured.reviewedContextItems.some((c) => c.title === "Note-B-crossref")).toBe(
+      false
+    );
     // The rendered markdown must not name B's person.
     expect(pack.markdown.includes("PrimaryB")).toBe(false);
   });
@@ -244,46 +281,60 @@ describe("array-index regression (media.personIds element-contains)", () => {
     expect(ws.contextItems.map((c) => c._id)).toContain(a.contextItem);
   });
 
-  test("scalar-vs-array equality (the round-3 bug class) matches NOTHING", async () => {
-    // This is the heart of GEN-95C: why the round-3 bug shipped. The buggy
-    // pattern was an index on the array field `personIds` queried with
-    // `q.eq("personIds", oneId)` — comparing a single person id to the WHOLE
-    // serialized array. The engine does structural equality against the array,
-    // never element-contains, so it matches nothing.
-    //
-    // VERIFIED out-of-band (GEN-95C): with a temporary `.index("by_person_PROBE",
-    // ["personIds"])` added to the media table, the REAL convex-test engine
-    // returned 0 rows for `withIndex("by_person_PROBE", q.eq("personIds", id))`
-    // while the owner-wide + JS `.some()` path returned the row. That throwaway
-    // index was reverted; convex-test faithfully reproduces the limitation that
-    // the old fake-ctx parity tests modeled incorrectly. We assert the same
-    // scalar-vs-array equality semantics here without depending on a throwaway
-    // index, so the invariant stays locked in the committed suite.
-    const t = convexTest(schema, modules);
-    const a = await seedOwner(t, OWNER_A, "A");
+  test("a standard .index() over an array field + q.eq(scalar) returns ZERO rows on the real engine (the round-3 bug)", async () => {
+    // The heart of GEN-95C. The round-3 bug indexed media.personIds (an array)
+    // and queried it with `q.eq("personIds", oneId)` — comparing a single person
+    // id against the WHOLE serialized array. Convex's engine does structural
+    // equality against the array value, never element-contains, so it matches
+    // nothing. We prove that ON THE REAL convex-test engine via a throwaway probe
+    // schema that HAS the (wrong) by_person array index — exactly the index the
+    // round-3 commit added and we reverted. This test FAILS if the buggy query
+    // ever returns rows (e.g. if Convex gained array-contains support), so the
+    // limitation is locked into the permanent suite, not just a code comment.
+    const probeSchema = defineSchema({
+      persons: defineTable({ vaultOwnerId: v.string() }).index("by_owner", ["vaultOwnerId"]),
+      media: defineTable({
+        vaultOwnerId: v.string(),
+        title: v.string(),
+        personIds: v.array(v.id("persons")),
+      })
+        .index("by_owner", ["vaultOwnerId"])
+        // The WRONG index the round-3 bug introduced (reverted in prod).
+        .index("by_person", ["personIds"]),
+    });
+    // Pass `modules` so convex-test can locate the _generated dir; this test only
+    // uses t.run (raw db on probeSchema), so the project functions are never invoked.
+    const t = convexTest(probeSchema, modules);
 
-    const { contains, scalarEqArray } = await t.run(async (ctx) => {
+    const { wrongIndexHits, ownerWideContains } = await t.run(async (ctx) => {
+      const personId = await ctx.db.insert("persons", { vaultOwnerId: OWNER_A });
+      await ctx.db.insert("media", {
+        vaultOwnerId: OWNER_A,
+        title: "Photo",
+        personIds: [personId],
+      });
+
+      // WRONG (the round-3 bug): array-field index queried with a scalar element.
+      const wrong = await ctx.db
+        .query("media")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .withIndex("by_person", (q: any) => q.eq("personIds", personId))
+        .collect();
+
+      // CORRECT: owner-wide read + JS element-contains (what prod does now).
       const all = await ctx.db
         .query("media")
         .withIndex("by_owner", (q) => q.eq("vaultOwnerId", OWNER_A))
         .collect();
-
-      // CORRECT path: JS element-contains. Finds the photo.
       const contains = all.filter((m) =>
-        m.personIds.some((id) => String(id) === String(a.primary))
+        m.personIds.some((id) => String(id) === String(personId))
       );
 
-      // WRONG path the round-3 bug used: compare a scalar id to the whole
-      // serialized personIds array. The real engine returns nothing.
-      const scalarEqArray = all.filter(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (m) => (m.personIds as any) === (a.primary as any)
-      );
-      return { contains: contains.length, scalarEqArray: scalarEqArray.length };
+      return { wrongIndexHits: wrong.length, ownerWideContains: contains.length };
     });
 
-    expect(contains).toBe(1); // element-contains works
-    expect(scalarEqArray).toBe(0); // scalar==array never matches -> the bug
+    expect(wrongIndexHits).toBe(0); // array index + scalar eq matches nothing -> the bug
+    expect(ownerWideContains).toBe(1); // owner-wide + JS element-contains is correct
   });
 });
 
