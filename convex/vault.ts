@@ -1121,10 +1121,9 @@ async function findPersonByIdentifier(
 // whole vault (getVaultSnapshot collects all ~20 owner tables). Returns a
 // VaultSnapshot whose arrays are restricted to this person's related rows but
 // ordered identically to the full snapshot, so assemblePersonWorkspaceFromSnapshot
-// produces the same output. media and contextItems are index-narrowed to this
-// person via the GEN-92FU by_person array-element index; historicalContext has
-// no person-scoped index, so it is still read owner-wide (and filtered in JS).
-// Every other (and larger) relational table is index-narrowed to this person.
+// produces the same output. media, contextItems, and historicalContext have no
+// usable person-scoped index, so they are read owner-wide and narrowed in JS;
+// every other (and larger) relational table is index-narrowed to this person.
 export async function loadPersonScopedSnapshot(
   ctx: QueryCtx,
   vaultOwnerId: string,
@@ -1300,36 +1299,36 @@ export async function loadPersonScopedSnapshot(
   }
   const importRuns = owned(Array.from(importRunSet));
 
-  // GEN-92FU: media and contextItems both index their personIds array via a
-  // by_person element index, so read only the rows referencing THIS person
-  // instead of every row the owner has. GEN-70 defense-in-depth: still apply
-  // the owner filter to the result so a row can never surface for the wrong
-  // owner even if a person _id were somehow shared across vaults.
-  // historicalContext has no person-scoped index, so it stays owner-wide.
-  // NOTE: querying an array-field index by a single element is a supported
-  // Convex runtime behavior (the index is keyed per element, so eq(element)
-  // matches rows whose array contains it), but the generated `q.eq` type for an
-  // array-typed index field expects the whole array. Cast the element to bridge
-  // that types-vs-runtime gap, mirroring the `as any` index pattern used in
-  // getVaultSnapshot above.
-  const [mediaByPerson, contextItemsByPerson, historicalContextRows] = await Promise.all([
+  // media, contextItems, historicalContext: read owner-wide, then narrow in JS
+  // to keep the assembled output identical to the full snapshot.
+  // IMPORTANT: media.personIds / contextItems.personIds are arrays, and Convex
+  // standard `.index()` does NOT support array-element ("contains") matching —
+  // array-typed indexes exist only for vector indexes. A `by_person` index on
+  // `personIds` queried with `q.eq("personIds", oneId)` compares against the
+  // whole serialized array and returns ZERO rows in production. So these two
+  // tables CANNOT be index-narrowed by person without a join/link table; do not
+  // re-attempt it. (The fake-ctx parity tests cannot catch that mismatch — it is
+  // exactly the class of bug the GEN-95C convex-test follow-up would surface.)
+  const [allMedia, allContextItems, historicalContextRows] = await Promise.all([
     ctx.db
       .query("media")
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .withIndex("by_person", (q: any) => q.eq("personIds", personId))
+      .withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId))
       .collect(),
     ctx.db
       .query("contextItems")
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .withIndex("by_person", (q: any) => q.eq("personIds", personId))
+      .withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId))
       .collect(),
     ctx.db
       .query("historicalContext")
       .withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId))
       .collect(),
   ]);
-  const media = owned(mediaByPerson);
-  const contextItems = owned(contextItemsByPerson);
+  const media = owned(allMedia).filter((item) =>
+    item.personIds.some((id) => String(id) === personIdStr)
+  );
+  const contextItems = owned(allContextItems).filter((item) =>
+    item.personIds.some((id) => String(id) === personIdStr)
+  );
   const historicalContext = owned(historicalContextRows);
 
   // Related people: the relationship counterparts (relatedPeople + relationship

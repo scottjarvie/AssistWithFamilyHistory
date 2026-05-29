@@ -614,12 +614,7 @@ export default defineSchema({
     .index("by_type", ["type"])
     .index("by_source", ["sourceId"])
     .index("by_import_key", ["importKey"])
-    .index("by_familySearchUrl", ["familySearchUrl"])
-    // GEN-92FU: Convex indexes array fields by element, so this lets the
-    // per-person loader fetch only the media whose personIds array contains a
-    // given person id — instead of reading all of the owner's media and
-    // filtering in JS. (GEN-70 owner filter is still applied to the result.)
-    .index("by_person", ["personIds"]),
+    .index("by_familySearchUrl", ["familySearchUrl"]),
 
   /**
    * CONTEXT ITEMS
@@ -676,10 +671,7 @@ export default defineSchema({
     reviewedAt: v.optional(v.number()),
   })
     .index("by_owner", ["vaultOwnerId"])
-    .index("by_primary_person", ["primaryPersonId"])
-    // GEN-92FU: array-element index on personIds so the per-person loader can
-    // fetch only context items referencing a given person (still owner-filtered).
-    .index("by_person", ["personIds"]),
+    .index("by_primary_person", ["primaryPersonId"]),
 
   /**
    * IMPORT RUNS
