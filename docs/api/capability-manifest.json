@@ -65,14 +65,14 @@
     },
     {
       "route": "/api/keys/[keyId]",
-      "methods": ["DELETE"],
+      "methods": ["PATCH", "DELETE"],
       "capability": "agent_api_key_revoke",
       "environment": "browser-or-local-api",
       "agentSupport": "not-supported",
       "reviewLevel": "owner-scoped-write",
       "risk": "high",
       "scopes": [],
-      "notes": "Revoke one of the owner's API keys (idempotent). Owner-guarded in the Convex mutation via matchesVaultOwner."
+      "notes": "DELETE revokes a key (idempotent, terminal). PATCH suspends/reactivates a key (operator tooling; revoked keys cannot be reactivated). Owner-guarded in the Convex mutation via matchesVaultOwner."
     },
     {
       "route": "/api/context-reports",

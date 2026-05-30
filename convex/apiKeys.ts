@@ -15,7 +15,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { filterByVaultOwner, matchesVaultOwner, resolveOwner } from "./vaultCore";
 
-const tierValidator = v.union(v.literal("free"), v.literal("standard"), v.literal("trusted"));
+const tierValidator = v.union(v.literal("trial"), v.literal("standard"), v.literal("trusted"));
 
 export const mintKey = mutation({
   args: {
@@ -68,6 +68,30 @@ export const revokeKey = mutation({
       await ctx.db.patch(row._id, { status: "revoked", revokedAt: Date.now() });
     }
     return { keyId: args.keyId, status: "revoked" as const };
+  },
+});
+
+/** Suspend or reactivate a key (operator tooling). Revoked keys are terminal. */
+export const setKeyStatus = mutation({
+  args: {
+    vaultOwnerId: v.string(),
+    keyId: v.string(),
+    status: v.union(v.literal("active"), v.literal("suspended")),
+  },
+  handler: async (ctx, args) => {
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
+    const row = await ctx.db
+      .query("apiKeys")
+      .withIndex("by_keyId", (q) => q.eq("keyId", args.keyId))
+      .first();
+    if (!row || !matchesVaultOwner(row.vaultOwnerId, vaultOwnerId)) {
+      throw new Error("API key not found");
+    }
+    if (row.status === "revoked") {
+      throw new Error("Revoked keys cannot be reactivated");
+    }
+    await ctx.db.patch(row._id, { status: args.status });
+    return { keyId: args.keyId, status: args.status };
   },
 });
 

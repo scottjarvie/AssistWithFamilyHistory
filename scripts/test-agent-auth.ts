@@ -5,12 +5,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  SCOPE_PRESETS,
+  SCOPE_PRESETS_META,
   hasScope,
   isScopePreset,
   isValidScope,
   presetScopes,
+  presetTier,
   sanitizeScopes,
+  scopesRequireAdmin,
 } from "@/lib/auth/scopes";
 import {
   API_KEY_PREFIX,
@@ -20,15 +22,20 @@ import {
   secretMatchesHash,
 } from "@/lib/auth/apiKey";
 
-test("scope presets are valid and read_only_assistant has no write scopes", () => {
+test("scope presets are valid, use shared tier names, and gate admin scopes", () => {
   assert.equal(isScopePreset("read_only_assistant"), true);
   assert.equal(isScopePreset("nope"), false);
-  for (const scopes of Object.values(SCOPE_PRESETS)) {
-    for (const scope of scopes) assert.equal(isValidScope(scope), true);
+  for (const preset of SCOPE_PRESETS_META) {
+    for (const scope of preset.scopes) assert.equal(isValidScope(scope), true);
+    assert.ok(["trial", "standard", "trusted"].includes(preset.tier));
   }
+  assert.equal(presetTier("read_only_assistant"), "trial");
   assert.equal(presetScopes("read_only_assistant").some((s) => s.includes(":write")), false);
   assert.equal(hasScope(presetScopes("trusted_operator"), "stories:publish"), true);
   assert.equal(hasScope(presetScopes("read_only_assistant"), "stories:publish"), false);
+  // only the admin/security preset carries admin scopes
+  assert.equal(scopesRequireAdmin(presetScopes("admin_security")), true);
+  assert.equal(scopesRequireAdmin(presetScopes("trusted_operator")), false);
 });
 
 test("sanitizeScopes drops unknown scopes", () => {

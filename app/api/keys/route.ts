@@ -15,15 +15,17 @@ import { api } from "@/convex/_generated/api";
 import { getAuthedConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
 import { getVaultAccessContext } from "@/lib/vault/server";
 import { generateApiKey } from "@/lib/auth/apiKey";
-import { isScopePreset, presetScopes, sanitizeScopes, type Scope } from "@/lib/auth/scopes";
-
-const TRUSTED_SCOPES = new Set<string>(["stories:publish", "provisional:resolve"]);
-
-function tierForScopes(scopes: readonly string[]): "free" | "standard" | "trusted" {
-  if (scopes.some((scope) => TRUSTED_SCOPES.has(scope))) return "trusted";
-  if (scopes.some((scope) => scope.includes(":") && !scope.endsWith(":read"))) return "standard";
-  return "free";
-}
+import {
+  isScopePreset,
+  presetScopes,
+  presetTier,
+  sanitizeScopes,
+  scopesRequireAdmin,
+  tierForScopes,
+  type ApiKeyTier,
+  type Scope,
+} from "@/lib/auth/scopes";
+import { isAdminUser } from "@/lib/auth/admin";
 
 const MintSchema = z.object({
   label: z.string().transform((value) => value.trim()),
@@ -46,10 +48,13 @@ export async function POST(request: NextRequest) {
     }
 
     let scopes: Scope[];
+    let tier: ApiKeyTier;
     if (parsed.data.preset && isScopePreset(parsed.data.preset)) {
       scopes = presetScopes(parsed.data.preset);
+      tier = presetTier(parsed.data.preset);
     } else if (parsed.data.scopes && parsed.data.scopes.length > 0) {
       scopes = sanitizeScopes(parsed.data.scopes);
+      tier = tierForScopes(scopes);
     } else {
       return NextResponse.json(
         { error: "Provide a valid scope preset or an explicit scopes array" },
@@ -60,8 +65,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No valid scopes were provided" }, { status: 400 });
     }
 
+    // Admin/operator scopes require the admin role (shared-model: Admin is a role).
+    if (scopesRequireAdmin(scopes) && !isAdminUser(userId)) {
+      return NextResponse.json(
+        { error: "Admin scopes require an operator role on your account" },
+        { status: 403 },
+      );
+    }
+
     const generated = generateApiKey();
-    const tier = tierForScopes(scopes);
     const client = await getAuthedConvexClient();
     await client.mutation(api.apiKeys.mintKey, {
       vaultOwnerId,
