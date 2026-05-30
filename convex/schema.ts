@@ -1227,8 +1227,8 @@ export default defineSchema({
     hashedSecret: v.string(),          // SHA-256(secret) hex; raw secret never stored
     label: v.string(),
     scopes: v.array(v.string()),
-    tier: v.union(v.literal("free"), v.literal("standard"), v.literal("trusted")),
-    status: v.union(v.literal("active"), v.literal("revoked")),
+    tier: v.union(v.literal("trial"), v.literal("standard"), v.literal("trusted")),
+    status: v.union(v.literal("active"), v.literal("revoked"), v.literal("suspended")),
     createdAt: v.number(),
     lastUsedAt: v.optional(v.number()),
     revokedAt: v.optional(v.number()),

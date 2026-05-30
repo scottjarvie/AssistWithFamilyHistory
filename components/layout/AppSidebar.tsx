@@ -38,6 +38,8 @@ import {
   ExternalLink,
   Gauge,
   FlaskConical,
+  KeyRound,
+  ShieldAlert,
   type LucideIcon
 } from "lucide-react";
 import { useState } from "react";
@@ -141,6 +143,21 @@ const navSections: NavSection[] = [
         label: "Timeline",
         icon: Clock,
         comingSoon: true,
+      },
+    ],
+  },
+  {
+    label: "Agents",
+    items: [
+      {
+        href: "/app/api",
+        label: "API Center",
+        icon: KeyRound,
+      },
+      {
+        href: "/app/api/admin",
+        label: "Admin API",
+        icon: ShieldAlert,
       },
     ],
   },
