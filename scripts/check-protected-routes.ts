@@ -47,6 +47,7 @@ const expectedPublic = [
   "/",
   "/features",
   "/extension",
+  "/updates",
   "/stories/abc",
   "/api/unknown",
 ];

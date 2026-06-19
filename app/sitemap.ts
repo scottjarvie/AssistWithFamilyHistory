@@ -10,6 +10,7 @@ const publicRoutes = [
   "/features/source-docs",
   "/privacy",
   "/roadmap",
+  "/updates",
   "/app",
   "/app/people",
   "/app/places",

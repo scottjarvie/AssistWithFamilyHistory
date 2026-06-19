@@ -10,7 +10,7 @@ Agents should run smoke checks by product surface, not as an unexplained list of
 
 `pnpm smoke:routes` groups routes into these gates:
 
-- Public marketing: homepage, features, extension page.
+- Public marketing: homepage, features, extension page, updates page.
 - App shell: `/app`.
 - Intake: `/app/imports`.
 - Operations: `/app/operations`.

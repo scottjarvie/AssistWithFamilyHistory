@@ -65,6 +65,9 @@ export default async function AppLayout({
             <SafeLink href="/contact" className="hover:text-stone-900 hover:underline">
               Contact
             </SafeLink>
+            <SafeLink href="/updates" className="hover:text-stone-900 hover:underline">
+              Updates
+            </SafeLink>
           </div>
         </footer>
       </main>

@@ -7,6 +7,7 @@ ROUTE_GATES=(
   "Public marketing|/"
   "Public marketing|/features"
   "Public marketing|/extension"
+  "Public marketing|/updates"
   "App shell|/app"
   "Intake|/app/imports"
   "Operations|/app/operations"
