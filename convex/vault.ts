@@ -2258,7 +2258,11 @@ export const getContextPack = query({
       memories: workspace.media.filter(isContextPackEligibleMedia),
       sourceFacts: workspace.sourceFacts,
       reviewedContextItems: workspace.contextItems.filter(isContextPackEligibleContextItem),
-      documents: workspace.documents,
+      // Source-doc rows can contain raw extraction text, private notes,
+      // contributor details, and local artifact paths, but the documents table
+      // does not yet carry review/privacy/AI-eligibility fields. Keep the
+      // document count in stats, and serve full documents through the dedicated
+      // owner-scoped document APIs instead of exporting raw rows to AI context.
       // AI surface: only ship reviewed, non-private, AI-allowed packs to the
       // structured context bundle. Unreviewed/private rows stay visible on
       // human-facing surfaces (person workspace, audit) via `entries`.

@@ -99,6 +99,25 @@ function storyFields(owner: string, personId: Id<"persons">, title: string) {
   };
 }
 
+function documentFields(owner: string, personKey: string, marker: string) {
+  return {
+    vaultOwnerId: owner,
+    personId: personKey,
+    type: "CST" as const,
+    title: `codex-test-private-source-doc-${marker}`,
+    contentMarkdown: [
+      `# codex-test-private-source-doc-${marker}`,
+      "",
+      `Private living-person note: codex-test-private-source-doc-secret-${marker}`,
+      `Raw contributor detail: codex-test-attached-by-${marker}`,
+    ].join("\n"),
+    contentText: `codex-test-private-source-doc-secret-${marker} codex-test-attached-by-${marker}`,
+    artifactPath: `codex-test-private-artifact-${marker}.md`,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 function sourceFields(owner: string, title: string) {
   return {
     vaultOwnerId: owner,
@@ -256,6 +275,43 @@ describe("owner isolation (real withIndex(by_owner) paths)", () => {
     );
     // The rendered markdown must not name B's person.
     expect(pack.markdown.includes("PrimaryB")).toBe(false);
+  });
+
+  test("getContextPack redacts private source-doc document values from AI/export output", async () => {
+    const t = convexTest(schema, modules);
+    const a = await seedOwner(t, OWNER_A, "A");
+    const marker = "A-001";
+    const privateNeedles = [
+      `codex-test-private-source-doc-${marker}`,
+      `codex-test-private-source-doc-secret-${marker}`,
+      `codex-test-attached-by-${marker}`,
+      `codex-test-private-artifact-${marker}.md`,
+    ];
+
+    await t.run(async (ctx) => {
+      await ctx.db.insert(
+        "documents",
+        documentFields(OWNER_A, "FSID-A", marker)
+      );
+    });
+
+    const pack = await t.query(api.vault.getContextPack, {
+      vaultOwnerId: OWNER_A,
+      personIdentifier: String(a.primary),
+    });
+    expect(pack).not.toBeNull();
+    if (!pack) return;
+
+    // Source docs can contain raw FamilySearch extraction text, private notes,
+    // contributor details, and local artifact paths. Story Writer/public-facing
+    // context-pack exports should not receive those raw source-doc values unless
+    // a dedicated redaction/review gate marks them safe for AI/public use.
+    const exported = `${pack.markdown}\n${JSON.stringify(pack.structured)}`;
+    expect("documents" in pack.structured).toBe(false);
+    expect(pack.structured.stats.documents).toBe(1);
+    for (const needle of privateNeedles) {
+      expect(exported).not.toContain(needle);
+    }
   });
 });
 
