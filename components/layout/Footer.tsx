@@ -46,6 +46,9 @@ export function Footer() {
             <SafeLink href="/roadmap" className="transition-colors hover:text-[#fff6e5]">
               Roadmap
             </SafeLink>
+            <SafeLink href="/updates" className="transition-colors hover:text-[#fff6e5]">
+              Updates
+            </SafeLink>
             <SafeLink href="/privacy" className="transition-colors hover:text-[#fff6e5]">
               Privacy
             </SafeLink>
