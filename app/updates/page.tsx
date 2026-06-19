@@ -15,11 +15,16 @@ export const metadata: Metadata = createPageMetadata({
 
 type ReleaseSectionKey = "created" | "fixed" | "upgraded";
 
-const dateFormatter = new Intl.DateTimeFormat("en", {
+const releaseTimeZone = "America/New_York";
+
+const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
   month: "long",
   day: "numeric",
   year: "numeric",
-  timeZone: "UTC",
+  hour: "numeric",
+  minute: "2-digit",
+  timeZone: releaseTimeZone,
+  timeZoneName: "short",
 });
 
 const releaseSections: Array<{
@@ -48,8 +53,15 @@ const releaseSections: Array<{
   },
 ];
 
-function formatReleaseDate(value: string) {
-  return dateFormatter.format(new Date(`${value}T00:00:00Z`));
+function formatReleaseDateTime(value: string) {
+  const parts = dateTimeFormatter.formatToParts(new Date(value));
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((item) => item.type === type)?.value ?? "";
+
+  return [
+    `${part("month")} ${part("day")}, ${part("year")}`,
+    `${part("hour")}:${part("minute")} ${part("dayPeriod")} ${part("timeZoneName")}`,
+  ].join(", ");
 }
 
 function ReleaseEntryCard({ entry }: { entry: ReleaseEntry }) {
@@ -61,7 +73,7 @@ function ReleaseEntryCard({ entry }: { entry: ReleaseEntry }) {
             v{entry.version}
           </Badge>
           <span className="text-sm font-medium text-[#6f664f]">
-            {formatReleaseDate(entry.date)}
+            {formatReleaseDateTime(entry.releasedAt)}
           </span>
         </div>
         <h2 className="mt-4 text-2xl font-semibold text-[#1d212a]">{entry.title}</h2>
@@ -118,7 +130,7 @@ export default function UpdatesPage() {
             <div className="mt-5 flex flex-wrap items-center gap-3 text-sm font-medium text-[#d9cdb5]">
               <span>Current version v{latestRelease.version}</span>
               <span className="h-1 w-1 rounded-full bg-[#d9cdb5]" aria-hidden="true" />
-              <span>Updated {formatReleaseDate(latestRelease.date)}</span>
+              <span>Updated {formatReleaseDateTime(latestRelease.releasedAt)}</span>
             </div>
             <p className="mt-5 max-w-3xl text-lg leading-8 text-[#d9cdb5]">
               A concise log of shipped, user-facing changes for the private beta.
@@ -138,7 +150,7 @@ export default function UpdatesPage() {
 
           <div className="space-y-5">
             {releaseNotes.map((entry) => (
-              <ReleaseEntryCard key={`${entry.version}-${entry.date}`} entry={entry} />
+              <ReleaseEntryCard key={`${entry.version}-${entry.releasedAt}`} entry={entry} />
             ))}
           </div>
         </section>

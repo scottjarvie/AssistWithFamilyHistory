@@ -2,7 +2,7 @@ import packageJson from "@/package.json";
 
 export type ReleaseEntry = {
   version: string;
-  date: string;
+  releasedAt: string;
   title: string;
   summary: string;
   created: string[];
@@ -15,7 +15,7 @@ export const appVersion = packageJson.version;
 export const releaseNotes = [
   {
     version: appVersion,
-    date: "2026-06-19",
+    releasedAt: "2026-06-19T09:09:20-04:00",
     title: "Initial release-log baseline",
     summary:
       "This starts the public release log for Discover Their Stories. Notes stay intentionally user-safe: private vault data, living-person details, raw source records, and unfinished internal work do not belong here.",
