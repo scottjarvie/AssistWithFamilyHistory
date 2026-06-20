@@ -306,11 +306,19 @@ describe("owner isolation (real withIndex(by_owner) paths)", () => {
     // contributor details, and local artifact paths. Story Writer/public-facing
     // context-pack exports should not receive those raw source-doc values unless
     // a dedicated redaction/review gate marks them safe for AI/public use.
-    const exported = `${pack.markdown}\n${JSON.stringify(pack.structured)}`;
+    const structuredJson = JSON.stringify(pack.structured);
+    const agentContextPayload = `${pack.markdown}\n${structuredJson}`;
+    const logRelevantPayload = JSON.stringify({
+      markdown: pack.markdown,
+      structured: pack.structured,
+    });
     expect("documents" in pack.structured).toBe(false);
     expect(pack.structured.stats.documents).toBe(1);
     for (const needle of privateNeedles) {
-      expect(exported).not.toContain(needle);
+      expect(pack.markdown).not.toContain(needle);
+      expect(structuredJson).not.toContain(needle);
+      expect(agentContextPayload).not.toContain(needle);
+      expect(logRelevantPayload).not.toContain(needle);
     }
   });
 });

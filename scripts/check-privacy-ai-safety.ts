@@ -8,7 +8,7 @@ const files = {
   storyWriter: read("components/vault/StoryWriterStudio.tsx"),
   schema: read("convex/schema.ts"),
   importer: read("lib/familysearch/importer.ts"),
-  vault: read("convex/vault.ts"),
+  vault: [read("convex/vault.ts"), read("convex/contextPackBuilder.ts")].join("\n"),
   mediaReview: read("components/vault/MediaPrivacyReviewPanel.tsx"),
   safeLog: read("lib/server/safeLog.ts"),
   convexServer: read("lib/convex/server.ts"),
