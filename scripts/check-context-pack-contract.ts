@@ -139,7 +139,10 @@ for (const token of [
 
 // -- 3. UI surface contract assertions (string-match against TSX) --------
 
-const contextPackSource = readFileSync("convex/vault.ts", "utf8");
+const contextPackSource = [
+  readFileSync("convex/vault.ts", "utf8"),
+  readFileSync("convex/contextPackBuilder.ts", "utf8"),
+].join("\n");
 for (const token of [
   // These describe the structured/markdown context-pack export shape.
   // Behavior-level assertions for these would require a Convex query

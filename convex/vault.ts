@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { buildStoryPublicSlug } from "../lib/stories/slug";
+import { buildContextPack } from "./contextPackBuilder";
 import {
   buildOperationSummary,
   filterByVaultOwner,
@@ -2159,12 +2160,6 @@ export const getResearchOverview = query({
   },
 });
 
-function truncateText(value: string | undefined, maxLength: number) {
-  if (!value) return undefined;
-  const compact = value.replace(/\s+/g, " ").trim();
-  return compact.length <= maxLength ? compact : `${compact.slice(0, maxLength - 3)}...`;
-}
-
 export const getContextPack = query({
   args: {
     vaultOwnerId: v.string(),
@@ -2179,236 +2174,12 @@ export const getContextPack = query({
     );
     if (!workspace) return null;
 
-    const evidenceTrace = workspace.sources.map((entry) => ({
-      sourceId: entry.source._id,
-      title: entry.source.title,
-      type: entry.source.type,
-      repository: entry.source.repository,
-      url: entry.source.url,
-      citationCount: entry.citations.length,
-      supportedClaims: entry.citations.slice(0, 8).map((citation) => ({
-        citationId: citation._id,
-        field: citation.field || "general",
-        confidence: citation.confidence,
-        isEvidence: citation.isEvidence,
-        page: citation.page,
-        text: truncateText(citation.editedText || citation.extractedText || citation.notes, 240),
-      })),
-    }));
-    const storyClaimReadiness = {
-      evidenceSources: workspace.sources.length,
-      citedClaims: workspace.citations.length,
-      openRequiredChecks: workspace.researchChecks
-        .filter(
-          (check) =>
-            check.applicability === "required" &&
-            (check.status === "missing" || check.status === "needs_review")
-        )
-        .map((check) => ({
-          checkKey: check.checkKey,
-          status: check.status,
-          summary: check.summary,
-          completionSource: check.completionSource,
-          lastReviewedAt: check.lastReviewedAt,
-        })),
-      staleChecks: workspace.researchChecks
-        .filter(
-          (check) =>
-            check.lastReviewedAt &&
-            check.lastReviewedAt < Date.now() - 1000 * 60 * 60 * 24 * 45 &&
-            check.status !== "missing" &&
-            check.status !== "needs_review"
-        )
-        .map((check) => ({
-          checkKey: check.checkKey,
-          status: check.status,
-          lastReviewedAt: check.lastReviewedAt,
-        })),
-      unresolvedProvisionalRelatives: workspace.provisionalRelatives.length,
-      unresolvedImportWarnings: workspace.importRuns.flatMap((run) => run.warnings).slice(0, 12),
-      // GEN-72: use AI-aware missing-places signal in the AI export so the
-      // AI sees "place X has no usable context" when X only has unreviewed
-      // rows. Human surfaces still use `missingPlaces` (unfiltered).
-      missingContextPlaces: workspace.contextCoverage.aiMissingPlaces,
-      mediaNeedingPrivacyReview: workspace.media
-        .filter((item) => !isPublicStoryMedia(item) || item.aiUseAllowed !== true)
-        .slice(0, 12)
-        .map((item) => ({
-          mediaId: item._id,
-          title: item.title,
-          privacyLevel: item.privacyLevel ?? "private",
-          reviewStatus: item.reviewStatus ?? "unreviewed",
-          rightsStatus: item.rightsStatus ?? "unknown",
-          aiUseAllowed: item.aiUseAllowed === true,
-        })),
-    };
-    const structured = {
-      person: workspace.person,
-      stats: workspace.stats,
-      operations: workspace.operations,
-      researchChecks: workspace.researchChecks,
-      timeline: workspace.timeline,
-      relationships: workspace.relationships,
-      places: workspace.places,
-      provisionalRelatives: workspace.provisionalRelatives,
-      sources: workspace.sources,
-      // GEN-72: filter media by AI eligibility (reviewed/redacted +
-      // non-private + aiUseAllowed=true). Items the user opted out of AI
-      // use must not ship to the AI context-pack export.
-      memories: workspace.media.filter(isContextPackEligibleMedia),
-      sourceFacts: workspace.sourceFacts,
-      reviewedContextItems: workspace.contextItems.filter(isContextPackEligibleContextItem),
-      // Source-doc rows can contain raw extraction text, private notes,
-      // contributor details, and local artifact paths, but the documents table
-      // does not yet carry review/privacy/AI-eligibility fields. Keep the
-      // document count in stats, and serve full documents through the dedicated
-      // owner-scoped document APIs instead of exporting raw rows to AI context.
-      // AI surface: only ship reviewed, non-private, AI-allowed packs to the
-      // structured context bundle. Unreviewed/private rows stay visible on
-      // human-facing surfaces (person workspace, audit) via `entries`.
-      historicalContext: workspace.contextCoverage.aiEligibleEntries,
-      stories: workspace.stories,
-      evidenceTrace,
-      storyClaimReadiness,
-      openResearchTasks: workspace.researchTasks.filter((task) => task.status !== "done"),
-      unresolvedConflicts: storyClaimReadiness.unresolvedImportWarnings,
-      recentImports: workspace.importRuns.slice(0, 5),
-    };
-
-    const markdown = [
-      `# Context Pack: ${workspace.person.displayName}`,
-      "",
-      `- FamilySearch ID: ${workspace.person.fsId || "Unknown"}`,
-      `- Research status: ${workspace.person.researchStatus}`,
-      `- Completion: ${workspace.operations.completionPercent}%`,
-      `- Missing critical checks: ${workspace.operations.criticalMissing.join(", ") || "None"}`,
-      "",
-      "## Person Summary",
-      "",
-      `- Name: ${workspace.person.displayName}`,
-      `- Birth: ${workspace.person.birth?.date?.original || "Unknown"}${workspace.person.birth?.place?.original ? ` in ${workspace.person.birth.place.original}` : ""}`,
-      `- Death: ${workspace.person.death?.date?.original || "Unknown"}${workspace.person.death?.place?.original ? ` in ${workspace.person.death.place.original}` : ""}`,
-      "",
-      "## Operations",
-      "",
-      ...workspace.researchChecks.map(
-        (check) =>
-          `- ${check.checkKey}: ${check.status} (${check.applicability}, source: ${check.completionSource}, reviewed: ${check.lastReviewedAt ? new Date(check.lastReviewedAt).toISOString() : "not recorded"})${check.summary ? ` - ${check.summary}` : ""}`
-      ),
-      "",
-      "## Story Claim Readiness",
-      "",
-      `- Evidence sources: ${storyClaimReadiness.evidenceSources}`,
-      `- Cited claims: ${storyClaimReadiness.citedClaims}`,
-      `- Open required checks: ${storyClaimReadiness.openRequiredChecks.map((check) => check.checkKey).join(", ") || "None"}`,
-      `- Stale checks: ${storyClaimReadiness.staleChecks.map((check) => check.checkKey).join(", ") || "None"}`,
-      `- Provisional relatives needing review: ${storyClaimReadiness.unresolvedProvisionalRelatives}`,
-      `- Missing context places: ${storyClaimReadiness.missingContextPlaces.map((place) => place.name).join("; ") || "None"}`,
-      `- Media/privacy review needed: ${storyClaimReadiness.mediaNeedingPrivacyReview.map((item) => item.title).join("; ") || "None"}`,
-      "",
-      "## Timeline",
-      "",
-      ...workspace.timeline.map(
-        (event) =>
-          `- ${event.date?.original || "Undated"}: ${event.type}${event.place?.original ? ` in ${event.place.original}` : ""}`
-      ),
-      "",
-      "## Relationships",
-      "",
-      ...workspace.relationships.map((relationship) => `- ${relationship!.type}: ${relationship!.relatedName}`),
-      "",
-      "## Provisional Relatives",
-      "",
-      ...(workspace.provisionalRelatives.length > 0
-        ? workspace.provisionalRelatives.map(
-            (relative) => `- ${relative.displayName}${relative.relationshipHint ? ` (${relative.relationshipHint})` : ""}`
-          )
-        : ["- No provisional relatives currently waiting for review."]),
-      "",
-      "## Places",
-      "",
-      ...workspace.places.map((place) => `- ${place.fullName || place.name || "Unknown place"}`),
-      "",
-      "## Historical and Local Context",
-      "",
-      ...(workspace.contextCoverage.aiEligibleEntries.length > 0
-        ? workspace.contextCoverage.aiEligibleEntries.flatMap((entry) => [
-            `- ${entry.title} (${entry.topic.replace(/_/g, " ")}, ${entry.timePeriod.startYear}-${entry.timePeriod.endYear})`,
-            `  - Review/privacy: ${entry.reviewStatus ?? "unreviewed"} / ${entry.privacyLevel ?? "private"}; AI use: ${entry.aiUseAllowed === true ? "allowed" : "blocked"}`,
-            entry.packType
-              ? `  - Research pack: ${entry.packType}${entry.templateVersion ? ` (${entry.templateVersion})` : ""}`
-              : `  - Research pack: untyped historical context`,
-            ...(entry.categoryBlocks ?? []).flatMap((block) => [
-              `  - ${block.category.replace(/_/g, " ")}: ${block.summary}`,
-              ...block.sourcedClaims.map(
-                (claim) =>
-                  `    - ${claim.confidence}: ${claim.text}${claim.sourceRefs.length > 0 ? ` [${claim.sourceRefs.join("; ")}]` : ""}`
-              ),
-              ...(block.synthesisNotes ? [`    - Synthesis: ${block.synthesisNotes}`] : []),
-            ]),
-          ])
-        : ["- No historical, place, era, church, building, news, or locality context reports linked yet."]),
-      "",
-      "## Sources",
-      "",
-      ...evidenceTrace.map(
-        (entry) =>
-          `- ${entry.title} (${entry.type}${entry.repository ? `, ${entry.repository}` : ""}) - ${entry.citationCount} citation${entry.citationCount === 1 ? "" : "s"}`
-      ),
-      "",
-      "## Evidence Trace",
-      "",
-      ...(evidenceTrace.length > 0
-        ? evidenceTrace.flatMap((entry) => [
-            `### ${entry.title}`,
-            ...entry.supportedClaims.map(
-              (claim) =>
-                `- ${claim.field}: ${claim.confidence}${claim.text ? ` - ${claim.text}` : ""}`
-            ),
-          ])
-        : ["- No source-backed claims are linked yet."]),
-      "",
-      "## Source-Backed Facts",
-      "",
-      ...(workspace.sourceFacts.length > 0
-        ? workspace.sourceFacts.slice(0, 24).map(
-            (fact) =>
-              `- ${fact.factType}: ${fact.value} (${fact.label}, ${fact.confidence}, ${fact.status})${fact.conflictReason ? ` - ${fact.conflictReason}` : ""}`
-          )
-        : ["- No indexed source facts have been extracted yet."]),
-      "",
-      "## Reviewed Loose Context",
-      "",
-      ...(workspace.contextItems.filter(isContextPackEligibleContextItem).length > 0
-        ? workspace.contextItems.filter(isContextPackEligibleContextItem).slice(0, 12).map(
-            (item) =>
-              `- ${item.title} (${item.itemType}, ${item.evidenceRole}, AI use: ${item.aiUseAllowed ? "allowed" : "blocked"})`
-          )
-        : ["- No reviewed loose-context items are eligible for context packs yet."]),
-      "",
-      "## Memories",
-      "",
-      ...workspace.media.map(
-        (item) =>
-          `- ${item.title} (privacy: ${item.privacyLevel ?? "private"}, review: ${item.reviewStatus ?? "unreviewed"}, rights: ${item.rightsStatus ?? "unknown"}, AI use: ${item.aiUseAllowed === true ? "allowed" : "blocked"})`
-      ),
-      "",
-      "## Open Research Questions",
-      "",
-      ...workspace.researchTasks
-        .filter((task) => task.status !== "done")
-        .map((task) => `- ${task.title}: ${task.description || task.type}`),
-      "",
-      "## Unresolved Import Warnings",
-      "",
-      ...(structured.unresolvedConflicts.length > 0
-        ? structured.unresolvedConflicts.map((warning) => `- ${warning}`)
-        : ["- No unresolved import warnings recorded."]),
-    ].join("\n");
-
-    return {
-      structured,
-      markdown,
-    };
+    // The extracted builder owns the structured export, including the
+    // reviewedContextItems projection gated by isContextPackEligibleContextItem.
+    return buildContextPack(workspace, {
+      isContextPackEligibleMedia,
+      isContextPackEligibleContextItem,
+      isPublicStoryMedia,
+    });
   },
 });
