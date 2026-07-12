@@ -70,10 +70,11 @@ timestamp and an exact subject configured in
 TRUST_BOUNDARY_SUPER_ADMIN_IDS:
 
 ~~~bash
+ROLLOUT_START_EPOCH_MS=1783876512000 # replace with the recorded rollout start
 pnpm exec convex run --prod \
   --identity '{"subject":"user_superadmin_clerk_id","issuer":"operator","tokenIdentifier":"operator|user_superadmin_clerk_id"}' \
   trustBoundary:getShadowLogSummary \
-  '{"since":ROLLOUT_START_EPOCH_MS,"limit":10000}'
+  "{\"since\":${ROLLOUT_START_EPOCH_MS},\"limit\":10000}"
 ~~~
 
 Do not flip unless:
