@@ -8,7 +8,7 @@ import {
   MAX_PROCESS_PAYLOAD_BYTES,
 } from "@/lib/ai/types";
 import { api } from "@/convex/_generated/api";
-import { getConvexClient, isConvexConfigured } from "@/lib/convex/server";
+import { getAuthedConvexClient, isConvexConfigured } from "@/lib/convex/server";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
 // GEN-89-RL: per-vaultOwner rate limiting for the external-AI spend vector.
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       try {
         const { vaultOwnerId } = await getVaultAccessContext();
         const limit = usingClientKey ? RATE_LIMIT_DEFAULT : RATE_LIMIT_SERVER_KEY;
-        const verdict = await getConvexClient().mutation(
+        const verdict = await (await getAuthedConvexClient()).mutation(
           api.rateLimits.checkAndIncrementRateLimit,
           {
             vaultOwnerId,

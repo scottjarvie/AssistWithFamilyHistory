@@ -13,7 +13,7 @@ export async function GET() {
   try {
     const client = await getAuthedConvexClient();
     const { vaultOwnerId } = await getVaultAccessContext();
-    const peopleWithDocs = await client.query(api.vault.getPeopleExplorer, { vaultOwnerId });
+    const peopleWithDocs = await client.action(api.vaultReads.getPeopleExplorer, { vaultOwnerId });
     const ready = getConvexReadyStatus();
 
     return NextResponse.json({

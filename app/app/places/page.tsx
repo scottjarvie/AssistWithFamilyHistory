@@ -47,7 +47,7 @@ export default async function PlacesPage({
   let places;
 
   try {
-    places = await client.query(api.vault.getPlacesExplorer, {
+    places = await client.action(api.vaultReads.getPlacesExplorer, {
       vaultOwnerId,
       search: params.q || undefined,
     });

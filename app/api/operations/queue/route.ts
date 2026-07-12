@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     const { vaultOwnerId } = await getVaultAccessContext();
     const searchParams = request.nextUrl.searchParams;
     const client = await getAuthedConvexClient();
-    const payload = await client.query(api.vault.getOperationsQueue, {
+    const payload = await client.action(api.vaultReads.getOperationsQueue, {
       vaultOwnerId,
       search: searchParams.get("q") || undefined,
       rowType:

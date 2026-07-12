@@ -8,6 +8,7 @@ const publicRoutePath = path.join(process.cwd(), "app", "stories", "[id]", "page
 const statusRoutePath = path.join(process.cwd(), "app", "api", "stories", "[id]", "status", "route.ts");
 const publicRoute = readFileSync(publicRoutePath, "utf8");
 const statusRoute = readFileSync(statusRoutePath, "utf8");
+const vaultMutations = readFileSync(path.join(process.cwd(), "convex", "vaultMutations.ts"), "utf8");
 const ogRoute = readFileSync(path.join(process.cwd(), "app", "stories", "[id]", "opengraph-image.tsx"), "utf8");
 
 const statuses = [
@@ -84,8 +85,18 @@ if (!ogRoute.includes("getPublishedStoryByIdentifier") || !ogRoute.includes("Sto
   failures.push("Public story OG route must avoid leaking unpublished story data");
 }
 
-if (!statusRoute.includes("eventType: body.status === \"published\" ? \"publish_confirmation\" : \"status_change\"")) {
-  failures.push("Status route should record publish confirmation and unpublish/status rollback events");
+if (
+  !vaultMutations.includes('eventType: "publish_confirmation"') ||
+  !vaultMutations.includes('if (args.status === "published" && publishReadiness)')
+) {
+  failures.push("Backend status mutation should atomically record publish confirmation events");
+}
+
+if (
+  !statusRoute.includes('if (body.status !== "published")') ||
+  !statusRoute.includes('eventType: "status_change"')
+) {
+  failures.push("Status route should record non-publish status changes without duplicating publish confirmation");
 }
 
 if (failures.length > 0) {

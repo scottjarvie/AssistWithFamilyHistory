@@ -24,7 +24,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { api } from "@/convex/_generated/api";
 import { isClerkEnabled } from "@/lib/clerk/config";
-import { getConvexClient, isConvexConfigured } from "@/lib/convex/server";
+import { getAuthedConvexClient, isConvexConfigured } from "@/lib/convex/server";
 import { VAULT_PREVIEW_COOKIE } from "@/lib/vault/constants";
 
 export const dynamic = "force-dynamic";
@@ -54,7 +54,7 @@ export async function POST() {
   }
 
   try {
-    const client = getConvexClient();
+    const client = await getAuthedConvexClient();
     const result = await client.mutation(api.vaultMigration.migrateGuestVault, {
       fromVaultOwnerId: guestId,
       toVaultOwnerId: authState.userId,

@@ -100,8 +100,35 @@ describe("research task lifecycle", () => {
       await ctx.db.insert("researchTasks", taskFields(OWNER_A, "a1"));
       await ctx.db.insert("researchTasks", taskFields(OWNER_B, "b1"));
     });
-    const list = await t.query(api.researchTasks.listResearchTasks, { vaultOwnerId: OWNER_A });
+    const list = await t.action(api.researchTasks.listResearchTasks, { vaultOwnerId: OWNER_A });
     expect(list.length).toBe(1);
     expect(list[0].title).toBe("a1");
+  });
+
+  test("person-filtered task reads reject a foreign person reference", async () => {
+    const t = convexTest(schema, modules);
+    const foreignPersonId = await t.run(async (ctx) =>
+      ctx.db.insert("persons", {
+        vaultOwnerId: OWNER_B,
+        name: { given: "Foreign", surname: "Fixture" },
+        sex: "unknown",
+        living: false,
+        researchStatus: "not_started",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await t.run(async (ctx) =>
+      ctx.db.insert("researchTasks", {
+        ...taskFields(OWNER_A, "corrupt cross-reference"),
+        personId: foreignPersonId,
+      }),
+    );
+
+    const list = await t.action(api.researchTasks.listResearchTasks, {
+      vaultOwnerId: OWNER_A,
+      personId: foreignPersonId,
+    });
+    expect(list).toEqual([]);
   });
 });

@@ -1265,4 +1265,24 @@ export default defineSchema({
   })
     .index("by_owner", ["vaultOwnerId"])
     .index("by_owner_request", ["vaultOwnerId", "requestId"]),
+
+  /**
+   * Guarded-rollout telemetry for calls that shadow mode would deny.
+   *
+   * Keep this deliberately sparse: no tokens, arguments, ancestor ids, story
+   * content, or free-form errors. The caller is the verified Clerk subject (or
+   * the literal <anonymous>) so an operator can distinguish a legitimate
+   * integration mismatch from an unauthenticated probe before enforcement.
+   */
+  trustBoundaryShadowLog: defineTable({
+    functionName: v.string(),
+    caller: v.string(),
+    callerKind: v.union(v.literal("anonymous"), v.literal("authenticated")),
+    reason: v.string(),
+    timestamp: v.number(),
+  })
+    .index("by_timestamp", ["timestamp"])
+    .index("by_function_timestamp", ["functionName", "timestamp"])
+    .index("by_reason_timestamp", ["reason", "timestamp"])
+    .index("by_caller_timestamp", ["caller", "timestamp"]),
 });

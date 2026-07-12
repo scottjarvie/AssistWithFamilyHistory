@@ -28,7 +28,7 @@ export async function GET(
     const format = request.nextUrl.searchParams.get("format") || "json";
     const client = await getAuthedConvexClient();
     const { vaultOwnerId } = await getVaultAccessContext();
-    const contextPack = await client.query(api.vault.getContextPack, {
+    const contextPack = await client.action(api.vaultReads.getContextPack, {
       vaultOwnerId,
       personIdentifier,
     });

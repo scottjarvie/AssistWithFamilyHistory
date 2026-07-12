@@ -1,6 +1,6 @@
 # Story Public Beta Readiness
 
-Last updated: 2026-05-21
+Last updated: 2026-07-12
 
 ## Route Purpose
 
@@ -13,6 +13,11 @@ The current route is:
 3. Trusted publisher previews publish gates.
 4. Trusted publisher confirms human review and changes status to published.
 5. Public page renders only when status is `published`, using the canonical readable slug when available.
+
+The Convex mutation independently recomputes the publish gates and records the
+confirmation. The anonymous Convex read independently checks published status
+and returns a server-redacted allowlist. API-route checks remain for useful UX,
+but are not the publication security boundary.
 
 ## Publish-Blocking Gates
 
@@ -79,6 +84,7 @@ pnpm check:story-capabilities
 pnpm check:api-inventory
 pnpm check:protected-routes
 pnpm check:public-beta-launch
+pnpm check:trust-boundary
 ```
 
 For browser QA, inspect `/app/stories/[storyId]` and verify:

@@ -1,5 +1,5 @@
 import { api } from "@/convex/_generated/api";
-import { getConvexClient, isConvexConfigured } from "@/lib/convex/server";
+import { getAuthedConvexClient, isConvexConfigured } from "@/lib/convex/server";
 import { getPerson } from "@/lib/storage/fileStorage";
 import type { PersonMetadata } from "@/lib/storage/types";
 
@@ -25,7 +25,7 @@ export async function resolvePersonAccess(args: {
 
   if (isConvexConfigured()) {
     try {
-      const workspace = await getConvexClient().query(api.vault.getPersonWorkspace, {
+      const workspace = await (await getAuthedConvexClient()).action(api.vaultReads.getPersonWorkspace, {
         vaultOwnerId,
         personIdentifier,
       });
