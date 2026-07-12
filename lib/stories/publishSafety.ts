@@ -1,3 +1,5 @@
+import { requireHumanReviewConfirmation } from "../operations/reviewGates";
+
 export type StoryStatus = "draft" | "review" | "published";
 
 export type StoryPublishGateSeverity = "blocker" | "warning" | "passed";
@@ -85,6 +87,15 @@ export type StoryPublishSafetyInput = {
     detail: string;
   }>;
   nowYear?: number;
+};
+
+export type StoryPublishGateDecisionInput = {
+  // Raw story row fields the writer already has in hand.
+  story: { secondReviewRequired?: boolean; secondReviewedAt?: number | null };
+  // The same bundle shape `assessStoryPublishReadiness` consumes.
+  readiness: StoryPublishSafetyInput;
+  humanReviewConfirmed: unknown;
+  humanReviewNote: unknown;
 };
 
 export type StoryPublishReadiness = {
@@ -447,4 +458,35 @@ export function assessStoryPublishReadiness(input: StoryPublishSafetyInput): Sto
     privacyRisk,
     recommendedNextActions,
   };
+}
+
+/**
+ * GEN-88 §A: the authoritative publish decision, as a pure function so the
+ * Convex writer (`updateStoryStatus`) and the Next API route enforce the exact
+ * same gate. Returns the list of blocking reasons (empty = allowed to publish).
+ * Only call this when transitioning a story to "published".
+ */
+export function evaluateStoryPublishGate(input: StoryPublishGateDecisionInput): string[] {
+  const errors: string[] = [];
+
+  if (input.story.secondReviewRequired && !input.story.secondReviewedAt) {
+    errors.push(
+      "Second review required: this story is marked high-risk and needs second reviewer approval before public publish.",
+    );
+  }
+
+  const readiness = assessStoryPublishReadiness(input.readiness);
+  if (!readiness.canPublish) {
+    errors.push(`Story publish blocked: ${readiness.summary}`);
+  }
+
+  errors.push(
+    ...requireHumanReviewConfirmation({
+      actionName: "Publishing a public story",
+      confirmed: input.humanReviewConfirmed,
+      note: input.humanReviewNote,
+    }),
+  );
+
+  return errors;
 }
