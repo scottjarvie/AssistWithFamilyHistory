@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { Doc } from "./_generated/dataModel";
-import { filterByVaultOwner, normalizeVaultOwnerId } from "./vaultCore";
+import { filterByVaultOwner, resolveOwner } from "./vaultCore";
 
 const placeTypeValidator = v.union(
   v.literal("country"),
@@ -27,8 +27,8 @@ export const upsert = mutation({
     longitude: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const now = Date.now();
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
     let existing: Doc<"places"> | null = null;
 
     if (args.familySearchId) {
@@ -74,11 +74,12 @@ export const upsert = mutation({
 export const getByFsId = query({
   args: { fsId: v.string(), vaultOwnerId: v.string() },
   handler: async (ctx, args) => {
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const matches = await ctx.db
       .query("places")
       .withIndex("by_fsId", (q) => q.eq("familySearchId", args.fsId))
       .collect();
-    return filterByVaultOwner(matches, normalizeVaultOwnerId(args.vaultOwnerId))[0] ?? null;
+    return filterByVaultOwner(matches, vaultOwnerId)[0] ?? null;
   },
 });
 
@@ -89,9 +90,9 @@ export const list = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const applyLimit = (rows: Doc<"places">[]) =>
       args.limit ? rows.slice(0, args.limit) : rows;
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
 
     if (args.type) {
       const results = await ctx.db
