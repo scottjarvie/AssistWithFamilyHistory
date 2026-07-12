@@ -22,6 +22,8 @@ The goal isn't just to find records or add names to a family tree. It's to:
 - **Connect emotionally** with your heritage
 - **Share their stories** in compelling ways
 
+See [Ancestor data vault philosophy and architecture](ancestor-data-vault-philosophy-and-architecture.md) for the working doctrine behind the vault: preserve originals first, extract reviewable claims and mentions second, promote clean conclusions only after review, and model the family, place, community, and historical context around each ancestor.
+
 ---
 
 ## What We're Building
