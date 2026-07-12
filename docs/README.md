@@ -8,6 +8,7 @@ Durable guidance that stays accurate as the product evolves.
 
 - [Product vision](product/vision.md)
 - [AI family history lab](product/ai-family-history-lab.md)
+- [Ancestor data vault philosophy and architecture](product/ancestor-data-vault-philosophy-and-architecture.md)
 - [Product map](product/product-map.md)
 - [Route audit](product/route-audit.md)
 - [Timeline Builder proposal (GEN-24)](product/timeline-builder-proposal.md)
