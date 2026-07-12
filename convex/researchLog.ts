@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { Doc } from "./_generated/dataModel";
-import { filterByVaultOwner, normalizeVaultOwnerId } from "./vaultCore";
+import { filterByVaultOwner, resolveOwner } from "./vaultCore";
 
 const entityTypeValidator = v.union(
   v.literal("person"),
@@ -70,8 +70,8 @@ export const upsert = mutation({
     completedAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const now = Date.now();
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
 
     let existing: Doc<"researchLog"> | null = null;
 
@@ -148,7 +148,7 @@ export const listForEntity = query({
     status: v.optional(statusValidator),
   },
   handler: async (ctx, args) => {
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     let query = ctx.db
       .query("researchLog")
       .withIndex("by_entity", (q) => q.eq("entityType", args.entityType));
