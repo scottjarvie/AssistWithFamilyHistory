@@ -1,19 +1,17 @@
-// GEN-87 Option A: declare Clerk as a trusted OIDC provider so Convex functions
-// can read a verified identity via `ctx.auth.getUserIdentity()` instead of
-// trusting a client-supplied `vaultOwnerId` argument.
+// Clerk is the trusted OIDC provider for the Convex tenant boundary. Protected
+// public actions/mutations resolve this verified identity before any vault work.
 //
 // `domain` is the Clerk "convex" JWT template issuer (CLERK_JWT_ISSUER_DOMAIN),
 // resolved ON THE CONVEX BACKEND from the Convex deployment's env (set via
 // `npx convex env set ...`), not from Next's .env. `applicationID` must equal
 // the JWT template name / `aud` claim ("convex").
 //
-// Defensive: when the env var is unset on a given deployment, we register NO
-// provider. Then `getUserIdentity()` simply returns null there — exactly today's
-// behavior — and the deploy can never fail on an undefined domain. This file is
-// PHASE 0 / shadow: no Convex function reads the identity yet, so it changes
-// nothing on its own. See docs/operations/gen-87-clerk-convex-auth-setup.md.
+// Defensive: an unset issuer registers no provider. Shadow mode then records
+// missing_identity while preserving the call; enforce mode denies it.
 const domain = process.env.CLERK_JWT_ISSUER_DOMAIN;
 
-export default {
+const authConfig = {
   providers: domain ? [{ domain, applicationID: "convex" }] : [],
 };
+
+export default authConfig;

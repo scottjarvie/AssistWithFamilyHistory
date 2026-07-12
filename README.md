@@ -248,6 +248,19 @@ Sign-in is powered by Clerk, and the auth posture is driven entirely by environm
 
 When Clerk keys are absent, `proxy.ts` short-circuits to a pass-through and no auth runs at all.
 
+**Convex tenant boundary.** Private Convex calls also carry a Clerk JWT from
+`getAuthedConvexClient()`; the backend verifies that token and the requested
+vault owner before touching family data. `TRUST_BOUNDARY_MODE` defaults to
+`shadow`, where would-be denials are recorded for rollout analysis, and the
+exact value `enforce` makes them fail closed. Set the same server-only mode in
+Vercel and Convex. Enforcement also requires
+`CLERK_JWT_ISSUER_DOMAIN`, `REQUIRE_AUTH=true`, and anonymous vaults off.
+See the [guarded rollout runbook](docs/operations/gen-87-clerk-convex-auth-setup.md).
+
+The only anonymous Convex data reads are published-story lookups. Convex checks
+published status and applies the public redacted DTO itself; the Next route is
+not trusted to enforce that rule.
+
 ## 🛠️ Tech Stack
 
 | Category | Technology |

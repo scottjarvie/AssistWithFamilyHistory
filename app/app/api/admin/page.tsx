@@ -68,7 +68,7 @@ export default async function AdminApiPage() {
     if (isAdminUser(userId)) {
       authorized = true;
       const client = await getAuthedConvexClient();
-      keys = (await client.query(api.apiKeys.listKeys, { vaultOwnerId })) as ApiKeyRow[];
+      keys = (await client.action(api.apiKeys.listKeys, { vaultOwnerId })) as ApiKeyRow[];
     }
   } catch (error) {
     const issue = getConvexRuntimeIssue(error);

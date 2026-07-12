@@ -27,7 +27,7 @@ describe("api key lifecycle", () => {
     const t = convexTest(schema, modules);
     await t.mutation(api.apiKeys.mintKey, mintArgs(OWNER_A, "dts_live_aaa111", "Claude Code"));
 
-    const keys = await t.query(api.apiKeys.listKeys, { vaultOwnerId: OWNER_A });
+    const keys = await t.action(api.apiKeys.listKeys, { vaultOwnerId: OWNER_A });
     expect(keys.length).toBe(1);
     expect(keys[0].keyId).toBe("dts_live_aaa111");
     expect(keys[0].status).toBe("active");
@@ -45,7 +45,7 @@ describe("api key lifecycle", () => {
     ).rejects.toThrow(/not found/);
 
     await t.mutation(api.apiKeys.revokeKey, { vaultOwnerId: OWNER_A, keyId: "dts_live_bbb222" });
-    const keys = await t.query(api.apiKeys.listKeys, { vaultOwnerId: OWNER_A });
+    const keys = await t.action(api.apiKeys.listKeys, { vaultOwnerId: OWNER_A });
     expect(keys[0].status).toBe("revoked");
     expect(typeof keys[0].revokedAt).toBe("number");
   });
@@ -69,7 +69,7 @@ describe("api key lifecycle", () => {
       keyId: "dts_live_ddd444",
       status: "suspended",
     });
-    let keys = await t.query(api.apiKeys.listKeys, { vaultOwnerId: OWNER_A });
+    let keys = await t.action(api.apiKeys.listKeys, { vaultOwnerId: OWNER_A });
     expect(keys[0].status).toBe("suspended");
 
     await t.mutation(api.apiKeys.setKeyStatus, {
@@ -77,7 +77,7 @@ describe("api key lifecycle", () => {
       keyId: "dts_live_ddd444",
       status: "active",
     });
-    keys = await t.query(api.apiKeys.listKeys, { vaultOwnerId: OWNER_A });
+    keys = await t.action(api.apiKeys.listKeys, { vaultOwnerId: OWNER_A });
     expect(keys[0].status).toBe("active");
 
     await t.mutation(api.apiKeys.revokeKey, { vaultOwnerId: OWNER_A, keyId: "dts_live_ddd444" });
@@ -94,7 +94,7 @@ describe("api key lifecycle", () => {
     const t = convexTest(schema, modules);
     await t.mutation(api.apiKeys.mintKey, mintArgs(OWNER_A, "dts_live_aaa", "a"));
     await t.mutation(api.apiKeys.mintKey, mintArgs(OWNER_B, "dts_live_bbb", "b"));
-    const aKeys = await t.query(api.apiKeys.listKeys, { vaultOwnerId: OWNER_A });
+    const aKeys = await t.action(api.apiKeys.listKeys, { vaultOwnerId: OWNER_A });
     expect(aKeys.length).toBe(1);
     expect(aKeys[0].keyId).toBe("dts_live_aaa");
   });

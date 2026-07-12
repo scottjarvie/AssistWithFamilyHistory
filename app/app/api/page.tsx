@@ -42,7 +42,7 @@ export default async function ApiCenterPage() {
     const { vaultOwnerId, userId } = await getVaultAccessContext();
     admin = isAdminUser(userId);
     const client = await getAuthedConvexClient();
-    keys = (await client.query(api.apiKeys.listKeys, { vaultOwnerId })) as ApiKeyRow[];
+    keys = (await client.action(api.apiKeys.listKeys, { vaultOwnerId })) as ApiKeyRow[];
   } catch (error) {
     const issue = getConvexRuntimeIssue(error);
     return (

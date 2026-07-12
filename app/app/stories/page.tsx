@@ -69,7 +69,7 @@ export default async function StoriesIndexPage({
   let stories;
 
   try {
-    stories = await client.query(api.vault.getStoriesIndex, { vaultOwnerId });
+    stories = await client.action(api.vaultReads.getStoriesIndex, { vaultOwnerId });
   } catch (error) {
     const issue = getConvexRuntimeIssue(error);
     return (

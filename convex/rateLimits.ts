@@ -15,13 +15,12 @@
  * acceptable for a spend guard. Stale rows from past windows are harmless and
  * can be cleaned up later if needed (they are ephemeral, not vault content).
  *
- * Trust model: `vaultOwnerId` is passed as an argument (consistent with the
- * other public `mutation` exports in this codebase). GEN-87 will bind owner
- * identity to the authenticated caller. The handler references `vaultOwnerId`
- * so the check:convex-visibility guardrail is satisfied.
+ * Trust model: the shared Convex guard binds vaultOwnerId to the verified Clerk
+ * identity before reading or incrementing a counter.
  */
 import { v } from "convex/values";
 import { mutation } from "./_generated/server";
+import { authorizeTenantMutation } from "./access";
 
 export type RateLimitResult =
   | { allowed: true; remaining: number; limit: number; windowStart: number }
@@ -34,7 +33,14 @@ export const checkAndIncrementRateLimit = mutation({
     limit: v.number(),
     windowMs: v.number(),
   },
-  handler: async (ctx, { vaultOwnerId, action, limit, windowMs }): Promise<RateLimitResult> => {
+  handler: async (ctx, args): Promise<RateLimitResult> => {
+    const decision = await authorizeTenantMutation(
+      ctx,
+      "rateLimits.checkAndIncrementRateLimit",
+      args.vaultOwnerId,
+    );
+    const vaultOwnerId = decision.owner;
+    const { action, limit, windowMs } = args;
     const now = Date.now();
     // Floor `now` to the start of its fixed window so all requests in the same
     // window share a single counter row.

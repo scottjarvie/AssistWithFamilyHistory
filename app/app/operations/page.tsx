@@ -66,7 +66,7 @@ export default async function OperationsPage({ searchParams }: { searchParams: S
   let queue;
 
   try {
-    queue = await client.query(api.vault.getOperationsQueue, {
+    queue = await client.action(api.vaultReads.getOperationsQueue, {
       vaultOwnerId,
       search: params.q || undefined,
       rowType: params.type === "person" || params.type === "provisional" ? params.type : undefined,

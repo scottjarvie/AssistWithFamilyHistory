@@ -88,7 +88,7 @@ export default async function StoryReviewPage({
   let bundle;
 
   try {
-    bundle = await client.query(api.vault.getStoryReview, {
+    bundle = await client.action(api.vaultReads.getStoryReview, {
       vaultOwnerId,
       storyId: storyId as Id<"stories">,
     });

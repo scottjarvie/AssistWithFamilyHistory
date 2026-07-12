@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { getConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
+import { getAuthedConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
 // GEN-94: zod request-body contract. The story type enum narrows into the
@@ -65,7 +65,7 @@ export async function PATCH(
     }
 
     const { vaultOwnerId } = await getVaultAccessContext();
-    const result = await getConvexClient().mutation(api.vaultMutations.updateStoryDraft, {
+    const result = await (await getAuthedConvexClient()).mutation(api.vaultMutations.updateStoryDraft, {
       vaultOwnerId,
       storyId: id as Id<"stories">,
       title,

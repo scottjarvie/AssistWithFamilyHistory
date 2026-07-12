@@ -1,6 +1,6 @@
 # API Route Inventory
 
-Last updated: 2026-05-21
+Last updated: 2026-07-12
 
 ## Purpose
 
@@ -12,9 +12,14 @@ Discover Their Stories has useful internal APIs, but they are not yet a public o
 
 All `/api/**` routes are in the protected route set when `REQUIRE_AUTH=true`.
 
-Every owner-scoped route should resolve the active owner with `getVaultAccessContext()` and pass `vaultOwnerId` into file storage, Convex queries, and Convex mutations.
+Every owner-scoped route resolves the active owner with
+`getVaultAccessContext()` and uses `getAuthedConvexClient()`. Convex verifies
+the attached Clerk JWT, requires its subject to match `vaultOwnerId`, and
+checks referenced records before private work.
 
-The public non-API route `/stories/[id]` is intentionally outside this inventory. It is public by design, resolves readable slugs or legacy story IDs, redirects IDs to canonical slugs when available, and only returns stories with status `published`.
+The public non-API route `/stories/[id]` is intentionally outside this
+inventory. Its two anonymous Convex queries enforce published status and build
+the redacted allowlisted DTO in the backend.
 
 ## Capability Presets To Consider Later
 
@@ -57,8 +62,8 @@ These are planning terms only. They are not implemented scopes yet.
 | `/api/process` | POST | Submit prompt/data to OpenRouter with client or server key | Protected by required-auth middleware, does not use vault owner | Internal AI utility | High privacy/abuse risk; should not become broad public API without quotas/disclosure |
 | `/api/stories/[id]` | PATCH | Update story title/content/type/tags | Uses `getVaultAccessContext()` and Convex owner checks | Internal now; future story-writer candidate | Owner-protected write; content changes should keep story in draft/review until gates pass |
 | `/api/stories/[id]/review` | PATCH | Assign a story reviewer, optionally require second approval, and record review history | Uses `getVaultAccessContext()` and Convex owner checks | Internal now; future reviewer/trusted-operator candidate | Explicit `story_writer` role is denied reviewer assignment |
-| `/api/stories/[id]/status` | GET, PATCH | Preview publish readiness or change story status between draft/review/published | Uses `getVaultAccessContext()` and Convex owner checks | Internal now; future story-writer/trusted-operator candidate | GET supports `?format=handoff`; `?record=true` stores a publish-preview audit snapshot; publish PATCH is blocked by capability, safety gates, required second approval, and explicit human review confirmation |
-| `/api/vault/migrate-guest` | POST | One-shot: re-tag rows from the anonymous-vault `guest_<UUID>` cookie to the signed-in Clerk user id, then delete the cookie | Reads Clerk auth + `vault-preview-id` cookie; calls Convex `vaultMigration.migrateGuestVault` | Internal only; never exposed to external agents | GEN-83. No-ops when not authenticated or no guest cookie. Convex mutation enforces `guest_*` source prefix and `user_*` destination prefix as defense in depth |
+| `/api/stories/[id]/status` | GET, PATCH | Preview publish readiness or change story status between draft/review/published | Clerk JWT plus Convex owner and record checks | Internal now; future story-writer/trusted-operator candidate | Convex recomputes publish safety and human/second-review gates, then records publish confirmation atomically |
+| `/api/vault/migrate-guest` | POST | Re-tag a preview guest vault to the signed-in Clerk user | Destination is bound to the verified Clerk subject | Shadow-only legacy path | Enforce denies the unsigned guest source until a signed guest capability exists |
 
 ## Current Gaps
 
@@ -93,4 +98,6 @@ Run this after adding or removing API routes:
 ```bash
 pnpm check:api-inventory
 pnpm check:protected-routes
+pnpm check:trust-boundary
+pnpm check:convex-client-auth
 ```

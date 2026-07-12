@@ -2,7 +2,14 @@ import { v } from "convex/values";
 import { mutation, type MutationCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { buildStoryPublicSlug } from "../lib/stories/slug";
-import { evaluateStoryPublishGate } from "../lib/stories/publishSafety";
+import { redactPublicText } from "../lib/privacy/publicTextRedaction";
+import { requireHumanReviewConfirmation } from "../lib/operations/reviewGates";
+import { assessStoryPublishReadiness } from "../lib/stories/publishSafety";
+import {
+  authorizeOwnedReferenceMutation,
+  authorizeTenantMutation,
+  handlePolicyViolationMutation,
+} from "./access";
 import { buildStoryBundle, loadStoryScopedSnapshot } from "./vault";
 import {
   buildProvisionalDedupeKey,
@@ -10,7 +17,6 @@ import {
   formatPersonName,
   inferResearchChecks,
   matchesVaultOwner,
-  resolveOwner,
 } from "./vaultCore";
 
 const dateValidator = v.object({
@@ -199,14 +205,24 @@ async function buildStorySlugForPerson(
   params: {
     storyId: string;
     title: string;
+    vaultOwnerId: string;
+    functionName: string;
     personId?: Doc<"stories">["personId"];
   }
 ) {
-  const person = params.personId ? await ctx.db.get(params.personId) : null;
+  const person = params.personId
+    ? await authorizeOwnedReferenceMutation(
+        ctx,
+        params.functionName,
+        params.vaultOwnerId,
+        await ctx.db.get(params.personId),
+        "Story person",
+      )
+    : null;
   return buildStoryPublicSlug({
     storyId: params.storyId,
-    title: params.title,
-    personName: person ? formatPersonName(person) : undefined,
+    title: redactPublicText(params.title),
+    personName: person ? redactPublicText(formatPersonName(person)) : undefined,
   });
 }
 
@@ -225,6 +241,37 @@ const storyReviewEventTypeValidator = v.union(
   v.literal("assignment"),
   v.literal("draft_edit")
 );
+
+function getBackendPublishReadiness(
+  bundle: NonNullable<ReturnType<typeof buildStoryBundle>>,
+) {
+  return assessStoryPublishReadiness({
+    story: bundle.story,
+    person: bundle.person,
+    readiness: bundle.readiness,
+    researchChecks: bundle.researchChecks,
+    contextCoverage: bundle.contextCoverage,
+    evidence: bundle.evidence,
+    events: bundle.events,
+    places: bundle.places,
+    relationships: bundle.relationships,
+    provisionalRelatives: bundle.provisionalRelatives,
+    publishWarnings: bundle.publishWarnings,
+  });
+}
+
+function toPublishAuditSnapshot(readiness: ReturnType<typeof getBackendPublishReadiness>) {
+  return {
+    canPublish: readiness.canPublish,
+    status: readiness.status,
+    score: readiness.score,
+    summary: readiness.summary,
+    blockers: readiness.blockers,
+    warnings: readiness.warnings,
+    provenance: readiness.provenance,
+    recommendedNextActions: readiness.recommendedNextActions,
+  };
+}
 
 export const upsertPerson = mutation({
   args: {
@@ -245,8 +292,22 @@ export const upsertPerson = mutation({
     tags: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
+    const { owner: vaultOwnerId } = await authorizeTenantMutation(
+      ctx,
+      "vaultMutations.upsertPerson",
+      args.vaultOwnerId,
+    );
+    for (const placeId of [args.birth?.place?.placeId, args.death?.place?.placeId]) {
+      if (!placeId) continue;
+      await authorizeOwnedReferenceMutation(
+        ctx,
+        "vaultMutations.upsertPerson",
+        vaultOwnerId,
+        await ctx.db.get(placeId),
+        "Person fact place",
+      );
+    }
     const now = Date.now();
-    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     let existing: Doc<"persons"> | null = null;
 
     if (args.fsId) {
@@ -339,8 +400,12 @@ export const upsertSource = mutation({
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const { owner: vaultOwnerId } = await authorizeTenantMutation(
+      ctx,
+      "vaultMutations.upsertSource",
+      args.vaultOwnerId,
+    );
     const now = Date.now();
-    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     let existing: Doc<"sources"> | null = null;
 
     if (args.fsId) {
@@ -406,8 +471,19 @@ export const upsertCitation = mutation({
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const { owner: vaultOwnerId } = await authorizeTenantMutation(
+      ctx,
+      "vaultMutations.upsertCitation",
+      args.vaultOwnerId,
+    );
+    await authorizeOwnedReferenceMutation(
+      ctx,
+      "vaultMutations.upsertCitation",
+      vaultOwnerId,
+      await ctx.db.get(args.sourceId),
+      "Citation source",
+    );
     const now = Date.now();
-    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     let existing: Doc<"citations"> | null = null;
 
     if (args.importKey) {
@@ -501,8 +577,21 @@ export const upsertEvent = mutation({
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const { owner: vaultOwnerId } = await authorizeTenantMutation(
+      ctx,
+      "vaultMutations.upsertEvent",
+      args.vaultOwnerId,
+    );
+    if (args.place?.placeId) {
+      await authorizeOwnedReferenceMutation(
+        ctx,
+        "vaultMutations.upsertEvent",
+        vaultOwnerId,
+        await ctx.db.get(args.place.placeId),
+        "Event place",
+      );
+    }
     const now = Date.now();
-    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     let existing: Doc<"events"> | null = null;
 
     if (args.importKey) {
@@ -561,13 +650,32 @@ export const upsertPersonEvent = mutation({
     ),
   },
   handler: async (ctx, args) => {
+    const { owner: vaultOwnerId } = await authorizeTenantMutation(
+      ctx,
+      "vaultMutations.upsertPersonEvent",
+      args.vaultOwnerId,
+    );
+    await authorizeOwnedReferenceMutation(
+      ctx,
+      "vaultMutations.upsertPersonEvent",
+      vaultOwnerId,
+      await ctx.db.get(args.personId),
+      "Person event person",
+    );
+    await authorizeOwnedReferenceMutation(
+      ctx,
+      "vaultMutations.upsertPersonEvent",
+      vaultOwnerId,
+      await ctx.db.get(args.eventId),
+      "Person event",
+    );
     const existingRows = await ctx.db
       .query("personEvents")
       .withIndex("by_person_and_event", (q) =>
         q.eq("personId", args.personId).eq("eventId", args.eventId)
       )
       .collect();
-    const existing = filterByVaultOwner(existingRows, await resolveOwner(ctx, args.vaultOwnerId))[0] ?? null;
+    const existing = filterByVaultOwner(existingRows, vaultOwnerId)[0] ?? null;
 
     if (existing) {
       await ctx.db.patch(existing._id, { role: args.role });
@@ -576,6 +684,7 @@ export const upsertPersonEvent = mutation({
 
     return await ctx.db.insert("personEvents", {
       ...args,
+      vaultOwnerId,
       createdAt: Date.now(),
     });
   },
@@ -608,8 +717,32 @@ export const upsertRelationship = mutation({
     importKey: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const { owner: vaultOwnerId } = await authorizeTenantMutation(
+      ctx,
+      "vaultMutations.upsertRelationship",
+      args.vaultOwnerId,
+    );
+    for (const personId of [args.person1, args.person2]) {
+      await authorizeOwnedReferenceMutation(
+        ctx,
+        "vaultMutations.upsertRelationship",
+        vaultOwnerId,
+        await ctx.db.get(personId),
+        "Relationship person",
+      );
+    }
+    for (const placeId of (args.facts ?? [])
+      .map((fact) => fact.place?.placeId)
+      .filter((id): id is NonNullable<typeof id> => Boolean(id))) {
+      await authorizeOwnedReferenceMutation(
+        ctx,
+        "vaultMutations.upsertRelationship",
+        vaultOwnerId,
+        await ctx.db.get(placeId),
+        "Relationship fact place",
+      );
+    }
     const now = Date.now();
-    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     let existing: Doc<"relationships"> | null = null;
 
     if (args.familySearchId) {
@@ -714,8 +847,30 @@ export const upsertMedia = mutation({
     reviewedAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const { owner: vaultOwnerId } = await authorizeTenantMutation(
+      ctx,
+      "vaultMutations.upsertMedia",
+      args.vaultOwnerId,
+    );
+    for (const personId of args.personIds) {
+      await authorizeOwnedReferenceMutation(
+        ctx,
+        "vaultMutations.upsertMedia",
+        vaultOwnerId,
+        await ctx.db.get(personId),
+        "Media person",
+      );
+    }
+    if (args.sourceId) {
+      await authorizeOwnedReferenceMutation(
+        ctx,
+        "vaultMutations.upsertMedia",
+        vaultOwnerId,
+        await ctx.db.get(args.sourceId),
+        "Media source",
+      );
+    }
     const now = Date.now();
-    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     let existing: Doc<"media"> | null = null;
 
     if (args.familySearchUrl) {
@@ -776,8 +931,36 @@ export const upsertSourceFact = mutation({
     conflictReason: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const { owner: vaultOwnerId } = await authorizeTenantMutation(
+      ctx,
+      "vaultMutations.upsertSourceFact",
+      args.vaultOwnerId,
+    );
+    await authorizeOwnedReferenceMutation(
+      ctx,
+      "vaultMutations.upsertSourceFact",
+      vaultOwnerId,
+      await ctx.db.get(args.personId),
+      "Source fact person",
+    );
+    const source = await authorizeOwnedReferenceMutation(
+      ctx,
+      "vaultMutations.upsertSourceFact",
+      vaultOwnerId,
+      await ctx.db.get(args.sourceId),
+      "Source fact source",
+    );
+    const citation = await authorizeOwnedReferenceMutation(
+      ctx,
+      "vaultMutations.upsertSourceFact",
+      vaultOwnerId,
+      await ctx.db.get(args.citationId),
+      "Source fact citation",
+    );
+    if (citation.sourceId !== source._id) {
+      throw new Error("Source fact citation does not belong to the selected source");
+    }
     const now = Date.now();
-    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const matches = await ctx.db
       .query("sourceFacts")
       .withIndex("by_import_key", (q) => q.eq("importKey", args.importKey))
@@ -813,11 +996,18 @@ export const reviewMedia = mutation({
     privacyReviewNote: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const media = await ctx.db.get(args.mediaId);
-    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
-    if (!media || !matchesVaultOwner(media.vaultOwnerId, vaultOwnerId)) {
-      throw new Error("Media item not found");
-    }
+    const { owner: vaultOwnerId } = await authorizeTenantMutation(
+      ctx,
+      "vaultMutations.reviewMedia",
+      args.vaultOwnerId,
+    );
+    await authorizeOwnedReferenceMutation(
+      ctx,
+      "vaultMutations.reviewMedia",
+      vaultOwnerId,
+      await ctx.db.get(args.mediaId),
+      "Media item",
+    );
 
     await ctx.db.patch(args.mediaId, {
       privacyLevel: args.privacyLevel,
@@ -850,7 +1040,11 @@ export const upsertContextItemForPerson = mutation({
     reviewNote: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
+    const { owner: vaultOwnerId } = await authorizeTenantMutation(
+      ctx,
+      "vaultMutations.upsertContextItemForPerson",
+      args.vaultOwnerId,
+    );
     const normalizedPersonId = ctx.db.normalizeId("persons", args.personIdentifier);
     const person =
       (normalizedPersonId ? await ctx.db.get(normalizedPersonId) : null) ??
@@ -863,9 +1057,13 @@ export const upsertContextItemForPerson = mutation({
       )[0] ??
       null;
 
-    if (!person || !matchesVaultOwner(person.vaultOwnerId, vaultOwnerId)) {
-      throw new Error("Person not found");
-    }
+    await authorizeOwnedReferenceMutation(
+      ctx,
+      "vaultMutations.upsertContextItemForPerson",
+      vaultOwnerId,
+      person,
+      "Person",
+    );
 
     const now = Date.now();
     const contextItemId = await ctx.db.insert("contextItems", {
@@ -917,11 +1115,25 @@ export const ensureResearchTask = mutation({
     priority: v.union(v.literal("high"), v.literal("medium"), v.literal("low")),
   },
   handler: async (ctx, args) => {
+    const { owner: vaultOwnerId } = await authorizeTenantMutation(
+      ctx,
+      "vaultMutations.ensureResearchTask",
+      args.vaultOwnerId,
+    );
+    if (args.personId) {
+      await authorizeOwnedReferenceMutation(
+        ctx,
+        "vaultMutations.ensureResearchTask",
+        vaultOwnerId,
+        await ctx.db.get(args.personId),
+        "Research task person",
+      );
+    }
     const existingRows = await ctx.db
       .query("researchTasks")
       .withIndex("by_person", (q) => q.eq("personId", args.personId))
       .collect();
-    const existing = filterByVaultOwner(existingRows, await resolveOwner(ctx, args.vaultOwnerId));
+    const existing = filterByVaultOwner(existingRows, vaultOwnerId);
 
     const match = existing.find((task) => task.title === args.title && task.status !== "done");
     if (match) {
@@ -931,6 +1143,7 @@ export const ensureResearchTask = mutation({
     const now = Date.now();
     const taskId = await ctx.db.insert("researchTasks", {
       ...args,
+      vaultOwnerId,
       status: "todo",
       aiSuggested: true,
       createdAt: now,
@@ -956,8 +1169,40 @@ export const upsertStoryDraft = mutation({
     contextPackIds: v.optional(v.array(v.id("historicalContext"))),
   },
   handler: async (ctx, args) => {
+    const { owner: vaultOwnerId } = await authorizeTenantMutation(
+      ctx,
+      "vaultMutations.upsertStoryDraft",
+      args.vaultOwnerId,
+    );
+    if (args.status === "published") {
+      await handlePolicyViolationMutation(
+        ctx,
+        "vaultMutations.upsertStoryDraft",
+        "direct_publish_bypass",
+      );
+    }
+
+    await authorizeOwnedReferenceMutation(
+      ctx,
+      "vaultMutations.upsertStoryDraft",
+      vaultOwnerId,
+      await ctx.db.get(args.personId),
+      "Person",
+    );
+    if (args.contextPackIds?.length) {
+      const contextPacks = await Promise.all(args.contextPackIds.map((id) => ctx.db.get(id)));
+      for (const contextPack of contextPacks) {
+        await authorizeOwnedReferenceMutation(
+          ctx,
+          "vaultMutations.upsertStoryDraft",
+          vaultOwnerId,
+          contextPack,
+          "Story context pack",
+        );
+      }
+    }
+
     const now = Date.now();
-    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const existingRows = await ctx.db
       .query("stories")
       .withIndex("by_person", (q) => q.eq("personId", args.personId))
@@ -991,6 +1236,8 @@ export const upsertStoryDraft = mutation({
       const publicSlug = await buildStorySlugForPerson(ctx, {
         storyId: String(match._id),
         title: args.title,
+        vaultOwnerId,
+        functionName: "vaultMutations.upsertStoryDraft",
         personId: args.personId,
       });
       await ctx.db.patch(match._id, {
@@ -1012,6 +1259,8 @@ export const upsertStoryDraft = mutation({
       publicSlug: await buildStorySlugForPerson(ctx, {
         storyId: String(storyId),
         title: args.title,
+        vaultOwnerId,
+        functionName: "vaultMutations.upsertStoryDraft",
         personId: args.personId,
       }),
     });
@@ -1033,53 +1282,42 @@ export const updateStoryStatus = mutation({
     humanReviewNote: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
-    const story = await ctx.db.get(args.storyId);
-    if (!story || !matchesVaultOwner(story.vaultOwnerId, vaultOwnerId)) {
-      throw new Error("Story not found");
-    }
+    const { owner: vaultOwnerId } = await authorizeTenantMutation(
+      ctx,
+      "vaultMutations.updateStoryStatus",
+      args.vaultOwnerId,
+    );
+    const story = await authorizeOwnedReferenceMutation(
+      ctx,
+      "vaultMutations.updateStoryStatus",
+      vaultOwnerId,
+      await ctx.db.get(args.storyId),
+      "Story",
+    );
 
-    // GEN-88 §A: enforce the full publish gate server-side. Because
-    // NEXT_PUBLIC_CONVEX_URL is public, a direct caller could otherwise flip a
-    // story to "published" with none of the readiness/privacy/review checks the
-    // API route performs. Re-derive the same bundle the route previews from and
-    // refuse to publish unless every gate passes. Only runs on the transition
-    // to "published"; draft/review transitions keep their existing behavior.
+    let publishReadiness: ReturnType<typeof getBackendPublishReadiness> | undefined;
     if (args.status === "published") {
-      const snapshot = await loadStoryScopedSnapshot(
-        ctx,
-        await resolveOwner(ctx, args.vaultOwnerId),
-        args.storyId,
-      );
-      const bundleStory = snapshot?.stories.find((entry) => entry._id === args.storyId);
-      if (!snapshot || !bundleStory) {
-        throw new Error("Story not found");
-      }
-      const bundle = buildStoryBundle(snapshot, bundleStory);
+      const snapshot = await loadStoryScopedSnapshot(ctx, vaultOwnerId, args.storyId);
+      const currentStory = snapshot?.stories.find((entry) => entry._id === args.storyId);
+      if (!snapshot || !currentStory) throw new Error("Story not found");
 
-      const gateErrors = evaluateStoryPublishGate({
-        story: {
-          secondReviewRequired: story.secondReviewRequired,
-          secondReviewedAt: story.secondReviewedAt,
-        },
-        readiness: {
-          story: bundle.story,
-          person: bundle.person,
-          readiness: bundle.readiness,
-          researchChecks: bundle.researchChecks,
-          contextCoverage: bundle.contextCoverage,
-          evidence: bundle.evidence,
-          events: bundle.events,
-          places: bundle.places,
-          relationships: bundle.relationships,
-          provisionalRelatives: bundle.provisionalRelatives,
-          publishWarnings: bundle.publishWarnings,
-        },
-        humanReviewConfirmed: args.humanReviewConfirmed,
-        humanReviewNote: args.humanReviewNote,
+      const bundle = buildStoryBundle(snapshot, currentStory);
+      publishReadiness = getBackendPublishReadiness(bundle);
+      const reviewErrors = requireHumanReviewConfirmation({
+        actionName: "Publishing a public story",
+        confirmed: args.humanReviewConfirmed,
+        note: args.humanReviewNote,
       });
-      if (gateErrors.length > 0) {
-        throw new Error(gateErrors.join(" "));
+      const secondReviewMissing = Boolean(
+        story.secondReviewRequired && !story.secondReviewedAt,
+      );
+
+      if (!publishReadiness.canPublish || secondReviewMissing || reviewErrors.length > 0) {
+        await handlePolicyViolationMutation(
+          ctx,
+          "vaultMutations.updateStoryStatus",
+          "publish_gate_failed",
+        );
       }
     }
 
@@ -1089,6 +1327,8 @@ export const updateStoryStatus = mutation({
       (await buildStorySlugForPerson(ctx, {
         storyId: String(story._id),
         title: story.title,
+        vaultOwnerId,
+        functionName: "vaultMutations.updateStoryStatus",
         personId: story.personId,
       }));
 
@@ -1111,7 +1351,26 @@ export const updateStoryStatus = mutation({
       updatedAt: now,
     });
 
-    return { storyId: args.storyId, status: args.status };
+    if (args.status === "published" && publishReadiness) {
+      await ctx.db.insert("storyReviewEvents", {
+        vaultOwnerId,
+        storyId: args.storyId,
+        personId: story.personId,
+        eventType: "publish_confirmation",
+        fromStatus: story.status,
+        toStatus: "published",
+        actorRole: "first_party_owner",
+        humanReviewNote: args.humanReviewNote?.trim(),
+        readinessSnapshot: toPublishAuditSnapshot(publishReadiness),
+        blockerCount: publishReadiness.blockers.length,
+        warningCount: publishReadiness.warnings.length,
+        readinessScore: publishReadiness.score,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    return { storyId: args.storyId, status: args.status, publishReadiness };
   },
 });
 
@@ -1125,10 +1384,24 @@ export const updateStoryDraft = mutation({
     tags: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
-    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
-    const story = await ctx.db.get(args.storyId);
-    if (!story || !matchesVaultOwner(story.vaultOwnerId, vaultOwnerId)) {
-      throw new Error("Story not found");
+    const { owner: vaultOwnerId } = await authorizeTenantMutation(
+      ctx,
+      "vaultMutations.updateStoryDraft",
+      args.vaultOwnerId,
+    );
+    const story = await authorizeOwnedReferenceMutation(
+      ctx,
+      "vaultMutations.updateStoryDraft",
+      vaultOwnerId,
+      await ctx.db.get(args.storyId),
+      "Story",
+    );
+    if (story.status === "published") {
+      await handlePolicyViolationMutation(
+        ctx,
+        "vaultMutations.updateStoryDraft",
+        "published_edit_requires_review",
+      );
     }
 
     const generatedBy = story.generatedBy === "ai" ? "ai_edited" : story.generatedBy;
@@ -1139,6 +1412,8 @@ export const updateStoryDraft = mutation({
       ? await buildStorySlugForPerson(ctx, {
           storyId: String(story._id),
           title,
+          vaultOwnerId,
+          functionName: "vaultMutations.updateStoryDraft",
           personId: story.personId,
         })
       : story.publicSlug;
@@ -1162,7 +1437,11 @@ export const backfillStoryPublicSlugs = mutation({
     vaultOwnerId: v.string(),
   },
   handler: async (ctx, args) => {
-    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
+    const { owner: vaultOwnerId } = await authorizeTenantMutation(
+      ctx,
+      "vaultMutations.backfillStoryPublicSlugs",
+      args.vaultOwnerId,
+    );
     const stories = filterByVaultOwner(await ctx.db.query("stories").collect(), vaultOwnerId);
     const now = Date.now();
     let updated = 0;
@@ -1175,6 +1454,8 @@ export const backfillStoryPublicSlugs = mutation({
           (await buildStorySlugForPerson(ctx, {
             storyId: String(story._id),
             title: story.title,
+            vaultOwnerId,
+            functionName: "vaultMutations.backfillStoryPublicSlugs",
             personId: story.personId,
           })),
         publicIndexing: story.publicIndexing ?? "noindex",
@@ -1200,7 +1481,11 @@ export const assignStoryReviewer = mutation({
     note: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
+    const { owner: vaultOwnerId } = await authorizeTenantMutation(
+      ctx,
+      "vaultMutations.assignStoryReviewer",
+      args.vaultOwnerId,
+    );
     const story = await ctx.db.get(args.storyId);
     if (!story || !matchesVaultOwner(story.vaultOwnerId, vaultOwnerId)) {
       throw new Error("Story not found");
@@ -1263,7 +1548,11 @@ export const recordStoryReviewEvent = mutation({
     readinessScore: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
+    const { owner: vaultOwnerId } = await authorizeTenantMutation(
+      ctx,
+      "vaultMutations.recordStoryReviewEvent",
+      args.vaultOwnerId,
+    );
     const story = await ctx.db.get(args.storyId);
     if (!story || !matchesVaultOwner(story.vaultOwnerId, vaultOwnerId)) {
       throw new Error("Story not found");
@@ -1321,7 +1610,20 @@ export const upsertHistoricalContext = mutation({
     categoryBlocks: v.optional(v.array(researchPackCategoryBlockValidator)),
   },
   handler: async (ctx, args) => {
-    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
+    const { owner: vaultOwnerId } = await authorizeTenantMutation(
+      ctx,
+      "vaultMutations.upsertHistoricalContext",
+      args.vaultOwnerId,
+    );
+    if (args.placeId) {
+      await authorizeOwnedReferenceMutation(
+        ctx,
+        "vaultMutations.upsertHistoricalContext",
+        vaultOwnerId,
+        await ctx.db.get(args.placeId),
+        "Historical context place",
+      );
+    }
     const now = Date.now();
     const candidates = args.placeId
       ? await ctx.db
@@ -1442,8 +1744,19 @@ export const upsertProvisionalRelative = mutation({
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const { owner: vaultOwnerId } = await authorizeTenantMutation(
+      ctx,
+      "vaultMutations.upsertProvisionalRelative",
+      args.vaultOwnerId,
+    );
+    await authorizeOwnedReferenceMutation(
+      ctx,
+      "vaultMutations.upsertProvisionalRelative",
+      vaultOwnerId,
+      await ctx.db.get(args.anchorPersonId),
+      "Provisional relative anchor",
+    );
     const now = Date.now();
-    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const dedupeKey = buildProvisionalDedupeKey({
       vaultOwnerId,
       anchorPersonId: args.anchorPersonId,
@@ -1517,8 +1830,46 @@ export const upsertResearchCheck = mutation({
     lastReviewedAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const { owner: vaultOwnerId } = await authorizeTenantMutation(
+      ctx,
+      "vaultMutations.upsertResearchCheck",
+      args.vaultOwnerId,
+    );
+    await authorizeOwnedReferenceMutation(
+      ctx,
+      "vaultMutations.upsertResearchCheck",
+      vaultOwnerId,
+      await ctx.db.get(args.personId),
+      "Research check person",
+    );
+    for (const sourceId of args.linkedSourceIds ?? []) {
+      await authorizeOwnedReferenceMutation(
+        ctx,
+        "vaultMutations.upsertResearchCheck",
+        vaultOwnerId,
+        await ctx.db.get(sourceId),
+        "Research check source",
+      );
+    }
+    for (const placeId of args.linkedPlaceIds ?? []) {
+      await authorizeOwnedReferenceMutation(
+        ctx,
+        "vaultMutations.upsertResearchCheck",
+        vaultOwnerId,
+        await ctx.db.get(placeId),
+        "Research check place",
+      );
+    }
+    for (const personId of args.linkedPersonIds ?? []) {
+      await authorizeOwnedReferenceMutation(
+        ctx,
+        "vaultMutations.upsertResearchCheck",
+        vaultOwnerId,
+        await ctx.db.get(personId),
+        "Research check linked person",
+      );
+    }
     const now = Date.now();
-    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const existingRows = await ctx.db
       .query("researchChecks")
       .withIndex("by_person_check", (q) => q.eq("personId", args.personId).eq("checkKey", args.checkKey))
@@ -1563,7 +1914,11 @@ export const bulkRefreshResearchChecks = mutation({
     source: researchCheckSourceValidator,
   },
   handler: async (ctx, args) => {
-    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
+    const { owner: vaultOwnerId } = await authorizeTenantMutation(
+      ctx,
+      "vaultMutations.bulkRefreshResearchChecks",
+      args.vaultOwnerId,
+    );
     const now = Date.now();
     const person = await ctx.db.get(args.personId);
     if (!person || !matchesVaultOwner(person.vaultOwnerId, vaultOwnerId)) {
@@ -1797,9 +2152,23 @@ export const createResearchTask = mutation({
     priority: v.union(v.literal("high"), v.literal("medium"), v.literal("low")),
   },
   handler: async (ctx, args) => {
+    const { owner: vaultOwnerId } = await authorizeTenantMutation(
+      ctx,
+      "vaultMutations.createResearchTask",
+      args.vaultOwnerId,
+    );
+    if (args.personId) {
+      await authorizeOwnedReferenceMutation(
+        ctx,
+        "vaultMutations.createResearchTask",
+        vaultOwnerId,
+        await ctx.db.get(args.personId),
+        "Research task person",
+      );
+    }
     const now = Date.now();
     const taskId = await ctx.db.insert("researchTasks", {
-      vaultOwnerId: await resolveOwner(ctx, args.vaultOwnerId),
+      vaultOwnerId,
       personId: args.personId,
       type: "other",
       title: args.title,
@@ -1821,12 +2190,23 @@ export const promoteProvisionalRelative = mutation({
     humanReviewNote: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
+    const { owner: vaultOwnerId } = await authorizeTenantMutation(
+      ctx,
+      "vaultMutations.promoteProvisionalRelative",
+      args.vaultOwnerId,
+    );
     const now = Date.now();
     const provisional = await ctx.db.get(args.provisionalId);
     if (!provisional || !matchesVaultOwner(provisional.vaultOwnerId, vaultOwnerId)) {
       throw new Error("Provisional relative not found");
     }
+    await authorizeOwnedReferenceMutation(
+      ctx,
+      "vaultMutations.promoteProvisionalRelative",
+      vaultOwnerId,
+      await ctx.db.get(provisional.anchorPersonId),
+      "Provisional relative anchor",
+    );
     if (provisional.mergeState !== "provisional") {
       throw new Error("This provisional relative has already been resolved");
     }
@@ -1900,7 +2280,11 @@ export const mergeProvisionalRelative = mutation({
     humanReviewNote: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
+    const { owner: vaultOwnerId } = await authorizeTenantMutation(
+      ctx,
+      "vaultMutations.mergeProvisionalRelative",
+      args.vaultOwnerId,
+    );
     const now = Date.now();
     const provisional = await ctx.db.get(args.provisionalId);
     const target = await ctx.db.get(args.targetPersonId);
@@ -1912,6 +2296,13 @@ export const mergeProvisionalRelative = mutation({
     ) {
       throw new Error("Could not merge provisional relative");
     }
+    await authorizeOwnedReferenceMutation(
+      ctx,
+      "vaultMutations.mergeProvisionalRelative",
+      vaultOwnerId,
+      await ctx.db.get(provisional.anchorPersonId),
+      "Provisional relative anchor",
+    );
     if (provisional.mergeState !== "provisional") {
       throw new Error("This provisional relative has already been resolved");
     }

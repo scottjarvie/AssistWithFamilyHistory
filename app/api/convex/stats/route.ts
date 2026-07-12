@@ -15,7 +15,7 @@ export async function GET() {
   try {
     const client = await getAuthedConvexClient();
     const { vaultOwnerId } = await getVaultAccessContext();
-    const summary = await client.query(api.vault.getDashboardSummary, { vaultOwnerId });
+    const summary = await client.action(api.vaultReads.getDashboardSummary, { vaultOwnerId });
 
     return NextResponse.json(
       {

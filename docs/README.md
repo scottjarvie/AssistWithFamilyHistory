@@ -17,9 +17,12 @@ Durable guidance that stays accurate as the product evolves.
 - [API route inventory](api/route-inventory.md)
 - [Browser tool and API routing](api/browser-api-routing.md)
 - [Vault owner isolation](security/vault-owner-isolation.md)
+- [Convex trust-boundary inventory](security/convex-trust-boundary-inventory.md)
 - [Privacy and AI safety review](security/privacy-ai-safety-review.md)
 - [Agent operations and handoff runbook](operations/agent-handoff-runbook.md)
 - [Product health gates and person route QA](operations/product-health-gates.md)
+- [GEN-87/88 guarded Convex rollout](operations/gen-87-clerk-convex-auth-setup.md)
+- [GEN-87/88 Convex trust-boundary architecture](operations/gen-87-convex-auth-design.md)
 - [Hydration mismatch notes (SafeLink workaround)](operations/hydration-mismatch-notes.md)
 - [Public story privacy sweep checklist](operations/public-story-privacy-sweep-checklist.md)
 - [Story mobile QA baselines](operations/story-mobile-qa-baselines.md)
@@ -47,7 +50,6 @@ Durable guidance that stays accurate as the product evolves.
 Point-in-time reports and audits. Useful as history, but read with their date in mind — they may not reflect the current codebase.
 
 - [Engineering audit — 2026-05](operations/engineering-audit-2026-05.md)
-- [GEN-87 Convex auth design](operations/gen-87-convex-auth-design.md)
 - [Production privacy sweep — 2026-05-25](operations/production-privacy-sweep-2026-05-25.md)
 - [Public beta launch QA report](operations/public-beta-launch-qa-report.md)
 - [Branch wrap-up — codex/foundation-route-long-hardening](operations/branch-wrap-up.md)

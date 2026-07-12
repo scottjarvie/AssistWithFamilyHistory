@@ -4,8 +4,8 @@
  * The `researchTasks.status` enum existed in the schema but NO mutation ever
  * transitioned a task off "todo" — a dead state machine. This pure module
  * defines the legal transitions so convex/researchTasks.ts can enforce them and
- * so the rule is unit-testable without a Convex runtime (mirrors the
- * compareOwnerForShadow seam in vaultCore.ts).
+ * so the rule is unit-testable without a Convex runtime (the same pattern used
+ * by other pure policy helpers in this repository).
  */
 export type ResearchTaskStatus = "todo" | "in_progress" | "blocked" | "done";
 

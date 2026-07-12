@@ -1,6 +1,6 @@
 # Discover Their Stories — AI Agent Platform: Design & Roadmap
 
-Status: active build (branch `scott/agent-platform`). Last updated: 2026-05-29.
+Status: active build. Last updated: 2026-07-12.
 
 ## Vision
 
@@ -10,8 +10,9 @@ plain language — acquiring sources, storing the full spectrum of context with 
 privacy, and producing grounded stories + visualizations — while the human watches tasks run and
 reviews agent work on the website.
 
-The whole agent layer is built ON the existing trust chokepoints (`resolveOwner`,
-`getVaultAccessContext`, `getContextPack`, `vaultMutations`, the three-gate predicates, the
+The whole agent layer is built ON the existing trust chokepoints
+(`convex/access.ts`, `getVaultAccessContext`, `getContextPack`,
+`vaultMutations`, the three-gate predicates, the
 contract-drift CI gates), never around them, so the load-bearing invariants extend automatically
 to every new surface.
 
@@ -51,7 +52,7 @@ network calls to the app); no Convex blob storage (`ctx.storage` unused — `med
 1. **Agent interface layer.** `apiKeys` + `agentActivity` tables; a `resource:action` scope
    vocabulary (replaces the self-asserted `x-dts-agent-scope` header); an `api_key` branch in
    `getVaultAccessContext` so all owner-scoped routes inherit agent auth; a Convex-trusted identity
-   for key principals so `resolveOwner` enforces agents identically to Clerk users; a versioned
+   for key principals so the Convex access guard enforces agents identically to Clerk users; a versioned
    `/api/v1` surface + the first-success path (`/me`, `/capabilities`, `/openapi.json`, `/usage`);
    served OpenAPI + enriched manifest + public discovery (`/.well-known/dts-capabilities.json`,
    `/llms.txt`); an MCP server (thin client of `/api/v1`); and a `/developers` onboarding +
@@ -99,12 +100,11 @@ bridge instead of manual copy-paste).
 
 ## Six-phase roadmap
 
-- **Phase 0 — Enforce the data-tier trust boundary (the unblocker).** Finish GEN-87: migrate
-  remaining write routes off the unauthenticated Convex client, internalize/delete the legacy CRUD
-  that inserts without an owner, then flip `resolveOwner` shadow→enforce (throw on verified-identity
-  mismatch). With guest vaults removed, the guest-identity work and `migrateGuestVault` are retired.
-  Nothing agent-write ships before this; needs a staged/rollback strategy and exhaustive
-  `ownerScoping.test.ts` coverage.
+- **Phase 0 — Enforce the data-tier trust boundary (the unblocker).** GEN-87/88 now guard every
+  external tenant function, route protected reads through authenticated actions, and enforce the
+  publish/redaction boundary in Convex. The code defaults to shadow; production flips only after
+  the superadmin summary shows zero legitimate denials. Guest migration is denied in enforce until
+  it has a signed capability. Nothing agent-write ships before the observed production flip.
 - **Phase 1 — Quick wins (no enforce dependency).** Serve the discovery contract + context taxonomy;
   fix story markdown rendering; ship Timeline + pedigree + map + stats over existing data; wake up
   the `researchTasks` lifecycle. Visible payoff while Phase 0 lands.

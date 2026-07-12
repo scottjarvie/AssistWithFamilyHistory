@@ -41,7 +41,7 @@ export default async function DashboardPage() {
   let summary;
 
   try {
-    summary = await client.query(api.vault.getDashboardSummary, { vaultOwnerId });
+    summary = await client.action(api.vaultReads.getDashboardSummary, { vaultOwnerId });
   } catch (error) {
     const issue = getConvexRuntimeIssue(error);
 

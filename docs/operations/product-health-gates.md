@@ -51,3 +51,17 @@ For route-health work:
 pnpm build
 BASE_URL=http://127.0.0.1:3443 pnpm smoke:routes
 ```
+
+## Trust-boundary gates
+
+Any Convex function, auth, or server-caller change must also run:
+
+```bash
+pnpm check:trust-boundary
+pnpm check:convex-client-auth
+pnpm test:convex
+```
+
+The first check inventories every public Convex registration and requires the
+shared guard outside the explicit public-query allowlist. The second prevents a
+private app or API call from using an unauthenticated Convex client.

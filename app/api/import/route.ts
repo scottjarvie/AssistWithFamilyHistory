@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateRawDocument } from "@/features/source-docs/lib/rawDocGenerator";
 import {
-  getConvexClient,
+  getAuthedConvexClient,
   getConvexReadyStatus,
   getConvexRuntimeIssue,
   isConvexConfigured,
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     if (isConvexConfigured()) {
       try {
         importResult = await importCapturePackageToConvex({
-          client: getConvexClient(),
+          client: await getAuthedConvexClient(),
           vaultOwnerId,
           capture,
           compatibilityMode,

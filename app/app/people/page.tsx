@@ -56,7 +56,7 @@ export default async function PeoplePage({
   let people;
 
   try {
-    people = await client.query(api.vault.getPeopleExplorer, {
+    people = await client.action(api.vaultReads.getPeopleExplorer, {
       vaultOwnerId,
       search: params.q || undefined,
       researchStatus:

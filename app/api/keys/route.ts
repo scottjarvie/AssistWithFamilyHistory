@@ -109,7 +109,7 @@ export async function GET() {
   try {
     const { vaultOwnerId } = await getVaultAccessContext();
     const client = await getAuthedConvexClient();
-    const keys = await client.query(api.apiKeys.listKeys, { vaultOwnerId });
+    const keys = await client.action(api.apiKeys.listKeys, { vaultOwnerId });
     return NextResponse.json({ success: true, keys });
   } catch (error) {
     const issue = getConvexRuntimeIssue(error);

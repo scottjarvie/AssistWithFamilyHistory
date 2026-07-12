@@ -26,6 +26,10 @@ Use this before enabling search indexing or broad beta sharing for published sto
 
 ## Share Surface
 
+- Confirm the anonymous Convex response includes publicationSafety with
+  redactionApplied true and the expected redaction version.
+- Confirm email, phone, SSN-shaped, and street-address fixtures are redacted by
+  the backend and address-type places are absent.
 - Confirm Open Graph and metadata use only published story/person data.
 - Confirm share descriptions do not expose private notes, unpublished review text, or internal audit details.
 - Confirm no unpublished story URL renders outside the authenticated app.
@@ -42,6 +46,8 @@ Use this before enabling search indexing or broad beta sharing for published sto
 - Public story pages: confirm draft/review stories 404, published stories render, slug URLs are canonical, and legacy ID routes redirect only for published stories.
 - OG images: confirm generated images and share text use only published story/person data and never private notes, review history, or unpublished draft text.
 - Story APIs: confirm `story_writer` can draft/edit/request review/preview, while `story:publish` requires trusted publisher or first-party owner authority.
-- Vault APIs: confirm private vault reads remain owner-scoped and are not reachable from public story identifiers.
+- Vault APIs: run `pnpm check:trust-boundary` and
+  `pnpm check:convex-client-auth`; confirm private reads require the Clerk JWT
+  and are not reachable from public story identifiers.
 - Browser/FamilySearch Capture flows: confirm capture packages are user/browser initiated while provider API approval is pending, and that private/living warnings survive import review.
 - Agent handoff packets: confirm handoff output includes blockers, warnings, provenance, and next actions without exposing private review notes to public pages.

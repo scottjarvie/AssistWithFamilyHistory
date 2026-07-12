@@ -36,7 +36,7 @@ export default async function StoryWriterPage() {
   let people;
 
   try {
-    people = await client.query(api.vault.getStoryReadinessCandidates, {
+    people = await client.action(api.vaultReads.getStoryReadinessCandidates, {
       vaultOwnerId,
       limit: 24,
     });

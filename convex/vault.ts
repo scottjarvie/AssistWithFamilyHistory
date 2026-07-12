@@ -1,7 +1,8 @@
 import { v } from "convex/values";
-import { query, type QueryCtx } from "./_generated/server";
+import { internalQuery, query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { buildStoryPublicSlug } from "../lib/stories/slug";
+import { redactPublicText } from "../lib/privacy/publicTextRedaction";
 import { buildContextPack } from "./contextPackBuilder";
 import {
   buildOperationSummary,
@@ -10,7 +11,6 @@ import {
   inferResearchChecks,
   matchesVaultOwner,
   normalizeVaultOwnerId,
-  resolveOwner,
   sortByTimestampDesc,
 } from "./vaultCore";
 
@@ -852,12 +852,17 @@ export function buildPublicStoryBundle(
     : null;
 
   return {
+    publicationSafety: {
+      published: story.status === "published",
+      redactionApplied: true,
+      redactionVersion: "public-text-v1" as const,
+    },
     // Story — title, content, status, slug, indexing only. NOT internal
     // workflow fields like `publishWarnings`, `lastReviewerNote`, etc.
     story: {
       _id: story._id,
-      title: story.title,
-      content: story.content,
+      title: redactPublicText(story.title),
+      content: redactPublicText(story.content),
       status: story.status,
       publicSlug,
       publicIndexing: story.publicIndexing ?? "noindex" as const,
@@ -867,9 +872,8 @@ export function buildPublicStoryBundle(
     person: person
       ? {
           _id: person._id,
-          displayName: formatPersonName(person),
-          routeId: person.fsId || String(person._id),
-          lifespan: getPersonLifespan(person),
+          displayName: redactPublicText(formatPersonName(person)),
+          lifespan: redactPublicText(getPersonLifespan(person)),
         }
       : null,
     // Evidence — source title + citation count only. NOT raw citation text,
@@ -877,7 +881,7 @@ export function buildPublicStoryBundle(
     evidence: sourceRecords.groupedSources.slice(0, 8).map((entry) => ({
       source: {
         _id: entry.source._id,
-        title: entry.source.title,
+        title: redactPublicText(entry.source.title),
       },
       citations: entry.citations.slice(0, 3).map((citation) => ({
         _id: citation._id,
@@ -894,23 +898,26 @@ export function buildPublicStoryBundle(
         type: event.type,
         date: event.date
           ? {
-              original: event.date.original,
+              original: redactPublicText(event.date.original),
               year: event.date.year,
             }
           : undefined,
         endDate: event.endDate
           ? {
-              original: event.endDate.original,
+              original: redactPublicText(event.endDate.original),
               year: event.endDate.year,
             }
           : undefined,
       })),
     // Places — display fields only. NOT temporal descriptions, parent IDs,
     // FamilySearch IDs, or notes.
-    places: (operations?.relatedPlaces ?? []).slice(0, 8).map((place) => ({
+    places: (operations?.relatedPlaces ?? [])
+      .filter((place) => place.type !== "address")
+      .slice(0, 8)
+      .map((place) => ({
       _id: place._id,
-      fullName: place.fullName,
-      name: place.name,
+      fullName: redactPublicText(place.fullName),
+      name: redactPublicText(place.name),
       type: place.type,
     })),
     // Media — public-gated subset, title only. NOT URLs, descriptions,
@@ -919,7 +926,7 @@ export function buildPublicStoryBundle(
       (operations?.relatedMedia ?? []).filter(isPublicStoryMedia)
     ).slice(0, 6).map((item) => ({
       _id: item._id,
-      title: item.title,
+      title: redactPublicText(item.title),
     })),
     // Relationships — `relatedName` only, no full `relatedPerson` Doc.
     // The public page only needs the display string.
@@ -927,11 +934,11 @@ export function buildPublicStoryBundle(
       if (!person) return null;
       const relatedId = relationship.person1 === person._id ? relationship.person2 : relationship.person1;
       const relatedPerson = snapshot.people.find((entry) => entry._id === relatedId);
-      return relatedPerson
+      return relatedPerson && !relatedPerson.living
         ? {
             _id: relationship._id,
             type: relationship.type,
-            relatedName: formatPersonName(relatedPerson),
+            relatedName: redactPublicText(formatPersonName(relatedPerson)),
           }
         : null;
     }).filter((entry): entry is NonNullable<typeof entry> => entry !== null),
@@ -940,10 +947,10 @@ export function buildPublicStoryBundle(
     // sources arrays.
     historicalContext: (contextCoverage?.publishableEntries ?? []).slice(0, 8).map((entry) => ({
       _id: entry._id,
-      title: entry.title,
-      topic: entry.topic,
+      title: redactPublicText(entry.title),
+      topic: redactPublicText(entry.topic),
       timePeriod: entry.timePeriod,
-      content: entry.content,
+      content: redactPublicText(entry.content),
     })),
   };
 }
@@ -1477,7 +1484,7 @@ function makeEmptyVaultSnapshot(): VaultSnapshot {
   };
 }
 
-export const getPeopleExplorer = query({
+export const getPeopleExplorer = internalQuery({
   args: {
     vaultOwnerId: v.string(),
     search: v.optional(v.string()),
@@ -1493,7 +1500,7 @@ export const getPeopleExplorer = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const snapshot = await getVaultSnapshot(ctx, await resolveOwner(ctx, args.vaultOwnerId));
+    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
     const search = args.search?.trim().toLowerCase();
 
     const rows = buildPeopleRows(snapshot).filter((person) => {
@@ -1517,7 +1524,7 @@ export const getPeopleExplorer = query({
   },
 });
 
-export const getPersonWorkspace = query({
+export const getPersonWorkspace = internalQuery({
   args: {
     vaultOwnerId: v.string(),
     personIdentifier: v.string(),
@@ -1526,18 +1533,18 @@ export const getPersonWorkspace = query({
     // GEN-92: per-person loader — fetches only this person's related rows.
     return assemblePersonWorkspaceScoped(
       ctx,
-      await resolveOwner(ctx, args.vaultOwnerId),
+      normalizeVaultOwnerId(args.vaultOwnerId),
       args.personIdentifier
     );
   },
 });
 
-export const getStoriesIndex = query({
+export const getStoriesIndex = internalQuery({
   args: {
     vaultOwnerId: v.string(),
   },
   handler: async (ctx, args) => {
-    const snapshot = await getVaultSnapshot(ctx, await resolveOwner(ctx, args.vaultOwnerId));
+    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
     const index = buildSnapshotIndex(snapshot);
     return sortByTimestampDesc(snapshot.stories).map((story) => {
       const person = story.personId
@@ -1584,7 +1591,7 @@ export const getStoriesIndex = query({
   },
 });
 
-export const getStoryReview = query({
+export const getStoryReview = internalQuery({
   args: {
     vaultOwnerId: v.string(),
     storyId: v.id("stories"),
@@ -1598,7 +1605,7 @@ export const getStoryReview = query({
     // full-snapshot buildStoryBundle on the fixture vault.
     const snapshot = await loadStoryScopedSnapshot(
       ctx,
-      await resolveOwner(ctx, args.vaultOwnerId),
+      normalizeVaultOwnerId(args.vaultOwnerId),
       args.storyId
     );
     if (!snapshot) return null;
@@ -1617,10 +1624,14 @@ export const getPublishedStory = query({
 
     const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(story.vaultOwnerId));
     const ownedStory = snapshot.stories.find((entry) => entry._id === story._id);
+    const person = ownedStory
+      ? snapshot.people.find((entry) => entry._id === ownedStory.personId)
+      : null;
+    if (!ownedStory || !person || person.living) return null;
     // GEN-77: use buildPublicStoryBundle (explicit field allowlist) instead
     // of the older internal bundle, which only gated 2 of 12 fields and
     // returned reviewer-only data on the public query response.
-    return ownedStory ? buildPublicStoryBundle(snapshot, ownedStory) : null;
+    return buildPublicStoryBundle(snapshot, ownedStory);
   },
 });
 
@@ -1643,7 +1654,10 @@ export const getPublishedStoryByIdentifier = query({
 
     const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(candidate.vaultOwnerId));
     const ownedStory = snapshot.stories.find((entry) => entry._id === candidate._id);
-    if (!ownedStory) return null;
+    const person = ownedStory
+      ? snapshot.people.find((entry) => entry._id === ownedStory.personId)
+      : null;
+    if (!ownedStory || !person || person.living) return null;
 
     // GEN-77: public DTO with explicit field allowlist.
     const bundle = buildPublicStoryBundle(snapshot, ownedStory);
@@ -1658,7 +1672,7 @@ export const getPublishedStoryByIdentifier = query({
   },
 });
 
-export const getPersonResearchChecks = query({
+export const getPersonResearchChecks = internalQuery({
   args: {
     vaultOwnerId: v.string(),
     personIdentifier: v.string(),
@@ -1667,20 +1681,20 @@ export const getPersonResearchChecks = query({
     // GEN-92: per-person loader — fetches only this person's related rows.
     const workspace = await assemblePersonWorkspaceScoped(
       ctx,
-      await resolveOwner(ctx, args.vaultOwnerId),
+      normalizeVaultOwnerId(args.vaultOwnerId),
       args.personIdentifier
     );
     return workspace?.researchChecks ?? [];
   },
 });
 
-export const getProvisionalRelatives = query({
+export const getProvisionalRelatives = internalQuery({
   args: {
     vaultOwnerId: v.string(),
     personIdentifier: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const snapshot = await getVaultSnapshot(ctx, await resolveOwner(ctx, args.vaultOwnerId));
+    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
     if (!args.personIdentifier) {
       return sortByTimestampDesc(snapshot.provisionalRelatives);
     }
@@ -1693,7 +1707,7 @@ export const getProvisionalRelatives = query({
   },
 });
 
-export const getOperationsQueue = query({
+export const getOperationsQueue = internalQuery({
   args: {
     vaultOwnerId: v.string(),
     search: v.optional(v.string()),
@@ -1716,7 +1730,7 @@ export const getOperationsQueue = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const snapshot = await getVaultSnapshot(ctx, await resolveOwner(ctx, args.vaultOwnerId));
+    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
     const peopleRows = buildPeopleRows(snapshot).map((row) => ({
       rowType: "person" as const,
       id: row.routeId,
@@ -1863,12 +1877,12 @@ export const getOperationsQueue = query({
   },
 });
 
-export const getOperationsSummary = query({
+export const getOperationsSummary = internalQuery({
   args: {
     vaultOwnerId: v.string(),
   },
   handler: async (ctx, args) => {
-    const snapshot = await getVaultSnapshot(ctx, await resolveOwner(ctx, args.vaultOwnerId));
+    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
     const rows = buildPeopleRows(snapshot);
     return {
       people: rows.length,
@@ -1883,12 +1897,12 @@ export const getOperationsSummary = query({
   },
 });
 
-export const getVaultAudit = query({
+export const getVaultAudit = internalQuery({
   args: {
     vaultOwnerId: v.string(),
   },
   handler: async (ctx, args) => {
-    const snapshot = await getVaultSnapshot(ctx, await resolveOwner(ctx, args.vaultOwnerId));
+    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
     const peopleRows = buildPeopleRows(snapshot);
     const storyWorkflowCounts = peopleRows.reduce<Record<string, number>>((totals, row) => {
       totals[row.storyWorkflow] = (totals[row.storyWorkflow] || 0) + 1;
@@ -1945,7 +1959,7 @@ export const getVaultAudit = query({
   },
 });
 
-export const getContextCoverage = query({
+export const getContextCoverage = internalQuery({
   args: {
     vaultOwnerId: v.string(),
     personIdentifier: v.string(),
@@ -1963,7 +1977,7 @@ export const getContextCoverage = query({
     // scripts/test-context-coverage-parity.ts deep-equals the two paths.
     const snapshot = await loadPersonScopedSnapshot(
       ctx,
-      await resolveOwner(ctx, args.vaultOwnerId),
+      normalizeVaultOwnerId(args.vaultOwnerId),
       args.personIdentifier
     );
     if (!snapshot) return null;
@@ -1975,14 +1989,14 @@ export const getContextCoverage = query({
   },
 });
 
-export const getStoryReadinessCandidates = query({
+export const getStoryReadinessCandidates = internalQuery({
   args: {
     vaultOwnerId: v.string(),
     storyWorkflow: v.optional(storyWorkflowValidator),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const snapshot = await getVaultSnapshot(ctx, await resolveOwner(ctx, args.vaultOwnerId));
+    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
     const rows = buildPeopleRows(snapshot)
       .filter((row) => !args.storyWorkflow || row.storyWorkflow === args.storyWorkflow)
       .sort((a, b) => b.storyReadinessScore - a.storyReadinessScore)
@@ -2003,14 +2017,14 @@ export const getStoryReadinessCandidates = query({
   },
 });
 
-export const getPlacesExplorer = query({
+export const getPlacesExplorer = internalQuery({
   args: {
     vaultOwnerId: v.string(),
     search: v.optional(v.string()),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const snapshot = await getVaultSnapshot(ctx, await resolveOwner(ctx, args.vaultOwnerId));
+    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
     const search = args.search?.trim().toLowerCase();
     const rows = snapshot.places.filter((place) => {
       if (!search) return true;
@@ -2032,13 +2046,13 @@ export const getPlacesExplorer = query({
   },
 });
 
-export const getPlaceWorkspace = query({
+export const getPlaceWorkspace = internalQuery({
   args: {
     vaultOwnerId: v.string(),
     placeId: v.id("places"),
   },
   handler: async (ctx, args) => {
-    const snapshot = await getVaultSnapshot(ctx, await resolveOwner(ctx, args.vaultOwnerId));
+    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
     const place = snapshot.places.find((entry) => entry._id === args.placeId);
     if (!place) return null;
 
@@ -2096,12 +2110,12 @@ export const getPlaceWorkspace = query({
   },
 });
 
-export const getDashboardSummary = query({
+export const getDashboardSummary = internalQuery({
   args: {
     vaultOwnerId: v.string(),
   },
   handler: async (ctx, args) => {
-    const snapshot = await getVaultSnapshot(ctx, await resolveOwner(ctx, args.vaultOwnerId));
+    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
     const peopleRows = buildPeopleRows(snapshot);
     const personById = new Map(snapshot.people.map((person) => [String(person._id), person]));
 
@@ -2136,12 +2150,12 @@ export const getDashboardSummary = query({
   },
 });
 
-export const getResearchOverview = query({
+export const getResearchOverview = internalQuery({
   args: {
     vaultOwnerId: v.string(),
   },
   handler: async (ctx, args) => {
-    const snapshot = await getVaultSnapshot(ctx, await resolveOwner(ctx, args.vaultOwnerId));
+    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
     const personById = new Map(snapshot.people.map((person) => [String(person._id), person]));
 
     return {
@@ -2160,7 +2174,7 @@ export const getResearchOverview = query({
   },
 });
 
-export const getContextPack = query({
+export const getContextPack = internalQuery({
   args: {
     vaultOwnerId: v.string(),
     personIdentifier: v.string(),
@@ -2169,7 +2183,7 @@ export const getContextPack = query({
     // GEN-92: per-person loader — fetches only this person's related rows.
     const workspace = await assemblePersonWorkspaceScoped(
       ctx,
-      await resolveOwner(ctx, args.vaultOwnerId),
+      normalizeVaultOwnerId(args.vaultOwnerId),
       args.personIdentifier
     );
     if (!workspace) return null;

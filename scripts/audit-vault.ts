@@ -26,8 +26,15 @@ async function main() {
   }
 
   const vaultOwnerId = process.env.VAULT_OWNER_ID || DEFAULT_LOCAL_VAULT_OWNER;
+  const authToken = process.env.CONVEX_AUTH_TOKEN;
+  if (!authToken) {
+    throw new Error(
+      "CONVEX_AUTH_TOKEN is required for this private vault audit; use a short-lived Clerk convex-template JWT",
+    );
+  }
   const client = new ConvexHttpClient(convexUrl);
-  const audit = await client.query(api.vault.getVaultAudit, { vaultOwnerId });
+  client.setAuth(authToken);
+  const audit = await client.action(api.vaultReads.getVaultAudit, { vaultOwnerId });
 
   console.log("Vault Audit");
   console.log("===========");

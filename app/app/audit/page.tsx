@@ -49,7 +49,7 @@ export default async function VaultAuditPage() {
   let audit;
 
   try {
-    audit = await client.query(api.vault.getVaultAudit, { vaultOwnerId });
+    audit = await client.action(api.vaultReads.getVaultAudit, { vaultOwnerId });
   } catch (error) {
     const issue = getConvexRuntimeIssue(error);
     return (
