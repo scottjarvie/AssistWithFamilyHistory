@@ -2,6 +2,8 @@ import { v } from "convex/values";
 import { mutation, type MutationCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { buildStoryPublicSlug } from "../lib/stories/slug";
+import { evaluateStoryPublishGate } from "../lib/stories/publishSafety";
+import { buildStoryBundle, loadStoryScopedSnapshot } from "./vault";
 import {
   buildProvisionalDedupeKey,
   filterByVaultOwner,
@@ -1023,11 +1025,61 @@ export const updateStoryStatus = mutation({
     vaultOwnerId: v.string(),
     storyId: v.id("stories"),
     status: storyStatusValidator,
+    // GEN-88 §A: the publish gate is now authoritative in the writer, not just
+    // the Next API route. These carry the human-review confirmation the route
+    // used to check on its own. Optional so non-publish transitions are
+    // unaffected; enforced below only when transitioning to "published".
+    humanReviewConfirmed: v.optional(v.boolean()),
+    humanReviewNote: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const story = await ctx.db.get(args.storyId);
     if (!story || !matchesVaultOwner(story.vaultOwnerId, args.vaultOwnerId)) {
       throw new Error("Story not found");
+    }
+
+    // GEN-88 §A: enforce the full publish gate server-side. Because
+    // NEXT_PUBLIC_CONVEX_URL is public, a direct caller could otherwise flip a
+    // story to "published" with none of the readiness/privacy/review checks the
+    // API route performs. Re-derive the same bundle the route previews from and
+    // refuse to publish unless every gate passes. Only runs on the transition
+    // to "published"; draft/review transitions keep their existing behavior.
+    if (args.status === "published") {
+      const snapshot = await loadStoryScopedSnapshot(
+        ctx,
+        await resolveOwner(ctx, args.vaultOwnerId),
+        args.storyId,
+      );
+      const bundleStory = snapshot?.stories.find((entry) => entry._id === args.storyId);
+      if (!snapshot || !bundleStory) {
+        throw new Error("Story not found");
+      }
+      const bundle = buildStoryBundle(snapshot, bundleStory);
+
+      const gateErrors = evaluateStoryPublishGate({
+        story: {
+          secondReviewRequired: story.secondReviewRequired,
+          secondReviewedAt: story.secondReviewedAt,
+        },
+        readiness: {
+          story: bundle.story,
+          person: bundle.person,
+          readiness: bundle.readiness,
+          researchChecks: bundle.researchChecks,
+          contextCoverage: bundle.contextCoverage,
+          evidence: bundle.evidence,
+          events: bundle.events,
+          places: bundle.places,
+          relationships: bundle.relationships,
+          provisionalRelatives: bundle.provisionalRelatives,
+          publishWarnings: bundle.publishWarnings,
+        },
+        humanReviewConfirmed: args.humanReviewConfirmed,
+        humanReviewNote: args.humanReviewNote,
+      });
+      if (gateErrors.length > 0) {
+        throw new Error(gateErrors.join(" "));
+      }
     }
 
     const now = Date.now();

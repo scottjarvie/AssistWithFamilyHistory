@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { chatCompletion } from "@/lib/ai/openrouter";
 import { getAiPrivacyDisclosure, type AiRedactionMode } from "@/lib/ai/privacy";
+import { scanForLivingPersonPII } from "@/lib/ai/redaction";
 import {
   ALLOWED_MODELS,
   DEFAULT_MODEL,
@@ -152,6 +153,48 @@ export async function POST(request: NextRequest) {
         },
         { status: 413 }
       );
+    }
+
+    // GEN-88 §C: enforce redaction server-side. `redactionMode` is a
+    // client-asserted label; do not trust it. When the caller claims the payload
+    // is "redacted", scan it for high-precision living-person / PII indicators
+    // and REFUSE to forward to the external AI on a hit — the whole point of
+    // "redacted" is that this data is absent. When the caller claims
+    // "original_reviewed", require a server-verified signed-in (non-guest) vault
+    // owner rather than trusting a bare client boolean; guests may not push
+    // original human-subject data to the external model.
+    if (data !== undefined && serializedData) {
+      if (redactionMode === "redacted") {
+        const scan = scanForLivingPersonPII(serializedData);
+        if (scan.hasPII) {
+          return NextResponse.json(
+            {
+              error: "Redaction check failed",
+              details:
+                "The payload is declared redacted but still contains living-person or PII indicators. Remove them or send as reviewed original data.",
+              indicators: scan.indicators,
+            },
+            { status: 422 }
+          );
+        }
+      } else if (redactionMode === "original_reviewed") {
+        let ownerId: string | null = null;
+        try {
+          ownerId = (await getVaultAccessContext()).vaultOwnerId;
+        } catch {
+          ownerId = null;
+        }
+        if (!ownerId || ownerId.startsWith("guest_")) {
+          return NextResponse.json(
+            {
+              error: "Human review verification required",
+              details:
+                "Sending original (unredacted) human-subject data requires a signed-in vault owner. Sign in, or send redacted data instead.",
+            },
+            { status: 403 }
+          );
+        }
+      }
     }
 
     const fullPrompt = serializedData ? `${prompt}\n\nINPUT DATA:\n${serializedData}` : prompt;
