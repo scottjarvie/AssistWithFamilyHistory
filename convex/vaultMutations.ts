@@ -1033,8 +1033,9 @@ export const updateStoryStatus = mutation({
     humanReviewNote: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const story = await ctx.db.get(args.storyId);
-    if (!story || !matchesVaultOwner(story.vaultOwnerId, args.vaultOwnerId)) {
+    if (!story || !matchesVaultOwner(story.vaultOwnerId, vaultOwnerId)) {
       throw new Error("Story not found");
     }
 
@@ -1124,8 +1125,9 @@ export const updateStoryDraft = mutation({
     tags: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const story = await ctx.db.get(args.storyId);
-    if (!story || !matchesVaultOwner(story.vaultOwnerId, args.vaultOwnerId)) {
+    if (!story || !matchesVaultOwner(story.vaultOwnerId, vaultOwnerId)) {
       throw new Error("Story not found");
     }
 

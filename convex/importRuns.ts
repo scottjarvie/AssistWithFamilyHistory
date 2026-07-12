@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { filterByVaultOwner, matchesVaultOwner, normalizeVaultOwnerId } from "./vaultCore";
+import { filterByVaultOwner, matchesVaultOwner, resolveOwner } from "./vaultCore";
 
 const pageTypeValidator = v.union(
   v.literal("sources"),
@@ -53,9 +53,10 @@ export const record = mutation({
     ),
   },
   handler: async (ctx, args) => {
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     return await ctx.db.insert("importRuns", {
       ...args,
-      vaultOwnerId: normalizeVaultOwnerId(args.vaultOwnerId),
+      vaultOwnerId,
       importedAt: Date.now(),
     });
   },
@@ -68,7 +69,7 @@ export const listRecent = query({
     personIdentifier: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     let rows = await ctx.db
       .query("importRuns")
       .withIndex("by_imported_at")
@@ -91,11 +92,12 @@ export const listRecent = query({
 export const getByCaptureId = query({
   args: { captureId: v.string(), vaultOwnerId: v.string() },
   handler: async (ctx, args) => {
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const rows = await ctx.db
       .query("importRuns")
       .withIndex("by_capture_id", (q) => q.eq("captureId", args.captureId))
       .collect();
-    return filterByVaultOwner(rows, normalizeVaultOwnerId(args.vaultOwnerId))[0] ?? null;
+    return filterByVaultOwner(rows, vaultOwnerId)[0] ?? null;
   },
 });
 
@@ -111,8 +113,9 @@ export const attachArtifactPaths = mutation({
     }),
   },
   handler: async (ctx, args) => {
+    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const existing = await ctx.db.get(args.importRunId);
-    if (!existing || !matchesVaultOwner(existing.vaultOwnerId, args.vaultOwnerId)) return null;
+    if (!existing || !matchesVaultOwner(existing.vaultOwnerId, vaultOwnerId)) return null;
 
     await ctx.db.patch(args.importRunId, {
       artifactPaths: {
