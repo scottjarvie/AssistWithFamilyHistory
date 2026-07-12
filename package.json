@@ -42,6 +42,7 @@
     "check:place-era-packs": "tsx scripts/check-place-era-research-packs.ts",
     "smoke:routes": "bash scripts/smoke-routes.sh",
     "check:protected-routes": "tsx scripts/check-protected-routes.ts",
+    "check:authed-mutation-routes": "tsx scripts/check-authed-mutation-routes.ts",
     "check:person-identifiers": "tsx scripts/check-person-identifiers.ts",
     "check:convex-visibility": "tsx scripts/check-convex-visibility.ts",
     "check:owned-tables-parity": "tsx scripts/check-owned-tables-parity.ts",

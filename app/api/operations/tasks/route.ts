@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { api } from "@/convex/_generated/api";
-import { getConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
+import { getAuthedConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
 // GEN-94: zod request-body contract. Priority narrows to the Convex mutation
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing task title" }, { status: 400 });
     }
 
-    const client = getConvexClient();
+    const client = await getAuthedConvexClient();
     const workspace = personIdentifier
       ? await client.query(api.vault.getPersonWorkspace, { vaultOwnerId, personIdentifier })
       : null;

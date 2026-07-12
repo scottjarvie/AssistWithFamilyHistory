@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "node:crypto";
 import { api } from "@/convex/_generated/api";
-import { getAuthedConvexClient, getConvexClient, isConvexConfigured } from "@/lib/convex/server";
+import { getAuthedConvexClient, isConvexConfigured } from "@/lib/convex/server";
 import {
   getContextualizedDocument,
   getLatestRun,
@@ -143,7 +143,7 @@ export async function POST(
 
     if (isConvexConfigured()) {
       try {
-        const client = getConvexClient();
+        const client = await getAuthedConvexClient();
         const importRun = await resolveImportRunForStoredRun({
           client,
           vaultOwnerId,

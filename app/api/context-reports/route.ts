@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { getConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
+import { getAuthedConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
 import {
   CONTEXT_REPORT_PRIVACY_LEVELS,
   CONTEXT_REPORT_REVIEW_STATUSES,
@@ -148,7 +148,8 @@ export async function POST(request: NextRequest) {
     }
 
     const { vaultOwnerId } = await getVaultAccessContext();
-    const result = await getConvexClient().mutation(api.vaultMutations.upsertHistoricalContext, {
+    const client = await getAuthedConvexClient();
+    const result = await client.mutation(api.vaultMutations.upsertHistoricalContext, {
       vaultOwnerId,
       placeId: placeId as Id<"places"> | undefined,
       timePeriod: {

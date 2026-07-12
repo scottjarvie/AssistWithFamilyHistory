@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { getAuthedConvexClient, getConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
+import { getAuthedConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
 import { requireHumanReviewConfirmation } from "@/lib/operations/reviewGates";
 import {
   getActionForStatusChange,
@@ -16,8 +16,9 @@ function isStoryStatus(value: unknown): value is "draft" | "review" | "published
   return value === "draft" || value === "review" || value === "published";
 }
 
-async function getStoryBundle(vaultOwnerId: string, storyId: string) {
-  const client = await getAuthedConvexClient();
+type AuthedConvexClient = Awaited<ReturnType<typeof getAuthedConvexClient>>;
+
+async function getStoryBundle(client: AuthedConvexClient, vaultOwnerId: string, storyId: string) {
   return client.query(api.vault.getStoryReview, {
     vaultOwnerId,
     storyId: storyId as Id<"stories">,
@@ -70,6 +71,7 @@ function toAuditSnapshot(readiness: StoryPublishReadiness) {
 }
 
 async function recordReviewEvent(params: {
+  client: AuthedConvexClient;
   vaultOwnerId: string;
   storyId: string;
   eventType: "publish_preview" | "status_change" | "publish_confirmation";
@@ -81,7 +83,7 @@ async function recordReviewEvent(params: {
   humanReviewNote?: string;
   publishReadiness?: StoryPublishReadiness;
 }) {
-  return getConvexClient().mutation(api.vaultMutations.recordStoryReviewEvent, {
+  return params.client.mutation(api.vaultMutations.recordStoryReviewEvent, {
     vaultOwnerId: params.vaultOwnerId,
     storyId: params.storyId as Id<"stories">,
     eventType: params.eventType,
@@ -110,7 +112,8 @@ export async function GET(
   try {
     const { id } = await params;
     const { vaultOwnerId } = await getVaultAccessContext();
-    const bundle = await getStoryBundle(vaultOwnerId, id);
+    const client = await getAuthedConvexClient();
+    const bundle = await getStoryBundle(client, vaultOwnerId, id);
 
     if (!bundle) {
       return NextResponse.json({ error: "Story not found" }, { status: 404 });
@@ -123,6 +126,7 @@ export async function GET(
 
     if (shouldRecord) {
       await recordReviewEvent({
+        client,
         vaultOwnerId,
         storyId: id,
         eventType: "publish_preview",
@@ -173,11 +177,12 @@ export async function PATCH(
     }
 
     const { vaultOwnerId } = await getVaultAccessContext();
+    const client = await getAuthedConvexClient();
     let publishReadiness;
     let fromStatus: "draft" | "review" | "published" | undefined;
 
     if (body.status === "published") {
-      const bundle = await getStoryBundle(vaultOwnerId, id);
+      const bundle = await getStoryBundle(client, vaultOwnerId, id);
 
       if (!bundle) {
         return NextResponse.json({ error: "Story not found" }, { status: 404 });
@@ -226,17 +231,18 @@ export async function PATCH(
     }
 
     if (!fromStatus) {
-      const bundle = await getStoryBundle(vaultOwnerId, id);
+      const bundle = await getStoryBundle(client, vaultOwnerId, id);
       fromStatus = bundle?.story.status;
     }
 
-    const result = await getConvexClient().mutation(api.vaultMutations.updateStoryStatus, {
+    const result = await client.mutation(api.vaultMutations.updateStoryStatus, {
       vaultOwnerId,
       storyId: id as Id<"stories">,
       status: body.status,
     });
 
     await recordReviewEvent({
+      client,
       vaultOwnerId,
       storyId: id,
       eventType: body.status === "published" ? "publish_confirmation" : "status_change",

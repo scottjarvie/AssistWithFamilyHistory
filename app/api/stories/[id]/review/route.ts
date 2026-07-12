@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { getConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
+import { getAuthedConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
 import { requireStoryAction, resolveStoryActor } from "@/lib/stories/capabilities";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
@@ -32,7 +32,8 @@ export async function PATCH(
     }
 
     const { vaultOwnerId } = await getVaultAccessContext();
-    const result = await getConvexClient().mutation(api.vaultMutations.assignStoryReviewer, {
+    const client = await getAuthedConvexClient();
+    const result = await client.mutation(api.vaultMutations.assignStoryReviewer, {
       vaultOwnerId,
       storyId: id as Id<"stories">,
       assignedReviewer,

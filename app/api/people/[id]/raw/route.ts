@@ -24,7 +24,7 @@ import {
   saveRawDocument,
   isLocalFsEnabled,
 } from "@/lib/storage/fileStorage";
-import { getAuthedConvexClient, getConvexClient, isConvexConfigured } from "@/lib/convex/server";
+import { getAuthedConvexClient, isConvexConfigured } from "@/lib/convex/server";
 import { generateRawDocument } from "@/features/source-docs/lib/rawDocGenerator";
 import { EvidencePackSchema } from "@/features/source-docs/lib/schemas";
 import { resolveImportRunForStoredRun } from "@/lib/familysearch/importRunResolver";
@@ -68,10 +68,12 @@ export async function GET(
     // Convex is the canonical store (GEN-91). Prefer the mirrored artifact from
     // the documents table; only fall back to the local filesystem in dev.
     let markdown: string | null = null;
+    const client =
+      isConvexConfigured() && storagePersonId ? await getAuthedConvexClient() : null;
 
-    if (isConvexConfigured() && storagePersonId) {
+    if (isConvexConfigured() && storagePersonId && client) {
       try {
-        const existingDoc = await (await getAuthedConvexClient()).query(api.documents.getDocument, {
+        const existingDoc = await client.query(api.documents.getDocument, {
           vaultOwnerId,
           personId: storagePersonId,
           type: "CST",
@@ -130,9 +132,8 @@ export async function GET(
 
     // Only mirror into Convex + refresh research checks when the artifact was
     // newly generated. A cache-hit read must not write (GEN-90).
-    if (generated && isConvexConfigured() && storagePersonId) {
+    if (generated && isConvexConfigured() && storagePersonId && client) {
       try {
-        const client = getConvexClient();
         const importRun = await resolveImportRunForStoredRun({
           client,
           vaultOwnerId,

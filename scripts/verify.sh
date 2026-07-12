@@ -47,6 +47,7 @@ steps=(
   "check:experimental-tools"
   "check:place-era-packs"
   "check:protected-routes"
+  "check:authed-mutation-routes"
   "check:person-identifiers"
   "check:convex-visibility"
   "check:owned-tables-parity"
