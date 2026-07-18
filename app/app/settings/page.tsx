@@ -123,7 +123,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="p-8 max-w-4xl">
+    <div className="max-w-4xl px-4 py-6 sm:p-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-stone-900 mb-2">Settings</h1>
         <p className="text-stone-500">
@@ -152,8 +152,8 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex gap-2">
-              <div className="relative flex-1">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-2">
+              <div className="relative min-w-0 flex-1">
                 <Label htmlFor="openrouter-api-key" className="sr-only">
                   OpenRouter API key
                 </Label>
@@ -163,14 +163,14 @@ export default function SettingsPage() {
                   placeholder="sk-or-..."
                   value={settings.openRouterApiKey}
                   onChange={(e) => setSettings({ ...settings, openRouterApiKey: e.target.value })}
-                  className="pr-10"
+                  className="h-11 pr-12"
                 />
                 <button
                   type="button"
                   onClick={() => setShowApiKey(!showApiKey)}
                   aria-label={showApiKey ? "Hide API key" : "Show API key"}
                   aria-pressed={showApiKey}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
+                  className="absolute right-0 top-1/2 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center text-stone-400 hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2"
                 >
                   {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -179,6 +179,7 @@ export default function SettingsPage() {
                 variant="outline" 
                 onClick={testApiKey}
                 disabled={testingKey}
+                className="min-h-11 w-full sm:w-auto"
               >
                 {testingKey ? "Testing..." : "Test"}
               </Button>
@@ -200,7 +201,7 @@ export default function SettingsPage() {
             )}
             <Button 
               onClick={() => saveSettings(settings)}
-              className="bg-amber-700 hover:bg-amber-800"
+              className="min-h-11 bg-amber-700 hover:bg-amber-800"
             >
               Save API Key
             </Button>
@@ -257,8 +258,8 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between p-4 bg-stone-50 rounded-lg">
-              <div>
+            <div className="flex flex-col gap-4 rounded-lg bg-stone-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
                 <Label className="text-stone-900 font-medium">
                   Auto-redact sensitive information
                 </Label>
@@ -271,13 +272,18 @@ export default function SettingsPage() {
                 aria-label={settings.autoRedact ? "Disable auto-redact" : "Enable auto-redact"}
                 aria-checked={settings.autoRedact}
                 role="switch"
-                className={`w-12 h-6 rounded-full transition-colors ${
-                  settings.autoRedact ? "bg-amber-700" : "bg-stone-300"
-                }`}
+                className="relative flex min-h-11 w-12 shrink-0 items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2"
               >
-                <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                  settings.autoRedact ? "translate-x-6" : "translate-x-0.5"
-                }`} />
+                <span
+                  aria-hidden="true"
+                  className={`relative h-6 w-12 rounded-full transition-colors ${
+                    settings.autoRedact ? "bg-amber-700" : "bg-stone-300"
+                  }`}
+                >
+                  <span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                    settings.autoRedact ? "translate-x-6" : "translate-x-0"
+                  }`} />
+                </span>
               </button>
             </div>
           </CardContent>
@@ -298,8 +304,8 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-stone-600">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0 text-sm text-stone-600">
                 {settings.adminMode 
                   ? "Admin mode is enabled. Extension will use faster pacing."
                   : "Enable for development and testing purposes only."
@@ -308,6 +314,7 @@ export default function SettingsPage() {
               <Button
                 variant={settings.adminMode ? "destructive" : "outline"}
                 onClick={handleAdminToggle}
+                className="min-h-11 w-full sm:w-auto"
               >
                 {settings.adminMode ? "Disable" : "Enable"}
               </Button>
@@ -334,11 +341,11 @@ export default function SettingsPage() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAdminDialog(false)}>
+            <Button className="min-h-11" variant="outline" onClick={() => setShowAdminDialog(false)}>
               Cancel
             </Button>
             <Button 
-              className="bg-orange-600 hover:bg-orange-700"
+              className="min-h-11 bg-orange-600 hover:bg-orange-700"
               onClick={confirmAdminMode}
             >
               I understand, enable Admin Mode
