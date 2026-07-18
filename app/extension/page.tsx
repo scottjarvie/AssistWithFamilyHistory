@@ -300,6 +300,7 @@ export default function ExtensionPage() {
         </section>
 
         <section className="border-y border-[#d8c7a7] bg-[#efe7d8] px-4 py-16 sm:px-6 md:py-20 lg:px-8">
+          <h2 className="sr-only">How capture stays deliberate</h2>
           <div className="mx-auto grid max-w-6xl gap-5 md:grid-cols-3">
             <DetailCard icon={Clock} title="Measured pacing">
               <li>Delays between visible capture actions</li>
