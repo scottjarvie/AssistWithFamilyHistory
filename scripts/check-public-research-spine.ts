@@ -55,6 +55,11 @@ assert.match(extensionPage, /href="\/app\/imports"/);
 assert.match(extensionPage, /Private by default/);
 assert.match(extensionPage, /user-initiated/i);
 assert.match(extensionPage, /does not publish/i);
+assert.match(
+  extensionPage,
+  /<h2[^>]*>\s*How capture stays deliberate\s*<\/h2>/,
+  "The capture safeguards section must have an accessible heading",
+);
 assert.doesNotMatch(extensionPage, /break-all/);
 
 assert.match(foundationSpec, /Accepted now/);
