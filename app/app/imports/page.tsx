@@ -9,6 +9,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  CaptureImportMergeResponseSchema,
+  CaptureImportPreviewResponseSchema,
+  getCaptureImportErrorMessage,
+  type CaptureImportPreviewResponse,
+} from "@/features/capture/importContract";
+import {
+  getCaptureImportReviewState,
+  type CaptureImportTone,
+} from "@/features/capture/importModel";
 
 type RecentImport = {
   _id: string;
@@ -33,45 +43,6 @@ type BackendStatus = {
   description: string;
 };
 
-type ImportPreview = {
-  canImport: boolean;
-  compatibilityMode: boolean;
-  personId: string;
-  personName: string;
-  pageType: string;
-  sourceCount: number;
-  memoryCount: number;
-  validation: {
-    errors: string[];
-    warnings: string[];
-  };
-  review?: CaptureImportReview;
-};
-
-type ImportTone = "ready" | "warning" | "blocked";
-
-type CaptureImportReview = {
-  reportVersion: string;
-  reviewedAt: string;
-  canImport: boolean;
-  recommendedAction: "merge" | "fix_package" | "human_review";
-  summary: string;
-  package: {
-    captureId: string;
-    schemaVersion: string;
-    compatibilityMode: boolean;
-    personId: string;
-    personName: string;
-    pageType: string;
-    pageUrl: string;
-    sourceCount: number;
-    memoryCount: number;
-    diagnosticsMode: string;
-  };
-  errors: string[];
-  warnings: string[];
-};
-
 export default function ImportsPage() {
   const [recentImports, setRecentImports] = useState<RecentImport[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -80,7 +51,7 @@ export default function ImportsPage() {
   const [importing, setImporting] = useState(false);
   const [backendStatus, setBackendStatus] = useState<BackendStatus | null>(null);
   const [lastImportWarnings, setLastImportWarnings] = useState<string[]>([]);
-  const [previewResult, setPreviewResult] = useState<ImportPreview | null>(null);
+  const [previewResult, setPreviewResult] = useState<CaptureImportPreviewResponse | null>(null);
   const [previewPayload, setPreviewPayload] = useState<unknown | null>(null);
 
   async function loadRecentImports() {
@@ -158,19 +129,24 @@ export default function ImportsPage() {
       });
       const payload = await response.json();
 
-      if (!response.ok || !payload?.success) {
-        const validationErrors = Array.isArray(payload?.validation?.errors)
-          ? payload.validation.errors.join(" ")
-          : "";
-        const message = [payload?.error || "Import preview failed", validationErrors].filter(Boolean).join(": ");
+      if (!response.ok) {
+        const message = getCaptureImportErrorMessage(payload, "Import preview failed");
         setImportError(message);
         toast.error(message);
         return;
       }
 
-      setPreviewResult(payload);
+      const parsedResponse = CaptureImportPreviewResponseSchema.safeParse(payload);
+      if (!parsedResponse.success) {
+        const message = "Import preview returned an unexpected response";
+        setImportError(message);
+        toast.error(message);
+        return;
+      }
+
+      setPreviewResult(parsedResponse.data);
       setPreviewPayload(parsed);
-      if (payload.canImport) {
+      if (parsedResponse.data.canImport) {
         toast.success("Capture package is ready for review");
       } else {
         toast.warning("Capture package has blocking validation errors");
@@ -210,36 +186,44 @@ export default function ImportsPage() {
       });
       const payload = await response.json();
 
-      if (!response.ok || !payload?.success) {
-        const validationErrors = Array.isArray(payload?.validation?.errors)
-          ? payload.validation.errors.join(" ")
-          : "";
-        const message = [payload?.error || "Import failed", validationErrors].filter(Boolean).join(": ");
+      if (!response.ok) {
+        const message = getCaptureImportErrorMessage(payload, "Import failed");
         setImportError(message);
         toast.error(message);
         return;
       }
 
-      setLastImportWarnings(Array.isArray(payload.warnings) ? payload.warnings : []);
-      if (payload.backendTitle && payload.backendDescription) {
-        setBackendStatus({
-          tone: payload.backendState === "ready" ? "ready" : "degraded",
-          state: payload.backendState || "ready",
-          title: payload.backendTitle,
-          description: payload.backendDescription,
-        });
+      const parsedResponse = CaptureImportMergeResponseSchema.safeParse(payload);
+      if (!parsedResponse.success) {
+        const message =
+          "The server accepted the import, but its response could not be verified. Check Recent Imports before trying again.";
+        setPreviewPayload(null);
+        setPreviewResult(null);
+        await loadRecentImports();
+        setImportError(message);
+        toast.warning(message);
+        return;
       }
-      toast.success(`Imported ${payload.sourceCount || 0} sources and ${payload.memoryCount || 0} memories`);
-      if (Array.isArray(payload.warnings) && payload.warnings.length > 0) {
-        toast.warning(`Imported with ${payload.warnings.length} warning${payload.warnings.length === 1 ? "" : "s"}`);
+
+      const result = parsedResponse.data;
+      setLastImportWarnings(result.warnings);
+      setBackendStatus({
+        tone: result.backendState === "ready" ? "ready" : "degraded",
+        state: result.backendState,
+        title: result.backendTitle,
+        description: result.backendDescription,
+      });
+      toast.success(`Imported ${result.sourceCount} sources and ${result.memoryCount} memories`);
+      if (result.warnings.length > 0) {
+        toast.warning(`Imported with ${result.warnings.length} warning${result.warnings.length === 1 ? "" : "s"}`);
       }
       setDialogOpen(false);
       setImportJson("");
       setPreviewPayload(null);
       setPreviewResult(null);
       loadRecentImports();
-    } catch (error) {
-      const message = error instanceof SyntaxError ? "Invalid JSON format" : "Import failed";
+    } catch {
+      const message = "Import failed";
       setImportError(message);
       toast.error(message);
     } finally {
@@ -247,7 +231,7 @@ export default function ImportsPage() {
     }
   }
 
-  const previewDiagnostics = previewResult ? getPreviewDiagnostics(previewResult) : null;
+  const previewDiagnostics = previewResult ? getCaptureImportReviewState(previewResult) : null;
 
   return (
     <div className="p-4 sm:p-8">
@@ -517,7 +501,7 @@ export default function ImportsPage() {
             </Button>
             <Button
               onClick={handleImport}
-              disabled={importing || !previewResult?.canImport}
+              disabled={importing || !previewDiagnostics?.canMerge}
               variant="outline"
             >
               {importing ? "Merging..." : "Merge into Vault"}
@@ -539,7 +523,7 @@ function getRecentImportDiagnostics(run: RecentImport) {
   const warningCount = run.counts.warnings || run.warnings.length;
   if (run.mergeStatus === "partial" || warningCount > 0) {
     return {
-      tone: "warning" as ImportTone,
+      tone: "warning" as CaptureImportTone,
       title: "Review needed",
       description:
         "Warnings were preserved for research review. Check the person workspace and operations queue before treating this import as clean.",
@@ -549,7 +533,7 @@ function getRecentImportDiagnostics(run: RecentImport) {
   }
 
   return {
-    tone: "ready" as ImportTone,
+    tone: "ready" as CaptureImportTone,
     title: "Merged cleanly",
     description: "No warnings were reported for this import. Continue from the person workspace.",
     href: `/app/people/${run.personRouteId || run.personFsId}`,
@@ -557,32 +541,7 @@ function getRecentImportDiagnostics(run: RecentImport) {
   };
 }
 
-function getPreviewDiagnostics(preview: ImportPreview) {
-  const action = preview.review?.recommendedAction;
-  if (!preview.canImport || action === "fix_package") {
-    return {
-      tone: "blocked" as ImportTone,
-      title: "Fix package before import",
-      description: "Blocking validation errors must be resolved before any artifact save or vault merge.",
-    };
-  }
-
-  if (action === "human_review" || preview.validation.warnings.length > 0) {
-    return {
-      tone: "warning" as ImportTone,
-      title: "Human review before merge",
-      description: "The package can import, but warnings should be reviewed before it becomes trusted vault context.",
-    };
-  }
-
-  return {
-    tone: "ready" as ImportTone,
-    title: "Ready to merge",
-    description: "No blocking errors or review warnings were reported by the preview.",
-  };
-}
-
-function diagnosticsClasses(tone: ImportTone) {
+function diagnosticsClasses(tone: CaptureImportTone) {
   if (tone === "ready") return "border-emerald-200 bg-emerald-50 text-emerald-950";
   if (tone === "warning") return "border-amber-200 bg-amber-50 text-amber-950";
   return "border-red-200 bg-red-50 text-red-800";
