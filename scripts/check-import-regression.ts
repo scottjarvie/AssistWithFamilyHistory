@@ -3,6 +3,7 @@ import { readFileSync } from "fs";
 import path from "path";
 import { assessCapturePackageForImport, parseCapturePackage, type CapturePackage } from "@/lib/familysearch/capture";
 import { buildCaptureImportReview } from "@/lib/familysearch/importReview";
+import "./check-capture-import-surface";
 
 const fixtureRoot = path.join(process.cwd(), "tests", "fixtures", "capture");
 
