@@ -19,7 +19,11 @@ export function MarketingNav() {
     <nav className="fixed inset-x-0 top-0 z-50 border-b border-[#b79f7a55] bg-[#f8f4ec]/80 backdrop-blur-xl">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-[4.5rem] items-center justify-between">
-          <SafeLink href="/" className="group flex items-center gap-3">
+          <SafeLink
+            href="/"
+            aria-label="Discover Their Stories home"
+            className="group flex items-center gap-3"
+          >
             <div className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[#b79f7a77] bg-[#efe4cd] shadow-[0_10px_30px_-20px_#000] transition-transform duration-300 group-hover:scale-105">
               <div className="absolute inset-1 rounded-full border border-[#c57d3980] animate-pulse-ring" />
               <Compass className="h-5 w-5 text-[#234d5e]" />
