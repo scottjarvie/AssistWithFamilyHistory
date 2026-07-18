@@ -88,6 +88,21 @@ if (!statusRoute.includes("eventType: body.status === \"published\" ? \"publish_
   failures.push("Status route should record publish confirmation and unpublish/status rollback events");
 }
 
+// GEN-79: the public story route must degrade Convex errors to notFound(), not
+// rethrow (which renders a production 500 error page for anonymous visitors).
+if (/throw error;/.test(publicRoute)) {
+  failures.push("GEN-79: public story route must not rethrow Convex errors (500) — degrade to notFound()");
+}
+if (!publicRoute.includes("classifyPublicStoryError")) {
+  failures.push("GEN-79: public story route must classify errors via classifyPublicStoryError before degrading to 404");
+}
+if (!publicRoute.includes('logServerFailure("public_story.resolve_degraded_to_not_found"')) {
+  failures.push("GEN-79: unexpected public story failures must use the values-safe server logger");
+}
+if (publicRoute.includes('console.error("[GEN-79]')) {
+  failures.push("GEN-79: public story failure logs must not include raw errors or story identifiers");
+}
+
 if (failures.length > 0) {
   console.error("Public story E2E policy assertions failed:");
   for (const failure of failures) {

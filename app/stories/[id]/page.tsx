@@ -15,7 +15,9 @@ import {
   isConvexConfigured,
 } from "@/lib/convex/server";
 import { createPageMetadata } from "@/lib/seo";
+import { logServerFailure } from "@/lib/server/safeLog";
 import { buildPublicStoryMetadata, canRenderPublicStory } from "@/lib/stories/publicStoryPolicy";
+import { classifyPublicStoryError } from "@/lib/stories/publicStoryError";
 import { publicStoryPath } from "@/lib/stories/slug";
 
 export const dynamic = "force-dynamic";
@@ -113,13 +115,26 @@ export default async function PublicStoryPage({
       storyIdentifier: id,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "";
-    if (/ArgumentValidationError|Value does not match validator|Invalid id/i.test(message)) {
+    // GEN-79: the public /stories/<id> route must never surface a 500 error
+    // page to anonymous visitors. Known bad-identifier / not-found errors are a
+    // quiet 404. Anything else (e.g. a Convex deploy desync throwing "Could not
+    // find function", which surfaced as a production 500 in the 2026-05-25
+    // privacy sweep) is logged loudly for ops and then also degraded to 404 —
+    // never rethrown.
+    if (classifyPublicStoryError(error).recognized) {
       notFound();
     }
     const issue = getConvexRuntimeIssue(error);
-    if (issue.statusCode === 404 || issue.statusCode === 400) notFound();
-    throw error;
+    if (issue.statusCode === 404 || issue.statusCode === 400) {
+      notFound();
+    }
+    logServerFailure("public_story.resolve_degraded_to_not_found", {
+      route: "/stories/[id]",
+      convexState: issue.state,
+      convexStatusCode: issue.statusCode,
+      storyIdentifierLength: id.length,
+    }, error);
+    notFound();
   }
 
   if (!bundle || !canRenderPublicStory(bundle.story.status)) notFound();
