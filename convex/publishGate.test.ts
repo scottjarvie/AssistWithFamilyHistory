@@ -52,6 +52,25 @@ async function seedStory(
 }
 
 describe("backend story publish gate", () => {
+  test("shadow auth rollout still fails closed on the already-accepted publish gate", async () => {
+    vi.stubEnv("TRUST_BOUNDARY_MODE", "shadow");
+    const t = convexTest(schema, modules);
+    const { storyId } = await seedStory(t, "draft");
+
+    await expect(
+      t.withIdentity({ subject: OWNER }).mutation(api.vaultMutations.updateStoryStatus, {
+        vaultOwnerId: OWNER,
+        storyId,
+        status: "published",
+        humanReviewConfirmed: true,
+        humanReviewNote: "I reviewed this synthetic fixture for the integration rehearsal.",
+      }),
+    ).rejects.toThrow(/Story publishing policy denied/);
+
+    const story = await t.run((ctx) => ctx.db.get(storyId));
+    expect(story?.status).toBe("draft");
+  });
+
   test("direct published upsert is denied in enforce mode", async () => {
     vi.stubEnv("TRUST_BOUNDARY_MODE", "enforce");
     const t = convexTest(schema, modules);

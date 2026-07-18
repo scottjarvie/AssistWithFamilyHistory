@@ -104,10 +104,15 @@ test("route and writer retain the same authoritative publish-gate contract", () 
   const route = readFileSync("app/api/stories/[id]/status/route.ts", "utf8");
   const writer = readFileSync("convex/vaultMutations.ts", "utf8");
 
-  assert.ok(writer.includes("evaluateStoryPublishGate({"));
-  assert.ok(writer.includes("buildStoryBundle(snapshot, bundleStory)"));
-  assert.ok(writer.includes("humanReviewConfirmed: args.humanReviewConfirmed"));
-  assert.ok(writer.includes("humanReviewNote: args.humanReviewNote"));
+  assert.ok(writer.includes("buildStoryBundle(snapshot, currentStory)"));
+  assert.ok(writer.includes("getBackendPublishReadiness(bundle)"));
+  assert.ok(writer.includes("requireHumanReviewConfirmation({"));
+  assert.ok(writer.includes("story.secondReviewRequired && !story.secondReviewedAt"));
+  assert.ok(writer.includes('ctx.db.insert("storyReviewEvents"'));
+  assert.ok(writer.includes('eventType: "publish_confirmation"'));
+  assert.ok(writer.includes("confirmed: args.humanReviewConfirmed"));
+  assert.ok(writer.includes("note: args.humanReviewNote"));
   assert.ok(route.includes("humanReviewConfirmed:"));
   assert.ok(route.includes("humanReviewNote:"));
+  assert.ok(route.includes('if (body.status !== "published")'));
 });

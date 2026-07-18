@@ -8,6 +8,7 @@ import { assessStoryPublishReadiness } from "../lib/stories/publishSafety";
 import {
   authorizeOwnedReferenceMutation,
   authorizeTenantMutation,
+  getTrustBoundaryMode,
   handlePolicyViolationMutation,
 } from "./access";
 import { buildStoryBundle, loadStoryScopedSnapshot } from "./vault";
@@ -271,6 +272,25 @@ function toPublishAuditSnapshot(readiness: ReturnType<typeof getBackendPublishRe
     provenance: readiness.provenance,
     recommendedNextActions: readiness.recommendedNextActions,
   };
+}
+
+/**
+ * Story publication policy was already fail-closed before the tenant-auth
+ * rollout. Shadow mode may observe identity mismatches, but it must never turn
+ * a rejected publish, direct-publish bypass, or published-story edit back into
+ * an allowed write. A denied Convex mutation rolls back all writes, including
+ * same-transaction audit inserts, so shadow mode refuses directly; enforce
+ * mode uses the trust-boundary refusal category.
+ */
+async function enforceStoryPolicyViolation(
+  ctx: MutationCtx,
+  functionName: string,
+  reason: "publish_gate_failed" | "published_edit_requires_review" | "direct_publish_bypass",
+): Promise<never> {
+  if (getTrustBoundaryMode() === "enforce") {
+    await handlePolicyViolationMutation(ctx, functionName, reason);
+  }
+  throw new Error(`Story publishing policy denied: ${reason}`);
 }
 
 export const upsertPerson = mutation({
@@ -1175,7 +1195,7 @@ export const upsertStoryDraft = mutation({
       args.vaultOwnerId,
     );
     if (args.status === "published") {
-      await handlePolicyViolationMutation(
+      await enforceStoryPolicyViolation(
         ctx,
         "vaultMutations.upsertStoryDraft",
         "direct_publish_bypass",
@@ -1313,7 +1333,7 @@ export const updateStoryStatus = mutation({
       );
 
       if (!publishReadiness.canPublish || secondReviewMissing || reviewErrors.length > 0) {
-        await handlePolicyViolationMutation(
+        await enforceStoryPolicyViolation(
           ctx,
           "vaultMutations.updateStoryStatus",
           "publish_gate_failed",
@@ -1397,7 +1417,7 @@ export const updateStoryDraft = mutation({
       "Story",
     );
     if (story.status === "published") {
-      await handlePolicyViolationMutation(
+      await enforceStoryPolicyViolation(
         ctx,
         "vaultMutations.updateStoryDraft",
         "published_edit_requires_review",
