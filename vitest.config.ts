@@ -1,12 +1,11 @@
 /**
- * GEN-95C: Vitest config scoped ONLY to the Convex runtime tests
- * (convex/**\/*.test.ts), which run the REAL Convex query/mutation handlers
- * in-memory via convex-test.
+ * GEN-95C: Vitest config for Convex runtime tests (convex/**\/*.test.ts),
+ * which run the REAL Convex query/mutation handlers in-memory via convex-test,
+ * plus explicitly colocated pure feature-contract tests.
  *
  * This is a SEPARATE runner from the node:test behavioral suite in scripts/*.ts
- * (run via `pnpm test`). Vitest is deliberately scoped to `convex/**\/*.test.ts`
- * so it does NOT pick up the node:test files; the two suites do not share a
- * runner.
+ * (run via `pnpm test`). Vitest is deliberately scoped so it does NOT pick up
+ * the node:test files; the two suites do not share a runner.
  *
  * Setup follows the convex-test recommendation:
  *   - environment "edge-runtime" so the in-memory Convex engine has the globals
@@ -27,7 +26,7 @@ export default defineConfig({
   },
   test: {
     environment: "edge-runtime",
-    include: ["convex/**/*.test.ts"],
+    include: ["convex/**/*.test.ts", "features/**/*.test.ts"],
     server: {
       deps: {
         inline: ["convex-test"],
