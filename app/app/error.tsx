@@ -13,10 +13,9 @@
  */
 
 import { useEffect } from "react";
-import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SafeLink } from "@/components/layout/SafeLink";
+import { WorkspaceStateCard } from "@/components/vault/WorkspaceStateCard";
 
 export default function AppError({
   error,
@@ -26,30 +25,27 @@ export default function AppError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Surface the error for diagnostics without exposing details to the UI.
-    console.error("App route error:", error);
-  }, [error]);
+    // Keep diagnostics values-safe: Next's digest is opaque, while the
+    // thrown error can contain request or workspace details.
+    console.error("App route error:", { digest: error.digest ?? "unavailable" });
+  }, [error.digest]);
 
   return (
     <div className="p-6 sm:p-8">
-      <Card className="mx-auto max-w-lg">
-        <CardHeader>
-          <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
-            <AlertTriangle className="h-5 w-5" />
-          </div>
-          <CardTitle>Something went wrong</CardTitle>
-          <CardDescription>
-            We hit an unexpected problem loading this part of your workspace. Your data is safe — you
-            can try again or head back to the dashboard.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-3">
-          <Button onClick={() => reset()}>Try again</Button>
-          <Button variant="outline" asChild>
-            <SafeLink href="/app">Back to dashboard</SafeLink>
-          </Button>
-        </CardContent>
-      </Card>
+      <WorkspaceStateCard
+        kind="error"
+        title="This view did not load"
+        description="We could not confirm this view loaded. Try again, or return to the dashboard. Recheck the latest workspace state before repeating a save or import."
+        className="mx-auto max-w-lg"
+        actions={
+          <>
+            <Button className="min-h-11" onClick={() => reset()}>Try again</Button>
+            <Button className="min-h-11" variant="outline" asChild>
+              <SafeLink href="/app">Back to dashboard</SafeLink>
+            </Button>
+          </>
+        }
+      />
     </div>
   );
 }
