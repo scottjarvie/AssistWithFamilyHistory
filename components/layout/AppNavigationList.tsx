@@ -53,9 +53,16 @@ export function AppNavigationList({
             );
           }
 
+          const collapsedAccessibleName =
+            variant === "desktop" && collapsed
+              ? `${item.label}${item.comingSoon ? " (coming soon)" : ""}`
+              : undefined;
+
           const link = (
             <SafeLink
               href={item.comingSoon ? "#" : item.href}
+              aria-label={collapsedAccessibleName}
+              title={collapsedAccessibleName}
               className={
                 variant === "mobile"
                   ? cn(

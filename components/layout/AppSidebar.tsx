@@ -75,14 +75,17 @@ export function AppMobileNav({ accountMode, vaultOwnerId, clerkEnabled }: Sideba
               <Menu className="h-5 w-5" />
             </button>
           </SheetTrigger>
-          <SheetContent side="left" className="border-stone-800 bg-stone-900 p-0 text-white">
+          <SheetContent
+            side="left"
+            className="h-dvh max-h-dvh overflow-hidden gap-0 border-stone-800 bg-stone-900 p-0 text-white"
+          >
             <SheetHeader className="sr-only">
               <SheetTitle>App navigation</SheetTitle>
               <SheetDescription>
                 Navigate between people, places, imports, research, and settings.
               </SheetDescription>
             </SheetHeader>
-            <div className="p-4 border-b border-stone-800">
+            <div className="shrink-0 border-b border-stone-800 p-4">
               <SafeLink href="/" className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-amber-700 rounded-lg flex items-center justify-center flex-shrink-0">
                   <BookOpen className="w-5 h-5 text-white" />
@@ -90,7 +93,7 @@ export function AppMobileNav({ accountMode, vaultOwnerId, clerkEnabled }: Sideba
                 <span className="font-semibold text-sm">Discover Their Stories</span>
               </SafeLink>
             </div>
-            <nav className="flex-1 py-4 px-2">
+            <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
               <AppNavigationList
                 pathname={pathname}
                 sections={appNavigationSections}
@@ -143,7 +146,12 @@ export function AppSidebar({ accountMode, vaultOwnerId, clerkEnabled }: SidebarA
     >
       {/* Logo */}
       <div className="p-4 border-b border-stone-800">
-        <SafeLink href="/" className="flex items-center gap-3">
+        <SafeLink
+          href="/"
+          aria-label={collapsed ? "Discover Their Stories home" : undefined}
+          title={collapsed ? "Discover Their Stories home" : undefined}
+          className="flex items-center gap-3"
+        >
           <div className="w-8 h-8 bg-amber-700 rounded-lg flex items-center justify-center flex-shrink-0">
             <BookOpen className="w-5 h-5 text-white" />
           </div>
@@ -167,6 +175,8 @@ export function AppSidebar({ accountMode, vaultOwnerId, clerkEnabled }: SidebarA
       <div className="border-t border-stone-800 p-2">
         <SafeLink
           href="/app/settings"
+          aria-label={collapsed ? "Settings" : undefined}
+          title={collapsed ? "Settings" : undefined}
           className={cn(
             "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
             isNavItemActive(pathname, "/app/settings")
@@ -193,6 +203,7 @@ export function AppSidebar({ accountMode, vaultOwnerId, clerkEnabled }: SidebarA
         onClick={() => setCollapsed(!collapsed)}
         aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         aria-expanded={!collapsed}
+        title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         className="absolute -right-3 top-20 w-6 h-6 bg-stone-800 border border-stone-700 rounded-full flex items-center justify-center text-stone-400 hover:text-white hover:bg-stone-700 transition-colors"
       >
         {collapsed ? (
