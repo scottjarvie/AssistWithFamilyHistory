@@ -3,6 +3,7 @@ import { readFileSync } from "fs";
 import path from "path";
 import { assessCapturePackageForImport, parseCapturePackage, type CapturePackage } from "@/lib/familysearch/capture";
 import { buildCaptureImportReview } from "@/lib/familysearch/importReview";
+import { checkCaptureImportMergeResponseBehavior } from "./check-capture-import-surface";
 
 const fixtureRoot = path.join(process.cwd(), "tests", "fixtures", "capture");
 
@@ -82,4 +83,9 @@ assert.ok(
   "Admin-mode fixture should force review."
 );
 
-console.log("Capture import regression checks passed.");
+void checkCaptureImportMergeResponseBehavior()
+  .then(() => console.log("Capture import regression checks passed."))
+  .catch((error: unknown) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
