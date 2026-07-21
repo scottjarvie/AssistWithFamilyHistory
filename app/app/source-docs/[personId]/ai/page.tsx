@@ -35,6 +35,7 @@ import { ImportResultsDialog } from "@/features/source-docs/components/ImportRes
 import { buildExportPrompt, SYSTEM_PROMPTS } from "@/lib/ai/promptBuilder";
 import { getAiPrivacyDisclosure } from "@/lib/ai/privacy";
 import { generateContextualizedDocument } from "@/features/source-docs/lib/contextualizedDocGenerator";
+import { loadSourceDocAiWorkspace } from "@/features/source-docs/lib/loadSourceDocAiWorkspace";
 
 interface PageProps {
   params: Promise<{ personId: string }>;
@@ -130,34 +131,26 @@ export default function AIProcessingPage({ params }: PageProps) {
     async function fetchData() {
       try {
         setPageError(null);
+        const result = await loadSourceDocAiWorkspace({
+          personId,
+          requestedRunId: runId,
+          fetcher: (input) => fetch(input),
+        });
 
-        const personResponse = await fetch(`/api/people/${personId}`);
-        const personData = await personResponse.json();
-
-        if (!personResponse.ok || !personData.success) {
+        if (result.status === "redirect-to-people") {
           router.push("/app/people");
           return;
         }
 
-        setPersonName(personData.person.name || personId);
-        const targetRunId = runId || personData.latestRunId;
-
-        if (!targetRunId) {
-          setPageError("No extraction runs found for this person. Import a capture package first.");
+        if (result.status === "error") {
+          setPageError(result.message);
           return;
         }
 
-        setActiveRunId(targetRunId);
+        setPersonName(result.personName);
+        setActiveRunId(result.runId);
 
-        const packResponse = await fetch(`/api/people/${personId}/runs/${targetRunId}/pack`);
-        const packData = await packResponse.json();
-
-        if (!packResponse.ok || !packData.success) {
-          setPageError(packData.error || "Could not load the legacy source capture for this run.");
-          return;
-        }
-
-        const pack = packData.pack as EvidencePack;
+        const pack = result.pack;
         setEvidencePack(pack);
 
         const { redactedPack: redacted, redactions, hasLivingIndicators: hasLiving } =
@@ -167,13 +160,8 @@ export default function AIProcessingPage({ params }: PageProps) {
         setRedactionSummary(getRedactionSummary(redactions));
         setHasLivingIndicators(hasLiving);
 
-        const contextualizedResponse = await fetch(
-          `/api/people/${personId}/contextualized?run=${targetRunId}`
-        );
-        const contextualizedData = await contextualizedResponse.json().catch(() => null);
-
-        if (contextualizedResponse.ok && contextualizedData?.success) {
-          setContextualizedMarkdown(contextualizedData.markdown || "");
+        if (result.hasContextualizedDocument) {
+          setContextualizedMarkdown(result.contextualizedMarkdown || "");
           setStages((prev) => ({
             ...prev,
             synthesize: {
