@@ -7,13 +7,12 @@
  * the guest-tagged rows become orphaned.
  *
  * This file provides a single mutation that re-tags every owner-scoped row
- * from a guest UUID to a Clerk user id. The Next.js API route at
- * `/api/vault/migrate-guest` is the only intended caller — it gates on Clerk
- * auth and on the cookie value, then deletes the cookie. We keep the
- * vaultOwnerId-as-arg pattern (the same trust model used by the other
- * `mutation` exports in this codebase).
+ * from a guest UUID to a Clerk user id. The destination must equal the
+ * authenticated Convex identity. The raw guest UUID is not a signed principal,
+ * so shadow mode logs and permits this legacy migration while enforce mode
+ * denies it until a signed guest capability exists.
  *
- * Safety:
+ * Structural checks:
  *   - `fromVaultOwnerId` MUST match `guest_*` (the cookie format from proxy.ts).
  *     This prevents any caller from migrating an arbitrary Clerk user's data
  *     out from under them.
@@ -27,6 +26,7 @@
 import { v } from "convex/values";
 import { mutation } from "./_generated/server";
 import type { TableNames } from "./_generated/dataModel";
+import { authorizeTenantMutation, handlePolicyViolationMutation } from "./access";
 
 // All tables with a `by_owner` index in schema.ts. If a new owner-scoped table
 // is added, append it here.
@@ -137,7 +137,21 @@ export const migrateGuestVault = mutation({
     toVaultOwnerId: v.string(),
   },
   handler: async (ctx, { fromVaultOwnerId, toVaultOwnerId }) => {
-    assertMigrationOwners(fromVaultOwnerId, toVaultOwnerId);
+    const { owner: authenticatedDestination } = await authorizeTenantMutation(
+      ctx,
+      "vaultMigration.migrateGuestVault",
+      toVaultOwnerId,
+    );
+    assertMigrationOwners(fromVaultOwnerId, authenticatedDestination);
+
+    // A raw guest UUID is not a verified principal. Shadow mode records any
+    // legitimate reliance on this legacy migration path; enforce mode denies
+    // it until the guest supplies a signed Convex-verifiable capability.
+    await handlePolicyViolationMutation(
+      ctx,
+      "vaultMigration.migrateGuestVault",
+      "guest_source_unverified",
+    );
 
     // ctx.db structurally satisfies RetagDb; the casts keep the index/table
     // names loose the same way the original inline loop did.
@@ -145,7 +159,7 @@ export const migrateGuestVault = mutation({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ctx.db as any,
       fromVaultOwnerId,
-      toVaultOwnerId,
+      authenticatedDestination,
     );
   },
 });

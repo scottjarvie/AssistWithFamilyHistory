@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { api } from "@/convex/_generated/api";
-import { getConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
+import { getAuthedConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
 import { requireHumanReviewConfirmation } from "@/lib/operations/reviewGates";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const client = getConvexClient();
+    const client = await getAuthedConvexClient();
     if (action === "promote") {
       const result = await client.mutation(api.vaultMutations.promoteProvisionalRelative, {
         vaultOwnerId,
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    const workspace = await client.query(api.vault.getPersonWorkspace, {
+    const workspace = await client.action(api.vaultReads.getPersonWorkspace, {
       vaultOwnerId,
       personIdentifier: targetPersonIdentifier,
     });

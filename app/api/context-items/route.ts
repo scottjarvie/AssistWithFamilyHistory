@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { api } from "@/convex/_generated/api";
-import { getConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
+import { getAuthedConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
 // GEN-94: zod request-body contract. Enums narrow into the Convex mutation arg
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const client = getConvexClient();
+    const client = await getAuthedConvexClient();
     const result = await client.mutation(api.vaultMutations.upsertContextItemForPerson, {
       vaultOwnerId,
       personIdentifier,

@@ -19,6 +19,10 @@ This checklist tracks the last blockers before public story publishing can move 
 
 ## Privacy Readiness
 
+- Convex itself permits anonymous reads only for published stories and applies
+  the server-side redacted public DTO.
+- Convex itself recomputes publish readiness before a published status write;
+  the API route is defense in depth.
 - Living/private-risk detection covers missing death dates, modern relatives, private notes, and young-family edge cases.
 - Production-data privacy sweep checklist is complete for pilot stories.
 - Takedown/support routing is confirmed before broader sharing.
@@ -64,6 +68,8 @@ pnpm check:story-capabilities
 pnpm check:api-inventory
 pnpm check:protected-routes
 pnpm check:public-beta-launch
+pnpm check:trust-boundary
+pnpm check:convex-client-auth
 ```
 
 Use `tests/fixtures/stories/manifest.json` as the source of truth for the fixture scenarios agents should exercise. Do not rely on a manually prepared dev vault when a fixture-backed check can cover the same risk.

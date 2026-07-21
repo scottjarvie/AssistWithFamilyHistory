@@ -4,16 +4,19 @@
  * Owner-scoped lifecycle for the credentials that let an external AI agent act
  * as one vault owner. The raw secret is generated + hashed in the Next server
  * (lib/auth/apiKey.ts); this layer only ever stores/returns the SHA-256 hash and
- * never the raw secret. All routes go through resolveOwner + matchesVaultOwner,
- * so keys inherit owner isolation like the rest of the vault.
+ * never the raw secret. Mutations authorize in-place; reads enter through an
+ * authorized public action before reaching their internal query.
  *
  * NOTE: resolution of an incoming key -> owner (the read/auth path) is a
  * separate, internal-only function added when the agent-auth middleware lands;
  * it is intentionally NOT a public query here (no public lookup-by-keyId).
  */
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
-import { filterByVaultOwner, matchesVaultOwner, resolveOwner } from "./vaultCore";
+import { action, internalQuery, mutation } from "./_generated/server";
+import { internal } from "./_generated/api";
+import type { Doc } from "./_generated/dataModel";
+import { authorizeTenantAction, authorizeTenantMutation } from "./access";
+import { filterByVaultOwner, matchesVaultOwner } from "./vaultCore";
 
 const tierValidator = v.union(v.literal("trial"), v.literal("standard"), v.literal("trusted"));
 
@@ -29,7 +32,8 @@ export const mintKey = mutation({
     createdByUserId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
+    const decision = await authorizeTenantMutation(ctx, "apiKeys.mintKey", args.vaultOwnerId);
+    const vaultOwnerId = decision.owner;
     if (!args.keyId.startsWith("dts_")) {
       throw new Error("Invalid API key id prefix");
     }
@@ -47,7 +51,10 @@ export const mintKey = mutation({
       status: "active",
       createdAt: now,
       expiresAt: args.expiresAt,
-      createdByUserId: args.createdByUserId,
+      createdByUserId:
+        decision.callerKind === "authenticated"
+          ? decision.caller
+          : args.createdByUserId,
     });
     return { _id: id, keyId: args.keyId };
   },
@@ -56,7 +63,8 @@ export const mintKey = mutation({
 export const revokeKey = mutation({
   args: { vaultOwnerId: v.string(), keyId: v.string() },
   handler: async (ctx, args) => {
-    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
+    const decision = await authorizeTenantMutation(ctx, "apiKeys.revokeKey", args.vaultOwnerId);
+    const vaultOwnerId = decision.owner;
     const row = await ctx.db
       .query("apiKeys")
       .withIndex("by_keyId", (q) => q.eq("keyId", args.keyId))
@@ -79,7 +87,8 @@ export const setKeyStatus = mutation({
     status: v.union(v.literal("active"), v.literal("suspended")),
   },
   handler: async (ctx, args) => {
-    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
+    const decision = await authorizeTenantMutation(ctx, "apiKeys.setKeyStatus", args.vaultOwnerId);
+    const vaultOwnerId = decision.owner;
     const row = await ctx.db
       .query("apiKeys")
       .withIndex("by_keyId", (q) => q.eq("keyId", args.keyId))
@@ -96,15 +105,21 @@ export const setKeyStatus = mutation({
 });
 
 /** Owner's keys, newest first. NEVER returns hashedSecret. */
-export const listKeys = query({
-  args: { vaultOwnerId: v.string() },
+const listKeysArgs = { vaultOwnerId: v.string() };
+
+type ListedApiKey = Pick<
+  Doc<"apiKeys">,
+  "keyId" | "label" | "scopes" | "tier" | "status" | "createdAt" | "lastUsedAt" | "revokedAt" | "expiresAt"
+>;
+
+export const listKeysInternal = internalQuery({
+  args: listKeysArgs,
   handler: async (ctx, args) => {
-    const vaultOwnerId = await resolveOwner(ctx, args.vaultOwnerId);
     const rows = await ctx.db
       .query("apiKeys")
-      .withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId))
+      .withIndex("by_owner", (q) => q.eq("vaultOwnerId", args.vaultOwnerId))
       .collect();
-    return filterByVaultOwner(rows, vaultOwnerId)
+    return filterByVaultOwner(rows, args.vaultOwnerId)
       .map((row) => ({
         keyId: row.keyId,
         label: row.label,
@@ -117,5 +132,21 @@ export const listKeys = query({
         expiresAt: row.expiresAt,
       }))
       .sort((a, b) => b.createdAt - a.createdAt);
+  },
+});
+
+export const listKeys = action({
+  args: listKeysArgs,
+  handler: async (ctx, args): Promise<ListedApiKey[]> => {
+    const decision = await authorizeTenantAction(
+      ctx,
+      "apiKeys.listKeys",
+      args.vaultOwnerId,
+      (entry) => ctx.runMutation(internal.trustBoundary.recordShadowDenial, entry),
+    );
+    return ctx.runQuery(internal.apiKeys.listKeysInternal, {
+      ...args,
+      vaultOwnerId: decision.owner,
+    });
   },
 });

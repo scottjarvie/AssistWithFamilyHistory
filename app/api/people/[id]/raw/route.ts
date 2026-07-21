@@ -24,7 +24,7 @@ import {
   saveRawDocument,
   isLocalFsEnabled,
 } from "@/lib/storage/fileStorage";
-import { getAuthedConvexClient, getConvexClient, isConvexConfigured } from "@/lib/convex/server";
+import { getAuthedConvexClient, isConvexConfigured } from "@/lib/convex/server";
 import { generateRawDocument } from "@/features/source-docs/lib/rawDocGenerator";
 import { EvidencePackSchema } from "@/features/source-docs/lib/schemas";
 import { resolveImportRunForStoredRun } from "@/lib/familysearch/importRunResolver";
@@ -71,7 +71,7 @@ export async function GET(
 
     if (isConvexConfigured() && storagePersonId) {
       try {
-        const existingDoc = await (await getAuthedConvexClient()).query(api.documents.getDocument, {
+        const existingDoc = await (await getAuthedConvexClient()).action(api.documents.getDocument, {
           vaultOwnerId,
           personId: storagePersonId,
           type: "CST",
@@ -132,7 +132,7 @@ export async function GET(
     // newly generated. A cache-hit read must not write (GEN-90).
     if (generated && isConvexConfigured() && storagePersonId) {
       try {
-        const client = getConvexClient();
+        const client = await getAuthedConvexClient();
         const importRun = await resolveImportRunForStoredRun({
           client,
           vaultOwnerId,

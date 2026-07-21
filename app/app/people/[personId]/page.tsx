@@ -56,7 +56,7 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
   let workspace;
 
   try {
-    workspace = await client.query(api.vault.getPersonWorkspace, {
+    workspace = await client.action(api.vaultReads.getPersonWorkspace, {
       vaultOwnerId,
       personIdentifier: personId,
     });
@@ -81,7 +81,7 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
   let documents: FunctionReturnType<typeof api.documents.getDocumentsByPerson> = [];
   let documentsError: string | null = null;
   try {
-    documents = await client.query(api.documents.getDocumentsByPerson, {
+    documents = await client.action(api.documents.getDocumentsByPerson, {
       vaultOwnerId,
       personId: documentsPersonId,
     });

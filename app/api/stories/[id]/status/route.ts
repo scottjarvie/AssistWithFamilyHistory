@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { getAuthedConvexClient, getConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
+import { getAuthedConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
 import { requireHumanReviewConfirmation } from "@/lib/operations/reviewGates";
 import {
   getActionForStatusChange,
@@ -16,9 +17,8 @@ function isStoryStatus(value: unknown): value is "draft" | "review" | "published
   return value === "draft" || value === "review" || value === "published";
 }
 
-async function getStoryBundle(vaultOwnerId: string, storyId: string) {
-  const client = await getAuthedConvexClient();
-  return client.query(api.vault.getStoryReview, {
+async function getStoryBundle(client: ConvexHttpClient, vaultOwnerId: string, storyId: string) {
+  return client.action(api.vaultReads.getStoryReview, {
     vaultOwnerId,
     storyId: storyId as Id<"stories">,
   });
@@ -69,7 +69,7 @@ function toAuditSnapshot(readiness: StoryPublishReadiness) {
   };
 }
 
-async function recordReviewEvent(params: {
+async function recordReviewEvent(client: ConvexHttpClient, params: {
   vaultOwnerId: string;
   storyId: string;
   eventType: "publish_preview" | "status_change" | "publish_confirmation";
@@ -81,7 +81,7 @@ async function recordReviewEvent(params: {
   humanReviewNote?: string;
   publishReadiness?: StoryPublishReadiness;
 }) {
-  return getConvexClient().mutation(api.vaultMutations.recordStoryReviewEvent, {
+  return client.mutation(api.vaultMutations.recordStoryReviewEvent, {
     vaultOwnerId: params.vaultOwnerId,
     storyId: params.storyId as Id<"stories">,
     eventType: params.eventType,
@@ -110,7 +110,8 @@ export async function GET(
   try {
     const { id } = await params;
     const { vaultOwnerId } = await getVaultAccessContext();
-    const bundle = await getStoryBundle(vaultOwnerId, id);
+    const client = await getAuthedConvexClient();
+    const bundle = await getStoryBundle(client, vaultOwnerId, id);
 
     if (!bundle) {
       return NextResponse.json({ error: "Story not found" }, { status: 404 });
@@ -122,7 +123,7 @@ export async function GET(
     const actor = resolveStoryActor(request);
 
     if (shouldRecord) {
-      await recordReviewEvent({
+      await recordReviewEvent(client, {
         vaultOwnerId,
         storyId: id,
         eventType: "publish_preview",
@@ -173,11 +174,12 @@ export async function PATCH(
     }
 
     const { vaultOwnerId } = await getVaultAccessContext();
+    const client = await getAuthedConvexClient();
     let publishReadiness;
     let fromStatus: "draft" | "review" | "published" | undefined;
 
     if (body.status === "published") {
-      const bundle = await getStoryBundle(vaultOwnerId, id);
+      const bundle = await getStoryBundle(client, vaultOwnerId, id);
 
       if (!bundle) {
         return NextResponse.json({ error: "Story not found" }, { status: 404 });
@@ -226,38 +228,46 @@ export async function PATCH(
     }
 
     if (!fromStatus) {
-      const bundle = await getStoryBundle(vaultOwnerId, id);
+      const bundle = await getStoryBundle(client, vaultOwnerId, id);
       fromStatus = bundle?.story.status;
     }
 
-    const result = await getConvexClient().mutation(api.vaultMutations.updateStoryStatus, {
+    const result = await client.mutation(api.vaultMutations.updateStoryStatus, {
       vaultOwnerId,
       storyId: id as Id<"stories">,
       status: body.status,
-      // GEN-88 §A: the writer now re-checks the publish gate authoritatively, so
-      // forward the human-review confirmation it needs. The route's own checks
-      // above stay as fast-fail UX / defense-in-depth.
-      humanReviewConfirmed:
-        typeof body.humanReviewConfirmed === "boolean" ? body.humanReviewConfirmed : undefined,
+      humanReviewConfirmed: body.status === "published" ? body.humanReviewConfirmed === true : undefined,
       humanReviewNote:
-        typeof body.humanReviewNote === "string" ? body.humanReviewNote.trim() : undefined,
+        body.status === "published" && typeof body.humanReviewNote === "string"
+          ? body.humanReviewNote.trim()
+          : undefined,
     });
 
-    await recordReviewEvent({
-      vaultOwnerId,
-      storyId: id,
-      eventType: body.status === "published" ? "publish_confirmation" : "status_change",
-      actorRole: actor.role,
-      actorName: actor.name,
-      fromStatus,
-      toStatus: body.status,
-      reviewerName: typeof body.reviewerName === "string" ? body.reviewerName.trim() : undefined,
-      humanReviewNote:
-        typeof body.humanReviewNote === "string" ? body.humanReviewNote.trim() : undefined,
-      publishReadiness,
-    });
+    // Publishing is audited atomically inside updateStoryStatus, next to the
+    // backend publish gate. Non-publish status changes keep the route-level
+    // event so the API does not create a duplicate publish confirmation.
+    if (body.status !== "published") {
+      await recordReviewEvent(client, {
+        vaultOwnerId,
+        storyId: id,
+        eventType: "status_change",
+        actorRole: actor.role,
+        actorName: actor.name,
+        fromStatus,
+        toStatus: body.status,
+        reviewerName: typeof body.reviewerName === "string" ? body.reviewerName.trim() : undefined,
+        humanReviewNote:
+          typeof body.humanReviewNote === "string" ? body.humanReviewNote.trim() : undefined,
+        publishReadiness,
+      });
+    }
 
-    return NextResponse.json({ success: true, actor, publishReadiness, ...result });
+    return NextResponse.json({
+      success: true,
+      actor,
+      ...result,
+      publishReadiness: result.publishReadiness ?? publishReadiness,
+    });
   } catch (error) {
     const issue = getConvexRuntimeIssue(error);
     return NextResponse.json({ error: issue.title, details: issue.description }, { status: issue.statusCode });

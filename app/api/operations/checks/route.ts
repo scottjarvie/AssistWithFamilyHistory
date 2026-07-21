@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { api } from "@/convex/_generated/api";
-import { getConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
+import { getAuthedConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
 import { validateAgentResearchCheckUpdate } from "@/lib/operations/agentQualityGate";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
@@ -68,8 +68,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const client = getConvexClient();
-    const workspace = await client.query(api.vault.getPersonWorkspace, {
+    const client = await getAuthedConvexClient();
+    const workspace = await client.action(api.vaultReads.getPersonWorkspace, {
       vaultOwnerId,
       personIdentifier,
     });
