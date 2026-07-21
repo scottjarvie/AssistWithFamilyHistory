@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { chatCompletion } from "@/lib/ai/openrouter";
 import { getAiPrivacyDisclosure, type AiRedactionMode } from "@/lib/ai/privacy";
 import {
+  hasVerifiedOriginalReviewAuthority,
+  scanAiEgressForLivingPersonPII,
+} from "@/lib/ai/redaction";
+import {
   ALLOWED_MODELS,
   DEFAULT_MODEL,
   MAX_COMPLETION_TOKENS,
@@ -55,26 +59,78 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (data !== undefined && body.privacyAcknowledged !== true) {
+    if (body.privacyAcknowledged !== true) {
       return NextResponse.json(
         {
           error: "AI privacy acknowledgement required",
-          details: "External AI requests with vault data must declare the redaction mode and explicit review acknowledgement.",
+          details:
+            "External AI requests must declare the redaction mode and explicit review acknowledgement.",
         },
         { status: 400 }
       );
     }
-    if (data !== undefined && !isRedactionMode(body.redactionMode)) {
+    if (!isRedactionMode(body.redactionMode)) {
       return NextResponse.json(
         {
           error: "AI redaction mode required",
-          details: "External AI requests with vault data must declare whether the payload is redacted or human-reviewed original data.",
+          details:
+            "External AI requests must declare whether the outbound content is redacted, human-reviewed original data, or contains no human-subject data.",
         },
         { status: 400 }
       );
     }
 
-    const redactionMode = isRedactionMode(body.redactionMode) ? body.redactionMode : "not_applicable";
+    const redactionMode = body.redactionMode;
+    const serializedData =
+      typeof data === "string"
+        ? data
+        : data !== undefined
+          ? JSON.stringify(data, null, 2)
+          : "";
+    const resolvedSystemPrompt =
+      typeof systemPrompt === "string" && systemPrompt.trim()
+        ? systemPrompt
+        : "You are a helpful research assistant.";
+
+    // GEN-88 §C: refuse unsafe outbound content before rate-limit mutation or
+    // provider work. Source Docs embeds its evidence in `prompt`, while Story
+    // Writer uses `data`, so the exact provider-bound system/prompt/data text
+    // must be evaluated together. `not_applicable` is also scanned: a positive
+    // PII signal disproves the claim that no human-subject privacy mode applies.
+    if (redactionMode === "redacted" || redactionMode === "not_applicable") {
+      const egressScan = scanAiEgressForLivingPersonPII({
+        prompt,
+        serializedData,
+        systemPrompt: resolvedSystemPrompt,
+      });
+      if (egressScan.hasPII) {
+        return NextResponse.json(
+          {
+            error: "Redaction check failed",
+            details:
+              "The outbound request still contains living-person or PII indicators. Remove them or send as reviewed original data.",
+          },
+          { status: 422 },
+        );
+      }
+    } else {
+      let access = null;
+      try {
+        access = await getVaultAccessContext();
+      } catch {
+        access = null;
+      }
+      if (!hasVerifiedOriginalReviewAuthority(access)) {
+        return NextResponse.json(
+          {
+            error: "Human review verification required",
+            details:
+              "Sending original (unredacted) human-subject data requires a signed-in vault owner. Sign in, or send redacted data instead.",
+          },
+          { status: 403 },
+        );
+      }
+    }
 
     // Determine API Key: Client provided > Server Env > Fail
     const usingClientKey = typeof apiKey === "string" && apiKey.trim().length > 0;
@@ -137,9 +193,6 @@ export async function POST(request: NextRequest) {
       resolvedModel = model;
     }
 
-    const serializedData =
-      typeof data === "string" ? data : data ? JSON.stringify(data, null, 2) : "";
-
     // GEN-89: cap the combined prompt+data payload size BEFORE building the
     // full prompt, measured in UTF-8 bytes (matches over-the-wire size).
     const payloadBytes =
@@ -173,10 +226,7 @@ export async function POST(request: NextRequest) {
       messages: [
         {
           role: "system",
-          content:
-            typeof systemPrompt === "string" && systemPrompt.trim()
-              ? systemPrompt
-              : "You are a helpful research assistant.",
+          content: resolvedSystemPrompt,
         },
         { role: "user", content: fullPrompt },
       ],

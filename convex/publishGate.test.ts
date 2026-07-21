@@ -52,6 +52,58 @@ async function seedStory(
 }
 
 describe("backend story publish gate", () => {
+  test("shadow auth rollout still fails closed on the accepted publish gate", async () => {
+    vi.stubEnv("TRUST_BOUNDARY_MODE", "shadow");
+    const t = convexTest(schema, modules);
+    const { storyId } = await seedStory(t, "draft");
+
+    await expect(
+      t.withIdentity({ subject: OWNER }).mutation(api.vaultMutations.updateStoryStatus, {
+        vaultOwnerId: OWNER,
+        storyId,
+        status: "published",
+        humanReviewConfirmed: true,
+        humanReviewNote: "I reviewed this synthetic shadow-mode fixture before publication.",
+      }),
+    ).rejects.toThrow(/Story publishing policy denied: publish_gate_failed/);
+
+    const story = await t.run((ctx) => ctx.db.get(storyId));
+    expect(story?.status).toBe("draft");
+  });
+
+  test("shadow mode cannot direct-publish a story draft", async () => {
+    vi.stubEnv("TRUST_BOUNDARY_MODE", "shadow");
+    const t = convexTest(schema, modules);
+    const personId = await seedPerson(t);
+
+    await expect(
+      t.withIdentity({ subject: OWNER }).mutation(api.vaultMutations.upsertStoryDraft, {
+        vaultOwnerId: OWNER,
+        personId,
+        type: "biography",
+        title: "Shadow bypass attempt",
+        content: "Shadow observation must not allow direct publication.",
+        status: "published",
+        generatedBy: "human",
+      }),
+    ).rejects.toThrow(/Story publishing policy denied: direct_publish_bypass/);
+  });
+
+  test("shadow mode cannot edit an already-published story", async () => {
+    vi.stubEnv("TRUST_BOUNDARY_MODE", "shadow");
+    const t = convexTest(schema, modules);
+    const { storyId } = await seedStory(t, "published");
+
+    await expect(
+      t.withIdentity({ subject: OWNER }).mutation(api.vaultMutations.updateStoryDraft, {
+        vaultOwnerId: OWNER,
+        storyId,
+        title: "Changed during shadow rollout",
+        content: "This edit must enter a new review cycle.",
+      }),
+    ).rejects.toThrow(/Story publishing policy denied: published_edit_requires_review/);
+  });
+
   test("direct published upsert is denied in enforce mode", async () => {
     vi.stubEnv("TRUST_BOUNDARY_MODE", "enforce");
     const t = convexTest(schema, modules);

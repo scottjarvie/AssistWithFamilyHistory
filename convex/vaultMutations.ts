@@ -3,11 +3,14 @@ import { mutation, type MutationCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { buildStoryPublicSlug } from "../lib/stories/slug";
 import { redactPublicText } from "../lib/privacy/publicTextRedaction";
-import { requireHumanReviewConfirmation } from "../lib/operations/reviewGates";
-import { assessStoryPublishReadiness } from "../lib/stories/publishSafety";
+import {
+  assessStoryPublishReadiness,
+  evaluateStoryPublishGate,
+} from "../lib/stories/publishSafety";
 import {
   authorizeOwnedReferenceMutation,
   authorizeTenantMutation,
+  getTrustBoundaryMode,
   handlePolicyViolationMutation,
 } from "./access";
 import { buildStoryBundle, loadStoryScopedSnapshot } from "./vault";
@@ -271,6 +274,23 @@ function toPublishAuditSnapshot(readiness: ReturnType<typeof getBackendPublishRe
     provenance: readiness.provenance,
     recommendedNextActions: readiness.recommendedNextActions,
   };
+}
+
+/**
+ * Tenant-auth mismatches may be observed during the guarded shadow rollout,
+ * but story publication policy was already fail-closed before that rollout.
+ * Never let shadow mode turn an invalid publish or public-story edit into an
+ * allowed write.
+ */
+async function enforceStoryPolicyViolation(
+  ctx: MutationCtx,
+  functionName: string,
+  reason: "publish_gate_failed" | "published_edit_requires_review" | "direct_publish_bypass",
+): Promise<never> {
+  if (getTrustBoundaryMode() === "enforce") {
+    await handlePolicyViolationMutation(ctx, functionName, reason);
+  }
+  throw new Error(`Story publishing policy denied: ${reason}`);
 }
 
 export const upsertPerson = mutation({
@@ -1175,7 +1195,7 @@ export const upsertStoryDraft = mutation({
       args.vaultOwnerId,
     );
     if (args.status === "published") {
-      await handlePolicyViolationMutation(
+      await enforceStoryPolicyViolation(
         ctx,
         "vaultMutations.upsertStoryDraft",
         "direct_publish_bypass",
@@ -1274,6 +1294,10 @@ export const updateStoryStatus = mutation({
     vaultOwnerId: v.string(),
     storyId: v.id("stories"),
     status: storyStatusValidator,
+    // GEN-88 §A: the publish gate is now authoritative in the writer, not just
+    // the Next API route. These carry the human-review confirmation the route
+    // used to check on its own. Optional so non-publish transitions are
+    // unaffected; enforced below only when transitioning to "published".
     humanReviewConfirmed: v.optional(v.boolean()),
     humanReviewNote: v.optional(v.string()),
   },
@@ -1299,17 +1323,30 @@ export const updateStoryStatus = mutation({
 
       const bundle = buildStoryBundle(snapshot, currentStory);
       publishReadiness = getBackendPublishReadiness(bundle);
-      const reviewErrors = requireHumanReviewConfirmation({
-        actionName: "Publishing a public story",
-        confirmed: args.humanReviewConfirmed,
-        note: args.humanReviewNote,
+      const gateErrors = evaluateStoryPublishGate({
+        story: {
+          secondReviewRequired: story.secondReviewRequired,
+          secondReviewedAt: story.secondReviewedAt,
+        },
+        readiness: {
+          story: bundle.story,
+          person: bundle.person,
+          readiness: bundle.readiness,
+          researchChecks: bundle.researchChecks,
+          contextCoverage: bundle.contextCoverage,
+          evidence: bundle.evidence,
+          events: bundle.events,
+          places: bundle.places,
+          relationships: bundle.relationships,
+          provisionalRelatives: bundle.provisionalRelatives,
+          publishWarnings: bundle.publishWarnings,
+        },
+        humanReviewConfirmed: args.humanReviewConfirmed,
+        humanReviewNote: args.humanReviewNote,
       });
-      const secondReviewMissing = Boolean(
-        story.secondReviewRequired && !story.secondReviewedAt,
-      );
 
-      if (!publishReadiness.canPublish || secondReviewMissing || reviewErrors.length > 0) {
-        await handlePolicyViolationMutation(
+      if (gateErrors.length > 0) {
+        await enforceStoryPolicyViolation(
           ctx,
           "vaultMutations.updateStoryStatus",
           "publish_gate_failed",
@@ -1393,7 +1430,7 @@ export const updateStoryDraft = mutation({
       "Story",
     );
     if (story.status === "published") {
-      await handlePolicyViolationMutation(
+      await enforceStoryPolicyViolation(
         ctx,
         "vaultMutations.updateStoryDraft",
         "published_edit_requires_review",

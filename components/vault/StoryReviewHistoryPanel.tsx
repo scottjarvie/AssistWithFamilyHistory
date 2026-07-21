@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ClipboardList, Filter } from "lucide-react";
+import { WorkspaceStateCard } from "@/components/vault/WorkspaceStateCard";
 
 type StoryReviewEvent = {
   _id: string;
@@ -63,7 +64,15 @@ export function StoryReviewHistoryPanel({ events }: { events: StoryReviewEvent[]
   );
 
   if (events.length === 0) {
-    return <p className="text-sm text-stone-500">No review activity has been recorded yet.</p>;
+    return (
+      <WorkspaceStateCard
+        kind="empty"
+        title="No review activity yet"
+        description="Review and publication events will appear here after they are recorded."
+        badge={null}
+        density="compact"
+      />
+    );
   }
 
   return (
@@ -88,9 +97,13 @@ export function StoryReviewHistoryPanel({ events }: { events: StoryReviewEvent[]
       </div>
 
       {filteredEvents.length === 0 ? (
-        <p className="border border-dashed border-stone-300 px-4 py-6 text-sm text-stone-500">
-          No review events match this filter.
-        </p>
+        <WorkspaceStateCard
+          kind="empty"
+          title="No matching review events"
+          description="Choose another filter to see the activity recorded for this story."
+          badge={null}
+          density="compact"
+        />
       ) : (
         filteredEvents.map((event) => (
           <div key={String(event._id)} className={`border px-4 py-4 ${eventTone[event.eventType]}`}>

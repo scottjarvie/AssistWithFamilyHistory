@@ -40,6 +40,7 @@ steps=(
   "check:public-beta-launch"
   "check:public-story-e2e"
   "check:story-slugs"
+  "check:sitemap-shape"
   "check:extension"
   "check:familysearch-capture"
   "check:familysearch-readiness-contract"

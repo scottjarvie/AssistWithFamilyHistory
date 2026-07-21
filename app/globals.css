@@ -214,4 +214,13 @@
     background-size: 200% 100%;
     animation: shimmer-line 4s linear infinite;
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-rise-in,
+    .animate-drift,
+    .animate-pulse-ring,
+    .shimmer-divider {
+      animation: none !important;
+    }
+  }
 }
