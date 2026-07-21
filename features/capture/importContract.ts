@@ -89,6 +89,53 @@ export type CaptureImportReview = z.infer<typeof CaptureImportReviewSchema>;
 export type CaptureImportPreviewResponse = z.infer<typeof CaptureImportPreviewResponseSchema>;
 export type CaptureImportMergeResponse = z.infer<typeof CaptureImportMergeResponseSchema>;
 
+export type CaptureImportMergeResponseOutcome =
+  | {
+      status: "verified";
+      data: CaptureImportMergeResponse;
+    }
+  | {
+      status: "rejected";
+      payload: unknown;
+    }
+  | {
+      status: "accepted_unverifiable";
+    };
+
+/**
+ * Classify the merge response before the UI decides whether another mutation is
+ * safe. Any 2xx whose body cannot be parsed and verified may already have
+ * committed, so callers must invalidate the reviewed package and refresh
+ * import history instead of offering a blind retry.
+ */
+export async function classifyCaptureImportMergeResponse(
+  response: Pick<Response, "ok" | "json">,
+): Promise<CaptureImportMergeResponseOutcome> {
+  let payload: unknown = null;
+  try {
+    payload = await response.json();
+  } catch {
+    if (response.ok) {
+      return {
+        status: "accepted_unverifiable",
+      };
+    }
+
+    return { status: "rejected", payload: null };
+  }
+
+  if (!response.ok) return { status: "rejected", payload };
+
+  const parsedResponse = CaptureImportMergeResponseSchema.safeParse(payload);
+  if (!parsedResponse.success) {
+    return {
+      status: "accepted_unverifiable",
+    };
+  }
+
+  return { status: "verified", data: parsedResponse.data };
+}
+
 export function getCaptureImportErrorMessage(payload: unknown, fallback: string) {
   const result = CaptureImportErrorResponseSchema.safeParse(payload);
   if (!result.success) return fallback;

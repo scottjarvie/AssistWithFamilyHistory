@@ -10,12 +10,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  CaptureImportMergeResponseSchema,
   CaptureImportPreviewResponseSchema,
+  classifyCaptureImportMergeResponse,
   getCaptureImportErrorMessage,
   type CaptureImportPreviewResponse,
 } from "@/features/capture/importContract";
 import {
+  getAcceptedCaptureImportMergeRecovery,
   getCaptureImportReviewState,
   type CaptureImportTone,
 } from "@/features/capture/importModel";
@@ -184,28 +185,28 @@ export default function ImportsPage() {
         },
         body: JSON.stringify(previewPayload),
       });
-      const payload = await response.json();
+      const outcome = await classifyCaptureImportMergeResponse(response);
 
-      if (!response.ok) {
-        const message = getCaptureImportErrorMessage(payload, "Import failed");
+      if (outcome.status === "rejected") {
+        const message = getCaptureImportErrorMessage(outcome.payload, "Import failed");
         setImportError(message);
         toast.error(message);
         return;
       }
 
-      const parsedResponse = CaptureImportMergeResponseSchema.safeParse(payload);
-      if (!parsedResponse.success) {
+      if (outcome.status === "accepted_unverifiable") {
+        const recovery = getAcceptedCaptureImportMergeRecovery();
         const message =
           "The server accepted the import, but its response could not be verified. Check Recent Imports before trying again.";
-        setPreviewPayload(null);
-        setPreviewResult(null);
-        await loadRecentImports();
+        setPreviewPayload(recovery.previewPayload);
+        setPreviewResult(recovery.previewResult);
+        if (recovery.refreshRecentImports) await loadRecentImports();
         setImportError(message);
         toast.warning(message);
         return;
       }
 
-      const result = parsedResponse.data;
+      const result = outcome.data;
       setLastImportWarnings(result.warnings);
       setBackendStatus({
         tone: result.backendState === "ready" ? "ready" : "degraded",

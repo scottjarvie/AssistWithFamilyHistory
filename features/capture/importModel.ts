@@ -10,6 +10,22 @@ export type CaptureImportReviewState = {
   canMerge: boolean;
 };
 
+export type CaptureImportMergeRecovery = {
+  previewResult: null;
+  previewPayload: null;
+  canMerge: false;
+  refreshRecentImports: true;
+};
+
+export function getAcceptedCaptureImportMergeRecovery(): CaptureImportMergeRecovery {
+  return {
+    previewResult: null,
+    previewPayload: null,
+    canMerge: false,
+    refreshRecentImports: true,
+  };
+}
+
 export function getCaptureImportReviewState(
   preview: CaptureImportPreviewResponse | null,
 ): CaptureImportReviewState {

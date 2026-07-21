@@ -3,9 +3,13 @@ import { readFileSync } from "node:fs";
 import {
   CaptureImportMergeResponseSchema,
   CaptureImportPreviewResponseSchema,
+  classifyCaptureImportMergeResponse,
   getCaptureImportErrorMessage,
 } from "@/features/capture/importContract";
-import { getCaptureImportReviewState } from "@/features/capture/importModel";
+import {
+  getAcceptedCaptureImportMergeRecovery,
+  getCaptureImportReviewState,
+} from "@/features/capture/importModel";
 
 const reviewedAt = "2026-07-18T07:30:00.000Z";
 
@@ -113,6 +117,61 @@ assert.equal(mergeResponse.mergeStatus, "partial");
 assert.equal(mergeResponse.vaultMerged, false);
 assert.equal(mergeResponse.warnings.length, 1);
 
+export async function checkCaptureImportMergeResponseBehavior() {
+  const verifiedMerge = await classifyCaptureImportMergeResponse(
+    new Response(JSON.stringify(mergeResponse), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }),
+  );
+  assert.equal(verifiedMerge.status, "verified", "A valid JSON success keeps its normal verified semantics.");
+
+  const rejectedMerge = await classifyCaptureImportMergeResponse(
+    new Response(JSON.stringify({ error: "Capture package failed import safety checks" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    }),
+  );
+  assert.equal(rejectedMerge.status, "rejected", "A non-2xx JSON response keeps its normal error semantics.");
+  if (rejectedMerge.status === "rejected") {
+    assert.equal(
+      getCaptureImportErrorMessage(rejectedMerge.payload, "Import failed"),
+      "Capture package failed import safety checks",
+    );
+  }
+
+  const unverifiableMerge = await classifyCaptureImportMergeResponse(
+    new Response("possibly committed", {
+      status: 200,
+      headers: { "Content-Type": "text/plain" },
+    }),
+  );
+  assert.deepEqual(unverifiableMerge, {
+    status: "accepted_unverifiable",
+  });
+
+  const recovery = getAcceptedCaptureImportMergeRecovery();
+  assert.deepEqual(recovery, {
+    previewResult: null,
+    previewPayload: null,
+    canMerge: false,
+    refreshRecentImports: true,
+  });
+
+  let retryPreview: typeof readyPreview | null = readyPreview;
+  let retryPayload: unknown | null = { synthetic: true };
+  let recentImportsRefreshes = 0;
+  retryPreview = recovery.previewResult;
+  retryPayload = recovery.previewPayload;
+  if (recovery.refreshRecentImports) recentImportsRefreshes += 1;
+  assert.equal(
+    Boolean(retryPreview && retryPayload && getCaptureImportReviewState(retryPreview).canMerge),
+    false,
+    "A non-JSON 2xx must make a duplicate merge retry impossible until a new preview succeeds.",
+  );
+  assert.equal(recentImportsRefreshes, 1, "An unverifiable accepted merge must refresh Recent Imports once.");
+}
+
 assert.equal(
   getCaptureImportErrorMessage(
     {
@@ -158,5 +217,3 @@ for (const envelopeField of [
 const importerSource = readFileSync("lib/familysearch/importer.ts", "utf8");
 assert(importerSource.includes("api.vaultMutations.upsertPerson"), "Stable api.vaultMutations identifiers drifted.");
 assert(importerSource.includes("api.vaultMutations.bulkRefreshResearchChecks"), "Stable vault refresh facade drifted.");
-
-console.log("Capture import response and state contract checks passed.");
