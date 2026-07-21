@@ -35,9 +35,12 @@ export function getConvexClient(): ConvexHttpClient {
 // be measured. In enforce mode a missing Clerk/JWT configuration or token is a
 // hard failure: silently sending an unauthenticated request would make every
 // protected operation fail farther downstream with less useful diagnostics.
-export async function getAuthedConvexClient(): Promise<ConvexHttpClient> {
+export async function getAuthedConvexClient(options?: {
+  requireAuthentication?: boolean;
+}): Promise<ConvexHttpClient> {
   const client = getConvexClient();
   const enforcing = process.env.TRUST_BOUNDARY_MODE === "enforce";
+  const requireAuthentication = options?.requireAuthentication === true || enforcing;
 
   // Only mint a "convex" template token in an environment actually configured
   // for Convex auth — i.e. where CLERK_JWT_ISSUER_DOMAIN is set (the same gate
@@ -46,9 +49,9 @@ export async function getAuthedConvexClient(): Promise<ConvexHttpClient> {
   // (e.g. production until GEN-103 step E), so we never attempt — or error on —
   // a getToken({template:"convex"}) the instance can't satisfy.
   if (!isClerkEnabled() || !process.env.CLERK_JWT_ISSUER_DOMAIN) {
-    if (enforcing) {
+    if (requireAuthentication) {
       throw new Error(
-        "Convex trust-boundary enforcement requires Clerk and CLERK_JWT_ISSUER_DOMAIN",
+        "Authenticated Convex access requires Clerk and CLERK_JWT_ISSUER_DOMAIN",
       );
     }
     return client;
@@ -61,8 +64,8 @@ export async function getAuthedConvexClient(): Promise<ConvexHttpClient> {
       client.setAuth(token);
       return client;
     }
-    if (enforcing) {
-      throw new Error("Convex trust-boundary enforcement requires an authenticated Clerk session");
+    if (requireAuthentication) {
+      throw new Error("Authenticated Convex access requires an authenticated Clerk session");
     }
   } catch (error) {
     logServerFailure(
@@ -70,7 +73,7 @@ export async function getAuthedConvexClient(): Promise<ConvexHttpClient> {
       { route: "convex", configured: isConvexConfigured() },
       error,
     );
-    if (enforcing) {
+    if (requireAuthentication) {
       throw new Error("Unable to authenticate this protected Convex request", { cause: error });
     }
   }
