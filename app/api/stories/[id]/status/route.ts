@@ -234,6 +234,13 @@ export async function PATCH(
       vaultOwnerId,
       storyId: id as Id<"stories">,
       status: body.status,
+      // GEN-88 §A: the writer now re-checks the publish gate authoritatively, so
+      // forward the human-review confirmation it needs. The route's own checks
+      // above stay as fast-fail UX / defense-in-depth.
+      humanReviewConfirmed:
+        typeof body.humanReviewConfirmed === "boolean" ? body.humanReviewConfirmed : undefined,
+      humanReviewNote:
+        typeof body.humanReviewNote === "string" ? body.humanReviewNote.trim() : undefined,
     });
 
     await recordReviewEvent({
