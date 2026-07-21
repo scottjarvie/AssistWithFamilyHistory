@@ -1,68 +1,82 @@
 # Vault Owner Isolation
 
-Last updated: 2026-05-21
+Last updated: 2026-07-12.
 
-## Purpose
+Discover Their Stories treats every vault as private tenant data. The browser,
+URL arguments, Next routes, and client-supplied vault owner are not security
+authorities. Convex verifies the caller at the data boundary.
 
-Discover Their Stories supports three vault access modes. Every private app route and internal API route must resolve the active vault owner before reading or writing vault data.
+## Access modes
 
-The public story route is the exception: `/stories/[id]` uses the story id and only returns stories whose status is `published`.
+| Mode | Owner | Production posture |
+| --- | --- | --- |
+| Signed-in user | Verified Clerk subject | Supported tenant-private mode |
+| Local development | local-dev | Shadow-only local development |
+| Anonymous guest | guest cookie ID | Preview-only; not compatible with enforcement until a signed guest capability exists |
 
-## Access Modes
+Production beta requires REQUIRE_AUTH=true and both anonymous-vault flags false
+or unset.
 
-| Mode | When used | Vault owner | Intended use |
-| --- | --- | --- | --- |
-| Local | Clerk is disabled or unavailable in local development | `local-dev` | Private local development and single-user local vaults |
-| User | Clerk is enabled and the visitor is signed in | Clerk `userId` | Authenticated user-owned vault |
-| Anonymous | Clerk is enabled, `ALLOW_ANONYMOUS_VAULT=true`, auth is not required, and the visitor is not signed in | `vault-preview-id` guest cookie | Explicit preview deployments only |
+## Next route gate
 
-## Required Auth Gate
+Protected routes first call getVaultAccessContext() and use
+getAuthedConvexClient(), which attaches the Clerk convex-template JWT. Route
+middleware remains useful for UX and request rejection, but it is defense in
+depth rather than the tenant boundary.
 
-For public beta, set `REQUIRE_AUTH=true` and leave `ALLOW_ANONYMOUS_VAULT` unset or false. When `REQUIRE_AUTH=true`, these route groups are protected by Clerk middleware:
+The protected route source of truth is lib/vault/protectedRoutes.ts:
 
-- `/app(.*)`
-- `/api/people(.*)`
-- `/api/import(.*)`
-- `/api/process(.*)`
-- `/api/convex(.*)`
-- `/api/operations(.*)`
-- `/api/stories(.*)`
-- `/api/context-reports(.*)`
-
-The shared source of truth is `lib/vault/protectedRoutes.ts`. Run:
-
-```bash
+~~~bash
 pnpm check:protected-routes
-```
+~~~
 
-## Owner Resolution
+## Convex boundary
 
-Server code should call `getVaultAccessContext()` from `lib/vault/server.ts` and pass its `vaultOwnerId` into storage, Convex queries, and Convex mutations.
+The shared helpers in convex/access.ts:
 
-Convex query and mutation code should normalize and compare owners with the helpers in `convex/vaultCore.ts`:
+1. resolve ctx.auth.getUserIdentity();
+2. compare the verified subject with the supplied vaultOwnerId;
+3. bind business reads and writes to the verified owner in enforce mode;
+4. validate referenced records before they are linked or dereferenced;
+5. log would-be denials in shadow or throw in enforce.
 
-- `normalizeVaultOwnerId`
-- `matchesVaultOwner`
-- `filterByVaultOwner`
+Mutations authorize before their first business-data access. Protected reads
+are public actions backed by internal queries so the action can persist a
+shadow log before the read. Internal functions cannot be called directly by an
+external client.
 
-Local raw artifacts are separated by owner directory under `data/source-docs/people/<owner>/`.
+Run both static contracts after changing Convex functions or callers:
 
-## Route Behavior
+~~~bash
+pnpm check:trust-boundary
+pnpm check:convex-client-auth
+~~~
 
-Private app routes under `/app` read only the active owner vault.
+The complete classification is in
+[Convex trust-boundary inventory](./convex-trust-boundary-inventory.md).
 
-Internal API routes under `/api/people`, `/api/import`, `/api/convex`, `/api/operations`, `/api/stories`, and `/api/context-reports` must use the active owner context before any read or write.
+## Public story exception
 
-Anonymous guest vaults are not the default public-beta posture. They require an explicit `ALLOW_ANONYMOUS_VAULT=true` deployment choice and should be treated as temporary preview vaults, not durable user workspaces.
+Only vault.getPublishedStory and vault.getPublishedStoryByIdentifier are
+anonymous:
 
-`/api/process` is protected in required-auth deployments because it can submit user-provided data to an AI model using either a client-provided OpenRouter key or the server key.
+- draft and review stories return null inside Convex;
+- a published story is converted to an explicit public DTO inside Convex;
+- person data exists only as a narrow projection nested in that published
+  story; there is no anonymous person endpoint;
+- server redaction removes common email, phone, SSN-shaped, and street-address
+  identifiers;
+- address-type places and non-public media/context are excluded.
 
-`/stories/[id]` is intentionally public, but it must only return published stories. Draft or review stories should resolve to not found.
+The API and page keep their checks, but cannot broaden the Convex response.
 
-## API Impact
+## Shadow rollout
 
-- API impact: read/write/admin route baseline.
-- API parity: current APIs are internal; future agent/API work should start from this owner model.
-- Scope/tier impact: future scopes such as read-only assistant, import agent, story writer, research operator, and trusted operator must not bypass owner isolation.
-- OpenAPI/capability manifest impact: protected versus public route classification should be reflected in future API inventory docs.
-- Security/abuse/privacy risk: cross-owner access, public unpublished story access, and unauthenticated writes in required-auth deployments are the main risks.
+TRUST_BOUNDARY_MODE defaults to shadow. Shadow preserves legacy behavior and
+writes function, caller, reason, and timestamp to trustBoundaryShadowLog.
+Enforce throws. The superadmin-only summary and full flip procedure are in the
+[guarded rollout runbook](../operations/gen-87-clerk-convex-auth-setup.md).
+
+Guest migration is deliberately denied in enforce because the guest source ID
+is not cryptographically verified. Disable guest vaults and resolve legitimate
+pending migrations before the production flip.

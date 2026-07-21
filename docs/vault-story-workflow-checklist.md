@@ -6,7 +6,7 @@ Use this checklist after `pnpm lint`, `pnpm build`, and `pnpm exec convex dev --
 
 - Open `/app/audit` and confirm Convex counts load.
 - Confirm the audit separates genealogy gaps from context research gaps.
-- Run `pnpm tsx scripts/audit-vault.ts` and compare the terminal summary to `/app/audit`.
+- Run `VAULT_OWNER_ID=<matching-clerk-subject> CONVEX_AUTH_TOKEN=<short-lived-convex-template-jwt> pnpm tsx scripts/audit-vault.ts` and compare the terminal summary to `/app/audit`.
 - Add or confirm at least one historical/context report for a real place.
 
 ## Context Reports

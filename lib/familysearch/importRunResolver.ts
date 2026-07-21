@@ -27,7 +27,7 @@ export async function resolveImportRunForStoredRun({
       : null;
 
   if (captureId) {
-    const importRun = await client.query(api.importRuns.getByCaptureId, {
+    const importRun = await client.action(api.importRuns.getByCaptureId, {
       captureId,
       vaultOwnerId,
     });
@@ -41,7 +41,7 @@ export async function resolveImportRunForStoredRun({
     }
   }
 
-  const latestImport = await client.query(api.importRuns.listRecent, {
+  const latestImport = await client.action(api.importRuns.listRecent, {
     vaultOwnerId,
     personIdentifier: personId,
     limit: 1,

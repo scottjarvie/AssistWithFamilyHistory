@@ -1,7 +1,9 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
-import { Doc } from "./_generated/dataModel";
-import { filterByVaultOwner, normalizeVaultOwnerId } from "./vaultCore";
+import { action, internalQuery, mutation } from "./_generated/server";
+import { internal } from "./_generated/api";
+import type { Doc } from "./_generated/dataModel";
+import { authorizeTenantAction, authorizeTenantMutation } from "./access";
+import { filterByVaultOwner } from "./vaultCore";
 
 const placeTypeValidator = v.union(
   v.literal("country"),
@@ -27,8 +29,9 @@ export const upsert = mutation({
     longitude: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const decision = await authorizeTenantMutation(ctx, "places.upsert", args.vaultOwnerId);
+    const vaultOwnerId = decision.owner;
     const now = Date.now();
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
     let existing: Doc<"places"> | null = null;
 
     if (args.familySearchId) {
@@ -71,37 +74,72 @@ export const upsert = mutation({
   },
 });
 
-export const getByFsId = query({
-  args: { fsId: v.string(), vaultOwnerId: v.string() },
+const getByFsIdArgs = { fsId: v.string(), vaultOwnerId: v.string() };
+
+export const getByFsIdInternal = internalQuery({
+  args: getByFsIdArgs,
   handler: async (ctx, args) => {
     const matches = await ctx.db
       .query("places")
       .withIndex("by_fsId", (q) => q.eq("familySearchId", args.fsId))
       .collect();
-    return filterByVaultOwner(matches, normalizeVaultOwnerId(args.vaultOwnerId))[0] ?? null;
+    return filterByVaultOwner(matches, args.vaultOwnerId)[0] ?? null;
   },
 });
 
-export const list = query({
-  args: {
-    vaultOwnerId: v.string(),
-    type: v.optional(placeTypeValidator),
-    limit: v.optional(v.number()),
+export const getByFsId = action({
+  args: getByFsIdArgs,
+  handler: async (ctx, args): Promise<Doc<"places"> | null> => {
+    const decision = await authorizeTenantAction(
+      ctx,
+      "places.getByFsId",
+      args.vaultOwnerId,
+      (entry) => ctx.runMutation(internal.trustBoundary.recordShadowDenial, entry),
+    );
+    return ctx.runQuery(internal.places.getByFsIdInternal, {
+      ...args,
+      vaultOwnerId: decision.owner,
+    });
   },
+});
+
+const listArgs = {
+  vaultOwnerId: v.string(),
+  type: v.optional(placeTypeValidator),
+  limit: v.optional(v.number()),
+};
+
+export const listInternal = internalQuery({
+  args: listArgs,
   handler: async (ctx, args) => {
     const applyLimit = (rows: Doc<"places">[]) =>
       args.limit ? rows.slice(0, args.limit) : rows;
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
 
     if (args.type) {
       const results = await ctx.db
         .query("places")
         .withIndex("by_type", (q) => q.eq("type", args.type!))
         .collect();
-      return applyLimit(filterByVaultOwner(results, vaultOwnerId));
+      return applyLimit(filterByVaultOwner(results, args.vaultOwnerId));
     }
 
     const results = await ctx.db.query("places").collect();
-    return applyLimit(filterByVaultOwner(results, vaultOwnerId));
+    return applyLimit(filterByVaultOwner(results, args.vaultOwnerId));
+  },
+});
+
+export const list = action({
+  args: listArgs,
+  handler: async (ctx, args): Promise<Doc<"places">[]> => {
+    const decision = await authorizeTenantAction(
+      ctx,
+      "places.list",
+      args.vaultOwnerId,
+      (entry) => ctx.runMutation(internal.trustBoundary.recordShadowDenial, entry),
+    );
+    return ctx.runQuery(internal.places.listInternal, {
+      ...args,
+      vaultOwnerId: decision.owner,
+    });
   },
 });

@@ -16,7 +16,23 @@ const files = {
 
 assert(files.processRoute.includes("privacyAcknowledged"), "AI process route must require privacy acknowledgement.");
 assert(files.processRoute.includes("redactionMode"), "AI process route must require redaction mode.");
-assert(files.processRoute.includes("AI redaction mode required"), "AI process route must reject missing redaction mode when data is present.");
+assert(files.processRoute.includes("AI redaction mode required"), "AI process route must reject a missing redaction mode.");
+const egressScanIndex = files.processRoute.indexOf("const egressScan = scanAiEgressForLivingPersonPII");
+const rateLimitIndex = files.processRoute.indexOf("checkAndIncrementRateLimit");
+const providerIndex = files.processRoute.indexOf("await chatCompletion");
+assert(egressScanIndex !== -1, "AI process route must scan the exact provider-bound egress surfaces.");
+assert(
+  egressScanIndex < rateLimitIndex && egressScanIndex < providerIndex,
+  "AI egress refusal must run before rate-limit mutation and provider work.",
+);
+assert(
+  files.processRoute.includes("hasVerifiedOriginalReviewAuthority(access)"),
+  "Reviewed-original AI egress must require server-verified signed-in user authority.",
+);
+assert(
+  !files.processRoute.includes("indicators: egressScan.indicators"),
+  "AI egress refusal responses must not echo detected private-data categories.",
+);
 assert(files.openRouter.includes("sanitizeAiProviderError"), "OpenRouter errors must be sanitized.");
 assert(files.privacy.includes("getAiPrivacyDisclosure"), "AI privacy disclosure helper is missing.");
 assert(files.sourceAiPage.includes("Use redacted data before sending living-person indicators"), "Source-doc AI page must block unredacted living-person submissions.");

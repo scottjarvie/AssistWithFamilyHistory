@@ -39,7 +39,7 @@ export default async function ResearchPage() {
   let overview;
 
   try {
-    overview = await client.query(api.vault.getResearchOverview, { vaultOwnerId });
+    overview = await client.action(api.vaultReads.getResearchOverview, { vaultOwnerId });
   } catch (error) {
     const issue = getConvexRuntimeIssue(error);
 

@@ -26,7 +26,6 @@ import { v } from "convex/values";
 import schema from "./schema";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { resolveOwner } from "./vaultCore";
 
 // Pass the module map explicitly so convex-test can find the function modules
 // regardless of cwd (this file sits in convex/, the default functions dir).
@@ -179,7 +178,7 @@ describe("owner isolation (real withIndex(by_owner) paths)", () => {
     await seedOwner(t, OWNER_A, "A");
     await seedOwner(t, OWNER_B, "B");
 
-    const rowsA = await t.query(api.vault.getPeopleExplorer, { vaultOwnerId: OWNER_A });
+    const rowsA = await t.action(api.vaultReads.getPeopleExplorer, { vaultOwnerId: OWNER_A });
     const namesA = rowsA.map((r) => r.displayName);
 
     // A sees exactly its two people, NONE of B's.
@@ -206,7 +205,7 @@ describe("owner isolation (real withIndex(by_owner) paths)", () => {
       );
     });
 
-    const ws = await t.query(api.vault.getPersonWorkspace, {
+    const ws = await t.action(api.vaultReads.getPersonWorkspace, {
       vaultOwnerId: OWNER_A,
       personIdentifier: String(a.primary),
     });
@@ -254,7 +253,7 @@ describe("owner isolation (real withIndex(by_owner) paths)", () => {
       );
     });
 
-    const pack = await t.query(api.vault.getContextPack, {
+    const pack = await t.action(api.vaultReads.getContextPack, {
       vaultOwnerId: OWNER_A,
       personIdentifier: String(a.primary),
     });
@@ -295,7 +294,7 @@ describe("owner isolation (real withIndex(by_owner) paths)", () => {
       );
     });
 
-    const pack = await t.query(api.vault.getContextPack, {
+    const pack = await t.action(api.vaultReads.getContextPack, {
       vaultOwnerId: OWNER_A,
       personIdentifier: String(a.primary),
     });
@@ -332,7 +331,7 @@ describe("array-index regression (media.personIds element-contains)", () => {
     const t = convexTest(schema, modules);
     const a = await seedOwner(t, OWNER_A, "A");
 
-    const ws = await t.query(api.vault.getPersonWorkspace, {
+    const ws = await t.action(api.vaultReads.getPersonWorkspace, {
       vaultOwnerId: OWNER_A,
       personIdentifier: String(a.primary),
     });
@@ -484,48 +483,16 @@ describe("migrateGuestVault (real mutation)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. GEN-87 P1-SHADOW — resolveOwner runs the real ctx.auth.getUserIdentity()
-//    path and proves the cardinal rule: it ALWAYS returns the supplied owner
-//    and NEVER enforces (no throw, no owner switch), even when the verified
-//    identity disagrees. This is the only place the real Convex identity ctx
-//    drives resolveOwner; the pure compareOwnerForShadow rules are covered in
-//    scripts/test-vault-core.ts.
+// 4. GEN-87 guarded rollout — public actions persist would-be denials.
 // ---------------------------------------------------------------------------
 
-describe("resolveOwner (shadow chokepoint, real ctx.auth identity)", () => {
-  test("identity present + DIFFERENT supplied owner -> returns the supplied owner (no enforce)", async () => {
-    const t = convexTest(schema, modules);
-    const owner = await t
-      .withIdentity({ subject: "user_X" })
-      .run((ctx) => resolveOwner(ctx, "user_Y"));
-    expect(owner).toBe("user_Y");
-  });
-
-  test("identity present + MATCHING supplied owner -> returns that owner", async () => {
-    const t = convexTest(schema, modules);
-    const owner = await t
-      .withIdentity({ subject: "user_X" })
-      .run((ctx) => resolveOwner(ctx, "user_X"));
-    expect(owner).toBe("user_X");
-  });
-
-  test("no identity (guest / Clerk off) -> returns the supplied owner", async () => {
-    const t = convexTest(schema, modules);
-    const owner = await t.run((ctx) => resolveOwner(ctx, "guest_z"));
-    expect(owner).toBe("guest_z");
-  });
-
-  // Stage B: a public query whose owner now flows through resolveOwner must
-  // still serve the SUPPLIED owner's data, even when the verified identity
-  // belongs to a DIFFERENT owner. Shadow logs the mismatch but never switches
-  // the owner or blocks the read — that is the cardinal "no enforcement" rule.
-  test("wired getPersonWorkspace under a MISMATCHED identity still returns the supplied owner's data (shadow does not enforce)", async () => {
+describe("guarded private reads", () => {
+  test("shadow mode preserves legacy data while logging a mismatched identity", async () => {
     const t = convexTest(schema, modules);
     const a = await seedOwner(t, OWNER_A, "A");
     await seedOwner(t, OWNER_B, "B");
 
-    // Caller is verified as OWNER_B but asks for OWNER_A's vault + A's person.
-    const ws = await t.withIdentity({ subject: OWNER_B }).query(api.vault.getPersonWorkspace, {
+    const ws = await t.withIdentity({ subject: OWNER_B }).action(api.vaultReads.getPersonWorkspace, {
       vaultOwnerId: OWNER_A,
       personIdentifier: String(a.primary),
     });
@@ -549,5 +516,13 @@ describe("resolveOwner (shadow chokepoint, real ctx.auth identity)", () => {
       expect(row.vaultOwnerId).toBe(OWNER_A);
     }
     expect(ws.relatedPeople.some((p) => p.name.given === "RelativeB")).toBe(false);
+
+    const logs = await t.run((ctx) => ctx.db.query("trustBoundaryShadowLog").collect());
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toMatchObject({
+      functionName: "vault.getPersonWorkspace",
+      caller: OWNER_B,
+      reason: "owner_mismatch",
+    });
   });
 });

@@ -1,7 +1,19 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
-import { Doc } from "./_generated/dataModel";
-import { filterByVaultOwner, normalizeVaultOwnerId } from "./vaultCore";
+import {
+  action,
+  internalQuery,
+  mutation,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
+import { internal } from "./_generated/api";
+import type { Doc } from "./_generated/dataModel";
+import {
+  authorizeOwnedReferenceMutation,
+  authorizeTenantAction,
+  authorizeTenantMutation,
+} from "./access";
+import { filterByVaultOwner, matchesVaultOwner } from "./vaultCore";
 
 const entityTypeValidator = v.union(
   v.literal("person"),
@@ -52,6 +64,74 @@ const statusValidator = v.union(
   v.literal("blocked")
 );
 
+const entityTableByType = {
+  person: "persons",
+  place: "places",
+  building: "places",
+  relationship: "relationships",
+  event: "events",
+  source: "sources",
+  citation: "citations",
+  story: "stories",
+  historicalContext: "historicalContext",
+} as const;
+
+type ReferencedEntityType = keyof typeof entityTableByType;
+type ResearchEntityType = ReferencedEntityType | "other";
+
+const entityLabelByType: Record<ReferencedEntityType, string> = {
+  person: "Person",
+  place: "Place",
+  building: "Building place",
+  relationship: "Relationship",
+  event: "Event",
+  source: "Source",
+  citation: "Citation",
+  story: "Story",
+  historicalContext: "Historical context",
+};
+
+async function loadResearchEntity(
+  ctx: Pick<QueryCtx, "db">,
+  entityType: ReferencedEntityType,
+  entityId: string,
+) {
+  const table = entityTableByType[entityType];
+  const normalizedId = ctx.db.normalizeId(table, entityId);
+  return normalizedId ? ctx.db.get(normalizedId) : null;
+}
+
+async function authorizeResearchEntityForMutation(
+  ctx: MutationCtx,
+  functionName: string,
+  vaultOwnerId: string,
+  entityType: ResearchEntityType,
+  entityId: string,
+) {
+  if (entityType === "other") return entityId;
+  const entity = await authorizeOwnedReferenceMutation(
+    ctx,
+    functionName,
+    vaultOwnerId,
+    await loadResearchEntity(ctx, entityType, entityId),
+    entityLabelByType[entityType],
+  );
+  return entity._id;
+}
+
+async function resolveOwnedResearchEntity(
+  ctx: QueryCtx,
+  vaultOwnerId: string,
+  entityType: ResearchEntityType,
+  entityId: string,
+) {
+  if (entityType === "other") return entityId;
+  const entity = await loadResearchEntity(ctx, entityType, entityId);
+  return entity && matchesVaultOwner(entity.vaultOwnerId, vaultOwnerId)
+    ? entity._id
+    : null;
+}
+
 /**
  * Upsert a research log entry for an entity + activity combination.
  * If entityId is omitted, we upsert by entityType + activityType only.
@@ -70,18 +150,30 @@ export const upsert = mutation({
     completedAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const functionName = "researchLog.upsert";
+    const decision = await authorizeTenantMutation(ctx, functionName, args.vaultOwnerId);
+    const vaultOwnerId = decision.owner;
     const now = Date.now();
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const entityId =
+      args.entityId === undefined
+        ? undefined
+        : await authorizeResearchEntityForMutation(
+            ctx,
+            functionName,
+            vaultOwnerId,
+            args.entityType,
+            String(args.entityId),
+          );
 
     let existing: Doc<"researchLog"> | null = null;
 
-    if (args.entityId !== undefined) {
+    if (entityId !== undefined) {
       const matches = await ctx.db
         .query("researchLog")
         .withIndex("by_entity_activity", (q) =>
           q
             .eq("entityType", args.entityType)
-            .eq("entityId", args.entityId)
+            .eq("entityId", entityId)
             .eq("activityType", args.activityType)
         )
         .collect();
@@ -123,7 +215,7 @@ export const upsert = mutation({
     const researchLogId = await ctx.db.insert("researchLog", {
       vaultOwnerId,
       entityType: args.entityType,
-      entityId: args.entityId,
+      entityId,
       activityType: args.activityType,
       status: args.status,
       summary: args.summary,
@@ -139,16 +231,28 @@ export const upsert = mutation({
   },
 });
 
-export const listForEntity = query({
-  args: {
-    vaultOwnerId: v.string(),
-    entityType: entityTypeValidator,
-    entityId: v.optional(entityIdValidator),
-    activityType: v.optional(activityTypeValidator),
-    status: v.optional(statusValidator),
-  },
+const listForEntityArgs = {
+  vaultOwnerId: v.string(),
+  entityType: entityTypeValidator,
+  entityId: v.optional(entityIdValidator),
+  activityType: v.optional(activityTypeValidator),
+  status: v.optional(statusValidator),
+};
+
+export const listForEntityInternal = internalQuery({
+  args: listForEntityArgs,
   handler: async (ctx, args) => {
-    const vaultOwnerId = normalizeVaultOwnerId(args.vaultOwnerId);
+    const entityId =
+      args.entityId === undefined
+        ? undefined
+        : await resolveOwnedResearchEntity(
+            ctx,
+            args.vaultOwnerId,
+            args.entityType,
+            String(args.entityId),
+          );
+    if (args.entityId !== undefined && entityId === null) return [];
+
     let query = ctx.db
       .query("researchLog")
       .withIndex("by_entity", (q) => q.eq("entityType", args.entityType));
@@ -163,12 +267,28 @@ export const listForEntity = query({
       query = query.filter((q) => q.eq(q.field("status"), args.status));
     }
 
-    if (args.entityId !== undefined) {
-      query = query.filter((q) => q.eq(q.field("entityId"), args.entityId));
+    if (entityId !== undefined) {
+      query = query.filter((q) => q.eq(q.field("entityId"), entityId));
     } else {
       query = query.filter((q) => q.eq(q.field("entityId"), undefined));
     }
 
-    return filterByVaultOwner(await query.collect(), vaultOwnerId);
+    return filterByVaultOwner(await query.collect(), args.vaultOwnerId);
+  },
+});
+
+export const listForEntity = action({
+  args: listForEntityArgs,
+  handler: async (ctx, args): Promise<Doc<"researchLog">[]> => {
+    const decision = await authorizeTenantAction(
+      ctx,
+      "researchLog.listForEntity",
+      args.vaultOwnerId,
+      (entry) => ctx.runMutation(internal.trustBoundary.recordShadowDenial, entry),
+    );
+    return ctx.runQuery(internal.researchLog.listForEntityInternal, {
+      ...args,
+      vaultOwnerId: decision.owner,
+    });
   },
 });

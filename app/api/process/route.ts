@@ -2,13 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { chatCompletion } from "@/lib/ai/openrouter";
 import { getAiPrivacyDisclosure, type AiRedactionMode } from "@/lib/ai/privacy";
 import {
+  hasVerifiedOriginalReviewAuthority,
+  scanAiEgressForLivingPersonPII,
+} from "@/lib/ai/redaction";
+import {
   ALLOWED_MODELS,
   DEFAULT_MODEL,
   MAX_COMPLETION_TOKENS,
   MAX_PROCESS_PAYLOAD_BYTES,
 } from "@/lib/ai/types";
 import { api } from "@/convex/_generated/api";
-import { getConvexClient, isConvexConfigured } from "@/lib/convex/server";
+import { getAuthedConvexClient, isConvexConfigured } from "@/lib/convex/server";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
 // GEN-89-RL: per-vaultOwner rate limiting for the external-AI spend vector.
@@ -27,6 +31,17 @@ const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
 const RATE_LIMIT_DEFAULT = 30; // client supplied their own API key
 const RATE_LIMIT_SERVER_KEY = 10; // falling back to server-funded OPENROUTER_API_KEY
 const RATE_LIMIT_ACTION = "process";
+
+function aiSpendGateUnavailable() {
+  return NextResponse.json(
+    {
+      error: "AI request authorization unavailable",
+      details:
+        "The authenticated AI spend gate is unavailable. Sign in and try again after the vault backend recovers.",
+    },
+    { status: 503 },
+  );
+}
 
 type ProcessRequestBody = {
   prompt?: unknown;
@@ -55,26 +70,78 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (data !== undefined && body.privacyAcknowledged !== true) {
+    if (body.privacyAcknowledged !== true) {
       return NextResponse.json(
         {
           error: "AI privacy acknowledgement required",
-          details: "External AI requests with vault data must declare the redaction mode and explicit review acknowledgement.",
+          details:
+            "External AI requests must declare the redaction mode and explicit review acknowledgement.",
         },
         { status: 400 }
       );
     }
-    if (data !== undefined && !isRedactionMode(body.redactionMode)) {
+    if (!isRedactionMode(body.redactionMode)) {
       return NextResponse.json(
         {
           error: "AI redaction mode required",
-          details: "External AI requests with vault data must declare whether the payload is redacted or human-reviewed original data.",
+          details:
+            "External AI requests must declare whether the outbound content is redacted, human-reviewed original data, or contains no human-subject data.",
         },
         { status: 400 }
       );
     }
 
-    const redactionMode = isRedactionMode(body.redactionMode) ? body.redactionMode : "not_applicable";
+    const redactionMode = body.redactionMode;
+    const serializedData =
+      typeof data === "string"
+        ? data
+        : data !== undefined
+          ? JSON.stringify(data, null, 2)
+          : "";
+    const resolvedSystemPrompt =
+      typeof systemPrompt === "string" && systemPrompt.trim()
+        ? systemPrompt
+        : "You are a helpful research assistant.";
+
+    // GEN-88 §C: refuse unsafe outbound content before rate-limit mutation or
+    // provider work. Source Docs embeds its evidence in `prompt`, while Story
+    // Writer uses `data`, so the exact provider-bound system/prompt/data text
+    // must be evaluated together. `not_applicable` is also scanned: a positive
+    // PII signal disproves the claim that no human-subject privacy mode applies.
+    if (redactionMode === "redacted" || redactionMode === "not_applicable") {
+      const egressScan = scanAiEgressForLivingPersonPII({
+        prompt,
+        serializedData,
+        systemPrompt: resolvedSystemPrompt,
+      });
+      if (egressScan.hasPII) {
+        return NextResponse.json(
+          {
+            error: "Redaction check failed",
+            details:
+              "The outbound request still contains living-person or PII indicators. Remove them or send as reviewed original data.",
+          },
+          { status: 422 },
+        );
+      }
+    } else {
+      let access = null;
+      try {
+        access = await getVaultAccessContext();
+      } catch {
+        access = null;
+      }
+      if (!hasVerifiedOriginalReviewAuthority(access)) {
+        return NextResponse.json(
+          {
+            error: "Human review verification required",
+            details:
+              "Sending original (unredacted) human-subject data requires a signed-in vault owner. Sign in, or send redacted data instead.",
+          },
+          { status: 403 },
+        );
+      }
+    }
 
     // Determine API Key: Client provided > Server Env > Fail
     const usingClientKey = typeof apiKey === "string" && apiKey.trim().length > 0;
@@ -87,38 +154,65 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // GEN-89-RL: throttle per vaultOwner BEFORE spending any tokens. Stricter
-    // cap when the request is funded by the server OPENROUTER_API_KEY. Best
-    // effort — if Convex isn't configured (e.g. local-only mode) we skip the
-    // limiter rather than block the request.
-    if (isConvexConfigured()) {
-      try {
-        const { vaultOwnerId } = await getVaultAccessContext();
-        const limit = usingClientKey ? RATE_LIMIT_DEFAULT : RATE_LIMIT_SERVER_KEY;
-        const verdict = await getConvexClient().mutation(
-          api.rateLimits.checkAndIncrementRateLimit,
+    // GEN-89-RL: external-AI spend is fail-closed. Privacy scanning above
+    // deliberately remains first, but provider work cannot begin unless a real
+    // signed-in vault owner successfully authenticates to Convex and consumes
+    // quota. Shadow-mode fallbacks are useful for ordinary vault rollout
+    // observation; they are never sufficient authority for paid AI egress.
+    if (!isConvexConfigured()) {
+      return aiSpendGateUnavailable();
+    }
+
+    let vaultOwnerId: string;
+    try {
+      const access = await getVaultAccessContext();
+      if (
+        access.mode !== "user" ||
+        !access.userId ||
+        access.vaultOwnerId !== access.userId
+      ) {
+        return NextResponse.json(
           {
-            vaultOwnerId,
-            action: RATE_LIMIT_ACTION,
-            limit,
-            windowMs: RATE_LIMIT_WINDOW_MS,
-          }
+            error: "Authentication required",
+            details: "AI requests require a signed-in vault owner.",
+          },
+          { status: 401 },
         );
-        if (!verdict.allowed) {
-          const retryAfterSec = Math.ceil(verdict.retryAfterMs / 1000);
-          return NextResponse.json(
-            {
-              error: "Rate limit exceeded",
-              details: `Too many AI requests for this vault. Try again in ${retryAfterSec}s.`,
-              retryAfterMs: verdict.retryAfterMs,
-            },
-            { status: 429, headers: { "Retry-After": String(retryAfterSec) } }
-          );
-        }
-      } catch {
-        // Limiter unavailable (Convex transient error). Fail open: do not block
-        // legitimate AI requests on a counter outage.
       }
+      vaultOwnerId = access.vaultOwnerId;
+    } catch {
+      return NextResponse.json(
+        {
+          error: "Authentication required",
+          details: "AI requests require a signed-in vault owner.",
+        },
+        { status: 401 },
+      );
+    }
+
+    try {
+      const limit = usingClientKey ? RATE_LIMIT_DEFAULT : RATE_LIMIT_SERVER_KEY;
+      const verdict = await (
+        await getAuthedConvexClient({ requireAuthentication: true })
+      ).mutation(api.rateLimits.checkAndIncrementRateLimit, {
+        vaultOwnerId,
+        action: RATE_LIMIT_ACTION,
+        limit,
+        windowMs: RATE_LIMIT_WINDOW_MS,
+      });
+      if (!verdict.allowed) {
+        const retryAfterSec = Math.ceil(verdict.retryAfterMs / 1000);
+        return NextResponse.json(
+          {
+            error: "Rate limit exceeded",
+            details: `Too many AI requests for this vault. Try again in ${retryAfterSec}s.`,
+            retryAfterMs: verdict.retryAfterMs,
+          },
+          { status: 429, headers: { "Retry-After": String(retryAfterSec) } },
+        );
+      }
+    } catch {
+      return aiSpendGateUnavailable();
     }
 
     // GEN-89: reject client-supplied models that are not on the allowlist.
@@ -136,9 +230,6 @@ export async function POST(request: NextRequest) {
       }
       resolvedModel = model;
     }
-
-    const serializedData =
-      typeof data === "string" ? data : data ? JSON.stringify(data, null, 2) : "";
 
     // GEN-89: cap the combined prompt+data payload size BEFORE building the
     // full prompt, measured in UTF-8 bytes (matches over-the-wire size).
@@ -173,10 +264,7 @@ export async function POST(request: NextRequest) {
       messages: [
         {
           role: "system",
-          content:
-            typeof systemPrompt === "string" && systemPrompt.trim()
-              ? systemPrompt
-              : "You are a helpful research assistant.",
+          content: resolvedSystemPrompt,
         },
         { role: "user", content: fullPrompt },
       ],

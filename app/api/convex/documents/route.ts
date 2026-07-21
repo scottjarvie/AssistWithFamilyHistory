@@ -5,11 +5,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
+import { getAuthedConvexClient, isConvexConfigured } from "@/lib/convex/server";
 import { getVaultAccessContext } from "@/lib/vault/server";
-
-const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
 
 const isDocumentType = (value: string | null): value is "PS" | "CST" =>
   value === "PS" || value === "CST";
@@ -35,7 +33,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  if (!convexUrl) {
+  if (!isConvexConfigured()) {
     return NextResponse.json(
       {
         success: false,
@@ -49,11 +47,11 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const client = new ConvexHttpClient(convexUrl);
+    const client = await getAuthedConvexClient();
     const { vaultOwnerId } = await getVaultAccessContext();
 
     if (type) {
-      const document = await client.query(api.documents.getDocument, {
+      const document = await client.action(api.documents.getDocument, {
         vaultOwnerId,
         personId,
         type,
@@ -65,7 +63,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const documents = await client.query(api.documents.getDocumentsByPerson, {
+    const documents = await client.action(api.documents.getDocumentsByPerson, {
       vaultOwnerId,
       personId,
     });

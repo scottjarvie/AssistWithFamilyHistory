@@ -39,7 +39,7 @@ export default async function PlaceWorkspacePage({ params }: PageProps) {
   let workspace;
 
   try {
-    workspace = await client.query(api.vault.getPlaceWorkspace, {
+    workspace = await client.action(api.vaultReads.getPlaceWorkspace, {
       vaultOwnerId,
       placeId: placeId as never,
     });
