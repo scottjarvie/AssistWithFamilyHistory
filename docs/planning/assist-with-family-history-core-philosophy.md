@@ -33,7 +33,7 @@ The higher purpose is connection: not only knowing that something happened,
 but understanding the human life and larger world the evidence can responsibly
 help reveal.
 
-## Think of it as…
+## Practical picture: think of it as…
 
 Not merely a family tree, record cabinet, private archive, or text generator.
 Think of it as several kinds of help gathered around the same research trail:
@@ -62,6 +62,11 @@ Think of it as several kinds of help gathered around the same research trail:
   let readers or reviewers follow connections across generations and trace
   important details back to their sources and uncertainty.
 
+Its distinctive value is the connected trail between evidence, uncertainty,
+context, relationships, questions, and story. A family tree may be one useful
+view of that trail, but it is not the product's limit or its measure of
+understanding.
+
 This is prepared explanatory structure, not the pending owner-authored
 front-door language. The facets are grounded in the enduring product, but they
 do not claim that every corresponding view, visualization, import, AI
@@ -69,7 +74,40 @@ connection, or publishing path is currently available. The dated
 [capability ledger](#dated-repository-capability-ledger) states what the
 checked-out repository can honestly support.
 
-## The Assist family model
+## Product scope and non-goals
+
+Family History exists to help people collect, connect, and understand evidence
+so they and their AI can tell meaningful, source-aware stories. Its subject can
+be a person, family line, relationship, place, building, community, culture,
+religion, event, or time period—not only a pedigree position.
+
+The scope is deliberately broader than a genealogy database and narrower than
+an autonomous genealogy service. It preserves the research trail and makes it
+usable for understanding and storytelling; it does not turn every clue into a
+fact, every family memory into evidence, or every generated passage into a
+true story.
+
+At the human product level, Family History must:
+
+- keep sources, claims, uncertainty, context, and stories connected without
+  making them indistinguishable;
+- let people see, question, and correct the understanding as evidence or
+  interpretation changes;
+- preserve flexible relationships and historical context that help explain a
+  life without treating proximity or context as proof of personal experience;
+- keep living-person and private family material inside a quiet,
+  user-controlled boundary; and
+- require sharing, collaboration, and publication to be explicit, bounded,
+  reviewable, revocable, and auditable rather than automatic.
+
+It is not a promise of complete genealogy, universal archival access,
+unattended research, automatic record import, universal AI compatibility,
+infallible conclusions, or automatic public storytelling. The detailed
+[capability ledger](#dated-repository-capability-ledger) and
+[builder trust boundaries](#detailed-trust-boundaries-for-builders) state the
+current implementation boundary without redefining this purpose.
+
+## The durable Assist family and trust model
 
 The research-to-story workspace becomes durable help through a clear division
 of roles. An Assist product is not the AI. The person chooses the AI that helps
@@ -112,95 +150,49 @@ every AI connection, research tool, visualization, sharing mode, or story
 workflow is currently available. The capability ledger below keeps that
 product truth explicit.
 
-## How your AI and queue work
+## The research-to-story loop
 
-Family History is designed to work alongside the AI environment a person
-chooses, not replace it. A person may continue working in ChatGPT, Codex,
-Claude, OpenClaude, Gemini, Hermes, or a future compatible system. These names
-are examples of user choice—not a preferred vendor list or a claim that direct
-integration with each client is currently shipped.
+Family History should preserve the whole arc from first clue to responsible
+story, not only the final family-tree value.
 
-The enduring split is:
+1. **Begin with an authorized question or source.** A person or authorized AI
+   names the scope, reason for the work, source, known constraints, and next
+   useful question.
+2. **Retrieve the connected context.** Your AI receives the permitted people,
+   relationships, places, dates, sources, claims, notes, historical context,
+   open questions, and prior work needed for this step.
+3. **Gather without flattening.** Records, documents, media, memories, family
+   lore, observations, and outside research enter with their original form,
+   provenance, privacy, rights, and review state intact.
+4. **Extract and connect cautiously.** Your AI may propose identities, name
+   variants, events, relationships, places, topics, claims, contradictions,
+   and historical context. Proposals remain distinct from accepted
+   conclusions.
+5. **Research the gaps.** Questions and weak points become durable work:
+   another record to seek, a place to investigate, a relationship to test, a
+   conflict to resolve, or a context pack to build.
+6. **Review according to authority and risk.** Routine permitted saves may
+   follow the user's operating preference. Identity merges, disputed claims,
+   living-person material, and publication require the applicable stronger
+   checkpoints.
+7. **Build the story from connected evidence.** A draft may combine accepted
+   claims, source-backed detail, and clearly labeled historical context while
+   keeping uncertainty visible.
+8. **Trace, correct, and continue.** The person can move from a story detail
+   back to its evidence, revise the understanding without erasing the research
+   trail, and resume later with the useful state intact.
 
-- **Your chosen AI remains the place for conversation, reasoning, research,
-  synthesis, and judgment.**
-- **Family History gives that work durable domain memory, scoped records and
-  tools, a resumable queue, and a visual place for you to understand progress,
-  evidence, uncertainty, and results.**
-- **You decide which AI may use which Family History scope and operation.**
-  Neither an AI client's general capability nor a queue assignment grants
-  Family History authority.
+The loop can produce a story about a person, family line, place, building,
+community, culture, religion, event, or time period. A story is not always the
+end: it can reveal a weak link, invite correction, or generate the next
+research question.
 
-Work can begin in either direction.
-
-### Begin in your preferred AI environment
-
-A person and their AI may begin with a conversation, document, research
-question, or outside investigation in the AI environment they already use.
-Through an available manual handoff or a separately shipped, authorized
-connection, they can retrieve the relevant Family History context, work with
-it, and return selected sources, notes, claims, questions, or story material to
-the permitted scope.
-
-Family History then preserves the useful result beyond that conversation. The
-person can inspect it visually, see where it came from, correct it, connect it
-to related people and evidence, and decide what should happen next.
-
-### Begin in Family History
-
-A person may instead begin in the site by defining work for later: the family,
-person, source, story, collection, or research project in scope; the question
-or requested outcome; relevant evidence and context; priority; constraints;
-and the authority available to the chosen AI.
-
-That instruction can wait in the queue until the person or an authorized,
-compatible AI path picks it up. The result returns to the same durable context
-with its acting identity, evidence, state, history, and next step intact. This
-direction supports asynchronous work without requiring the person to keep one
-chat open or reconstruct the assignment later.
-
-### A queue is continuity, not a todo list
-
-A useful queue item preserves:
-
-- the exact scope and requested outcome;
-- the questions, assumptions, and desired level of proof;
-- priority and why the work matters now;
-- relevant evidence, context, and prior attempts;
-- state such as active, waiting, blocked, needs review, or done;
-- the responsible person or AI and the operations actually authorized;
-- blockers, dependencies, and what would unblock them;
-- the exact next step or checkpoint; and
-- result links, provenance, decisions, and history.
-
-That continuity changes the work. One AI session can stop and a later session
-or compatible client can understand what has already happened, what remains
-uncertain, and the smallest useful action to take next. The person can see
-progress and results without treating the queue as permission or trusting an
-opaque “working” state.
-
-> **Capability truth:** The current repository has research tasks, research
-> checks and logs, an operations queue, compact handoff export, and selected
-> quality and audit foundations. It does not yet prove that arbitrary external
-> AI clients can authenticate, claim work, maintain leases or checkpoints,
-> recover stale work, and return results end to end. Those broader client and
-> multi-AI paths remain **In design** until implemented and verified.
-
-## How to use this document
-
-Read the working identity and Assist family model first. For focused work, use
-this map:
-
-| Reader | Start with | Questions answered |
-|---|---|---|
-| Product owners | [One-sentence identity](#one-sentence-identity), [Think of it as…](#think-of-it-as), [Assist family model](#the-assist-family-model), [AI and queue model](#how-your-ai-and-queue-work), [Shared authority](#user-owned-data-and-shared-authority), [Collaboration and sharing](#collaboration-and-bounded-sharing), and [Trust boundaries](#trust-boundaries-and-non-goals) | What Family History helps with, why story matters, how work moves between the site and a chosen AI, who owns the work, how access may be shared, and what the product must not imply |
-| Implementers | [AI and queue model](#how-your-ai-and-queue-work), [Research-to-story loop](#the-research-to-story-loop), [Information model](#durable-information-model), [Provenance](#provenance-uncertainty-and-changing-understanding), and [Maintenance](#maintenance-and-claim-verification) | What must persist, how work begins or resumes, which distinctions must survive, and what needs proof |
-| AI and integration builders | [AI and queue model](#how-your-ai-and-queue-work), [Shared authority](#user-owned-data-and-shared-authority), [Questions and queues](#questions-queues-and-unfinished-work), and [Trust boundaries](#trust-boundaries-and-non-goals) | Where the chosen AI works, which Family History operations may be used, what a durable handoff contains, and where the site's responsibility stops |
-| Writers and designers | [One-sentence identity](#one-sentence-identity), [Think of it as…](#think-of-it-as), [Storytelling principles](#storytelling-principles), [Capability truth](#capability-truth), [Language rules](#language-rules), and [Homepage implications](#public-homepage-and-future-shell-implications) | How to explain the product simply, what may be claimed now, how to describe evidence and uncertainty, and how the philosophy should feel |
-
-Anyone publishing a capability claim must read both
-[Capability truth](#capability-truth) and
-[Maintenance and claim verification](#maintenance-and-claim-verification).
+The current repository implements valuable parts of this loop: user-mediated
+FamilySearch capture, preview and import, structured vault records, candidate
+source facts, context packs, research tasks and checks, an operations handoff
+queue, Story Writer drafts, Story Studio review, and guarded publication.
+It does not yet implement the entire generalized loop across every subject,
+source, AI, authority scope, and visualization.
 
 ## User-owned data and shared authority
 
@@ -252,50 +244,6 @@ guarded story roles, human-review gates, and selected activity history. It does
 **not** yet prove a complete per-person, per-AI, per-record operation matrix or
 a working external-AI credential-to-tool path. Those remain in design until
 implemented and verified end to end.
-
-## The research-to-story loop
-
-Family History should preserve the whole arc from first clue to responsible
-story, not only the final family-tree value.
-
-1. **Begin with an authorized question or source.** A person or authorized AI
-   names the scope, reason for the work, source, known constraints, and next
-   useful question.
-2. **Retrieve the connected context.** Your AI receives the permitted people,
-   relationships, places, dates, sources, claims, notes, historical context,
-   open questions, and prior work needed for this step.
-3. **Gather without flattening.** Records, documents, media, memories, family
-   lore, observations, and outside research enter with their original form,
-   provenance, privacy, rights, and review state intact.
-4. **Extract and connect cautiously.** Your AI may propose identities, name
-   variants, events, relationships, places, topics, claims, contradictions,
-   and historical context. Proposals remain distinct from accepted
-   conclusions.
-5. **Research the gaps.** Questions and weak points become durable work:
-   another record to seek, a place to investigate, a relationship to test, a
-   conflict to resolve, or a context pack to build.
-6. **Review according to authority and risk.** Routine permitted saves may
-   follow the user's operating preference. Identity merges, disputed claims,
-   living-person material, and publication require the applicable stronger
-   checkpoints.
-7. **Build the story from connected evidence.** A draft may combine accepted
-   claims, source-backed detail, and clearly labeled historical context while
-   keeping uncertainty visible.
-8. **Trace, correct, and continue.** The person can move from a story detail
-   back to its evidence, revise the understanding without erasing the research
-   trail, and resume later with the useful state intact.
-
-The loop can produce a story about a person, family line, place, building,
-community, culture, religion, event, or time period. A story is not always the
-end: it can reveal a weak link, invite correction, or generate the next
-research question.
-
-The current repository implements valuable parts of this loop: user-mediated
-FamilySearch capture, preview and import, structured vault records, candidate
-source facts, context packs, research tasks and checks, an operations handoff
-queue, Story Writer drafts, Story Studio review, and guarded publication.
-It does not yet implement the entire generalized loop across every subject,
-source, AI, authority scope, and visualization.
 
 ## Durable information model
 
@@ -484,36 +432,32 @@ AI-generated narratives should identify their generated or edited status. The
 goal is a compelling, source-aware story that teaches the reader what is known
 and lets uncertainty breathe—not a confident fiction wearing citations.
 
-## Questions, queues, and unfinished work
+## Living people and private family material
 
-The earlier [AI and queue model](#how-your-ai-and-queue-work) explains the two
-directions of work. This section defines the durable research contract behind
-that handoff.
+Privacy is a quiet boundary, not the public identity of Family History.
+Historical research often uses public records, public archives, and people who
+are long deceased. The public promise should lead with evidence, connection,
+understanding, and story.
 
-Questions belong to the person, relationship, source, claim, place, event,
-story, collection, or research project they concern. They can remain open
-without blocking unrelated work.
+Still, living people and private family material require deliberate control.
+Private notes, correspondence, recent addresses, contributor details,
+restricted media, sensitive relationships, oral histories, and unreviewed
+family claims should remain user-controlled.
 
-The queue is the durable front door for new instructions and resumable work:
-records to seek, captures to review, claims to compare, provisional identities
-to resolve, context to research, stories to revise, and publication checks to
-complete.
+Private, AI-eligible, and public are separate states:
 
-A useful queue item records:
+- something may be visible to its owner but not permitted for AI use;
+- something may be permitted for a chosen AI but not for named collaborators
+  or share links;
+- something may be available to a named collaborator but excluded from every
+  bounded link and public story;
+- something may be included in a private bounded view but not publicly
+  publishable; and
+- public historical context does not make every linked family detail public.
 
-- scope and requested outcome;
-- responsible person or AI;
-- source or evidence references;
-- status such as active, waiting, blocked, needs review, or done;
-- questions and assumptions;
-- next action and checkpoint;
-- result links and history; and
-- what authority the assigned actor actually has.
-
-The queue coordinates work; it does not grant authority or turn every question
-into an approval gate. Work may pause for a person, another AI, a provider, an
-archive, or better evidence. The next session should be able to resume without
-reconstructing the whole conversation.
+Sharing and publishing are explicit, reviewable state changes—never automatic
+side effects of import, AI use, a “published” suggestion, or connection to
+another Assist product.
 
 ## Collaboration and bounded sharing
 
@@ -565,33 +509,6 @@ the relevant person, scope, operation, and audience access after review.
 Inherited relationships, public historical context, or an already-public story
 must never silently broaden that boundary.
 
-## Living people and private family material
-
-Privacy is a quiet boundary, not the public identity of Family History.
-Historical research often uses public records, public archives, and people who
-are long deceased. The public promise should lead with evidence, connection,
-understanding, and story.
-
-Still, living people and private family material require deliberate control.
-Private notes, correspondence, recent addresses, contributor details,
-restricted media, sensitive relationships, oral histories, and unreviewed
-family claims should remain user-controlled.
-
-Private, AI-eligible, and public are separate states:
-
-- something may be visible to its owner but not permitted for AI use;
-- something may be permitted for a chosen AI but not for named collaborators
-  or share links;
-- something may be available to a named collaborator but excluded from every
-  bounded link and public story;
-- something may be included in a private bounded view but not publicly
-  publishable; and
-- public historical context does not make every linked family detail public.
-
-Sharing and publishing are explicit, reviewable state changes—never automatic
-side effects of import, AI use, a “published” suggestion, or connection to
-another Assist product.
-
 ## Human visibility and control
 
 A person should be able to answer these questions without learning database or
@@ -620,6 +537,154 @@ adding a low-risk research note.
 Family History should remain useful without an AI. A person must be able to
 inspect, correct, organize, research, write, and control their information
 through human-complete workflows.
+
+## How to use this document
+
+Read the identity, practical picture, product scope, durable family model, and
+research-to-story loop first. They are the philosophical heart. The later
+builder reference translates that philosophy into operating contracts and
+dated capability truth without replacing it. For focused work, use this map:
+
+| Reader | Start with | Questions answered |
+|---|---|---|
+| Product owners | [One-sentence identity](#one-sentence-identity), [Practical picture](#practical-picture-think-of-it-as), [Product scope](#product-scope-and-non-goals), [Durable family model](#the-durable-assist-family-and-trust-model), [Research-to-story loop](#the-research-to-story-loop), and [Shared authority](#user-owned-data-and-shared-authority) | What Family History helps with, why story matters, who owns the work, and what the product must not become |
+| Implementers | [Builder reference](#builder-reference-operating-model-and-capability-truth), [AI and queue model](#how-your-ai-and-queue-work), [Information model](#durable-information-model), [Provenance](#provenance-uncertainty-and-changing-understanding), and [Maintenance](#maintenance-and-claim-verification) | What must persist, how work begins or resumes, which distinctions must survive, and what needs proof |
+| AI and integration builders | [Builder reference](#builder-reference-operating-model-and-capability-truth), [AI and queue model](#how-your-ai-and-queue-work), [Shared authority](#user-owned-data-and-shared-authority), [Questions and queues](#questions-queues-and-unfinished-work), and [Detailed trust boundaries](#detailed-trust-boundaries-for-builders) | Where the chosen AI works, which Family History operations may be used, what a durable handoff contains, and where the site's responsibility stops |
+| Writers and designers | [One-sentence identity](#one-sentence-identity), [Practical picture](#practical-picture-think-of-it-as), [Product scope](#product-scope-and-non-goals), [Storytelling principles](#storytelling-principles), [Capability truth](#capability-truth), [Language rules](#language-rules), and [Homepage implications](#public-homepage-and-future-shell-implications) | How to explain the product simply, what may be claimed now, how to describe evidence and uncertainty, and how the philosophy should feel |
+
+Anyone publishing a capability claim must read both
+[Capability truth](#capability-truth) and
+[Maintenance and claim verification](#maintenance-and-claim-verification).
+
+## Builder reference: operating model and capability truth
+
+The sections above define the human promise, durable trust model, and
+research-to-story philosophy. The sections below are the secondary reference
+for people and AIs making product, design, engineering, integration, and
+feature decisions.
+
+Use this builder reference to preserve five implementation contracts:
+
+1. the chosen AI works alongside Family History rather than being replaced by
+   it;
+2. queue work carries scope, evidence, authority, state, blockers, and the
+   exact next step across sessions;
+3. observing or retrieving remains distinct from changing, deleting,
+   promoting, sharing, or publishing;
+4. implementation claims stay labeled **Current**, **In design**, or
+   **Later**; and
+5. repository foundations, deployed behavior, public proof, and authenticated
+   operational proof remain distinct.
+
+This boundary makes the document easier to absorb; it does not make the
+builder material optional. Any design or feature choice that touches AI work,
+authority, provenance, queues, sharing, publication, or a capability claim
+must follow the relevant sections below.
+
+## How your AI and queue work
+
+Family History is designed to work alongside the AI environment a person
+chooses, not replace it. A person may continue working in ChatGPT, Codex,
+Claude, OpenClaude, Gemini, Hermes, or a future compatible system. These names
+are examples of user choice—not a preferred vendor list or a claim that direct
+integration with each client is currently shipped.
+
+The enduring split is:
+
+- **Your chosen AI remains the place for conversation, reasoning, research,
+  synthesis, and judgment.**
+- **Family History gives that work durable domain memory, scoped records and
+  tools, a resumable queue, and a visual place for you to understand progress,
+  evidence, uncertainty, and results.**
+- **You decide which AI may use which Family History scope and operation.**
+  Neither an AI client's general capability nor a queue assignment grants
+  Family History authority.
+
+Work can begin in either direction.
+
+### Begin in your preferred AI environment
+
+A person and their AI may begin with a conversation, document, research
+question, or outside investigation in the AI environment they already use.
+Through an available manual handoff or a separately shipped, authorized
+connection, they can retrieve the relevant Family History context, work with
+it, and return selected sources, notes, claims, questions, or story material to
+the permitted scope.
+
+Family History then preserves the useful result beyond that conversation. The
+person can inspect it visually, see where it came from, correct it, connect it
+to related people and evidence, and decide what should happen next.
+
+### Begin in Family History
+
+A person may instead begin in the site by defining work for later: the family,
+person, source, story, collection, or research project in scope; the question
+or requested outcome; relevant evidence and context; priority; constraints;
+and the authority available to the chosen AI.
+
+That instruction can wait in the queue until the person or an authorized,
+compatible AI path picks it up. The result returns to the same durable context
+with its acting identity, evidence, state, history, and next step intact. This
+direction supports asynchronous work without requiring the person to keep one
+chat open or reconstruct the assignment later.
+
+### A queue is continuity, not a todo list
+
+A useful queue item preserves:
+
+- the exact scope and requested outcome;
+- the questions, assumptions, and desired level of proof;
+- priority and why the work matters now;
+- relevant evidence, context, and prior attempts;
+- state such as active, waiting, blocked, needs review, or done;
+- the responsible person or AI and the operations actually authorized;
+- blockers, dependencies, and what would unblock them;
+- the exact next step or checkpoint; and
+- result links, provenance, decisions, and history.
+
+That continuity changes the work. One AI session can stop and a later session
+or compatible client can understand what has already happened, what remains
+uncertain, and the smallest useful action to take next. The person can see
+progress and results without treating the queue as permission or trusting an
+opaque “working” state.
+
+> **Capability truth:** The current repository has research tasks, research
+> checks and logs, an operations queue, compact handoff export, and selected
+> quality and audit foundations. It does not yet prove that arbitrary external
+> AI clients can authenticate, claim work, maintain leases or checkpoints,
+> recover stale work, and return results end to end. Those broader client and
+> multi-AI paths remain **In design** until implemented and verified.
+
+## Questions, queues, and unfinished work
+
+The earlier [AI and queue model](#how-your-ai-and-queue-work) explains the two
+directions of work. This section defines the durable research contract behind
+that handoff.
+
+Questions belong to the person, relationship, source, claim, place, event,
+story, collection, or research project they concern. They can remain open
+without blocking unrelated work.
+
+The queue is the durable front door for new instructions and resumable work:
+records to seek, captures to review, claims to compare, provisional identities
+to resolve, context to research, stories to revise, and publication checks to
+complete.
+
+A useful queue item records:
+
+- scope and requested outcome;
+- responsible person or AI;
+- source or evidence references;
+- status such as active, waiting, blocked, needs review, or done;
+- questions and assumptions;
+- next action and checkpoint;
+- result links and history; and
+- what authority the assigned actor actually has.
+
+The queue coordinates work; it does not grant authority or turn every question
+into an approval gate. Work may pause for a person, another AI, a provider, an
+archive, or better evidence. The next session should be able to resume without
+reconstructing the whole conversation.
 
 ## Capability truth
 
@@ -692,7 +757,7 @@ them or a planning artifact names them:
 - owner-vault export and coordinated account deletion; or
 - cross-product Assist data retrieval, navigation, or publication.
 
-## Trust boundaries and non-goals
+## Detailed trust boundaries for builders
 
 Assist With Family History does not:
 
