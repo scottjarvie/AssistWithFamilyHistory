@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <meta name="source-markdown" content="docs/planning/assist-with-family-history-core-philosophy.md">
-  <meta name="source-sha256" content="055100302ad7227be44343f5f7815810a70ac752bce6fdf2a0c1baace421c10c">
+  <meta name="source-sha256" content="4507c3997f5595def86e2daa2b5639c1933a8ce3eb66eeff6065f2982ab02222">
   <title>Assist With Family History Core Philosophy</title>
   <link rel="icon" href="data:,">
   <style>
@@ -203,6 +203,11 @@
       color: var(--moss); font: 800 .7rem/1.3 var(--sans);
       letter-spacing: .14em; text-transform: uppercase;
     }
+    .marketing-takeaways {
+      border-left-color: var(--moss) !important;
+      background: var(--moss-soft) !important;
+    }
+    .marketing-takeaways ul { margin-bottom: .9rem; }
     #storytelling-principles + p { font-size: 1.13rem; color: var(--soft); }
     #capability-truth ~ blockquote { border-left-color: var(--future); background: var(--gold-soft); }
     #living-people-and-private-family-material { border-top-color: var(--moss); }
@@ -259,7 +264,7 @@
   <nav class="mobile-nav" aria-label="Compact section navigation">
     <details>
       <summary>Reading map and sections</summary>
-      <ol><li><a href="#one-sentence-identity">One-sentence identity</a></li><li><a href="#practical-picture-think-of-it-as">Practical picture</a></li><li><a href="#product-scope-and-non-goals">Scope and non-goals</a></li><li><a href="#the-durable-assist-family-and-trust-model">Durable family model</a></li><li><a href="#the-research-to-story-loop">Research-to-story loop</a></li><li><a href="#user-owned-data-and-shared-authority">Shared authority</a></li><li><a href="#durable-information-model">Information model</a></li><li><a href="#provenance-uncertainty-and-changing-understanding">Provenance and uncertainty</a></li><li><a href="#relationships-and-historical-context">Relationships and context</a></li><li><a href="#storytelling-principles">Storytelling principles</a></li><li><a href="#living-people-and-private-family-material">Living and private material</a></li><li><a href="#collaboration-and-bounded-sharing">Collaboration and sharing</a></li><li><a href="#human-visibility-and-control">Human visibility</a></li><li><a href="#how-to-use-this-document">Reading map</a></li><li><a href="#builder-reference-operating-model-and-capability-truth">Builder reference</a></li><li><a href="#how-your-ai-and-queue-work">AI and queue model</a></li><li><a href="#questions-queues-and-unfinished-work">Questions and queues</a></li><li><a href="#capability-truth">Capability truth</a></li><li><a href="#detailed-trust-boundaries-for-builders">Builder trust boundaries</a></li><li><a href="#language-rules">Language rules</a></li><li><a href="#public-homepage-and-future-shell-implications">Homepage and shell</a></li><li><a href="#maintenance-and-claim-verification">Maintenance</a></li><li><a href="#evidence-handoff">Evidence handoff</a></li><li><a href="#documentation-package-verification">Verification</a></li></ol>
+      <ol><li><a href="#one-sentence-identity">One-sentence identity</a></li><li><a href="#practical-picture-think-of-it-as">Practical picture</a></li><li><a href="#why-not-just-ask-your-ai-to-build-a-quick-feature">Why not a quick feature?</a></li><li><a href="#why-this-instead-of-a-conventional-website">Why not a conventional site?</a></li><li><a href="#product-scope-and-non-goals">Scope and non-goals</a></li><li><a href="#the-durable-assist-family-and-trust-model">Durable family model</a></li><li><a href="#the-research-to-story-loop">Research-to-story loop</a></li><li><a href="#user-owned-data-and-shared-authority">Shared authority</a></li><li><a href="#durable-information-model">Information model</a></li><li><a href="#provenance-uncertainty-and-changing-understanding">Provenance and uncertainty</a></li><li><a href="#relationships-and-historical-context">Relationships and context</a></li><li><a href="#storytelling-principles">Storytelling principles</a></li><li><a href="#living-people-and-private-family-material">Living and private material</a></li><li><a href="#collaboration-and-bounded-sharing">Collaboration and sharing</a></li><li><a href="#human-visibility-and-control">Human visibility</a></li><li><a href="#how-to-use-this-document">Reading map</a></li><li><a href="#builder-reference-operating-model-and-capability-truth">Builder reference</a></li><li><a href="#how-your-ai-and-queue-work">AI and queue model</a></li><li><a href="#questions-queues-and-unfinished-work">Questions and queues</a></li><li><a href="#capability-truth">Capability truth</a></li><li><a href="#detailed-trust-boundaries-for-builders">Builder trust boundaries</a></li><li><a href="#language-rules">Language rules</a></li><li><a href="#public-homepage-and-future-shell-implications">Homepage and shell</a></li><li><a href="#maintenance-and-claim-verification">Maintenance</a></li><li><a href="#evidence-handoff">Evidence handoff</a></li><li><a href="#documentation-package-verification">Verification</a></li></ol>
     </details>
   </nav>
   <div class="story-ribbon" aria-label="The research-to-story thread">
@@ -274,7 +279,7 @@
   <main class="page" id="main-content">
     <nav class="section-nav" aria-label="Section navigation">
       <p>Along the research trail</p>
-      <ol><li><a href="#one-sentence-identity">One-sentence identity</a></li><li><a href="#practical-picture-think-of-it-as">Practical picture</a></li><li><a href="#product-scope-and-non-goals">Scope and non-goals</a></li><li><a href="#the-durable-assist-family-and-trust-model">Durable family model</a></li><li><a href="#the-research-to-story-loop">Research-to-story loop</a></li><li><a href="#user-owned-data-and-shared-authority">Shared authority</a></li><li><a href="#durable-information-model">Information model</a></li><li><a href="#provenance-uncertainty-and-changing-understanding">Provenance and uncertainty</a></li><li><a href="#relationships-and-historical-context">Relationships and context</a></li><li><a href="#storytelling-principles">Storytelling principles</a></li><li><a href="#living-people-and-private-family-material">Living and private material</a></li><li><a href="#collaboration-and-bounded-sharing">Collaboration and sharing</a></li><li><a href="#human-visibility-and-control">Human visibility</a></li><li><a href="#how-to-use-this-document">Reading map</a></li><li><a href="#builder-reference-operating-model-and-capability-truth">Builder reference</a></li><li><a href="#how-your-ai-and-queue-work">AI and queue model</a></li><li><a href="#questions-queues-and-unfinished-work">Questions and queues</a></li><li><a href="#capability-truth">Capability truth</a></li><li><a href="#detailed-trust-boundaries-for-builders">Builder trust boundaries</a></li><li><a href="#language-rules">Language rules</a></li><li><a href="#public-homepage-and-future-shell-implications">Homepage and shell</a></li><li><a href="#maintenance-and-claim-verification">Maintenance</a></li><li><a href="#evidence-handoff">Evidence handoff</a></li><li><a href="#documentation-package-verification">Verification</a></li></ol>
+      <ol><li><a href="#one-sentence-identity">One-sentence identity</a></li><li><a href="#practical-picture-think-of-it-as">Practical picture</a></li><li><a href="#why-not-just-ask-your-ai-to-build-a-quick-feature">Why not a quick feature?</a></li><li><a href="#why-this-instead-of-a-conventional-website">Why not a conventional site?</a></li><li><a href="#product-scope-and-non-goals">Scope and non-goals</a></li><li><a href="#the-durable-assist-family-and-trust-model">Durable family model</a></li><li><a href="#the-research-to-story-loop">Research-to-story loop</a></li><li><a href="#user-owned-data-and-shared-authority">Shared authority</a></li><li><a href="#durable-information-model">Information model</a></li><li><a href="#provenance-uncertainty-and-changing-understanding">Provenance and uncertainty</a></li><li><a href="#relationships-and-historical-context">Relationships and context</a></li><li><a href="#storytelling-principles">Storytelling principles</a></li><li><a href="#living-people-and-private-family-material">Living and private material</a></li><li><a href="#collaboration-and-bounded-sharing">Collaboration and sharing</a></li><li><a href="#human-visibility-and-control">Human visibility</a></li><li><a href="#how-to-use-this-document">Reading map</a></li><li><a href="#builder-reference-operating-model-and-capability-truth">Builder reference</a></li><li><a href="#how-your-ai-and-queue-work">AI and queue model</a></li><li><a href="#questions-queues-and-unfinished-work">Questions and queues</a></li><li><a href="#capability-truth">Capability truth</a></li><li><a href="#detailed-trust-boundaries-for-builders">Builder trust boundaries</a></li><li><a href="#language-rules">Language rules</a></li><li><a href="#public-homepage-and-future-shell-implications">Homepage and shell</a></li><li><a href="#maintenance-and-claim-verification">Maintenance</a></li><li><a href="#evidence-handoff">Evidence handoff</a></li><li><a href="#documentation-package-verification">Verification</a></li></ol>
     </nav>
     <article class="reader"><h1 id="assist-with-family-history-core-philosophy">Assist With Family History Core Philosophy</h1>
 <blockquote>
@@ -343,6 +348,63 @@ do not claim that every corresponding view, visualization, import, AI
 connection, or publishing path is currently available. The dated
 <a href="#dated-repository-capability-ledger">capability ledger</a> states what the
 checked-out repository can honestly support.</p>
+<h2 id="why-not-just-ask-your-ai-to-build-a-quick-feature">Why not just ask your AI to build a quick feature?</h2>
+<p>Sometimes that is exactly the right move. A quick transcription helper, record
+comparison, timeline mockup, or page for one research question can solve an
+immediate problem. The difference begins when the work needs to survive that
+moment.</p>
+<p>A durable Family History workspace keeps people and name variants,
+relationships, places, buildings, events, sources, claims, uncertainty,
+questions, context, and stories as connected records—not as scattered chat
+turns or the temporary state of one generated page. It preserves where a
+detail came from, what changed, why an interpretation currently leads, and
+what remains unresolved. Through an available manual handoff or a separately
+shipped connection, a later AI session can resume the research without
+reconstructing the family, the evidence, and the decisions from scratch.</p>
+<p>The enduring advantage is the family-history loop: a clue can become preserved
+evidence, a cautious claim, a relationship or context connection, a new
+question, and eventually a grounded story; a correction can travel back
+through that trail without erasing its history. The person can inspect and
+correct each stage, control who or what may act, and continue even when the
+chosen AI or its interface changes.</p>
+<p>Family History is therefore not an argument against asking your AI to build or
+analyze something. It is the durable, domain-shaped place where the useful
+records, relationships, research state, and story trail remain after the
+one-off tool or conversation has done its job.</p>
+<h2 id="why-this-instead-of-a-conventional-website">Why this instead of a conventional website?</h2>
+<p>A family-tree site, searchable archive, file store, storytelling tool, or
+other focused website can be valuable. Family History is meant for the
+long-running work that crosses those categories: your chosen AI can reason and
+perform separately authorized work while the workspace preserves the connected
+family-history record and gives you an inspectable place to understand what
+happened and what comes next.</p>
+<p>That distinction matters when one new record changes more than one field. It
+might introduce a name variant, challenge an identity or relationship, move an
+event to a different place or date, create a research question, alter the
+historical context, and require a story revision. Family History should keep
+those effects connected and reviewable rather than reducing them to an
+isolated profile edit, uploaded file, search result, or generated paragraph.</p>
+<p>It also provides a durable coordination model: people and their chosen AIs can
+work from explicit scopes, questions, evidence, authority, state, blockers,
+and next steps. Named collaboration inside a project and bounded sharing of a
+selected story, tree branch, collection, or view extend that model where
+appropriate—but both remain <strong>In design</strong> until their complete user paths are
+implemented and verified. Human-complete research, correction, organization,
+and writing must remain possible without an AI connection.</p>
+<blockquote class="marketing-takeaways">
+<p><strong>Marketing and PR takeaways</strong></p>
+<ul>
+<li><strong>A family tree shows connections. Family History preserves why those
+connections are believed—and how responsible stories grow from them.</strong></li>
+<li><strong>Bring your chosen AI; keep the research trail.</strong></li>
+<li><strong>From clue to evidence to story, with a path back when understanding
+changes.</strong></li>
+</ul>
+<p>Use these as enduring positioning, not as proof that every AI connection,
+collaboration mode, visualization, import, or publishing path is currently
+shipped. Pair feature-specific use with the dated
+<a href="#dated-repository-capability-ledger">capability ledger</a>.</p>
+</blockquote>
 <h2 id="product-scope-and-non-goals">Product scope and non-goals</h2>
 <p>Family History exists to help people collect, connect, and understand evidence
 so they and their AI can tell meaningful, source-aware stories. Its subject can
@@ -735,10 +797,11 @@ adding a low-risk research note.</p>
 inspect, correct, organize, research, write, and control their information
 through human-complete workflows.</p>
 <h2 id="how-to-use-this-document">How to use this document</h2>
-<p>Read the identity, practical picture, product scope, durable family model, and
-research-to-story loop first. They are the philosophical heart. The later
-builder reference translates that philosophy into operating contracts and
-dated capability truth without replacing it. For focused work, use this map:</p>
+<p>Read the identity, practical picture, two differentiation sections, product
+scope, durable family model, and research-to-story loop first. They are the
+philosophical heart. The later builder reference translates that philosophy
+into operating contracts and dated capability truth without replacing it. For
+focused work, use this map:</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Scrollable table"><table>
 <thead>
 <tr>
@@ -749,8 +812,8 @@ dated capability truth without replacing it. For focused work, use this map:</p>
 </thead>
 <tbody><tr>
 <td>Product owners</td>
-<td><a href="#one-sentence-identity">One-sentence identity</a>, <a href="#practical-picture-think-of-it-as">Practical picture</a>, <a href="#product-scope-and-non-goals">Product scope</a>, <a href="#the-durable-assist-family-and-trust-model">Durable family model</a>, <a href="#the-research-to-story-loop">Research-to-story loop</a>, and <a href="#user-owned-data-and-shared-authority">Shared authority</a></td>
-<td>What Family History helps with, why story matters, who owns the work, and what the product must not become</td>
+<td><a href="#one-sentence-identity">One-sentence identity</a>, <a href="#practical-picture-think-of-it-as">Practical picture</a>, <a href="#why-not-just-ask-your-ai-to-build-a-quick-feature">Why not a quick feature?</a>, <a href="#why-this-instead-of-a-conventional-website">Why not a conventional site?</a>, <a href="#product-scope-and-non-goals">Product scope</a>, <a href="#the-durable-assist-family-and-trust-model">Durable family model</a>, and <a href="#user-owned-data-and-shared-authority">Shared authority</a></td>
+<td>What Family History helps with, why a durable workspace matters, who owns the work, and what the product must not become</td>
 </tr>
 <tr>
 <td>Implementers</td>
@@ -764,8 +827,8 @@ dated capability truth without replacing it. For focused work, use this map:</p>
 </tr>
 <tr>
 <td>Writers and designers</td>
-<td><a href="#one-sentence-identity">One-sentence identity</a>, <a href="#practical-picture-think-of-it-as">Practical picture</a>, <a href="#product-scope-and-non-goals">Product scope</a>, <a href="#storytelling-principles">Storytelling principles</a>, <a href="#capability-truth">Capability truth</a>, <a href="#language-rules">Language rules</a>, and <a href="#public-homepage-and-future-shell-implications">Homepage implications</a></td>
-<td>How to explain the product simply, what may be claimed now, how to describe evidence and uncertainty, and how the philosophy should feel</td>
+<td><a href="#one-sentence-identity">One-sentence identity</a>, <a href="#practical-picture-think-of-it-as">Practical picture</a>, <a href="#why-not-just-ask-your-ai-to-build-a-quick-feature">Why not a quick feature?</a>, <a href="#why-this-instead-of-a-conventional-website">Why not a conventional site?</a>, <a href="#product-scope-and-non-goals">Product scope</a>, <a href="#storytelling-principles">Storytelling principles</a>, <a href="#capability-truth">Capability truth</a>, <a href="#language-rules">Language rules</a>, and <a href="#public-homepage-and-future-shell-implications">Homepage implications</a></td>
+<td>How to explain the product simply, differentiate it responsibly, state what may be claimed now, describe evidence and uncertainty, and preserve the intended feel</td>
 </tr>
 </tbody></table></div>
 <p>Anyone publishing a capability claim must read both
@@ -1318,7 +1381,7 @@ before it was run.</p>
     <div class="source-footer-inner">
       <p><strong>Source synchronization</strong></p>
       <p>This HTML is a designed companion. The Markdown remains authoritative, and substantive changes must update both files in the same commit.</p>
-      <p class="digest"><strong>Source SHA-256:</strong> 055100302ad7227be44343f5f7815810a70ac752bce6fdf2a0c1baace421c10c</p>
+      <p class="digest"><strong>Source SHA-256:</strong> 4507c3997f5595def86e2daa2b5639c1933a8ce3eb66eeff6065f2982ab02222</p>
       <p><strong>Capability evidence date:</strong> 2026-07-29 · <strong>Repository evidence revision:</strong> <code>2afbfa3</code></p>
     </div>
   </footer>

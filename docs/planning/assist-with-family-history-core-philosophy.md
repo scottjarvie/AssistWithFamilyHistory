@@ -74,6 +74,71 @@ connection, or publishing path is currently available. The dated
 [capability ledger](#dated-repository-capability-ledger) states what the
 checked-out repository can honestly support.
 
+## Why not just ask your AI to build a quick feature?
+
+Sometimes that is exactly the right move. A quick transcription helper, record
+comparison, timeline mockup, or page for one research question can solve an
+immediate problem. The difference begins when the work needs to survive that
+moment.
+
+A durable Family History workspace keeps people and name variants,
+relationships, places, buildings, events, sources, claims, uncertainty,
+questions, context, and stories as connected records—not as scattered chat
+turns or the temporary state of one generated page. It preserves where a
+detail came from, what changed, why an interpretation currently leads, and
+what remains unresolved. Through an available manual handoff or a separately
+shipped connection, a later AI session can resume the research without
+reconstructing the family, the evidence, and the decisions from scratch.
+
+The enduring advantage is the family-history loop: a clue can become preserved
+evidence, a cautious claim, a relationship or context connection, a new
+question, and eventually a grounded story; a correction can travel back
+through that trail without erasing its history. The person can inspect and
+correct each stage, control who or what may act, and continue even when the
+chosen AI or its interface changes.
+
+Family History is therefore not an argument against asking your AI to build or
+analyze something. It is the durable, domain-shaped place where the useful
+records, relationships, research state, and story trail remain after the
+one-off tool or conversation has done its job.
+
+## Why this instead of a conventional website?
+
+A family-tree site, searchable archive, file store, storytelling tool, or
+other focused website can be valuable. Family History is meant for the
+long-running work that crosses those categories: your chosen AI can reason and
+perform separately authorized work while the workspace preserves the connected
+family-history record and gives you an inspectable place to understand what
+happened and what comes next.
+
+That distinction matters when one new record changes more than one field. It
+might introduce a name variant, challenge an identity or relationship, move an
+event to a different place or date, create a research question, alter the
+historical context, and require a story revision. Family History should keep
+those effects connected and reviewable rather than reducing them to an
+isolated profile edit, uploaded file, search result, or generated paragraph.
+
+It also provides a durable coordination model: people and their chosen AIs can
+work from explicit scopes, questions, evidence, authority, state, blockers,
+and next steps. Named collaboration inside a project and bounded sharing of a
+selected story, tree branch, collection, or view extend that model where
+appropriate—but both remain **In design** until their complete user paths are
+implemented and verified. Human-complete research, correction, organization,
+and writing must remain possible without an AI connection.
+
+> **Marketing and PR takeaways**
+>
+> - **A family tree shows connections. Family History preserves why those
+>   connections are believed—and how responsible stories grow from them.**
+> - **Bring your chosen AI; keep the research trail.**
+> - **From clue to evidence to story, with a path back when understanding
+>   changes.**
+>
+> Use these as enduring positioning, not as proof that every AI connection,
+> collaboration mode, visualization, import, or publishing path is currently
+> shipped. Pair feature-specific use with the dated
+> [capability ledger](#dated-repository-capability-ledger).
+
 ## Product scope and non-goals
 
 Family History exists to help people collect, connect, and understand evidence
@@ -540,17 +605,18 @@ through human-complete workflows.
 
 ## How to use this document
 
-Read the identity, practical picture, product scope, durable family model, and
-research-to-story loop first. They are the philosophical heart. The later
-builder reference translates that philosophy into operating contracts and
-dated capability truth without replacing it. For focused work, use this map:
+Read the identity, practical picture, two differentiation sections, product
+scope, durable family model, and research-to-story loop first. They are the
+philosophical heart. The later builder reference translates that philosophy
+into operating contracts and dated capability truth without replacing it. For
+focused work, use this map:
 
 | Reader | Start with | Questions answered |
 |---|---|---|
-| Product owners | [One-sentence identity](#one-sentence-identity), [Practical picture](#practical-picture-think-of-it-as), [Product scope](#product-scope-and-non-goals), [Durable family model](#the-durable-assist-family-and-trust-model), [Research-to-story loop](#the-research-to-story-loop), and [Shared authority](#user-owned-data-and-shared-authority) | What Family History helps with, why story matters, who owns the work, and what the product must not become |
+| Product owners | [One-sentence identity](#one-sentence-identity), [Practical picture](#practical-picture-think-of-it-as), [Why not a quick feature?](#why-not-just-ask-your-ai-to-build-a-quick-feature), [Why not a conventional site?](#why-this-instead-of-a-conventional-website), [Product scope](#product-scope-and-non-goals), [Durable family model](#the-durable-assist-family-and-trust-model), and [Shared authority](#user-owned-data-and-shared-authority) | What Family History helps with, why a durable workspace matters, who owns the work, and what the product must not become |
 | Implementers | [Builder reference](#builder-reference-operating-model-and-capability-truth), [AI and queue model](#how-your-ai-and-queue-work), [Information model](#durable-information-model), [Provenance](#provenance-uncertainty-and-changing-understanding), and [Maintenance](#maintenance-and-claim-verification) | What must persist, how work begins or resumes, which distinctions must survive, and what needs proof |
 | AI and integration builders | [Builder reference](#builder-reference-operating-model-and-capability-truth), [AI and queue model](#how-your-ai-and-queue-work), [Shared authority](#user-owned-data-and-shared-authority), [Questions and queues](#questions-queues-and-unfinished-work), and [Detailed trust boundaries](#detailed-trust-boundaries-for-builders) | Where the chosen AI works, which Family History operations may be used, what a durable handoff contains, and where the site's responsibility stops |
-| Writers and designers | [One-sentence identity](#one-sentence-identity), [Practical picture](#practical-picture-think-of-it-as), [Product scope](#product-scope-and-non-goals), [Storytelling principles](#storytelling-principles), [Capability truth](#capability-truth), [Language rules](#language-rules), and [Homepage implications](#public-homepage-and-future-shell-implications) | How to explain the product simply, what may be claimed now, how to describe evidence and uncertainty, and how the philosophy should feel |
+| Writers and designers | [One-sentence identity](#one-sentence-identity), [Practical picture](#practical-picture-think-of-it-as), [Why not a quick feature?](#why-not-just-ask-your-ai-to-build-a-quick-feature), [Why not a conventional site?](#why-this-instead-of-a-conventional-website), [Product scope](#product-scope-and-non-goals), [Storytelling principles](#storytelling-principles), [Capability truth](#capability-truth), [Language rules](#language-rules), and [Homepage implications](#public-homepage-and-future-shell-implications) | How to explain the product simply, differentiate it responsibly, state what may be claimed now, describe evidence and uncertainty, and preserve the intended feel |
 
 Anyone publishing a capability claim must read both
 [Capability truth](#capability-truth) and
