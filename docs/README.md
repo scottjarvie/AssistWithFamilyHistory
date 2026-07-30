@@ -6,6 +6,8 @@ This directory keeps project documentation out of the repository root and separa
 
 Durable guidance that stays accurate as the product evolves.
 
+- [Assist With Family History core philosophy](planning/assist-with-family-history-core-philosophy.md)
+- [Assist With Family History editorial reader](planning/assist-with-family-history-core-philosophy.html)
 - [Product vision](product/vision.md)
 - [AI family history lab](product/ai-family-history-lab.md)
 - [Ancestor data vault philosophy and architecture](product/ancestor-data-vault-philosophy-and-architecture.md)
