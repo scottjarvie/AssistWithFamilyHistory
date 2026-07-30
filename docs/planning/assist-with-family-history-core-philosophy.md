@@ -112,6 +112,80 @@ every AI connection, research tool, visualization, sharing mode, or story
 workflow is currently available. The capability ledger below keeps that
 product truth explicit.
 
+## How your AI and queue work
+
+Family History is designed to work alongside the AI environment a person
+chooses, not replace it. A person may continue working in ChatGPT, Codex,
+Claude, OpenClaude, Gemini, Hermes, or a future compatible system. These names
+are examples of user choice—not a preferred vendor list or a claim that direct
+integration with each client is currently shipped.
+
+The enduring split is:
+
+- **Your chosen AI remains the place for conversation, reasoning, research,
+  synthesis, and judgment.**
+- **Family History gives that work durable domain memory, scoped records and
+  tools, a resumable queue, and a visual place for you to understand progress,
+  evidence, uncertainty, and results.**
+- **You decide which AI may use which Family History scope and operation.**
+  Neither an AI client's general capability nor a queue assignment grants
+  Family History authority.
+
+Work can begin in either direction.
+
+### Begin in your preferred AI environment
+
+A person and their AI may begin with a conversation, document, research
+question, or outside investigation in the AI environment they already use.
+Through an available manual handoff or a separately shipped, authorized
+connection, they can retrieve the relevant Family History context, work with
+it, and return selected sources, notes, claims, questions, or story material to
+the permitted scope.
+
+Family History then preserves the useful result beyond that conversation. The
+person can inspect it visually, see where it came from, correct it, connect it
+to related people and evidence, and decide what should happen next.
+
+### Begin in Family History
+
+A person may instead begin in the site by defining work for later: the family,
+person, source, story, collection, or research project in scope; the question
+or requested outcome; relevant evidence and context; priority; constraints;
+and the authority available to the chosen AI.
+
+That instruction can wait in the queue until the person or an authorized,
+compatible AI path picks it up. The result returns to the same durable context
+with its acting identity, evidence, state, history, and next step intact. This
+direction supports asynchronous work without requiring the person to keep one
+chat open or reconstruct the assignment later.
+
+### A queue is continuity, not a todo list
+
+A useful queue item preserves:
+
+- the exact scope and requested outcome;
+- the questions, assumptions, and desired level of proof;
+- priority and why the work matters now;
+- relevant evidence, context, and prior attempts;
+- state such as active, waiting, blocked, needs review, or done;
+- the responsible person or AI and the operations actually authorized;
+- blockers, dependencies, and what would unblock them;
+- the exact next step or checkpoint; and
+- result links, provenance, decisions, and history.
+
+That continuity changes the work. One AI session can stop and a later session
+or compatible client can understand what has already happened, what remains
+uncertain, and the smallest useful action to take next. The person can see
+progress and results without treating the queue as permission or trusting an
+opaque “working” state.
+
+> **Capability truth:** The current repository has research tasks, research
+> checks and logs, an operations queue, compact handoff export, and selected
+> quality and audit foundations. It does not yet prove that arbitrary external
+> AI clients can authenticate, claim work, maintain leases or checkpoints,
+> recover stale work, and return results end to end. Those broader client and
+> multi-AI paths remain **In design** until implemented and verified.
+
 ## How to use this document
 
 Read the working identity and Assist family model first. For focused work, use
@@ -119,9 +193,9 @@ this map:
 
 | Reader | Start with | Questions answered |
 |---|---|---|
-| Product owners | [One-sentence identity](#one-sentence-identity), [Think of it as…](#think-of-it-as), [Assist family model](#the-assist-family-model), [Shared authority](#user-owned-data-and-shared-authority), [Collaboration and sharing](#collaboration-and-bounded-sharing), and [Trust boundaries](#trust-boundaries-and-non-goals) | What Family History helps with, why story matters, who owns the work, how access may be shared, and what the product must not imply |
-| Implementers | [Research-to-story loop](#the-research-to-story-loop), [Information model](#durable-information-model), [Provenance](#provenance-uncertainty-and-changing-understanding), and [Maintenance](#maintenance-and-claim-verification) | What must persist, which distinctions must survive, how research resumes, and what needs proof |
-| AI and integration builders | [Assist family model](#the-assist-family-model), [Shared authority](#user-owned-data-and-shared-authority), [Questions and queues](#questions-queues-and-unfinished-work), and [Trust boundaries](#trust-boundaries-and-non-goals) | What your AI may do, which Family History operations may be used, what must remain reviewable, and where the site's responsibility stops |
+| Product owners | [One-sentence identity](#one-sentence-identity), [Think of it as…](#think-of-it-as), [Assist family model](#the-assist-family-model), [AI and queue model](#how-your-ai-and-queue-work), [Shared authority](#user-owned-data-and-shared-authority), [Collaboration and sharing](#collaboration-and-bounded-sharing), and [Trust boundaries](#trust-boundaries-and-non-goals) | What Family History helps with, why story matters, how work moves between the site and a chosen AI, who owns the work, how access may be shared, and what the product must not imply |
+| Implementers | [AI and queue model](#how-your-ai-and-queue-work), [Research-to-story loop](#the-research-to-story-loop), [Information model](#durable-information-model), [Provenance](#provenance-uncertainty-and-changing-understanding), and [Maintenance](#maintenance-and-claim-verification) | What must persist, how work begins or resumes, which distinctions must survive, and what needs proof |
+| AI and integration builders | [AI and queue model](#how-your-ai-and-queue-work), [Shared authority](#user-owned-data-and-shared-authority), [Questions and queues](#questions-queues-and-unfinished-work), and [Trust boundaries](#trust-boundaries-and-non-goals) | Where the chosen AI works, which Family History operations may be used, what a durable handoff contains, and where the site's responsibility stops |
 | Writers and designers | [One-sentence identity](#one-sentence-identity), [Think of it as…](#think-of-it-as), [Storytelling principles](#storytelling-principles), [Capability truth](#capability-truth), [Language rules](#language-rules), and [Homepage implications](#public-homepage-and-future-shell-implications) | How to explain the product simply, what may be claimed now, how to describe evidence and uncertainty, and how the philosophy should feel |
 
 Anyone publishing a capability claim must read both
@@ -412,6 +486,10 @@ and lets uncertainty breathe—not a confident fiction wearing citations.
 
 ## Questions, queues, and unfinished work
 
+The earlier [AI and queue model](#how-your-ai-and-queue-work) explains the two
+directions of work. This section defines the durable research contract behind
+that handoff.
+
 Questions belong to the person, relationship, source, claim, place, event,
 story, collection, or research project they concern. They can remain open
 without blocking unrelated work.
@@ -695,7 +773,12 @@ Public and product language should:
 - keep private, AI-eligible, collaborator-visible, link-visible, and public
   states separate;
 - distinguish external user-authorized AI activity from a Family
-  History-operated integration; and
+  History-operated integration;
+- use **AI environment** for the external place where the person and their
+  chosen AI converse and work; naming a client must not imply a shipped
+  integration or preferred vendor;
+- describe a **queue** as durable scope, evidence, state, blockers, and next
+  action across sessions—not as a generic todo list or authority grant; and
 - label **Current**, **In design**, and **Later** capability status directly.
 
 Avoid **“agent”** in user-facing copy when **“your AI”** communicates the idea.
@@ -730,6 +813,11 @@ change the application.
 - Explain provenance in human language: “see where each detail came from.”
 - Show user-owned scoped authority without depicting read access as blanket
   permission to change or publish.
+- Show both work directions: continue in a preferred AI environment and
+  preserve selected context in Family History, or create scoped queued work in
+  Family History for a later authorized pickup.
+- Name example AI environments only to illustrate user choice, and label the
+  actual connection status rather than implying universal compatibility.
 - Explain that named collaboration and bounded share links are different
   in-design access modes; do not present either as current until verified.
 - Keep living/private material as a quiet control, not the emotional headline.
@@ -757,6 +845,9 @@ change the application.
   line, or see which stories use a claim.
 - Treat questions and queue work as durable research objects, not transient
   notifications.
+- Show queue scope, priority, evidence, state, blockers, responsible person or
+  AI, and exact next step so a person can understand progress without opening
+  the originating AI conversation.
 - Show historical context as setting, never as silent proof of personal
   experience.
 - Keep sharing and publication explicit, previewable, reviewable, reversible
@@ -794,20 +885,24 @@ description, AI guide, provider guide, or integration claim:
 6. verify any chosen-AI connection against the real authentication path,
    incoming credential resolution, exact tools, scope enforcement, revocation,
    audit, and a synthetic retrieve → work → save → inspect result;
-7. verify any publishing claim against draft/review state, source and context
+7. verify any AI-client or queue claim against the real work-creation and
+   pickup path, identity and scope enforcement, priority and evidence
+   preservation, claim or lease behavior where used, checkpoints, blockers,
+   stale-work recovery, result return, audit, and exact next-step continuity;
+8. verify any publishing claim against draft/review state, source and context
    visibility, living/private checks, human confirmation, public filtering,
    unpublish behavior, and exact public route;
-8. verify any collaboration claim against the invite and acceptance lifecycle,
+9. verify any collaboration claim against the invite and acceptance lifecycle,
    named identity, exact record scope, per-operation authority, living/private
    boundaries, attribution, audit history, and revocation; separately verify
    any share-link claim against its reviewed content boundary, audience,
    expiry and discoverability state, recipient-safe filtering, and revocation;
-9. confirm that collaboration, bounded links, and public publication remain
+10. confirm that collaboration, bounded links, and public publication remain
    independently controlled and that none silently broadens another;
-10. update the evidence date, repository revision, and evidence references when
-   a status changes; and
-11. update the Markdown and HTML companion in the same commit and refresh the
-   HTML source digest.
+11. update the evidence date, repository revision, and evidence references when
+    a status changes; and
+12. update the Markdown and HTML companion in the same commit and refresh the
+    HTML source digest.
 
 Changes to the one-sentence identity, Assist family model, research-to-story
 purpose, user-owned scoped-authority principle, provenance boundary,
