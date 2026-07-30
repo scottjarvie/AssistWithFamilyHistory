@@ -20,13 +20,14 @@ redefine the product.
 
 ## One-sentence identity
 
-**Assist with discovering and telling family stories—grounded in evidence and
-connected across generations.**
+**Assist With Family History is a durable, user-controlled research-to-story
+workspace where your AI can work with connected evidence and context, and
+where you can understand, correct, and turn that work into meaningful,
+source-aware stories.**
 
-That is the plain-language promise of Assist With Family History. Behind it is
-a durable, user-controlled research-to-story workspace where your AI can work
-with connected evidence and context, and where you can understand, correct,
-and shape that work into meaningful, source-aware stories.
+> **Owner-language hold:** The portfolio-level owner-authored front-door line
+> is intentionally pending. Do not replace this working identity from a
+> partial excerpt; wait for the complete owner-authored project set.
 
 The higher purpose is connection: not only knowing that something happened,
 but understanding the human life and larger world the evidence can responsibly
@@ -61,15 +62,18 @@ Think of it as several kinds of help gathered around the same research trail:
   let readers or reviewers follow connections across generations and trace
   important details back to their sources and uncertainty.
 
-These are facets of the enduring product, not a claim that every corresponding
-view, visualization, import, AI connection, or publishing path is currently
-available. The dated [capability ledger](#dated-repository-capability-ledger)
-states what the checked-out repository can honestly support.
+This is prepared explanatory structure, not the pending owner-authored
+front-door language. The facets are grounded in the enduring product, but they
+do not claim that every corresponding view, visualization, import, AI
+connection, or publishing path is currently available. The dated
+[capability ledger](#dated-repository-capability-ledger) states what the
+checked-out repository can honestly support.
 
 ## The Assist family model
 
-The simple promise becomes durable help through a clear division of roles. An
-Assist product is not the AI. The person chooses the AI that helps them.
+The research-to-story workspace becomes durable help through a clear division
+of roles. An Assist product is not the AI. The person chooses the AI that helps
+them.
 
 - **Your AI does the reasoning and work under your direction.** It can inspect
   permitted material, identify patterns and contradictions, research
@@ -110,8 +114,8 @@ product truth explicit.
 
 ## How to use this document
 
-Read the front-door promise and Assist family model first. For focused work,
-use this map:
+Read the working identity and Assist family model first. For focused work, use
+this map:
 
 | Reader | Start with | Questions answered |
 |---|---|---|
