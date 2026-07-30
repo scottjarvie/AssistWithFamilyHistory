@@ -25,7 +25,7 @@ this map:
 
 | Reader | Start with | Questions answered |
 |---|---|---|
-| Product owners | [One-sentence identity](#one-sentence-identity), [Assist family model](#the-assist-family-model), [Shared authority](#user-owned-data-and-shared-authority), and [Trust boundaries](#trust-boundaries-and-non-goals) | What Family History is, why story matters, who owns the work, and what the product must not imply |
+| Product owners | [One-sentence identity](#one-sentence-identity), [Assist family model](#the-assist-family-model), [Shared authority](#user-owned-data-and-shared-authority), [Collaboration and sharing](#collaboration-and-bounded-sharing), and [Trust boundaries](#trust-boundaries-and-non-goals) | What Family History is, why story matters, who owns the work, how access may be shared, and what the product must not imply |
 | Implementers | [Research-to-story loop](#the-research-to-story-loop), [Information model](#durable-information-model), [Provenance](#provenance-uncertainty-and-changing-understanding), and [Maintenance](#maintenance-and-claim-verification) | What must persist, which distinctions must survive, how research resumes, and what needs proof |
 | AI and integration builders | [Assist family model](#the-assist-family-model), [Shared authority](#user-owned-data-and-shared-authority), [Questions and queues](#questions-queues-and-unfinished-work), and [Trust boundaries](#trust-boundaries-and-non-goals) | What your AI may do, which Family History operations may be used, what must remain reviewable, and where the site's responsibility stops |
 | Writers and designers | [Storytelling principles](#storytelling-principles), [Capability truth](#capability-truth), [Language rules](#language-rules), and [Homepage implications](#public-homepage-and-future-shell-implications) | What may be claimed now, how to describe evidence and uncertainty, and how the philosophy should feel |
@@ -395,6 +395,56 @@ into an approval gate. Work may pause for a person, another AI, a provider, an
 archive, or better evidence. The next session should be able to resume without
 reconstructing the whole conversation.
 
+## Collaboration and bounded sharing
+
+Family History needs two distinct sharing modes. Neither is verified as a
+current repository capability; both are **In design**.
+
+### Named collaboration inside a project
+
+A named collaborator is an identifiable person invited into a family-history
+project. Their access is account- or identity-bound and limited to the named
+family tree, research project, person, story, collection, or narrower record.
+The owner grants each allowed operation independently: retrieve, comment or
+review, add, update, delete, promote, or publish where relevant.
+
+Collaboration is not blanket vault access. The invite, acceptance, actor,
+scope, allowed operations, changes, and revocation should remain visible and
+auditable. Removing a collaborator ends future access without erasing the
+attributed research or review history they already contributed.
+
+### A share link to a bounded view
+
+A share link gives its holder access only to a deliberately selected story,
+tree branch, collection, or other bounded view. It is not an invitation into
+the project, does not identify its holder as a collaborator, and does not grant
+access to neighboring people, sources, notes, stories, or the full tree.
+
+Before creating a link, the owner should be able to review exactly what the
+view contains, who it is intended for, whether it expires, whether it is
+discoverable, and whether any supported copying or download is allowed. A
+link's status and scope must be understandable, revocable, and auditable. A
+tree-branch link is a bounded view of selected relationships and supporting
+material—not a transfer of ownership or a copy of the whole family tree.
+
+Named collaboration and link sharing can coexist, but neither implies the
+other. A collaborator does not automatically receive a share link, and a link
+holder does not gain collaboration or mutation authority.
+
+### Public storytelling remains separate
+
+Publishing a story publicly is a separate, explicit promotion decision. An
+invite does not publish; creating or opening a share link does not make its
+contents public or searchable; and a public story does not expose the
+underlying project, tree branch, collection, private sources, or research
+notes.
+
+Living people and private family documents are excluded from collaboration,
+bounded views, and publication by default unless the owner deliberately grants
+the relevant person, scope, operation, and audience access after review.
+Inherited relationships, public historical context, or an already-public story
+must never silently broaden that boundary.
+
 ## Living people and private family material
 
 Privacy is a quiet boundary, not the public identity of Family History.
@@ -410,8 +460,12 @@ family claims should remain user-controlled.
 Private, AI-eligible, and public are separate states:
 
 - something may be visible to its owner but not permitted for AI use;
-- something may be permitted for a chosen AI but not for family sharing;
-- something may be family-reviewable but not publicly publishable; and
+- something may be permitted for a chosen AI but not for named collaborators
+  or share links;
+- something may be available to a named collaborator but excluded from every
+  bounded link and public story;
+- something may be included in a private bounded view but not publicly
+  publishable; and
 - public historical context does not make every linked family detail public.
 
 Sharing and publishing are explicit, reviewable state changes—never automatic
@@ -432,7 +486,8 @@ AI-platform vocabulary:
 6. Which details are context, inference, family lore, or AI synthesis?
 7. What changed, who or what changed it, and can I correct or recover it?
 8. What is active, waiting, blocked, needs me, or ready to resume?
-9. What is private, AI-eligible, family-reviewable, or public?
+9. What is private, AI-eligible, available to named collaborators, included in
+   a bounded link, or public?
 10. Which outside or cross-Assist connections exist, what can they do, and how
     do I revoke them?
 
@@ -478,6 +533,7 @@ or an older production observation is not sufficient by itself.
 | Questions and operations | Research tasks, research checks, research log, operations queue, compact handoff export, and quality-gated check writes | **Current partial foundation.** Not a complete durable multi-AI run, lease, checkpoint, and recovery system |
 | AI context and Story Writer | Owner-scoped person context packs; manual prompt copy; optional OpenRouter generation; editable draft save with model/prompt metadata | **Current repository foundation.** Generation is person-centered and first-party; it is not proof of arbitrary chosen-AI connectivity or every story subject |
 | Story Studio and publication | Draft/review/published states, reviewer assignment, evidence/context/privacy/living-person gates, explicit human confirmation, public story DTO filtering, and unpublish paths | **Current repository foundation.** Public availability still needs deployment/user-path proof; broader publishing, collaboration, books, and collections are not established |
+| Collaboration and bounded sharing | Philosophy direction plus backlog decisions for family review, family-sharing artifacts, and richer sharing settings; no complete invite or scoped-link path is verified | **In design.** Named project collaboration and bounded links for a selected story, tree branch, collection, or view are distinct future modes. Current guarded story publication proves neither |
 | Scoped authority | Scope vocabulary, API-key mint/list/suspend/revoke primitives, owner checks, story roles, guarded publish actions, and selected review/audit events | **Current partial foundation.** Incoming API-key resolution to an external AI is explicitly unfinished; self-asserted story headers are not a public authorization model |
 | API and AI connections | Internal app APIs, a static planning capability manifest, a story OpenAPI skeleton, `/api/capabilities`, API Center source, and `llms.txt` | **Current internal/planning foundation only.** No verified public agent API, no MCP server, no universal AI setup path |
 | Search and retrieval | Person/place/stories views, owner-scoped API reads, context packs, filters, and queue exports | **Current narrow retrieval surfaces.** No verified universal search across the full information model |
@@ -509,7 +565,9 @@ them or a planning artifact names them:
 - automatic story generation for every subject type;
 - timelines, maps, pedigree explorers, relationship graphs, heatmaps, or
   migration visualizations as completed experiences;
-- collaborative family review or editing;
+- named project collaboration, collaborator invitations, or family review;
+- scoped or unlisted share links for a story, tree branch, collection, or
+  bounded view;
 - books, exhibits, audio/podcast production, or general publishing;
 - owner-vault export and coordinated account deletion; or
 - cross-product Assist data retrieval, navigation, or publication.
@@ -533,6 +591,10 @@ Assist With Family History does not:
 - let an actor change, delete, promote, merge, or publish merely because that
   actor may retrieve;
 - treat an automation or review preference as authority;
+- turn a collaborator invitation into blanket vault access or let a share link
+  expose neighboring or newly connected records outside its reviewed view;
+- treat a share link as collaboration authority, make it discoverable by
+  default, or convert either sharing mode into public publication;
 - publish living-person information, private family material, restricted
   media, or unreviewed claims automatically;
 - silently share information with another person, AI, family tree, research
@@ -582,7 +644,14 @@ Public and product language should:
   promoting, merging, and publishing;
 - name the actual tree, person, source, story, collection, or research-project
   scope when describing access;
-- keep private, AI-eligible, family-reviewable, and public states separate;
+- use **named collaborator** for an identifiable person invited into a project
+  with explicit operations;
+- use **share link** for access to a selected story, tree branch, collection,
+  or bounded view without project membership or mutation authority;
+- use **public story** only for separately promoted, publicly available
+  narrative output;
+- keep private, AI-eligible, collaborator-visible, link-visible, and public
+  states separate;
 - distinguish external user-authorized AI activity from a Family
   History-operated integration; and
 - label **Current**, **In design**, and **Later** capability status directly.
@@ -619,6 +688,8 @@ change the application.
 - Explain provenance in human language: “see where each detail came from.”
 - Show user-owned scoped authority without depicting read access as blanket
   permission to change or publish.
+- Explain that named collaboration and bounded share links are different
+  in-design access modes; do not present either as current until verified.
 - Keep living/private material as a quiet control, not the emotional headline.
 - Use a visible **Current / In design / Later** ledger whenever future
   connections, imports, AI tools, or visualizations appear.
@@ -648,6 +719,11 @@ change the application.
   experience.
 - Keep sharing and publication explicit, previewable, reviewable, reversible
   where supported, and separate from ordinary saving.
+- Give named collaboration an invite, identity, scope, operation, history, and
+  revoke surface. Give share links a reviewed content boundary, audience,
+  expiry/discoverability status, and revoke surface.
+- Keep public publication as a separate promotion step; never let an invite or
+  link silently become a public story.
 - Keep human workflows complete when no AI is connected.
 - Keep connection and capability status truthful inside the shell as well as
   on the homepage.
@@ -679,9 +755,16 @@ description, AI guide, provider guide, or integration claim:
 7. verify any publishing claim against draft/review state, source and context
    visibility, living/private checks, human confirmation, public filtering,
    unpublish behavior, and exact public route;
-8. update the evidence date, repository revision, and evidence references when
+8. verify any collaboration claim against the invite and acceptance lifecycle,
+   named identity, exact record scope, per-operation authority, living/private
+   boundaries, attribution, audit history, and revocation; separately verify
+   any share-link claim against its reviewed content boundary, audience,
+   expiry and discoverability state, recipient-safe filtering, and revocation;
+9. confirm that collaboration, bounded links, and public publication remain
+   independently controlled and that none silently broadens another;
+10. update the evidence date, repository revision, and evidence references when
    a status changes; and
-9. update the Markdown and HTML companion in the same commit and refresh the
+11. update the Markdown and HTML companion in the same commit and refresh the
    HTML source digest.
 
 Changes to the one-sentence identity, Assist family model, research-to-story
@@ -735,9 +818,9 @@ The repository-foundation boundary in this revision was reconciled against:
 - `app/app/timeline/page.tsx`
 
 Linear product truth was checked against the **Current Product & Architecture
-Map**, **AI Family History Lab Thesis**, `GEN-35`, `GEN-61`, `GEN-109`, and
-`GEN-117`. Linear was used as coordination evidence, not as proof that source
-or production behavior exists.
+Map**, **AI Family History Lab Thesis**, `GEN-26`, `GEN-28`, `GEN-35`, `GEN-45`,
+`GEN-61`, `GEN-109`, and `GEN-117`. Linear was used as coordination evidence,
+not as proof that source or production behavior exists.
 
 Exact handoff rule:
 
