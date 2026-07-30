@@ -18,54 +18,71 @@ overstate the product. Architecture notes, Linear issues, release evidence, and
 operational runbooks remain authoritative for delivery status; they do not
 redefine the product.
 
-## How to use this document
-
-Read the document in order for product-level decisions. For focused work, use
-this map:
-
-| Reader | Start with | Questions answered |
-|---|---|---|
-| Product owners | [One-sentence identity](#one-sentence-identity), [Assist family model](#the-assist-family-model), [Shared authority](#user-owned-data-and-shared-authority), [Collaboration and sharing](#collaboration-and-bounded-sharing), and [Trust boundaries](#trust-boundaries-and-non-goals) | What Family History is, why story matters, who owns the work, how access may be shared, and what the product must not imply |
-| Implementers | [Research-to-story loop](#the-research-to-story-loop), [Information model](#durable-information-model), [Provenance](#provenance-uncertainty-and-changing-understanding), and [Maintenance](#maintenance-and-claim-verification) | What must persist, which distinctions must survive, how research resumes, and what needs proof |
-| AI and integration builders | [Assist family model](#the-assist-family-model), [Shared authority](#user-owned-data-and-shared-authority), [Questions and queues](#questions-queues-and-unfinished-work), and [Trust boundaries](#trust-boundaries-and-non-goals) | What your AI may do, which Family History operations may be used, what must remain reviewable, and where the site's responsibility stops |
-| Writers and designers | [Storytelling principles](#storytelling-principles), [Capability truth](#capability-truth), [Language rules](#language-rules), and [Homepage implications](#public-homepage-and-future-shell-implications) | What may be claimed now, how to describe evidence and uncertainty, and how the philosophy should feel |
-
-Anyone publishing a capability claim must read both
-[Capability truth](#capability-truth) and
-[Maintenance and claim verification](#maintenance-and-claim-verification).
-
 ## One-sentence identity
 
-**Assist With Family History is a durable, user-controlled research-to-story
-workspace where your AI can work with connected evidence and context, and
-where you can understand, correct, and turn that work into meaningful,
-source-aware stories.**
+**Assist with discovering and telling family stories—grounded in evidence and
+connected across generations.**
 
-It is not merely a family tree, a record cabinet, a private archive, or a text
-generator. It helps collect, connect, and understand evidence so people and
-their AI can tell grounded stories about people, families, places, buildings,
-communities, cultures, religions, events, and time periods.
+That is the plain-language promise of Assist With Family History. Behind it is
+a durable, user-controlled research-to-story workspace where your AI can work
+with connected evidence and context, and where you can understand, correct,
+and shape that work into meaningful, source-aware stories.
 
 The higher purpose is connection: not only knowing that something happened,
 but understanding the human life and larger world the evidence can responsibly
 help reveal.
 
+## Think of it as…
+
+Not merely a family tree, record cabinet, private archive, or text generator.
+Think of it as several kinds of help gathered around the same research trail:
+
+- **A life file that can hold more than one name.** Follow a person through
+  name variants, identities, records, dates, and places without forcing every
+  uncertain match into one profile.
+- **A web of relationships bigger than a pedigree.** Connect families across
+  generations while also preserving households, witnesses, neighbors,
+  communities, institutions, and other relationships that help explain a
+  life.
+- **A place-and-event thread.** Bring people, buildings, migrations, work,
+  faith, conflict, celebration, and other events together across time without
+  pretending that proximity proves personal experience.
+- **A source table where important details keep their receipts.** Keep
+  documents, records, photographs, media, family memories, citations, and
+  extracts connected to the claims and story details they support.
+- **An open-question board.** Make uncertainty, contradictions, missing
+  evidence, competing interpretations, and the next useful research step
+  visible instead of smoothing them into false certainty.
+- **A lens on the wider world.** Add sourced historical context about a place,
+  community, culture, religion, event, or era while keeping that context
+  distinct from evidence about a particular person.
+- **A story workshop with a path back to the evidence.** Build grounded stories
+  about a person, family line, place, building, community, or time period, and
+  let readers or reviewers follow connections across generations and trace
+  important details back to their sources and uncertainty.
+
+These are facets of the enduring product, not a claim that every corresponding
+view, visualization, import, AI connection, or publishing path is currently
+available. The dated [capability ledger](#dated-repository-capability-ledger)
+states what the checked-out repository can honestly support.
+
 ## The Assist family model
 
-An Assist product is not the AI. The person chooses the AI that helps them.
+The simple promise becomes durable help through a clear division of roles. An
+Assist product is not the AI. The person chooses the AI that helps them.
 
-- **Your AI does the reasoning and outside research.** It can inspect material,
-  identify patterns and contradictions, research elsewhere, ask questions,
-  propose connections, and help shape narratives through capabilities the
-  person separately authorizes.
-- **Family History supplies the durable research-to-story layer.** It gives
-  the work persistent structured context, retrieval, organization,
+- **Your AI does the reasoning and work under your direction.** It can inspect
+  permitted material, identify patterns and contradictions, research
+  elsewhere, ask questions, propose connections, and help shape narratives
+  through capabilities you separately authorize.
+- **Family History provides durable family-history memory, organization, and
+  tools.** It gives the work persistent structured context, retrieval,
   provenance, relationships, history, questions, queues, and visual
   understanding after the original conversation is gone.
-- **You remain the authority.** You decide who or what may retrieve, add,
-  update, delete, promote, or publish in each family tree, person, source,
-  story, collection, or research project. You can inspect the trail, correct
-  the understanding, revoke access, and decide what becomes shared.
+- **You keep visibility and authority.** You can see what is known, inferred,
+  disputed, changed, or waiting; correct the understanding; and decide who or
+  what may retrieve, add, update, delete, promote, share, or publish in each
+  family tree, person, source, story, collection, or research project.
 
 The benefit is different for each side. Your AI receives continuity and
 well-labeled evidence instead of reconstructing a family from scattered chats.
@@ -85,6 +102,27 @@ Assist identity also does not authorize silent movement of family-history
 information into Assist With Life, Memory, Homes, Moving, Finances, Buying, or
 another product. Every connection must be separately shipped, explicit,
 understandable, reviewable, revocable, and visible in provenance.
+
+This division of roles is enduring product philosophy. It does not claim that
+every AI connection, research tool, visualization, sharing mode, or story
+workflow is currently available. The capability ledger below keeps that
+product truth explicit.
+
+## How to use this document
+
+Read the front-door promise and Assist family model first. For focused work,
+use this map:
+
+| Reader | Start with | Questions answered |
+|---|---|---|
+| Product owners | [One-sentence identity](#one-sentence-identity), [Think of it as…](#think-of-it-as), [Assist family model](#the-assist-family-model), [Shared authority](#user-owned-data-and-shared-authority), [Collaboration and sharing](#collaboration-and-bounded-sharing), and [Trust boundaries](#trust-boundaries-and-non-goals) | What Family History helps with, why story matters, who owns the work, how access may be shared, and what the product must not imply |
+| Implementers | [Research-to-story loop](#the-research-to-story-loop), [Information model](#durable-information-model), [Provenance](#provenance-uncertainty-and-changing-understanding), and [Maintenance](#maintenance-and-claim-verification) | What must persist, which distinctions must survive, how research resumes, and what needs proof |
+| AI and integration builders | [Assist family model](#the-assist-family-model), [Shared authority](#user-owned-data-and-shared-authority), [Questions and queues](#questions-queues-and-unfinished-work), and [Trust boundaries](#trust-boundaries-and-non-goals) | What your AI may do, which Family History operations may be used, what must remain reviewable, and where the site's responsibility stops |
+| Writers and designers | [One-sentence identity](#one-sentence-identity), [Think of it as…](#think-of-it-as), [Storytelling principles](#storytelling-principles), [Capability truth](#capability-truth), [Language rules](#language-rules), and [Homepage implications](#public-homepage-and-future-shell-implications) | How to explain the product simply, what may be claimed now, how to describe evidence and uncertainty, and how the philosophy should feel |
+
+Anyone publishing a capability claim must read both
+[Capability truth](#capability-truth) and
+[Maintenance and claim verification](#maintenance-and-claim-verification).
 
 ## User-owned data and shared authority
 
