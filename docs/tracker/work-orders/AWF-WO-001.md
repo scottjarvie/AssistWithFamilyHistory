@@ -24,9 +24,10 @@ without weakening safeguards for software or ordinary contributors.
 
 The repository started clean at main commit `924fc047`; it had no tracker, no
 state helper, no ignore classifier, no branch ruleset, and a full CI workflow
-for every main push. Vercel is connected to `discover-their-stories`, current
-production serves `https://discovertheirstories.com`, and Scott is the only
-repository admin. Implementation is active on an isolated `codex/` branch.
+for every main push. PR #28 merged the implementation to `main` through full CI
+and a normal Vercel production build. Tracker migration and philosophy
+alignment are complete; the useful state-only provider proof is the remaining
+execution step.
 
 ## Sequence
 
@@ -88,9 +89,13 @@ canonical state paths and rejected the same index after `README.md` was added.
 The in-app browser blocked local `file://` inspection by security policy; the
 zero-dependency verifier still proved byte parity, standalone assets, emitted
 JavaScript syntax, skip-link/focus markers, responsive containment, two views,
-and required controls. PR, provider, ruleset, state-SHA, and live-alias receipts
-will be appended without invented provenance. Completion remains separate from
-AWF-0004's future independent audit.
+and required controls. PR #28 ran full CI in Actions run `31272713270`; merge
+commit `26b5d21b73917353660c7be750825339711f72c2` ran full main CI in run
+`31272820711`. Vercel deployment `dpl_vngjLJMJRMBgo7dM6gpBvT2p7C6J` is
+`READY`, contains one build, and owns the retained public aliases. Ruleset
+`20590341` requires the PR/check lane and names only Scott user id `53326860`
+as bypass actor. State-SHA receipts will be appended only after observed.
+Completion remains separate from AWF-0004's future independent audit.
 
 ## History
 
@@ -100,3 +105,6 @@ AWF-0004's future independent audit.
 - 2026-08-08 · Codex — began execution on the isolated implementation branch.
 - 2026-08-08 · Codex — completed local implementation and all 46 full
   verification steps; normal PR/CI/deployment publication is next.
+- 2026-08-08 · Codex — merged PR #28 after full PR CI; full main CI, one-build
+  production deployment, and least-permissive owner ruleset are verified. The
+  useful direct-main state proof is next.
