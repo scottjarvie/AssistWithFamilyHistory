@@ -25,6 +25,10 @@ const oldOutputPath = path.join(
 );
 const sourcePath = path.join(repositoryRoot, sourceRelativePath);
 const outputPath = path.join(repositoryRoot, outputRelativePath);
+const trackerMetadataPath = path.join(
+  repositoryRoot,
+  "docs/tracker/tracker.json",
+);
 
 const failures = [];
 const assert = (condition, message) => {
@@ -41,10 +45,13 @@ if (!existsSync(sourcePath) || !existsSync(outputPath)) {
   process.exit(1);
 }
 
-const [source, html] = await Promise.all([
+const [source, html, trackerMetadataRaw] = await Promise.all([
   readFile(sourcePath, "utf8"),
   readFile(outputPath, "utf8"),
+  readFile(trackerMetadataPath, "utf8"),
 ]);
+const trackerMetadata = JSON.parse(trackerMetadataRaw);
+const familyCore = trackerMetadata.familyCore;
 const digest = createHash("sha256").update(source).digest("hex");
 const metaDigest = html.match(
   /<meta name="source-sha256" content="([0-9a-f]{64})">/,
@@ -72,11 +79,29 @@ assert(
     !html.includes("Assist With Family History Core Philosophy"),
   "A competing product-level Core Philosophy title remains.",
 );
+assert(
+  /^Assist With Sites — Core Philosophy v\d+\.\d+\.\d+$/.test(
+    familyCore?.label ?? "",
+  ),
+  "Tracker Family Core label is missing or malformed.",
+);
+assert(
+  /^\d{4}-\d{2}-\d{2}$/.test(familyCore?.date ?? ""),
+  "Tracker Family Core date is missing or malformed.",
+);
+assert(
+  /^[0-9a-f]{40}$/.test(familyCore?.commit ?? ""),
+  "Tracker Family Core commit is missing or malformed.",
+);
+assert(
+  /^[0-9a-f]{64}$/.test(familyCore?.sourceSha256 ?? ""),
+  "Tracker Family Core source SHA-256 is missing or malformed.",
+);
 
 for (const requiredText of [
   "**Document:** Assist With Family History — Project Philosophy",
   `**Canonical:**`,
-  "**Family Core:** Assist With Sites — Core Philosophy v1.6.2 (2026-08-08)",
+  `**Family Core:** ${familyCore.label} (${familyCore.date})`,
   "**Aligned:** 2026-08-08",
   "**Adopted:**",
   "**Deferred/gaps:**",
@@ -85,6 +110,14 @@ for (const requiredText of [
 ]) {
   assert(source.includes(requiredText), `Missing alignment field: ${requiredText}`);
 }
+assert(
+  source.includes(familyCore.commit),
+  "Project Philosophy does not name the tracker Family Core commit.",
+);
+assert(
+  source.includes(familyCore.sourceSha256),
+  "Project Philosophy does not name the tracker Family Core source SHA-256.",
+);
 
 const slugify = (value) =>
   value

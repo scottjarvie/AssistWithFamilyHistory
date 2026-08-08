@@ -62,7 +62,9 @@ provenance only and are not a current operating dependency.
 >
 > **Evidence:** Dated capability ledger and repository evidence handoff in this
 > document; `docs/tracker/`; Core v1.6.2 commit
-> `561481843793a1d0fb97eee3984bccfd004c21a2`; PR #28; AWF-WO-001; state
+> `561481843793a1d0fb97eee3984bccfd004c21a2`, source SHA-256
+> `4ac7273ecb1d734b53bcb4cc6ddd5f1ff87ee32293289f0c36526bdf9d58ca47`;
+> PR #28; AWF-WO-001; state
 > commit `dc30429`; Actions run `31273074126`; Vercel ignored deployment
 > `dpl_8FfUtYW5FBJ6sZLbXGkiZtbQvf3a`; retained live deployment
 > `dpl_vngjLJMJRMBgo7dM6gpBvT2p7C6J`. Product capabilities remain separately
