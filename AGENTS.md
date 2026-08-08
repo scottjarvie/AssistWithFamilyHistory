@@ -11,6 +11,7 @@ This project follows the shared Jarvie Projects operating standards:
 
 1. Read Linear before inventing work. Active routes, priorities, labels, blockers, and acceptance criteria live in Linear.
 2. Read the stable repo docs for architecture and verification:
+   - [`Assist With Family History Project Philosophy`](docs/planning/assist-with-family-history-project-philosophy.md) — canonical product purpose, domain language, responsibility split, design character, truth boundaries, and family-Core alignment
    - `docs/README.md`
    - `docs/operations/agent-handoff-runbook.md`
    - `docs/operations/product-health-gates.md`

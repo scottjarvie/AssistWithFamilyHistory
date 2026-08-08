@@ -1,10 +1,12 @@
-# Assist With Family History Core Philosophy
+# Assist With Family History Project Philosophy
 
 > **Philosophy status:** Canonical product identity and claim boundary
 >
-> **Capability evidence last verified:** 2026-07-29
+> **Product document version:** 1.2.0
 >
-> **Repository evidence revision:** `2afbfa3`
+> **Capability evidence last verified:** 2026-08-07
+>
+> **Repository evidence revision:** `2ec5b70`
 >
 > **Scope:** Product truth, language, trust, and design direction—not an
 > implementation plan, production claim, or permission to change application
@@ -18,6 +20,92 @@ overstate the product. Architecture notes, Linear issues, release evidence, and
 operational runbooks remain authoritative for delivery status; they do not
 redefine the product.
 
+## Family Core alignment record
+
+> **Document:** Assist With Family History — Project Philosophy
+>
+> **Canonical:**
+> `docs/planning/assist-with-family-history-project-philosophy.md`
+>
+> **Family Core:** Assist With Sites — Core Philosophy v1.5.0 (2026-08-07)
+>
+> **Aligned:** 2026-08-07 — repository and public claims reviewed at `2ec5b70`
+>
+> **Adopted:** The shared chassis: the three-way person / Assist workspace /
+> your AI promise; dependable family routes and truth surfaces; the Queue
+> contract; scoped, revocable authority; provenance and activity; shared access
+> vocabulary; identity, privacy, export, and deletion rules; family navigation;
+> the Support Desk convention; website launch truth; and the repo-owned Cards /
+> Work Orders / Guide operating contract. Adoption accepts these requirements;
+> it does not prove they are implemented or prescribe the primary experience.
+>
+> **Deferred/gaps:** The unverified big/public-launch requirements recorded below,
+> including the family Queue, MCP and AI setup paths, complete activity history,
+> export and deletion, `/me`, `/admin`, Support Desk, family navigation, and the
+> product tracker. These remain explicit alignment gaps rather than hidden
+> assumptions.
+>
+> **Differs:** Family History keeps its
+> research-to-story purpose and audience; Research Spine; domain objects and
+> workflows; citation-grade evidence, uncertainty, and living-person review
+> gates; information architecture and information density; rare, explicit
+> public-story workflow; content and voice; and the Discover Their Stories
+> archival compass, palette, typography, motifs, and editorial identity. Its
+> research operations console remains distinct from both the product Queue and
+> the internal build tracker.
+>
+> **Evidence:** Dated capability ledger and repository evidence handoff in this
+> document; checked-out revision `2ec5b70`; public/deployed state remains
+> separately unverified where marked **Unknown**.
+
+This document is derived from the internal family contract rather than a copy
+of it. That contract is a shared chassis and trust/operations contract, not a
+site template. It wins where a shared route, trust boundary, privacy rule,
+activity convention, truth surface, navigation convention, or support contract
+directly conflicts. Family History remains authoritative for its purpose,
+users, domain objects, workflows, evidence model, information architecture,
+content, density, voice, branding, palette, typography, motifs, and primary
+experience. The goal is a clearly related sibling, not another version of the
+same site.
+
+Use these status labels throughout this revision:
+
+| Status | Meaning here |
+|---|---|
+| **Current / verified** | Proven in this checked-out repository at the stated revision; still not a deployment or production claim |
+| **Coming soon** | Committed soft-launch work required for the big/public launch; it may appear publicly only beside a plainly unfinished, non-working control or claim |
+| **In design** | Required or deliberately designed, but not yet proven as a complete current path; do not imply availability |
+| **Later** | Unscheduled, exploratory, or gated behind real usage; not a commitment and not eligible for a public **Coming soon** label |
+| **Intentional product-specific difference** | A justified Family History domain or brand choice that preserves the shared family behavior |
+| **Unknown** | Repository evidence cannot establish the live, provider, catalog, or authenticated operational state |
+
+### Adoption and contradiction matrix
+
+| Contract area | Status | Evidence-backed Family History decision |
+|---|---|---|
+| Person / Assist workspace / your AI split | **Current / verified philosophy; Coming soon public-shell alignment** | The enduring split below already makes the person authoritative, Family History durable, and “your AI” user-chosen. The current home source does not yet use the required “Assist your AI, so it can assist you with family history” turn of phrase or link to `/ai` |
+| Domain promise, users, objects, and primary experience | **Intentional product-specific difference** | Keep the research-to-story promise and the connected vocabulary of people, families, relationships, places, buildings, events, sources, claims, questions, context, collections, projects, and stories. Family History decides how researchers, relatives, storytellers, and their chosen AI move through that evidence. The family chassis fixes dependable assistance and trust boundaries, not this domain model or experience |
+| Product Queue | **Coming soon** | `/app/operations`, `researchTasks`, research checks, and handoff export are real research-operations foundations, but they are not the family product Queue at `/queue` and do not implement its four states or directive-first creation path |
+| Queue authority | **In design** | Adopt the family rule: the directive authorizes only reversible, in-scope record changes plainly requested. New objectives, destructive work, identity merges, disputed promotion, publication, purchases, access changes, and outside-world actions return to **Needs you** |
+| Queue context objects | **Intentional product-specific difference; In design** | “Add context” offers three Family History groups: a research subject, evidence, or a work thread. Their concrete objects are defined in the Queue section below; attaching context stays optional |
+| Internal project tracker | **In design — required alignment gap** | No repo-owned tracker with exactly Cards, Work Orders, and Guide was found. `AGENTS.md` and `docs/agent-workflow.md` point to Linear, which does not satisfy the v1.5.0 repo-owned handoff contract. Bootstrap it in a separate follow-up; do not confuse it with the product Queue |
+| MCP and AI setup paths | **Coming soon** | No `/mcp`, `/ai`, `/ai.txt`, or `/settings/ai` route exists. `/llms.txt`, internal app APIs, the API Center, key-management primitives, and a static capability manifest do not substitute for a verified scoped MCP connection and generated current briefing |
+| Activity and provenance | **Current / verified partial foundation; Coming soon complete contract** | Import runs, research logs, story review events, source links, model/prompt fields, and the `agentActivity` schema provide partial evidence. The repo does not prove a plain-language, record-visible entry for every meaningful AI create, change, or delete |
+| Access and sharing | **Current / verified Private and guarded Public foundations; In design Unlisted and Trusted** | Owner-scoped vault reads/writes and filtered public-story publication exist in source. Family History intentionally needs rare Public stories plus later Trusted collaboration and read-only Unlisted views; no complete invite or unlisted-link lifecycle is verified |
+| Identity boundary | **Current / verified source foundation; Unknown deployed state** | Source supports per-site Clerk identity and owner isolation when configured, plus local/guest modes for controlled environments. No shared Assist identity or cross-site session is claimed, and exact deployed Clerk/trust-boundary configuration is not proven here |
+| Export and deletion | **Coming soon** | Person context-pack export and key revocation are narrower current tools. No complete owner export, `/settings/data`, `/delete-account`, coordinated record/account deletion, attachment purge, or content-bearing-history purge is verified |
+| Public truth surfaces and honesty | **Current / verified partial source; Coming soon alignment** | `/updates`, public marketing, roadmap, privacy, and `/llms.txt` exist in source. The home page lacks the required FAQ and `/ai` invitation; `/updates` lacks the exact **Local / In review / Backend live / Public & live** labels and AI-written 1.1.1 release habit; and stale or unverified public statements need a separate sentence-by-sentence honesty pass before a big/public launch |
+| `/me` and `/admin` | **Coming soon** | No family `/me` or owner `/admin` route exists. `/app/audit` is a private genealogy-readiness view and `/app/api/admin` is an API-key operator surface; neither is the family usage/stats contract |
+| Support Desk | **In design / deferred dependency** | `/contact` exists, but no registered Assist With Life Support Desk source key or header/footer desk link is present. Link it only when the shared desk is live; do not market it beforehand |
+| Brand, design, and themes | **Intentional product-specific difference; Coming soon accessibility floor** | Preserve Discover Their Stories’ compass, parchment, teal/rust, archival annotations, evidence-thread motif, typography, and editorial voice as the product's own design system. The designed philosophy reader already supports light/dark; the product UI does not yet prove first-class light/dark coverage. The family swatches `#8FD7B4` and `#245A43` identify Family History in shared portfolio wayfinding; they do not replace or dictate the product palette |
+| Dense information | **Intentional product-specific difference; Current / verified partial foundation; Coming soon dependable behavior** | Family History may be denser than a sibling because evidence comparison requires it. People reads are capped and the operations view has a contained table, filters, sorting controls, and bounded rendering. Cursor pagination, table-first people view, click-to-sort columns, remembered preferences, account-saved views, and complete phone drill-down are not verified. The family contract supplies performance and phone-usability guardrails, not a uniform layout |
+| Family navigation | **Coming soon** | No family catalog row exists in the public or signed-in shell. It must show the whole verified roster without leaking cross-site counts or activity |
+| Launch stage | **Unknown current publication state; adopted sequence** | Repository and public-copy evidence cannot prove the real domain, Assist With Life catalog listing, deployment, or authenticated operation. Do not call this soft-launched, big/public-launched, or production-ready without fresh external proof |
+| Native privacy and review readiness | **Later guardrail only** | No native package is claimed or currently designed. Revisit native review requirements only after substantial recurring website use demonstrates a distinct native job; this does not shape the present product philosophy or website experience |
+
+This matrix is the current contradiction/adoption record. The dated capability
+ledger later in the document provides the deeper repository evidence boundary.
+
 ## One-sentence identity
 
 **Assist With Family History is a durable, user-controlled research-to-story
@@ -25,13 +113,31 @@ workspace where your AI can work with connected evidence and context, and
 where you can understand, correct, and turn that work into meaningful,
 source-aware stories.**
 
-> **Owner-language hold:** The portfolio-level owner-authored front-door line
-> is intentionally pending. Do not replace this working identity from a
-> partial excerpt; wait for the complete owner-authored project set.
+> **Family front-door line:** “Assist your AI, so it can assist you with family
+> history.” This required family phrase sits beside—not in place of—the fuller
+> research-to-story identity above.
 
 The higher purpose is connection: not only knowing that something happened,
 but understanding the human life and larger world the evidence can responsibly
 help reveal.
+
+## Who this serves and what they need
+
+Family History serves people doing evidence-led work about lives and
+relationships: family historians, relatives preserving what they know,
+researchers resolving uncertain identities, and storytellers trying to make a
+life understandable without outrunning its sources. They may be experienced
+genealogists or simply the family member holding a box of documents and a
+question. The product does not require professional vocabulary or one preferred
+way to organize a family.
+
+Their recurring jobs are to preserve a clue without losing its origin; connect
+people, relationships, places, events, and historical context; compare
+conflicting evidence; keep uncertainty visible; decide what needs more research
+or review; and turn responsibly supported understanding into a story another
+person can follow. Some work is solitary, some eventually involves a trusted
+relative, and all of it needs to remain understandable after the current AI
+conversation ends.
 
 ## Practical picture: think of it as…
 
@@ -67,9 +173,9 @@ context, relationships, questions, and story. A family tree may be one useful
 view of that trail, but it is not the product's limit or its measure of
 understanding.
 
-This is prepared explanatory structure, not the pending owner-authored
-front-door language. The facets are grounded in the enduring product, but they
-do not claim that every corresponding view, visualization, import, AI
+This is prepared explanatory structure around the family front-door line. The
+facets are grounded in the enduring product, but they do not claim that every
+corresponding view, visualization, import, AI
 connection, or publishing path is currently available. The dated
 [capability ledger](#dated-repository-capability-ledger) states what the
 checked-out repository can honestly support.
@@ -120,11 +226,11 @@ isolated profile edit, uploaded file, search result, or generated paragraph.
 
 It also provides a durable coordination model: people and their chosen AIs can
 work from explicit scopes, questions, evidence, authority, state, blockers,
-and next steps. Named collaboration inside a project and bounded sharing of a
-selected story, tree branch, collection, or view extend that model where
-appropriate—but both remain **In design** until their complete user paths are
-implemented and verified. Human-complete research, correction, organization,
-and writing must remain possible without an AI connection.
+and next steps. Trusted collaboration inside a project and an Unlisted,
+read-only view of a selected story, tree branch, collection, or view extend
+that model where appropriate—but both remain **In design** until their complete
+user paths are implemented and verified. Human-complete research, correction,
+organization, and writing must remain possible without an AI connection.
 
 > **Marketing and PR takeaways**
 >
@@ -512,8 +618,8 @@ family claims should remain user-controlled.
 Private, AI-eligible, and public are separate states:
 
 - something may be visible to its owner but not permitted for AI use;
-- something may be permitted for a chosen AI but not for named collaborators
-  or share links;
+- something may be permitted for a chosen AI but not for Trusted collaborators
+  or Unlisted links;
 - something may be available to a named collaborator but excluded from every
   bounded link and public story;
 - something may be included in a private bounded view but not publicly
@@ -524,15 +630,44 @@ Sharing and publishing are explicit, reviewable state changes—never automatic
 side effects of import, AI use, a “published” suggestion, or connection to
 another Assist product.
 
+### Identity, export, and deletion boundary
+
+Family History identity is site-specific. Signing into or deleting a Family
+History account must not sign a person into, delete from, or silently move data
+through another Assist product. The repository contains conditional Clerk
+identity and owner-isolation foundations, but the exact deployed identity and
+trust-boundary configuration is **Unknown** until verified in the real
+environment.
+
+Before the big/public launch, `/settings/data` must let a person export the
+Family History data held about them in a useful form, see every active share,
+delete a record, and request deletion of the site-specific account. Record
+deletion removes the record, attachments, and content-bearing history; only a
+minimal content-free tombstone may remain when operationally necessary.
+Account deletion must map and remove the Clerk identity, Convex owner records,
+raw artifacts and exports, media/storage objects, Unlisted links, AI grants, and
+other processors keyed to that account, with any lawful retention explained
+plainly. `/delete-account` provides the stable public explanation and signed-in
+request path required for later Google Play readiness. None of these complete
+paths is verified today, so they are **Coming soon**, not Current.
+
 ## Collaboration and bounded sharing
 
-Family History needs two distinct sharing modes. Neither is verified as a
-current repository capability; both are **In design**.
+Family History adopts the family access vocabulary: **Private**, **Unlisted**,
+**Trusted**, and **Public**. Private is the default. A product does not need to
+offer every higher level, but it must not invent a competing name or meaning.
 
-### Named collaboration inside a project
+The repository currently proves owner-scoped Private foundations and a
+guarded, separately promoted Public story path in source. Family History also
+needs two distinct future sharing modes—Trusted collaboration and Unlisted
+bounded views. Neither is verified as a complete current repository
+capability; both are **In design**. Public storytelling is an intentional,
+rare domain extension, not permission to make the underlying vault public.
 
-A named collaborator is an identifiable person invited into a family-history
-project. Their access is account- or identity-bound and limited to the named
+### Trusted collaboration inside a project
+
+A Trusted collaborator is an identifiable person invited into a family-history
+project. Their access is account-bound or identity-bound and limited to the named
 family tree, research project, person, story, collection, or narrower record.
 The owner grants each allowed operation independently: retrieve, comment or
 review, add, update, delete, promote, or publish where relevant.
@@ -542,37 +677,42 @@ scope, allowed operations, changes, and revocation should remain visible and
 auditable. Removing a collaborator ends future access without erasing the
 attributed research or review history they already contributed.
 
-### A share link to a bounded view
+### An Unlisted link to a bounded view
 
-A share link gives its holder access only to a deliberately selected story,
-tree branch, collection, or other bounded view. It is not an invitation into
-the project, does not identify its holder as a collaborator, and does not grant
-access to neighboring people, sources, notes, stories, or the full tree.
+An Unlisted link is a long, unguessable, read-only address that gives its holder
+access only to a deliberately selected story, tree branch, collection, or other
+bounded view. It is not secret, never expires on its own, and works until the
+owner revokes it. It is not an invitation into the project, does not identify
+its holder as a collaborator, and does not grant access to neighboring people,
+sources, notes, stories, or the full tree.
 
 Before creating a link, the owner should be able to review exactly what the
-view contains, who it is intended for, whether it expires, whether it is
-discoverable, and whether any supported copying or download is allowed. A
-link's status and scope must be understandable, revocable, and auditable. A
-tree-branch link is a bounded view of selected relationships and supporting
-material—not a transfer of ownership or a copy of the whole family tree.
+view contains, who it is intended for, that anyone holding the address can open
+it, that it is not indexed or listed, and whether any supported copying or
+download is allowed. Its status and scope must be understandable, revocable,
+and auditable; revocation ends access immediately. A tree-branch link is a
+bounded view of selected relationships and supporting material—not a transfer
+of ownership or a copy of the whole family tree.
 
-Named collaboration and link sharing can coexist, but neither implies the
-other. A collaborator does not automatically receive a share link, and a link
-holder does not gain collaboration or mutation authority.
+Trusted collaboration and Unlisted sharing can coexist, but neither implies
+the other. A collaborator does not automatically receive an Unlisted link, and
+a link holder does not gain collaboration or mutation authority.
 
 ### Public storytelling remains separate
 
 Publishing a story publicly is a separate, explicit promotion decision. An
-invite does not publish; creating or opening a share link does not make its
+invite does not publish; creating or opening an Unlisted link does not make its
 contents public or searchable; and a public story does not expose the
 underlying project, tree branch, collection, private sources, or research
 notes.
 
-Living people and private family documents are excluded from collaboration,
-bounded views, and publication by default unless the owner deliberately grants
+Living people and private family documents are excluded from Trusted access,
+Unlisted views, and publication by default unless the owner deliberately grants
 the relevant person, scope, operation, and audience access after review.
 Inherited relationships, public historical context, or an already-public story
-must never silently broaden that boundary.
+must never silently broaden that boundary. One owner-visible screen must
+eventually list every active Unlisted or Trusted grant and make each one
+revocable.
 
 ## Human visibility and control
 
@@ -587,7 +727,9 @@ AI-platform vocabulary:
 5. Which sources support this claim or story detail?
 6. Which details are context, inference, family lore, or AI synthesis?
 7. What changed, who or what changed it, and can I correct or recover it?
-8. What is active, waiting, blocked, needs me, or ready to resume?
+8. Which Queue work **Needs you**, is **Working**, is **Waiting for your AI**,
+   or is **Done**—and which separate research records remain proposed,
+   disputed, or under review?
 9. What is private, AI-eligible, available to named collaborators, included in
    a bounded link, or public?
 10. Which outside or cross-Assist connections exist, what can they do, and how
@@ -605,17 +747,18 @@ through human-complete workflows.
 
 ## How to use this document
 
-Read the identity, practical picture, two differentiation sections, product
-scope, durable family model, and research-to-story loop first. They are the
-philosophical heart. The later builder reference translates that philosophy
+Read the family contract adoption record, identity, practical picture, two
+differentiation sections, product scope, durable family model, and
+research-to-story loop first. They are the philosophical heart and the shared
+alignment boundary. The later builder reference translates that philosophy
 into operating contracts and dated capability truth without replacing it. For
 focused work, use this map:
 
 | Reader | Start with | Questions answered |
 |---|---|---|
-| Product owners | [One-sentence identity](#one-sentence-identity), [Practical picture](#practical-picture-think-of-it-as), [Why not a quick feature?](#why-not-just-ask-your-ai-to-build-a-quick-feature), [Why not a conventional site?](#why-this-instead-of-a-conventional-website), [Product scope](#product-scope-and-non-goals), [Durable family model](#the-durable-assist-family-and-trust-model), and [Shared authority](#user-owned-data-and-shared-authority) | What Family History helps with, why a durable workspace matters, who owns the work, and what the product must not become |
-| Implementers | [Builder reference](#builder-reference-operating-model-and-capability-truth), [AI and queue model](#how-your-ai-and-queue-work), [Information model](#durable-information-model), [Provenance](#provenance-uncertainty-and-changing-understanding), and [Maintenance](#maintenance-and-claim-verification) | What must persist, how work begins or resumes, which distinctions must survive, and what needs proof |
-| AI and integration builders | [Builder reference](#builder-reference-operating-model-and-capability-truth), [AI and queue model](#how-your-ai-and-queue-work), [Shared authority](#user-owned-data-and-shared-authority), [Questions and queues](#questions-queues-and-unfinished-work), and [Detailed trust boundaries](#detailed-trust-boundaries-for-builders) | Where the chosen AI works, which Family History operations may be used, what a durable handoff contains, and where the site's responsibility stops |
+| Product owners | [Family alignment](#family-core-alignment-record), [One-sentence identity](#one-sentence-identity), [Who this serves](#who-this-serves-and-what-they-need), [Practical picture](#practical-picture-think-of-it-as), [Why not a quick feature?](#why-not-just-ask-your-ai-to-build-a-quick-feature), [Why not a conventional site?](#why-this-instead-of-a-conventional-website), [Product scope](#product-scope-and-non-goals), [Durable family model](#the-durable-assist-family-and-trust-model), and [Shared authority](#user-owned-data-and-shared-authority) | What Family History helps with, who it serves, how it adopts the family contract, why a durable workspace matters, who owns the work, and what the product must not become |
+| Implementers | [Builder reference](#builder-reference-operating-model-and-capability-truth), [AI and Queue model](#how-your-ai-and-the-family-history-queue-work), [Information model](#durable-information-model), [Provenance](#provenance-uncertainty-and-changing-understanding), and [Maintenance](#maintenance-and-claim-verification) | What must persist, how work begins or resumes, which distinctions must survive, and what needs proof |
+| AI and integration builders | [Builder reference](#builder-reference-operating-model-and-capability-truth), [AI and Queue model](#how-your-ai-and-the-family-history-queue-work), [Shared authority](#user-owned-data-and-shared-authority), [Questions and queues](#questions-queues-and-unfinished-work), and [Detailed trust boundaries](#detailed-trust-boundaries-for-builders) | Where the chosen AI works, which Family History operations may be used, what a durable handoff contains, and where the site's responsibility stops |
 | Writers and designers | [One-sentence identity](#one-sentence-identity), [Practical picture](#practical-picture-think-of-it-as), [Why not a quick feature?](#why-not-just-ask-your-ai-to-build-a-quick-feature), [Why not a conventional site?](#why-this-instead-of-a-conventional-website), [Product scope](#product-scope-and-non-goals), [Storytelling principles](#storytelling-principles), [Capability truth](#capability-truth), [Language rules](#language-rules), and [Homepage implications](#public-homepage-and-future-shell-implications) | How to explain the product simply, differentiate it responsibly, state what may be claimed now, describe evidence and uncertainty, and preserve the intended feel |
 
 Anyone publishing a capability claim must read both
@@ -637,8 +780,9 @@ Use this builder reference to preserve five implementation contracts:
    exact next step across sessions;
 3. observing or retrieving remains distinct from changing, deleting,
    promoting, sharing, or publishing;
-4. implementation claims stay labeled **Current**, **In design**, or
-   **Later**; and
+4. implementation claims use the complete status vocabulary in the family
+   alignment record, with **Coming soon** reserved for committed
+   big/public-launch work; and
 5. repository foundations, deployed behavior, public proof, and authenticated
    operational proof remain distinct.
 
@@ -647,7 +791,7 @@ builder material optional. Any design or feature choice that touches AI work,
 authority, provenance, queues, sharing, publication, or a capability claim
 must follow the relevant sections below.
 
-## How your AI and queue work
+## How your AI and the Family History Queue work
 
 Family History is designed to work alongside the AI environment a person
 chooses, not replace it. A person may continue working in ChatGPT, Codex,
@@ -660,11 +804,11 @@ The enduring split is:
 - **Your chosen AI remains the place for conversation, reasoning, research,
   synthesis, and judgment.**
 - **Family History gives that work durable domain memory, scoped records and
-  tools, a resumable queue, and a visual place for you to understand progress,
+  tools, a resumable Queue, and a visual place for you to understand progress,
   evidence, uncertainty, and results.**
 - **You decide which AI may use which Family History scope and operation.**
-  Neither an AI client's general capability nor a queue assignment grants
-  Family History authority.
+  Neither an AI client's general capability nor an unrelated Queue item grants
+  broader Family History authority.
 
 Work can begin in either direction.
 
@@ -688,24 +832,73 @@ person, source, story, collection, or research project in scope; the question
 or requested outcome; relevant evidence and context; priority; constraints;
 and the authority available to the chosen AI.
 
-That instruction can wait in the queue until the person or an authorized,
+That directive can wait in the Queue until the person or an authorized,
 compatible AI path picks it up. The result returns to the same durable context
 with its acting identity, evidence, state, history, and next step intact. This
 direction supports asynchronous work without requiring the person to keep one
 chat open or reconstruct the assignment later.
 
-### A queue is continuity, not a todo list
+### The directive is enough; context is optional
+
+The Family History Queue begins with one required field: the person's directive
+in their own words. No category, attachment, family-tree selection, or form may
+block submission. “Add context” is one optional tap and offers three
+genealogy-shaped groups:
+
+1. **Research subject** — a person, family line, relationship, place, building,
+   community, event, or era.
+2. **Evidence** — a source, document, record, photograph, media item, memory,
+   citation, or claim.
+3. **Work thread** — a research question, project, collection, or story.
+
+These groups are an **Intentional product-specific difference**: they keep the
+family's directive-first interaction while preserving the richer Family
+History graph. Exact chips and arguments remain **In design** until the product
+Queue is implemented and tested.
+
+### Four Queue states, exactly
+
+| State | Family History meaning | Card requirement |
+|---|---|---|
+| **Needs you** | Work stopped on a decision, fact, file, review, or authority only the person can provide | The smallest exact question, answerable in place |
+| **Working** | The person's AI has picked up the directive | The current step in genealogy language |
+| **Waiting for your AI** | The directive was accepted but no AI has picked it up | Plainly state that nothing is running; before connection, link to `/ai` |
+| **Done** | A result or answered question is attached | The readable result, evidence links, provenance, and any remaining uncertainty |
+
+There is no fifth product Queue state. **Needs review**, **provisional**,
+**disputed**, **publishable**, and similar terms remain valuable record or
+evidence states; they do not become Queue states. Current database values such
+as `todo`, `in_progress`, and `blocked` belong to the existing research-task
+implementation and must not be presented as the family Queue vocabulary.
+
+### Bounded directive authority
+
+The directive itself authorizes the person's chosen AI to make reversible,
+in-scope Family History record changes plainly necessary to complete the
+request, but only inside an already granted actor, record, and operation scope.
+It does not authorize a new objective, destructive work, identity merge,
+promotion of a disputed claim, publication, purchase, access or identity
+change, outside communication, or action in the world. If the requested result
+would cross one of those boundaries—or the intended scope is genuinely
+unclear—the card moves to **Needs you** with the smallest question that unlocks
+it.
+
+Permission and Queue authority remain separate layers. A directive cannot
+grant an AI access to a person or source it was not allowed to read; a general
+write grant cannot invent a directive; and a review preference cannot widen
+either one.
+
+### A Queue is continuity, not a todo list
 
 A useful queue item preserves:
 
-- the exact scope and requested outcome;
-- the questions, assumptions, and desired level of proof;
+- the directive verbatim, the exact scope, and requested outcome;
+- its one family Queue state;
+- the handoff line: who it was left for, when, and whether it was picked up;
 - priority and why the work matters now;
-- relevant evidence, context, and prior attempts;
-- state such as active, waiting, blocked, needs review, or done;
+- any optional evidence, context, questions, assumptions, and prior attempts;
 - the responsible person or AI and the operations actually authorized;
-- blockers, dependencies, and what would unblock them;
-- the exact next step or checkpoint; and
+- the exact next step while Working or blocker question while Needs you; and
 - result links, provenance, decisions, and history.
 
 That continuity changes the work. One AI session can stop and a later session
@@ -715,23 +908,39 @@ progress and results without treating the queue as permission or trusting an
 opaque “working” state.
 
 > **Capability truth:** The current repository has research tasks, research
-> checks and logs, an operations queue, compact handoff export, and selected
-> quality and audit foundations. It does not yet prove that arbitrary external
-> AI clients can authenticate, claim work, maintain leases or checkpoints,
-> recover stale work, and return results end to end. Those broader client and
-> multi-AI paths remain **In design** until implemented and verified.
+> checks and logs, an operations console, compact handoff export, and selected
+> quality and audit foundations. That console is **not** the family Queue, and
+> no `/queue` route or complete arbitrary-client pickup-and-return path is
+> verified. The product Queue is **Coming soon** for the big/public launch.
+
+### The product Queue is not the project tracker
+
+The Queue carries a person's family-history directive inside the product. The
+internal tracker coordinates building the product. The tracker has exactly
+three top-level concepts: **Cards** record one outcome and current truth;
+**Work Orders** bundle an owner-approved, bounded tranche; and the **Guide**
+teaches a new person or AI how to continue. Work Order execution
+(`Ready / Active / Complete / Superseded`) remains separate from independent
+audit (`Not audited / Passed / Follow-up needed`), with real model/agent
+provenance and evidence recorded for both.
+
+No repo-owned Cards / Work Orders / Guide source or stable entry point is
+verified in this repository. Linear coordination and the product's research
+operations console are not substitutes. This is an **In design — required
+alignment gap** for a separate bootstrap task; this documentation-only task
+does not create a competing board or automatic dispatcher.
 
 ## Questions, queues, and unfinished work
 
-The earlier [AI and queue model](#how-your-ai-and-queue-work) explains the two
-directions of work. This section defines the durable research contract behind
-that handoff.
+The earlier [AI and Queue model](#how-your-ai-and-the-family-history-queue-work)
+explains the two directions of work. This section defines the durable research
+contract behind that handoff.
 
 Questions belong to the person, relationship, source, claim, place, event,
 story, collection, or research project they concern. They can remain open
 without blocking unrelated work.
 
-The queue is the durable front door for new instructions and resumable work:
+The product Queue is the durable front door for new instructions and resumable work:
 records to seek, captures to review, claims to compare, provisional identities
 to resolve, context to research, stories to revise, and publication checks to
 complete.
@@ -741,16 +950,20 @@ A useful queue item records:
 - scope and requested outcome;
 - responsible person or AI;
 - source or evidence references;
-- status such as active, waiting, blocked, needs review, or done;
+- exactly one Queue state: **Needs you**, **Working**, **Waiting for your AI**,
+  or **Done**;
 - questions and assumptions;
 - next action and checkpoint;
 - result links and history; and
 - what authority the assigned actor actually has.
 
-The queue coordinates work; it does not grant authority or turn every question
-into an approval gate. Work may pause for a person, another AI, a provider, an
-archive, or better evidence. The next session should be able to resume without
-reconstructing the whole conversation.
+The Queue coordinates work under the bounded directive authority above. It
+does not turn every question into an approval gate or grant access beyond the
+AI's existing scope. Work may pause for the person, their AI, a provider, an
+archive, or better evidence. When only the person can unblock it, the Queue
+state is **Needs you**; when nothing has picked it up, it is **Waiting for your
+AI**. The next session should resume without reconstructing the whole
+conversation.
 
 ## Capability truth
 
@@ -759,43 +972,47 @@ current proof, not design intent.
 
 | Status | Meaning | Claim rule |
 |---|---|---|
-| **Current** | Verified in the checked-out repository, with the exact evidence boundary stated | May be described as a repository foundation; it is not automatically a deployed or production claim |
+| **Current / verified** | Verified in the checked-out repository, with the exact evidence boundary stated | May be described as a repository foundation; it is not automatically a deployed or production claim |
+| **Coming soon** | Committed work required for the big/public launch but not yet verified | May appear on a soft-launch public surface only beside the unfinished claim or non-working future control; never on `/updates`, `/ai`, or `/ai.txt` as though usable |
 | **In design** | The philosophy or an active design/architecture direction defines it, but the complete user path is not verified | Must be labeled “in design”; no direct action or implied availability |
 | **Later** | Desired, partial, exploratory, or unscheduled capability | May appear only as future direction, never as a promise |
+| **Intentional product-specific difference** | Family History needs a different domain object, workflow detail, safety gate, voice, or visual treatment while keeping shared family behavior | State the reason and preserve the family boundary it extends |
+| **Unknown** | The repository cannot prove current live, provider, catalog, or authenticated operational state | Do not infer a launch or availability state; verify externally before a claim |
 
-For public availability, **Current** must be upgraded with exact deployed
+For public availability, **Current / verified** must be upgraded with exact deployed
 environment and user-path proof. Source code, a route, a mockup, a Linear issue,
 or an older production observation is not sufficient by itself.
 
 ### Dated repository capability ledger
 
-> **Time-sensitive evidence—verified 2026-07-29 at repository commit
-> `2afbfa3`:** This table describes the checked-out source. It does not prove
+> **Time-sensitive evidence—verified 2026-08-07 at repository commit
+> `2ec5b70`:** This table describes the checked-out source. It does not prove
 > deployment, provider configuration, authenticated production behavior, or
 > safe operation with private family data.
 
 | Capability area | Repository evidence | Honest interpretation |
 |---|---|---|
-| Research vault | Owner-scoped Convex tables for people, alternate names, relationships, events, places, sources, citations, candidate source facts, media, context, imports, tasks, logs, stories, and historical context | **Current repository foundation.** Richer generalized claims, institutions, collections, and version histories remain in design |
-| FamilySearch intake | User-mediated Chrome extension capture, package validation, preview, merge, dedupe, warnings, and raw/provenance contracts | **Current repository foundation.** Not automatic import, provider API access, unattended crawling, or universal genealogy integration |
-| Provenance and uncertainty | Source/citation separation, citation confidence and conflicts, candidate/accepted/conflict/rejected source facts, import runs, research logs, and context source references | **Current partial foundation.** Not a complete generalized claim/provenance graph or immutable research history |
-| Relationships | First-class person-to-person relationship rows, roles, facts, provisional relatives, and guarded promotion/merge flow | **Current partial foundation.** Broader social/institutional relationships and full competing-interpretation history remain in design |
-| Context | Loose context items plus place/era research packs with sources, confidence, review, privacy, and AI-use gates | **Current partial foundation.** Buildings and institutions are pack/context types, not a complete first-class context graph |
-| Questions and operations | Research tasks, research checks, research log, operations queue, compact handoff export, and quality-gated check writes | **Current partial foundation.** Not a complete durable multi-AI run, lease, checkpoint, and recovery system |
-| AI context and Story Writer | Owner-scoped person context packs; manual prompt copy; optional OpenRouter generation; editable draft save with model/prompt metadata | **Current repository foundation.** Generation is person-centered and first-party; it is not proof of arbitrary chosen-AI connectivity or every story subject |
-| Story Studio and publication | Draft/review/published states, reviewer assignment, evidence/context/privacy/living-person gates, explicit human confirmation, public story DTO filtering, and unpublish paths | **Current repository foundation.** Public availability still needs deployment/user-path proof; broader publishing, collaboration, books, and collections are not established |
-| Collaboration and bounded sharing | Philosophy direction plus backlog decisions for family review, family-sharing artifacts, and richer sharing settings; no complete invite or scoped-link path is verified | **In design.** Named project collaboration and bounded links for a selected story, tree branch, collection, or view are distinct future modes. Current guarded story publication proves neither |
-| Scoped authority | Scope vocabulary, API-key mint/list/suspend/revoke primitives, owner checks, story roles, guarded publish actions, and selected review/audit events | **Current partial foundation.** Incoming API-key resolution to an external AI is explicitly unfinished; self-asserted story headers are not a public authorization model |
-| API and AI connections | Internal app APIs, a static planning capability manifest, a story OpenAPI skeleton, `/api/capabilities`, API Center source, and `llms.txt` | **Current internal/planning foundation only.** No verified public agent API, no MCP server, no universal AI setup path |
-| Search and retrieval | Person/place/stories views, owner-scoped API reads, context packs, filters, and queue exports | **Current narrow retrieval surfaces.** No verified universal search across the full information model |
-| Visualization | People/place workspaces and data suitable for relational views; Timeline route is explicitly a placeholder | **Partial foundation / in design.** Do not claim timeline, pedigree, map, heatmap, or general graph experiences as shipped |
-| Retention, export, and deletion | Low-level record and key revocation paths plus documented lifecycle gap | **In design.** No complete owner-vault export, coordinated retention policy, account deletion, or cross-store recovery workflow is verified |
+| Research vault | Owner-scoped Convex tables for people, alternate names, relationships, events, places, sources, citations, candidate source facts, media, context, imports, tasks, logs, stories, and historical context | **Current / verified repository foundation.** Richer generalized claims, institutions, collections, and version histories remain **In design** |
+| FamilySearch intake | User-mediated Chrome extension capture, package validation, preview, merge, dedupe, warnings, and raw/provenance contracts | **Current / verified repository foundation.** Automatic import, provider API access, unattended crawling, and universal genealogy integration are not claimed |
+| Provenance and uncertainty | Source/citation separation, citation confidence and conflicts, candidate/accepted/conflict/rejected source facts, import runs, research logs, and context source references | **Current / verified partial foundation.** A complete generalized claim/provenance graph and immutable research history remain **In design** |
+| Relationships | First-class person-to-person relationship rows, roles, facts, provisional relatives, and guarded promotion/merge flow | **Current / verified partial foundation.** Broader social/institutional relationships and full competing-interpretation history remain **In design** |
+| Context | Loose context items plus place/era research packs with sources, confidence, review, privacy, and AI-use gates | **Current / verified partial foundation.** Buildings and institutions are pack/context types; a complete first-class context graph remains **In design** |
+| Questions and operations | Research tasks, research checks, research log, `/app/operations`, compact handoff export, and quality-gated check writes | **Current / verified partial foundation.** This is a research-operations console, not the family Queue. `/queue`, its four states, directive-first creation, and a complete multi-AI pickup/return path are **Coming soon** |
+| AI context and Story Writer | Owner-scoped person context packs; manual prompt copy; optional OpenRouter generation; editable draft save with model/prompt metadata | **Current / verified repository foundation.** Generation is person-centered and first-party; arbitrary chosen-AI connectivity and every story subject remain unverified |
+| Story Studio and publication | Draft/review/published states, reviewer assignment, evidence/context/privacy/living-person gates, explicit human confirmation, public story DTO filtering, and unpublish paths | **Current / verified repository foundation.** Public availability remains **Unknown** pending deployment/user-path proof; broader publishing, collaboration, books, and collections are **Later** |
+| Collaboration and bounded sharing | Owner-scoped private vault operations plus guarded public-story publication; no complete invite or unlisted-link path | **Current / verified Private and guarded Public foundations.** Trusted project collaboration and read-only, non-expiring Unlisted links are **In design** and distinct from publication |
+| Scoped authority | Scope vocabulary, API-key mint/list/suspend/revoke primitives, owner checks, story roles, guarded publish actions, and selected review/audit events | **Current / verified partial foundation.** Incoming API-key resolution to an external AI is explicitly unfinished; self-asserted story headers are not a public authorization model |
+| API and AI connections | Internal app APIs, API-key management, scope presets, the `agentActivity` schema, a static planning capability manifest, a story OpenAPI skeleton, `/api/capabilities`, API Center source, and `/llms.txt` | **Current / verified internal/planning foundation only.** No verified incoming external-AI authentication, public agent API, `/mcp`, `/ai`, `/ai.txt`, or `/settings/ai` path |
+| Search and retrieval | Person/place/stories views, owner-scoped API reads, context packs, filters, and queue exports | **Current / verified narrow retrieval surfaces.** Universal search across the full information model is **In design** |
+| Visualization | People/place workspaces and data suitable for relational views; Timeline route is explicitly a placeholder | **Current / verified partial foundation; In design full experience.** Do not claim timeline, pedigree, map, heatmap, or general graph experiences as shipped |
+| Retention, export, and deletion | Person context-pack export, low-level record operations, and key revocation plus a documented lifecycle gap | **Current / verified narrow tools; Coming soon complete contract.** No complete owner-vault export, coordinated retention policy, `/settings/data`, `/delete-account`, or cross-store deletion workflow is verified |
 | Cross-product Assist links | Philosophy and portfolio direction only | **Later.** No qualifying explicit, reviewable, revocable Family History connection is verified |
 
-No item in this philosophy is designated **Coming soon**. The repository uses
-that label on a Timeline placeholder, but a placeholder is not delivery proof.
-Until an active, owned delivery commitment and user path are verified, this
-philosophy classifies the capability as **In design** or **Later**.
+The family contract makes its Tier A gaps committed big/public-launch work, so
+this philosophy labels those gaps **Coming soon**. That status is not delivery
+proof. The repository's Timeline placeholder remains **Later** because no
+active owned delivery commitment is verified. Unscheduled ideas stay **Later**
+and must not borrow the **Coming soon** label.
 
 ### Explicitly unclaimed until verified
 
@@ -817,7 +1034,7 @@ them or a planning artifact names them:
 - timelines, maps, pedigree explorers, relationship graphs, heatmaps, or
   migration visualizations as completed experiences;
 - named project collaboration, collaborator invitations, or family review;
-- scoped or unlisted share links for a story, tree branch, collection, or
+- scoped Unlisted links for a story, tree branch, collection, or
   bounded view;
 - books, exhibits, audio/podcast production, or general publishing;
 - owner-vault export and coordinated account deletion; or
@@ -842,10 +1059,10 @@ Assist With Family History does not:
 - let an actor change, delete, promote, merge, or publish merely because that
   actor may retrieve;
 - treat an automation or review preference as authority;
-- turn a collaborator invitation into blanket vault access or let a share link
+- turn a Trusted invitation into blanket vault access or let an Unlisted link
   expose neighboring or newly connected records outside its reviewed view;
-- treat a share link as collaboration authority, make it discoverable by
-  default, or convert either sharing mode into public publication;
+- treat an Unlisted link as collaboration authority, index or list it, add an
+  automatic expiry, or convert either sharing mode into public publication;
 - publish living-person information, private family material, restricted
   media, or unreviewed claims automatically;
 - silently share information with another person, AI, family tree, research
@@ -868,12 +1085,13 @@ external-AI account connection, or evidence that the product keeps provider
 sessions. Public wording should not generalize it into “Family History connects
 to your accounts.”
 
-Family History may eventually issue its own scoped credentials so an approved
-AI client can call Family History tools. That is different from collecting the
-credentials used to access an outside provider. Family History authorization
-must derive and enforce acting identity, family and record scope, and allowed
-operation; preserve provenance and audit; support revocation; and keep
-retrieval separate from mutation.
+The repository can mint, list, suspend, and revoke Family History API keys, but
+it does not yet resolve an incoming key into an externally usable Family
+History tool session. A future verified connection is different from
+collecting credentials used to access an outside provider. Family History
+authorization must derive and enforce acting identity, family and record scope,
+and allowed operation; preserve provenance and audit; support revocation; and
+keep retrieval separate from mutation.
 
 ## Language rules
 
@@ -895,10 +1113,11 @@ Public and product language should:
   promoting, merging, and publishing;
 - name the actual tree, person, source, story, collection, or research-project
   scope when describing access;
-- use **named collaborator** for an identifiable person invited into a project
-  with explicit operations;
-- use **share link** for access to a selected story, tree branch, collection,
-  or bounded view without project membership or mutation authority;
+- use **Trusted collaborator** for an identifiable person invited into a
+  project with explicit operations;
+- use **Unlisted link** for non-expiring, owner-revocable, read-only access to a
+  selected story, tree branch, collection, or bounded view without project
+  membership or mutation authority;
 - use **public story** only for separately promoted, publicly available
   narrative output;
 - keep private, AI-eligible, collaborator-visible, link-visible, and public
@@ -908,9 +1127,12 @@ Public and product language should:
 - use **AI environment** for the external place where the person and their
   chosen AI converse and work; naming a client must not imply a shipped
   integration or preferred vendor;
-- describe a **queue** as durable scope, evidence, state, blockers, and next
-  action across sessions—not as a generic todo list or authority grant; and
-- label **Current**, **In design**, and **Later** capability status directly.
+- describe the product **Queue** as a directive-first handoff with exactly
+  **Needs you**, **Working**, **Waiting for your AI**, and **Done**—not as a
+  generic todo list, autonomous runner, internal project tracker, or unlimited
+  authority grant; and
+- label **Current / verified**, **Coming soon**, **In design**, **Later**,
+  **Intentional product-specific difference**, or **Unknown** directly.
 
 Avoid **“agent”** in user-facing copy when **“your AI”** communicates the idea.
 Technical documentation may retain agent, API key, scope, MCP, or tool where
@@ -926,6 +1148,30 @@ Stories** for the current repository/application name where compatibility,
 delivery, or historical precision requires it. This philosophy does not claim
 that branding, domains, redirects, or provider configuration have changed.
 
+## Distinctive design and interaction character
+
+Family History should feel like a serious, generous research folio rather than
+a generic SaaS dashboard or chatbot wrapper. Its visual language comes from
+archives and field research: parchment-like surfaces, map and compass cues,
+margin notes, captions, source marks, restrained teal and rust, and a visible
+thread running from clue to evidence to interpretation to story. Typography is
+editorial and deliberately paired; it should make long-form reading and dense
+evidence comparison feel related without making either look like the other.
+
+The interface may be information-rich because the domain requires comparison,
+provenance, and changing interpretations. Density is organized rather than
+removed: decision columns lead, sources and confidence sit beside the claims
+they qualify, and deeper detail opens without losing the current person or
+research trail. On a phone, the experience becomes narrower and more focused,
+not a miniature desktop table.
+
+The voice is calm, curious, humane, and specific. It distinguishes record,
+memory, inference, context, and story without sounding clinical; it invites
+correction without scolding; and it never turns private-family safeguards into
+the emotional headline. Shared Assist routes and controls should feel native to
+this system, but they do not replace its information architecture, typography,
+palette, imagery, density, or interaction rhythm.
+
 ## Public homepage and future shell implications
 
 These are design constraints, not a UI specification or authorization to
@@ -937,6 +1183,12 @@ change the application.
   their AI can understand lives and tell grounded stories.
 - Make the Assist family model clear: your AI reasons and researches; Family
   History remembers and organizes; you remain the authority.
+- Use the family turn of phrase at least once: **“Assist your AI, so it can
+  assist you with family history.”** Keep the fuller research-to-story identity
+  as the product-specific promise around it.
+- Include six to ten real FAQ questions on the home page, one honest screenshot
+  of the working product, and an early invitation to `/ai`. The setup offer
+  explains the outcome in human terms rather than leading with MCP.
 - Show that the subject can be a person, family, place, building, community,
   culture, religion, event, or era—not only a pedigree node.
 - Demonstrate the path from source to claim to context to story, including an
@@ -949,16 +1201,52 @@ change the application.
   Family History for a later authorized pickup.
 - Name example AI environments only to illustrate user choice, and label the
   actual connection status rather than implying universal compatibility.
-- Explain that named collaboration and bounded share links are different
-  in-design access modes; do not present either as current until verified.
+- Explain that Trusted collaboration and Unlisted links are different
+  **In design** access modes; do not present either as current until verified.
 - Keep living/private material as a quiet control, not the emotional headline.
-- Use a visible **Current / In design / Later** ledger whenever future
-  connections, imports, AI tools, or visualizations appear.
+- Use the complete status vocabulary in this document whenever future
+  connections, imports, AI tools, or visualizations appear. **Coming soon** is
+  only for committed big/public-launch work; unscheduled work is **Later**.
+- Keep `/updates`, `/ai`, and `/ai.txt` strictly current. A future control is
+  visibly non-working and labeled **Coming soon**; a button, form, or link that
+  accepts action must already work.
+- Version `/updates` entries as 1.1.1, date each entry, label it **Local**, **In
+  review**, **Backend live**, or **Public & live**, and make the AI that ships a
+  change write the entry as part of shipping.
+- Carry the family row and Support Desk link in the shell when their
+  destinations are verified. The row is wayfinding only and never exposes
+  cross-site records, counts, or activity.
 - Use synthetic, clearly labeled illustrations. Never use private family data,
   real credentials, or unresolved living-person material as marketing proof.
 - Prefer a human editorial character—archival paper, margin notes, maps,
   captions, family annotations, and a visible evidence thread—over a generic
   chatbot, SaaS dashboard, or glowing autonomous-AI aesthetic.
+
+The current public source is only a partial foundation. It has `/updates`,
+roadmap/status copy, privacy copy, and `/llms.txt`, but no front-page FAQ,
+family `/ai` invitation, `/ai`, `/ai.txt`, family row, or Support Desk link.
+`/llms.txt` does not substitute for `/ai.txt`. The current `/about` local-only
+storage/export statement also conflicts with the Convex-backed architecture,
+and source alone cannot prove that “working now” claims are deployed. Those
+public-copy corrections belong to a separate implementation and live-proof
+route; this docs-only task records the gap without silently changing the site.
+
+### Website launch sequence
+
+| Stage | Family History meaning | Evidence rule |
+|---|---|---|
+| **1 · Soft launch** | The real site is online on its public domain, listed by Assist With Life, and still changing before active marketing | Public shell, privacy boundary, and active controls work; committed unfinished Tier A claims say **Coming soon**; truth surfaces remain strictly current |
+| **2 · Big launch / public launch** | The website is ready to market because every family Tier A requirement and the sentence-by-sentence honesty pass are verified | No Tier A **Coming soon** labels remain; deployment and representative public/authenticated paths have fresh proof |
+
+The repository does not establish the current external launch stage, so it is
+**Unknown** here. Do not infer soft launch from a public-looking route, private
+beta copy, a merge, or a deployment configuration.
+
+> **Future native guardrail — Later:** Only after substantial recurring website
+> use reveals a distinct native job should Family History evaluate an app-store
+> package and its then-current privacy, deletion, reviewer-access, accessibility,
+> sharing, and SDK declarations. This later gate does not drive today's
+> information architecture, design system, or website priorities.
 
 ### Future signed-in shell
 
@@ -974,20 +1262,37 @@ change the application.
   the details they qualify.
 - Make the story-to-evidence path bidirectional: inspect the evidence behind a
   line, or see which stories use a claim.
-- Treat questions and queue work as durable research objects, not transient
+- Treat questions and Queue work as durable research objects, not transient
   notifications.
-- Show queue scope, priority, evidence, state, blockers, responsible person or
-  AI, and exact next step so a person can understand progress without opening
-  the originating AI conversation.
+- Show the directive, one of the four family Queue states, handoff line,
+  optional context/evidence, responsible person or AI, next step or exact
+  blocker question, result, and history so a person can understand progress
+  without opening the originating AI conversation.
 - Show historical context as setting, never as silent proof of personal
   experience.
 - Keep sharing and publication explicit, previewable, reviewable, reversible
   where supported, and separate from ordinary saving.
-- Give named collaboration an invite, identity, scope, operation, history, and
-  revoke surface. Give share links a reviewed content boundary, audience,
-  expiry/discoverability status, and revoke surface.
+- Give Trusted collaboration an invite, identity, scope, operation, history,
+  and revoke surface. Give Unlisted links a reviewed content boundary, clear
+  “anyone with the link” audience, no indexing, no automatic expiry, and an
+  immediate revoke surface.
 - Keep public publication as a separate promotion step; never let an invite or
   link silently become a public story.
+- Provide `/me` for a person's own useful counts, storage, Queue activity, AI
+  footprint, and links to data controls. Provide owner-only `/admin` for
+  aggregate users, usage, health, and public-content operations without
+  reading private family content to produce stats.
+- Use bounded, indexed, paginated data access; make tables the default for
+  dense comparison; let meaningful columns sort on click; show organized
+  filters; remember browser-local preferences; and keep account-saved views as
+  explicit records. On phones, show fewer decision columns and drill down
+  instead of shrinking or horizontally scrolling the whole product by default.
+- Keep Family History’s archival compass and evidence-thread character while
+  delivering first-class light and dark themes, 44px targets, visible focus,
+  non-color status labels, reduced motion, and no page-level overflow at 320px.
+- Use bottom navigation with at most five primary destinations on phones. The
+  current mobile drawer is a **Coming soon** family-shell alignment gap, not an
+  intentional Family History exception.
 - Keep human workflows complete when no AI is connected.
 - Keep connection and capability status truthful inside the shell as well as
   on the homepage.
@@ -1000,13 +1305,15 @@ can drift.
 Before changing a public page, onboarding flow, signed-in shell, product
 description, AI guide, provider guide, or integration claim:
 
-1. classify every material capability as **Current**, **In design**, or
-   **Later**;
-2. verify public **Current** claims against the exact deployed environment and
+1. classify every material capability as **Current / verified**, **Coming
+   soon**, **In design**, **Later**, **Intentional product-specific
+   difference**, or **Unknown**;
+2. verify public **Current / verified** claims against the exact deployed environment and
    relevant user path—not only source code, a merged commit, a provider
    setting, a Linear issue, or an older observation;
 3. default missing, stale, contradictory, partial, or unscheduled evidence to
-   **In design**, **Later**, or omission;
+   **In design**, **Later**, **Unknown**, or omission; never use **Coming soon**
+   without a committed big/public-launch path;
 4. verify trust-sensitive language against current identity, owner isolation,
    actor scope, operation authority, provenance, AI/privacy gates, rights,
    public DTOs, revocation, and provider behavior;
@@ -1023,16 +1330,19 @@ description, AI guide, provider guide, or integration claim:
 8. verify any publishing claim against draft/review state, source and context
    visibility, living/private checks, human confirmation, public filtering,
    unpublish behavior, and exact public route;
-9. verify any collaboration claim against the invite and acceptance lifecycle,
-   named identity, exact record scope, per-operation authority, living/private
-   boundaries, attribution, audit history, and revocation; separately verify
-   any share-link claim against its reviewed content boundary, audience,
-   expiry and discoverability state, recipient-safe filtering, and revocation;
+9. verify any Trusted-collaboration claim against the invite and acceptance
+   lifecycle, named identity, exact record scope, per-operation authority,
+   living/private boundaries, attribution, audit history, and revocation;
+   separately verify any Unlisted-link claim against its reviewed content
+   boundary, anyone-with-the-link disclosure, read-only behavior, no-expiry
+   rule, non-indexing, recipient-safe filtering, and revocation;
 10. confirm that collaboration, bounded links, and public publication remain
    independently controlled and that none silently broadens another;
-11. update the evidence date, repository revision, and evidence references when
+11. verify the family contract version and rerun the adoption/contradiction
+    matrix, including the repo-owned tracker entry point;
+12. update the evidence date, repository revision, and evidence references when
     a status changes; and
-12. update the Markdown and HTML companion in the same commit and refresh the
+13. update the Markdown and HTML companion together and refresh the
     HTML source digest.
 
 Changes to the one-sentence identity, Assist family model, research-to-story
@@ -1041,21 +1351,27 @@ living/private-material boundary, or trust/non-goal boundary require explicit
 product-owner approval. Evidence-led capability status updates may change
 without redefining the philosophy.
 
-The Finance philosophy and reusable template established the shared family
-structure. Buying, Memory, and Moving were used to compare authority language,
-capability ledgers, evidence handoff, and HTML-reader conventions. No
-repository-local Assist With Homes philosophy package was found in the
-available checkouts at verification time, so this package does not invent or
-attribute Homes-specific structure.
+Assist With Sites — Core Philosophy v1.5.0 is the authoritative shared chassis
+and trust/operations contract for this package. It is not the product template.
+Sibling documents may offer structural examples, but they are not evidence of
+Family History capability, identity, experience, or design and cannot override
+this product's verified domain truth unless that truth conflicts with a shared
+route, trust, privacy, activity, navigation, support, or release requirement.
 
 The Markdown file is canonical. Its HTML companion is a designed reader, not a
-second source of product truth. Any substantive Markdown change must update
-the HTML in the same commit and refresh the HTML's `source-sha256` metadata.
+second source of product truth. Any substantive Markdown change must regenerate
+the HTML companion and refresh its `source-sha256` metadata. Commit,
+publication, deployment, provider, and live-proof state are reported
+separately.
 
 ## Evidence handoff
 
 The repository-foundation boundary in this revision was reconciled against:
 
+- Assist With Sites — Core Philosophy v1.5.0 (2026-08-07), authoritative
+  internal family source held outside this repository and intentionally not
+  linked from public product surfaces
+- `AGENTS.md`
 - `docs/README.md`
 - `docs/product/vision.md`
 - `docs/product/ai-family-history-lab.md`
@@ -1071,8 +1387,27 @@ The repository-foundation boundary in this revision was reconciled against:
 - `docs/context/place-era-research-packs.md`
 - `docs/operations/agent-handoff-runbook.md`
 - `docs/operations/product-health-gates.md`
+- `docs/security/privacy-ai-safety-review.md`
+- `docs/security/convex-trust-boundary-inventory.md`
+- `docs/security/vault-owner-isolation.md`
+- `app/page.tsx`
+- `app/about/page.tsx`
+- `app/privacy/page.tsx`
+- `app/updates/page.tsx`
+- `app/llms.txt/route.ts`
+- `app/app/people/page.tsx`
+- `app/app/operations/page.tsx`
+- `app/app/settings/page.tsx`
+- `app/app/api/page.tsx`
+- `app/app/api/admin/page.tsx`
+- `components/marketing/Hero.tsx`
+- `components/marketing/FeatureShowcase.tsx`
+- `components/layout/Footer.tsx`
+- `components/layout/AppSidebar.tsx`
+- `components/layout/appNavigation.ts`
 - `convex/schema.ts`
 - `convex/apiKeys.ts`
+- `convex/access.ts`
 - `lib/auth/scopes.ts`
 - `lib/stories/capabilities.ts`
 - `lib/stories/publishSafety.ts`
@@ -1085,10 +1420,11 @@ The repository-foundation boundary in this revision was reconciled against:
 - `app/api/keys/route.ts`
 - `app/app/timeline/page.tsx`
 
-Linear product truth was checked against the **Current Product & Architecture
-Map**, **AI Family History Lab Thesis**, `GEN-26`, `GEN-28`, `GEN-35`, `GEN-45`,
-`GEN-61`, `GEN-109`, and `GEN-117`. Linear was used as coordination evidence,
-not as proof that source or production behavior exists.
+Earlier revisions consulted Linear coordination material. This v1.1.0
+alignment did not update Linear and does not use issue state as proof of source,
+deployment, or production behavior. The family tracker gap is therefore
+recorded here for a separate repo-owned Cards / Work Orders / Guide follow-up
+rather than hidden in a new or modified issue.
 
 Exact handoff rule:
 
@@ -1120,3 +1456,25 @@ The exact completed proof belongs in the local commit handoff and may be
 reproduced from the canonical Markdown, HTML metadata, and browser checks. This
 section defines the acceptance contract; it does not claim a check passed
 before it was run.
+
+## Changelog
+
+- **1.2.0 · 2026-08-07** — adopted the one-family-Core / one-product-Project
+  Philosophy hierarchy from Assist With Sites — Core Philosophy v1.5.0;
+  renamed the canonical package and repository discovery links; added the exact
+  alignment record, explicit audience/jobs section, and distinctive design and
+  interaction character; and retained the evidence-backed gaps, Family History
+  domain model, research-to-story workflow, and restrained **Later** native
+  guardrail.
+- **1.1.0 · 2026-08-07** — derived the product philosophy explicitly from
+  Assist With Sites — Core Philosophy v1.4.4; added the evidence-backed
+  adoption/contradiction matrix and complete truth-status vocabulary; aligned
+  the Queue states, directive authority, access names, public truth surfaces,
+  website launch sequence, concise later native guardrail, dense-data behavior,
+  `/me`, `/admin`, Support
+  Desk, family row, identity/deletion boundaries, and distinct design contract;
+  and recorded the missing repo-owned Cards / Work Orders / Guide tracker as a
+  required follow-up without claiming implementation.
+- **1.0.0 · 2026-07-30** — established the canonical research-to-story product
+  philosophy, evidence ledger, safety boundaries, and synchronized editorial
+  reader.

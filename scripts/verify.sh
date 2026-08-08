@@ -28,6 +28,7 @@ steps=(
   "check:loose-context"
   "check:context-taxonomy"
   "check:no-raw-markdown-render"
+  "check:project-philosophy"
   "check:import-regression"
   "check:agent-quality-gates"
   "check:operations-handoff"

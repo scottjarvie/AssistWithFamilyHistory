@@ -21,6 +21,8 @@
     "check:loose-context": "tsx scripts/check-loose-context-contract.ts",
     "check:context-taxonomy": "tsx scripts/check-context-taxonomy.ts",
     "check:no-raw-markdown-render": "tsx scripts/check-no-raw-markdown-render.ts",
+    "docs:render:project-philosophy": "node scripts/render-family-history-project-philosophy.mjs",
+    "check:project-philosophy": "node scripts/check-family-history-project-philosophy.mjs",
     "check:import-regression": "tsx scripts/check-import-regression.ts",
     "check:agent-quality-gates": "tsx scripts/check-agent-quality-gates.ts",
     "check:operations-handoff": "tsx scripts/check-operations-handoff.ts",

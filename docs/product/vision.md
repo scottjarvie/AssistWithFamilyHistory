@@ -8,9 +8,12 @@
 
 It is also an **AI family history lab**: an experimental product asking what modern AI can unlock for genealogy, ancestor context, research discovery, and story creation. Some ideas should become durable product surfaces. Others can stay in a clearly labeled experimental area while we learn whether they are useful.
 
-### Core Philosophy
+### Product principles
 
 > "Go beyond names and dates. Research deeply, tell stories, create content."
+
+The canonical product-level doctrine is the
+[Assist With Family History Project Philosophy](../planning/assist-with-family-history-project-philosophy.md).
 
 The goal isn't just to find records or add names to a family tree. It's to:
 
