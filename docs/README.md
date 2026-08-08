@@ -8,6 +8,9 @@ Durable guidance that stays accurate as the product evolves.
 
 - [Assist With Family History Project Philosophy](planning/assist-with-family-history-project-philosophy.md)
 - [Assist With Family History Project Philosophy editorial reader](planning/assist-with-family-history-project-philosophy.html)
+- [Family History project tracker](tracker/board.html)
+- [Family History tracker Guide](tracker/GUIDE.md)
+- [Family History Work Orders](tracker/board.html#workspace)
 - [Product vision](product/vision.md)
 - [AI family history lab](product/ai-family-history-lab.md)
 - [Ancestor data vault philosophy and architecture](product/ancestor-data-vault-philosophy-and-architecture.md)

@@ -45,4 +45,7 @@ pnpm check:api-inventory
 pnpm check:public-beta-launch
 ```
 
-`tests/fixtures/stories/manifest.json` maps fixture scenarios to the Linear route. Keep it updated when adding publish gates, story API roles, privacy checks, or public sharing policy.
+`tests/fixtures/stories/manifest.json` retains historical Linear issue ids as
+fixture provenance; they are not a live routing dependency. Keep the scenarios
+updated when adding publish gates, story API roles, privacy checks, or public
+sharing policy, and record new operational follow-up in the repository tracker.

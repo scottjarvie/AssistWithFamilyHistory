@@ -70,11 +70,11 @@ Experimentation should not weaken trust.
 - Experimental features must not corrupt canonical vault data.
 - Public publishing should be intentional and reversible.
 
-## Linear Project Model
+## Repository Tracker Work Areas
 
-Linear should be organized around feature-set projects, not only one giant backlog.
-
-The current project family is:
+Cards and Work Orders should use stable product areas instead of one giant
+backlog or an external system that a future AI may not be able to read. The
+current work-area family is:
 
 - Product OS & Agent Workflow
 - Intake & Source Capture
@@ -85,4 +85,6 @@ The current project family is:
 - Experimental Tools Lab
 - Privacy, Trust & Quality
 
-Agents should use those projects to understand which part of the product they are working in, how features interact, and what work should happen next.
+Agents use those areas to understand which part of the product they are working
+in and how features interact. The current priority and authorized next tranche
+come from `docs/tracker/`, not from an area label by itself.

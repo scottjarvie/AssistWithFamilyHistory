@@ -2,11 +2,11 @@
 
 > **Philosophy status:** Canonical product identity and claim boundary
 >
-> **Product document version:** 1.2.0
+> **Product document version:** 1.3.0
 >
-> **Capability evidence last verified:** 2026-08-07
+> **Capability evidence last verified:** 2026-08-08
 >
-> **Repository evidence revision:** `2ec5b70`
+> **Repository evidence revision:** `924fc047 + AWF-WO-001 migration`
 >
 > **Scope:** Product truth, language, trust, and design direction—not an
 > implementation plan, production claim, or permission to change application
@@ -16,9 +16,10 @@ This document defines what Assist With Family History is, how it fits the
 Assist family, and which claims its public and signed-in experiences may make.
 It supersedes “genealogy database,” “private family vault,” “automatic
 researcher,” and “AI story generator” descriptions when they shrink or
-overstate the product. Architecture notes, Linear issues, release evidence, and
-operational runbooks remain authoritative for delivery status; they do not
-redefine the product.
+overstate the product. Repository tracker Cards and Work Orders, architecture
+notes, release evidence, and operational runbooks remain authoritative for
+delivery status; they do not redefine the product. Historical Linear ids are
+provenance only and are not a current operating dependency.
 
 ## Family Core alignment record
 
@@ -27,23 +28,27 @@ redefine the product.
 > **Canonical:**
 > `docs/planning/assist-with-family-history-project-philosophy.md`
 >
-> **Family Core:** Assist With Sites — Core Philosophy v1.5.0 (2026-08-07)
+> **Family Core:** Assist With Sites — Core Philosophy v1.6.2 (2026-08-08)
 >
-> **Aligned:** 2026-08-07 — repository and public claims reviewed at `2ec5b70`
+> **Aligned:** 2026-08-08 — repository, delivery configuration, and public
+> deployment records reviewed from `924fc047` through AWF-WO-001
 >
 > **Adopted:** The shared chassis: the three-way person / Assist workspace /
 > your AI promise; dependable family routes and truth surfaces; the Queue
 > contract; scoped, revocable authority; provenance and activity; shared access
 > vocabulary; identity, privacy, export, and deletion rules; family navigation;
 > the Support Desk convention; website launch truth; and the repo-owned Cards /
-> Work Orders / Guide operating contract. Adoption accepts these requirements;
-> it does not prove they are implemented or prescribe the primary experience.
+> Work Orders / Guide operating contract; exact state-versus-software
+> publication boundary; and separate GitHub, Vercel, and live-alias proof
+> gates. Adoption accepts these requirements; it does not prove they are
+> implemented or prescribe the primary experience.
 >
 > **Deferred/gaps:** The unverified big/public-launch requirements recorded below,
 > including the family Queue, MCP and AI setup paths, complete activity history,
-> export and deletion, `/me`, `/admin`, Support Desk, family navigation, and the
-> product tracker. These remain explicit alignment gaps rather than hidden
-> assumptions.
+> export and deletion, `/me`, `/admin`, Support Desk, and family navigation.
+> Tracker/provider setup is **In review** in AWF-WO-001; it remains unproven as
+> an established fast lane until a useful same-SHA state commit passes all
+> three external gates. These remain explicit gaps rather than assumptions.
 >
 > **Differs:** Family History keeps its
 > research-to-story purpose and audience; Research Spine; domain objects and
@@ -55,8 +60,10 @@ redefine the product.
 > the internal build tracker.
 >
 > **Evidence:** Dated capability ledger and repository evidence handoff in this
-> document; checked-out revision `2ec5b70`; public/deployed state remains
-> separately unverified where marked **Unknown**.
+> document; `docs/tracker/`; Core v1.6.2 commit
+> `561481843793a1d0fb97eee3984bccfd004c21a2`; checked-out base `924fc047` plus
+> AWF-WO-001; public/deployed state remains separately unverified where marked
+> **Unknown**.
 
 This document is derived from the internal family contract rather than a copy
 of it. That contract is a shared chassis and trust/operations contract, not a
@@ -88,7 +95,7 @@ Use these status labels throughout this revision:
 | Product Queue | **Coming soon** | `/app/operations`, `researchTasks`, research checks, and handoff export are real research-operations foundations, but they are not the family product Queue at `/queue` and do not implement its four states or directive-first creation path |
 | Queue authority | **In design** | Adopt the family rule: the directive authorizes only reversible, in-scope record changes plainly requested. New objectives, destructive work, identity merges, disputed promotion, publication, purchases, access changes, and outside-world actions return to **Needs you** |
 | Queue context objects | **Intentional product-specific difference; In design** | “Add context” offers three Family History groups: a research subject, evidence, or a work thread. Their concrete objects are defined in the Queue section below; attaching context stays optional |
-| Internal project tracker | **In design — required alignment gap** | No repo-owned tracker with exactly Cards, Work Orders, and Guide was found. `AGENTS.md` and `docs/agent-workflow.md` point to Linear, which does not satisfy the v1.5.0 repo-owned handoff contract. Bootstrap it in a separate follow-up; do not confuse it with the product Queue |
+| Internal project tracker | **In review — repository package implemented; provider proof pending** | `docs/tracker/` now carries canonical Cards, Work Orders, Guide, factual metadata, and generated Kanban/Work Orders readers in Family History's archival identity. Current instructions use that durable source rather than mandatory Linear. AWF-WO-001 keeps execution separate from AWF-0004's future independent audit. The fast lane is not called established until useful same-SHA GitHub, Vercel, and live-alias proof exists; do not confuse this build tracker with the product Queue |
 | MCP and AI setup paths | **Coming soon** | No `/mcp`, `/ai`, `/ai.txt`, or `/settings/ai` route exists. `/llms.txt`, internal app APIs, the API Center, key-management primitives, and a static capability manifest do not substitute for a verified scoped MCP connection and generated current briefing |
 | Activity and provenance | **Current / verified partial foundation; Coming soon complete contract** | Import runs, research logs, story review events, source links, model/prompt fields, and the `agentActivity` schema provide partial evidence. The repo does not prove a plain-language, record-visible entry for every meaningful AI create, change, or delete |
 | Access and sharing | **Current / verified Private and guarded Public foundations; In design Unlisted and Trusted** | Owner-scoped vault reads/writes and filtered public-story publication exist in source. Family History intentionally needs rare Public stories plus later Trusted collaboration and read-only Unlisted views; no complete invite or unlisted-link lifecycle is verified |
@@ -924,11 +931,19 @@ teaches a new person or AI how to continue. Work Order execution
 audit (`Not audited / Passed / Follow-up needed`), with real model/agent
 provenance and evidence recorded for both.
 
-No repo-owned Cards / Work Orders / Guide source or stable entry point is
-verified in this repository. Linear coordination and the product's research
-operations console are not substitutes. This is an **In design — required
-alignment gap** for a separate bootstrap task; this documentation-only task
-does not create a competing board or automatic dispatcher.
+The canonical tracker source is `docs/tracker/`, with generated Kanban and Work
+Orders views in `docs/tracker/board.html` and the stable one-minute contract in
+`docs/tracker/GUIDE.md`. Current agent instructions use this repository truth;
+historical Linear references do not route or authorize work. AWF-WO-001 is the
+bounded migration and AWF-0004 preserves independent audit as a later fact.
+This package still does not substitute for the product's research operations
+console, create a competing board, or add an automatic dispatcher.
+
+The state fast lane is deliberately reported as **In review**, not established:
+its software, workflow, validators, provider configuration, and branch policy
+must reach `main` through normal PR/full-CI/deployment safeguards, then a useful
+state commit must separately prove lightweight GitHub Actions, a Vercel ignored
+zero-build record, and an unchanged live production alias.
 
 ## Questions, queues, and unfinished work
 
@@ -1351,7 +1366,7 @@ living/private-material boundary, or trust/non-goal boundary require explicit
 product-owner approval. Evidence-led capability status updates may change
 without redefining the philosophy.
 
-Assist With Sites — Core Philosophy v1.5.0 is the authoritative shared chassis
+Assist With Sites — Core Philosophy v1.6.2 is the authoritative shared chassis
 and trust/operations contract for this package. It is not the product template.
 Sibling documents may offer structural examples, but they are not evidence of
 Family History capability, identity, experience, or design and cannot override
@@ -1368,9 +1383,11 @@ separately.
 
 The repository-foundation boundary in this revision was reconciled against:
 
-- Assist With Sites — Core Philosophy v1.5.0 (2026-08-07), authoritative
+- Assist With Sites — Core Philosophy v1.6.2 (2026-08-08), authoritative
   internal family source held outside this repository and intentionally not
   linked from public product surfaces
+- `docs/tracker/GUIDE.md`, `docs/tracker/cards/`, and
+  `docs/tracker/work-orders/`
 - `AGENTS.md`
 - `docs/README.md`
 - `docs/product/vision.md`
@@ -1420,11 +1437,11 @@ The repository-foundation boundary in this revision was reconciled against:
 - `app/api/keys/route.ts`
 - `app/app/timeline/page.tsx`
 
-Earlier revisions consulted Linear coordination material. This v1.1.0
-alignment did not update Linear and does not use issue state as proof of source,
-deployment, or production behavior. The family tracker gap is therefore
-recorded here for a separate repo-owned Cards / Work Orders / Guide follow-up
-rather than hidden in a new or modified issue.
+Earlier revisions consulted Linear coordination material. Scott retired Linear
+as a current dependency on 2026-08-08. Historical issue ids remain dated
+provenance only and never prove source, deployment, production behavior,
+priority, approval, or completion. Current work and handoff live in the
+repository tracker.
 
 Exact handoff rule:
 
@@ -1459,6 +1476,11 @@ before it was run.
 
 ## Changelog
 
+- **1.3.0 · 2026-08-08** — aligned to Assist With Sites Core Philosophy
+  v1.6.2; installed the Family History Cards / Work Orders / Guide source and
+  generated readers; retired mandatory Linear operation; recorded the exact
+  state-versus-software publication boundary; and kept GitHub, Vercel, live
+  alias, and independent-audit proof explicitly pending until observed.
 - **1.2.0 · 2026-08-07** — adopted the one-family-Core / one-product-Project
   Philosophy hierarchy from Assist With Sites — Core Philosophy v1.5.0;
   renamed the canonical package and repository discovery links; added the exact

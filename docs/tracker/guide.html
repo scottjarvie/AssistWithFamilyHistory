@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en" data-mode="paper">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Assist With Family History — tracker guide</title>
+<style>
+
+
+  :root {
+    --paper:#f7f3e8; --paper-2:#eee7d6; --ink:#24312c; --soft:#5c6862;
+    --faint:#727b76; --line:#d4cab6; --surface:#fffdf7; --surface-deep:#e8dfcc;
+    --groove:#245a43; --groove-2:#2f7358; --groove-wash:#dceee5;
+    --signal:#a65332; --signal-soft:#f1d8ca; --gold:#98702b;
+  }
+  html[data-mode="studio"] {
+    --paper:#111916; --paper-2:#19241f; --ink:#f3efe4; --soft:#aab6af;
+    --faint:#8e9993; --line:#314139; --surface:#17211d; --surface-deep:#0c1310;
+    --groove:#8fd7b4; --groove-2:#71c99f; --groove-wash:#1c382c;
+    --signal:#e18a64; --signal-soft:#4d2d21; --gold:#d6ad5b;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font: 15px/1.55 Georgia, "Times New Roman", serif;
+  }
+  header {
+    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+    padding: 18px 20px 10px;
+  }
+  header h1 { font-size: 20px; margin: 0; }
+  header .sub { color: var(--soft); font-size: 13px; }
+  header button, header a.btn {
+    min-height: 44px; padding: 9px 14px; cursor: pointer; display: inline-block;
+    background: var(--surface); color: var(--ink); text-decoration: none;
+    border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 13px;
+  }
+  header .spacer { margin-left: auto; }
+  header nav { display:flex; gap:6px; flex-wrap:wrap; }
+  .skip { position:fixed; left:12px; top:8px; z-index:100;
+    transform:translateY(-180%); background:var(--ink); color:var(--paper);
+    padding:10px 14px; border-radius:8px; }
+  .skip:focus { transform:translateY(0); }
+  code {
+    font-family: ui-monospace, monospace; font-size: 13px;
+    background: var(--paper-2); padding: 1px 4px; border-radius: 4px;
+  }
+  a { color: var(--groove-2); }
+  .quote { border-left: 3px solid var(--line); padding-left: 12px; color: var(--soft); }
+  .trow { display:flex; min-width:max-content; overflow-wrap:anywhere; }
+  .trow [role="cell"] { padding: 3px 10px 3px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+  :focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+
+  main { max-width: 760px; margin: 0 auto; padding: 8px 20px 60px; }
+  main h2 { font-size: 20px; margin: 30px 0 10px; }
+  main h3 { font-size: 16px; margin: 22px 0 8px; }
+  .lede { background: var(--surface); border: 1px solid var(--line);
+    border-top: 3px solid var(--groove-2); border-radius: 12px; padding: 8px 24px 18px; }
+  .lede h2:first-child { margin-top: 14px; }
+  .small { font-size: 13px; color: var(--soft); }
+  hr { border: none; border-top: 1px solid var(--line); margin: 22px 0 12px; }
+  @media (max-width: 700px) {
+    header { align-items:flex-start; }
+    header nav { width:100%; overflow-x:auto; flex-wrap:nowrap; padding-bottom:4px; }
+    header nav .btn { white-space:nowrap; }
+    main { padding-inline:12px; }
+    .lede { padding-inline:16px; }
+    .trow { overflow-x:auto; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to guide</a>
+<header>
+  <h1>Assist With Family History — tracker guide</h1>
+  <span class="spacer"></span>
+  <nav aria-label="Tracker links">
+    <a class="btn" href="https://discovertheirstories.com">Project</a>
+    <a class="btn" href="../planning/assist-with-family-history-project-philosophy.md">Project Philosophy</a>
+    <a class="btn" href="https://github.com/scottjarvie/assistwithlife/blob/main/planning/assist-with-sites-core-philosophy.md">Family Core</a>
+    <a class="btn" href="GUIDE.md">Guide</a>
+  </nav>
+  <button id="mode" type="button">Night archive</button>
+</header>
+<main id="main" tabindex="-1">
+
+<section class="lede">
+<h2>What this page is</h2>
+<p>Every Assist With repository carries its own tracker: a small board of work
+cards that lives <em>in the repo, next to the code</em>. No Linear, no service,
+no login — the cards are plain text files, and this board is one HTML file
+compiled from them. If you can open a file, you can see the whole state of the
+project.</p>
+
+<h2>Why it exists — for you</h2>
+<p>It answers "where is this project?" at a glance: what's queued, what an AI
+is working on, what's finished, and — most importantly — the <strong>Needs
+you</strong> column: the short list of things only you can decide. Those
+cards are written to be answerable on the spot: they teach the situation first,
+lay out the options with costs, and end with the smallest possible question.
+Everything else on the board is the AI's to do, not yours.</p>
+
+<h2>Why it exists — for your AI</h2>
+<p>A chat forgets; the board doesn't. Each card carries enough context that an
+AI opening it cold — next month, on another computer, or a different model
+entirely — can start working without the conversation that created it. As it
+works it appends dated <strong>follow-up notes</strong> to the card, so the
+next session inherits the trail. Findings from audits land here as cards
+instead of scrolling away in chat.</p>
+
+<h2>How this works, mechanically</h2>
+<p>Cards are markdown files in <code>docs/tracker/cards/</code>; canonical Work
+Orders live in <code>docs/tracker/work-orders/</code>. Edit a source file, run
+<code>node scripts/tracker-build.mjs</code>, and the board and this guide
+regenerate. Nothing else to install or run.</p>
+
+<h2>How to hand a card to your AI</h2>
+<p>Open any card and press <strong>Copy prompt</strong> — you get a
+ready-to-paste instruction that introduces the project, includes the whole
+card, its linked Work Order, the Project Philosophy, the exact Family Core,
+rules, and current evidence. <strong>Copy work order</strong> bundles the whole
+bounded tranche and every contained Card.</p>
+
+<hr>
+<p class="small">Below is Family History's canonical Guide. It preserves the
+research-to-story identity while following the shared tracker contract.</p>
+</section>
+
+<h2>Assist With Family History tracker guide</h2>
+<p>This repository-owned tracker is the durable owner-and-AI view of work for Assist With Family History / Discover Their Stories. It travels with every authorized clone. Markdown is canonical; the generated board and guide are zero-setup readers, not separate sources of truth.</p>
+<h2>The three concepts</h2>
+<ul>
+<li><strong>Cards</strong> preserve one outcome and its current truth, next safe action, constraints, evidence, provenance, and dated history.</li>
+<li><strong>Work Orders</strong> bundle a bounded execution tranche. Your AI may propose one; only Scott moves it from Proposed to Ready. A Ready order may be executed, and a separate AI audits completion.</li>
+<li><strong>Guide</strong> is this stable operating contract. It lets a future person or AI continue without reconstructing an old conversation.</li>
+</ul>
+<p><code>tracker.json</code> is factual implementation metadata. <code>board.html</code> and <code>guide.html</code> are generated reading views. Supporting specifications and dated reports remain evidence, not new tracker concepts.</p>
+<h2>One-minute orientation</h2>
+<p>Open <code>board.html</code>. Start with <strong>Needs You</strong>, then scan <strong>Doing</strong> and <strong>Next</strong>. Kanban shows motion; Work Orders show approved bundles, derived progress, execution evidence, and the separate audit result.</p>
+<p>A Needs You Card must teach before asking: why Scott is needed, the smallest action, the recommendation, alternatives and trade-offs, what each choice changes, the safe default, the consequence of waiting, and evidence. If your AI can safely decide within approved scope, the Card is not Needs You.</p>
+<h2>Canonical states</h2>
+<p>Cards use exactly:</p>
+<ul>
+<li><code>backlog</code> — real work, not presently selected.</li>
+<li><code>next</code> — safe to pick up within a Ready or Active Work Order.</li>
+<li><code>doing</code> — active execution.</li>
+<li><code>needs-you</code> — blocked on Scott's consequential decision or human-only act.</li>
+<li><code>done</code> — completion evidence exists; Work Order audit remains separate.</li>
+</ul>
+<p>Work Order execution is exactly <code>proposed</code>, <code>ready</code>, <code>active</code>, <code>complete</code>, or <code>superseded</code>. Audit is independently <code>not-audited</code>, <code>passed</code>, or <code>follow-up-needed</code>. Complete never silently means audited.</p>
+<h2>Authority and handoff</h2>
+<p>The bounded loop is <strong>your AI proposes; Scott approves scope; your AI executes; a separate AI audits</strong>. There is no automatic dispatcher. A Work Order states its goal, included Cards, sequence, dependencies, exclusions, stop rules, verification, and genuine human gates.</p>
+<p>Copy prompt carries the Project, Project Philosophy, Family Core, full Card, linked Work Order, current evidence, and update rules. Copy Work Order carries the approved tranche and all included Cards.</p>
+<h2>Durable authoring rules</h2>
+<ul>
+<li>Cards live in <code>docs/tracker/cards/</code> with stable <code>AWF-####</code> ids.</li>
+<li>Work Orders live in <code>docs/tracker/work-orders/</code> with stable <code>AWF-WO-###</code> ids.</li>
+<li>Append dated, attributed history. Do not erase earlier truth or invent provenance.</li>
+<li>Treat living-person details, private family notes, memory media, raw capture artifacts, and unresolved relationship claims as private. Tracker source in this public repository must contain no such material.</li>
+<li>Run <code>pnpm tracker:build</code> and <code>pnpm tracker:verify</code> after state edits.</li>
+</ul>
+<h2>Project operation is repository-owned</h2>
+<p>Cards, Work Orders, Guide, repository evidence, pull requests, deployments, and live proof are the current operating sources. Historical Linear ids may remain in old reports or fixtures as provenance, but agents do not query, update, or depend on Linear to begin, route, verify, or finish work.</p>
+<h2>Safe publication classes</h2>
+<p>Tracker software—generators, parsers, validators, board behavior or styling, templates, package scripts, workflows, instruction files, and build/deployment configuration—uses a normal branch, pull request, full CI, and deployment.</p>
+<p>State only—Cards, Work Orders, this Guide, factual <code>tracker.json</code>, generated readers, and the canonical Project Philosophy Markdown/HTML pair—may use the locally validated trusted-owner direct-main path:</p>
+<p>git add docs/tracker/cards docs/tracker/work-orders docs/tracker/GUIDE.md docs/tracker/board.html docs/tracker/guide.html docs/tracker/tracker.json docs/planning/assist-with-family-history-project-philosophy.md docs/planning/assist-with-family-history-project-philosophy.html pnpm tracker:commit-state -- "Update Family History tracker state" git push origin HEAD:main</p>
+<p>The helper rejects mixed or uncertain changes, runs both tracker and Project Philosophy validators, requires local <code>main</code>, and writes the final <code>skip-checks: true</code> trailer. GitHub still runs its lightweight state-recording path. Vercel separately compares the complete range since its previous successful deployment and ignores only the same strict validated state class. Any uncertainty builds normally.</p>
+<p>Never use this route for software or open a skipped-check pull request. If canonical-branch protection rejects the trusted-owner publication, stop and repair policy through the normal protected path.</p>
+<h2>Family History character</h2>
+<p>This tracker uses archival paper, evidence green, annotation rust, restrained editorial density, and research-to-story language. Other products may copy the information architecture and safety contract, not this identity.</p>
+</main>
+<script>
+const mode = document.getElementById("mode");
+const root = document.documentElement;
+function setMode(m) {
+  root.dataset.mode = m;
+  mode.textContent = m === "paper" ? "Night archive" : "Day archive";
+  localStorage.setItem("tracker-mode", m);
+}
+setMode(localStorage.getItem("tracker-mode") ||
+  (matchMedia("(prefers-color-scheme: dark)").matches ? "studio" : "paper"));
+mode.onclick = () => setMode(root.dataset.mode === "paper" ? "studio" : "paper");
+</script>
+</body>
+</html>
