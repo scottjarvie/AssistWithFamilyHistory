@@ -2,11 +2,11 @@
 
 > **Philosophy status:** Canonical product identity and claim boundary
 >
-> **Product document version:** 1.3.1
+> **Product document version:** 1.3.2
 >
 > **Capability evidence last verified:** 2026-08-08
 >
-> **Repository evidence revision:** `26b5d21 + state proof dc30429`
+> **Repository evidence revision:** `f7edb92 + state proof dc30429`
 >
 > **Scope:** Product truth, language, trust, and design direction—not an
 > implementation plan, production claim, or permission to change application
@@ -28,10 +28,11 @@ provenance only and are not a current operating dependency.
 > **Canonical:**
 > `docs/planning/assist-with-family-history-project-philosophy.md`
 >
-> **Family Core:** Assist With Sites — Core Philosophy v1.6.2 (2026-08-08)
+> **Family Core:** Assist With Sites — Core Philosophy v1.6.3 (2026-08-08)
 >
-> **Aligned:** 2026-08-08 — repository, delivery configuration, and public
-> deployment records reviewed from `924fc047` through state proof `dc30429`
+> **Aligned:** 2026-08-08 — the complete published Core, repository, tracker,
+> delivery configuration, and public deployment records reviewed through
+> prerequisite merge `f7edb92` and state proof `dc30429`
 >
 > **Adopted:** The shared chassis: the three-way person / Assist workspace /
 > your AI promise; dependable family routes and truth surfaces; the Queue
@@ -40,8 +41,9 @@ provenance only and are not a current operating dependency.
 > the Support Desk convention; website launch truth; and the repo-owned Cards /
 > Work Orders / Guide operating contract; exact state-versus-software
 > publication boundary; and separate GitHub, Vercel, and live-alias proof
-> gates. Adoption accepts these requirements; it does not prove they are
-> implemented or prescribe the primary experience.
+> gates; plus §17's ordered setup, retrofit, and agent-handoff paths. Adoption
+> accepts these requirements; it does not prove they are implemented or
+> prescribe the primary experience.
 >
 > **Deferred/gaps:** The unverified big/public-launch requirements recorded below,
 > including the family Queue, MCP and AI setup paths, complete activity history,
@@ -61,14 +63,23 @@ provenance only and are not a current operating dependency.
 > the internal build tracker.
 >
 > **Evidence:** Dated capability ledger and repository evidence handoff in this
-> document; `docs/tracker/`; Core v1.6.2 commit
-> `561481843793a1d0fb97eee3984bccfd004c21a2`, source SHA-256
-> `4ac7273ecb1d734b53bcb4cc6ddd5f1ff87ee32293289f0c36526bdf9d58ca47`;
-> PR #28; AWF-WO-001; state
+> document; `docs/tracker/`; published Core v1.6.3 commit
+> `db658ab091bcfbb71f62db55d5b8b6d51b64e52f`, source SHA-256
+> `6c354eb33422d6b48453c578b93d5a32551fbe3008ce58673a0f11437335a30c`;
+> PRs #28 and #29; AWF-WO-001; state
 > commit `dc30429`; Actions run `31273074126`; Vercel ignored deployment
 > `dpl_8FfUtYW5FBJ6sZLbXGkiZtbQvf3a`; retained live deployment
 > `dpl_vngjLJMJRMBgo7dM6gpBvT2p7C6J`. Product capabilities remain separately
 > unverified where marked **Unknown**.
+
+Core v1.6.3 reorganizes rather than changes Family History's installed
+operating contract: §16.1 owns the Cards / Work Orders / Guide tracker rules,
+§16.2 owns state-versus-software publishing and its three provider proof gates,
+and §16.3 owns launch posture. Section 17 applies those rules through ordered
+new-project setup, retrofit, and agent-handoff paths; it is not a competing
+tracker or local policy. The repository-owned tracker remains durable
+current-work truth. Linear is optional historical or portfolio context only and
+never a work, migration, or AI-handoff gate.
 
 This document is derived from the internal family contract rather than a copy
 of it. That contract is a shared chassis and trust/operations contract, not a
@@ -1376,7 +1387,7 @@ living/private-material boundary, or trust/non-goal boundary require explicit
 product-owner approval. Evidence-led capability status updates may change
 without redefining the philosophy.
 
-Assist With Sites — Core Philosophy v1.6.2 is the authoritative shared chassis
+Assist With Sites — Core Philosophy v1.6.3 is the authoritative shared chassis
 and trust/operations contract for this package. It is not the product template.
 Sibling documents may offer structural examples, but they are not evidence of
 Family History capability, identity, experience, or design and cannot override
@@ -1393,7 +1404,7 @@ separately.
 
 The repository-foundation boundary in this revision was reconciled against:
 
-- Assist With Sites — Core Philosophy v1.6.2 (2026-08-08), authoritative
+- Assist With Sites — Core Philosophy v1.6.3 (2026-08-08), authoritative
   internal family source held outside this repository and intentionally not
   linked from public product surfaces
 - `docs/tracker/GUIDE.md`, `docs/tracker/cards/`, and
@@ -1486,6 +1497,13 @@ before it was run.
 
 ## Changelog
 
+- **1.3.2 · 2026-08-08** — reattested against published Assist With Sites Core
+  Philosophy v1.6.3 at commit
+  `db658ab091bcfbb71f62db55d5b8b6d51b64e52f` and its source digest; aligned
+  navigation to clarified §16 tracker, publishing, and launch sections and §17
+  setup, retrofit, and handoff paths; reaffirmed Cards / Work Orders / Guide as
+  durable current-work truth and Linear as optional context only. No tracker
+  mechanics, provider policy, application behavior, or product identity changed.
 - **1.3.1 · 2026-08-08** — recorded PR #28's full software lane, ruleset
   `20590341`, same-SHA lightweight Actions proof, Vercel ignored-build
   cancellation, and retained live deployment; closed AWF-WO-001 execution while
