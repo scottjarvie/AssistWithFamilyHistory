@@ -2,11 +2,11 @@
 
 > **Philosophy status:** Canonical product identity and claim boundary
 >
-> **Product document version:** 1.3.0
+> **Product document version:** 1.3.1
 >
 > **Capability evidence last verified:** 2026-08-08
 >
-> **Repository evidence revision:** `924fc047 + AWF-WO-001 migration`
+> **Repository evidence revision:** `26b5d21 + state proof dc30429`
 >
 > **Scope:** Product truth, language, trust, and design direction—not an
 > implementation plan, production claim, or permission to change application
@@ -31,7 +31,7 @@ provenance only and are not a current operating dependency.
 > **Family Core:** Assist With Sites — Core Philosophy v1.6.2 (2026-08-08)
 >
 > **Aligned:** 2026-08-08 — repository, delivery configuration, and public
-> deployment records reviewed from `924fc047` through AWF-WO-001
+> deployment records reviewed from `924fc047` through state proof `dc30429`
 >
 > **Adopted:** The shared chassis: the three-way person / Assist workspace /
 > your AI promise; dependable family routes and truth surfaces; the Queue
@@ -46,9 +46,10 @@ provenance only and are not a current operating dependency.
 > **Deferred/gaps:** The unverified big/public-launch requirements recorded below,
 > including the family Queue, MCP and AI setup paths, complete activity history,
 > export and deletion, `/me`, `/admin`, Support Desk, and family navigation.
-> Tracker/provider setup is **In review** in AWF-WO-001; it remains unproven as
-> an established fast lane until a useful same-SHA state commit passes all
-> three external gates. These remain explicit gaps rather than assumptions.
+> Tracker/provider setup is **Current / verified** in AWF-WO-001 through useful
+> state commit `dc30429`. Independent audit remains **Not audited** in AWF-0004;
+> that fact does not erase the observed delivery evidence. Product capability
+> gaps remain explicit rather than assumptions.
 >
 > **Differs:** Family History keeps its
 > research-to-story purpose and audience; Research Spine; domain objects and
@@ -61,9 +62,11 @@ provenance only and are not a current operating dependency.
 >
 > **Evidence:** Dated capability ledger and repository evidence handoff in this
 > document; `docs/tracker/`; Core v1.6.2 commit
-> `561481843793a1d0fb97eee3984bccfd004c21a2`; checked-out base `924fc047` plus
-> AWF-WO-001; public/deployed state remains separately unverified where marked
-> **Unknown**.
+> `561481843793a1d0fb97eee3984bccfd004c21a2`; PR #28; AWF-WO-001; state
+> commit `dc30429`; Actions run `31273074126`; Vercel ignored deployment
+> `dpl_8FfUtYW5FBJ6sZLbXGkiZtbQvf3a`; retained live deployment
+> `dpl_vngjLJMJRMBgo7dM6gpBvT2p7C6J`. Product capabilities remain separately
+> unverified where marked **Unknown**.
 
 This document is derived from the internal family contract rather than a copy
 of it. That contract is a shared chassis and trust/operations contract, not a
@@ -95,7 +98,7 @@ Use these status labels throughout this revision:
 | Product Queue | **Coming soon** | `/app/operations`, `researchTasks`, research checks, and handoff export are real research-operations foundations, but they are not the family product Queue at `/queue` and do not implement its four states or directive-first creation path |
 | Queue authority | **In design** | Adopt the family rule: the directive authorizes only reversible, in-scope record changes plainly requested. New objectives, destructive work, identity merges, disputed promotion, publication, purchases, access changes, and outside-world actions return to **Needs you** |
 | Queue context objects | **Intentional product-specific difference; In design** | “Add context” offers three Family History groups: a research subject, evidence, or a work thread. Their concrete objects are defined in the Queue section below; attaching context stays optional |
-| Internal project tracker | **In review — repository package implemented; provider proof pending** | `docs/tracker/` now carries canonical Cards, Work Orders, Guide, factual metadata, and generated Kanban/Work Orders readers in Family History's archival identity. Current instructions use that durable source rather than mandatory Linear. AWF-WO-001 keeps execution separate from AWF-0004's future independent audit. The fast lane is not called established until useful same-SHA GitHub, Vercel, and live-alias proof exists; do not confuse this build tracker with the product Queue |
+| Internal project tracker | **Current / verified — independent audit pending** | `docs/tracker/` carries canonical Cards, Work Orders, Guide, factual metadata, and generated Kanban/Work Orders readers in Family History's archival identity. Current instructions use that durable source rather than mandatory Linear. State commit `dc30429` proved the lightweight GitHub path, Vercel ignored-build cancellation, and retained live deployment. AWF-WO-001 keeps completed execution separate from AWF-0004's future independent audit; do not confuse this build tracker with the product Queue |
 | MCP and AI setup paths | **Coming soon** | No `/mcp`, `/ai`, `/ai.txt`, or `/settings/ai` route exists. `/llms.txt`, internal app APIs, the API Center, key-management primitives, and a static capability manifest do not substitute for a verified scoped MCP connection and generated current briefing |
 | Activity and provenance | **Current / verified partial foundation; Coming soon complete contract** | Import runs, research logs, story review events, source links, model/prompt fields, and the `agentActivity` schema provide partial evidence. The repo does not prove a plain-language, record-visible entry for every meaningful AI create, change, or delete |
 | Access and sharing | **Current / verified Private and guarded Public foundations; In design Unlisted and Trusted** | Owner-scoped vault reads/writes and filtered public-story publication exist in source. Family History intentionally needs rare Public stories plus later Trusted collaboration and read-only Unlisted views; no complete invite or unlisted-link lifecycle is verified |
@@ -939,11 +942,16 @@ bounded migration and AWF-0004 preserves independent audit as a later fact.
 This package still does not substitute for the product's research operations
 console, create a competing board, or add an automatic dispatcher.
 
-The state fast lane is deliberately reported as **In review**, not established:
-its software, workflow, validators, provider configuration, and branch policy
-must reach `main` through normal PR/full-CI/deployment safeguards, then a useful
-state commit must separately prove lightweight GitHub Actions, a Vercel ignored
-zero-build record, and an unchanged live production alias.
+The state fast lane is **Current / verified**. PR #28 carried its software,
+workflow, validators, provider configuration, and branch policy through normal
+full CI and a real production build. Useful state commit `dc30429` then ran only
+the lightweight GitHub validation path; Vercel canceled deployment
+`dpl_8FfUtYW5FBJ6sZLbXGkiZtbQvf3a` after the ignore classifier validated all 5
+changes and before application output; and `discovertheirstories.com` remained
+on successful deployment `dpl_vngjLJMJRMBgo7dM6gpBvT2p7C6J`. Vercel's current
+inspection schema exposes one empty build envelope even for the canceled record,
+so evidence should say “canceled before application build/output” rather than
+claiming its provider array is empty.
 
 ## Questions, queues, and unfinished work
 
@@ -1476,6 +1484,10 @@ before it was run.
 
 ## Changelog
 
+- **1.3.1 · 2026-08-08** — recorded PR #28's full software lane, ruleset
+  `20590341`, same-SHA lightweight Actions proof, Vercel ignored-build
+  cancellation, and retained live deployment; closed AWF-WO-001 execution while
+  preserving AWF-0004 as a separate future independent audit.
 - **1.3.0 · 2026-08-08** — aligned to Assist With Sites Core Philosophy
   v1.6.2; installed the Family History Cards / Work Orders / Guide source and
   generated readers; retired mandatory Linear operation; recorded the exact

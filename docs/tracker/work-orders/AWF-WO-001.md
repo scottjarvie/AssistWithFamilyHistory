@@ -1,7 +1,7 @@
 ---
 id: AWF-WO-001
 title: Migrate Family History to the repo-owned tracker and proven state fast lane
-execution: active
+execution: complete
 audit: not-audited
 cards: AWF-0001 AWF-0002 AWF-0003
 created: 2026-08-08
@@ -25,9 +25,10 @@ without weakening safeguards for software or ordinary contributors.
 The repository started clean at main commit `924fc047`; it had no tracker, no
 state helper, no ignore classifier, no branch ruleset, and a full CI workflow
 for every main push. PR #28 merged the implementation to `main` through full CI
-and a normal Vercel production build. Tracker migration and philosophy
-alignment are complete; the useful state-only provider proof is the remaining
-execution step.
+and a normal Vercel production build. State commit `dc304294` proved the
+lightweight GitHub lane, Vercel cancellation before application output, and an
+unchanged live production alias. Execution is complete; independent audit
+remains explicitly separate in AWF-0004.
 
 ## Sequence
 
@@ -94,8 +95,17 @@ commit `26b5d21b73917353660c7be750825339711f72c2` ran full main CI in run
 `31272820711`. Vercel deployment `dpl_vngjLJMJRMBgo7dM6gpBvT2p7C6J` is
 `READY`, contains one build, and owns the retained public aliases. Ruleset
 `20590341` requires the PR/check lane and names only Scott user id `53326860`
-as bypass actor. State-SHA receipts will be appended only after observed.
-Completion remains separate from AWF-0004's future independent audit.
+as bypass actor. State commit
+`dc304294f4213ff3eb29f64e632c310c108acbd6` ran only lightweight validation
+in Actions run `31273074126`, job `93142201615`. Vercel deployment
+`dpl_8FfUtYW5FBJ6sZLbXGkiZtbQvf3a` is `CANCELED`; its log validates 5 state
+changes and records cancellation by the Ignored Build Step before application
+output. The provider currently returns one empty build envelope in deployment
+metadata, so this record is described precisely rather than as a literal empty
+array. `discovertheirstories.com` remained on
+`dpl_vngjLJMJRMBgo7dM6gpBvT2p7C6J`, which is `READY` with one real build and
+217 outputs, and returned HTTP 200. Completion remains separate from AWF-0004's
+future independent audit.
 
 ## History
 
@@ -108,3 +118,6 @@ Completion remains separate from AWF-0004's future independent audit.
 - 2026-08-08 · Codex — merged PR #28 after full PR CI; full main CI, one-build
   production deployment, and least-permissive owner ruleset are verified. The
   useful direct-main state proof is next.
+- 2026-08-08 · Codex — completed execution after state commit `dc30429` proved
+  lightweight GitHub validation, Vercel ignored-build cancellation, and the
+  retained live production deployment. Independent audit remains not audited.
