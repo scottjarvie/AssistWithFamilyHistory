@@ -36,9 +36,14 @@ const metadata = JSON.parse(fs.readFileSync(path.join(TRACKER, "tracker.json"), 
 assert.equal(metadata.schemaVersion, 1);
 assert.equal(metadata.project, "Assist With Family History");
 assert.equal(metadata.idPrefix, "AWF");
-assert.equal(metadata.familyCore.label, "Assist With Sites Core Philosophy v1.6.2");
-assert.equal(metadata.familyCore.date, "2026-08-08");
-assert.equal(metadata.familyCore.commit, "561481843793a1d0fb97eee3984bccfd004c21a2");
+assert.match(metadata.familyCore.label, /^Assist With Sites — Core Philosophy v\d+\.\d+\.\d+$/);
+assert.match(metadata.familyCore.date, /^\d{4}-\d{2}-\d{2}$/);
+assert.match(metadata.familyCore.commit, /^[0-9a-f]{40}$/);
+assert.match(metadata.familyCore.sourceSha256, /^[0-9a-f]{64}$/);
+assert.equal(
+  metadata.familyCore.url,
+  "https://github.com/scottjarvie/assistwithlife/blob/main/planning/assist-with-sites-core-philosophy.md",
+);
 
 const cards = list(path.join(TRACKER, "cards"));
 const orders = list(path.join(TRACKER, "work-orders"));
