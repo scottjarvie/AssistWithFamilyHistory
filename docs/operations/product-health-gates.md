@@ -41,7 +41,10 @@ Safe ways to get `PERSON_ROUTE_ID`:
 - Query the local Convex dashboard for a fixture or development-only person ID.
 - Use a person from a deliberately created QA vault, not a private family record.
 
-Do not hard-code real family IDs into repo scripts, docs, fixtures, or Linear comments. If real data is needed for a logged-in FamilySearch session, keep it in the live session checklist or a private Linear note with the right routing labels.
+Do not hard-code real family IDs into repository scripts, docs, fixtures, or
+tracker Cards. If real data is needed for a logged-in FamilySearch session,
+keep it in a private, access-controlled session checklist; the public repository
+tracker may link only to a safe redacted evidence receipt.
 
 ## Verification
 

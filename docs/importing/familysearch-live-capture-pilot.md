@@ -62,8 +62,10 @@ Queue rules:
 - Prefer deceased people with well-understood identity context for the first pilot.
 - Include one source-heavy person and one memory/media page if available.
 - Do not include living people in the first pilot unless the user explicitly directs it during the session and the result stays preview-only.
-- Do not store real private target notes in repo fixtures or public Linear comments.
-- If the queue needs private details, keep them in the live session handoff or a private Linear note.
+- Do not store real private target notes in repository fixtures or tracker Cards.
+- If the queue needs private details, keep them in an access-controlled live
+  session handoff; the repository tracker may contain only a safe redacted
+  reference.
 
 ## One-Person Capture Loop
 
@@ -160,4 +162,5 @@ The live pilot is complete when:
 - At least one source capture package validates in preview.
 - Any merged package has post-merge verification notes.
 - Any blocked row has a clear stop rule and next action.
-- Follow-up Linear issues exist for extension drift, import regressions, privacy review gaps, or source-backed fact extraction discovered during the session.
+- Follow-up tracker Cards exist for extension drift, import regressions, privacy
+  review gaps, or source-backed fact extraction discovered during the session.

@@ -268,7 +268,7 @@ export function OperationRowActions({
         <DialogHeader>
           <DialogTitle>Agent handoff</DialogTitle>
           <DialogDescription>
-            Copy this packet into the next agent route or keep it with the Linear verification note.
+            Copy this packet into the next agent route or attach a privacy-safe reference to the relevant tracker Card.
           </DialogDescription>
         </DialogHeader>
         <Textarea value={handoffText} readOnly className="min-h-[320px] font-mono text-sm" />

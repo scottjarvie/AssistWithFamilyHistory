@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="en" data-mode="paper">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Assist With Family History — tracker</title>
+<style>
+
+
+  :root {
+    --paper:#f7f3e8; --paper-2:#eee7d6; --ink:#24312c; --soft:#5c6862;
+    --faint:#727b76; --line:#d4cab6; --surface:#fffdf7; --surface-deep:#e8dfcc;
+    --groove:#245a43; --groove-2:#2f7358; --groove-wash:#dceee5;
+    --signal:#a65332; --signal-soft:#f1d8ca; --gold:#98702b;
+  }
+  html[data-mode="studio"] {
+    --paper:#111916; --paper-2:#19241f; --ink:#f3efe4; --soft:#aab6af;
+    --faint:#8e9993; --line:#314139; --surface:#17211d; --surface-deep:#0c1310;
+    --groove:#8fd7b4; --groove-2:#71c99f; --groove-wash:#1c382c;
+    --signal:#e18a64; --signal-soft:#4d2d21; --gold:#d6ad5b;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font: 15px/1.55 Georgia, "Times New Roman", serif;
+  }
+  header {
+    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+    padding: 18px 20px 10px;
+  }
+  header h1 { font-size: 20px; margin: 0; }
+  header .sub { color: var(--soft); font-size: 13px; }
+  header button, header a.btn {
+    min-height: 44px; padding: 9px 14px; cursor: pointer; display: inline-block;
+    background: var(--surface); color: var(--ink); text-decoration: none;
+    border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 13px;
+  }
+  header .spacer { margin-left: auto; }
+  header nav { display:flex; gap:6px; flex-wrap:wrap; }
+  .skip { position:fixed; left:12px; top:8px; z-index:100;
+    transform:translateY(-180%); background:var(--ink); color:var(--paper);
+    padding:10px 14px; border-radius:8px; }
+  .skip:focus { transform:translateY(0); }
+  code {
+    font-family: ui-monospace, monospace; font-size: 13px;
+    background: var(--paper-2); padding: 1px 4px; border-radius: 4px;
+  }
+  a { color: var(--groove-2); }
+  .quote { border-left: 3px solid var(--line); padding-left: 12px; color: var(--soft); }
+  .trow { display:flex; min-width:max-content; overflow-wrap:anywhere; }
+  .trow [role="cell"] { padding: 3px 10px 3px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+  :focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+
+  .filters { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 20px 12px; align-items: center; }
+  .filters .flabel { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--faint); margin-right: 2px; }
+  .filters button {
+    font: inherit; font-size: 12.5px; min-height: 32px; padding: 3px 10px;
+    border: 1px solid var(--line); border-radius: 999px; cursor: pointer;
+    background: var(--surface); color: var(--soft);
+  }
+  .filters button[aria-pressed="true"] {
+    background: var(--groove-wash); color: var(--groove); border-color: var(--groove-2);
+  }
+  .viewbar { position:sticky; top:0; z-index:20; display:flex; gap:8px;
+    align-items:center; padding:10px 20px; background:color-mix(in srgb,var(--paper) 92%,transparent);
+    border-block:1px solid var(--line); backdrop-filter:blur(10px); }
+  .viewbar button { min-height:42px; padding:7px 14px; border:1px solid var(--line);
+    border-radius:999px; background:var(--surface); color:var(--ink); font:inherit; cursor:pointer; }
+  .viewbar button[aria-selected="true"] { background:var(--groove); color:var(--paper);
+    border-color:var(--groove); }
+  .viewbar .needs-entry { margin-left:auto; border:2px solid var(--signal); color:var(--signal);
+    font-weight:700; }
+  .viewbar .needs-entry[data-count="0"] { border-style:dashed; opacity:.8; }
+  .specs { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 20px 12px; align-items: center; }
+  .specs .flabel { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--faint); }
+  .specs button {
+    font: inherit; font-size: 13px; min-height: 40px; padding: 6px 14px;
+    border: 1.5px solid var(--gold); border-radius: 8px; cursor: pointer;
+    background: var(--surface); color: var(--ink); font-weight: 600;
+  }
+  .specs .auto { font-size: 12px; color: var(--soft); }
+  .specs .sid.warn { color: var(--signal); }
+  .specs .sid.ok { color: var(--groove-2); }
+  .prov { font-size: 12.5px; color: var(--soft); font-family: ui-monospace, monospace;
+    margin: 6px 0 0; }
+  .prov a { color: var(--groove-2); }
+  .specs button .sid { font-family: ui-monospace, monospace; font-size: 11px; color: var(--gold); }
+  .work-orders { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
+    gap:14px; padding:0 20px 44px; align-items:start; }
+  .work-order { background:var(--surface); border:1px solid var(--line); border-radius:12px;
+    padding:16px; box-shadow:0 10px 24px color-mix(in srgb,var(--ink) 7%,transparent); }
+  .work-order.ready { border-top:4px solid var(--groove-2); }
+  .work-order.complete { border-top:4px solid var(--gold); }
+  .work-order h2 { font-size:18px; margin:8px 0; }
+  .work-order .meta,.work-order .movement { color:var(--soft); font-size:13px; }
+  .work-order .meter { height:8px; overflow:hidden; background:var(--paper-2); border-radius:99px; }
+  .work-order .meter span { display:block; height:100%; background:var(--groove-2); }
+  .work-order .order-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
+  .work-order button { min-height:40px; padding:7px 12px; font:inherit; cursor:pointer;
+    border:1px solid var(--line); border-radius:8px; color:var(--ink); background:var(--paper-2); }
+  .run-now { margin:0 20px 14px; padding:12px 16px; border-left:4px solid var(--groove-2);
+    background:var(--groove-wash); border-radius:0 10px 10px 0; }
+  [hidden] { display:none !important; }
+  .board {
+    display: grid; gap: 12px; padding: 0 20px 40px; align-items: start;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
+  .col { background: var(--paper-2); border-radius: 10px; padding: 10px; }
+  .col.primary { border-top: 3px solid var(--groove-2); }
+  .col.primary h2 { color: var(--groove-2); }
+  .col.dim { background: transparent; border: 1px dashed var(--line); }
+  .col.dim .card { opacity: .72; }
+  .col.dim .card:hover, .col.dim .card:focus-visible { opacity: 1; }
+  .col h2 {
+    font-size: 13px; letter-spacing: .06em; text-transform: uppercase;
+    margin: 2px 4px 10px; color: var(--soft); font-weight: 600;
+  }
+  .col h2 .n { color: var(--faint); font-weight: 400; }
+  .card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px 12px; margin-bottom: 8px; cursor: pointer;
+  }
+  .card.attn { border-top: 3px solid var(--signal); }
+  .card .id { font-size: 11.5px; color: var(--faint); font-family: ui-monospace, monospace; }
+  .card .t { margin: 2px 0 6px; font-size: 14.5px; }
+  .tag {
+    display: inline-block; font-size: 11px; font-family: ui-monospace, monospace;
+    border: 1px solid var(--line); border-radius: 4px; padding: 0 6px; margin-right: 4px;
+    color: var(--soft);
+  }
+  .tag.P1 { border-color: var(--signal); color: var(--signal); }
+  .tag.conforms { border-color: var(--groove-2); color: var(--groove-2); }
+  .tag.missing { border-color: var(--signal); color: var(--signal); border-style: dashed; }
+  .tag.adapt { border-color: var(--gold); color: var(--gold); border-style: dotted; }
+  .tag.edu { border-color: var(--gold); color: var(--gold); }
+  .tag.fu { border-color: var(--groove-2); color: var(--groove-2); }
+  dialog {
+    max-width: 720px; width: calc(100vw - 32px); border: 1px solid var(--line);
+    border-radius: 12px; background: var(--surface); color: var(--ink); padding: 22px 26px;
+  }
+  dialog::backdrop { background: rgba(10, 20, 16, .55); }
+  dialog h2 { margin-top: 22px; }
+  dialog h2:first-of-type { margin-top: 0; }
+  dialog h3 { font-size: 15px; }
+  .dlg-actions { display: flex; gap: 8px; float: right; }
+  .dlg-actions button {
+    font: inherit; font-size: 13px; min-height: 44px; padding: 6px 12px; cursor: pointer;
+    background: var(--surface); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 8px;
+  }
+  .dlg-actions .copy { border-color: var(--groove-2); color: var(--groove-2); }
+  .edu-note {
+    background: var(--paper-2); border-left: 3px solid var(--gold);
+    border-radius: 0 8px 8px 0; padding: 2px 14px; margin: 14px 0;
+  }
+  .spec-cards { margin: 10px 0; }
+  .spec-cards button {
+    font: inherit; font-size: 12.5px; margin: 0 6px 6px 0; min-height: 32px;
+    padding: 3px 10px; cursor: pointer; border: 1px solid var(--line);
+    border-radius: 6px; background: var(--paper-2); color: var(--ink);
+  }
+  @media (max-width: 700px) {
+    header { align-items:flex-start; }
+    header nav { width:100%; overflow-x:auto; flex-wrap:nowrap; padding-bottom:4px; }
+    header nav .btn { white-space:nowrap; }
+    .board,.work-orders { grid-template-columns:1fr; padding-inline:12px; }
+    .viewbar { padding-inline:12px; }
+    .filters { padding-inline:12px; }
+    dialog { padding:18px; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#workspace">Skip to tracker</a>
+<header>
+  <h1>Assist With Family History — tracker</h1>
+  <span class="sub">What's moving now, what's queued, and the few things waiting on you · 4 cards · 2026-08-08</span>
+  <span class="spacer"></span>
+  <nav aria-label="Tracker links">
+    <a class="btn" href="https://discovertheirstories.com">Project</a>
+    <a class="btn" href="../planning/assist-with-family-history-project-philosophy.md">Project Philosophy</a>
+    <a class="btn" href="https://github.com/scottjarvie/assistwithlife/blob/main/planning/assist-with-sites-core-philosophy.md">Family Core</a>
+    <a class="btn" href="guide.html">Guide</a>
+  </nav>
+  <button id="mode" type="button">Night archive</button>
+</header>
+<main id="workspace" tabindex="-1">
+  <div class="viewbar" role="tablist" aria-label="Tracker view">
+    <button id="kanbanTab" type="button" role="tab" aria-controls="kanbanView" aria-selected="true">Kanban</button>
+    <button id="ordersTab" type="button" role="tab" aria-controls="ordersView" aria-selected="false">Work Orders</button>
+    <button id="needsEntry" class="needs-entry" type="button" data-count="0">Needs You · 0</button>
+  </div>
+  <section id="kanbanView" role="tabpanel" aria-labelledby="kanbanTab">
+    <div class="filters" id="filters"></div>
+    <div class="board" id="board"></div>
+  </section>
+  <section id="ordersView" role="tabpanel" aria-labelledby="ordersTab" hidden>
+    <p class="run-now" id="runNow"></p>
+    <div class="work-orders" id="workOrders"></div>
+  </section>
+</main>
+<dialog id="dlg">
+  <div class="dlg-actions">
+    <button class="copy" id="copyCard" type="button">Copy prompt</button>
+    <button class="close" type="button" aria-label="Close">✕</button>
+  </div>
+  <div id="dlgBody"></div>
+</dialog>
+<dialog id="specDlg">
+  <div class="dlg-actions">
+    <button class="copy" id="copySpec" type="button">Copy whole work order</button>
+    <button class="close" type="button" aria-label="Close">✕</button>
+  </div>
+  <div id="specBody"></div>
+</dialog>
+<dialog id="fallbackDlg">
+  <div class="dlg-actions">
+    <button class="close" type="button" aria-label="Close">✕</button>
+  </div>
+  <h2>Copy it yourself</h2>
+  <p>This viewer blocks automatic copying. The prompt below is already selected — press <code>⌘C</code> (or <code>Ctrl+C</code>), then paste it to your AI.</p>
+  <textarea id="fbText" readonly style="width:100%; height:260px; font:12.5px/1.5 ui-monospace,monospace; background:var(--paper-2); color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:10px;"></textarea>
+</dialog>
+<script>
+const REPO_NAME = "Assist With Family History";
+const REPO_SLUG = "github.com/scottjarvie/discover-their-stories";
+const PROJECT_URL = "https://discovertheirstories.com";
+const PROJECT_PHILOSOPHY = "../planning/assist-with-family-history-project-philosophy.md";
+const FAMILY_CORE = {"label":"Assist With Sites Core Philosophy v1.6.2","date":"2026-08-08","commit":"561481843793a1d0fb97eee3984bccfd004c21a2","url":"https://github.com/scottjarvie/assistwithlife/blob/main/planning/assist-with-sites-core-philosophy.md"};
+const CARDS = [{"file":"AWF-0001.md","id":"AWF-0001","title":"Make the repository tracker the day-to-day operating source","status":"doing","type":"migration","area":"operations","priority":"P1","verdict":"missing","contract":"Core §16 · Cards / Work Orders / Guide","work-orders":"AWF-WO-001","created":"2026-08-08","updated":"2026-08-08","updated-by":"Codex","hasEdu":false,"followups":0,"workOrderIds":["AWF-WO-001"]},{"file":"AWF-0002.md","id":"AWF-0002","title":"Establish the fail-closed GitHub and Vercel state fast lane","status":"doing","type":"operations","area":"delivery","priority":"P1","verdict":"missing","contract":"Core §16 · state publication","work-orders":"AWF-WO-001","created":"2026-08-08","updated":"2026-08-08","updated-by":"Codex","hasEdu":false,"followups":0,"workOrderIds":["AWF-WO-001"]},{"file":"AWF-0003.md","id":"AWF-0003","title":"Align the Project Philosophy with Family Core v1.6.2","status":"doing","type":"documentation","area":"philosophy","priority":"P1","verdict":"adapt","contract":"Core §§2, 16, 17","work-orders":"AWF-WO-001","created":"2026-08-08","updated":"2026-08-08","updated-by":"Codex","hasEdu":false,"followups":0,"workOrderIds":["AWF-WO-001"]},{"file":"AWF-0004.md","id":"AWF-0004","title":"Independently audit the completed fast-lane rollout","status":"next","type":"audit","area":"assurance","priority":"P2","verdict":"missing","created":"2026-08-08","updated":"2026-08-08","updated-by":"Codex","hasEdu":false,"followups":0,"workOrderIds":[]}];
+const WORK_ORDERS = [{"file":"AWF-WO-001.md","id":"AWF-WO-001","title":"Migrate Family History to the repo-owned tracker and proven state fast lane","execution":"active","audit":"not-audited","cards":"AWF-0001 AWF-0002 AWF-0003","created":"2026-08-08","updated":"2026-08-08","proposed-by":"Codex","approved-by":"Scott","approved-on":"2026-08-08","executed-by":"Codex","executed-on":"2026-08-08","cardIds":["AWF-0001","AWF-0002","AWF-0003"]}];
+const RAW = {"AWF-0001":"## Why this exists\n\nDay-to-day operation currently begins with a mandatory Linear read. Scott\nexplicitly retired that dependency for this rollout. Work needs a durable,\npullable source that another AI can recover without an external service or an\nold conversation.\n\n## Current truth\n\nThe repository had no Cards / Work Orders / Guide package before this Work\nOrder. `AGENTS.md` and `docs/agent-workflow.md` made Linear a mandatory gate.\nThis branch adds the repo-owned tracker and revises those current instructions.\nHistorical Linear identifiers may remain in dated reports and fixtures only as\nprovenance; they do not authorize, route, or prove current work.\n\n## Next safe action\n\nMerge the tracker software/instruction migration through normal PR, CI, and\nVercel deployment safeguards. Then publish this Card as `done` through the\nvalidated state-only path so the migration choice itself is durable proof.\n\n## Constraints\n\n- Do not query, modify, reconnect, or depend on Linear.\n- Preserve useful historical issue references as dated provenance.\n- Keep product Queue records separate from this internal build tracker.\n- Keep private family information out of the public repository tracker.\n\n## Evidence\n\n- Owner policy: coordinator delegation dated 2026-08-08 explicitly says not\n  to reconnect Linear and to remove the stale mandatory dependency.\n- Pre-migration instructions: `AGENTS.md` and `docs/agent-workflow.md` at\n  `924fc0474f298a80769db0e284a626969f48b56b`.\n- New canonical entry point: `docs/tracker/board.html` with Markdown sources\n  under `docs/tracker/`.\n\n## Definition of done\n\n- [x] Current agent instructions start from repository tracker truth.\n- [x] The Guide explicitly records that Linear is historical/optional only.\n- [x] README and documentation index expose stable tracker links.\n- [ ] The safeguarded implementation reaches main and deploys normally.\n- [ ] A later state-only commit closes this Card without application CI/build.\n\n## History\n\n- 2026-08-08 · Scott — retired mandatory Linear operation for this rollout.\n- 2026-08-08 · Codex — began the repo-owned tracker and instruction migration.\n- 2026-08-08 · Codex — verified the new instructions, stable links, generated\n  readers, and full repository suite locally; main publication remains pending.","AWF-0002":"## Why this exists\n\nCards and Project Philosophy state should travel quickly without paying for a\nfull application test and production build, while every software, workflow,\nvalidator, dependency, schema, or configuration change keeps normal safeguards.\n\n## Current truth\n\nBefore this branch, GitHub ran the full CI job for every push, Vercel built\nevery `main` commit, and `main` had no protection or ruleset. This branch adds\none shared exact allowlist, local commit helper, strict push classifier,\nzero-dependency validators, and a full-range Vercel ignored-build classifier.\nProvider policy and real same-SHA proof remain incomplete until the software\nPR is merged and useful state travels through the direct-main owner lane.\n\n## Next safe action\n\nRun the adversarial fixtures and full repository verification, merge the\nsoftware/config branch through PR and full CI/deployment, establish protected\nmain with the sole-admin bypass, then prove a useful state publication at all\nthree provider gates.\n\n## Constraints\n\n- The exact changed-file range controls classification, not intent alone.\n- Direct-main publication is owner-only and state-only.\n- Missing history, malformed SHA, rename, mixed path, failed validator, or any\n  uncertainty must build normally.\n- GitHub Actions, Vercel deployment state, and live production alias identity\n  are separate evidence gates.\n\n## Evidence\n\n- Core v1.6.2 at Assist With Life commit\n  `561481843793a1d0fb97eee3984bccfd004c21a2`.\n- Music reference software PR #228 and state proof commit `84b929c` were read\n  as implementation precedent; Family History retains its own identity and\n  narrows GitHub classification to Core's exact state allowlist.\n- Pre-rollout production commit: `924fc0474f298a80769db0e284a626969f48b56b`.\n\n## Definition of done\n\n- [x] Accepted state range and rejected mixed/software/config/rename/malformed/\n  missing-history fixtures pass locally.\n- [ ] Software/config PR runs full CI and a normal Vercel build.\n- [ ] Main protection preserves PR/check rules for ordinary contributors.\n- [ ] Useful state SHA runs only lightweight GitHub steps.\n- [ ] Vercel records that SHA as ignored/canceled with zero builds.\n- [ ] `discovertheirstories.com` remains on the previous successful deployment.\n\n## History\n\n- 2026-08-08 · Scott — authorized the portfolio fast-lane rollout.\n- 2026-08-08 · Codex — began the repository and provider implementation.\n- 2026-08-08 · Codex — passed the CI/Vercel adversarial fixtures, validated an\n  isolated state-only index, rejected the same index after adding `README.md`,\n  and passed all 46 repository verification steps. The in-app browser blocked\n  local `file://` inspection by policy; static HTML parity, JavaScript syntax,\n  responsive markers, focus, standalone assets, and links passed instead.","AWF-0003":"## Why this exists\n\nThe product's canonical philosophy still records v1.5.0 and treats the\nrepository tracker as a future gap. Core v1.6.2 makes the tracker and proven\nstate-publication boundary required operating infrastructure.\n\n## Current truth\n\nThe Family History philosophy already preserves its research-to-story identity,\ndomain vocabulary, privacy boundaries, and honest capability ledger. This work\nupdates only its alignment/evidence record and operational truth: the tracker\nis being installed, Linear is no longer an active dependency, and provider\nfast-lane proof remains pending until observed.\n\n## Next safe action\n\nUpdate the canonical Markdown, regenerate the synchronized reader, and run the\nexisting philosophy verifier. Do not rewrite the product's enduring identity\nor claim the provider fast lane is established before real proof.\n\n## Constraints\n\n- Markdown remains authoritative and HTML digest/parity must pass.\n- Preserve Current / In design / Later and evidence-backed claim boundaries.\n- Treat tracker installation, policy configuration, and provider proof as\n  distinct facts.\n\n## Evidence\n\n- Current philosophy package at main commit `924fc047`.\n- Core v1.6.2 at Assist With Life commit `561481843793a1d0fb97eee3984bccfd004c21a2`.\n- Existing verifier: `scripts/check-family-history-project-philosophy.mjs`.\n\n## Definition of done\n\n- [x] Alignment record names Core v1.6.2 and the exact reviewed commit.\n- [x] Tracker migration choice and current proof limits are explicit.\n- [x] Markdown/HTML reader parity and repository links pass.\n- [x] Family History identity and capability truth remain intact.\n\n## History\n\n- 2026-08-08 · Codex — opened v1.6.2 alignment as part of AWF-WO-001.\n- 2026-08-08 · Codex — regenerated the editorial reader and passed 58-heading,\n  SHA-256, link, semantic, responsive, and substantive-parity verification.","AWF-0004":"## Why this exists\n\nExecution and audit are separate facts. The implementing agent must not award\nits own independent audit result, especially for a policy that can bypass\nordinary branch protection and suppress provider builds.\n\n## Current truth\n\nAWF-WO-001 is being executed by Codex and therefore remains `not-audited` even\nafter implementation claims completion. The final evidence must include exact\nGitHub, Vercel, production-alias, branch-ruleset, and local fixture receipts.\n\n## Next safe action\n\nA separate AI should pull `main`, read Core v1.6.2 §16 and the full Work Order,\nre-run local adversarial verification, inspect provider receipts, and record\neither `passed` or `follow-up-needed` without rewriting execution history.\n\n## Constraints\n\n- Auditor must be distinct from the executor.\n- Provider claims require exact immutable identifiers, not screenshots alone.\n- Any mismatch becomes a follow-up Card or Work Order.\n\n## Evidence\n\n- Audit target: `docs/tracker/work-orders/AWF-WO-001.md`.\n- Contract: Assist With Sites Core Philosophy v1.6.2 §16.\n\n## Definition of done\n\n- [ ] A separate AI records identity, date, checks, and evidence reviewed.\n- [ ] AWF-WO-001 audit becomes `passed` or `follow-up-needed`.\n- [ ] Any remaining issue has a durable linked follow-up.\n\n## History\n\n- 2026-08-08 · Codex — created the independent-audit follow-up before execution\n  completion so it cannot be collapsed into the executor's claim."};
+const WORK_ORDER_RAW = {"AWF-WO-001":"## Goal\n\nReplace mandatory Linear-based project operation with the canonical\nrepository-owned Cards / Work Orders / Guide tracker, align the Project\nPhilosophy to Core v1.6.2, and establish the narrow GitHub/Vercel state lane\nwithout weakening safeguards for software or ordinary contributors.\n\n## Current truth\n\nThe repository started clean at main commit `924fc047`; it had no tracker, no\nstate helper, no ignore classifier, no branch ruleset, and a full CI workflow\nfor every main push. Vercel is connected to `discover-their-stories`, current\nproduction serves `https://discovertheirstories.com`, and Scott is the only\nrepository admin. Implementation is active on an isolated `codex/` branch.\n\n## Sequence\n\n1. Read Core v1.6.2 and reconcile the Music provider proof against this repo.\n2. Add Family History's own tracker sources, readers, validators, and links.\n3. Remove the mandatory Linear gate from current agent instructions.\n4. Add the exact shared state contract, local helper, strict GitHub classifier,\n   and Vercel full-range ignore classifier.\n5. Align and regenerate the Project Philosophy.\n6. Prove fixtures and full repository verification.\n7. Publish software/config through PR, full CI, and a normal Vercel deployment.\n8. Protect main with the least-permissive available owner bypass.\n9. Publish useful state directly to main and prove GitHub, Vercel, and live\n   production separately; then record immutable receipts as state.\n\n## Dependencies\n\n- Assist With Sites Core Philosophy v1.6.2 at `561481843793a1d0fb97eee3984bccfd004c21a2`.\n- Existing Family History Project Philosophy and zero-dependency renderer.\n- GitHub and Vercel authenticated provider access already present locally.\n\n## Exclusions\n\n- No product Queue, MCP, auth, schema, customer data, or unrelated app work.\n- No import of the historical Linear backlog.\n- No automatic dispatch or new tracker concepts.\n- No claims that provider proof exists until the exact external records agree.\n\n## Stop rules\n\n- Stop if any private family or living-person detail would enter the tracker.\n- Stop a direct-main publication when the local helper rejects any path.\n- Stop at sign-in, MFA, billing, or irreversible provider confirmation gates.\n- Never broaden the bypass beyond the least-permissive owner role available.\n- Any missing or uncertain Vercel range builds normally.\n\n## Verification\n\n- Run tracker and Project Philosophy parity checks.\n- Exercise accepted state and rejected mixed, software, configuration,\n  deletion/rename, malformed, missing-history, and invalid-state fixtures.\n- Run `pnpm verify` for the full software/config branch.\n- Inspect exact PR checks, main Actions run, Vercel deployment metadata/logs,\n  branch ruleset, live alias assignment, and live-site health.\n\n## Human gates\n\nScott explicitly authorized the portfolio rollout, the repo-owned tracker, the\ntrusted-owner direct-main state path, and removal of mandatory Linear operation\non 2026-08-08. New billing, identity, private-data, domain/DNS, or materially\nbroader access changes still require a separate gate.\n\n## Execution evidence\n\nLocal implementation passed `pnpm verify`: 46 steps including typecheck, lint,\ntests, every established contract, tracker/philosophy parity, both state\nclassifiers, and the production build. An isolated temporary index accepted 11\ncanonical state paths and rejected the same index after `README.md` was added.\nThe in-app browser blocked local `file://` inspection by security policy; the\nzero-dependency verifier still proved byte parity, standalone assets, emitted\nJavaScript syntax, skip-link/focus markers, responsive containment, two views,\nand required controls. PR, provider, ruleset, state-SHA, and live-alias receipts\nwill be appended without invented provenance. Completion remains separate from\nAWF-0004's future independent audit.\n\n## History\n\n- 2026-08-08 · Scott — approved the portfolio state-publication rollout.\n- 2026-08-08 · Scott — explicitly retired the Linear reauthorization and\n  dependency for this project.\n- 2026-08-08 · Codex — began execution on the isolated implementation branch.\n- 2026-08-08 · Codex — completed local implementation and all 46 full\n  verification steps; normal PR/CI/deployment publication is next."};
+const BODIES = {"AWF-0001": "<h2>Why this exists</h2>\n<p>Day-to-day operation currently begins with a mandatory Linear read. Scott explicitly retired that dependency for this rollout. Work needs a durable, pullable source that another AI can recover without an external service or an old conversation.</p>\n<h2>Current truth</h2>\n<p>The repository had no Cards / Work Orders / Guide package before this Work Order. <code>AGENTS.md</code> and <code>docs/agent-workflow.md</code> made Linear a mandatory gate. This branch adds the repo-owned tracker and revises those current instructions. Historical Linear identifiers may remain in dated reports and fixtures only as provenance; they do not authorize, route, or prove current work.</p>\n<h2>Next safe action</h2>\n<p>Merge the tracker software/instruction migration through normal PR, CI, and Vercel deployment safeguards. Then publish this Card as <code>done</code> through the validated state-only path so the migration choice itself is durable proof.</p>\n<h2>Constraints</h2>\n<ul>\n<li>Do not query, modify, reconnect, or depend on Linear.</li>\n<li>Preserve useful historical issue references as dated provenance.</li>\n<li>Keep product Queue records separate from this internal build tracker.</li>\n<li>Keep private family information out of the public repository tracker.</li>\n</ul>\n<h2>Evidence</h2>\n<ul>\n<li>Owner policy: coordinator delegation dated 2026-08-08 explicitly says not to reconnect Linear and to remove the stale mandatory dependency.</li>\n<li>Pre-migration instructions: <code>AGENTS.md</code> and <code>docs/agent-workflow.md</code> at <code>924fc0474f298a80769db0e284a626969f48b56b</code>.</li>\n<li>New canonical entry point: <code>docs/tracker/board.html</code> with Markdown sources under <code>docs/tracker/</code>.</li>\n</ul>\n<h2>Definition of done</h2>\n<ul>\n<li><span class=\"chk\">☑</span> Current agent instructions start from repository tracker truth.</li>\n<li><span class=\"chk\">☑</span> The Guide explicitly records that Linear is historical/optional only.</li>\n<li><span class=\"chk\">☑</span> README and documentation index expose stable tracker links.</li>\n<li><span class=\"chk\">☐</span> The safeguarded implementation reaches main and deploys normally.</li>\n<li><span class=\"chk\">☐</span> A later state-only commit closes this Card without application CI/build.</li>\n</ul>\n<h2>History</h2>\n<ul>\n<li>2026-08-08 · Scott — retired mandatory Linear operation for this rollout.</li>\n<li>2026-08-08 · Codex — began the repo-owned tracker and instruction migration.</li>\n<li>2026-08-08 · Codex — verified the new instructions, stable links, generated readers, and full repository suite locally; main publication remains pending.</li>\n</ul>","AWF-0002": "<h2>Why this exists</h2>\n<p>Cards and Project Philosophy state should travel quickly without paying for a full application test and production build, while every software, workflow, validator, dependency, schema, or configuration change keeps normal safeguards.</p>\n<h2>Current truth</h2>\n<p>Before this branch, GitHub ran the full CI job for every push, Vercel built every <code>main</code> commit, and <code>main</code> had no protection or ruleset. This branch adds one shared exact allowlist, local commit helper, strict push classifier, zero-dependency validators, and a full-range Vercel ignored-build classifier. Provider policy and real same-SHA proof remain incomplete until the software PR is merged and useful state travels through the direct-main owner lane.</p>\n<h2>Next safe action</h2>\n<p>Run the adversarial fixtures and full repository verification, merge the software/config branch through PR and full CI/deployment, establish protected main with the sole-admin bypass, then prove a useful state publication at all three provider gates.</p>\n<h2>Constraints</h2>\n<ul>\n<li>The exact changed-file range controls classification, not intent alone.</li>\n<li>Direct-main publication is owner-only and state-only.</li>\n<li>Missing history, malformed SHA, rename, mixed path, failed validator, or any uncertainty must build normally.</li>\n<li>GitHub Actions, Vercel deployment state, and live production alias identity are separate evidence gates.</li>\n</ul>\n<h2>Evidence</h2>\n<ul>\n<li>Core v1.6.2 at Assist With Life commit <code>561481843793a1d0fb97eee3984bccfd004c21a2</code>.</li>\n<li>Music reference software PR #228 and state proof commit <code>84b929c</code> were read as implementation precedent; Family History retains its own identity and narrows GitHub classification to Core's exact state allowlist.</li>\n<li>Pre-rollout production commit: <code>924fc0474f298a80769db0e284a626969f48b56b</code>.</li>\n</ul>\n<h2>Definition of done</h2>\n<ul>\n<li><span class=\"chk\">☑</span> Accepted state range and rejected mixed/software/config/rename/malformed/ missing-history fixtures pass locally.</li>\n<li><span class=\"chk\">☐</span> Software/config PR runs full CI and a normal Vercel build.</li>\n<li><span class=\"chk\">☐</span> Main protection preserves PR/check rules for ordinary contributors.</li>\n<li><span class=\"chk\">☐</span> Useful state SHA runs only lightweight GitHub steps.</li>\n<li><span class=\"chk\">☐</span> Vercel records that SHA as ignored/canceled with zero builds.</li>\n<li><span class=\"chk\">☐</span> <code>discovertheirstories.com</code> remains on the previous successful deployment.</li>\n</ul>\n<h2>History</h2>\n<ul>\n<li>2026-08-08 · Scott — authorized the portfolio fast-lane rollout.</li>\n<li>2026-08-08 · Codex — began the repository and provider implementation.</li>\n<li>2026-08-08 · Codex — passed the CI/Vercel adversarial fixtures, validated an isolated state-only index, rejected the same index after adding <code>README.md</code>, and passed all 46 repository verification steps. The in-app browser blocked local <code>file://</code> inspection by policy; static HTML parity, JavaScript syntax, responsive markers, focus, standalone assets, and links passed instead.</li>\n</ul>","AWF-0003": "<h2>Why this exists</h2>\n<p>The product's canonical philosophy still records v1.5.0 and treats the repository tracker as a future gap. Core v1.6.2 makes the tracker and proven state-publication boundary required operating infrastructure.</p>\n<h2>Current truth</h2>\n<p>The Family History philosophy already preserves its research-to-story identity, domain vocabulary, privacy boundaries, and honest capability ledger. This work updates only its alignment/evidence record and operational truth: the tracker is being installed, Linear is no longer an active dependency, and provider fast-lane proof remains pending until observed.</p>\n<h2>Next safe action</h2>\n<p>Update the canonical Markdown, regenerate the synchronized reader, and run the existing philosophy verifier. Do not rewrite the product's enduring identity or claim the provider fast lane is established before real proof.</p>\n<h2>Constraints</h2>\n<ul>\n<li>Markdown remains authoritative and HTML digest/parity must pass.</li>\n<li>Preserve Current / In design / Later and evidence-backed claim boundaries.</li>\n<li>Treat tracker installation, policy configuration, and provider proof as distinct facts.</li>\n</ul>\n<h2>Evidence</h2>\n<ul>\n<li>Current philosophy package at main commit <code>924fc047</code>.</li>\n<li>Core v1.6.2 at Assist With Life commit <code>561481843793a1d0fb97eee3984bccfd004c21a2</code>.</li>\n<li>Existing verifier: <code>scripts/check-family-history-project-philosophy.mjs</code>.</li>\n</ul>\n<h2>Definition of done</h2>\n<ul>\n<li><span class=\"chk\">☑</span> Alignment record names Core v1.6.2 and the exact reviewed commit.</li>\n<li><span class=\"chk\">☑</span> Tracker migration choice and current proof limits are explicit.</li>\n<li><span class=\"chk\">☑</span> Markdown/HTML reader parity and repository links pass.</li>\n<li><span class=\"chk\">☑</span> Family History identity and capability truth remain intact.</li>\n</ul>\n<h2>History</h2>\n<ul>\n<li>2026-08-08 · Codex — opened v1.6.2 alignment as part of AWF-WO-001.</li>\n<li>2026-08-08 · Codex — regenerated the editorial reader and passed 58-heading, SHA-256, link, semantic, responsive, and substantive-parity verification.</li>\n</ul>","AWF-0004": "<h2>Why this exists</h2>\n<p>Execution and audit are separate facts. The implementing agent must not award its own independent audit result, especially for a policy that can bypass ordinary branch protection and suppress provider builds.</p>\n<h2>Current truth</h2>\n<p>AWF-WO-001 is being executed by Codex and therefore remains <code>not-audited</code> even after implementation claims completion. The final evidence must include exact GitHub, Vercel, production-alias, branch-ruleset, and local fixture receipts.</p>\n<h2>Next safe action</h2>\n<p>A separate AI should pull <code>main</code>, read Core v1.6.2 §16 and the full Work Order, re-run local adversarial verification, inspect provider receipts, and record either <code>passed</code> or <code>follow-up-needed</code> without rewriting execution history.</p>\n<h2>Constraints</h2>\n<ul>\n<li>Auditor must be distinct from the executor.</li>\n<li>Provider claims require exact immutable identifiers, not screenshots alone.</li>\n<li>Any mismatch becomes a follow-up Card or Work Order.</li>\n</ul>\n<h2>Evidence</h2>\n<ul>\n<li>Audit target: <code>docs/tracker/work-orders/AWF-WO-001.md</code>.</li>\n<li>Contract: Assist With Sites Core Philosophy v1.6.2 §16.</li>\n</ul>\n<h2>Definition of done</h2>\n<ul>\n<li><span class=\"chk\">☐</span> A separate AI records identity, date, checks, and evidence reviewed.</li>\n<li><span class=\"chk\">☐</span> AWF-WO-001 audit becomes <code>passed</code> or <code>follow-up-needed</code>.</li>\n<li><span class=\"chk\">☐</span> Any remaining issue has a durable linked follow-up.</li>\n</ul>\n<h2>History</h2>\n<ul>\n<li>2026-08-08 · Codex — created the independent-audit follow-up before execution completion so it cannot be collapsed into the executor's claim.</li>\n</ul>"};
+const WORK_ORDER_BODIES = {"AWF-WO-001": "<h2>Goal</h2>\n<p>Replace mandatory Linear-based project operation with the canonical repository-owned Cards / Work Orders / Guide tracker, align the Project Philosophy to Core v1.6.2, and establish the narrow GitHub/Vercel state lane without weakening safeguards for software or ordinary contributors.</p>\n<h2>Current truth</h2>\n<p>The repository started clean at main commit <code>924fc047</code>; it had no tracker, no state helper, no ignore classifier, no branch ruleset, and a full CI workflow for every main push. Vercel is connected to <code>discover-their-stories</code>, current production serves <code>https://discovertheirstories.com</code>, and Scott is the only repository admin. Implementation is active on an isolated <code>codex/</code> branch.</p>\n<h2>Sequence</h2>\n<ol>\n<li>Read Core v1.6.2 and reconcile the Music provider proof against this repo.</li>\n<li>Add Family History's own tracker sources, readers, validators, and links.</li>\n<li>Remove the mandatory Linear gate from current agent instructions.</li>\n<li>Add the exact shared state contract, local helper, strict GitHub classifier, and Vercel full-range ignore classifier.</li>\n<li>Align and regenerate the Project Philosophy.</li>\n<li>Prove fixtures and full repository verification.</li>\n<li>Publish software/config through PR, full CI, and a normal Vercel deployment.</li>\n<li>Protect main with the least-permissive available owner bypass.</li>\n<li>Publish useful state directly to main and prove GitHub, Vercel, and live production separately; then record immutable receipts as state.</li>\n</ol>\n<h2>Dependencies</h2>\n<ul>\n<li>Assist With Sites Core Philosophy v1.6.2 at <code>561481843793a1d0fb97eee3984bccfd004c21a2</code>.</li>\n<li>Existing Family History Project Philosophy and zero-dependency renderer.</li>\n<li>GitHub and Vercel authenticated provider access already present locally.</li>\n</ul>\n<h2>Exclusions</h2>\n<ul>\n<li>No product Queue, MCP, auth, schema, customer data, or unrelated app work.</li>\n<li>No import of the historical Linear backlog.</li>\n<li>No automatic dispatch or new tracker concepts.</li>\n<li>No claims that provider proof exists until the exact external records agree.</li>\n</ul>\n<h2>Stop rules</h2>\n<ul>\n<li>Stop if any private family or living-person detail would enter the tracker.</li>\n<li>Stop a direct-main publication when the local helper rejects any path.</li>\n<li>Stop at sign-in, MFA, billing, or irreversible provider confirmation gates.</li>\n<li>Never broaden the bypass beyond the least-permissive owner role available.</li>\n<li>Any missing or uncertain Vercel range builds normally.</li>\n</ul>\n<h2>Verification</h2>\n<ul>\n<li>Run tracker and Project Philosophy parity checks.</li>\n<li>Exercise accepted state and rejected mixed, software, configuration, deletion/rename, malformed, missing-history, and invalid-state fixtures.</li>\n<li>Run <code>pnpm verify</code> for the full software/config branch.</li>\n<li>Inspect exact PR checks, main Actions run, Vercel deployment metadata/logs, branch ruleset, live alias assignment, and live-site health.</li>\n</ul>\n<h2>Human gates</h2>\n<p>Scott explicitly authorized the portfolio rollout, the repo-owned tracker, the trusted-owner direct-main state path, and removal of mandatory Linear operation on 2026-08-08. New billing, identity, private-data, domain/DNS, or materially broader access changes still require a separate gate.</p>\n<h2>Execution evidence</h2>\n<p>Local implementation passed <code>pnpm verify</code>: 46 steps including typecheck, lint, tests, every established contract, tracker/philosophy parity, both state classifiers, and the production build. An isolated temporary index accepted 11 canonical state paths and rejected the same index after <code>README.md</code> was added. The in-app browser blocked local <code>file://</code> inspection by security policy; the zero-dependency verifier still proved byte parity, standalone assets, emitted JavaScript syntax, skip-link/focus markers, responsive containment, two views, and required controls. PR, provider, ruleset, state-SHA, and live-alias receipts will be appended without invented provenance. Completion remains separate from AWF-0004's future independent audit.</p>\n<h2>History</h2>\n<ul>\n<li>2026-08-08 · Scott — approved the portfolio state-publication rollout.</li>\n<li>2026-08-08 · Scott — explicitly retired the Linear reauthorization and dependency for this project.</li>\n<li>2026-08-08 · Codex — began execution on the isolated implementation branch.</li>\n<li>2026-08-08 · Codex — completed local implementation and all 46 full verification steps; normal PR/CI/deployment publication is next.</li>\n</ul>"};
+const STATUSES = [["backlog","Backlog"],["next","Next"],["doing","Doing"],["needs-you","Needs You"],["done","Done"]];
+const state = { area: null, type: null, verdict: null, status: null, view: "kanban" };
+
+const mode = document.getElementById("mode");
+const root = document.documentElement;
+function setMode(m) {
+  root.dataset.mode = m;
+  mode.textContent = m === "paper" ? "Night archive" : "Day archive";
+  localStorage.setItem("tracker-mode", m);
+}
+setMode(localStorage.getItem("tracker-mode") ||
+  (matchMedia("(prefers-color-scheme: dark)").matches ? "studio" : "paper"));
+mode.onclick = () => setMode(root.dataset.mode === "paper" ? "studio" : "paper");
+
+/* ---- copy-as-prompt ---- */
+const AI_NOTES = "\n\n---\nWorking notes for you, the AI taking this on:\n" +
+  "- Project: " + REPO_NAME + " (" + PROJECT_URL + "; " + REPO_SLUG + ").\n" +
+  "- Project Philosophy: " + PROJECT_PHILOSOPHY + ".\n" +
+  "- Family Core: " + FAMILY_CORE.label + " dated " + FAMILY_CORE.date + " at commit " + FAMILY_CORE.commit + " (" + FAMILY_CORE.url + ").\n" +
+  "- Tracker rules: docs/tracker/GUIDE.md. Card path: docs/tracker/cards/<ID>.md.\n" +
+  "- No automatic dispatch. AI proposes; Scott approves Proposed -> Ready; AI executes; a separate AI audits.\n" +
+  "- Append progress as dated bullets under a \"## Follow-ups\" section on the Card — never rewrite earlier notes.\n" +
+    "- When finished: record evidence, check the Definition of done, update status, run pnpm tracker:build && pnpm tracker:verify, and append history.\n" +
+  "- Record provenance with your REAL agent/model identity. If you don't know it, omit the field — never invent one.";
+function cardPrompt(c) {
+  let out = "This is a Card from the " + REPO_NAME + " project tracker, currently in " +
+    c.status + ". I'd like you to work on it. Here are the details:\n\n" +
+    "Card " + c.id + " — " + c.title + "\n" +
+    "Type " + c.type + " · area " + c.area +
+    (c.priority ? " · priority " + c.priority : "") +
+    (c.contract ? " · family contract " + c.contract : "") + "\n\n" + RAW[c.id];
+  for (const orderId of c.workOrderIds || []) {
+    const order = WORK_ORDERS.find((item) => item.id === orderId);
+    if (order) out += "\n\n=== LINKED WORK ORDER " + order.id + " — " + order.title + " (" + order.execution + ") ===\n\n" + WORK_ORDER_RAW[order.id];
+  }
+  return out + AI_NOTES.replace("<ID>", c.id);
+}
+function specPrompt(s) {
+  let out = "This is a bounded Work Order from the " + REPO_NAME + " project tracker (" +
+    REPO_SLUG + "). Confirm it is Ready or Active before executing; Proposed requires Scott's approval.\n\n" +
+    "=== WORK ORDER " + s.id + " — " + s.title + " (" + s.execution + "; audit " + s.audit + ") ===\n\n" + WORK_ORDER_RAW[s.id] + "\n";
+  for (const cid of s.cardIds) {
+    const c = CARDS.find((x) => x.id === cid);
+    out += "\n=== CARD " + cid + " — " + (c ? c.title : "") + " (" + (c ? c.status : "?") + ") ===\n\n" + RAW[cid] + "\n";
+  }
+  out += AI_NOTES.replace("Card path: docs/tracker/cards/<ID>.md.", "Card paths: docs/tracker/cards/; Work Order path: docs/tracker/work-orders/" + s.id + ".md.") +
+    "\n- Work Card by Card; leave dated evidence on every Card touched, even unfinished ones.\n" +
+    "- Stop on every Human gate and stop rule. Do not mark audit passed; a separate AI owns that state.";
+  return out;
+}
+async function copyText(text, btn) {
+  let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+  if (!ok) {
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.append(ta); ta.select();
+    try { ok = document.execCommand("copy"); } catch {}
+    ta.remove();
+  }
+  if (!ok) {
+    /* Last resort (viewers that block clipboard access entirely): show the
+       prompt pre-selected so a manual Cmd+C always works. */
+    fbText.value = text;
+    fallbackDlg.showModal();
+    fbText.focus();
+    fbText.select();
+    return;
+  }
+  const prev = btn.textContent;
+  btn.textContent = "Copied ✓";
+  setTimeout(() => { btn.textContent = prev; }, 2000);
+}
+
+function chip(group, value, label) {
+  const b = document.createElement("button");
+  b.type = "button"; b.textContent = label;
+  b.setAttribute("aria-pressed", String(state[group] === value));
+  b.onclick = () => { state[group] = state[group] === value ? null : value; render(); };
+  return b;
+}
+function flabel(text) {
+  const s = document.createElement("span");
+  s.className = "flabel"; s.textContent = text;
+  return s;
+}
+function renderWorkOrders() {
+  const host = document.getElementById("workOrders");
+  host.replaceChildren();
+  const runnable = WORK_ORDERS.filter((order) => order.execution === "ready");
+  document.getElementById("runNow").innerHTML = runnable.length
+    ? "<strong>Runnable now:</strong> " + runnable.map((order) => order.id + " · " + order.title).join("; ") + ". Ready means Scott already approved the bounded scope."
+    : "<strong>Runnable now:</strong> no Ready Work Orders. Proposed requires Scott; Active is already claimed; Complete awaits only its separate audit when needed.";
+  for (const order of WORK_ORDERS) {
+    const done = order.cardIds.filter((id) => CARDS.find((card) => card.id === id)?.status === "done").length;
+    const progress = Math.round((done / order.cardIds.length) * 100);
+    const blocker = order.execution === "proposed" ? "Scott's scope approval" :
+      order.execution === "ready" ? "None known — runnable now" :
+      order.execution === "active" ? "See stop rules and contained Cards" :
+      order.execution === "complete" && order.audit !== "passed" ? "Independent audit still open" : "None recorded";
+    const evidence = order["completed-on"]
+      ? "Completed " + order["completed-on"] + (order["executed-by"] ? " by " + order["executed-by"] : "")
+      : order["executed-on"] ? "Execution started " + order["executed-on"] : "No execution evidence recorded";
+    const article = document.createElement("article");
+    article.className = "work-order " + order.execution;
+    article.innerHTML = '<div class="meta">' + order.id + ' · <strong>' + order.execution + '</strong> · audit: <strong>' + order.audit + '</strong></div>' +
+      '<h2>' + order.title + '</h2>' +
+      '<div class="meter" aria-label="' + done + ' of ' + order.cardIds.length + ' Cards complete"><span style="width:' + progress + '%"></span></div>' +
+      '<p class="meta">' + done + ' of ' + order.cardIds.length + ' Cards complete</p>' +
+      '<p><strong>Blocker:</strong> ' + blocker + '</p>' +
+      '<p><strong>Execution evidence:</strong> ' + evidence + '</p>' +
+      '<p><strong>Independent audit:</strong> ' + order.audit + (order["audited-by"] ? ' by ' + order["audited-by"] : '') + '</p>' +
+      '<p class="movement">Last movement · ' + order.updated + '</p>' +
+      '<div class="spec-cards">' + order.cardIds.map((id) => '<button type="button" data-card="' + id + '">' + id + ' · ' + (CARDS.find((card) => card.id === id)?.status || '?') + '</button>').join('') + '</div>' +
+      '<div class="order-actions"><button type="button" data-open>Open details</button><button type="button" data-copy>Copy whole work order</button></div>';
+    article.querySelector("[data-open]").onclick = () => openSpec(order);
+    article.querySelector("[data-copy]").onclick = (event) => copyText(specPrompt(order), event.currentTarget);
+    for (const button of article.querySelectorAll("[data-card]")) button.onclick = () => openCard(CARDS.find((card) => card.id === button.dataset.card));
+    host.append(article);
+  }
+}
+function setView(view) {
+  state.view = view;
+  const kanban = view === "kanban";
+  document.getElementById("kanbanView").hidden = !kanban;
+  document.getElementById("ordersView").hidden = kanban;
+  document.getElementById("kanbanTab").setAttribute("aria-selected", String(kanban));
+  document.getElementById("ordersTab").setAttribute("aria-selected", String(!kanban));
+  localStorage.setItem("tracker-view", view);
+}
+function render() {
+  const f = document.getElementById("filters");
+  f.replaceChildren();
+  f.append(flabel("area"));
+  for (const a of [...new Set(CARDS.map((c) => c.area))].sort()) f.append(chip("area", a, a));
+  f.append(flabel("type"));
+  for (const t of [...new Set(CARDS.map((c) => c.type))].sort()) f.append(chip("type", t, t));
+  const verdicts = ["conforms", "missing", "adapt"].filter((v) => CARDS.some((c) => c.verdict === v));
+  if (verdicts.length) f.append(flabel("verdict"));
+  for (const v of verdicts) f.append(chip("verdict", v, v));
+  const board = document.getElementById("board");
+  board.replaceChildren();
+  const visible = CARDS.filter((c) =>
+    (!state.area || c.area === state.area) &&
+    (!state.type || c.type === state.type) &&
+    (!state.verdict || c.verdict === state.verdict) &&
+    (!state.status || c.status === state.status));
+  for (const [key, label] of STATUSES) {
+    const col = document.createElement("div");
+    col.className = "col" + (key === "next" ? " primary" : key === "backlog" ? " dim" : "");
+    const cs = visible.filter((c) => c.status === key)
+      .sort((a, b) => (a.priority || "P9").localeCompare(b.priority || "P9") || a.id.localeCompare(b.id));
+    col.innerHTML = '<h2>' + label + ' <span class="n">' + cs.length + '</span></h2>';
+    for (const c of cs) {
+      const el = document.createElement("div");
+      el.className = "card" + (c.status === "needs-you" ? " attn" : "");
+      el.tabIndex = 0; el.setAttribute("role", "button");
+      el.innerHTML = '<span class="id">' + c.id + '</span>' +
+        (c.priority ? ' <span class="tag ' + c.priority + '">' + c.priority + "</span>" : "") +
+        (c.size ? ' <span class="tag">' + c.size + "</span>" : "") +
+        (c.verdict ? ' <span class="tag ' + c.verdict + '">' + c.verdict + "</span>" : "") +
+        (c.hasEdu ? ' <span class="tag edu">edu</span>' : "") +
+        (c.followups ? ' <span class="tag fu">+' + c.followups + ' notes</span>' : "") +
+        '<div class="t">' + c.title + "</div>" +
+        '<span class="tag">' + c.type + '</span><span class="tag">' + c.area + "</span>" +
+        (c.contract ? '<span class="tag">' + c.contract + "</span>" : "");
+      el.onclick = () => openCard(c);
+      el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openCard(c); } };
+      col.append(el);
+    }
+    board.append(col);
+  }
+  const needs = CARDS.filter((card) => card.status === "needs-you").length;
+  const needsButton = document.getElementById("needsEntry");
+  needsButton.textContent = "Needs You · " + needs;
+  needsButton.dataset.count = String(needs);
+}
+const dlg = document.getElementById("dlg");
+const specDlg = document.getElementById("specDlg");
+const fallbackDlg = document.getElementById("fallbackDlg");
+const fbText = document.getElementById("fbText");
+/* No inline onclick handlers — sandboxed viewers (and strict CSPs) drop them.
+   A click that lands on the dialog element itself (its padding or the
+   ::backdrop) rather than on content closes it. Escape works natively. */
+for (const d of [dlg, specDlg, fallbackDlg]) {
+  d.querySelector(".close").addEventListener("click", () => d.close());
+  d.addEventListener("click", (e) => { if (e.target === d) d.close(); });
+}
+let currentCard = null, currentSpec = null;
+document.getElementById("copyCard").addEventListener("click", (e) => {
+  if (currentCard) copyText(cardPrompt(currentCard), e.currentTarget);
+});
+document.getElementById("copySpec").addEventListener("click", (e) => {
+  if (currentSpec) copyText(specPrompt(currentSpec), e.currentTarget);
+});
+function openCard(c) {
+  currentCard = c;
+  const prov = [];
+  if (c["completed-by"] || c["completed-on"]) prov.push("completed by " + (c["completed-by"] || "?") + (c["completed-on"] ? " on " + c["completed-on"] : ""));
+  if (c["updated-by"]) prov.push("last updated by " + c["updated-by"] + (c.updated ? " on " + c.updated : ""));
+  if (c.evidenceLinks) prov.push(c.evidenceLinks.map((u, i) => '<a href="' + u + '">evidence ' + (i + 1) + "</a>").join(" "));
+  document.getElementById("dlgBody").innerHTML =
+    '<span class="id">' + c.id + " · " + c.status + (c.contract ? " · " + c.contract : "") +
+    "</span><h2>" + c.title + "</h2>" +
+    (prov.length ? '<p class="prov">' + prov.join(" · ") + "</p>" : "") +
+    (c.status === "needs-you" ? '<div class="edu-note"><strong>Owner gate · read the teaching before acting</strong>' + BODIES[c.id] + '</div>' : BODIES[c.id]);
+  const eduH = [...document.getElementById("dlgBody").querySelectorAll("h2")]
+    .find((h) => h.textContent === "Education");
+  if (eduH) {
+    const wrap = document.createElement("div");
+    wrap.className = "edu-note";
+    let n = eduH.nextSibling;
+    const nodes = [];
+    while (n && !(n.tagName && /^H2$/.test(n.tagName))) { nodes.push(n); n = n.nextSibling; }
+    eduH.after(wrap);
+    for (const node of nodes) wrap.append(node);
+  }
+  dlg.showModal();
+}
+function openSpec(s) {
+  currentSpec = s;
+  const cardsHtml = s.cardIds.map((cid) => {
+    const c = CARDS.find((x) => x.id === cid);
+    return '<button type="button" data-card="' + cid + '">' + cid + " · " +
+      (c ? c.title : "?") + " (" + (c ? c.status : "?") + ")</button>";
+  }).join("");
+  const done = s.cardIds.filter((cid) => CARDS.find((c) => c.id === cid)?.status === "done").length;
+  const prov = [];
+  if (s["executed-by"] || s["executed-on"]) prov.push("executed by " + (s["executed-by"] || "?") + (s["executed-on"] ? " on " + s["executed-on"] : ""));
+  if (s["completed-on"]) prov.push("completed " + s["completed-on"]);
+  if (s["audited-by"] || s["audited-on"]) prov.push("audited by " + (s["audited-by"] || "?") + (s["audited-on"] ? " on " + s["audited-on"] : "") + " — " + s.audit);
+  else prov.push("audit: " + s.audit);
+  if (s.followUpIds) prov.push("follow-ups: " + s.followUpIds.join(", "));
+  document.getElementById("specBody").innerHTML =
+    '<span class="id">' + s.id + " · " + s.execution + " · audit " + s.audit + " · " + done + " of " + s.cardIds.length + " Cards complete</span>" +
+    "<h2>" + s.title + "</h2>" +
+    '<p class="prov">' + prov.join(" · ") + "</p>" +
+    (s.execution === "ready"
+      ? '<p><strong>Runnable now: Scott already approved this bounded scope.</strong></p>'
+      : "") +
+    WORK_ORDER_BODIES[s.id] +
+    '<h3>Cards in this Work Order</h3><div class="spec-cards">' + cardsHtml + "</div>";
+  if (s.followUpIds) {
+    const fb = s.followUpIds
+      .map((fid) => CARDS.find((c) => c.id === fid) ? '<button type="button" data-card="' + fid + '">' + fid + "</button>" : fid)
+      .join(" ");
+    document.getElementById("specBody").insertAdjacentHTML("beforeend",
+      '<h3>Resulting follow-ups</h3><div class="spec-cards">' + fb + "</div>");
+  }
+  for (const b of document.getElementById("specBody").querySelectorAll("[data-card]")) {
+    b.addEventListener("click", () => {
+      specDlg.close();
+      openCard(CARDS.find((x) => x.id === b.dataset.card));
+    });
+  }
+  specDlg.showModal();
+}
+document.getElementById("kanbanTab").onclick = () => setView("kanban");
+document.getElementById("ordersTab").onclick = () => setView("orders");
+document.getElementById("needsEntry").onclick = () => {
+  setView("kanban"); state.status = "needs-you"; render();
+  document.getElementById("kanbanView").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+};
+renderWorkOrders();
+render();
+setView(localStorage.getItem("tracker-view") === "orders" ? "orders" : "kanban");
+</script>
+</body>
+</html>

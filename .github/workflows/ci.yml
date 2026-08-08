@@ -10,6 +10,9 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+permissions:
+  contents: read
+
 jobs:
   build-and-smoke:
     runs-on: ubuntu-latest
@@ -18,33 +21,56 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Classify CI scope
+        id: ci_scope
+        env:
+          CI_EVENT_NAME: ${{ github.event_name }}
+          CI_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          CI_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          node scripts/classify-ci-change.mjs \
+            --event-name "$CI_EVENT_NAME" \
+            --base "$CI_BASE_SHA" \
+            --head "$CI_HEAD_SHA" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Verify canonical state
+        if: steps.ci_scope.outputs.run_full != 'true'
+        run: |
+          node scripts/verify-tracker.mjs
+          node scripts/check-family-history-project-philosophy.mjs
+          echo "Validated state-only range; no dependency install, application build, tests, server, or browser ran." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Setup pnpm
+        if: steps.ci_scope.outputs.run_full == 'true'
         uses: pnpm/action-setup@v4
-        # pnpm version is read from `packageManager` in package.json — do not
-        # also set `version:` here or the action errors with ERR_PNPM_BAD_PM_VERSION.
 
       - name: Setup Node.js
+        if: steps.ci_scope.outputs.run_full == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
 
       - name: Install dependencies
+        if: steps.ci_scope.outputs.run_full == 'true'
         run: pnpm install --frozen-lockfile
 
-      # pnpm verify runs typecheck + lint + test + 28 contract checks + build
-      # in a single deterministic pass (~25s locally). Catches the contract
-      # regressions that smoke alone misses.
       - name: Verify (typecheck + lint + test + checks + build)
+        if: steps.ci_scope.outputs.run_full == 'true'
         run: pnpm verify
 
       - name: Start app
+        if: steps.ci_scope.outputs.run_full == 'true'
         run: |
           pnpm start > /tmp/tell-their-stories.log 2>&1 &
           echo $! > /tmp/tell-their-stories.pid
 
       - name: Wait for app
+        if: steps.ci_scope.outputs.run_full == 'true'
         run: |
           for i in {1..60}; do
             if curl -sSf http://127.0.0.1:3443/ >/dev/null; then
@@ -57,10 +83,11 @@ jobs:
           exit 1
 
       - name: Smoke test routes
+        if: steps.ci_scope.outputs.run_full == 'true'
         run: BASE_URL=http://127.0.0.1:3443 pnpm smoke:routes
 
       - name: Stop app
-        if: always()
+        if: ${{ always() && steps.ci_scope.outputs.run_full == 'true' }}
         run: |
           if [[ -f /tmp/tell-their-stories.pid ]]; then
             kill "$(cat /tmp/tell-their-stories.pid)" || true

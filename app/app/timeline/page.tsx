@@ -96,7 +96,7 @@ export default function TimelinePlaceholderPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-sm text-stone-600">
             <Beaker className="h-4 w-4 text-amber-700" />
-            <span>Want to influence the design? See the Timeline Builder proposal doc and Linear issue GEN-24.</span>
+            <span>Want to influence the design? See the Timeline Builder proposal document.</span>
           </div>
           <Button asChild variant="outline">
             <Link href="/app/experiments">

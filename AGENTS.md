@@ -2,14 +2,17 @@
 
 This repo builds Discover Their Stories, a FamilySearch-first family history vault, research operations queue, and story-writing workflow. Treat genealogy data as private by default, especially living people, memories, notes, and raw imported artifacts.
 
-This project follows the shared Jarvie Projects operating standards:
-
-- [Start Here: General Agentic Linear Operating Model](https://linear.app/jarvie/document/start-here-general-agentic-linear-operating-model-becfec3938ac)
-- [Autonomous Agentic Coding Mode and Route Execution Standard](https://linear.app/jarvie/document/autonomous-agentic-coding-mode-and-route-execution-standard-4f84826a7fed)
+This project follows the repository-owned Assist tracker operating standard in
+[`docs/tracker/GUIDE.md`](docs/tracker/GUIDE.md). Historical Linear references
+may remain as provenance, but Linear is not a current routing or authorization
+dependency and must not block work.
 
 ## Start Here
 
-1. Read Linear before inventing work. Active routes, priorities, labels, blockers, and acceptance criteria live in Linear.
+1. Read the [tracker Guide](docs/tracker/GUIDE.md), generated
+   [tracker board](docs/tracker/board.html), relevant Cards, and Ready/Active
+   Work Orders before inventing work. Cards and Work Orders carry current
+   priorities, blockers, approved scope, evidence, and handoff truth.
 2. Read the stable repo docs for architecture and verification:
    - [`Assist With Family History Project Philosophy`](docs/planning/assist-with-family-history-project-philosophy.md) — canonical product purpose, domain language, responsibility split, design character, truth boundaries, and family-Core alignment
    - `docs/README.md`
@@ -21,19 +24,28 @@ This project follows the shared Jarvie Projects operating standards:
 
 ## Autonomous Mode
 
-When asked to work autonomously, follow a route: group related Linear issues by product surface, dependency, workflow, refactor path, verification need, or release goal. Do not stop after one tiny task unless there is a real blocker or a real stopping point.
+When asked to work autonomously, follow a Ready or Active Work Order. If no
+approved order covers the request, record verified intake as Cards and propose a
+bounded Work Order for Scott's scope approval. Group work by product surface,
+dependency, workflow, refactor path, verification need, or release goal. Do not
+stop after one tiny task unless there is a real blocker or stopping point.
 
 As you work:
 
-- Move relevant Linear issues into progress.
-- Clarify issue descriptions or acceptance criteria when the repo reveals missing detail.
-- Create follow-up issues for real remaining work instead of burying TODOs in prose.
-- Leave verification notes before marking issues done.
+- Move relevant Cards to `doing` only while actively executing approved scope.
+- Clarify Card truth, constraints, next safe action, and completion evidence when
+  the repository reveals missing detail.
+- Create follow-up Cards or Proposed Work Orders for real remaining work instead
+  of burying TODOs in prose.
+- Leave dated verification evidence before marking Cards `done`.
 - Prefer repo patterns over new abstractions.
 
 ## Escalation Rules
 
-Answer technical questions from the repo, docs, tests, and Linear first. Ask the PM only when the answer materially changes product direction, UX taste, risk tolerance, production access, main-dev/backend ownership, or another decision that cannot be safely inferred.
+Answer technical questions from the repo, tracker, docs, tests, and provider
+evidence first. Ask the PM only when the answer materially changes product
+direction, UX taste, risk tolerance, production access, main-dev/backend
+ownership, or another decision that cannot be safely inferred.
 
 When you do ask, explain the technical question in plain language and state the tradeoff.
 
@@ -61,13 +73,26 @@ For targeted work pick from:
 
 For UI work, run browser checks on desktop and mobile breakpoints where relevant, inspect console errors, and note what changed visually.
 
+## State Publication Boundary
+
+Tracker and Project Philosophy content may use the narrow state path only after
+`pnpm tracker:commit-state --check` accepts the staged index. The exact state
+paths, local validators, required `skip-checks: true` trailer, trusted-owner
+direct-main rule, GitHub lightweight path, and Vercel ignored-build behavior are
+documented in [`docs/tracker/GUIDE.md`](docs/tracker/GUIDE.md).
+
+Application code, schemas, generators, validators, workflows, dependencies,
+instructions, repository/build/deployment configuration, mixed changes,
+renames, malformed changes, and any uncertain change always use a normal branch,
+pull request, full CI, and deployment proof.
+
 ## Final Reporting
 
 At a meaningful stopping point, report:
 
-- Completed issues and meaningful code/product changes.
+- Completed Cards/Work Orders and meaningful code/product changes.
 - Verification run and results.
 - UI routes or preview links to inspect, including desktop/mobile notes when relevant.
-- New or updated Linear issues.
+- New or updated Cards and Work Orders, including separate audit state.
 - Residual risks or blockers.
 - The next long route to take if continuing.

@@ -76,8 +76,8 @@ assert(
 for (const requiredText of [
   "**Document:** Assist With Family History — Project Philosophy",
   `**Canonical:**`,
-  "**Family Core:** Assist With Sites — Core Philosophy v1.5.0 (2026-08-07)",
-  "**Aligned:** 2026-08-07",
+  "**Family Core:** Assist With Sites — Core Philosophy v1.6.2 (2026-08-08)",
+  "**Aligned:** 2026-08-08",
   "**Adopted:**",
   "**Deferred/gaps:**",
   "**Differs:**",
