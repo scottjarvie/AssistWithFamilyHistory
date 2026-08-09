@@ -20,6 +20,7 @@ import type * as media from "../media.js";
 import type * as personEvents from "../personEvents.js";
 import type * as persons from "../persons.js";
 import type * as places from "../places.js";
+import type * as queue from "../queue.js";
 import type * as rateLimits from "../rateLimits.js";
 import type * as relationships from "../relationships.js";
 import type * as researchLog from "../researchLog.js";
@@ -51,6 +52,7 @@ declare const fullApi: ApiFromModules<{
   personEvents: typeof personEvents;
   persons: typeof persons;
   places: typeof places;
+  queue: typeof queue;
   rateLimits: typeof rateLimits;
   relationships: typeof relationships;
   researchLog: typeof researchLog;

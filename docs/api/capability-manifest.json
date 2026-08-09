@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "2026-05-21",
+  "schemaVersion": "2026-08-09",
   "status": "internal-planning",
   "defaultPolicy": {
     "ownerBoundary": "All private app APIs must resolve owner context before reading or writing vault data.",
@@ -10,7 +10,7 @@
     "read_only_assistant": "Owner-scoped reads for people, context packs, queue summaries, stories, and documents.",
     "capture_validate": "Validate user-provided capture packages without saving or merging.",
     "capture_merge": "Merge user-provided capture packages after review.",
-    "research_operator": "Create tasks and update checks with evidence-backed notes.",
+    "research_operator": "Work an assigned Queue handoff, create tasks, and update checks with evidence-backed notes. Queue scopes do not grant domain-record writes.",
     "story_writer": "Save story drafts inside an owner vault.",
     "trusted_operator": "Higher-risk merges, publish actions, and bulk operations.",
     "admin_security": "Cross-user, incident, or security workflows. Not present."
@@ -41,6 +41,28 @@
     }
   },
   "routes": [
+    {
+      "route": "/api/queue",
+      "methods": ["GET", "POST"],
+      "capability": "product_queue_list_create",
+      "environment": "browser-or-local-api",
+      "agentSupport": "restricted",
+      "reviewLevel": "owner-scoped-read-write",
+      "risk": "medium",
+      "scopes": ["queue:read"],
+      "notes": "Current internal human API for cursor-paged list and directive-first create. Chosen-AI list/read stays internal until incoming credentials resolve to a server-trusted principal."
+    },
+    {
+      "route": "/api/queue/[id]",
+      "methods": ["GET", "PATCH", "DELETE"],
+      "capability": "product_queue_handoff_commands",
+      "environment": "browser-or-local-api",
+      "agentSupport": "restricted",
+      "reviewLevel": "owner-scoped-command-gates",
+      "risk": "medium",
+      "scopes": ["queue:read", "queue:claim", "queue:update", "queue:complete"],
+      "notes": "Current internal human API. Commands enforce exact four-state semantics, optimistic versioning, idempotency, actor-bound leases, owner-only cancel/reopen/delete, and no implied domain mutation authority. External AI access is not exposed."
+    },
     {
       "route": "/api/capabilities",
       "methods": ["GET"],

@@ -22,6 +22,11 @@ export const SCOPES = [
   "documents:read",
   "queue:read",
   "stories:read",
+  // Queue handoff commands. These mutate only Queue continuity state; they do
+  // not grant permission to change genealogy records, publish, merge, or delete.
+  "queue:claim",
+  "queue:update",
+  "queue:complete",
   // guarded writes
   "context:write",
   "checks:write",
@@ -81,8 +86,16 @@ export const SCOPE_PRESETS_META: ScopePresetDef[] = [
   {
     key: "research_operator",
     label: "Research operator",
-    description: "Reads, plus add research notes, update research checks, and create tasks (review-gated).",
-    scopes: [...READ_SCOPES, "context:write", "checks:write", "tasks:write"],
+    description: "Reads, plus work a bounded Queue handoff, add research notes, update research checks, and create tasks (review-gated).",
+    scopes: [
+      ...READ_SCOPES,
+      "queue:claim",
+      "queue:update",
+      "queue:complete",
+      "context:write",
+      "checks:write",
+      "tasks:write",
+    ],
     tier: "standard",
   },
   {
