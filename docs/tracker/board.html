@@ -62,6 +62,16 @@
   .filters button[aria-pressed="true"] {
     background: var(--groove-wash); color: var(--groove); border-color: var(--groove-2);
   }
+  .orderbar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:0 20px 12px;
+    padding:10px 12px; border:1px solid var(--line); border-radius:10px;
+    background:color-mix(in srgb,var(--surface) 88%,var(--paper)); color:var(--soft); }
+  .orderbar strong { color:var(--groove-2); }
+  .orderbar .order-state { font:12px/1.4 ui-monospace,monospace; }
+  .orderbar .order-help { flex:1 1 300px; margin:0; font-size:12.5px; }
+  .orderbar button { min-height:40px; padding:7px 12px; border:1px solid var(--line);
+    border-radius:8px; background:var(--surface); color:var(--ink); font:inherit; cursor:pointer; }
+  .orderbar button:disabled { cursor:not-allowed; opacity:.55; }
+  .orderbar.storage-warning { border-color:var(--gold); }
   .viewbar { position:sticky; top:0; z-index:20; display:flex; gap:8px;
     align-items:center; padding:10px 20px; background:color-mix(in srgb,var(--paper) 92%,transparent);
     border-block:1px solid var(--line); backdrop-filter:blur(10px); }
@@ -110,17 +120,20 @@
   .col.primary { border-top: 3px solid var(--groove-2); }
   .col.primary h2 { color: var(--groove-2); }
   .col.dim { background: transparent; border: 1px dashed var(--line); }
-  .col.dim .card { opacity: .72; }
-  .col.dim .card:hover, .col.dim .card:focus-visible { opacity: 1; }
+  .col.dim .card-shell { opacity: .72; }
+  .col.dim .card-shell:hover, .col.dim .card-shell:focus-within { opacity: 1; }
   .col h2 {
     font-size: 13px; letter-spacing: .06em; text-transform: uppercase;
     margin: 2px 4px 10px; color: var(--soft); font-weight: 600;
   }
   .col h2 .n { color: var(--faint); font-weight: 400; }
+  .card-shell { position:relative; margin-bottom:8px; transition:transform .14s ease,opacity .14s ease; }
   .card {
+    display:block; width:100%; min-height:44px; text-align:left; color:var(--ink);
     background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
-    padding: 10px 12px; margin-bottom: 8px; cursor: pointer;
+    padding:10px 12px; cursor:grab; font:inherit; touch-action:manipulation;
   }
+  .card:active { cursor:grabbing; }
   .card.attn { border-top: 3px solid var(--signal); }
   .card .id { font-size: 11.5px; color: var(--faint); font-family: ui-monospace, monospace; }
   .card .t { margin: 2px 0 6px; font-size: 14.5px; }
@@ -135,6 +148,14 @@
   .tag.adapt { border-color: var(--gold); color: var(--gold); border-style: dotted; }
   .tag.edu { border-color: var(--gold); color: var(--gold); }
   .tag.fu { border-color: var(--groove-2); color: var(--groove-2); }
+  .card-shell.is-dragging { z-index:5; opacity:.82; transform:scale(.985);
+    filter:drop-shadow(0 14px 18px color-mix(in srgb,var(--ink) 22%,transparent)); }
+  .card-shell.is-dragging .card { cursor:grabbing; border-color:var(--signal); }
+  .col.drop-blocked { outline:2px dashed var(--signal); outline-offset:3px; }
+  body.is-reordering { cursor:grabbing; user-select:none; }
+  .visually-hidden { position:absolute!important; width:1px!important; height:1px!important;
+    padding:0!important; margin:-1px!important; overflow:hidden!important; clip:rect(0 0 0 0)!important;
+    white-space:nowrap!important; border:0!important; }
   dialog {
     max-width: 720px; width: calc(100vw - 32px); border: 1px solid var(--line);
     border-radius: 12px; background: var(--surface); color: var(--ink); padding: 22px 26px;
@@ -167,7 +188,12 @@
     .board,.work-orders { grid-template-columns:1fr; padding-inline:12px; }
     .viewbar { padding-inline:12px; }
     .filters { padding-inline:12px; }
+    .orderbar { margin-inline:12px; align-items:flex-start; }
+    .orderbar .order-help { flex-basis:100%; }
     dialog { padding:18px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .card-shell { transition:none; }
   }
 </style>
 </head>
@@ -175,7 +201,7 @@
 <a class="skip" href="#workspace">Skip to tracker</a>
 <header>
   <h1>Assist With Family History — tracker</h1>
-  <span class="sub">What's moving now, what's queued, and the few things waiting on you · 28 cards · 2026-08-08</span>
+  <span class="sub">What's moving now, what's queued, and the few things waiting on you · 28 cards · 2026-08-09</span>
   <span class="spacer"></span>
   <nav aria-label="Tracker links">
     <a class="btn" href="https://discovertheirstories.com">Project</a>
@@ -193,6 +219,12 @@
   </div>
   <section id="kanbanView" role="tabpanel" aria-labelledby="kanbanTab">
     <div class="filters" id="filters"></div>
+    <div class="orderbar" id="orderbar">
+      <strong>Personal order · browser only</strong>
+      <span class="order-state" id="orderStatus">Canonical order</span>
+      <p class="order-help" id="reorderHelp">Drag Cards · touch: hold, then drag · keyboard: Alt + ↑/↓/Home/End. Canonical fields never change.</p>
+      <button id="resetOrder" type="button" disabled>Reset to canonical order</button>
+    </div>
     <div class="board" id="board"></div>
   </section>
   <section id="ordersView" role="tabpanel" aria-labelledby="ordersTab" hidden>
@@ -222,6 +254,7 @@
   <p>This viewer blocks automatic copying. The prompt below is already selected — press <code>⌘C</code> (or <code>Ctrl+C</code>), then paste it to your AI.</p>
   <textarea id="fbText" readonly style="width:100%; height:260px; font:12.5px/1.5 ui-monospace,monospace; background:var(--paper-2); color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:10px;"></textarea>
 </dialog>
+<p id="reorderAnnouncement" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
 <script>
 const REPO_NAME = "Assist With Family History";
 const REPO_SLUG = "github.com/scottjarvie/discover-their-stories";
@@ -236,15 +269,30 @@ const BODIES = {"AWF-0001": "<h2>Why this exists</h2>\n<p>Day-to-day operation c
 const WORK_ORDER_BODIES = {"AWF-WO-001": "<h2>Goal</h2>\n<p>Replace mandatory Linear-based project operation with the canonical repository-owned Cards / Work Orders / Guide tracker, align the Project Philosophy to Core v1.6.2, and establish the narrow GitHub/Vercel state lane without weakening safeguards for software or ordinary contributors.</p>\n<h2>Current truth</h2>\n<p>The repository started clean at main commit <code>924fc047</code>; it had no tracker, no state helper, no ignore classifier, no branch ruleset, and a full CI workflow for every main push. PR #28 merged the implementation to <code>main</code> through full CI and a normal Vercel production build. State commit <code>dc304294</code> proved the lightweight GitHub lane, Vercel cancellation before application output, and an unchanged live production alias. Execution is complete; independent audit remains explicitly separate in AWF-0004.</p>\n<h2>Sequence</h2>\n<ol>\n<li>Read Core v1.6.2 and reconcile the Music provider proof against this repo.</li>\n<li>Add Family History's own tracker sources, readers, validators, and links.</li>\n<li>Remove the mandatory Linear gate from current agent instructions.</li>\n<li>Add the exact shared state contract, local helper, strict GitHub classifier, and Vercel full-range ignore classifier.</li>\n<li>Align and regenerate the Project Philosophy.</li>\n<li>Prove fixtures and full repository verification.</li>\n<li>Publish software/config through PR, full CI, and a normal Vercel deployment.</li>\n<li>Protect main with the least-permissive available owner bypass.</li>\n<li>Publish useful state directly to main and prove GitHub, Vercel, and live production separately; then record immutable receipts as state.</li>\n</ol>\n<h2>Dependencies</h2>\n<ul>\n<li>Assist With Sites Core Philosophy v1.6.2 at <code>561481843793a1d0fb97eee3984bccfd004c21a2</code>.</li>\n<li>Existing Family History Project Philosophy and zero-dependency renderer.</li>\n<li>GitHub and Vercel authenticated provider access already present locally.</li>\n</ul>\n<h2>Exclusions</h2>\n<ul>\n<li>No product Queue, MCP, auth, schema, customer data, or unrelated app work.</li>\n<li>No import of the historical Linear backlog.</li>\n<li>No automatic dispatch or new tracker concepts.</li>\n<li>No claims that provider proof exists until the exact external records agree.</li>\n</ul>\n<h2>Stop rules</h2>\n<ul>\n<li>Stop if any private family or living-person detail would enter the tracker.</li>\n<li>Stop a direct-main publication when the local helper rejects any path.</li>\n<li>Stop at sign-in, MFA, billing, or irreversible provider confirmation gates.</li>\n<li>Never broaden the bypass beyond the least-permissive owner role available.</li>\n<li>Any missing or uncertain Vercel range builds normally.</li>\n</ul>\n<h2>Verification</h2>\n<ul>\n<li>Run tracker and Project Philosophy parity checks.</li>\n<li>Exercise accepted state and rejected mixed, software, configuration, deletion/rename, malformed, missing-history, and invalid-state fixtures.</li>\n<li>Run <code>pnpm verify</code> for the full software/config branch.</li>\n<li>Inspect exact PR checks, main Actions run, Vercel deployment metadata/logs, branch ruleset, live alias assignment, and live-site health.</li>\n</ul>\n<h2>Human gates</h2>\n<p>Scott explicitly authorized the portfolio rollout, the repo-owned tracker, the trusted-owner direct-main state path, and removal of mandatory Linear operation on 2026-08-08. New billing, identity, private-data, domain/DNS, or materially broader access changes still require a separate gate.</p>\n<h2>Execution evidence</h2>\n<p>Local implementation passed <code>pnpm verify</code>: 46 steps including typecheck, lint, tests, every established contract, tracker/philosophy parity, both state classifiers, and the production build. An isolated temporary index accepted 11 canonical state paths and rejected the same index after <code>README.md</code> was added. The in-app browser blocked local <code>file://</code> inspection by security policy; the zero-dependency verifier still proved byte parity, standalone assets, emitted JavaScript syntax, skip-link/focus markers, responsive containment, two views, and required controls. PR #28 ran full CI in Actions run <code>31272713270</code>; merge commit <code>26b5d21b73917353660c7be750825339711f72c2</code> ran full main CI in run <code>31272820711</code>. Vercel deployment <code>dpl_vngjLJMJRMBgo7dM6gpBvT2p7C6J</code> is <code>READY</code>, contains one build, and owns the retained public aliases. Ruleset <code>20590341</code> requires the PR/check lane and names only Scott user id <code>53326860</code> as bypass actor. State commit <code>dc304294f4213ff3eb29f64e632c310c108acbd6</code> ran only lightweight validation in Actions run <code>31273074126</code>, job <code>93142201615</code>. Vercel deployment <code>dpl_8FfUtYW5FBJ6sZLbXGkiZtbQvf3a</code> is <code>CANCELED</code>; its log validates 5 state changes and records cancellation by the Ignored Build Step before application output. The provider currently returns one empty build envelope in deployment metadata, so this record is described precisely rather than as a literal empty array. <code>discovertheirstories.com</code> remained on <code>dpl_vngjLJMJRMBgo7dM6gpBvT2p7C6J</code>, which is <code>READY</code> with one real build and 217 outputs, and returned HTTP 200. Completion remains separate from AWF-0004's future independent audit.</p>\n<h2>History</h2>\n<ul>\n<li>2026-08-08 · Scott — approved the portfolio state-publication rollout.</li>\n<li>2026-08-08 · Scott — explicitly retired the Linear reauthorization and dependency for this project.</li>\n<li>2026-08-08 · Codex — began execution on the isolated implementation branch.</li>\n<li>2026-08-08 · Codex — completed local implementation and all 46 full verification steps; normal PR/CI/deployment publication is next.</li>\n<li>2026-08-08 · Codex — merged PR #28 after full PR CI; full main CI, one-build production deployment, and least-permissive owner ruleset are verified. The useful direct-main state proof is next.</li>\n<li>2026-08-08 · Codex — completed execution after state commit <code>dc30429</code> proved lightweight GitHub validation, Vercel ignored-build cancellation, and the retained live production deployment. Independent audit remains not audited.</li>\n</ul>","AWF-WO-002": "<h2>Goal</h2>\n<p>Give a new beta user an accurate public promise, a clear route into one safe reviewed FamilySearch import, and end-to-end evidence that a synthetic capture can become a grounded, explicitly reviewed, reversible public story without crossing privacy or owner boundaries.</p>\n<h2>Current truth</h2>\n<p>Current <code>main</code> is clean at <code>6febd109b7942cf81706723a8fc77be1ac08be21</code> and passes all 46 repository verification steps. The public site is live on READY deployment <code>dpl_4x1uoNBMJCR1VgA33UWHFRo3F2kA</code>; Assist With Life labels the workspace live and links to it. The home page is coherent private-beta positioning, but About contradicts the Convex storage architecture, the sign-in entry does not teach the first useful workflow, and no current authenticated production capture-to-story proof was available. The older fixture report is local/dev evidence and explicitly leaves production privacy verification open.</p>\n<h2>Sequence</h2>\n<ol>\n<li>Build a sentence-by-sentence claim and data-location matrix from current source, deployed configuration, and public routes.</li>\n<li>Correct public truth surfaces and explain the Discover Their Stories / Assist With Family History relationship without changing product identity.</li>\n<li>Design the empty-vault first-use path around the existing reviewed import contracts and user-mediated FamilySearch boundary.</li>\n<li>Add focused synthetic fixtures and acceptance tests before changing the dashboard, onboarding, or import UI.</li>\n<li>Prove deployed sign-in, tenant boundaries, cross-owner denial, and account recovery with synthetic identities before relying on them.</li>\n<li>Publish all software/content changes through a normal branch, PR, full CI, and deployment; never use the state fast lane for implementation.</li>\n<li>With the exact required human authorization, prove the deployed synthetic capture → review → story → publish → public read → unpublish path and clean up the test data.</li>\n<li>Leave execution evidence complete but audit <code>not-audited</code> until a separate AI reviews the implementation and external receipts.</li>\n</ol>\n<h2>Dependencies</h2>\n<ul>\n<li>Scott approval moving this Work Order from Proposed to Ready.</li>\n<li>Current import, privacy, owner-isolation, story, and public-route contracts.</li>\n<li>A clearly synthetic deceased-person capture fixture and isolated QA owner.</li>\n<li>Provider access sufficient to read exact Clerk, Convex, GitHub, and Vercel state without exposing secrets or private family content.</li>\n</ul>\n<h2>Exclusions</h2>\n<ul>\n<li>No product Queue, MCP, chosen-AI connection, complete export/deletion, shared identity, Support Desk, family-row redesign, broad theme work, or unrelated application feature.</li>\n<li>No real FamilySearch person, living-person material, production owner vault, or private family record in tests, screenshots, logs, or tracker evidence.</li>\n<li>No rebranding away from Discover Their Stories and no change to another Assist repository from this Work Order.</li>\n<li>Independent audit is not part of executor completion.</li>\n</ul>\n<h2>Stop rules</h2>\n<ul>\n<li>Stop before any production write, durable test-account creation, auth-policy change, production-data inspection, identity/provider reconfiguration, or destructive cleanup until Scott approves that exact gate.</li>\n<li>Stop if the synthetic fixture can be mistaken for a real person or contains private/living data.</li>\n<li>Stop publication if public copy would describe an unproved capability as current.</li>\n<li>Stop direct-main publication for any software, content, route, test, config, or mixed change; all implementation uses normal safeguards.</li>\n</ul>\n<h2>Verification</h2>\n<ul>\n<li>Run <code>pnpm verify</code> and targeted import, privacy, auth, owner-isolation, story, route, and public-beta contracts.</li>\n<li>Exercise invalid, warning, duplicate, partial-response, backend-unavailable, cross-owner, living/private, publish-blocked, public-filtered, and unpublish fixtures.</li>\n<li>Check the public and first-use flow at 320, 390, 768, 1280, and 1440 pixels, including keyboard order, skip/focus, 44px actions, contrast, reduced motion, overflow, loading/empty/error states, and browser console.</li>\n<li>Record exact commit, PR, Actions runs, deployment, aliases, authenticated environment, route outcomes, audit rows, and approved cleanup receipt.</li>\n</ul>\n<h2>Human gates</h2>\n<p>Scott must approve this proposed scope. A second explicit approval is required before a production write, production test account, real-provider auth change, or destructive production cleanup. If preview/isolated QA proof is sufficient, prefer it and report production behavior as unverified. A separate AI must award the final audit result.</p>\n<h2>Execution evidence</h2>\n<p>None yet. This Work Order is Proposed, not approved or active. The audit and tracker-state publication that created this proposal are intake evidence, not implementation or completion evidence for its Cards.</p>\n<h2>History</h2>\n<ul>\n<li>2026-08-08 · Codex — proposed from a Core v1.6.3 compliance and product-gap audit of tracker truth, current source, all 46 local checks, public routes, responsive signed-out journeys, Assist With Life listing, and Vercel state.</li>\n</ul>"};
 const STATUSES = [["backlog","Backlog"],["next","Next"],["doing","Doing"],["needs-you","Needs You"],["done","Done"]];
 const state = { area: null, type: null, verdict: null, status: null, view: "kanban" };
+const ORDER_STORAGE_KEY = "assist-tracker-personal-order:" + REPO_SLUG + ":v1";
+let storageAvailable = true;
+
+function storageGet(key) {
+  try { return localStorage.getItem(key); }
+  catch { storageAvailable = false; return null; }
+}
+function storageSet(key, value) {
+  try { localStorage.setItem(key, value); return true; }
+  catch { storageAvailable = false; return false; }
+}
+function storageRemove(key) {
+  try { localStorage.removeItem(key); return true; }
+  catch { storageAvailable = false; return false; }
+}
 
 const mode = document.getElementById("mode");
 const root = document.documentElement;
 function setMode(m) {
   root.dataset.mode = m;
   mode.textContent = m === "paper" ? "Night archive" : "Day archive";
-  localStorage.setItem("tracker-mode", m);
+  storageSet("tracker-mode", m);
 }
-setMode(localStorage.getItem("tracker-mode") ||
+setMode(storageGet("tracker-mode") ||
   (matchMedia("(prefers-color-scheme: dark)").matches ? "studio" : "paper"));
 mode.onclick = () => setMode(root.dataset.mode === "paper" ? "studio" : "paper");
 
@@ -311,6 +359,7 @@ async function copyText(text, btn) {
 function chip(group, value, label) {
   const b = document.createElement("button");
   b.type = "button"; b.textContent = label;
+  b.dataset.filterGroup = group; b.dataset.filterValue = value;
   b.setAttribute("aria-pressed", String(state[group] === value));
   b.onclick = () => { state[group] = state[group] === value ? null : value; render(); };
   return b;
@@ -362,8 +411,213 @@ function setView(view) {
   document.getElementById("ordersView").hidden = kanban;
   document.getElementById("kanbanTab").setAttribute("aria-selected", String(kanban));
   document.getElementById("ordersTab").setAttribute("aria-selected", String(!kanban));
-  localStorage.setItem("tracker-view", view);
+  storageSet("tracker-view", view);
 }
+
+/* ---- personal, lane-scoped ordering ---- */
+function canonicalCompare(a, b) {
+  return (a.priority || "P9").localeCompare(b.priority || "P9") || a.id.localeCompare(b.id);
+}
+function canonicalLaneIds(status) {
+  return CARDS.filter((card) => card.status === status).sort(canonicalCompare).map((card) => card.id);
+}
+function normalizeLaneOrder(status, proposed) {
+  const canonical = canonicalLaneIds(status);
+  const valid = new Set(canonical);
+  const seen = new Set();
+  const kept = Array.isArray(proposed)
+    ? proposed.filter((id) => typeof id === "string" && valid.has(id) && !seen.has(id) && seen.add(id))
+    : [];
+  return kept.concat(canonical.filter((id) => !seen.has(id)));
+}
+function canonicalOrder() {
+  return Object.fromEntries(STATUSES.map(([status]) => [status, canonicalLaneIds(status)]));
+}
+function loadPersonalOrder() {
+  let saved = null;
+  const raw = storageGet(ORDER_STORAGE_KEY);
+  if (raw) {
+    try { const parsed = JSON.parse(raw); if (parsed && parsed.version === 1) saved = parsed.lanes; }
+    catch { storageRemove(ORDER_STORAGE_KEY); }
+  }
+  return Object.fromEntries(STATUSES.map(([status]) => [status, normalizeLaneOrder(status, saved?.[status])]));
+}
+let personalOrder = loadPersonalOrder();
+function laneCards(status) {
+  const byId = new Map(CARDS.filter((card) => card.status === status).map((card) => [card.id, card]));
+  return normalizeLaneOrder(status, personalOrder[status]).map((id) => byId.get(id)).filter(Boolean);
+}
+function isPersonalized() {
+  return STATUSES.some(([status]) => canonicalLaneIds(status).join(",") !== personalOrder[status].join(","));
+}
+function updateOrderUi() {
+  const changed = isPersonalized();
+  const status = document.getElementById("orderStatus");
+  const bar = document.getElementById("orderbar");
+  status.textContent = storageAvailable
+    ? (changed ? "Personal order saved locally" : "Canonical order")
+    : (changed ? "Personal order for this session" : "Canonical order · storage unavailable");
+  bar.classList.toggle("storage-warning", !storageAvailable);
+  document.getElementById("resetOrder").disabled = !changed;
+}
+function savePersonalOrder() {
+  storageSet(ORDER_STORAGE_KEY, JSON.stringify({ version: 1, lanes: personalOrder }));
+  updateOrderUi();
+}
+function announceOrder(message) {
+  const live = document.getElementById("reorderAnnouncement");
+  live.textContent = "";
+  requestAnimationFrame(() => { live.textContent = message; });
+}
+function laneLabel(status) {
+  return STATUSES.find(([key]) => key === status)?.[1] || status;
+}
+function commitVisibleOrder(status, visibleIds) {
+  const visible = new Set(visibleIds);
+  let index = 0;
+  personalOrder[status] = normalizeLaneOrder(status, personalOrder[status]).map((id) =>
+    visible.has(id) ? visibleIds[index++] : id);
+  savePersonalOrder();
+}
+function focusCard(id) {
+  requestAnimationFrame(() => document.querySelector('[data-open-card="' + CSS.escape(id) + '"]')?.focus());
+}
+function moveCardByKeyboard(id, status, destination) {
+  const lane = document.querySelector('[data-lane="' + CSS.escape(status) + '"]');
+  const visible = [...lane.querySelectorAll("[data-card-shell]")].map((shell) => shell.dataset.cardShell);
+  const from = visible.indexOf(id);
+  const to = destination === "first" ? 0 : destination === "last" ? visible.length - 1
+    : Math.max(0, Math.min(visible.length - 1, from + destination));
+  if (from < 0 || from === to) {
+    announceOrder(id + " is already at the " + (to === 0 ? "start" : "end") + " of visible " + laneLabel(status) + " Cards.");
+    return;
+  }
+  visible.splice(to, 0, visible.splice(from, 1)[0]);
+  commitVisibleOrder(status, visible);
+  render();
+  focusCard(id);
+  const neighbor = visible[to + (to < from ? 1 : -1)];
+  announceOrder("Moved " + id + (to === 0 ? " to the start" : to === visible.length - 1 ? " to the end" : to < from ? " before " + neighbor : " after " + neighbor) + " in " + laneLabel(status) + ". Personal order only; status is unchanged.");
+}
+let pointerOrder = null;
+let suppressCardClick = null;
+function beginPointerOrder(event) {
+  if (event.pointerType === "touch") return;
+  if (event.pointerType === "mouse" && event.button !== 0) return;
+  const card = event.currentTarget;
+  const shell = card.closest("[data-card-shell]");
+  pointerOrder = { pointerId:event.pointerId, card, shell, status:shell.dataset.status,
+    id:shell.dataset.cardShell, startX:event.clientX, startY:event.clientY,
+    active:false, blocked:false, holdTimer:null };
+}
+function activateOrder(order) {
+  if (order.active) return;
+  order.active = true;
+  suppressCardClick = order.id;
+  if (order.pointerId !== null) order.card.setPointerCapture?.(order.pointerId);
+  order.shell.classList.add("is-dragging");
+  document.body.classList.add("is-reordering");
+}
+function moveActiveOrder(order, clientX, clientY) {
+  document.querySelectorAll(".col.drop-blocked").forEach((lane) => lane.classList.remove("drop-blocked"));
+  const point = document.elementFromPoint(clientX, clientY);
+  const target = point?.closest("[data-card-shell]");
+  const targetLane = point?.closest("[data-lane]");
+  order.blocked = !targetLane || targetLane.dataset.lane !== order.status;
+  if (order.blocked) targetLane?.classList.add("drop-blocked");
+  if (target && target.dataset.status === order.status && target !== order.shell) {
+    const before = clientY < target.getBoundingClientRect().top + target.getBoundingClientRect().height / 2;
+    target.parentElement.insertBefore(order.shell, before ? target : target.nextSibling);
+  }
+  if (clientY < 70) window.scrollBy(0, -12);
+  else if (clientY > innerHeight - 70) window.scrollBy(0, 12);
+}
+function pointerOrderMove(event) {
+  if (!pointerOrder || event.pointerId !== pointerOrder.pointerId) return;
+  const distance = Math.hypot(event.clientX - pointerOrder.startX, event.clientY - pointerOrder.startY);
+  if (!pointerOrder.active && distance < 6) return;
+  if (!pointerOrder.active) activateOrder(pointerOrder);
+  event.preventDefault();
+  moveActiveOrder(pointerOrder, event.clientX, event.clientY);
+}
+function finishOrder(current, cancelled = false) {
+  clearTimeout(current.holdTimer);
+  current.shell.classList.remove("is-dragging");
+  document.body.classList.remove("is-reordering");
+  document.querySelectorAll(".col.drop-blocked").forEach((lane) => lane.classList.remove("drop-blocked"));
+  if (!current.active) return;
+  if (cancelled || current.blocked) {
+    render(); focusCard(current.id);
+    announceOrder(current.blocked ? "Cards stay in their canonical lane. " + current.id + " was not moved or changed." : "Reordering cancelled.");
+    setTimeout(() => { if (suppressCardClick === current.id) suppressCardClick = null; }, 0);
+    return;
+  }
+  const lane = current.shell.closest("[data-lane]");
+  const visible = [...lane.querySelectorAll("[data-card-shell]")].map((shell) => shell.dataset.cardShell);
+  commitVisibleOrder(current.status, visible);
+  render(); focusCard(current.id);
+  const position = visible.indexOf(current.id) + 1;
+  announceOrder("Moved " + current.id + " to position " + position + " of " + visible.length + " visible " + laneLabel(current.status) + " Cards. Personal order only; status is unchanged.");
+  setTimeout(() => { if (suppressCardClick === current.id) suppressCardClick = null; }, 0);
+}
+function finishPointerOrder(event, cancelled = false) {
+  if (!pointerOrder || event.pointerId !== pointerOrder.pointerId) return;
+  const current = pointerOrder;
+  pointerOrder = null;
+  finishOrder(current, cancelled);
+}
+let touchOrder = null;
+function beginTouchOrder(event) {
+  if (event.touches.length !== 1) return;
+  const touch = event.touches[0];
+  const card = event.currentTarget;
+  const shell = card.closest("[data-card-shell]");
+  const order = { pointerId:null, touchId:touch.identifier, card, shell, status:shell.dataset.status,
+    id:shell.dataset.cardShell, startX:touch.clientX, startY:touch.clientY,
+    active:false, blocked:false, movedBeforeHold:false, holdTimer:null };
+  order.holdTimer = setTimeout(() => {
+    if (touchOrder === order && !order.movedBeforeHold) {
+      activateOrder(order);
+      announceOrder("Reordering " + order.id + " within " + laneLabel(order.status) + ". Move, then lift to place it.");
+    }
+  }, 420);
+  touchOrder = order;
+}
+function touchOrderMove(event) {
+  if (!touchOrder) return;
+  const touch = [...event.touches].find((item) => item.identifier === touchOrder.touchId);
+  if (!touch) return;
+  const distance = Math.hypot(touch.clientX - touchOrder.startX, touch.clientY - touchOrder.startY);
+  if (!touchOrder.active) {
+    if (distance >= 8) {
+      touchOrder.movedBeforeHold = true;
+      clearTimeout(touchOrder.holdTimer);
+    }
+    return;
+  }
+  event.preventDefault();
+  moveActiveOrder(touchOrder, touch.clientX, touch.clientY);
+}
+function finishTouchOrder(event, cancelled = false) {
+  if (!touchOrder) return;
+  const current = touchOrder;
+  touchOrder = null;
+  if (current.active) event.preventDefault();
+  finishOrder(current, cancelled);
+}
+document.addEventListener("pointermove", pointerOrderMove, { passive:false });
+document.addEventListener("pointerup", (event) => finishPointerOrder(event));
+document.addEventListener("pointercancel", (event) => finishPointerOrder(event, true));
+document.addEventListener("touchmove", touchOrderMove, { passive:false });
+document.addEventListener("touchend", (event) => finishTouchOrder(event));
+document.addEventListener("touchcancel", (event) => finishTouchOrder(event, true));
+document.getElementById("resetOrder").addEventListener("click", () => {
+  personalOrder = canonicalOrder();
+  storageRemove(ORDER_STORAGE_KEY);
+  render();
+  announceOrder("Personal Card order reset to canonical priority and ID order in every lane.");
+});
+
 function render() {
   const f = document.getElementById("filters");
   f.replaceChildren();
@@ -384,14 +638,25 @@ function render() {
   for (const [key, label] of STATUSES) {
     const col = document.createElement("div");
     col.className = "col" + (key === "next" ? " primary" : key === "backlog" ? " dim" : "");
-    const cs = visible.filter((c) => c.status === key)
-      .sort((a, b) => (a.priority || "P9").localeCompare(b.priority || "P9") || a.id.localeCompare(b.id));
+    col.dataset.lane = key;
+    const visibleIds = new Set(visible.filter((card) => card.status === key).map((card) => card.id));
+    const cs = laneCards(key).filter((card) => visibleIds.has(card.id));
     col.innerHTML = '<h2>' + label + ' <span class="n">' + cs.length + '</span></h2>';
     for (const c of cs) {
-      const el = document.createElement("div");
-      el.className = "card" + (c.status === "needs-you" ? " attn" : "");
-      el.tabIndex = 0; el.setAttribute("role", "button");
-      el.innerHTML = '<span class="id">' + c.id + '</span>' +
+      const shell = document.createElement("div");
+      shell.className = "card-shell";
+      shell.dataset.cardShell = c.id;
+      shell.dataset.status = c.status;
+      shell.dataset.type = c.type;
+      shell.dataset.area = c.area;
+      const open = document.createElement("button");
+      open.type = "button";
+      open.className = "card" + (c.status === "needs-you" ? " attn" : "");
+      open.dataset.openCard = c.id;
+      open.setAttribute("aria-label", "Open " + c.id + ": " + c.title + ". Drag to reorder within " + label + "; or use Alt plus Arrow keys, Home, or End.");
+      open.setAttribute("aria-describedby", "reorderHelp");
+      open.setAttribute("aria-keyshortcuts", "Alt+ArrowUp Alt+ArrowDown Alt+Home Alt+End");
+      open.innerHTML = '<span class="id">' + c.id + '</span>' +
         (c.priority ? ' <span class="tag ' + c.priority + '">' + c.priority + "</span>" : "") +
         (c.size ? ' <span class="tag">' + c.size + "</span>" : "") +
         (c.verdict ? ' <span class="tag ' + c.verdict + '">' + c.verdict + "</span>" : "") +
@@ -400,9 +665,22 @@ function render() {
         '<div class="t">' + c.title + "</div>" +
         '<span class="tag">' + c.type + '</span><span class="tag">' + c.area + "</span>" +
         (c.contract ? '<span class="tag">' + c.contract + "</span>" : "");
-      el.onclick = () => openCard(c);
-      el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openCard(c); } };
-      col.append(el);
+      open.onclick = (event) => {
+        if (suppressCardClick === c.id) { event.preventDefault(); suppressCardClick = null; return; }
+        openCard(c);
+      };
+      open.onkeydown = (event) => {
+        if (!event.altKey) return;
+        const destination = event.key === "ArrowUp" ? -1 : event.key === "ArrowDown" ? 1
+          : event.key === "Home" ? "first" : event.key === "End" ? "last" : null;
+        if (destination === null) return;
+        event.preventDefault();
+        moveCardByKeyboard(c.id, c.status, destination);
+      };
+      open.addEventListener("pointerdown", beginPointerOrder);
+      open.addEventListener("touchstart", beginTouchOrder, { passive:true });
+      shell.append(open);
+      col.append(shell);
     }
     board.append(col);
   }
@@ -410,6 +688,7 @@ function render() {
   const needsButton = document.getElementById("needsEntry");
   needsButton.textContent = "Needs You · " + needs;
   needsButton.dataset.count = String(needs);
+  updateOrderUi();
 }
 const dlg = document.getElementById("dlg");
 const specDlg = document.getElementById("specDlg");
@@ -499,7 +778,7 @@ document.getElementById("needsEntry").onclick = () => {
 };
 renderWorkOrders();
 render();
-setView(localStorage.getItem("tracker-view") === "orders" ? "orders" : "kanban");
+setView(storageGet("tracker-view") === "orders" ? "orders" : "kanban");
 </script>
 </body>
 </html>

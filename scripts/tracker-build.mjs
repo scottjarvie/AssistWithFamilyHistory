@@ -372,6 +372,16 @@ ${SHARED_CSS}
   .filters button[aria-pressed="true"] {
     background: var(--groove-wash); color: var(--groove); border-color: var(--groove-2);
   }
+  .orderbar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:0 20px 12px;
+    padding:10px 12px; border:1px solid var(--line); border-radius:10px;
+    background:color-mix(in srgb,var(--surface) 88%,var(--paper)); color:var(--soft); }
+  .orderbar strong { color:var(--groove-2); }
+  .orderbar .order-state { font:12px/1.4 ui-monospace,monospace; }
+  .orderbar .order-help { flex:1 1 300px; margin:0; font-size:12.5px; }
+  .orderbar button { min-height:40px; padding:7px 12px; border:1px solid var(--line);
+    border-radius:8px; background:var(--surface); color:var(--ink); font:inherit; cursor:pointer; }
+  .orderbar button:disabled { cursor:not-allowed; opacity:.55; }
+  .orderbar.storage-warning { border-color:var(--gold); }
   .viewbar { position:sticky; top:0; z-index:20; display:flex; gap:8px;
     align-items:center; padding:10px 20px; background:color-mix(in srgb,var(--paper) 92%,transparent);
     border-block:1px solid var(--line); backdrop-filter:blur(10px); }
@@ -420,17 +430,20 @@ ${SHARED_CSS}
   .col.primary { border-top: 3px solid var(--groove-2); }
   .col.primary h2 { color: var(--groove-2); }
   .col.dim { background: transparent; border: 1px dashed var(--line); }
-  .col.dim .card { opacity: .72; }
-  .col.dim .card:hover, .col.dim .card:focus-visible { opacity: 1; }
+  .col.dim .card-shell { opacity: .72; }
+  .col.dim .card-shell:hover, .col.dim .card-shell:focus-within { opacity: 1; }
   .col h2 {
     font-size: 13px; letter-spacing: .06em; text-transform: uppercase;
     margin: 2px 4px 10px; color: var(--soft); font-weight: 600;
   }
   .col h2 .n { color: var(--faint); font-weight: 400; }
+  .card-shell { position:relative; margin-bottom:8px; transition:transform .14s ease,opacity .14s ease; }
   .card {
+    display:block; width:100%; min-height:44px; text-align:left; color:var(--ink);
     background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
-    padding: 10px 12px; margin-bottom: 8px; cursor: pointer;
+    padding:10px 12px; cursor:grab; font:inherit; touch-action:manipulation;
   }
+  .card:active { cursor:grabbing; }
   .card.attn { border-top: 3px solid var(--signal); }
   .card .id { font-size: 11.5px; color: var(--faint); font-family: ui-monospace, monospace; }
   .card .t { margin: 2px 0 6px; font-size: 14.5px; }
@@ -445,6 +458,14 @@ ${SHARED_CSS}
   .tag.adapt { border-color: var(--gold); color: var(--gold); border-style: dotted; }
   .tag.edu { border-color: var(--gold); color: var(--gold); }
   .tag.fu { border-color: var(--groove-2); color: var(--groove-2); }
+  .card-shell.is-dragging { z-index:5; opacity:.82; transform:scale(.985);
+    filter:drop-shadow(0 14px 18px color-mix(in srgb,var(--ink) 22%,transparent)); }
+  .card-shell.is-dragging .card { cursor:grabbing; border-color:var(--signal); }
+  .col.drop-blocked { outline:2px dashed var(--signal); outline-offset:3px; }
+  body.is-reordering { cursor:grabbing; user-select:none; }
+  .visually-hidden { position:absolute!important; width:1px!important; height:1px!important;
+    padding:0!important; margin:-1px!important; overflow:hidden!important; clip:rect(0 0 0 0)!important;
+    white-space:nowrap!important; border:0!important; }
   dialog {
     max-width: 720px; width: calc(100vw - 32px); border: 1px solid var(--line);
     border-radius: 12px; background: var(--surface); color: var(--ink); padding: 22px 26px;
@@ -477,7 +498,12 @@ ${SHARED_CSS}
     .board,.work-orders { grid-template-columns:1fr; padding-inline:12px; }
     .viewbar { padding-inline:12px; }
     .filters { padding-inline:12px; }
+    .orderbar { margin-inline:12px; align-items:flex-start; }
+    .orderbar .order-help { flex-basis:100%; }
     dialog { padding:18px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .card-shell { transition:none; }
   }
 </style>
 </head>
@@ -503,6 +529,12 @@ ${SHARED_CSS}
   </div>
   <section id="kanbanView" role="tabpanel" aria-labelledby="kanbanTab">
     <div class="filters" id="filters"></div>
+    <div class="orderbar" id="orderbar">
+      <strong>Personal order · browser only</strong>
+      <span class="order-state" id="orderStatus">Canonical order</span>
+      <p class="order-help" id="reorderHelp">Drag Cards · touch: hold, then drag · keyboard: Alt + ↑/↓/Home/End. Canonical fields never change.</p>
+      <button id="resetOrder" type="button" disabled>Reset to canonical order</button>
+    </div>
     <div class="board" id="board"></div>
   </section>
   <section id="ordersView" role="tabpanel" aria-labelledby="ordersTab" hidden>
@@ -532,6 +564,7 @@ ${SHARED_CSS}
   <p>This viewer blocks automatic copying. The prompt below is already selected — press <code>⌘C</code> (or <code>Ctrl+C</code>), then paste it to your AI.</p>
   <textarea id="fbText" readonly style="width:100%; height:260px; font:12.5px/1.5 ui-monospace,monospace; background:var(--paper-2); color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:10px;"></textarea>
 </dialog>
+<p id="reorderAnnouncement" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
 <script>
 const REPO_NAME = ${JSON.stringify(REPO_NAME)};
 const REPO_SLUG = ${JSON.stringify(REPO_SLUG)};
@@ -546,15 +579,30 @@ const BODIES = {${cards.map((c) => `${JSON.stringify(c.id)}: ${JSON.stringify(c.
 const WORK_ORDER_BODIES = {${workOrders.map((order) => `${JSON.stringify(order.id)}: ${JSON.stringify(order.html)}`).join(",")}};
 const STATUSES = ${JSON.stringify(STATUSES)};
 const state = { area: null, type: null, verdict: null, status: null, view: "kanban" };
+const ORDER_STORAGE_KEY = "assist-tracker-personal-order:" + REPO_SLUG + ":v1";
+let storageAvailable = true;
+
+function storageGet(key) {
+  try { return localStorage.getItem(key); }
+  catch { storageAvailable = false; return null; }
+}
+function storageSet(key, value) {
+  try { localStorage.setItem(key, value); return true; }
+  catch { storageAvailable = false; return false; }
+}
+function storageRemove(key) {
+  try { localStorage.removeItem(key); return true; }
+  catch { storageAvailable = false; return false; }
+}
 
 const mode = document.getElementById("mode");
 const root = document.documentElement;
 function setMode(m) {
   root.dataset.mode = m;
   mode.textContent = m === "paper" ? "Night archive" : "Day archive";
-  localStorage.setItem("tracker-mode", m);
+  storageSet("tracker-mode", m);
 }
-setMode(localStorage.getItem("tracker-mode") ||
+setMode(storageGet("tracker-mode") ||
   (matchMedia("(prefers-color-scheme: dark)").matches ? "studio" : "paper"));
 mode.onclick = () => setMode(root.dataset.mode === "paper" ? "studio" : "paper");
 
@@ -621,6 +669,7 @@ async function copyText(text, btn) {
 function chip(group, value, label) {
   const b = document.createElement("button");
   b.type = "button"; b.textContent = label;
+  b.dataset.filterGroup = group; b.dataset.filterValue = value;
   b.setAttribute("aria-pressed", String(state[group] === value));
   b.onclick = () => { state[group] = state[group] === value ? null : value; render(); };
   return b;
@@ -672,8 +721,213 @@ function setView(view) {
   document.getElementById("ordersView").hidden = kanban;
   document.getElementById("kanbanTab").setAttribute("aria-selected", String(kanban));
   document.getElementById("ordersTab").setAttribute("aria-selected", String(!kanban));
-  localStorage.setItem("tracker-view", view);
+  storageSet("tracker-view", view);
 }
+
+/* ---- personal, lane-scoped ordering ---- */
+function canonicalCompare(a, b) {
+  return (a.priority || "P9").localeCompare(b.priority || "P9") || a.id.localeCompare(b.id);
+}
+function canonicalLaneIds(status) {
+  return CARDS.filter((card) => card.status === status).sort(canonicalCompare).map((card) => card.id);
+}
+function normalizeLaneOrder(status, proposed) {
+  const canonical = canonicalLaneIds(status);
+  const valid = new Set(canonical);
+  const seen = new Set();
+  const kept = Array.isArray(proposed)
+    ? proposed.filter((id) => typeof id === "string" && valid.has(id) && !seen.has(id) && seen.add(id))
+    : [];
+  return kept.concat(canonical.filter((id) => !seen.has(id)));
+}
+function canonicalOrder() {
+  return Object.fromEntries(STATUSES.map(([status]) => [status, canonicalLaneIds(status)]));
+}
+function loadPersonalOrder() {
+  let saved = null;
+  const raw = storageGet(ORDER_STORAGE_KEY);
+  if (raw) {
+    try { const parsed = JSON.parse(raw); if (parsed && parsed.version === 1) saved = parsed.lanes; }
+    catch { storageRemove(ORDER_STORAGE_KEY); }
+  }
+  return Object.fromEntries(STATUSES.map(([status]) => [status, normalizeLaneOrder(status, saved?.[status])]));
+}
+let personalOrder = loadPersonalOrder();
+function laneCards(status) {
+  const byId = new Map(CARDS.filter((card) => card.status === status).map((card) => [card.id, card]));
+  return normalizeLaneOrder(status, personalOrder[status]).map((id) => byId.get(id)).filter(Boolean);
+}
+function isPersonalized() {
+  return STATUSES.some(([status]) => canonicalLaneIds(status).join(",") !== personalOrder[status].join(","));
+}
+function updateOrderUi() {
+  const changed = isPersonalized();
+  const status = document.getElementById("orderStatus");
+  const bar = document.getElementById("orderbar");
+  status.textContent = storageAvailable
+    ? (changed ? "Personal order saved locally" : "Canonical order")
+    : (changed ? "Personal order for this session" : "Canonical order · storage unavailable");
+  bar.classList.toggle("storage-warning", !storageAvailable);
+  document.getElementById("resetOrder").disabled = !changed;
+}
+function savePersonalOrder() {
+  storageSet(ORDER_STORAGE_KEY, JSON.stringify({ version: 1, lanes: personalOrder }));
+  updateOrderUi();
+}
+function announceOrder(message) {
+  const live = document.getElementById("reorderAnnouncement");
+  live.textContent = "";
+  requestAnimationFrame(() => { live.textContent = message; });
+}
+function laneLabel(status) {
+  return STATUSES.find(([key]) => key === status)?.[1] || status;
+}
+function commitVisibleOrder(status, visibleIds) {
+  const visible = new Set(visibleIds);
+  let index = 0;
+  personalOrder[status] = normalizeLaneOrder(status, personalOrder[status]).map((id) =>
+    visible.has(id) ? visibleIds[index++] : id);
+  savePersonalOrder();
+}
+function focusCard(id) {
+  requestAnimationFrame(() => document.querySelector('[data-open-card="' + CSS.escape(id) + '"]')?.focus());
+}
+function moveCardByKeyboard(id, status, destination) {
+  const lane = document.querySelector('[data-lane="' + CSS.escape(status) + '"]');
+  const visible = [...lane.querySelectorAll("[data-card-shell]")].map((shell) => shell.dataset.cardShell);
+  const from = visible.indexOf(id);
+  const to = destination === "first" ? 0 : destination === "last" ? visible.length - 1
+    : Math.max(0, Math.min(visible.length - 1, from + destination));
+  if (from < 0 || from === to) {
+    announceOrder(id + " is already at the " + (to === 0 ? "start" : "end") + " of visible " + laneLabel(status) + " Cards.");
+    return;
+  }
+  visible.splice(to, 0, visible.splice(from, 1)[0]);
+  commitVisibleOrder(status, visible);
+  render();
+  focusCard(id);
+  const neighbor = visible[to + (to < from ? 1 : -1)];
+  announceOrder("Moved " + id + (to === 0 ? " to the start" : to === visible.length - 1 ? " to the end" : to < from ? " before " + neighbor : " after " + neighbor) + " in " + laneLabel(status) + ". Personal order only; status is unchanged.");
+}
+let pointerOrder = null;
+let suppressCardClick = null;
+function beginPointerOrder(event) {
+  if (event.pointerType === "touch") return;
+  if (event.pointerType === "mouse" && event.button !== 0) return;
+  const card = event.currentTarget;
+  const shell = card.closest("[data-card-shell]");
+  pointerOrder = { pointerId:event.pointerId, card, shell, status:shell.dataset.status,
+    id:shell.dataset.cardShell, startX:event.clientX, startY:event.clientY,
+    active:false, blocked:false, holdTimer:null };
+}
+function activateOrder(order) {
+  if (order.active) return;
+  order.active = true;
+  suppressCardClick = order.id;
+  if (order.pointerId !== null) order.card.setPointerCapture?.(order.pointerId);
+  order.shell.classList.add("is-dragging");
+  document.body.classList.add("is-reordering");
+}
+function moveActiveOrder(order, clientX, clientY) {
+  document.querySelectorAll(".col.drop-blocked").forEach((lane) => lane.classList.remove("drop-blocked"));
+  const point = document.elementFromPoint(clientX, clientY);
+  const target = point?.closest("[data-card-shell]");
+  const targetLane = point?.closest("[data-lane]");
+  order.blocked = !targetLane || targetLane.dataset.lane !== order.status;
+  if (order.blocked) targetLane?.classList.add("drop-blocked");
+  if (target && target.dataset.status === order.status && target !== order.shell) {
+    const before = clientY < target.getBoundingClientRect().top + target.getBoundingClientRect().height / 2;
+    target.parentElement.insertBefore(order.shell, before ? target : target.nextSibling);
+  }
+  if (clientY < 70) window.scrollBy(0, -12);
+  else if (clientY > innerHeight - 70) window.scrollBy(0, 12);
+}
+function pointerOrderMove(event) {
+  if (!pointerOrder || event.pointerId !== pointerOrder.pointerId) return;
+  const distance = Math.hypot(event.clientX - pointerOrder.startX, event.clientY - pointerOrder.startY);
+  if (!pointerOrder.active && distance < 6) return;
+  if (!pointerOrder.active) activateOrder(pointerOrder);
+  event.preventDefault();
+  moveActiveOrder(pointerOrder, event.clientX, event.clientY);
+}
+function finishOrder(current, cancelled = false) {
+  clearTimeout(current.holdTimer);
+  current.shell.classList.remove("is-dragging");
+  document.body.classList.remove("is-reordering");
+  document.querySelectorAll(".col.drop-blocked").forEach((lane) => lane.classList.remove("drop-blocked"));
+  if (!current.active) return;
+  if (cancelled || current.blocked) {
+    render(); focusCard(current.id);
+    announceOrder(current.blocked ? "Cards stay in their canonical lane. " + current.id + " was not moved or changed." : "Reordering cancelled.");
+    setTimeout(() => { if (suppressCardClick === current.id) suppressCardClick = null; }, 0);
+    return;
+  }
+  const lane = current.shell.closest("[data-lane]");
+  const visible = [...lane.querySelectorAll("[data-card-shell]")].map((shell) => shell.dataset.cardShell);
+  commitVisibleOrder(current.status, visible);
+  render(); focusCard(current.id);
+  const position = visible.indexOf(current.id) + 1;
+  announceOrder("Moved " + current.id + " to position " + position + " of " + visible.length + " visible " + laneLabel(current.status) + " Cards. Personal order only; status is unchanged.");
+  setTimeout(() => { if (suppressCardClick === current.id) suppressCardClick = null; }, 0);
+}
+function finishPointerOrder(event, cancelled = false) {
+  if (!pointerOrder || event.pointerId !== pointerOrder.pointerId) return;
+  const current = pointerOrder;
+  pointerOrder = null;
+  finishOrder(current, cancelled);
+}
+let touchOrder = null;
+function beginTouchOrder(event) {
+  if (event.touches.length !== 1) return;
+  const touch = event.touches[0];
+  const card = event.currentTarget;
+  const shell = card.closest("[data-card-shell]");
+  const order = { pointerId:null, touchId:touch.identifier, card, shell, status:shell.dataset.status,
+    id:shell.dataset.cardShell, startX:touch.clientX, startY:touch.clientY,
+    active:false, blocked:false, movedBeforeHold:false, holdTimer:null };
+  order.holdTimer = setTimeout(() => {
+    if (touchOrder === order && !order.movedBeforeHold) {
+      activateOrder(order);
+      announceOrder("Reordering " + order.id + " within " + laneLabel(order.status) + ". Move, then lift to place it.");
+    }
+  }, 420);
+  touchOrder = order;
+}
+function touchOrderMove(event) {
+  if (!touchOrder) return;
+  const touch = [...event.touches].find((item) => item.identifier === touchOrder.touchId);
+  if (!touch) return;
+  const distance = Math.hypot(touch.clientX - touchOrder.startX, touch.clientY - touchOrder.startY);
+  if (!touchOrder.active) {
+    if (distance >= 8) {
+      touchOrder.movedBeforeHold = true;
+      clearTimeout(touchOrder.holdTimer);
+    }
+    return;
+  }
+  event.preventDefault();
+  moveActiveOrder(touchOrder, touch.clientX, touch.clientY);
+}
+function finishTouchOrder(event, cancelled = false) {
+  if (!touchOrder) return;
+  const current = touchOrder;
+  touchOrder = null;
+  if (current.active) event.preventDefault();
+  finishOrder(current, cancelled);
+}
+document.addEventListener("pointermove", pointerOrderMove, { passive:false });
+document.addEventListener("pointerup", (event) => finishPointerOrder(event));
+document.addEventListener("pointercancel", (event) => finishPointerOrder(event, true));
+document.addEventListener("touchmove", touchOrderMove, { passive:false });
+document.addEventListener("touchend", (event) => finishTouchOrder(event));
+document.addEventListener("touchcancel", (event) => finishTouchOrder(event, true));
+document.getElementById("resetOrder").addEventListener("click", () => {
+  personalOrder = canonicalOrder();
+  storageRemove(ORDER_STORAGE_KEY);
+  render();
+  announceOrder("Personal Card order reset to canonical priority and ID order in every lane.");
+});
+
 function render() {
   const f = document.getElementById("filters");
   f.replaceChildren();
@@ -694,14 +948,25 @@ function render() {
   for (const [key, label] of STATUSES) {
     const col = document.createElement("div");
     col.className = "col" + (key === "next" ? " primary" : key === "backlog" ? " dim" : "");
-    const cs = visible.filter((c) => c.status === key)
-      .sort((a, b) => (a.priority || "P9").localeCompare(b.priority || "P9") || a.id.localeCompare(b.id));
+    col.dataset.lane = key;
+    const visibleIds = new Set(visible.filter((card) => card.status === key).map((card) => card.id));
+    const cs = laneCards(key).filter((card) => visibleIds.has(card.id));
     col.innerHTML = '<h2>' + label + ' <span class="n">' + cs.length + '</span></h2>';
     for (const c of cs) {
-      const el = document.createElement("div");
-      el.className = "card" + (c.status === "needs-you" ? " attn" : "");
-      el.tabIndex = 0; el.setAttribute("role", "button");
-      el.innerHTML = '<span class="id">' + c.id + '</span>' +
+      const shell = document.createElement("div");
+      shell.className = "card-shell";
+      shell.dataset.cardShell = c.id;
+      shell.dataset.status = c.status;
+      shell.dataset.type = c.type;
+      shell.dataset.area = c.area;
+      const open = document.createElement("button");
+      open.type = "button";
+      open.className = "card" + (c.status === "needs-you" ? " attn" : "");
+      open.dataset.openCard = c.id;
+      open.setAttribute("aria-label", "Open " + c.id + ": " + c.title + ". Drag to reorder within " + label + "; or use Alt plus Arrow keys, Home, or End.");
+      open.setAttribute("aria-describedby", "reorderHelp");
+      open.setAttribute("aria-keyshortcuts", "Alt+ArrowUp Alt+ArrowDown Alt+Home Alt+End");
+      open.innerHTML = '<span class="id">' + c.id + '</span>' +
         (c.priority ? ' <span class="tag ' + c.priority + '">' + c.priority + "</span>" : "") +
         (c.size ? ' <span class="tag">' + c.size + "</span>" : "") +
         (c.verdict ? ' <span class="tag ' + c.verdict + '">' + c.verdict + "</span>" : "") +
@@ -710,9 +975,22 @@ function render() {
         '<div class="t">' + c.title + "</div>" +
         '<span class="tag">' + c.type + '</span><span class="tag">' + c.area + "</span>" +
         (c.contract ? '<span class="tag">' + c.contract + "</span>" : "");
-      el.onclick = () => openCard(c);
-      el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openCard(c); } };
-      col.append(el);
+      open.onclick = (event) => {
+        if (suppressCardClick === c.id) { event.preventDefault(); suppressCardClick = null; return; }
+        openCard(c);
+      };
+      open.onkeydown = (event) => {
+        if (!event.altKey) return;
+        const destination = event.key === "ArrowUp" ? -1 : event.key === "ArrowDown" ? 1
+          : event.key === "Home" ? "first" : event.key === "End" ? "last" : null;
+        if (destination === null) return;
+        event.preventDefault();
+        moveCardByKeyboard(c.id, c.status, destination);
+      };
+      open.addEventListener("pointerdown", beginPointerOrder);
+      open.addEventListener("touchstart", beginTouchOrder, { passive:true });
+      shell.append(open);
+      col.append(shell);
     }
     board.append(col);
   }
@@ -720,6 +998,7 @@ function render() {
   const needsButton = document.getElementById("needsEntry");
   needsButton.textContent = "Needs You · " + needs;
   needsButton.dataset.count = String(needs);
+  updateOrderUi();
 }
 const dlg = document.getElementById("dlg");
 const specDlg = document.getElementById("specDlg");
@@ -809,7 +1088,7 @@ document.getElementById("needsEntry").onclick = () => {
 };
 renderWorkOrders();
 render();
-setView(localStorage.getItem("tracker-view") === "orders" ? "orders" : "kanban");
+setView(storageGet("tracker-view") === "orders" ? "orders" : "kanban");
 </script>
 </body>
 </html>
