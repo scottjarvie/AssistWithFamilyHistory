@@ -98,5 +98,23 @@ assert.match(board, /Copy whole work order/);
 assert.match(board, /No automatic dispatch/);
 assert.match(board, /Independent audit/);
 assert.match(board, /overflow-x:auto/);
+for (const required of [
+  "Personal order · browser only",
+  "Reset to canonical order",
+  "assist-tracker-personal-order:",
+  "aria-keyshortcuts",
+  "pointerdown",
+  "pointercancel",
+  "pointerType === \"touch\"",
+  "Alt+ArrowUp Alt+ArrowDown Alt+Home Alt+End",
+  "Personal order for this session",
+  "storage unavailable",
+  "status is unchanged",
+  "normalizeLaneOrder",
+  "commitVisibleOrder",
+]) assert(board.includes(required), `board missing personal-ordering contract: ${required}`);
+assert.match(board, /role="status" aria-live="polite"/);
+assert.doesNotMatch(board, /drag-handle|data-reorder-card|reorder-control|⠿|⋮⋮/);
+assert.match(board, /@media \(prefers-reduced-motion: reduce\)/);
 
 console.log(`tracker verified: ${cards.length} Cards, ${orders.length} Work Orders, generated parity and JavaScript syntax`);
