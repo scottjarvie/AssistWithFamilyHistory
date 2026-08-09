@@ -1,7 +1,7 @@
 ---
 id: AWF-WO-003
 title: Build and prove the Family History Queue backend foundation
-execution: active
+execution: complete
 audit: not-audited
 cards: AWF-0008
 created: 2026-08-09
@@ -22,9 +22,12 @@ without relabeling existing domain statuses or inventing a live AI connection.
 
 Scott explicitly authorized the complete Queue foundation in this task. The
 existing Operations console, research tasks/checks, imports, story workflow,
-provisional identities, agent telemetry, and build tracker all carry different
-truth and must remain distinct. Work is active on a local change set based on
-`e1eee0d`; normal PR/CI/schema/deployment proof remains pending.
+provisional identities, agent telemetry, and build tracker all retain their
+different truth. PR #31 shipped the distinct foundation at main commit
+`e65b03a` after full CI and successful Vercel preview/production builds. The
+signed-out live alias and Queue protection boundary were proved without using
+private data. Authenticated persistence and exact Convex provider-log proof are
+separate AWF-0030 verification work, not a reason to invent completion here.
 
 ## Sequence
 
@@ -85,8 +88,15 @@ migration remain outside this approval.
 
 ## Execution evidence
 
-Implementation and targeted local verification are in progress. Provider and
-live evidence must not be added until observed for the exact published commit.
+Implementation, focused tests, tracker readers, Project Philosophy, and the
+Claude Design handoff shipped in PR #31. Actions run `31328562901` used the
+full software path and passed verify/build/server/smoke. Vercel reported a
+successful preview for head `7569b607` and a successful production deployment
+for main `e65b03a`. A fresh signed-out browser probe proved the retained
+`https://discovertheirstories.com` alias with no console errors and proved that
+`/api/queue` redirects to sign-in while preserving the requested URL. No
+authenticated account or private genealogy data was used. AWF-0030 holds the
+remaining provider/authenticated verification gap; AWF-0029 holds final design.
 
 ## History
 
@@ -94,3 +104,6 @@ live evidence must not be added until observed for the exact published commit.
   foundation and reserved final screen design for later Claude Design work.
 - 2026-08-09 · Codex — completed the cross-surface audit and began the distinct
   Queue backend without migrating or relabeling existing product records.
+- 2026-08-09 · Codex — completed implementation and full PR/CI/Vercel/live
+  signed-out proof at `e65b03a`; closed execution while preserving AWF-0030 as
+  verification work and AWF-0029 as the separate Claude Design outcome.
