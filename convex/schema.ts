@@ -892,6 +892,168 @@ export default defineSchema({
     .index("by_entity_activity", ["entityType", "entityId", "activityType"]),
 
   /**
+   * PRODUCT QUEUE
+   *
+   * A directive-first continuity record for a person and their chosen AI.
+   * This is intentionally distinct from researchTasks and from the derived
+   * research-operations view. `state` is the complete product state set;
+   * failure, retry, cancellation, and handoff expiry are conditions within
+   * those four states, never additional user-facing states.
+   */
+  queueItems: defineTable({
+    vaultOwnerId: v.string(),
+    directive: v.string(),
+    summary: v.string(),
+    requestedOutcome: v.optional(v.string()),
+    state: v.union(
+      v.literal("needs_you"),
+      v.literal("working"),
+      v.literal("waiting_for_your_ai"),
+      v.literal("done"),
+    ),
+    condition: v.union(
+      v.literal("ready"),
+      v.literal("active"),
+      v.literal("awaiting_user"),
+      v.literal("retry_scheduled"),
+      v.literal("failed"),
+      v.literal("disconnected"),
+      v.literal("expired"),
+      v.literal("canceled"),
+      v.literal("completed"),
+    ),
+    priority: v.union(v.literal("high"), v.literal("normal"), v.literal("low")),
+    priorityReason: v.optional(v.string()),
+    context: v.array(
+      v.union(
+        v.object({ kind: v.literal("person"), refId: v.id("persons") }),
+        v.object({ kind: v.literal("relationship"), refId: v.id("relationships") }),
+        v.object({ kind: v.literal("place"), refId: v.id("places") }),
+        v.object({ kind: v.literal("event"), refId: v.id("events") }),
+        v.object({ kind: v.literal("source"), refId: v.id("sources") }),
+        v.object({ kind: v.literal("citation"), refId: v.id("citations") }),
+        v.object({ kind: v.literal("media"), refId: v.id("media") }),
+        v.object({ kind: v.literal("context_item"), refId: v.id("contextItems") }),
+        v.object({ kind: v.literal("research_task"), refId: v.id("researchTasks") }),
+        v.object({ kind: v.literal("research_check"), refId: v.id("researchChecks") }),
+        v.object({ kind: v.literal("story"), refId: v.id("stories") }),
+        v.object({ kind: v.literal("import_run"), refId: v.id("importRuns") }),
+        v.object({ kind: v.literal("provisional_relative"), refId: v.id("provisionalRelatives") }),
+      ),
+    ),
+    authority: v.object({
+      actorKind: v.union(
+        v.literal("user"),
+        v.literal("chosen_ai"),
+        v.literal("first_party_ai"),
+        v.literal("system"),
+      ),
+      actorId: v.string(),
+      operations: v.array(
+        v.union(
+          v.literal("queue:read"),
+          v.literal("queue:claim"),
+          v.literal("queue:update"),
+          v.literal("queue:complete"),
+        ),
+      ),
+      scopeNote: v.string(),
+    }),
+    leftForActorKind: v.union(v.literal("user"), v.literal("chosen_ai")),
+    leftForActorId: v.optional(v.string()),
+    activeActorKind: v.optional(
+      v.union(v.literal("user"), v.literal("chosen_ai"), v.literal("first_party_ai"), v.literal("system")),
+    ),
+    activeActorId: v.optional(v.string()),
+    leaseExpiresAt: v.optional(v.number()),
+    handoffExpiresAt: v.optional(v.number()),
+    requiredAction: v.optional(v.string()),
+    nextStep: v.optional(v.string()),
+    resultSummary: v.optional(v.string()),
+    resultRefs: v.optional(v.array(v.string())),
+    failureCode: v.optional(v.string()),
+    failureSummary: v.optional(v.string()),
+    retryCount: v.number(),
+    maxRetries: v.number(),
+    nextRetryAt: v.optional(v.number()),
+    canceledReason: v.optional(v.string()),
+    submittedAt: v.number(),
+    pickedUpAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    canceledAt: v.optional(v.number()),
+    createdByActorKind: v.union(v.literal("user"), v.literal("chosen_ai"), v.literal("first_party_ai")),
+    createdByActorId: v.string(),
+    lastUserResponse: v.optional(v.string()),
+    lastReopenReason: v.optional(v.string()),
+    version: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner", ["vaultOwnerId"])
+    .index("by_owner_updated", ["vaultOwnerId", "updatedAt"])
+    .index("by_owner_state_updated", ["vaultOwnerId", "state", "updatedAt"])
+    .index("by_owner_priority_updated", ["vaultOwnerId", "priority", "updatedAt"]),
+
+  /** Append-only, owner-visible Queue history. Content-bearing rows share the
+   * Queue item's deletion/export lifecycle; they are not permanent telemetry. */
+  queueActivity: defineTable({
+    vaultOwnerId: v.string(),
+    queueItemId: v.id("queueItems"),
+    eventType: v.union(
+      v.literal("created"),
+      v.literal("claimed"),
+      v.literal("checkpointed"),
+      v.literal("needs_you"),
+      v.literal("resumed"),
+      v.literal("released"),
+      v.literal("failed"),
+      v.literal("retry_scheduled"),
+      v.literal("completed"),
+      v.literal("canceled"),
+      v.literal("expired"),
+      v.literal("reopened"),
+    ),
+    fromState: v.optional(v.string()),
+    toState: v.string(),
+    actorKind: v.union(
+      v.literal("user"),
+      v.literal("chosen_ai"),
+      v.literal("first_party_ai"),
+      v.literal("system"),
+    ),
+    actorId: v.string(),
+    summary: v.string(),
+    detail: v.optional(v.string()),
+    commandId: v.string(),
+    itemVersion: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_owner", ["vaultOwnerId"])
+    .index("by_item_created", ["queueItemId", "createdAt"])
+    .index("by_owner_actor_created", ["vaultOwnerId", "actorId", "createdAt"]),
+
+  /** Idempotency receipts for Queue commands. The request key is unique only
+   * inside one owner boundary and never grants authority by itself. */
+  queueCommandReceipts: defineTable({
+    vaultOwnerId: v.string(),
+    idempotencyKey: v.string(),
+    command: v.string(),
+    queueItemId: v.id("queueItems"),
+    actorKind: v.union(
+      v.literal("user"),
+      v.literal("chosen_ai"),
+      v.literal("first_party_ai"),
+      v.literal("system"),
+    ),
+    actorId: v.string(),
+    resultVersion: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_owner", ["vaultOwnerId"])
+    .index("by_owner_key", ["vaultOwnerId", "idempotencyKey"])
+    .index("by_item", ["queueItemId"]),
+
+  /**
    * DOCUMENTS
    * Person-level documents (Person Sheet + CST)
    */

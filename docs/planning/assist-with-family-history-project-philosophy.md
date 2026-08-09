@@ -2,11 +2,11 @@
 
 > **Philosophy status:** Canonical product identity and claim boundary
 >
-> **Product document version:** 1.3.2
+> **Product document version:** 1.4.0
 >
-> **Capability evidence last verified:** 2026-08-08
+> **Capability evidence last verified:** 2026-08-09
 >
-> **Repository evidence revision:** `f7edb92 + state proof dc30429`
+> **Repository evidence revision:** `e1eee0d + Queue foundation change set; external proof pending`
 >
 > **Scope:** Product truth, language, trust, and design direction—not an
 > implementation plan, production claim, or permission to change application
@@ -46,7 +46,7 @@ provenance only and are not a current operating dependency.
 > prescribe the primary experience.
 >
 > **Deferred/gaps:** The unverified big/public-launch requirements recorded below,
-> including the family Queue, MCP and AI setup paths, complete activity history,
+> including the final designed Queue screen, MCP and AI setup paths, complete activity history,
 > export and deletion, `/me`, `/admin`, Support Desk, and family navigation.
 > Tracker/provider setup is **Current / verified** in AWF-WO-001 through useful
 > state commit `dc30429`. Independent audit remains **Not audited** in AWF-0004;
@@ -108,12 +108,12 @@ Use these status labels throughout this revision:
 |---|---|---|
 | Person / Assist workspace / your AI split | **Current / verified philosophy; Coming soon public-shell alignment** | The enduring split below already makes the person authoritative, Family History durable, and “your AI” user-chosen. The current home source does not yet use the required “Assist your AI, so it can assist you with family history” turn of phrase or link to `/ai` |
 | Domain promise, users, objects, and primary experience | **Intentional product-specific difference** | Keep the research-to-story promise and the connected vocabulary of people, families, relationships, places, buildings, events, sources, claims, questions, context, collections, projects, and stories. Family History decides how researchers, relatives, storytellers, and their chosen AI move through that evidence. The family chassis fixes dependable assistance and trust boundaries, not this domain model or experience |
-| Product Queue | **Coming soon** | `/app/operations`, `researchTasks`, research checks, and handoff export are real research-operations foundations, but they are not the family product Queue at `/queue` and do not implement its four states or directive-first creation path |
-| Queue authority | **In design** | Adopt the family rule: the directive authorizes only reversible, in-scope record changes plainly requested. New objectives, destructive work, identity merges, disputed promotion, publication, purchases, access changes, and outside-world actions return to **Needs you** |
-| Queue context objects | **Intentional product-specific difference; In design** | “Add context” offers three Family History groups: a research subject, evidence, or a work thread. Their concrete objects are defined in the Queue section below; attaching context stays optional |
+| Product Queue | **Current / verified repository backend foundation; Coming soon designed experience** | `queueItems`, `queueActivity`, command receipts, owner-scoped `/api/queue` seams, and focused contracts implement directive-first creation, exactly four product states, bounded handoff commands, cursor pagination, idempotency, concurrency, retry/failure/cancel/expiry, and hard deletion. `/app/operations` and `researchTasks` remain separate. No final `/queue` page, deployed schema, authenticated production journey, or arbitrary chosen-AI pickup path is claimed |
+| Queue authority | **Current / verified Queue-command foundation; Coming soon external identity proof** | Queue commands enforce bounded leases, exact actor/item operations, and the family rule that attached context grants no domain mutation authority. New objectives, destructive domain work, identity merges, disputed promotion, publication, purchases, access changes, and outside-world actions still return to **Needs you** or their separate human gate. Incoming chosen-AI credentials are not yet resolved to this authority |
+| Queue context objects | **Intentional product-specific difference; Current / verified repository backend foundation** | Optional owner-verified references use three Family History groups: research subject (person, relationship, place, event), evidence (source, citation, media, context item), or work thread (research task/check, story, import run, provisional relative). Directive-only creation remains valid. Project/collection adapters stay unimplemented because no matching durable model exists |
 | Internal project tracker | **Current / verified — independent audit pending** | `docs/tracker/` carries canonical Cards, Work Orders, Guide, factual metadata, and generated Kanban/Work Orders readers in Family History's archival identity. Current instructions use that durable source rather than mandatory Linear. State commit `dc30429` proved the lightweight GitHub path, Vercel ignored-build cancellation, and retained live deployment. AWF-WO-001 keeps completed execution separate from AWF-0004's future independent audit; do not confuse this build tracker with the product Queue |
-| MCP and AI setup paths | **Coming soon** | No `/mcp`, `/ai`, `/ai.txt`, or `/settings/ai` route exists. `/llms.txt`, internal app APIs, the API Center, key-management primitives, and a static capability manifest do not substitute for a verified scoped MCP connection and generated current briefing |
-| Activity and provenance | **Current / verified partial foundation; Coming soon complete contract** | Import runs, research logs, story review events, source links, model/prompt fields, and the `agentActivity` schema provide partial evidence. The repo does not prove a plain-language, record-visible entry for every meaningful AI create, change, or delete |
+| MCP and AI setup paths | **Current / verified internal Queue tool boundary; Coming soon connection** | Seven narrow Queue discovery/read/claim/checkpoint/question/complete/failure tool contracts now enforce per-operation scope and exclude broad domain writes. No `/mcp`, `/ai`, `/ai.txt`, or `/settings/ai` route or incoming chosen-AI credential resolution exists. Internal tools and key lifecycle primitives do not substitute for a verified connection |
+| Activity and provenance | **Current / verified Queue-specific history and partial wider foundation; Coming soon complete product contract** | Queue state-changing commands now emit append-only, actor-attributed history and idempotency receipts that share the item's deletion lifecycle. Import runs, research logs, story review events, source links, model/prompt fields, and `agentActivity` remain separate partial foundations; the repo still does not prove one complete history for every meaningful product create, change, or delete |
 | Access and sharing | **Current / verified Private and guarded Public foundations; In design Unlisted and Trusted** | Owner-scoped vault reads/writes and filtered public-story publication exist in source. Family History intentionally needs rare Public stories plus later Trusted collaboration and read-only Unlisted views; no complete invite or unlisted-link lifecycle is verified |
 | Identity boundary | **Current / verified source foundation; Unknown deployed state** | Source supports per-site Clerk identity and owner isolation when configured, plus local/guest modes for controlled environments. No shared Assist identity or cross-site session is claimed, and exact deployed Clerk/trust-boundary configuration is not proven here |
 | Export and deletion | **Coming soon** | Person context-pack export and key revocation are narrower current tools. No complete owner export, `/settings/data`, `/delete-account`, coordinated record/account deletion, attachment purge, or content-bearing-history purge is verified |
@@ -876,8 +876,11 @@ genealogy-shaped groups:
 
 These groups are an **Intentional product-specific difference**: they keep the
 family's directive-first interaction while preserving the richer Family
-History graph. Exact chips and arguments remain **In design** until the product
-Queue is implemented and tested.
+History graph. Backend adapters are **Current / verified in source** for
+owner-verified person, relationship, place, event, source, citation, media,
+context item, research task/check, story, import run, and provisional-relative
+references. Final chips and interaction remain for the designed Queue
+experience. Project/collection adapters wait for matching durable records.
 
 ### Four Queue states, exactly
 
@@ -930,11 +933,13 @@ uncertain, and the smallest useful action to take next. The person can see
 progress and results without treating the queue as permission or trusting an
 opaque “working” state.
 
-> **Capability truth:** The current repository has research tasks, research
-> checks and logs, an operations console, compact handoff export, and selected
-> quality and audit foundations. That console is **not** the family Queue, and
-> no `/queue` route or complete arbitrary-client pickup-and-return path is
-> verified. The product Queue is **Coming soon** for the big/public launch.
+> **Capability truth:** The current source has a distinct product Queue backend
+> with directive-only creation, four states, owner-verified context, bounded
+> commands, leases, retry/failure/cancel/expiry conditions, cursor pagination,
+> idempotency, concurrency protection, attributed activity, and hard deletion.
+> The research-operations console remains separate. No final `/queue` page,
+> deployed Convex schema, authenticated production path, or arbitrary-client
+> credential-to-tool round trip is verified; those remain **Coming soon**.
 
 ### The product Queue is not the project tracker
 
@@ -1033,12 +1038,12 @@ or an older production observation is not sufficient by itself.
 | Provenance and uncertainty | Source/citation separation, citation confidence and conflicts, candidate/accepted/conflict/rejected source facts, import runs, research logs, and context source references | **Current / verified partial foundation.** A complete generalized claim/provenance graph and immutable research history remain **In design** |
 | Relationships | First-class person-to-person relationship rows, roles, facts, provisional relatives, and guarded promotion/merge flow | **Current / verified partial foundation.** Broader social/institutional relationships and full competing-interpretation history remain **In design** |
 | Context | Loose context items plus place/era research packs with sources, confidence, review, privacy, and AI-use gates | **Current / verified partial foundation.** Buildings and institutions are pack/context types; a complete first-class context graph remains **In design** |
-| Questions and operations | Research tasks, research checks, research log, `/app/operations`, compact handoff export, and quality-gated check writes | **Current / verified partial foundation.** This is a research-operations console, not the family Queue. `/queue`, its four states, directive-first creation, and a complete multi-AI pickup/return path are **Coming soon** |
+| Questions and operations | Research tasks/checks/log, `/app/operations`, compact handoff export, plus distinct `queueItems`, `queueActivity`, idempotent command receipts, `/api/queue`, exact four-state transitions, owner-verified context adapters, bounded queries, leases, retry/failure/cancel/expiry, and deletion contracts | **Current / verified repository backend foundation.** The operations console remains distinct. Final `/queue` UI, deployed schema, authenticated production behavior, and a complete external chosen-AI pickup/return path are **Coming soon** |
 | AI context and Story Writer | Owner-scoped person context packs; manual prompt copy; optional OpenRouter generation; editable draft save with model/prompt metadata | **Current / verified repository foundation.** Generation is person-centered and first-party; arbitrary chosen-AI connectivity and every story subject remain unverified |
 | Story Studio and publication | Draft/review/published states, reviewer assignment, evidence/context/privacy/living-person gates, explicit human confirmation, public story DTO filtering, and unpublish paths | **Current / verified repository foundation.** Public availability remains **Unknown** pending deployment/user-path proof; broader publishing, collaboration, books, and collections are **Later** |
 | Collaboration and bounded sharing | Owner-scoped private vault operations plus guarded public-story publication; no complete invite or unlisted-link path | **Current / verified Private and guarded Public foundations.** Trusted project collaboration and read-only, non-expiring Unlisted links are **In design** and distinct from publication |
 | Scoped authority | Scope vocabulary, API-key mint/list/suspend/revoke primitives, owner checks, story roles, guarded publish actions, and selected review/audit events | **Current / verified partial foundation.** Incoming API-key resolution to an external AI is explicitly unfinished; self-asserted story headers are not a public authorization model |
-| API and AI connections | Internal app APIs, API-key management, scope presets, the `agentActivity` schema, a static planning capability manifest, a story OpenAPI skeleton, `/api/capabilities`, API Center source, and `/llms.txt` | **Current / verified internal/planning foundation only.** No verified incoming external-AI authentication, public agent API, `/mcp`, `/ai`, `/ai.txt`, or `/settings/ai` path |
+| API and AI connections | Internal app APIs, API-key management, Queue scope presets and seven narrow MCP-friendly Queue tool contracts, `agentActivity`, capability manifest, story OpenAPI skeleton, `/api/capabilities`, API Center source, and `/llms.txt` | **Current / verified internal/planning foundation only.** Queue tools are not externally exposed. No verified incoming external-AI authentication, public agent API, `/mcp`, `/ai`, `/ai.txt`, or `/settings/ai` path |
 | Search and retrieval | Person/place/stories views, owner-scoped API reads, context packs, filters, and queue exports | **Current / verified narrow retrieval surfaces.** Universal search across the full information model is **In design** |
 | Visualization | People/place workspaces and data suitable for relational views; Timeline route is explicitly a placeholder | **Current / verified partial foundation; In design full experience.** Do not claim timeline, pedigree, map, heatmap, or general graph experiences as shipped |
 | Retention, export, and deletion | Person context-pack export, low-level record operations, and key revocation plus a documented lifecycle gap | **Current / verified narrow tools; Coming soon complete contract.** No complete owner-vault export, coordinated retention policy, `/settings/data`, `/delete-account`, or cross-store deletion workflow is verified |
@@ -1063,7 +1068,8 @@ them or a planning artifact names them:
 - universal search across every person, source, claim, note, and story;
 - a complete per-person and per-AI read/create/update/delete/promote/publish
   authority matrix;
-- complete chosen-AI run history, work claiming, leases, retries, or quotas;
+- a deployed chosen-AI credential-to-Queue round trip, externally callable MCP
+  tools, provider/client compatibility, or quotas;
 - first-class generalized claims, institutions, buildings, communities,
   topics, collections, and story versioning;
 - automatic story generation for every subject type;
@@ -1416,6 +1422,7 @@ The repository-foundation boundary in this revision was reconciled against:
 - `docs/product/product-map.md`
 - `docs/product/ancestor-data-vault-philosophy-and-architecture.md`
 - `docs/product/agent-platform-design.md`
+- `docs/product/queue-foundation-design-handoff.md`
 - `docs/api/route-inventory.md`
 - `docs/api/capability-manifest.json`
 - `docs/api/story-agent-openapi-skeleton.yaml`
@@ -1445,6 +1452,7 @@ The repository-foundation boundary in this revision was reconciled against:
 - `components/layout/appNavigation.ts`
 - `convex/schema.ts`
 - `convex/apiKeys.ts`
+- `convex/queue.ts`
 - `convex/access.ts`
 - `lib/auth/scopes.ts`
 - `lib/stories/capabilities.ts`
@@ -1497,6 +1505,14 @@ before it was run.
 
 ## Changelog
 
+- **1.4.0 · 2026-08-09** — recorded the distinct product Queue backend
+  foundation: directive-only creation, exactly four product states,
+  owner-verified Family History context adapters, bounded and idempotent
+  commands, actor leases, optimistic concurrency, retry/failure/cancel/expiry
+  conditions, attributed activity, hard deletion, cursor pagination, and a
+  narrow seven-tool internal chosen-AI boundary. Kept the final designed Queue UI,
+  deployed/authenticated proof, incoming credential resolution, and live MCP
+  connection explicitly unverified.
 - **1.3.2 · 2026-08-08** — reattested against published Assist With Sites Core
   Philosophy v1.6.3 at commit
   `db658ab091bcfbb71f62db55d5b8b6d51b64e52f` and its source digest; aligned

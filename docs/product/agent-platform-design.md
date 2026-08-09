@@ -1,6 +1,13 @@
 # Discover Their Stories — AI Agent Platform: Design & Roadmap
 
-Status: active build. Last updated: 2026-07-12.
+Status: active design/build history. Last reconciled: 2026-08-09.
+
+> **Current Queue correction:** the product Queue backend is now implemented in
+> source as `queueItems`, `queueActivity`, idempotent command receipts, bounded
+> APIs, and an internal scoped tool boundary. It is not the broader autonomous
+> `agentRuns` runtime imagined in this older roadmap, and no live MCP or incoming
+> chosen-AI credential path is claimed. See
+> [`queue-foundation-design-handoff.md`](queue-foundation-design-handoff.md).
 
 ## Vision
 
@@ -28,12 +35,13 @@ the three-gate privacy/AI model as fixture-tested predicates in `convex/vault.ts
 capture→validate→preview→merge import engine; Story Studio draft→review→publish with an 8-gate
 publish-safety engine + human-review confirmation; and strong contract-drift CI gates.
 
-**Not real yet (the work):** no platform API keys / agent identity (the only "role" is a
-self-asserted header defaulting to full publish authority); nothing machine-readable is served
-(`capability-manifest.json` + OpenAPI skeleton are static files behind auth; no MCP server); no live
-job runtime (`researchTasks` status enum is dead — no mutation transitions it; handoff is
-one-directional/stateless; `researchLog` overwrites instead of appends; the extension makes zero
-network calls to the app); no Convex blob storage (`ctx.storage` unused — `media` uses
+**Still not real (the work):** API-key lifecycle exists, but incoming chosen-AI
+credentials do not resolve to a server-trusted principal; the capability
+manifest remains internal and there is no MCP server. `researchTasks` now has
+guarded transitions, and the separate product Queue has durable bidirectional
+handoff, leases, retry and history, but there is no autonomous `agentRuns`
+runtime. `researchLog` remains its own mutable-status record, and the extension
+makes zero network calls to the app. There is no Convex blob storage (`ctx.storage` unused; `media` uses
 `filePath`/`url` strings); visualization/render gaps (stories render literal markdown; Timeline is
 "Coming Soon"; the pedigree builder is backend-only/unwired; no viz libs installed).
 

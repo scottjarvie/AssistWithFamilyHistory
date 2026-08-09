@@ -1,5 +1,13 @@
 # Agent Operations And Handoff Runbook
 
+> **Two distinct handoffs:** `/api/operations/queue` below is the existing
+> evidence-readiness export. The product Queue backend is defined in
+> [`queue-foundation-design-handoff.md`](../product/queue-foundation-design-handoff.md)
+> and uses `queueItems` plus exactly Needs You / Working / Waiting for your AI /
+> Done. Neither surface is a live MCP connection. Incoming chosen-AI identity
+> remains blocked until the credential-resolution boundary is implemented and
+> proven.
+
 This project can use agents for meaningful work, but the operations surface should decide what agents are allowed to do instead of letting each agent infer it from the UI.
 
 ## Current Safe Order
@@ -12,6 +20,10 @@ This project can use agents for meaningful work, but the operations surface shou
 6. Leave provisional relative promotion, merges, and publish actions for human review until stronger gates exist.
 
 ## Agent-Ready Surfaces
+
+- Product Queue internal tool contract: bounded list/read plus assigned-actor
+  claim, checkpoint, exact user question, and completion. These tools are
+  source-complete but intentionally not exposed to external clients yet.
 
 - `/api/operations/queue`: read-only queue and filters.
 - `/api/operations/queue?format=handoff`: compact JSON handoff packet with recommended agent type, review level, prompt, routes, and reason per row.

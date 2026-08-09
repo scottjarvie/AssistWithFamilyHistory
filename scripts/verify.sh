@@ -35,6 +35,7 @@ steps=(
   "check:import-regression"
   "check:agent-quality-gates"
   "check:operations-handoff"
+  "check:queue-foundation"
   "check:context-pack-contract"
   "check:privacy-ai-safety"
   "check:review-gates"
