@@ -2,7 +2,9 @@
 
 > **Philosophy status:** Canonical product identity and claim boundary
 >
-> **Product document version:** 1.4.1
+> **Product document version:** 1.5.0
+>
+> **Philosophy date:** 2026-08-11
 >
 > **Capability evidence last verified:** 2026-08-09
 >
@@ -47,7 +49,11 @@ provenance only and are not a current operating dependency.
 >
 > **Deferred/gaps:** The unverified big/public-launch requirements recorded below,
 > including the final designed Queue screen, MCP and AI setup paths, complete activity history,
-> export and deletion, `/me`, `/admin`, Support Desk, and family navigation.
+> export and deletion, `/me`, `/admin`, Support Desk, and family navigation;
+> plus the approved but unverified People/relationships-first onboarding,
+> selected-object visibility, simple collaboration roles, separate
+> interpretations, optional passage/source reader layer, and prompt/loop
+> library.
 > Tracker/provider setup is **Current / verified** in AWF-WO-001 through useful
 > state commit `dc30429`. Independent audit remains **Not audited** in AWF-0004;
 > that fact does not erase the observed delivery evidence. Product capability
@@ -71,6 +77,21 @@ provenance only and are not a current operating dependency.
 > `dpl_8FfUtYW5FBJ6sZLbXGkiZtbQvf3a`; retained live deployment
 > `dpl_vngjLJMJRMBgo7dM6gpBvT2p7C6J`. Product capabilities remain separately
 > unverified where marked **Unknown**.
+
+> **Owner authority clarification:** 2026-08-09 — a person may discuss or
+> direct their chosen AI however they want outside Family History. The product
+> neither controls those conversations nor polices that AI's overall behavior.
+> Family History controls only its own boundary: access to its tools and data,
+> operations performed through the product, and specifically approved,
+> recorded handoffs to that AI.
+
+> **Product direction synthesis:** 2026-08-11 — People and relationships are
+> the friendly first step into a connected private archive. Imports and the
+> owner's chosen AI may accelerate that picture under explicit authority;
+> uncertainty, separate interpretations, optional story evidence, living-person
+> review, selected-object visibility, simple collaboration roles, and an
+> optional prompt/loop library are preserved as product direction rather than
+> claimed current implementation.
 
 Core v1.6.3 reorganizes rather than changes Family History's installed
 operating contract: §16.1 owns the Cards / Work Orders / Guide tracker rules,
@@ -96,6 +117,7 @@ Use these status labels throughout this revision:
 | Status | Meaning here |
 |---|---|
 | **Current / verified** | Proven in this checked-out repository at the stated revision; still not a deployment or production claim |
+| **Partial / verified foundation** | Specific pieces are proven, but the complete capability or user path is not; name both the proven pieces and the missing boundary |
 | **Coming soon** | Committed soft-launch work required for the big/public launch; it may appear publicly only beside a plainly unfinished, non-working control or claim |
 | **In design** | Required or deliberately designed, but not yet proven as a complete current path; do not imply availability |
 | **Later** | Unscheduled, exploratory, or gated behind real usage; not a commitment and not eligible for a public **Coming soon** label |
@@ -108,20 +130,22 @@ Use these status labels throughout this revision:
 |---|---|---|
 | Person / Assist workspace / your AI split | **Current / verified philosophy; Coming soon public-shell alignment** | The enduring split below already makes the person authoritative, Family History durable, and “your AI” user-chosen. The current home source does not yet use the required “Assist your AI, so it can assist you with family history” turn of phrase or link to `/ai` |
 | Domain promise, users, objects, and primary experience | **Intentional product-specific difference** | Keep the research-to-story promise and the connected vocabulary of people, families, relationships, places, buildings, events, sources, claims, questions, context, collections, projects, and stories. Family History decides how researchers, relatives, storytellers, and their chosen AI move through that evidence. The family chassis fixes dependable assistance and trust boundaries, not this domain model or experience |
+| Friendly start and connected archive | **Intentional product-specific difference; In design onboarding** | People and relationships are the primary friendly start, but not a forced container. An authorized import or chosen-AI research handoff may quickly extend that first connected picture. Sources, documents, media, places, buildings, events, claims, and stories remain many-to-many records with provenance and uncertainty; no direct provider integration is implied |
 | Product Queue | **Current / verified repository and deployed Next.js backend foundation; Coming soon designed/authenticated experience** | `queueItems`, `queueActivity`, command receipts, owner-scoped `/api/queue` seams, and focused contracts implement directive-first creation, exactly four product states, bounded handoff commands, cursor pagination, idempotency, concurrency, retry/failure/cancel/expiry, and hard deletion. PR #31 passed full CI, merged as `e65b03a`, and received successful Vercel preview/production statuses; the retained live alias and signed-out sign-in redirect were observed. `/app/operations` and `researchTasks` remain separate. No final `/queue` page, authenticated persistence, exact production Convex build-plan log, or arbitrary chosen-AI pickup path is claimed |
-| Queue authority | **Current / verified Queue-command foundation; Coming soon external identity proof** | Queue commands enforce bounded leases, exact actor/item operations, and the family rule that attached context grants no domain mutation authority. New objectives, destructive domain work, identity merges, disputed promotion, publication, purchases, access changes, and outside-world actions still return to **Needs you** or their separate human gate. Incoming chosen-AI credentials are not yet resolved to this authority |
+| Queue authority | **Current / verified Queue-command foundation; Coming soon external identity proof** | Queue commands enforce bounded leases, exact actor/item operations, and the family rule that attached context grants no domain mutation authority. A Queue item never silently expands authority. Product grants must explicitly bind actor/AI, scope, permitted data, operation or external-action category, approval, and expiry/revocation. Missing authority returns to **Needs you** with the smallest exact question. Where a complete grant already exists, the Queue may give that chosen AI a recorded external-action intent and selected context, then attribute success, denial, failure, or return; Family History itself never performs the outside-world action. Incoming chosen-AI credentials are not yet resolved to this authority |
 | Queue context objects | **Intentional product-specific difference; Current / verified repository backend foundation** | Optional owner-verified references use three Family History groups: research subject (person, relationship, place, event), evidence (source, citation, media, context item), or work thread (research task/check, story, import run, provisional relative). Directive-only creation remains valid. Project/collection adapters stay unimplemented because no matching durable model exists |
+| Prompt and research-loop library | **In design** | A small curated menu may help the person's chosen AI begin useful family-history work. Every prompt or loop is optional, editable, combinable, and ignorable, with version/freshness/provenance/limits metadata. It is assistance, not a required workflow or site-owned automation engine |
 | Internal project tracker | **Current / verified — independent audit pending** | `docs/tracker/` carries canonical Cards, Work Orders, Guide, factual metadata, and generated Kanban/Work Orders readers in Family History's archival identity. Current instructions use that durable source rather than mandatory Linear. State commit `dc30429` proved the lightweight GitHub path, Vercel ignored-build cancellation, and retained live deployment. AWF-WO-001 keeps completed execution separate from AWF-0004's future independent audit; do not confuse this build tracker with the product Queue |
 | MCP and AI setup paths | **Current / verified internal Queue tool boundary; Coming soon connection** | Seven narrow Queue discovery/read/claim/checkpoint/question/complete/failure tool contracts now enforce per-operation scope and exclude broad domain writes. No `/mcp`, `/ai`, `/ai.txt`, or `/settings/ai` route or incoming chosen-AI credential resolution exists. Internal tools and key lifecycle primitives do not substitute for a verified connection |
 | Activity and provenance | **Current / verified Queue-specific history and partial wider foundation; Coming soon complete product contract** | Queue state-changing commands now emit append-only, actor-attributed history and idempotency receipts that share the item's deletion lifecycle. Import runs, research logs, story review events, source links, model/prompt fields, and `agentActivity` remain separate partial foundations; the repo still does not prove one complete history for every meaningful product create, change, or delete |
-| Access and sharing | **Current / verified Private and guarded Public foundations; In design Unlisted and Trusted** | Owner-scoped vault reads/writes and filtered public-story publication exist in source. Family History intentionally needs rare Public stories plus later Trusted collaboration and read-only Unlisted views; no complete invite or unlisted-link lifecycle is verified |
+| Access and sharing | **Current / verified Private and guarded Public foundations; In design Unlisted and Trusted** | Use one selected-object visibility vocabulary for appropriate stories, collections, and source/record surfaces: Private, Unlisted, Trusted, Public. Trusted collaboration uses simple Viewer, Contributor, Editor, and Owner roles scoped to the relevant boundary. Sharing stays deliberate, reviewable, revocable, and subject to living/sensitive review; complete invite, link, role, and visibility lifecycles are not verified |
 | Identity boundary | **Current / verified source foundation; Unknown deployed state** | Source supports per-site Clerk identity and owner isolation when configured, plus local/guest modes for controlled environments. No shared Assist identity or cross-site session is claimed, and exact deployed Clerk/trust-boundary configuration is not proven here |
 | Export and deletion | **Coming soon** | Person context-pack export and key revocation are narrower current tools. No complete owner export, `/settings/data`, `/delete-account`, coordinated record/account deletion, attachment purge, or content-bearing-history purge is verified |
-| Public truth surfaces and honesty | **Current / verified partial source; Coming soon alignment** | `/updates`, public marketing, roadmap, privacy, and `/llms.txt` exist in source. The home page lacks the required FAQ and `/ai` invitation; `/updates` lacks the exact **Local / In review / Backend live / Public & live** labels and AI-written 1.1.1 release habit; and stale or unverified public statements need a separate sentence-by-sentence honesty pass before a big/public launch |
+| Public truth surfaces and honesty | **Partial / verified source; Coming soon alignment** | `/updates`, public marketing, roadmap, privacy, and `/llms.txt` exist in source. The home page lacks the required FAQ and `/ai` invitation; `/updates` lacks the exact **Local / In review / Backend live / Public & live** labels and AI-written 1.1.1 release habit; and stale or unverified public statements need a separate sentence-by-sentence honesty pass before a big/public launch |
 | `/me` and `/admin` | **Coming soon** | No family `/me` or owner `/admin` route exists. `/app/audit` is a private genealogy-readiness view and `/app/api/admin` is an API-key operator surface; neither is the family usage/stats contract |
 | Support Desk | **In design / deferred dependency** | `/contact` exists, but no registered Assist With Life Support Desk source key or header/footer desk link is present. Link it only when the shared desk is live; do not market it beforehand |
 | Brand, design, and themes | **Intentional product-specific difference; Coming soon accessibility floor** | Preserve Discover Their Stories’ compass, parchment, teal/rust, archival annotations, evidence-thread motif, typography, and editorial voice as the product's own design system. The designed philosophy reader already supports light/dark; the product UI does not yet prove first-class light/dark coverage. The family swatches `#8FD7B4` and `#245A43` identify Family History in shared portfolio wayfinding; they do not replace or dictate the product palette |
-| Dense information | **Intentional product-specific difference; Current / verified partial foundation; Coming soon dependable behavior** | Family History may be denser than a sibling because evidence comparison requires it. People reads are capped and the operations view has a contained table, filters, sorting controls, and bounded rendering. Cursor pagination, table-first people view, click-to-sort columns, remembered preferences, account-saved views, and complete phone drill-down are not verified. The family contract supplies performance and phone-usability guardrails, not a uniform layout |
+| Dense information | **Intentional product-specific difference; Partial / verified foundation; Coming soon dependable behavior** | Family History may be denser than a sibling because evidence comparison requires it. People reads are capped and the operations view has a contained table, filters, sorting controls, and bounded rendering. Cursor pagination, table-first people view, click-to-sort columns, remembered preferences, account-saved views, and complete phone drill-down are not verified. The family contract supplies performance and phone-usability guardrails, not a uniform layout |
 | Family navigation | **Coming soon** | No family catalog row exists in the public or signed-in shell. It must show the whole verified roster without leaking cross-site counts or activity |
 | Launch stage | **Unknown current publication state; adopted sequence** | Repository and public-copy evidence cannot prove the real domain, Assist With Life catalog listing, deployment, or authenticated operation. Do not call this soft-launched, big/public-launched, or production-ready without fresh external proof |
 | Native privacy and review readiness | **Later guardrail only** | No native package is claimed or currently designed. Revisit native review requirements only after substantial recurring website use demonstrates a distinct native job; this does not shape the present product philosophy or website experience |
@@ -301,16 +325,25 @@ infallible conclusions, or automatic public storytelling. The detailed
 [builder trust boundaries](#detailed-trust-boundaries-for-builders) state the
 current implementation boundary without redefining this purpose.
 
+It is also not a governor for the person's AI. People may discuss or direct
+their AI however they choose outside this product, including requests broader
+than any Family History grant. Family History neither controls those external
+conversations nor claims authority over the AI's overall behavior. It enforces
+only whether that AI may use Family History tools or data, perform an operation
+through Family History, or receive a specifically approved handoff from it.
+
 ## The durable Assist family and trust model
 
 The research-to-story workspace becomes durable help through a clear division
 of roles. An Assist product is not the AI. The person chooses the AI that helps
 them.
 
-- **Your AI does the reasoning and work under your direction.** It can inspect
-  permitted material, identify patterns and contradictions, research
-  elsewhere, ask questions, propose connections, and help shape narratives
-  through capabilities you separately authorize.
+- **Your AI does the reasoning and work under your direction.** You may discuss
+  or direct it however you want in its own environment. When it reaches into
+  Family History, it can inspect only permitted material and use only granted
+  product operations. With a specifically approved handoff it may also receive
+  selected context and an external-action intent to carry out outside the
+  product.
 - **Family History provides durable family-history memory, organization, and
   tools.** It gives the work persistent structured context, retrieval,
   provenance, relationships, history, questions, queues, and visual
@@ -320,6 +353,14 @@ them.
   what may retrieve, add, update, delete, promote, share, or publish in each
   family tree, person, source, story, collection, or research project.
 
+Family History controls its own boundary, not the external conversation. Its
+settings and grants determine whether a named AI may read selected workspace
+data, receive sensitive context, create, update, or delete a record, share,
+publish, or export through the product, or receive a recorded handoff carrying
+an external-action intent. If the owner has disallowed one of those product
+data or tool operations, Family History denies it. That denial does not forbid
+the person from discussing the same subject or request with their AI elsewhere.
+
 The benefit is different for each side. Your AI receives continuity and
 well-labeled evidence instead of reconstructing a family from scattered chats.
 You receive clarity: what is known, what is inferred, what is disputed, what
@@ -328,9 +369,13 @@ changed, what needs attention, and which stories the material can support.
 The practical work may begin with a person, a family line, a document, a
 photograph, a place, a building, a remembered story, a historical question, or
 an unresolved contradiction. The person may authorize their AI, in the AI's
-own environment, to browse, research, or communicate elsewhere. Only selected
-information deliberately submitted through Family History's scoped interface
-becomes Family History data.
+own environment, to browse, research, communicate, contact someone, or take
+another outside action. Family History does not perform that action. When the
+owner wants the product to supply private context or a formal instruction for
+it, Family History may do so only through a visible, granular, revocable grant
+and a specifically approved, attributable handoff. Only selected information
+deliberately submitted through Family History's scoped interface becomes
+Family History data.
 
 Family History does not inherit browser sessions, passwords, archive accounts,
 FamilySearch access, or the authority of the person's external AI. A shared
@@ -344,20 +389,64 @@ every AI connection, research tool, visualization, sharing mode, or story
 workflow is currently available. The capability ledger below keeps that
 product truth explicit.
 
+## A friendly start: people, relationships, and a connected archive
+
+The private Family History archive or workspace is the trust boundary, but it
+is not a single required first container. The underlying work begins with
+connected People, families and relationships, places and buildings, events,
+sources and documents, media, claims and observations, questions, and stories.
+Each of those records can be reached from more than one direction.
+
+The friendliest first step is usually one person and a known family
+relationship. That gives someone a recognizable first picture without asking
+them to understand the whole information model. From there they can add another
+relative, connect a source, record an event or place, preserve a memory, or ask
+their chosen AI to help extend the picture.
+
+An authorized import from existing family-history work can accelerate that
+start. FamilySearch capture, another genealogy service, an exported tree,
+research files, a census, a journal, or a group of photographs may contribute
+people, relationships, evidence, and context together. Import is an
+accelerator—not a replacement for the person-centered model and not proof that
+Family History has a live direct connection to every named provider.
+
+The graph is deliberately many-to-many:
+
+- one census entry can describe several people, a household, a place, and an
+  event;
+- one photograph can connect several people to a building, occasion, date, and
+  photographer;
+- one journal or document can support multiple claims and stories;
+- one place, church, home, school, or event can connect many lives; and
+- one person can carry several sources, names, relationships, hypotheses, and
+  stories without collapsing them into one unquestioned record.
+
+The user may direct their chosen AI outside Family History to research
+FamilySearch, another service, an archive, the web, or supplied files. With the
+necessary Family History workspace grant, that AI may deliberately save the
+resulting evidence and context into the correct connected records. The save
+must preserve the original source, capture or retrieval provenance,
+uncertainty, acting AI, time, and any transformation or interpretation. The
+product does not inherit the AI's external access and does not claim automatic
+provider access merely because the AI can return a result.
+
 ## The research-to-story loop
 
 Family History should preserve the whole arc from first clue to responsible
 story, not only the final family-tree value.
 
-1. **Begin with an authorized question or source.** A person or authorized AI
-   names the scope, reason for the work, source, known constraints, and next
-   useful question.
+1. **Begin with someone and a connection.** The friendly path starts with a
+   person and known relationship, while still allowing an authorized source,
+   import, question, place, event, or story to enter first. Name the scope,
+   source, known constraints, and next useful question.
 2. **Retrieve the connected context.** Your AI receives the permitted people,
    relationships, places, dates, sources, claims, notes, historical context,
    open questions, and prior work needed for this step.
 3. **Gather without flattening.** Records, documents, media, memories, family
-   lore, observations, and outside research enter with their original form,
-   provenance, privacy, rights, and review state intact.
+   lore, observations, authorized imports, and outside research enter with
+   their original form, provenance, privacy, rights, uncertainty, and review
+   state intact, connected to every relevant person/place/event rather than
+   forced under one profile.
 4. **Extract and connect cautiously.** Your AI may propose identities, name
    variants, events, relationships, places, topics, claims, contradictions,
    and historical context. Proposals remain distinct from accepted
@@ -406,19 +495,26 @@ Authority is independently controllable for each actor and operation:
   and audit rules; and
 - **promote or publish, where relevant** — move provisional material into an
   accepted conclusion, private material into a reusable state, or a reviewed
-  story into an explicitly shared or public state.
+  story into an explicitly shared or public state;
+- **share or export through Family History** — disclose a reviewed, bounded
+  set of data to an approved audience or produce an owner-requested copy; and
+- **receive an external-action handoff** — give the named chosen AI a selected
+  private context package plus one specifically approved outside-world intent,
+  without Family History performing that action itself.
 
 These permissions are not interchangeable. Read is not write. Create is not
 update or delete. Proposal authority is not authority to accept a claim, merge
 an identity, or publish a story. Access to one person or research project does
 not carry into another.
 
-The permitted actor, scope, and operations must be visible, editable,
-revocable, and auditable. Retrieval and every data-changing action should
-retain the acting person or AI, operation, scope, time, relevant policy, and
-result in provenance or audit history. Your AI cannot grant itself broader
-authority, inherit another actor's permission, or expand access because it
-found a related person.
+Every grant must name the actor or chosen AI, scope, permitted data, operation
+or action category, approval, and expiry or revocation condition. Those terms
+must be visible, editable where safe, revocable, and auditable. Retrieval,
+every data-changing action, and every external-action handoff should retain the
+acting person or AI, operation or intent, scope, approval, time, relevant
+policy, result, and any denial, failure, or return in provenance or activity
+history. Your AI cannot grant itself broader authority, inherit another
+actor's permission, or expand access because it found a related person.
 
 Permission and operating preference answer different questions:
 
@@ -431,6 +527,15 @@ Automation and review preferences never grant permission. “Review everything�
 does not create read access. “Save routine research automatically” does not
 create update authority. A queue item identifies work to do; it does not widen
 the actor's scope.
+
+These grants govern Family History, not the person's speech. An owner may ask
+their AI about any topic or outside action in the AI's own environment even
+when Family History has denied that AI access to related workspace data or
+tools. The product must refuse the disallowed data/tool operation while making
+no claim to forbid or police the external conversation. Conversely, a broad
+external conversation does not authorize the AI to retrieve one private note,
+change one record, export one file, publish one story, or receive one sensitive
+handoff from Family History.
 
 This is the intended Assist-family authority model. The current repository has
 owner-scoped records, signed-in key-management primitives, a scope vocabulary,
@@ -495,6 +600,12 @@ conclusions. Rights, privacy, repository, page or image reference, capture
 time, checksum where available, and transformation history belong with the
 material.
 
+A source is not owned by one profile. A census, photograph, journal, letter,
+record, or media item can connect to several people and also to a relationship,
+place, building, event, claim, collection, or story. Preserve the original once
+and make those links explicit; do not duplicate or flatten it into a
+one-source-one-person model.
+
 ### Claims and interpretations
 
 A claim is a statement that may be supported, challenged, or refined. It
@@ -510,8 +621,21 @@ should identify:
 - who or what created or changed it; and
 - why one interpretation currently leads.
 
-Canonical person, relationship, place, or event records are the current
-working conclusions—not a place to erase every conflicting claim.
+Uncertain research belongs inside the workspace rather than in an untracked
+side conversation. A person or authorized AI may save a source-linked
+hypothesis, proposed relationship, candidate identity, or possible event with
+its confidence, concise rationale or evidence notes, actor, and timestamp. It
+must remain visibly distinct from a confirmed fact and must never silently
+rewrite the connected family picture as certain.
+
+Canonical person, relationship, place, or event records can carry a practical
+working conclusion, but they are not a place to erase every conflicting claim.
+When evidence is shared, each researcher—or their authorized AI acting on their
+behalf—may retain or select a different interpretation with its own rationale,
+confidence, sources, and reasoning. Family History preserves shared evidence,
+separate interpretations, authorship, and history rather than forcing one
+official answer. A later correction or promotion is an attributed review event,
+not a silent overwrite.
 
 ### Research notes, questions, and history
 
@@ -575,6 +699,11 @@ renormalized. A family story may become more cautious when a record is
 reinterpreted. The useful history is not clutter; it is what makes future AI
 reasoning and human trust possible.
 
+Shared evidence does not require shared interpretation. Two collaborators may
+look at the same census and select different same-person or relationship
+hypotheses. Both can remain legible with their sources, reasoning, confidence,
+author/AI attribution, timestamp, review state, and later correction history.
+
 ## Relationships and historical context
 
 Family history becomes meaningful through connections.
@@ -598,33 +727,37 @@ that does not prove a person attended it. If a migration corridor was common,
 that does not prove a family used it. Story language should make the difference
 clear without turning every paragraph into a legal disclaimer.
 
-## Storytelling principles
+## Storytelling and the optional evidence layer
 
-Storytelling is a primary capability, not a decorative export. It is also not
-permission to fabricate.
+Storytelling is a primary capability, not a decorative export. Family History
+does not prescribe how the person or their chosen AI must write, and it does
+not police voice, structure, imagination, or whether every sentence carries a
+citation. The author remains in control of the story.
 
-1. **Begin with what the evidence can support.** The narrative should use
-   source-backed facts, reviewed claims, and relevant context.
-2. **Make uncertainty readable.** Use careful language when identity,
-   chronology, motive, or experience is uncertain or contested.
-3. **Separate life detail from setting.** Explain which details come from the
-   person's evidence and which describe the wider place or era.
-4. **Link the story back to its foundation.** A reader or reviewer should be
-   able to inspect the sources, claims, and context behind important details.
-5. **Preserve human meaning.** Evidence discipline should support clarity,
-   dignity, emotion, and connection—not reduce a life to a citation list.
-6. **Do not invent interiority.** AI may suggest narrative structure, but it
-   must not present imagined thoughts, motives, dialogue, or experiences as
-   fact.
-7. **Keep revision honest.** A corrected claim should be able to update the
-   story while preserving its prior version and research trail.
-8. **Respect audience and rights.** Private material, living people, restricted
-   media, and culturally sensitive stories need the applicable review before
-   sharing.
+The product's job is to make rich, source-aware writing and reading pleasantly
+possible. A story may optionally connect a passage to:
 
-AI-generated narratives should identify their generated or edited status. The
-goal is a compelling, source-aware story that teaches the reader what is known
-and lets uncertainty breathe—not a confident fiction wearing citations.
+- one or more people and relationships;
+- a memory, journal, photograph, letter, census, document, or other source;
+- an event, place, city, building, church, school, workplace, or route;
+- a claim, hypothesis, competing interpretation, or uncertainty note; and
+- wider place/era context that is clearly distinct from evidence about a
+  particular person's experience.
+
+Those connections form an optional reader layer. The story should stand on its
+own as a readable narrative; a curious reader can open the people, source,
+place, event, image, context, or research trail behind a passage when desired.
+A writer may link densely, lightly, or not at all. The product offers the
+capability rather than turning one evidence format into a writing policy.
+
+When references are used, Family History preserves author or AI attribution,
+source provenance, uncertainty, story version history, and the distinction
+between original material, interpretation, and historical setting. A corrected
+claim can update the optional reader layer without erasing the prior story or
+research trail. Private material, living people, restricted media, and
+culturally sensitive content still require the applicable audience/rights
+review before the product shares or publishes them; that is a product boundary,
+not control over the author's external writing process.
 
 ## Living people and private family material
 
@@ -638,6 +771,13 @@ Private notes, correspondence, recent addresses, contributor details,
 restricted media, sensitive relationships, oral histories, and unreviewed
 family claims should remain user-controlled.
 
+Private by default does not mean hidden from the authorized family workspace.
+The owner and specifically authorized collaborators or chosen AIs may see the
+living relatives relevant to their granted archive/project scope. The product
+must not infer that someone is deceased merely because of age or an old date;
+deceased status comes from an explicit user assertion or supporting evidence,
+and its provenance remains visible.
+
 Private, AI-eligible, and public are separate states:
 
 - something may be visible to its owner but not permitted for AI use;
@@ -648,6 +788,19 @@ Private, AI-eligible, and public are separate states:
 - something may be included in a private bounded view but not publicly
   publishable; and
 - public historical context does not make every linked family detail public.
+
+Sensitive material remains private by default and is excluded from public
+surfaces and any broader Unlisted, Trusted, export, or AI scope unless the
+owner explicitly grants the relevant actor, scope, data, operation, and
+audience after a visible living/sensitive review. That default does not block
+properly authorized workspace access. Private data belongs to the owner: they
+must be able to view and correct it while it is retained, export it in a useful
+form, and delete it subject only to narrow disclosed retention requirements.
+
+Deceased records may have an easier sharing path once status is explicitly
+supported, but they still follow the owner's visibility settings, source and
+media rights, and deliberate review. A deceased label does not make every
+linked living relative, private note, or sensitive relationship shareable.
 
 Sharing and publishing are explicit, reviewable state changes—never automatic
 side effects of import, AI use, a “published” suggestion, or connection to
@@ -663,8 +816,9 @@ trust-boundary configuration is **Unknown** until verified in the real
 environment.
 
 Before the big/public launch, `/settings/data` must let a person export the
-Family History data held about them in a useful form, see every active share,
-delete a record, and request deletion of the site-specific account. Record
+Family History data held about them in a useful form, view and correct their
+records, see every active share and AI grant, delete a record, and request
+deletion of the site-specific account. Record
 deletion removes the record, attachments, and content-bearing history; only a
 minimal content-free tombstone may remain when operationally necessary.
 Account deletion must map and remove the Clerk identity, Convex owner records,
@@ -677,35 +831,68 @@ paths is verified today, so they are **Coming soon**, not Current.
 ## Collaboration and bounded sharing
 
 Family History adopts the family access vocabulary: **Private**, **Unlisted**,
-**Trusted**, and **Public**. Private is the default. A product does not need to
-offer every higher level, but it must not invent a competing name or meaning.
+**Trusted**, and **Public**. Private is the default. Family History intends all
+four for appropriate selected objects and views, with each complete path still
+labeled **In design** until verified; it must not invent a competing name or
+meaning.
+
+The visibility choice belongs to a selected object or reviewed view—not to the
+whole archive by accident. Appropriate stories, collections, source/record
+surfaces, and other deliberately bounded views may be Private, Unlisted,
+Trusted, or Public. Every change is explicit, previewable, reviewable,
+revocable, and attributable. Making one story Public or one source Unlisted
+does not broaden linked people, notes, media, claims, or the archive around it.
 
 The repository currently proves owner-scoped Private foundations and a
 guarded, separately promoted Public story path in source. Family History also
 needs two distinct future sharing modes—Trusted collaboration and Unlisted
 bounded views. Neither is verified as a complete current repository
-capability; both are **In design**. Public storytelling is an intentional,
-rare domain extension, not permission to make the underlying vault public.
+capability; both are **In design**. Public visibility for a deliberately
+reviewed story, collection, or appropriate source/record view is intentional
+and bounded, never permission to make the underlying vault public.
 
 ### Trusted collaboration inside a project
 
 A Trusted collaborator is an identifiable person invited into a family-history
-project. Their access is account-bound or identity-bound and limited to the named
-family tree, research project, person, story, collection, or narrower record.
-The owner grants each allowed operation independently: retrieve, comment or
-review, add, update, delete, promote, or publish where relevant.
+project or selected boundary. Their access is tied to a named Assist With Family
+History account, for example an account email, and limited to the named archive,
+family tree, research project, person, story, collection, share, or narrower
+record.
+
+Keep the roles simple:
+
+| Role | Plain meaning |
+|---|---|
+| **Viewer** | Read the approved shared records and stories. |
+| **Contributor** | Add sources, notes, candidate facts, hypotheses, and other proposed research without silently promoting them to confirmed truth. |
+| **Editor** | Organize and improve the shared records inside the granted boundary while preserving provenance and interpretation history. |
+| **Owner** | Manage the relevant people/archive boundary, sharing, roles, permissions, and consequential promotion/publication controls. |
+
+Roles are a starting bundle, not an enterprise permission system. The visible
+grant still names the exact archive/project/share scope, relevant data,
+operation limits, approval, and revoke condition. Viewer never implies edit;
+Contributor never implies merge or publish; Editor never implies ownership;
+Owner applies only to the boundary actually granted.
 
 Collaboration is not blanket vault access. The invite, acceptance, actor,
 scope, allowed operations, changes, and revocation should remain visible and
 auditable. Removing a collaborator ends future access without erasing the
 attributed research or review history they already contributed.
 
+Shared evidence does not force a shared conclusion. A Contributor, Editor, or
+their authorized AI may retain or select a hypothesis with its rationale,
+confidence, sources, reasoning, and authorship while another collaborator keeps
+a different interpretation. Private working material can remain private until
+deliberately shared. The product preserves the linked evidence and parallel
+interpretation history instead of silently resolving conflict.
+
 ### An Unlisted link to a bounded view
 
 An Unlisted link is a long, unguessable, read-only address that gives its holder
-access only to a deliberately selected story, tree branch, collection, or other
-bounded view. It is not secret, never expires on its own, and works until the
-owner revokes it. It is not an invitation into the project, does not identify
+access only to a deliberately selected story, tree branch, collection,
+appropriate source/record surface, or other bounded view. It is not secret,
+never expires on its own, and works until the owner revokes it. It is not an
+invitation into the project, does not identify
 its holder as a collaborator, and does not grant access to neighboring people,
 sources, notes, stories, or the full tree.
 
@@ -721,21 +908,26 @@ Trusted collaboration and Unlisted sharing can coexist, but neither implies
 the other. A collaborator does not automatically receive an Unlisted link, and
 a link holder does not gain collaboration or mutation authority.
 
-### Public storytelling remains separate
+### Public visibility remains separate
 
-Publishing a story publicly is a separate, explicit promotion decision. An
-invite does not publish; creating or opening an Unlisted link does not make its
-contents public or searchable; and a public story does not expose the
-underlying project, tree branch, collection, private sources, or research
-notes.
+Making a story, collection, or appropriate source/record view Public is a
+separate, explicit promotion decision. An invite does not publish; creating or
+opening an Unlisted link does not make its contents public or searchable; and a
+Public object does not expose the underlying project, tree branch, collection,
+private sources, research notes, or connected records outside its reviewed
+boundary.
 
-Living people and private family documents are excluded from Trusted access,
-Unlisted views, and publication by default unless the owner deliberately grants
-the relevant person, scope, operation, and audience access after review.
+Living people and sensitive family documents stay inside the Private workspace
+by default but may be visible to the owner and specifically authorized Trusted
+collaborators or chosen AIs inside their granted scope. Moving that material to
+broader Trusted access, an Unlisted view, an export, or Public visibility
+requires a deliberate living/sensitive review naming the relevant data,
+recipient/audience, and operation.
 Inherited relationships, public historical context, or an already-public story
 must never silently broaden that boundary. One owner-visible screen must
-eventually list every active Unlisted or Trusted grant and make each one
-revocable.
+eventually list every active Unlisted, Trusted, or chosen-AI grant and make each
+one revocable. A chosen AI receiving a separately approved private handoff does
+not make that material collaborator-visible, Unlisted, or Public.
 
 ## Human visibility and control
 
@@ -757,6 +949,9 @@ AI-platform vocabulary:
    a bounded link, or public?
 10. Which outside or cross-Assist connections exist, what can they do, and how
     do I revoke them?
+11. Which external-action handoffs were approved, which AI received them, what
+    selected data went with them, and what result, failure, or return was
+    recorded?
 
 Visual and batch review are controls, not universal gates. Within explicit
 operation authority, the person may choose direct saving, review-before-save,
@@ -779,10 +974,10 @@ focused work, use this map:
 
 | Reader | Start with | Questions answered |
 |---|---|---|
-| Product owners | [Family alignment](#family-core-alignment-record), [One-sentence identity](#one-sentence-identity), [Who this serves](#who-this-serves-and-what-they-need), [Practical picture](#practical-picture-think-of-it-as), [Why not a quick feature?](#why-not-just-ask-your-ai-to-build-a-quick-feature), [Why not a conventional site?](#why-this-instead-of-a-conventional-website), [Product scope](#product-scope-and-non-goals), [Durable family model](#the-durable-assist-family-and-trust-model), and [Shared authority](#user-owned-data-and-shared-authority) | What Family History helps with, who it serves, how it adopts the family contract, why a durable workspace matters, who owns the work, and what the product must not become |
+| Product owners | [Family alignment](#family-core-alignment-record), [One-sentence identity](#one-sentence-identity), [Who this serves](#who-this-serves-and-what-they-need), [Practical picture](#practical-picture-think-of-it-as), [Why not a quick feature?](#why-not-just-ask-your-ai-to-build-a-quick-feature), [Why not a conventional site?](#why-this-instead-of-a-conventional-website), [Product scope](#product-scope-and-non-goals), [Durable family model](#the-durable-assist-family-and-trust-model), [Friendly start](#a-friendly-start-people-relationships-and-a-connected-archive), and [Shared authority](#user-owned-data-and-shared-authority) | What Family History helps with, who it serves, how it adopts the family contract, why a durable workspace matters, how People/relationships and imports enter the connected archive, who owns the work, and what the product must not become |
 | Implementers | [Builder reference](#builder-reference-operating-model-and-capability-truth), [AI and Queue model](#how-your-ai-and-the-family-history-queue-work), [Information model](#durable-information-model), [Provenance](#provenance-uncertainty-and-changing-understanding), and [Maintenance](#maintenance-and-claim-verification) | What must persist, how work begins or resumes, which distinctions must survive, and what needs proof |
 | AI and integration builders | [Builder reference](#builder-reference-operating-model-and-capability-truth), [AI and Queue model](#how-your-ai-and-the-family-history-queue-work), [Shared authority](#user-owned-data-and-shared-authority), [Questions and queues](#questions-queues-and-unfinished-work), and [Detailed trust boundaries](#detailed-trust-boundaries-for-builders) | Where the chosen AI works, which Family History operations may be used, what a durable handoff contains, and where the site's responsibility stops |
-| Writers and designers | [One-sentence identity](#one-sentence-identity), [Practical picture](#practical-picture-think-of-it-as), [Why not a quick feature?](#why-not-just-ask-your-ai-to-build-a-quick-feature), [Why not a conventional site?](#why-this-instead-of-a-conventional-website), [Product scope](#product-scope-and-non-goals), [Storytelling principles](#storytelling-principles), [Capability truth](#capability-truth), [Language rules](#language-rules), and [Homepage implications](#public-homepage-and-future-shell-implications) | How to explain the product simply, differentiate it responsibly, state what may be claimed now, describe evidence and uncertainty, and preserve the intended feel |
+| Writers and designers | [One-sentence identity](#one-sentence-identity), [Practical picture](#practical-picture-think-of-it-as), [Why not a quick feature?](#why-not-just-ask-your-ai-to-build-a-quick-feature), [Why not a conventional site?](#why-this-instead-of-a-conventional-website), [Product scope](#product-scope-and-non-goals), [Storytelling and evidence](#storytelling-and-the-optional-evidence-layer), [Capability truth](#capability-truth), [Language rules](#language-rules), and [Homepage implications](#public-homepage-and-future-shell-implications) | How to explain the product simply, differentiate it responsibly, state what may be claimed now, preserve writer control while offering optional evidence exploration, and preserve the intended feel |
 
 Anyone publishing a capability claim must read both
 [Capability truth](#capability-truth) and
@@ -802,7 +997,8 @@ Use this builder reference to preserve five implementation contracts:
 2. queue work carries scope, evidence, authority, state, blockers, and the
    exact next step across sessions;
 3. observing or retrieving remains distinct from changing, deleting,
-   promoting, sharing, or publishing;
+   promoting, sharing, publishing, exporting, or receiving an external-action
+   handoff;
 4. implementation claims use the complete status vocabulary in the family
    alignment record, with **Coming soon** reserved for committed
    big/public-launch work; and
@@ -833,12 +1029,22 @@ The enduring split is:
   Neither an AI client's general capability nor an unrelated Queue item grants
   broader Family History authority.
 
+People remain free to discuss or direct their AI however they want outside
+Family History, including requests beyond the product's current settings. The
+product does not monitor, control, or police those conversations or the AI's
+general behavior. It enforces only its side of the boundary: whether that AI
+may use Family History tools, retrieve selected Family History data, perform a
+Family History operation, or receive a specifically approved recorded handoff.
+
 Work can begin in either direction.
 
 ### Begin in your preferred AI environment
 
 A person and their AI may begin with a conversation, document, research
 question, or outside investigation in the AI environment they already use.
+That conversation may include any instruction the person chooses; it is not
+limited by Family History settings. Those settings matter only when the AI
+asks Family History for data, a tool operation, or an approved handoff.
 Through an available manual handoff or a separately shipped, authorized
 connection, they can retrieve the relevant Family History context, work with
 it, and return selected sources, notes, claims, questions, or story material to
@@ -860,6 +1066,38 @@ compatible AI path picks it up. The result returns to the same durable context
 with its acting identity, evidence, state, history, and next step intact. This
 direction supports asynchronous work without requiring the person to keep one
 chat open or reconstruct the assignment later.
+
+### An optional library of prompts and research loops
+
+Family History may offer a small, curated menu of proven starting patterns for
+the person's chosen AI. It is help, not an automation engine. The person or AI
+may inspect an entry, edit it, adapt it, combine it with another, or ignore it
+entirely. No entry is a required route, a permission grant, or a policy.
+
+A **prompt** is one editable instruction for a single piece of work. A
+**research loop** is a reusable repeat pattern: gather, compare, record what was
+learned, identify the next gap, and continue under the user's authority. The
+distinction should remain clear so a simple prompt does not masquerade as an
+autonomous workflow.
+
+Useful candidates include:
+
+- make a research plan for an ancestor or family line;
+- compare evidence and frame a same-person hypothesis;
+- identify gaps, conflicts, and the next useful sources;
+- create a source-aware story outline;
+- research place and era context;
+- draft interview questions for living relatives;
+- translate, transcribe, or interpret a supplied source; and
+- create a brief for a family tree, visual, or story project.
+
+Every entry carries transparent freshness and provenance appropriate to its
+form: version, created date, last reviewed or updated date, author/maintainer
+when meaningful, intended purpose, and known assumptions or limits. Older
+patterns may still be useful, but neither the product nor a chosen AI should
+silently treat age as current truth. The library is **In design**; current
+research-planner references and prompt exports do not prove a shipped curated
+library or a compatible chosen-AI connection.
 
 ### The directive is enough; context is optional
 
@@ -899,20 +1137,35 @@ implementation and must not be presented as the family Queue vocabulary.
 
 ### Bounded directive authority
 
-The directive itself authorizes the person's chosen AI to make reversible,
-in-scope Family History record changes plainly necessary to complete the
-request, but only inside an already granted actor, record, and operation scope.
-It does not authorize a new objective, destructive work, identity merge,
+The directive records what the person wants and can provide action-specific
+approval, but it never silently expands the chosen AI's standing authority. A
+Queue handoff is allowed only when the product can identify the AI, exact
+scope, permitted data, operation or external-action category, approval, and
+expiry or revocation condition.
+
+Inside that explicit grant, the directive may authorize reversible, in-scope
+Family History record changes plainly necessary to complete the request. It
+does not silently authorize a new objective, destructive work, identity merge,
 promotion of a disputed claim, publication, purchase, access or identity
-change, outside communication, or action in the world. If the requested result
-would cross one of those boundaries—or the intended scope is genuinely
-unclear—the card moves to **Needs you** with the smallest question that unlocks
-it.
+change, or a different outside action. If required authority is missing or the
+intended scope is genuinely unclear, the card moves to **Needs you** with the
+smallest exact question that unlocks it.
+
+Family History never independently contacts a relative or archive, makes an
+offer, purchases, publishes, or otherwise acts in the outside world. When the
+owner has already granted the necessary external-action category, however, the
+Queue may hand the named chosen AI a specifically approved intent and selected
+context. It records the actor, scope, permitted data, action approval, time,
+expiry/revocation condition, result, and any denial, failure, or return. The
+chosen AI—not Family History—then decides and acts under the person's direction
+outside the product.
 
 Permission and Queue authority remain separate layers. A directive cannot
 grant an AI access to a person or source it was not allowed to read; a general
 write grant cannot invent a directive; and a review preference cannot widen
-either one.
+either one. If an owner has disallowed a Family History operation, the product
+must deny it. That denial does not forbid the person from discussing or asking
+for the same thing in their AI's external environment.
 
 ### A Queue is continuity, not a todo list
 
@@ -924,6 +1177,8 @@ A useful queue item preserves:
 - priority and why the work matters now;
 - any optional evidence, context, questions, assumptions, and prior attempts;
 - the responsible person or AI and the operations actually authorized;
+- any external-action intent, selected data disclosure, approval, expiry or
+  revocation condition, and receipt;
 - the exact next step while Working or blocker question while Needs you; and
 - result links, provenance, decisions, and history.
 
@@ -1002,11 +1257,13 @@ A useful queue item records:
 
 The Queue coordinates work under the bounded directive authority above. It
 does not turn every question into an approval gate or grant access beyond the
-AI's existing scope. Work may pause for the person, their AI, a provider, an
-archive, or better evidence. When only the person can unblock it, the Queue
-state is **Needs you**; when nothing has picked it up, it is **Waiting for your
-AI**. The next session should resume without reconstructing the whole
-conversation.
+AI's existing scope. When the needed grant already exists, it may hand the
+work to that chosen AI and record the approval, actor, scope, time, result, and
+any failure or return. Work may pause for the person, their AI, a provider, an
+archive, or better evidence. When missing authority or information can only be
+supplied by the person, the Queue state is **Needs you** and asks the smallest
+exact question; when nothing has picked it up, it is **Waiting for your AI**.
+The next session should resume without reconstructing the whole conversation.
 
 ## Capability truth
 
@@ -1016,6 +1273,7 @@ current proof, not design intent.
 | Status | Meaning | Claim rule |
 |---|---|---|
 | **Current / verified** | Verified in the checked-out repository, with the exact evidence boundary stated | May be described as a repository foundation; it is not automatically a deployed or production claim |
+| **Partial / verified foundation** | Named pieces are verified, but the complete capability or user path is not | Describe only the proven pieces and state the missing boundary in the same claim; never shorten this to Current |
 | **Coming soon** | Committed work required for the big/public launch but not yet verified | May appear on a soft-launch public surface only beside the unfinished claim or non-working future control; never on `/updates`, `/ai`, or `/ai.txt` as though usable |
 | **In design** | The philosophy or an active design/architecture direction defines it, but the complete user path is not verified | Must be labeled “in design”; no direct action or implied availability |
 | **Later** | Desired, partial, exploratory, or unscheduled capability | May appear only as future direction, never as a promise |
@@ -1038,13 +1296,14 @@ or an older production observation is not sufficient by itself.
 | Research vault | Owner-scoped Convex tables for people, alternate names, relationships, events, places, sources, citations, candidate source facts, media, context, imports, tasks, logs, stories, and historical context | **Current / verified repository foundation.** Richer generalized claims, institutions, collections, and version histories remain **In design** |
 | FamilySearch intake | User-mediated Chrome extension capture, package validation, preview, merge, dedupe, warnings, and raw/provenance contracts | **Current / verified repository foundation.** Automatic import, provider API access, unattended crawling, and universal genealogy integration are not claimed |
 | Provenance and uncertainty | Source/citation separation, citation confidence and conflicts, candidate/accepted/conflict/rejected source facts, import runs, research logs, and context source references | **Current / verified partial foundation.** A complete generalized claim/provenance graph and immutable research history remain **In design** |
-| Relationships | First-class person-to-person relationship rows, roles, facts, provisional relatives, and guarded promotion/merge flow | **Current / verified partial foundation.** Broader social/institutional relationships and full competing-interpretation history remain **In design** |
+| Relationships | First-class person-to-person relationship rows, roles, facts, provisional relatives, and guarded promotion/merge flow | **Current / verified partial foundation.** People/relationship-first onboarding, wider many-to-many source/context links, stored hypotheses, and full separate-interpretation history remain **In design** |
 | Context | Loose context items plus place/era research packs with sources, confidence, review, privacy, and AI-use gates | **Current / verified partial foundation.** Buildings and institutions are pack/context types; a complete first-class context graph remains **In design** |
 | Questions and operations | Research tasks/checks/log, `/app/operations`, compact handoff export, plus distinct `queueItems`, `queueActivity`, idempotent command receipts, `/api/queue`, exact four-state transitions, owner-verified context adapters, bounded queries, leases, retry/failure/cancel/expiry, and deletion contracts | **Current / verified repository and deployed Next.js backend foundation.** PR #31 passed full CI and Vercel preview/production; the signed-out live protection boundary was observed. The operations console remains distinct. Final `/queue` UI, authenticated persistence, exact Convex deploy-log proof, and a complete external chosen-AI pickup/return path are **Coming soon** |
 | AI context and Story Writer | Owner-scoped person context packs; manual prompt copy; optional OpenRouter generation; editable draft save with model/prompt metadata | **Current / verified repository foundation.** Generation is person-centered and first-party; arbitrary chosen-AI connectivity and every story subject remain unverified |
-| Story Studio and publication | Draft/review/published states, reviewer assignment, evidence/context/privacy/living-person gates, explicit human confirmation, public story DTO filtering, and unpublish paths | **Current / verified repository foundation.** Public availability remains **Unknown** pending deployment/user-path proof; broader publishing, collaboration, books, and collections are **Later** |
-| Collaboration and bounded sharing | Owner-scoped private vault operations plus guarded public-story publication; no complete invite or unlisted-link path | **Current / verified Private and guarded Public foundations.** Trusted project collaboration and read-only, non-expiring Unlisted links are **In design** and distinct from publication |
-| Scoped authority | Scope vocabulary, API-key mint/list/suspend/revoke primitives, owner checks, story roles, guarded publish actions, and selected review/audit events | **Current / verified partial foundation.** Incoming API-key resolution to an external AI is explicitly unfinished; self-asserted story headers are not a public authorization model |
+| Prompt and research-loop library | Product docs mention research planners and prompt exports; no verified curated library, freshness metadata, or chosen-AI library path | **In design.** Optional, editable prompt/loop patterns are approved direction, not a shipped feature or automation engine |
+| Story Studio and publication | Draft/review/published states, reviewer assignment, evidence/context/privacy/living-person gates, explicit human confirmation, public story DTO filtering, and unpublish paths | **Current / verified repository foundation.** Optional passage-to-evidence reader links and selected-object visibility beyond the guarded story path remain **In design**; public availability is **Unknown** pending deployed user-path proof |
+| Collaboration and bounded sharing | Owner-scoped private vault operations plus guarded public-story publication; no complete invite, role, interpretation, or unlisted-link path | **Current / verified Private and guarded Public foundations.** Selected-object Private / Unlisted / Trusted / Public visibility, Viewer / Contributor / Editor / Owner roles, shared evidence with separate interpretations, and living/sensitive review are **In design** |
+| Scoped authority | Scope vocabulary, API-key mint/list/suspend/revoke primitives, owner checks, story roles, guarded publish actions, selected review/audit events, and bounded Queue command scopes | **Current / verified partial foundation.** Queue commands do not grant domain authority, but no complete grant yet binds an external chosen AI, scope, permitted data, operation/external-action category, approval, expiry/revocation, and attributable result. Incoming API-key resolution remains unfinished; self-asserted story headers are not a public authorization model |
 | API and AI connections | Internal app APIs, API-key management, Queue scope presets and seven narrow MCP-friendly Queue tool contracts, `agentActivity`, capability manifest, story OpenAPI skeleton, `/api/capabilities`, API Center source, and `/llms.txt` | **Current / verified internal/planning foundation only.** Queue tools are not externally exposed. No verified incoming external-AI authentication, public agent API, `/mcp`, `/ai`, `/ai.txt`, or `/settings/ai` path |
 | Search and retrieval | Person/place/stories views, owner-scoped API reads, context packs, filters, and queue exports | **Current / verified narrow retrieval surfaces.** Universal search across the full information model is **In design** |
 | Visualization | People/place workspaces and data suitable for relational views; Timeline route is explicitly a placeholder | **Current / verified partial foundation; In design full experience.** Do not claim timeline, pedigree, map, heatmap, or general graph experiences as shipped |
@@ -1063,6 +1322,8 @@ Do not claim these as current merely because the information model anticipates
 them or a planning artifact names them:
 
 - MCP connectivity or “works with any AI” setup;
+- people/relationship-first onboarding or automatic construction of a connected
+  family picture from an external service;
 - automatic record import or direct FamilySearch/provider API access;
 - Ancestry, Findmypast, Find a Grave, newspaper, archive, or universal provider
   integration;
@@ -1072,15 +1333,21 @@ them or a planning artifact names them:
   authority matrix;
 - a deployed chosen-AI credential-to-Queue round trip, externally callable MCP
   tools, provider/client compatibility, or quotas;
+- granular, recorded external-action handoffs with selected private context,
+  action-category approval, expiry/revocation, result, and failure/return;
 - first-class generalized claims, institutions, buildings, communities,
   topics, collections, and story versioning;
+- a curated prompt/research-loop library, freshness review process, or
+  site-operated autonomous research engine;
 - automatic story generation for every subject type;
 - timelines, maps, pedigree explorers, relationship graphs, heatmaps, or
   migration visualizations as completed experiences;
-- named project collaboration, collaborator invitations, or family review;
+- named project collaboration, Viewer/Contributor/Editor/Owner roles, separate
+  collaborator interpretations, or family review;
 - scoped Unlisted links for a story, tree branch, collection, or
   bounded view;
-- books, exhibits, audio/podcast production, or general publishing;
+- optional passage-level story/source exploration, books, exhibits,
+  audio/podcast production, or general publishing;
 - owner-vault export and coordinated account deletion; or
 - cross-product Assist data retrieval, navigation, or publication.
 
@@ -1092,10 +1359,15 @@ Assist With Family History does not:
   cookies, or sessions;
 - independently contact relatives, researchers, archives, churches,
   repositories, or record providers;
+- independently make offers, purchase, publish, share, export, or take another
+  outside-world action without the applicable explicit owner-approved product
+  operation;
 - browse, crawl, or retrieve records in the background unless a separately
   shipped Family History integration explicitly says it does;
 - decide what external sites, tools, accounts, communications, or actions a
   person may authorize their chosen AI to use;
+- control or police what the person discusses with their AI outside Family
+  History, even when that request exceeds the product's grants;
 - present an inference, family story, generated summary, or historical
   generalization as a record-supported fact;
 - silently overwrite accepted facts, merge identities, or flatten
@@ -1117,10 +1389,20 @@ Assist With Family History does not:
   product.
 
 These boundaries apply to Family History, not to the person's independently
-authorized relationship with their AI. Your AI may browse, research, or
-communicate elsewhere when you authorize it. Family History does not operate
-or inherit that outside access. It receives only the material intentionally
+authorized relationship with their AI. Your AI may browse, research,
+communicate, contact someone, make an offer, purchase, or take another outside
+action when you direct it under that relationship. Family History does not
+operate or inherit that outside access. It receives only material intentionally
 submitted through its own scoped path.
+
+Family History must enforce its own side precisely. A disallowed tool call,
+private-data retrieval, record mutation, product share/publish/export, or
+external-action handoff is denied even if the person and AI have discussed it
+elsewhere. That denial limits the product operation, not the conversation. A
+permitted external-action handoff names the chosen AI, selected context, scope,
+action category, approval, time, and expiry or revocation condition, then
+records the result and any denial, failure, or return. The platform supplies
+the bounded handoff; it does not become the outside-world actor.
 
 The current first-party Story Writer may use an OpenRouter key kept in the
 user's local browser settings for an explicit generation request. That narrow
@@ -1134,8 +1416,10 @@ it does not yet resolve an incoming key into an externally usable Family
 History tool session. A future verified connection is different from
 collecting credentials used to access an outside provider. Family History
 authorization must derive and enforce acting identity, family and record scope,
-and allowed operation; preserve provenance and audit; support revocation; and
-keep retrieval separate from mutation.
+permitted data, allowed product operation or external-action handoff category,
+approval, and expiry/revocation; preserve provenance and activity; and keep
+retrieval, mutation, product sharing/publishing/export, and outside-action
+handoffs distinct.
 
 ## Language rules
 
@@ -1153,6 +1437,15 @@ Public and product language should:
   slow a general reader;
 - distinguish original material, transcription, extraction, conclusion,
   synthesis, and narrative;
+- say that People and relationships are the friendly first step while imports
+  and outside research are accelerators into the connected archive—not the
+  required shape of every record;
+- describe hypotheses and separate interpretations as durable, attributable
+  research states rather than errors to hide or one official answer to force;
+- describe prompts and loops as optional, editable, combinable, ignorable
+  patterns with freshness/provenance metadata—not site-owned automation;
+- preserve the writer's control: story evidence links are an optional reader
+  layer, not a mandatory citation format or product-policed writing style;
 - distinguish observing or retrieving from adding, updating, deleting,
   promoting, merging, and publishing;
 - name the actual tree, person, source, story, collection, or research-project
@@ -1168,6 +1461,12 @@ Public and product language should:
   states separate;
 - distinguish external user-authorized AI activity from a Family
   History-operated integration;
+- say plainly that people may discuss or direct their AI however they want
+  outside the product, while Family History grants govern only access to its
+  tools, data, operations, and recorded handoffs;
+- describe an **external-action handoff** as selected context plus one approved
+  intent given to the named chosen AI—not as Family History contacting,
+  offering, purchasing, publishing, or acting on the person's behalf;
 - use **AI environment** for the external place where the person and their
   chosen AI converse and work; naming a client must not imply a shipped
   integration or preferred vendor;
@@ -1175,8 +1474,9 @@ Public and product language should:
   **Needs you**, **Working**, **Waiting for your AI**, and **Done**—not as a
   generic todo list, autonomous runner, internal project tracker, or unlimited
   authority grant; and
-- label **Current / verified**, **Coming soon**, **In design**, **Later**,
-  **Intentional product-specific difference**, or **Unknown** directly.
+- label **Current / verified**, **Partial / verified foundation**, **Coming
+  soon**, **In design**, **Later**, **Intentional product-specific difference**,
+  or **Unknown** directly.
 
 Avoid **“agent”** in user-facing copy when **“your AI”** communicates the idea.
 Technical documentation may retain agent, API key, scope, MCP, or tool where
@@ -1225,6 +1525,10 @@ change the application.
 
 - Lead with research-to-story: collect and connect evidence so people and
   their AI can understand lives and tell grounded stories.
+- Make the friendly first step concrete: begin with someone and a known family
+  connection, then add relatives and let authorized imports or chosen-AI
+  research accelerate the connected picture. Do not claim a final onboarding
+  UI or direct provider connection until verified.
 - Make the Assist family model clear: your AI reasons and researches; Family
   History remembers and organizes; you remain the authority.
 - Use the family turn of phrase at least once: **“Assist your AI, so it can
@@ -1237,9 +1541,14 @@ change the application.
   culture, religion, event, or era—not only a pedigree node.
 - Demonstrate the path from source to claim to context to story, including an
   honest contradiction or uncertain detail.
+- Demonstrate many-to-many connection: one photograph, census, journal,
+  document, place, building, or event may relate to several people and stories.
 - Explain provenance in human language: “see where each detail came from.”
 - Show user-owned scoped authority without depicting read access as blanket
   permission to change or publish.
+- Explain the control boundary plainly: Family History does not police a
+  person's external AI conversation; it grants or denies only its own data,
+  tools, product operations, and recorded handoffs.
 - Show both work directions: continue in a preferred AI environment and
   preserve selected context in Family History, or create scoped queued work in
   Family History for a later authorized pickup.
@@ -1294,6 +1603,9 @@ beta copy, a merge, or a deployment configuration.
 
 ### Future signed-in shell
 
+- Offer People and relationships as the friendly first step without forcing
+  every user through one container. In an empty workspace, let authorized
+  imports or returned chosen-AI research extend that first graph after review.
 - Center the current research subject and its connected evidence, context,
   questions, and stories.
 - Make **known**, **proposed**, **disputed**, **needs review**, **waiting**, and
@@ -1301,7 +1613,8 @@ beta copy, a merge, or a deployment configuration.
 - Let people move naturally between person, relationship, place, event, source,
   claim, question, and story views.
 - Keep the selected scope, acting person or AI, independently allowed
-  operations, and revocation controls understandable.
+  operations or external-action handoff categories, approval, expiry, and
+  revocation controls understandable.
 - Put source, date, confidence, author, review state, and uncertainty beside
   the details they qualify.
 - Make the story-to-evidence path bidirectional: inspect the evidence behind a
@@ -1312,16 +1625,27 @@ beta copy, a merge, or a deployment configuration.
   optional context/evidence, responsible person or AI, next step or exact
   blocker question, result, and history so a person can understand progress
   without opening the originating AI conversation.
+- When a Queue item includes an external-action intent, show the selected data,
+  named chosen AI, approved category, time, expiry/revocation condition, and
+  result or failure without implying that Family History performed the action.
 - Show historical context as setting, never as silent proof of personal
   experience.
 - Keep sharing and publication explicit, previewable, reviewable, reversible
   where supported, and separate from ordinary saving.
 - Give Trusted collaboration an invite, identity, scope, operation, history,
-  and revoke surface. Give Unlisted links a reviewed content boundary, clear
+  role (Viewer / Contributor / Editor / Owner), and revoke surface. Give
+  Unlisted links a reviewed content boundary, clear
   “anyone with the link” audience, no indexing, no automatic expiry, and an
   immediate revoke surface.
 - Keep public publication as a separate promotion step; never let an invite or
   link silently become a public story.
+- Let collaborators share evidence while retaining separate, attributed
+  hypotheses and conclusions; never force one official interpretation.
+- Let a story stand on its own while offering optional passage-level paths to
+  people, memories, documents, events, places/buildings, images, and historical
+  context.
+- Offer the curated prompt/loop library as an optional menu with visible
+  version, review date, purpose, maintainer/provenance, and assumptions/limits.
 - Provide `/me` for a person's own useful counts, storage, Queue activity, AI
   footprint, and links to data controls. Provide owner-only `/admin` for
   aggregate users, usage, health, and public-content operations without
@@ -1349,9 +1673,9 @@ can drift.
 Before changing a public page, onboarding flow, signed-in shell, product
 description, AI guide, provider guide, or integration claim:
 
-1. classify every material capability as **Current / verified**, **Coming
-   soon**, **In design**, **Later**, **Intentional product-specific
-   difference**, or **Unknown**;
+1. classify every material capability as **Current / verified**, **Partial /
+   verified foundation**, **Coming soon**, **In design**, **Later**,
+   **Intentional product-specific difference**, or **Unknown**;
 2. verify public **Current / verified** claims against the exact deployed environment and
    relevant user path—not only source code, a merged commit, a provider
    setting, a Linear issue, or an older observation;
@@ -1363,30 +1687,46 @@ description, AI guide, provider guide, or integration claim:
    public DTOs, revocation, and provider behavior;
 5. verify any import claim against the exact provider, consent flow, capture
    method, validation, merge gate, dedupe, provenance, and living/private-data
-   boundary;
+   boundary; distinguish a user- or chosen-AI-authorized outside retrieval from
+   a verified direct Family History integration;
 6. verify any chosen-AI connection against the real authentication path,
-   incoming credential resolution, exact tools, scope enforcement, revocation,
-   audit, and a synthetic retrieve → work → save → inspect result;
+   incoming credential resolution, exact tools, actor, permitted-data and
+   operation scopes, approval, expiry/revocation, activity, and a synthetic
+   retrieve → work → save → inspect result;
 7. verify any AI-client or queue claim against the real work-creation and
    pickup path, identity and scope enforcement, priority and evidence
    preservation, claim or lease behavior where used, checkpoints, blockers,
-   stale-work recovery, result return, audit, and exact next-step continuity;
+   stale-work recovery, result return, activity, exact next-step continuity,
+   and—where an external-action handoff is claimed—the named AI, selected data,
+   approved action category, expiry/revocation, result, denial, failure, and
+   return path;
 8. verify any publishing claim against draft/review state, source and context
    visibility, living/private checks, human confirmation, public filtering,
-   unpublish behavior, and exact public route;
+   unpublish behavior, exact public route, and the selected-object boundary;
 9. verify any Trusted-collaboration claim against the invite and acceptance
-   lifecycle, named identity, exact record scope, per-operation authority,
-   living/private boundaries, attribution, audit history, and revocation;
+   lifecycle, named identity, Viewer/Contributor/Editor/Owner role, exact record
+   scope, per-operation authority, living/private boundaries, separate
+   interpretation history, attribution, audit history, and revocation;
    separately verify any Unlisted-link claim against its reviewed content
    boundary, anyone-with-the-link disclosure, read-only behavior, no-expiry
    rule, non-indexing, recipient-safe filtering, and revocation;
 10. confirm that collaboration, bounded links, and public publication remain
    independently controlled and that none silently broadens another;
-11. verify the family contract version and rerun the adoption/contradiction
+11. verify any prompt/loop-library claim against the actual entries, optional
+    and editable behavior, version, created/reviewed dates, author/maintainer,
+    purpose, assumptions/limits, and chosen-AI access path; never infer an
+    autonomous engine from a prompt export;
+12. verify any living/deceased claim from explicit owner assertion or evidence,
+    never age alone, and test the reviewed boundary separately for Private,
+    AI, Trusted, Unlisted, export, and Public use;
+13. verify any hypothesis or claim workflow preserves sources, confidence,
+    rationale, actor/AI, timestamp, separate collaborator interpretations, and
+    later correction history without silent canonical promotion;
+14. verify the family contract version and rerun the adoption/contradiction
     matrix, including the repo-owned tracker entry point;
-12. update the evidence date, repository revision, and evidence references when
+15. update the evidence date, repository revision, and evidence references when
     a status changes; and
-13. update the Markdown and HTML companion together and refresh the
+16. update the Markdown and HTML companion together and refresh the
     HTML source digest.
 
 Changes to the one-sentence identity, Assist family model, research-to-story
@@ -1507,6 +1847,23 @@ before it was run.
 
 ## Changelog
 
+- **1.5.0 · 2026-08-11** — synthesized Scott's approved Family History product
+  direction: People and relationships are the friendly first step into a
+  connected private archive; imports and user-authorized chosen-AI research are
+  accelerators with original-source provenance, not claims of live provider
+  integration; sources/context are many-to-many; uncertain hypotheses are
+  stored with confidence, rationale, provenance, and correction history;
+  collaborators may share evidence while retaining separate interpretations;
+  living people are visible inside specifically authorized workspace scope but
+  reviewed deliberately for broader AI/share/export/public use and never
+  inferred deceased from age alone; selected objects use Private / Unlisted /
+  Trusted / Public visibility; Trusted roles are Viewer / Contributor / Editor
+  / Owner; story references are a rich optional reader layer rather than a
+  product-policed writing format; and a curated prompt/loop library is optional,
+  editable, combinable, ignorable, and freshness/provenance labeled. It also
+  clarifies that Family History controls its own tool/data/operation boundary,
+  not the person's external conversations with their chosen AI. All new
+  directions remain evidence-bounded and unclaimed where not implemented.
 - **1.4.1 · 2026-08-09** — recorded PR #31, full Actions run
   `31328562901`, main merge `e65b03a`, successful Vercel preview and
   production statuses, retained live-alias proof, and signed-out Queue
@@ -1521,6 +1878,17 @@ before it was run.
   narrow seven-tool internal chosen-AI boundary. Kept the final designed Queue UI,
   deployed/authenticated proof, incoming credential resolution, and live MCP
   connection explicitly unverified.
+- **1.3.3 · 2026-08-09** — clarified the family authority boundary throughout:
+  people may discuss or direct their chosen AI however they want outside the
+  product; Family History controls only access to its tools, data, product
+  operations, and specifically approved recorded handoffs. Replaced the
+  categorical outside-action prohibition with granular, revocable authority
+  by actor/AI, scope, permitted data, operation or action category, approval,
+  expiry/revocation, and attributable result. The platform still never acts
+  independently in the outside world; when authority already exists, the Queue
+  may hand selected context and an external-action intent to the chosen AI and
+  record success, denial, failure, or return. No capability status was promoted
+  and no provider compatibility was claimed.
 - **1.3.2 · 2026-08-08** — reattested against published Assist With Sites Core
   Philosophy v1.6.3 at commit
   `db658ab091bcfbb71f62db55d5b8b6d51b64e52f` and its source digest; aligned
