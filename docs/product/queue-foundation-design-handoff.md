@@ -1,6 +1,6 @@
 # Family History Queue foundation and Claude Design handoff
 
-Status: backend/source authority and expiry repair under normal software review. This document is a behavior and integration contract, not a claim that the repair, a final Queue screen, external AI connection, deployment, or authenticated production journey is live.
+Status: backend Queue-local authority and expiry repair merged through protected PR #32 and is present in the matching Ready Vercel production build. This document is a behavior and integration contract, not a claim that the production Convex deploy branch, a final Queue screen, external AI connection, or authenticated production journey is proven.
 
 ## Product boundary
 
@@ -149,4 +149,8 @@ Claude Design may decide final page composition, card layout, responsive informa
 
 Source verification covers pure state/authority contracts and real Convex-runtime fixtures for Queue-local fail-closed anonymous/cross-owner denial even in legacy shadow mode, owner isolation, foreign-reference rejection, directive-only creation, pagination, handoff-capped claim leases, automatic and read-time expiry, expired-authority rejection, idempotent recovery/reassignment, actor authority, optimistic concurrency, Needs You/resume, retry/exhaustion, completion/activity attribution, human-only operation, and hard deletion.
 
-Deployment, Convex schema publication, authenticated production behavior, a real chosen-AI connection, and the final designed Queue screen remain separate proof gates and must be reported separately.
+Exact-main CI and the matching Vercel production application deployment are
+proven for main commit `1a82a03ed207c8cd3c9e99f0dd4b6d4720c282cd`.
+Provider build-plan/Convex publication, authenticated production behavior,
+revocation and cleanup, a real chosen-AI connection, and the final designed
+Queue screen remain separate proof gates and must be reported separately.

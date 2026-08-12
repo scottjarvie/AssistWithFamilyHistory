@@ -1,7 +1,7 @@
 ---
 id: AWF-WO-004
 title: Repair Queue tenant authority and expiry recovery
-execution: active
+execution: complete
 audit: not-audited
 cards: AWF-0032
 created: 2026-08-12
@@ -22,11 +22,14 @@ final experience, or external AI connection truth.
 ## Current truth
 
 Scott approved this exact tranche after the independent Queue audit. The repair
-is locally implemented on a branch from current remote `main` `1a5e731`; the
-older philosophy branch and a separate dirty `main` worktree were left
-untouched. Focused Convex, pure contract, repository unit, TypeScript, and diff
-checks pass. No merge, deployment, provider change, production data, or
-authenticated production proof has occurred.
+merged through protected PR #32 as main commit
+`1a82a03ed207c8cd3c9e99f0dd4b6d4720c282cd`; the older philosophy branch and a
+separate dirty `main` worktree remained untouched. Focused Convex, pure
+contract, repository unit, full verification, exact-main CI, and the matching
+Vercel production deployment passed. No provider/auth policy changed and no
+production genealogy data was inspected or mutated. Authenticated synthetic,
+provider build-plan, cleanup/revocation, and independent audit proof remain
+separate.
 
 ## Sequence
 
@@ -85,10 +88,14 @@ irreversible migration remains a separate stop and owner decision.
 
 ## Execution evidence
 
-Local implementation currently passes 16/16 adversarial Queue Convex tests,
-100/100 repository unit tests, TypeScript, and diff checks. Protected PR, CI,
-deployment, authenticated/provider proof, cleanup, and independent audit are
-not yet complete and are not claimed.
+Local implementation passed 16/16 adversarial Queue Convex tests, 100/100
+repository unit tests, TypeScript, diff checks, and all 47 `pnpm verify` checks.
+Protected PR #32 merged normally as
+`1a82a03ed207c8cd3c9e99f0dd4b6d4720c282cd`. Exact-main Actions run
+`31615964828` passed `build-and-smoke`. Vercel production deployment
+`HDzMFmbrsany1z95y6y63r3vSHgb` reported Ready and Current for the same commit;
+the public homepage returned HTTP 200. Authenticated/provider build-plan,
+revocation/cleanup, and independent audit proof remain unclaimed.
 
 ## History
 
@@ -98,3 +105,6 @@ not yet complete and are not claimed.
   protected software path with the listed exclusions and stop rules.
 - 2026-08-12 · Codex — implemented the local repair and adversarial fixtures;
   execution remains Active through protected PR/CI review.
+- 2026-08-12 · Codex — completed execution through protected PR #32, exact-main
+  CI, and matching Vercel production deployment. Audit remains `not-audited`;
+  AWF-0030 retains provider/authenticated proof without expanding this tranche.
