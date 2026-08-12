@@ -5,7 +5,9 @@ import {
   QUEUE_STATE_LABELS,
   assertCommandAllowed,
   handoffLine,
+  leaseExpiresAtForActor,
   nextStateForFailure,
+  queueExpiryTransition,
   summarizeDirective,
 } from "../lib/queue/contract";
 import { QUEUE_AGENT_TOOLS, assertNoBroadQueueAgentTools, authorizeQueueAgentTool } from "../lib/queue/agentTools";
@@ -36,6 +38,46 @@ test("completion requires the active unexpired actor", () => {
   assert.doesNotThrow(() => assertCommandAllowed("complete", snapshot, { kind: "chosen_ai", id: "ai:a" }, 1_000));
   assert.throws(() => assertCommandAllowed("complete", snapshot, { kind: "chosen_ai", id: "ai:b" }, 1_000));
   assert.throws(() => assertCommandAllowed("complete", snapshot, { kind: "chosen_ai", id: "ai:a" }, 2_001));
+});
+
+test("chosen-AI authority expires even when a longer lease was requested", () => {
+  const snapshot = {
+    state: "waiting_for_your_ai" as const,
+    condition: "ready" as const,
+    version: 1,
+    handoffExpiresAt: 90_000,
+    retryCount: 0,
+    maxRetries: 3,
+  };
+  assert.equal(
+    leaseExpiresAtForActor(snapshot, { kind: "chosen_ai", id: "ai:a" }, 10_000, 120_000),
+    90_000,
+  );
+  assert.equal(
+    leaseExpiresAtForActor(snapshot, { kind: "user", id: "user:a" }, 10_000, 120_000),
+    130_000,
+  );
+});
+
+test("expiry stays inside Needs You and is inert before the real deadline", () => {
+  const snapshot = {
+    state: "working" as const,
+    condition: "active" as const,
+    version: 2,
+    activeActorKind: "chosen_ai" as const,
+    activeActorId: "ai:a",
+    leaseExpiresAt: 80_000,
+    handoffExpiresAt: 90_000,
+    retryCount: 0,
+    maxRetries: 3,
+  };
+  assert.equal(queueExpiryTransition(snapshot, 79_999), null);
+  assert.deepEqual(queueExpiryTransition(snapshot, 80_000), {
+    expiresAt: 80_000,
+    state: "needs_you",
+    condition: "expired",
+    requiredAction: "Reconnect or choose an AI for this directive, then return it to Waiting for your AI.",
+  });
 });
 
 test("failure stays inside the four-state model", () => {

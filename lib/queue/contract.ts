@@ -71,6 +71,13 @@ export type QueueSnapshot = {
   maxRetries: number;
 };
 
+export type QueueExpiryTransition = {
+  expiresAt: number;
+  state: "needs_you";
+  condition: "expired";
+  requiredAction: string;
+};
+
 export type QueueCommand =
   | "assign"
   | "claim"
@@ -145,9 +152,58 @@ export function assertActiveActor(
   if (snapshot.activeActorKind !== actor.kind || snapshot.activeActorId !== actor.id) {
     throw new Error("Queue item is claimed by another actor");
   }
+  if (
+    actor.kind !== "user" &&
+    snapshot.handoffExpiresAt !== undefined &&
+    snapshot.handoffExpiresAt <= now
+  ) {
+    throw new QueueConflictError("Queue handoff expired; the user must reconnect or reassign it");
+  }
   if (!snapshot.leaseExpiresAt || snapshot.leaseExpiresAt <= now) {
     throw new QueueConflictError("Queue claim expired; reclaim the item before continuing");
   }
+}
+
+export function leaseExpiresAtForActor(
+  snapshot: QueueSnapshot,
+  actor: { kind: QueueActorKind; id: string },
+  now: number,
+  leaseMs: number,
+): number {
+  const requestedExpiry = now + leaseMs;
+  if (actor.kind === "user" || snapshot.handoffExpiresAt === undefined) {
+    return requestedExpiry;
+  }
+  return Math.min(requestedExpiry, snapshot.handoffExpiresAt);
+}
+
+export function queueExpiryDeadline(snapshot: QueueSnapshot): number | undefined {
+  if (snapshot.state === "done" || snapshot.state === "needs_you") return undefined;
+  const deadlines: number[] = [];
+  if (snapshot.state === "working" && snapshot.leaseExpiresAt !== undefined) {
+    deadlines.push(snapshot.leaseExpiresAt);
+  }
+  if (
+    snapshot.handoffExpiresAt !== undefined &&
+    (snapshot.state === "waiting_for_your_ai" || snapshot.activeActorKind !== "user")
+  ) {
+    deadlines.push(snapshot.handoffExpiresAt);
+  }
+  return deadlines.length > 0 ? Math.min(...deadlines) : undefined;
+}
+
+export function queueExpiryTransition(
+  snapshot: QueueSnapshot,
+  now: number,
+): QueueExpiryTransition | null {
+  const expiresAt = queueExpiryDeadline(snapshot);
+  if (expiresAt === undefined || expiresAt > now) return null;
+  return {
+    expiresAt,
+    state: "needs_you",
+    condition: "expired",
+    requiredAction: "Reconnect or choose an AI for this directive, then return it to Waiting for your AI.",
+  };
 }
 
 export function assertCommandAllowed(
@@ -162,7 +218,11 @@ export function assertCommandAllowed(
       if (snapshot.state === "done") throw new Error("Reopen Done work before assigning it");
       return;
     case "claim":
-      if (snapshot.handoffExpiresAt !== undefined && snapshot.handoffExpiresAt <= now) {
+      if (
+        actor.kind !== "user" &&
+        snapshot.handoffExpiresAt !== undefined &&
+        snapshot.handoffExpiresAt <= now
+      ) {
         throw new QueueConflictError("Queue handoff expired; the user must reconnect or reassign it");
       }
       if (

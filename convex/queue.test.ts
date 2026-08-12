@@ -25,13 +25,20 @@ function principal(ownerId = OWNER_A, actorId = AI_A, scopes = ["queue:read", "q
 
 async function createItem(
   t: ReturnType<typeof convexTest>,
-  input: { owner?: string; chosenAiId?: string; maxRetries?: number; idempotencyKey?: string } = {},
+  input: {
+    owner?: string;
+    chosenAiId?: string;
+    handoffExpiresAt?: number;
+    maxRetries?: number;
+    idempotencyKey?: string;
+  } = {},
 ) {
   const owner = input.owner ?? OWNER_A;
   return t.withIdentity({ subject: owner }).mutation(api.queue.createQueueItem, {
     vaultOwnerId: owner,
     directive: "Compare the two census records and explain which household is the stronger match.",
     chosenAiId: input.chosenAiId,
+    handoffExpiresAt: input.handoffExpiresAt,
     maxRetries: input.maxRetries,
     idempotencyKey: input.idempotencyKey ?? `create:${owner}:${input.chosenAiId ?? "none"}`,
   });
@@ -79,6 +86,47 @@ describe("product Queue foundation", () => {
         idempotencyKey: "cross-owner-cancel",
       }),
     ).rejects.toThrow(/owner_mismatch/);
+  });
+
+  test("Queue tenancy stays fail-closed while the legacy trust boundary is in shadow mode", async () => {
+    vi.stubEnv("TRUST_BOUNDARY_MODE", "shadow");
+    const t = convexTest(schema, modules);
+
+    await expect(
+      t.mutation(api.queue.createQueueItem, {
+        vaultOwnerId: OWNER_A,
+        directive: "An anonymous caller must not create Queue work.",
+        idempotencyKey: "anonymous-create",
+      }),
+    ).rejects.toThrow(/missing_identity/);
+
+    const created = await createItem(t, { chosenAiId: AI_A, idempotencyKey: "shadow-owner-create" });
+    await expect(
+      t.withIdentity({ subject: OWNER_B }).action(api.queue.listQueueItems, {
+        vaultOwnerId: OWNER_A,
+        paginationOpts: { numItems: 20, cursor: null },
+      }),
+    ).rejects.toThrow(/owner_mismatch/);
+    await expect(
+      t.withIdentity({ subject: OWNER_B }).mutation(api.queue.cancelQueueItem, {
+        vaultOwnerId: OWNER_A,
+        queueItemId: created.item._id,
+        expectedVersion: created.item.version,
+        reason: "A foreign tenant must not mutate this item.",
+        idempotencyKey: "shadow-cross-owner-cancel",
+      }),
+    ).rejects.toThrow(/owner_mismatch/);
+    await expect(
+      t.action(api.queue.getQueueItem, {
+        vaultOwnerId: OWNER_A,
+        queueItemId: created.item._id,
+        activityPagination: { numItems: 20, cursor: null },
+      }),
+    ).rejects.toThrow(/missing_identity/);
+
+    const unchanged = await t.run((ctx) => ctx.db.get(created.item._id));
+    expect(unchanged?.version).toBe(1);
+    expect(unchanged?.state).toBe("waiting_for_your_ai");
   });
 
   test("context adapters reject foreign genealogy records", async () => {
@@ -274,10 +322,10 @@ describe("product Queue foundation", () => {
       reason: "New evidence made the comparison useful again.", idempotencyKey: "reopen-1",
     });
     expect(reopened.item.state).toBe("waiting_for_your_ai");
-    expect(reopened.item.condition).toBe("ready");
+    expect(reopened.item.condition).toBe("disconnected");
   });
 
-  test("expired handoff becomes Needs You with an exact reconnect action", async () => {
+  test("an expired handoff is reconciled on read and can be resumed without a stale deadline", async () => {
     vi.stubEnv("TRUST_BOUNDARY_MODE", "enforce");
     vi.useFakeTimers();
     const baseTime = Date.now();
@@ -291,15 +339,109 @@ describe("product Queue foundation", () => {
       idempotencyKey: "create-expiry",
     });
     vi.setSystemTime(baseTime + 60_001);
-    const expired = await t.mutation(internal.queue.expireQueueHandoff, {
+    const detail = await t.withIdentity({ subject: OWNER_A }).action(api.queue.getQueueItem, {
       vaultOwnerId: OWNER_A,
       queueItemId: created.item._id,
-      expectedVersion: 1,
-      idempotencyKey: "expire-1",
+      activityPagination: { numItems: 20, cursor: null },
     });
-    expect(expired.item.state).toBe("needs_you");
-    expect(expired.item.condition).toBe("expired");
-    expect(expired.item.requiredAction).toMatch(/Reconnect or choose an AI/);
+    expect(detail?.item.state).toBe("needs_you");
+    expect(detail?.item.condition).toBe("expired");
+    expect(detail?.item.requiredAction).toMatch(/Reconnect or choose an AI/);
+    expect(detail?.activity.page[0].eventType).toBe("expired");
+
+    const resumed = await t.withIdentity({ subject: OWNER_A }).mutation(api.queue.resumeQueueItem, {
+      vaultOwnerId: OWNER_A,
+      queueItemId: created.item._id,
+      expectedVersion: detail!.item.version,
+      answerSummary: "The chosen AI connection is available again.",
+      idempotencyKey: "resume-expired",
+    });
+    expect(resumed.item.state).toBe("waiting_for_your_ai");
+    expect(resumed.item.condition).toBe("ready");
+    expect(resumed.item.handoffExpiresAt).toBeUndefined();
+  });
+
+  test("scheduled expiry is automatic, idempotent, and recoverable by reassignment", async () => {
+    vi.stubEnv("TRUST_BOUNDARY_MODE", "shadow");
+    vi.useFakeTimers();
+    const baseTime = Date.now();
+    vi.setSystemTime(baseTime);
+    const t = convexTest(schema, modules);
+    const created = await createItem(t, {
+      chosenAiId: AI_A,
+      handoffExpiresAt: baseTime + 60_000,
+      idempotencyKey: "scheduled-expiry-create",
+    });
+
+    vi.advanceTimersByTime(60_001);
+    await t.finishInProgressScheduledFunctions();
+    const expired = await t.run((ctx) => ctx.db.get(created.item._id));
+    expect(expired?.state).toBe("needs_you");
+    expect(expired?.condition).toBe("expired");
+    expect(expired?.version).toBe(2);
+
+    const assigned = await t.withIdentity({ subject: OWNER_A }).mutation(api.queue.assignQueueItemToAi, {
+      vaultOwnerId: OWNER_A,
+      queueItemId: created.item._id,
+      chosenAiId: AI_A,
+      expectedVersion: expired!.version,
+      idempotencyKey: "recover-expired-assignment",
+    });
+    expect(assigned.item.state).toBe("waiting_for_your_ai");
+    expect(assigned.item.condition).toBe("ready");
+    expect(assigned.item.handoffExpiresAt).toBeUndefined();
+
+    const claimed = await t.mutation(internal.queue.agentClaimQueueItem, {
+      principal: principal(),
+      queueItemId: created.item._id,
+      expectedVersion: assigned.item.version,
+      leaseMs: 120_000,
+      nextStep: "Continue after the explicit reassignment.",
+      idempotencyKey: "claim-after-expiry-recovery",
+    });
+    expect(claimed.item.state).toBe("working");
+  });
+
+  test("AI leases cannot outlive handoff authority and continuation fails after expiry", async () => {
+    vi.stubEnv("TRUST_BOUNDARY_MODE", "shadow");
+    vi.useFakeTimers();
+    const baseTime = Date.now();
+    vi.setSystemTime(baseTime);
+    const t = convexTest(schema, modules);
+    const handoffExpiresAt = baseTime + 90_000;
+    const created = await createItem(t, {
+      chosenAiId: AI_A,
+      handoffExpiresAt,
+      idempotencyKey: "bounded-handoff-create",
+    });
+    const claimed = await t.mutation(internal.queue.agentClaimQueueItem, {
+      principal: principal(),
+      queueItemId: created.item._id,
+      expectedVersion: created.item.version,
+      leaseMs: 120_000,
+      nextStep: "Work only inside the approved handoff window.",
+      idempotencyKey: "bounded-handoff-claim",
+    });
+    expect(claimed.item.leaseExpiresAt).toBe(handoffExpiresAt);
+
+    vi.setSystemTime(handoffExpiresAt + 1);
+    await expect(
+      t.mutation(internal.queue.agentCompleteQueueItem, {
+        principal: principal(),
+        queueItemId: created.item._id,
+        expectedVersion: claimed.item.version,
+        resultSummary: "This completion is too late for the approved handoff.",
+        idempotencyKey: "late-handoff-complete",
+      }),
+    ).rejects.toThrow(/handoff expired/);
+
+    const detail = await t.withIdentity({ subject: OWNER_A }).action(api.queue.getQueueItem, {
+      vaultOwnerId: OWNER_A,
+      queueItemId: created.item._id,
+      activityPagination: { numItems: 20, cursor: null },
+    });
+    expect(detail?.item.state).toBe("needs_you");
+    expect(detail?.item.condition).toBe("expired");
   });
 
   test("agent discovery is bounded, filtered, and scope-gated", async () => {
@@ -307,7 +449,7 @@ describe("product Queue foundation", () => {
     const t = convexTest(schema, modules);
     await createItem(t, { chosenAiId: AI_A, idempotencyKey: "agent-list-1" });
     await createItem(t, { chosenAiId: AI_A, idempotencyKey: "agent-list-2" });
-    const page = await t.query(internal.queue.agentListQueueItems, {
+    const page = await t.action(internal.queue.agentListQueueItems, {
       principal: principal(),
       state: "waiting_for_your_ai",
       paginationOpts: { numItems: 1, cursor: null },
@@ -316,7 +458,7 @@ describe("product Queue foundation", () => {
     expect(page.page[0].state).toBe("waiting_for_your_ai");
     expect(page.isDone).toBe(false);
 
-    const detail = await t.query(internal.queue.agentGetQueueItem, {
+    const detail = await t.action(internal.queue.agentGetQueueItem, {
       principal: principal(),
       queueItemId: page.page[0]._id,
       activityPagination: { numItems: 10, cursor: null },
@@ -325,7 +467,7 @@ describe("product Queue foundation", () => {
     expect(detail?.activity.page[0].eventType).toBe("created");
 
     await expect(
-      t.query(internal.queue.agentListQueueItems, {
+      t.action(internal.queue.agentListQueueItems, {
         principal: principal(OWNER_A, AI_A, []),
         paginationOpts: { numItems: 1, cursor: null },
       }),
