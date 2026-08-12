@@ -2,7 +2,7 @@
 id: AWF-WO-005
 title: Ship the product-native Queue experience
 execution: active
-audit: not-audited
+audit: follow-up-needed
 cards: AWF-0029, AWF-0030
 created: 2026-08-12
 updated: 2026-08-12
@@ -115,6 +115,30 @@ before the app. Public/product-authenticated production proof therefore remains
 blocked on AWF-0030's owner access decision, and independent audit remains a
 separate unfinished layer.
 
+## Independent acceptance audit
+
+2026-08-12 · Codex Queue acceptance QA — **follow-up-needed**. Current main
+`6e346cb` passed a fresh isolated development acceptance run with two disposable
+Clerk test identities and the configured development Convex deployment. The
+browser proved create, exact Waiting / Working / Needs You / Done presentation,
+person claim/checkpoint/result, internal verified-principal AI
+claim/question/checkpoint/result, 12 attributable activity versions, filters,
+25-item cursor pagination, loading, empty, backend error, signed-out redirect,
+desktop, and 390×844 behavior. A second tenant saw an empty Queue and a direct
+cross-owner read failed closed with `owner_mismatch`. Cleanup ended with zero
+Queue items, activity rows, command receipts, or matching Clerk test identities.
+Local verification passed 46 gates; the first build hit stale generated Next
+font cache, then passed after that cache was moved aside. No application-code
+defect was reproduced.
+
+The follow-up is strictly the production proof gate: the live homepage returned
+HTTP 200 but the live alias returned HTTP 404 for `/app/queue`, while PR #34,
+exact-main CI, and the protected Vercel deployment remain successful. Resolving
+the public alias/Deployment Protection posture and running production-authenticated
+synthetic proof require Scott's existing AWF-0030 access decision. External
+chosen-AI credential resolution also remains unimplemented; internal principal
+fixtures are not advertised as a connection.
+
 ## History
 
 - 2026-08-12 · Scott — approved Queue as an independent product lane: establish
@@ -128,4 +152,8 @@ separate unfinished layer.
 - 2026-08-12 · Codex — merged PR #34, passed exact-main CI, and completed the
   configured Vercel production deployment. Stopped at the genuine Vercel
   Deployment Protection decision without changing access policy; execution
-  remains active and audit remains not-audited.
+  remains active pending the production-access decision.
+- 2026-08-12 · Codex Queue acceptance QA — independently passed the complete
+  isolated development/browser lifecycle and cleanup audit. Marked audit
+  follow-up-needed only for the live-alias 404, production-authenticated access,
+  and missing external chosen-AI credential path; changed no provider policy.
