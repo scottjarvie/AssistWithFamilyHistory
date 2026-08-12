@@ -11,6 +11,14 @@ import {
   summarizeDirective,
 } from "../lib/queue/contract";
 import { QUEUE_AGENT_TOOLS, assertNoBroadQueueAgentTools, authorizeQueueAgentTool } from "../lib/queue/agentTools";
+import {
+  QUEUE_STATE_PRESENTATION,
+  canPersonClaim,
+  canPersonContinue,
+  queueFocusLabel,
+  queueHandoffCopy,
+  type QueueItemRecord,
+} from "../lib/queue/presentation";
 
 test("Queue exposes exactly the four Core states", () => {
   assert.deepEqual(QUEUE_STATES, ["needs_you", "working", "waiting_for_your_ai", "done"]);
@@ -100,4 +108,58 @@ test("agent surface is narrow and requires per-operation scope", () => {
 
 test("directive summary is derived without adding a required field", () => {
   assert.equal(summarizeDirective("  Find   the household. "), "Find the household.");
+});
+
+const presentationFixture = (partial: Partial<QueueItemRecord>): QueueItemRecord => ({
+  _id: "queue:test",
+  directive: "Review the household evidence.",
+  summary: "Review the household evidence.",
+  state: "waiting_for_your_ai",
+  condition: "disconnected",
+  priority: "normal",
+  context: [],
+  authority: {
+    actorKind: "chosen_ai",
+    actorId: "unassigned",
+    operations: ["queue:read"],
+    scopeNote: "Queue continuity only",
+  },
+  leftForActorKind: "chosen_ai",
+  retryCount: 0,
+  maxRetries: 3,
+  submittedAt: 1,
+  version: 1,
+  createdAt: 1,
+  updatedAt: 1,
+  ...partial,
+});
+
+test("Queue presentation retains exactly the four person-facing states", () => {
+  assert.deepEqual(Object.keys(QUEUE_STATE_PRESENTATION), [...QUEUE_STATES]);
+});
+
+test("disconnected Waiting copy never implies autonomous work", () => {
+  assert.match(queueHandoffCopy(presentationFixture({})), /nothing is running/i);
+  assert.match(queueHandoffCopy(presentationFixture({})), /no AI is connected/i);
+});
+
+test("person-side controls respect the active actor boundary", () => {
+  assert.equal(canPersonClaim(presentationFixture({})), true);
+  assert.equal(
+    canPersonClaim(presentationFixture({ condition: "retry_scheduled", nextRetryAt: 2_000 }), 1_000),
+    false,
+  );
+  assert.equal(
+    canPersonClaim(presentationFixture({ condition: "retry_scheduled", nextRetryAt: 2_000 }), 2_000),
+    true,
+  );
+  assert.equal(
+    canPersonContinue(presentationFixture({ state: "working", condition: "active", activeActorKind: "chosen_ai" })),
+    false,
+  );
+  assert.equal(
+    canPersonContinue(presentationFixture({ state: "working", condition: "active", activeActorKind: "user" })),
+    true,
+  );
+  assert.equal(queueFocusLabel(presentationFixture({ state: "needs_you", condition: "awaiting_user" })), "What needs you");
 });

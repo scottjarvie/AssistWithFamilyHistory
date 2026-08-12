@@ -6,6 +6,7 @@ import {
   FileUp,
   FlaskConical,
   Gauge,
+  Inbox,
   KeyRound,
   LayoutDashboard,
   MapPinned,
@@ -39,6 +40,11 @@ export const appNavigationSections = [
         icon: LayoutDashboard,
         exact: true,
       },
+      {
+        href: "/app/queue",
+        label: "Your Queue",
+        icon: Inbox,
+      },
     ],
   },
   {
@@ -62,7 +68,7 @@ export const appNavigationSections = [
     ],
   },
   {
-    label: "Research Queue",
+    label: "Research",
     items: [
       {
         href: "/app/operations",
