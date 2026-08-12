@@ -1,6 +1,6 @@
 # Family History Queue foundation and Claude Design handoff
 
-Status: backend/source implementation under normal software review. This document is a behavior and integration contract, not a claim that a final Queue screen, external AI connection, deployment, or authenticated production journey is live.
+Status: backend/source authority and expiry repair under normal software review. This document is a behavior and integration contract, not a claim that the repair, a final Queue screen, external AI connection, deployment, or authenticated production journey is live.
 
 ## Product boundary
 
@@ -68,13 +68,21 @@ The directive is sufficient. Optional context is capped at 20 unique, owner-veri
 
 The server loads every reference and verifies its `vaultOwnerId` before saving it. A caller cannot infer access from a Convex id, and attaching a reference does not grant permission to mutate that record. Collection/project types remain unimplemented because this repository has no corresponding durable owner-scoped model to validate.
 
+Every public Queue read and mutation is fail-closed locally after Clerk/Convex
+identity resolution. Queue access does not inherit the broader legacy
+trust-boundary shadow behavior: anonymous callers and supplied-owner mismatches
+stop before Queue rows can be read or changed, regardless of
+`TRUST_BOUNDARY_MODE`. Internal chosen-AI functions still require a
+server-derived `VerifiedQueuePrincipal`; this source does not expose one through
+MCP or a public credential resolver.
+
 ## Commands and transition safety
 
 | Command | Allowed actor and state | Result |
 | --- | --- | --- |
 | Create | Verified owner; directive only is valid | Waiting; `disconnected` until an AI is assigned |
 | Assign | Verified owner; any non-Done item | Waiting for the named AI |
-| Claim | Assigned AI or owner; Waiting, or an expired Working lease | Working with bounded lease and current step |
+| Claim | Assigned AI or owner; Waiting, or an expired Working lease | Working with bounded lease and current step; an AI lease cannot outlive its handoff authority |
 | Checkpoint | Current actor with an unexpired lease | Working; advances version and lease |
 | Request user action | Current assigned AI with unexpired lease | Needs You with exact action |
 | Resume | Verified owner; Needs You | Waiting for your AI |
@@ -82,15 +90,19 @@ The server loads every reference and verifies its `vaultOwnerId` before saving i
 | Complete | Current actor with unexpired lease | Done with readable result |
 | Cancel | Verified owner; non-Done | Done with cancellation result/reason |
 | Reopen | Verified owner; Done | Waiting for your AI |
-| Expire | Internal system boundary after a real lease/handoff deadline | Needs You with reconnect/reassign action |
+| Expire | Scheduled and read-reconciled internal boundary after a real lease/handoff deadline | Needs You with reconnect/reassign action and one attributable, idempotent expiry event |
 | Delete | Verified owner plus exact destructive confirmation | Hard-delete item, content-bearing activity, and command receipts in bounded batches |
 
-All mutations are atomic Convex transactions. Stale versions return a retryable conflict instead of overwriting newer work. Claims are actor-bound and time-bounded. No Queue command changes a person, relationship, source, claim, story publication state, identity, access grant, or provider account.
+All mutations are atomic Convex transactions. Stale versions return a retryable conflict instead of overwriting newer work. Claims are actor-bound and time-bounded. A chosen AI cannot checkpoint, fail, request user action, or complete after handoff authority expires even if a nominal lease was longer. Reassigning an expired item clears the stale deadline unless the person supplies a new future deadline; resuming an expired item also removes the expired deadline, and reopening disconnected work remains honestly disconnected. No Queue command changes a person, relationship, source, claim, story publication state, identity, access grant, or provider account.
 
 ## Query, filtering, retention, and representable service states
 
 - Item lists use owner/state/priority indexes and cursor pagination capped at 50 items per request.
 - Activity uses item/time indexes and cursor pagination capped at 100 rows per request.
+- New lease and handoff deadlines schedule only lifecycle reconciliation, not
+  research or autonomous work. Bounded item reads also reconcile a missed or
+  pre-existing deadline, so scheduler delay cannot make stale Working authority
+  look current indefinitely.
 - The integration contract represents `loading`, `empty`, `ready`,
   `permission_denied`, `error`, `retry`, `disconnected_ai`, and
   `expired_handoff`; loading is a client state and the latter two derive from
@@ -135,6 +147,6 @@ Claude Design may decide final page composition, card layout, responsive informa
 
 ## Verification boundary
 
-Source verification covers pure state/authority contracts and real Convex-runtime fixtures for owner isolation, foreign-reference rejection, directive-only creation, pagination, claim leases, actor authority, idempotency, optimistic concurrency, Needs You/resume, retry/exhaustion, completion/activity attribution, human-only operation, and hard deletion.
+Source verification covers pure state/authority contracts and real Convex-runtime fixtures for Queue-local fail-closed anonymous/cross-owner denial even in legacy shadow mode, owner isolation, foreign-reference rejection, directive-only creation, pagination, handoff-capped claim leases, automatic and read-time expiry, expired-authority rejection, idempotent recovery/reassignment, actor authority, optimistic concurrency, Needs You/resume, retry/exhaustion, completion/activity attribution, human-only operation, and hard deletion.
 
 Deployment, Convex schema publication, authenticated production behavior, a real chosen-AI connection, and the final designed Queue screen remain separate proof gates and must be reported separately.

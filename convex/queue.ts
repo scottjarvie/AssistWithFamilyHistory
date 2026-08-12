@@ -1,19 +1,26 @@
 import { paginationOptsValidator, type PaginationResult } from "convex/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
-import type { MutationCtx } from "./_generated/server";
-import { action, internalMutation, internalQuery, mutation } from "./_generated/server";
+import type { ActionCtx, MutationCtx } from "./_generated/server";
+import { action, internalAction, internalMutation, internalQuery, mutation } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { authorizeTenantAction, authorizeTenantMutation } from "./access";
+import {
+  authorizeTenantAction,
+  authorizeTenantMutation,
+  type TenantAccessDecision,
+} from "./access";
 import { matchesVaultOwner } from "./vaultCore";
 import {
   QUEUE_LIMITS,
   assertCommandAllowed,
   assertLeaseDuration,
   assertVersion,
+  leaseExpiresAtForActor,
   nextStateForFailure,
   normalizeOptionalText,
   normalizeRequiredText,
+  queueExpiryDeadline,
+  queueExpiryTransition,
   summarizeDirective,
   type QueueActorKind,
   type QueueCommand,
@@ -60,6 +67,30 @@ const principalValidator = v.object({
 
 type QueueItem = Doc<"queueItems">;
 type QueueContext = QueueItem["context"][number];
+type QueueExpiryReconciliation = { item: QueueItem | null; expired: boolean };
+
+function assertQueueTenantAllowed(
+  decision: TenantAccessDecision,
+): asserts decision is TenantAccessDecision & { allowed: true } {
+  if (!decision.allowed) {
+    throw new Error(`Trust boundary denied: ${decision.reason ?? "missing_identity"}`);
+  }
+}
+
+async function authorizeQueueTenantAction(
+  ctx: ActionCtx,
+  functionName: string,
+  suppliedOwner?: string | null,
+) {
+  const decision = await authorizeTenantAction(
+    ctx,
+    functionName,
+    suppliedOwner,
+    (entry) => ctx.runMutation(internal.trustBoundary.recordShadowDenial, entry),
+  );
+  assertQueueTenantAllowed(decision);
+  return decision;
+}
 
 function actorForUser(owner: string): { kind: "user"; id: string } {
   return { kind: "user", id: owner };
@@ -167,6 +198,21 @@ function cleanIdempotencyKey(value: string): string {
   return normalizeRequiredText(value, "Idempotency key", 160);
 }
 
+function assertFutureHandoffExpiration(value: number | undefined, now: number): void {
+  if (value !== undefined && value <= now) {
+    throw new Error("handoffExpiresAt must be in the future");
+  }
+}
+
+async function scheduleQueueExpiry(ctx: MutationCtx, item: QueueItem): Promise<void> {
+  const expiresAt = queueExpiryDeadline(item);
+  if (expiresAt === undefined || expiresAt <= Date.now()) return;
+  await ctx.scheduler.runAt(expiresAt, internal.queue.reconcileQueueItemExpiry, {
+    vaultOwnerId: item.vaultOwnerId,
+    queueItemId: item._id,
+  });
+}
+
 async function runCommand(
   ctx: MutationCtx,
   input: {
@@ -211,6 +257,7 @@ async function runCommand(
     detail: input.detail,
     now,
   });
+  await scheduleQueueExpiry(ctx, updated);
   return { item: updated, deduplicated: false as const };
 }
 
@@ -229,6 +276,7 @@ export const createQueueItem = mutation({
   },
   handler: async (ctx, args) => {
     const decision = await authorizeTenantMutation(ctx, "queue.createQueueItem", args.vaultOwnerId);
+    assertQueueTenantAllowed(decision);
     const owner = decision.owner;
     const actor = actorForUser(owner);
     const idempotencyKey = cleanIdempotencyKey(args.idempotencyKey);
@@ -251,9 +299,7 @@ export const createQueueItem = mutation({
       throw new Error(`maxRetries must be between 0 and ${QUEUE_LIMITS.maxRetries}`);
     }
     const now = Date.now();
-    if (args.handoffExpiresAt !== undefined && args.handoffExpiresAt <= now) {
-      throw new Error("handoffExpiresAt must be in the future");
-    }
+    assertFutureHandoffExpiration(args.handoffExpiresAt, now);
     const queueItemId = await ctx.db.insert("queueItems", {
       vaultOwnerId: owner,
       directive,
@@ -294,6 +340,7 @@ export const createQueueItem = mutation({
       summary: chosenAiId ? "Directive left for the chosen AI." : "Directive saved; no AI is connected.",
       now,
     });
+    await scheduleQueueExpiry(ctx, item);
     return { item, deduplicated: false as const };
   },
 });
@@ -303,12 +350,15 @@ export const assignQueueItemToAi = mutation({
     vaultOwnerId: v.string(),
     queueItemId: v.id("queueItems"),
     chosenAiId: v.string(),
+    handoffExpiresAt: v.optional(v.number()),
     expectedVersion: v.number(),
     idempotencyKey: v.string(),
   },
   handler: async (ctx, args) => {
     const decision = await authorizeTenantMutation(ctx, "queue.assignQueueItemToAi", args.vaultOwnerId);
+    assertQueueTenantAllowed(decision);
     const chosenAiId = normalizeRequiredText(args.chosenAiId, "Chosen AI id", 160);
+    assertFutureHandoffExpiration(args.handoffExpiresAt, Date.now());
     return runCommand(ctx, {
       owner: decision.owner,
       itemId: args.queueItemId,
@@ -319,7 +369,7 @@ export const assignQueueItemToAi = mutation({
       eventType: "released",
       summary: "Queue handoff assigned to a chosen AI.",
       detail: chosenAiId,
-      patch: () => ({
+      patch: (_current, now) => ({
         state: "waiting_for_your_ai",
         condition: "ready",
         authority: {
@@ -333,6 +383,14 @@ export const assignQueueItemToAi = mutation({
         activeActorKind: undefined,
         activeActorId: undefined,
         leaseExpiresAt: undefined,
+        handoffExpiresAt: args.handoffExpiresAt,
+        requiredAction: undefined,
+        nextStep: undefined,
+        failureCode: undefined,
+        failureSummary: undefined,
+        nextRetryAt: undefined,
+        retryCount: 0,
+        submittedAt: now,
       }),
     });
   },
@@ -349,6 +407,7 @@ export const claimQueueItemAsUser = mutation({
   },
   handler: async (ctx, args) => {
     const decision = await authorizeTenantMutation(ctx, "queue.claimQueueItemAsUser", args.vaultOwnerId);
+    assertQueueTenantAllowed(decision);
     assertLeaseDuration(args.leaseMs);
     const nextStep = normalizeRequiredText(args.nextStep, "Next step", QUEUE_LIMITS.nextStep);
     const actor = actorForUser(decision.owner);
@@ -387,6 +446,7 @@ export const checkpointQueueItemAsUser = mutation({
   },
   handler: async (ctx, args) => {
     const decision = await authorizeTenantMutation(ctx, "queue.checkpointQueueItemAsUser", args.vaultOwnerId);
+    assertQueueTenantAllowed(decision);
     assertLeaseDuration(args.leaseMs);
     const nextStep = normalizeRequiredText(args.nextStep, "Next step", QUEUE_LIMITS.nextStep);
     return runCommand(ctx, {
@@ -415,6 +475,7 @@ export const completeQueueItemAsUser = mutation({
   },
   handler: async (ctx, args) => {
     const decision = await authorizeTenantMutation(ctx, "queue.completeQueueItemAsUser", args.vaultOwnerId);
+    assertQueueTenantAllowed(decision);
     const resultSummary = normalizeRequiredText(args.resultSummary, "Result", QUEUE_LIMITS.resultSummary);
     const resultRefs = (args.resultRefs ?? []).map((ref) => normalizeRequiredText(ref, "Result reference", 500));
     if (resultRefs.length > QUEUE_LIMITS.resultRefs) {
@@ -441,6 +502,7 @@ export const completeQueueItemAsUser = mutation({
         activeActorKind: undefined,
         activeActorId: undefined,
         leaseExpiresAt: undefined,
+        handoffExpiresAt: undefined,
       }),
     });
   },
@@ -487,13 +549,27 @@ export const listQueueItemsInternal = internalQuery({
 export const listQueueItems = action({
   args: listQueueArgs,
   handler: async (ctx, args): Promise<PaginationResult<QueueItem>> => {
-    const decision = await authorizeTenantAction(
-      ctx,
-      "queue.listQueueItems",
-      args.vaultOwnerId,
-      (entry) => ctx.runMutation(internal.trustBoundary.recordShadowDenial, entry),
-    );
-    return ctx.runQuery(internal.queue.listQueueItemsInternal, { ...args, vaultOwnerId: decision.owner });
+    const decision = await authorizeQueueTenantAction(ctx, "queue.listQueueItems", args.vaultOwnerId);
+    const result = await ctx.runQuery(internal.queue.listQueueItemsInternal, {
+      ...args,
+      vaultOwnerId: decision.owner,
+    });
+    const page: QueueItem[] = [];
+    for (const item of result.page) {
+      const transition = queueExpiryTransition(item, Date.now());
+      if (!transition) {
+        page.push(item);
+        continue;
+      }
+      const reconciled = await ctx.runMutation(internal.queue.reconcileQueueItemExpiry, {
+        vaultOwnerId: decision.owner,
+        queueItemId: item._id,
+      });
+      if (reconciled.item && (!args.state || reconciled.item.state === args.state)) {
+        page.push(reconciled.item);
+      }
+    }
+    return { ...result, page };
   },
 });
 
@@ -528,12 +604,11 @@ export const getQueueItem = action({
     ctx,
     args,
   ): Promise<{ item: QueueItem; activity: PaginationResult<Doc<"queueActivity">> } | null> => {
-    const decision = await authorizeTenantAction(
-      ctx,
-      "queue.getQueueItem",
-      args.vaultOwnerId,
-      (entry) => ctx.runMutation(internal.trustBoundary.recordShadowDenial, entry),
-    );
+    const decision = await authorizeQueueTenantAction(ctx, "queue.getQueueItem", args.vaultOwnerId);
+    await ctx.runMutation(internal.queue.reconcileQueueItemExpiry, {
+      vaultOwnerId: decision.owner,
+      queueItemId: args.queueItemId,
+    });
     return ctx.runQuery(internal.queue.getQueueItemInternal, { ...args, vaultOwnerId: decision.owner });
   },
 });
@@ -542,62 +617,60 @@ function verifyPrincipal(principal: VerifiedQueuePrincipal, toolName: QueueAgent
   return authorizeQueueAgentTool(principal, toolName);
 }
 
-export const agentListQueueItems = internalQuery({
+export const agentListQueueItems = internalAction({
   args: {
     principal: principalValidator,
     state: v.optional(queueStateValidator),
     priority: v.optional(queuePriorityValidator),
     paginationOpts: paginationOptsValidator,
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<PaginationResult<QueueItem>> => {
     const actor = verifyPrincipal(args.principal, "list_queue_items");
-    const requested = Math.min(args.paginationOpts.numItems, QUEUE_LIMITS.itemPage);
-    const paginationOpts = { ...args.paginationOpts, numItems: requested };
-    if (args.state) {
-      return ctx.db
-        .query("queueItems")
-        .withIndex("by_owner_state_updated", (q) =>
-          q.eq("vaultOwnerId", actor.ownerId).eq("state", args.state!),
-        )
-        .order("desc")
-        .paginate(paginationOpts);
+    const result = await ctx.runQuery(internal.queue.listQueueItemsInternal, {
+      vaultOwnerId: actor.ownerId,
+      state: args.state,
+      priority: args.priority,
+      paginationOpts: args.paginationOpts,
+    });
+    const page: QueueItem[] = [];
+    for (const item of result.page) {
+      const transition = queueExpiryTransition(item, Date.now());
+      if (!transition) {
+        page.push(item);
+        continue;
+      }
+      const reconciled = await ctx.runMutation(internal.queue.reconcileQueueItemExpiry, {
+        vaultOwnerId: actor.ownerId,
+        queueItemId: item._id,
+      });
+      if (reconciled.item && (!args.state || reconciled.item.state === args.state)) {
+        page.push(reconciled.item);
+      }
     }
-    if (args.priority) {
-      return ctx.db
-        .query("queueItems")
-        .withIndex("by_owner_priority_updated", (q) =>
-          q.eq("vaultOwnerId", actor.ownerId).eq("priority", args.priority!),
-        )
-        .order("desc")
-        .paginate(paginationOpts);
-    }
-    return ctx.db
-      .query("queueItems")
-      .withIndex("by_owner_updated", (q) => q.eq("vaultOwnerId", actor.ownerId))
-      .order("desc")
-      .paginate(paginationOpts);
+    return { ...result, page };
   },
 });
 
-export const agentGetQueueItem = internalQuery({
+export const agentGetQueueItem = internalAction({
   args: {
     principal: principalValidator,
     queueItemId: v.id("queueItems"),
     activityPagination: paginationOptsValidator,
   },
-  handler: async (ctx, args) => {
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ item: QueueItem; activity: PaginationResult<Doc<"queueActivity">> } | null> => {
     const actor = verifyPrincipal(args.principal, "get_queue_item");
-    const item = await ctx.db.get(args.queueItemId);
-    if (!item || !matchesVaultOwner(item.vaultOwnerId, actor.ownerId)) return null;
-    const activity = await ctx.db
-      .query("queueActivity")
-      .withIndex("by_item_created", (q) => q.eq("queueItemId", args.queueItemId))
-      .order("desc")
-      .paginate({
-        ...args.activityPagination,
-        numItems: Math.min(args.activityPagination.numItems, QUEUE_LIMITS.activityPage),
-      });
-    return { item, activity };
+    await ctx.runMutation(internal.queue.reconcileQueueItemExpiry, {
+      vaultOwnerId: actor.ownerId,
+      queueItemId: args.queueItemId,
+    });
+    return ctx.runQuery(internal.queue.getQueueItemInternal, {
+      vaultOwnerId: actor.ownerId,
+      queueItemId: args.queueItemId,
+      activityPagination: args.activityPagination,
+    });
   },
 });
 
@@ -627,13 +700,13 @@ export const agentClaimQueueItem = internalMutation({
       eventType: "claimed",
       summary: "Chosen AI picked up the Queue directive.",
       detail: nextStep,
-      patch: (_current, now) => ({
+      patch: (current, now) => ({
         state: "working",
         condition: "active",
         activeActorKind: actor.actorKind,
         activeActorId: actor.actorId,
         pickedUpAt: now,
-        leaseExpiresAt: now + args.leaseMs,
+        leaseExpiresAt: leaseExpiresAtForActor(current, { kind: actor.actorKind, id: actor.actorId }, now, args.leaseMs),
         nextStep,
         requiredAction: undefined,
         nextRetryAt: undefined,
@@ -668,7 +741,15 @@ export const agentCheckpointQueueItem = internalMutation({
       eventType: "checkpointed",
       summary: "Chosen AI recorded the current Queue step.",
       detail: nextStep,
-      patch: (_current, now) => ({ nextStep, leaseExpiresAt: now + args.leaseMs }),
+      patch: (current, now) => ({
+        nextStep,
+        leaseExpiresAt: leaseExpiresAtForActor(
+          current,
+          { kind: actor.actorKind, id: actor.actorId },
+          now,
+          args.leaseMs,
+        ),
+      }),
     });
   },
 });
@@ -754,6 +835,7 @@ export const agentCompleteQueueItem = internalMutation({
         activeActorKind: undefined,
         activeActorId: undefined,
         leaseExpiresAt: undefined,
+        handoffExpiresAt: undefined,
       }),
     });
   },
@@ -769,6 +851,7 @@ export const resumeQueueItem = mutation({
   },
   handler: async (ctx, args) => {
     const decision = await authorizeTenantMutation(ctx, "queue.resumeQueueItem", args.vaultOwnerId);
+    assertQueueTenantAllowed(decision);
     const answerSummary = normalizeRequiredText(args.answerSummary, "Answer summary", 1_000);
     return runCommand(ctx, {
       owner: decision.owner,
@@ -780,12 +863,17 @@ export const resumeQueueItem = mutation({
       eventType: "resumed",
       summary: "User answered the blocker and returned the directive to the chosen AI.",
       detail: answerSummary,
-      patch: () => ({
+      patch: (current, now) => ({
         state: "waiting_for_your_ai",
-        condition: "ready",
+        condition: current.authority.actorId === "unassigned" ? "disconnected" : "ready",
         requiredAction: undefined,
         failureCode: undefined,
         failureSummary: undefined,
+        nextRetryAt: undefined,
+        handoffExpiresAt:
+          current.handoffExpiresAt !== undefined && current.handoffExpiresAt > now
+            ? current.handoffExpiresAt
+            : undefined,
         lastUserResponse: answerSummary,
       }),
     });
@@ -802,6 +890,7 @@ export const cancelQueueItem = mutation({
   },
   handler: async (ctx, args) => {
     const decision = await authorizeTenantMutation(ctx, "queue.cancelQueueItem", args.vaultOwnerId);
+    assertQueueTenantAllowed(decision);
     const reason = normalizeRequiredText(args.reason, "Cancellation reason", 1_000);
     return runCommand(ctx, {
       owner: decision.owner,
@@ -825,6 +914,7 @@ export const cancelQueueItem = mutation({
         activeActorKind: undefined,
         activeActorId: undefined,
         leaseExpiresAt: undefined,
+        handoffExpiresAt: undefined,
       }),
     });
   },
@@ -840,6 +930,7 @@ export const reopenQueueItem = mutation({
   },
   handler: async (ctx, args) => {
     const decision = await authorizeTenantMutation(ctx, "queue.reopenQueueItem", args.vaultOwnerId);
+    assertQueueTenantAllowed(decision);
     const reason = normalizeRequiredText(args.reason, "Reopen reason", 1_000);
     return runCommand(ctx, {
       owner: decision.owner,
@@ -851,15 +942,16 @@ export const reopenQueueItem = mutation({
       eventType: "reopened",
       summary: "User reopened completed Queue work.",
       detail: reason,
-      patch: () => ({
+      patch: (current) => ({
         state: "waiting_for_your_ai",
-        condition: "ready",
+        condition: current.authority.actorId === "unassigned" ? "disconnected" : "ready",
         resultSummary: undefined,
         resultRefs: undefined,
         completedAt: undefined,
         canceledAt: undefined,
         canceledReason: undefined,
         retryCount: 0,
+        handoffExpiresAt: undefined,
         lastReopenReason: reason,
       }),
     });
@@ -931,11 +1023,8 @@ export const expireQueueHandoff = internalMutation({
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.queueItemId);
     assertItemOwner(item, args.vaultOwnerId);
-    const now = Date.now();
-    const expired =
-      (item.handoffExpiresAt !== undefined && item.handoffExpiresAt <= now) ||
-      (item.leaseExpiresAt !== undefined && item.leaseExpiresAt <= now);
-    if (!expired) throw new Error("Queue handoff has not expired");
+    const transition = queueExpiryTransition(item, Date.now());
+    if (!transition) throw new Error("Queue handoff has not expired");
     return runCommand(ctx, {
       owner: args.vaultOwnerId,
       itemId: args.queueItemId,
@@ -947,15 +1036,50 @@ export const expireQueueHandoff = internalMutation({
       summary: "Queue handoff expired and now needs the user to reconnect or reassign it.",
       detail: "Reconnect or choose an AI for this directive, then return it to Waiting for your AI.",
       patch: () => ({
-        state: "needs_you",
-        condition: "expired",
-        requiredAction: "Reconnect or choose an AI for this directive, then return it to Waiting for your AI.",
+        state: transition.state,
+        condition: transition.condition,
+        requiredAction: transition.requiredAction,
         activeActorKind: undefined,
         activeActorId: undefined,
         leaseExpiresAt: undefined,
         nextStep: undefined,
       }),
     });
+  },
+});
+
+export const reconcileQueueItemExpiry = internalMutation({
+  args: {
+    vaultOwnerId: v.string(),
+    queueItemId: v.id("queueItems"),
+  },
+  handler: async (ctx, args): Promise<QueueExpiryReconciliation> => {
+    const item = await ctx.db.get(args.queueItemId);
+    if (!item) return { item: null, expired: false };
+    assertItemOwner(item, args.vaultOwnerId);
+    const transition = queueExpiryTransition(item, Date.now());
+    if (!transition) return { item, expired: false as const };
+    const result = await runCommand(ctx, {
+      owner: args.vaultOwnerId,
+      itemId: args.queueItemId,
+      expectedVersion: item.version,
+      idempotencyKey: `queue-expiry:${item._id}:${transition.expiresAt}`,
+      command: "expire",
+      actor: { kind: "system", id: "queue-expiry" },
+      eventType: "expired",
+      summary: "Queue handoff expired and now needs the user to reconnect or reassign it.",
+      detail: transition.requiredAction,
+      patch: () => ({
+        state: transition.state,
+        condition: transition.condition,
+        requiredAction: transition.requiredAction,
+        activeActorKind: undefined,
+        activeActorId: undefined,
+        leaseExpiresAt: undefined,
+        nextStep: undefined,
+      }),
+    });
+    return { item: result.item, expired: true as const };
   },
 });
 
@@ -994,12 +1118,7 @@ export const deleteQueueItem = action({
     confirmation: v.literal("delete_queue_item_and_history"),
   },
   handler: async (ctx, args): Promise<{ deleted: true; rowsDeleted: number }> => {
-    const decision = await authorizeTenantAction(
-      ctx,
-      "queue.deleteQueueItem",
-      args.vaultOwnerId,
-      (entry) => ctx.runMutation(internal.trustBoundary.recordShadowDenial, entry),
-    );
+    const decision = await authorizeQueueTenantAction(ctx, "queue.deleteQueueItem", args.vaultOwnerId);
     let rowsDeleted = 0;
     for (let page = 0; page < 1_000; page += 1) {
       const result: { done: boolean; deleted: number } = await ctx.runMutation(

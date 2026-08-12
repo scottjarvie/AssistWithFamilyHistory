@@ -35,10 +35,15 @@ assert.match(queueModule, /QUEUE_LIMITS\.activityPage/);
 assert.match(queueModule, /assertVersion/);
 assert.match(queueModule, /existingReceipt/);
 assert.match(queueModule, /assertAgentAuthority/);
+assert.match(queueModule, /assertQueueTenantAllowed/);
+assert.match(queueModule, /ctx\.scheduler\.runAt/);
+assert.match(queueModule, /reconcileQueueItemExpiry/);
 assert.match(route, /api\.queue\.listQueueItems/);
 assert.match(itemRoute, /delete_queue_item_and_history/);
 assert.match(handoff, /not automatically adapted/i);
 assert.match(handoff, /incoming API-key resolution/i);
+assert.match(handoff, /does not inherit the broader legacy[\s\S]*shadow behavior/i);
+assert.match(handoff, /lifecycle reconciliation, not[\s\S]*autonomous work/i);
 assert.match(philosophy, /There is no fifth product Queue state/);
 
 console.log("Queue foundation contract assertions passed");

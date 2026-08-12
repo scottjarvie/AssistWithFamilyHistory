@@ -2,10 +2,10 @@
 id: AWF-WO-003
 title: Build and prove the Family History Queue backend foundation
 execution: complete
-audit: not-audited
+audit: follow-up-needed
 cards: AWF-0008
 created: 2026-08-09
-updated: 2026-08-09
+updated: 2026-08-12
 proposed-by: Codex
 approved-by: Scott
 approved-on: 2026-08-09
@@ -28,6 +28,12 @@ different truth. PR #31 shipped the distinct foundation at main commit
 signed-out live alias and Queue protection boundary were proved without using
 private data. Authenticated persistence and exact Convex provider-log proof are
 separate AWF-0030 verification work, not a reason to invent completion here.
+The 2026-08-12 independent Queue audit found two source-level follow-ups behind
+that release evidence: Queue public functions could continue under the global
+shadow-mode tenant decision, and expiry required an unwired internal call while
+recovery retained stale deadlines. AWF-0032 and AWF-WO-004 own the approved
+repair; this audit result does not rewrite the original execution or claim the
+repair is deployed.
 
 ## Sequence
 
@@ -98,6 +104,16 @@ for main `e65b03a`. A fresh signed-out browser probe proved the retained
 authenticated account or private genealogy data was used. AWF-0030 holds the
 remaining provider/authenticated verification gap; AWF-0029 holds final design.
 
+## Independent audit
+
+- 2026-08-12 · Codex Queue audit — **follow-up-needed**. Current `main` at
+  `1a5e731` was selectively checked against the shared Queue contract, source,
+  tests, tracker, PR #31, and deployment/signed-out receipts. The shipped
+  four-state and domain-separation foundation was confirmed, but public Queue
+  tenancy was config-dependent and expiry/recovery was not deterministic.
+  AWF-0032 is the bounded P0 repair; AWF-0030 still owns provider/authenticated
+  production proof and AWF-0029 still owns final UI.
+
 ## History
 
 - 2026-08-09 · Scott — approved autonomous delivery of the complete Queue
@@ -107,3 +123,6 @@ remaining provider/authenticated verification gap; AWF-0029 holds final design.
 - 2026-08-09 · Codex — completed implementation and full PR/CI/Vercel/live
   signed-out proof at `e65b03a`; closed execution while preserving AWF-0030 as
   verification work and AWF-0029 as the separate Claude Design outcome.
+- 2026-08-12 · Codex Queue audit — recorded `follow-up-needed` without changing
+  the completed executor result; linked the verified P0 source gaps to
+  AWF-0032 and the separately approved AWF-WO-004 repair.
