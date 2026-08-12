@@ -49,6 +49,9 @@ export function Footer() {
             <SafeLink href="/updates" className="transition-colors hover:text-[#fff6e5]">
               Updates
             </SafeLink>
+            <SafeLink href="/ai" className="transition-colors hover:text-[#fff6e5]">
+              Connect AI
+            </SafeLink>
             <SafeLink href="/privacy" className="transition-colors hover:text-[#fff6e5]">
               Privacy
             </SafeLink>

@@ -1,0 +1,40 @@
+import { FAMILY_HISTORY_MCP_TOOL_NAMES } from "@/lib/mcp/contract";
+
+export function GET() {
+  const body = [
+    "# Assist With Family History — agent setup",
+    "",
+    "Product: Discover Their Stories is the user's durable private family-history research-to-story workspace. The assistant reasons, researches, compares, corrects, and drafts; the product owns identity, permissions, records, provenance, workflow state, and human review.",
+    "MCP endpoint: https://discovertheirstories.com/mcp",
+    "Transport: remote Streamable HTTP MCP with OAuth. Modern 2026-07-28 requests and stateless 2025-era fallback share one tool factory.",
+    "Setup page: https://discovertheirstories.com/ai",
+    "",
+    "## Required workflow",
+    "1. Call get_family_history_brief first.",
+    "2. Use search_family_history before creating records that may already exist.",
+    "3. Use get_family_history_context to hydrate stable IDs and updatedAt before corrections.",
+    "4. Prefer save_complete_result for one finished research pass. Use granular save tools for partial work and corrections.",
+    "5. Preserve source/citation provenance, evidence-versus-conclusion status, conflicts, uncertainty, and blocked research honestly.",
+    "6. Queue context never grants domain-write authority. Use Queue tools only for work assigned to oauth-chosen-ai.",
+    "",
+    "## Tools",
+    ...FAMILY_HISTORY_MCP_TOOL_NAMES.map((name) => `- ${name}`),
+    "",
+    "## Safety",
+    "- Never provide or invent userId, ownerId, workspaceId, vaultOwnerId, or tenant IDs. The server derives the vault from verified OAuth.",
+    "- Never publish, delete, merge identities, change sharing, or perform external FamilySearch actions through this MCP surface.",
+    "- Broad discovery withholds living-person notes. Person hydration includes only reviewed AI-allowed loose context and media.",
+    "- Evidence facts do not silently overwrite canonical person conclusions. Save candidates/conflicts and let the person review.",
+    "- Story writes are draft or review only. Published stories are human-gated and cannot be edited here.",
+    "- Reuse operationId for a safe retry of exactly the same write. Reuse createKey for the same durable record intent.",
+    "",
+    "## Current / Partial / Later",
+    "Current in source: endpoint, OAuth challenge/metadata, twelve tools, bounded reads, server-derived owner, replay-safe writes, canonical UI-visible records, docs.",
+    "Partial until exact deployed proof: provider OAuth registration/consent, named client, mobile setup, authenticated production journey, reconnect and revocation.",
+    "Later: granular grant UI, private media delivery, publishing/deletion/identity merge/external actions, wider client matrix.",
+    "",
+    "If tools look stale after a deploy: disconnect the MCP server, reconnect it, sign in again, and confirm all twelve names above appear before writing.",
+    "",
+  ].join("\n");
+  return new Response(body, { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=300" } });
+}

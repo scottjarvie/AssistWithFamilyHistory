@@ -8,6 +8,8 @@ ROUTE_GATES=(
   "Public marketing|/features"
   "Public marketing|/extension"
   "Public marketing|/updates"
+  "Chosen AI setup|/ai"
+  "Chosen AI setup|/ai.txt"
   "App shell|/app"
   "Intake|/app/imports"
   "Operations|/app/operations"

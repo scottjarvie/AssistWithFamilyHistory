@@ -2,13 +2,13 @@
 
 > **Philosophy status:** Canonical product identity and claim boundary
 >
-> **Product document version:** 1.5.0
+> **Product document version:** 1.6.0
 >
 > **Philosophy date:** 2026-08-11
 >
-> **Capability evidence last verified:** 2026-08-09
+> **Capability evidence last verified:** 2026-08-12
 >
-> **Repository evidence revision:** `e65b03a — Queue foundation merge; authenticated provider proof remains separate`
+> **Repository evidence revision:** `AWF-WO-006 source foundation — protected release and named-client proof remain separate`
 >
 > **Scope:** Product truth, language, trust, and design direction—not an
 > implementation plan, production claim, or permission to change application
@@ -48,7 +48,7 @@ provenance only and are not a current operating dependency.
 > prescribe the primary experience.
 >
 > **Deferred/gaps:** The unverified big/public-launch requirements recorded below,
-> including the final designed Queue screen, MCP and AI setup paths, complete activity history,
+> including complete activity history,
 > export and deletion, `/me`, `/admin`, Support Desk, and family navigation;
 > plus the approved but unverified People/relationships-first onboarding,
 > selected-object visibility, simple collaboration roles, separate
@@ -128,7 +128,7 @@ Use these status labels throughout this revision:
 
 | Contract area | Status | Evidence-backed Family History decision |
 |---|---|---|
-| Person / Assist workspace / your AI split | **Current / verified philosophy; Coming soon public-shell alignment** | The enduring split below already makes the person authoritative, Family History durable, and “your AI” user-chosen. The current home source does not yet use the required “Assist your AI, so it can assist you with family history” turn of phrase or link to `/ai` |
+| Person / Assist workspace / your AI split | **Current / verified philosophy and `/ai` source; Coming soon full public-shell alignment** | The enduring split below makes the person authoritative, Family History durable, and “your AI” user-chosen. `/ai` now teaches that split in Family History's archival voice; the current home source still does not use the required “Assist your AI, so it can assist you with family history” turn of phrase or provide the complete launch invitation/FAQ alignment |
 | Domain promise, users, objects, and primary experience | **Intentional product-specific difference** | Keep the research-to-story promise and the connected vocabulary of people, families, relationships, places, buildings, events, sources, claims, questions, context, collections, projects, and stories. Family History decides how researchers, relatives, storytellers, and their chosen AI move through that evidence. The family chassis fixes dependable assistance and trust boundaries, not this domain model or experience |
 | Friendly start and connected archive | **Intentional product-specific difference; In design onboarding** | People and relationships are the primary friendly start, but not a forced container. An authorized import or chosen-AI research handoff may quickly extend that first connected picture. Sources, documents, media, places, buildings, events, claims, and stories remain many-to-many records with provenance and uncertainty; no direct provider integration is implied |
 | Product Queue | **Current / verified repository and deployed Next.js backend foundation; Coming soon designed/authenticated experience** | `queueItems`, `queueActivity`, command receipts, owner-scoped `/api/queue` seams, and focused contracts implement directive-first creation, exactly four product states, bounded handoff commands, cursor pagination, idempotency, concurrency, retry/failure/cancel/expiry, and hard deletion. PR #31 passed full CI, merged as `e65b03a`, and received successful Vercel preview/production statuses; the retained live alias and signed-out sign-in redirect were observed. `/app/operations` and `researchTasks` remain separate. No final `/queue` page, authenticated persistence, exact production Convex build-plan log, or arbitrary chosen-AI pickup path is claimed |
@@ -136,7 +136,7 @@ Use these status labels throughout this revision:
 | Queue context objects | **Intentional product-specific difference; Current / verified repository backend foundation** | Optional owner-verified references use three Family History groups: research subject (person, relationship, place, event), evidence (source, citation, media, context item), or work thread (research task/check, story, import run, provisional relative). Directive-only creation remains valid. Project/collection adapters stay unimplemented because no matching durable model exists |
 | Prompt and research-loop library | **In design** | A small curated menu may help the person's chosen AI begin useful family-history work. Every prompt or loop is optional, editable, combinable, and ignorable, with version/freshness/provenance/limits metadata. It is assistance, not a required workflow or site-owned automation engine |
 | Internal project tracker | **Current / verified — independent audit pending** | `docs/tracker/` carries canonical Cards, Work Orders, Guide, factual metadata, and generated Kanban/Work Orders readers in Family History's archival identity. Current instructions use that durable source rather than mandatory Linear. State commit `dc30429` proved the lightweight GitHub path, Vercel ignored-build cancellation, and retained live deployment. AWF-WO-001 keeps completed execution separate from AWF-0004's future independent audit; do not confuse this build tracker with the product Queue |
-| MCP and AI setup paths | **Current / verified internal Queue tool boundary; Coming soon connection** | Seven narrow Queue discovery/read/claim/checkpoint/question/complete/failure tool contracts now enforce per-operation scope and exclude broad domain writes. No `/mcp`, `/ai`, `/ai.txt`, or `/settings/ai` route or incoming chosen-AI credential resolution exists. Internal tools and key lifecycle primitives do not substitute for a verified connection |
+| MCP and AI setup paths | **Current / verified source and isolated official-client foundation; Partial deployed/named-client journey** | `/mcp`, protected-resource metadata, `/ai`, `/ai.txt`, and twelve Family History workflow tools now cover bounded brief/search/context, canonical people/relationship/event/evidence/research/story saves, one-call complete results, granular corrections, and Queue continuation. OAuth tokens select the owner server-side; operations are replay-safe; living-person discovery and public story gates stay bounded. The official v2 MCP client plus generated signed-token tests prove negotiation, discovery, a canonical write, and product reads through the real stateless handler with isolated synthetic tenants. Provider registration/consent, a named compatible client, production authentication, reconnect, and revocation remain unproved and must not be inferred from source, local, CI, or deployment evidence |
 | Activity and provenance | **Current / verified Queue-specific history and partial wider foundation; Coming soon complete product contract** | Queue state-changing commands now emit append-only, actor-attributed history and idempotency receipts that share the item's deletion lifecycle. Import runs, research logs, story review events, source links, model/prompt fields, and `agentActivity` remain separate partial foundations; the repo still does not prove one complete history for every meaningful product create, change, or delete |
 | Access and sharing | **Current / verified Private and guarded Public foundations; In design Unlisted and Trusted** | Use one selected-object visibility vocabulary for appropriate stories, collections, and source/record surfaces: Private, Unlisted, Trusted, Public. Trusted collaboration uses simple Viewer, Contributor, Editor, and Owner roles scoped to the relevant boundary. Sharing stays deliberate, reviewable, revocable, and subject to living/sensitive review; complete invite, link, role, and visibility lifecycles are not verified |
 | Identity boundary | **Current / verified source foundation; Unknown deployed state** | Source supports per-site Clerk identity and owner isolation when configured, plus local/guest modes for controlled environments. No shared Assist identity or cross-site session is claimed, and exact deployed Clerk/trust-boundary configuration is not proven here |
@@ -1304,7 +1304,7 @@ or an older production observation is not sufficient by itself.
 | Story Studio and publication | Draft/review/published states, reviewer assignment, evidence/context/privacy/living-person gates, explicit human confirmation, public story DTO filtering, and unpublish paths | **Current / verified repository foundation.** Optional passage-to-evidence reader links and selected-object visibility beyond the guarded story path remain **In design**; public availability is **Unknown** pending deployed user-path proof |
 | Collaboration and bounded sharing | Owner-scoped private vault operations plus guarded public-story publication; no complete invite, role, interpretation, or unlisted-link path | **Current / verified Private and guarded Public foundations.** Selected-object Private / Unlisted / Trusted / Public visibility, Viewer / Contributor / Editor / Owner roles, shared evidence with separate interpretations, and living/sensitive review are **In design** |
 | Scoped authority | Scope vocabulary, API-key mint/list/suspend/revoke primitives, owner checks, story roles, guarded publish actions, selected review/audit events, and bounded Queue command scopes | **Current / verified partial foundation.** Queue commands do not grant domain authority, but no complete grant yet binds an external chosen AI, scope, permitted data, operation/external-action category, approval, expiry/revocation, and attributable result. Incoming API-key resolution remains unfinished; self-asserted story headers are not a public authorization model |
-| API and AI connections | Internal app APIs, API-key management, Queue scope presets and seven narrow MCP-friendly Queue tool contracts, `agentActivity`, capability manifest, story OpenAPI skeleton, `/api/capabilities`, API Center source, and `/llms.txt` | **Current / verified internal/planning foundation only.** Queue tools are not externally exposed. No verified incoming external-AI authentication, public agent API, `/mcp`, `/ai`, `/ai.txt`, or `/settings/ai` path |
+| API and AI connections | Internal app APIs, API-key management, Queue scope presets, `agentActivity`, capability manifest, story OpenAPI skeleton, `/api/capabilities`, API Center source, `/llms.txt`, plus `/mcp`, `/ai`, and `/ai.txt` | **Current / verified source and isolated official-client foundation; Partial deployed connection.** Twelve stateless MCP workflow tools resolve the owner from an exact-issuer, Clerk-shaped OAuth access token with an OAuth client identifier, keep reads bounded, and write canonical records with receipts and human publication gates. Ordinary Clerk session JWTs are rejected. The official v2 client and a generated signed token have exercised the real handler and isolated tenants. No provider registration/consent, named client, production-authenticated journey, reconnect, revocation, or `/settings/ai` path is claimed |
 | Search and retrieval | Person/place/stories views, owner-scoped API reads, context packs, filters, and queue exports | **Current / verified narrow retrieval surfaces.** Universal search across the full information model is **In design** |
 | Visualization | People/place workspaces and data suitable for relational views; Timeline route is explicitly a placeholder | **Current / verified partial foundation; In design full experience.** Do not claim timeline, pedigree, map, heatmap, or general graph experiences as shipped |
 | Retention, export, and deletion | Person context-pack export, low-level record operations, and key revocation plus a documented lifecycle gap | **Current / verified narrow tools; Coming soon complete contract.** No complete owner-vault export, coordinated retention policy, `/settings/data`, `/delete-account`, or cross-store deletion workflow is verified |
@@ -1321,7 +1321,8 @@ and must not borrow the **Coming soon** label.
 Do not claim these as current merely because the information model anticipates
 them or a planning artifact names them:
 
-- MCP connectivity or “works with any AI” setup;
+- universal “works with any AI” compatibility, a named-client provider consent
+  journey, production-authenticated reconnect/revocation, or granular client grants;
 - people/relationship-first onboarding or automatic construction of a connected
   family picture from an external service;
 - automatic record import or direct FamilySearch/provider API access;
@@ -1331,8 +1332,8 @@ them or a planning artifact names them:
 - universal search across every person, source, claim, note, and story;
 - a complete per-person and per-AI read/create/update/delete/promote/publish
   authority matrix;
-- a deployed chosen-AI credential-to-Queue round trip, externally callable MCP
-  tools, provider/client compatibility, or quotas;
+- a deployed named-client credential-to-Queue round trip, provider/client
+  compatibility beyond the protocol foundation, or quotas;
 - granular, recorded external-action handoffs with selected private context,
   action-category approval, expiry/revocation, result, and failure/return;
 - first-class generalized claims, institutions, buildings, communities,
@@ -1576,9 +1577,10 @@ change the application.
   chatbot, SaaS dashboard, or glowing autonomous-AI aesthetic.
 
 The current public source is only a partial foundation. It has `/updates`,
-roadmap/status copy, privacy copy, and `/llms.txt`, but no front-page FAQ,
-family `/ai` invitation, `/ai`, `/ai.txt`, family row, or Support Desk link.
-`/llms.txt` does not substitute for `/ai.txt`. The current `/about` local-only
+roadmap/status copy, privacy copy, `/llms.txt`, `/ai`, and `/ai.txt`, but no
+front-page FAQ, complete family `/ai` invitation, family row, or Support Desk
+link. The new setup surfaces keep provider/named-client proof Partial rather
+than treating `/llms.txt` or source implementation as a live connection. The current `/about` local-only
 storage/export statement also conflicts with the Convex-backed architecture,
 and source alone cannot prove that “working now” claims are deployed. Those
 public-copy corrections belong to a separate implementation and live-proof
@@ -1847,6 +1849,14 @@ before it was run.
 
 ## Changelog
 
+- **1.6.0 · 2026-08-12** — recorded the AWF-WO-006 source and isolated official
+  v2 client MCP foundation: twelve product-native research-to-story tools,
+  a stateless protected resource, server-derived vault identity, bounded reads,
+  replay-safe canonical writes, one-call complete-result preservation,
+  optimistic corrections, Queue continuation, and `/ai` plus `/ai.txt` setup
+  truth. Kept protected release, deployed provider behavior, named-client
+  registration/consent, production authentication, reconnect, and revocation
+  as separate unproved layers rather than inferring them from local proof.
 - **1.5.0 · 2026-08-11** — synthesized Scott's approved Family History product
   direction: People and relationships are the friendly first step into a
   connected private archive; imports and user-authorized chosen-AI research are
