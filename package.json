@@ -1,6 +1,6 @@
 {
   "name": "discover-their-stories",
-  "version": "0.1.0",
+  "version": "1.1.1",
   "private": true,
   "description": "A Family History AI Toolset - Go beyond names and dates",
   "scripts": {
@@ -66,6 +66,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1057.0",
     "@clerk/nextjs": "^6.38.2",
+    "@modelcontextprotocol/server": "^2.0.0",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@radix-ui/react-label": "^2.1.8",
@@ -76,6 +77,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "convex": "^1.32.0",
+    "jose": "^6.1.0",
     "lucide-react": "^0.562.0",
     "next": "16.1.1",
     "next-themes": "^0.4.6",
@@ -90,6 +92,7 @@
   },
   "devDependencies": {
     "@edge-runtime/vm": "^5.0.0",
+    "@modelcontextprotocol/client": "^2.0.0",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",

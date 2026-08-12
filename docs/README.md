@@ -26,6 +26,7 @@ Durable guidance that stays accurate as the product evolves.
 - [Privacy and AI safety review](security/privacy-ai-safety-review.md)
 - [Agent operations and handoff runbook](operations/agent-handoff-runbook.md)
 - [Family History Queue foundation and Claude Design handoff](product/queue-foundation-design-handoff.md)
+- [Family History stateless MCP foundation](planning/family-history-stateless-mcp-foundation.md)
 - [Product health gates and person route QA](operations/product-health-gates.md)
 - [GEN-87/88 guarded Convex rollout](operations/gen-87-clerk-convex-auth-setup.md)
 - [GEN-87/88 Convex trust-boundary architecture](operations/gen-87-convex-auth-design.md)

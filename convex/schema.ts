@@ -1411,7 +1411,7 @@ export default defineSchema({
     vaultOwnerId: v.string(),
     requestId: v.string(),
     keyId: v.optional(v.string()),
-    principalKind: v.union(v.literal("user"), v.literal("api_key")),
+    principalKind: v.union(v.literal("user"), v.literal("api_key"), v.literal("mcp")),
     route: v.string(),
     method: v.string(),
     scope: v.optional(v.string()),
@@ -1427,6 +1427,48 @@ export default defineSchema({
   })
     .index("by_owner", ["vaultOwnerId"])
     .index("by_owner_request", ["vaultOwnerId", "requestId"]),
+
+  /**
+   * MCP OPERATION RECEIPTS
+   *
+   * Replay-safe receipts for remote chosen-AI writes. The verified owner is
+   * always injected by the MCP edge; callers never supply a vault owner.
+   * Result JSON is intentionally bounded and contains only stable ids,
+   * timestamps, and short summaries needed to resume a workflow.
+   */
+  mcpOperations: defineTable({
+    vaultOwnerId: v.string(),
+    operationId: v.string(),
+    toolName: v.string(),
+    requestHash: v.string(),
+    resultJson: v.string(),
+    clientId: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_owner", ["vaultOwnerId"])
+    .index("by_owner_operation", ["vaultOwnerId", "operationId"]),
+
+  /** Stable natural keys for records first created through MCP. */
+  mcpRecordKeys: defineTable({
+    vaultOwnerId: v.string(),
+    recordType: v.union(
+      v.literal("person"),
+      v.literal("relationship"),
+      v.literal("event"),
+      v.literal("source"),
+      v.literal("citation"),
+      v.literal("source_fact"),
+      v.literal("research_task"),
+      v.literal("research_log"),
+      v.literal("story"),
+    ),
+    recordKey: v.string(),
+    recordId: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner", ["vaultOwnerId"])
+    .index("by_owner_type_key", ["vaultOwnerId", "recordType", "recordKey"]),
 
   /**
    * Guarded-rollout telemetry for calls that shadow mode would deny.

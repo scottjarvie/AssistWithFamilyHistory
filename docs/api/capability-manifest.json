@@ -1,10 +1,38 @@
 {
-  "schemaVersion": "2026-08-09",
-  "status": "internal-planning",
+  "schemaVersion": "2026-08-12",
+  "status": "current-source-with-separated-deployment-proof",
   "defaultPolicy": {
     "ownerBoundary": "All private app APIs must resolve owner context before reading or writing vault data.",
     "authBaseline": "Protected by middleware when REQUIRE_AUTH=true; local development may run without Clerk. Anonymous vaults require ALLOW_ANONYMOUS_VAULT=true.",
     "publicApi": false
+  },
+  "mcp": {
+    "resource": "https://discovertheirstories.com/mcp",
+    "transport": "stateless-streamable-http",
+    "oauth": "protected-resource metadata plus exact-issuer Clerk-shaped OAuth access-token JWT verification; ordinary session JWTs are rejected",
+    "ownerBoundary": "The verified OAuth subject selects the vault server-side. No MCP tool accepts an owner, user, workspace, or vault identifier.",
+    "currentInSource": [
+      "get_family_history_brief",
+      "search_family_history",
+      "get_family_history_context",
+      "save_person",
+      "save_relationship",
+      "save_event",
+      "save_source_evidence",
+      "save_research_work",
+      "save_story_work",
+      "save_complete_result",
+      "get_queue",
+      "update_queue"
+    ],
+    "notExposed": [
+      "delete",
+      "publish",
+      "identity_merge",
+      "sharing_or_collaboration_grants",
+      "external_familysearch_actions"
+    ],
+    "proofBoundary": "Source and isolated signed synthetic tests do not prove deployed provider consent, a named client, production authentication, reconnect, or revocation."
   },
   "scopePresets": {
     "read_only_assistant": "Owner-scoped reads for people, context packs, queue summaries, stories, and documents.",
@@ -46,22 +74,22 @@
       "methods": ["GET", "POST"],
       "capability": "product_queue_list_create",
       "environment": "browser-or-local-api",
-      "agentSupport": "restricted",
+      "agentSupport": "guarded-write",
       "reviewLevel": "owner-scoped-read-write",
       "risk": "medium",
       "scopes": ["queue:read"],
-      "notes": "Current internal human API for cursor-paged list and directive-first create. Chosen-AI list/read stays internal until incoming credentials resolve to a server-trusted principal."
+      "notes": "Current internal human API for cursor-paged list and directive-first create. The separate MCP get_queue tool now resolves verified OAuth to the bounded oauth-chosen-ai principal; provider and named-client deployment proof remains separate."
     },
     {
       "route": "/api/queue/[id]",
       "methods": ["GET", "PATCH", "DELETE"],
       "capability": "product_queue_handoff_commands",
       "environment": "browser-or-local-api",
-      "agentSupport": "restricted",
+      "agentSupport": "guarded-write",
       "reviewLevel": "owner-scoped-command-gates",
       "risk": "medium",
       "scopes": ["queue:read", "queue:claim", "queue:update", "queue:complete"],
-      "notes": "Current internal human API. Commands enforce exact four-state semantics, optimistic versioning, idempotency, actor-bound leases, owner-only cancel/reopen/delete, and no implied domain mutation authority. External AI access is not exposed."
+      "notes": "Current internal human API. Commands enforce exact four-state semantics, optimistic versioning, idempotency, actor-bound leases, owner-only cancel/reopen/delete, and no implied domain mutation authority. The MCP update_queue tool exposes only claim/checkpoint/question/complete/fail for work assigned to oauth-chosen-ai; provider and named-client deployment proof remains separate."
     },
     {
       "route": "/api/capabilities",

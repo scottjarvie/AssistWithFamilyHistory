@@ -57,6 +57,8 @@ const OWNED_TABLES = [
   "historicalContext",
   "apiKeys",
   "agentActivity",
+  "mcpOperations",
+  "mcpRecordKeys",
 ] as const satisfies readonly TableNames[];
 
 export const GUEST_PREFIX = "guest_";

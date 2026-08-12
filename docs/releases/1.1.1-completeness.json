@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "1.1.1",
+    "from": "92adca8e48fd8bfd562376a36ea9a54e48177360",
+    "to": "5179c0eb74a4b6d8eea4c9b1523f4b33c4abb47b",
+    "cutoff": "2026-08-12T16:22:37-07:00"
+  },
+  "sources": [
+    {
+      "id": "commit-5179c0eb74a4",
+      "title": "Give chosen AI durable family-history work",
+      "disposition": "include",
+      "releaseItemId": "chosen-ai-workspace"
+    }
+  ]
+}

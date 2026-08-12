@@ -171,6 +171,7 @@ function NewDirectiveForm({ onCreated, onClose }: { onCreated: (item: QueueItemR
             requestedOutcome: outcome || undefined,
             priority,
             priorityReason: priority === "high" ? priorityReason : undefined,
+            chosenAiId: "oauth-chosen-ai",
             idempotencyKey: crypto.randomUUID(),
           }),
         });
@@ -252,7 +253,7 @@ function NewDirectiveForm({ onCreated, onClose }: { onCreated: (item: QueueItemR
         <div className="flex flex-col gap-4 border-t border-[#d7cfbf] pt-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex max-w-xl gap-3 text-sm leading-6 text-[#5f665f]">
             <Bot className="mt-0.5 h-5 w-5 shrink-0 text-[#98702b]" aria-hidden="true" />
-            <p>No AI is connected through this product yet. The directive will be saved as <strong>Waiting for your AI</strong>, and nothing will run until you pick it up yourself.</p>
+            <p>The directive will wait for the compatible AI you connect through OAuth. Nothing runs automatically; that AI must connect and deliberately claim it.</p>
           </div>
           <Button type="submit" disabled={isPending || !directive.trim()} className="shrink-0 bg-[#245a43] text-[#fffdf7] hover:bg-[#1c4936]">
             {isPending ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <Archive aria-hidden="true" />}
@@ -736,7 +737,7 @@ export function QueueWorkspace() {
               </Button>
               <p className="flex items-center gap-2 text-xs leading-5 text-[#d3cec1]">
                 <Bot className="h-4 w-4 shrink-0 text-[#d8b16d]" aria-hidden="true" />
-                Your AI connection is not available yet. Human-only Queue work remains fully usable.
+                A compatible AI can connect through MCP and OAuth. Nothing runs until it deliberately claims a directive.
               </p>
             </div>
           </div>
