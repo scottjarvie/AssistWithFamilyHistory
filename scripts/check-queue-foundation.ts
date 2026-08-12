@@ -10,6 +10,10 @@ const handoff = readFileSync("docs/product/queue-foundation-design-handoff.md", 
 const philosophy = readFileSync("docs/planning/assist-with-family-history-project-philosophy.md", "utf8");
 const route = readFileSync("app/api/queue/route.ts", "utf8");
 const itemRoute = readFileSync("app/api/queue/[id]/route.ts", "utf8");
+const queuePage = readFileSync("app/app/queue/page.tsx", "utf8");
+const queueWorkspace = readFileSync("components/queue/QueueWorkspace.tsx", "utf8");
+const queuePresentation = readFileSync("lib/queue/presentation.ts", "utf8");
+const appNavigation = readFileSync("components/layout/appNavigation.ts", "utf8");
 
 assert.deepEqual(QUEUE_STATES, ["needs_you", "working", "waiting_for_your_ai", "done"]);
 assert.deepEqual(Object.values(QUEUE_STATE_LABELS), ["Needs You", "Working", "Waiting for your AI", "Done"]);
@@ -40,6 +44,13 @@ assert.match(queueModule, /ctx\.scheduler\.runAt/);
 assert.match(queueModule, /reconcileQueueItemExpiry/);
 assert.match(route, /api\.queue\.listQueueItems/);
 assert.match(itemRoute, /delete_queue_item_and_history/);
+assert.match(queuePage, /QueueWorkspace/);
+assert.match(appNavigation, /href: "\/app\/queue"/);
+assert.match(appNavigation, /label: "Your Queue"/);
+assert.match(queuePresentation, /Nothing is running/i);
+assert.match(queuePresentation, /no AI is connected/i);
+assert.match(queueWorkspace, /queueHandoffCopy/);
+assert.match(queueWorkspace, /QUEUE_STATES\.map/);
 assert.match(handoff, /not automatically adapted/i);
 assert.match(handoff, /incoming API-key resolution/i);
 assert.match(handoff, /does not inherit the broader legacy[\s\S]*shadow behavior/i);

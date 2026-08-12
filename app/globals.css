@@ -215,6 +215,23 @@
     animation: shimmer-line 4s linear infinite;
   }
 
+  .queue-ledger {
+    background-color: #f4efe3;
+    background-image:
+      linear-gradient(#98702b0a 1px, transparent 1px),
+      radial-gradient(circle at 12% 0%, #e6d8bc 0%, transparent 34%),
+      radial-gradient(circle at 100% 26%, #dce8df 0%, transparent 30%);
+    background-size: 100% 2.75rem, auto, auto;
+  }
+
+  .queue-paper {
+    background-color: #fffaf2;
+    background-image:
+      linear-gradient(92deg, #ffffff99, transparent 38%),
+      radial-gradient(#24312c0c 0.7px, transparent 0.7px);
+    background-size: auto, 5px 5px;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .animate-rise-in,
     .animate-drift,
