@@ -107,8 +107,13 @@ UI proof: the exact four states, navigation separation, disconnected-AI truth,
 directive/result/activity anatomy, empty/loading/error/permission source paths,
 desktop design, and authenticated 390×844 layout passed locally. Signed-out
 `/app/queue` redirected to Clerk sign-in. Queue API calls in the exercised
-lifecycle returned successful 2xx responses. Protected release, CI,
-deployment/public proof, and independent audit remain in progress.
+lifecycle returned successful 2xx responses. PR #34 merged as protected main
+commit `e4d1e35`; exact-main CI run `31634382959` passed verify and route smoke,
+and Vercel production deployment `EwU4tNWp2P6aMoGHgq4M2iKwZr79` completed.
+Both the preview and exact production deployment redirected to Vercel login
+before the app. Public/product-authenticated production proof therefore remains
+blocked on AWF-0030's owner access decision, and independent audit remains a
+separate unfinished layer.
 
 ## History
 
@@ -120,3 +125,7 @@ deployment/public proof, and independent audit remain in progress.
 - 2026-08-12 · Codex — completed the local multi-client lifecycle, isolation,
   responsive UI, signed-out boundary, and complete synthetic data/identity
   cleanup proof; began protected release preparation.
+- 2026-08-12 · Codex — merged PR #34, passed exact-main CI, and completed the
+  configured Vercel production deployment. Stopped at the genuine Vercel
+  Deployment Protection decision without changing access policy; execution
+  remains active and audit remains not-audited.
