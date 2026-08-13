@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { canonicalizeProductionUrl } from "../lib/site/canonicalProductionUrl";
 
-test("canonicalizes the Assist With Family History production alias", () => {
+test("canonicalizes the retired production domain", () => {
   assert.equal(
     canonicalizeProductionUrl(
-      "https://assistwithfamilyhistory.com/sign-in?redirect_url=https%3A%2F%2Fassistwithfamilyhistory.com%2Fapp"
+      "https://discovertheirstories.com/sign-in?redirect_url=https%3A%2F%2Fdiscovertheirstories.com%2Fapp"
     )?.toString(),
-    "https://discovertheirstories.com/sign-in?redirect_url=https%3A%2F%2Fdiscovertheirstories.com%2Fapp"
+    "https://assistwithfamilyhistory.com/sign-in?redirect_url=https%3A%2F%2Fassistwithfamilyhistory.com%2Fapp"
   );
 });
 
@@ -16,13 +16,13 @@ test("preserves paths and queries on legacy deployment aliases", () => {
     canonicalizeProductionUrl(
       "http://tell-their-stories.vercel.app/app/people?focus=ancestor"
     )?.toString(),
-    "https://discovertheirstories.com/app/people?focus=ancestor"
+    "https://assistwithfamilyhistory.com/app/people?focus=ancestor"
   );
 });
 
 test("does not redirect canonical, local, or lookalike hosts", () => {
   for (const url of [
-    "https://discovertheirstories.com/sign-in",
+    "https://assistwithfamilyhistory.com/sign-in",
     "http://127.0.0.1:3443/sign-in",
     "https://assistwithfamilyhistory.com.example.test/sign-in",
   ]) {
@@ -33,8 +33,8 @@ test("does not redirect canonical, local, or lookalike hosts", () => {
 test("does not rewrite a redirect target on an unrelated origin", () => {
   assert.equal(
     canonicalizeProductionUrl(
-      "https://assistwithfamilyhistory.com/sign-in?redirect_url=https%3A%2F%2Fexample.com%2Freturn"
+      "https://discovertheirstories.com/sign-in?redirect_url=https%3A%2F%2Fexample.com%2Freturn"
     )?.toString(),
-    "https://discovertheirstories.com/sign-in?redirect_url=https%3A%2F%2Fexample.com%2Freturn"
+    "https://assistwithfamilyhistory.com/sign-in?redirect_url=https%3A%2F%2Fexample.com%2Freturn"
   );
 });

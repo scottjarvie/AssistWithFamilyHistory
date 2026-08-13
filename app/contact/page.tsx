@@ -13,16 +13,19 @@ const contactItems = [
   {
     title: "General Support",
     email: "support@discovertheirstories.com",
+    label: "Email support",
     description: "Questions about setup, usage, and troubleshooting.",
   },
   {
     title: "Feature Requests",
     email: "features@discovertheirstories.com",
+    label: "Share product feedback",
     description: "Suggestions for new tools, improvements, and workflows.",
   },
   {
     title: "Privacy Questions",
     email: "privacy@discovertheirstories.com",
+    label: "Contact the privacy team",
     description: "Questions about local storage, processing, or data handling.",
   },
 ];
@@ -46,7 +49,7 @@ export default function ContactPage() {
                 <h2 className="mb-2 text-lg font-semibold text-stone-900">{item.title}</h2>
                 <p className="mb-4 text-sm text-stone-500">{item.description}</p>
                 <a className="text-amber-700 hover:underline" href={`mailto:${item.email}`}>
-                  {item.email}
+                  {item.label}
                 </a>
               </article>
             ))}

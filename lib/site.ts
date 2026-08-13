@@ -1,8 +1,8 @@
 const defaultSiteUrl = "http://127.0.0.1:3443";
 
-export const SITE_NAME = "Discover Their Stories";
+export const SITE_NAME = "Assist With Family History";
 export const SITE_DESCRIPTION =
-  "Use AI to discover family stories beyond names and dates by finding evidence, building context, and turning research into meaningful narratives.";
+  "A durable, user-controlled family-history workspace where your AI can work with connected evidence and context and you can correct and shape source-aware stories.";
 
 /**
  * Normalize a configured site URL into a safe origin: no internal or trailing

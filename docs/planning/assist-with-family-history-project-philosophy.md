@@ -2,13 +2,13 @@
 
 > **Philosophy status:** Canonical product identity and claim boundary
 >
-> **Product document version:** 1.6.1
+> **Product document version:** 1.7.0
 >
-> **Philosophy date:** 2026-08-11
+> **Philosophy date:** 2026-08-13
 >
 > **Capability evidence last verified:** 2026-08-12
 >
-> **Repository evidence revision:** `AWF-WO-006 production MCP and disposable named-client acceptance complete; audit separate`
+> **Repository evidence revision:** `AWF-WO-007 Assist With Family History identity release active; prior production MCP acceptance retained; audit separate`
 >
 > **Scope:** Product truth, language, trust, and design direction—not an
 > implementation plan, production claim, or permission to change application
@@ -63,8 +63,8 @@ provenance only and are not a current operating dependency.
 > research-to-story purpose and audience; Research Spine; domain objects and
 > workflows; citation-grade evidence, uncertainty, and living-person review
 > gates; information architecture and information density; rare, explicit
-> public-story workflow; content and voice; and the Discover Their Stories
-> archival compass, palette, typography, motifs, and editorial identity. Its
+> public-story workflow; content and voice; and the Family History archival
+> compass, palette, typography, motifs, and editorial identity. Its
 > research operations console remains distinct from both the product Queue and
 > the internal build tracker.
 >
@@ -128,7 +128,7 @@ Use these status labels throughout this revision:
 
 | Contract area | Status | Evidence-backed Family History decision |
 |---|---|---|
-| Person / Assist workspace / your AI split | **Current / verified philosophy and `/ai` source; Coming soon full public-shell alignment** | The enduring split below makes the person authoritative, Family History durable, and “your AI” user-chosen. `/ai` now teaches that split in Family History's archival voice; the current home source still does not use the required “Assist your AI, so it can assist you with family history” turn of phrase or provide the complete launch invitation/FAQ alignment |
+| Person / Assist workspace / your AI split | **Current / verified philosophy, `/ai`, and version 2.0.0 home source; production rebrand proof pending** | The enduring split below makes the person authoritative, Family History durable, and “your AI” user-chosen. `/ai` teaches that split in Family History's archival voice; the version 2.0.0 home source now uses “Assist your AI, so it can assist you with family history,” links the connection path early, and carries an eight-question capability and authority FAQ. Protected deployment and live proof remain separate AWF-WO-007 gates |
 | Domain promise, users, objects, and primary experience | **Intentional product-specific difference** | Keep the research-to-story promise and the connected vocabulary of people, families, relationships, places, buildings, events, sources, claims, questions, context, collections, projects, and stories. Family History decides how researchers, relatives, storytellers, and their chosen AI move through that evidence. The family chassis fixes dependable assistance and trust boundaries, not this domain model or experience |
 | Friendly start and connected archive | **Intentional product-specific difference; In design onboarding** | People and relationships are the primary friendly start, but not a forced container. An authorized import or chosen-AI research handoff may quickly extend that first connected picture. Sources, documents, media, places, buildings, events, claims, and stories remain many-to-many records with provenance and uncertainty; no direct provider integration is implied |
 | Product Queue | **Current / verified repository and deployed Next.js backend foundation; Coming soon designed/authenticated experience** | `queueItems`, `queueActivity`, command receipts, owner-scoped `/api/queue` seams, and focused contracts implement directive-first creation, exactly four product states, bounded handoff commands, cursor pagination, idempotency, concurrency, retry/failure/cancel/expiry, and hard deletion. PR #31 passed full CI, merged as `e65b03a`, and received successful Vercel preview/production statuses; the retained live alias and signed-out sign-in redirect were observed. `/app/operations` and `researchTasks` remain separate. No final `/queue` page, authenticated persistence, exact production Convex build-plan log, or arbitrary chosen-AI pickup path is claimed |
@@ -141,10 +141,10 @@ Use these status labels throughout this revision:
 | Access and sharing | **Current / verified Private and guarded Public foundations; In design Unlisted and Trusted** | Use one selected-object visibility vocabulary for appropriate stories, collections, and source/record surfaces: Private, Unlisted, Trusted, Public. Trusted collaboration uses simple Viewer, Contributor, Editor, and Owner roles scoped to the relevant boundary. Sharing stays deliberate, reviewable, revocable, and subject to living/sensitive review; complete invite, link, role, and visibility lifecycles are not verified |
 | Identity boundary | **Current / verified production Family History identity and owner isolation; Partial broader sign-in proof** | The production MCP and web app resolved the same retained test subject to one empty private vault, with no tenant selector, elevated role, or cross-family access. A one-time exact-user Clerk sign-in token left global verification unchanged. Fresh-device email verification remains unproved; no shared Assist identity or cross-site session is claimed |
 | Export and deletion | **Coming soon** | Person context-pack export and key revocation are narrower current tools. No complete owner export, `/settings/data`, `/delete-account`, coordinated record/account deletion, attachment purge, or content-bearing-history purge is verified |
-| Public truth surfaces and honesty | **Partial / verified source and live release surface; Coming soon wider alignment** | `/updates` now uses the exact **Local / In review / Backend live / Public & live** vocabulary and carries the AI-written 1.1.1 MCP release. Public marketing, roadmap, privacy, and `/llms.txt` exist. The home page still lacks the required FAQ and complete `/ai` invitation, and stale or unverified public statements need a separate sentence-by-sentence honesty pass before a big/public launch |
+| Public truth surfaces and honesty | **Partial / verified version 2.0.0 source and prior live release surface; production rebrand proof pending** | `/updates` uses the exact **Local / In review / Backend live / Public & live** vocabulary and version 2.0.0 is In review after full local and responsive verification. Public marketing, roadmap, privacy, `/llms.txt`, the home FAQ, and the early `/ai` invitation now use the enduring product identity and Current / Coming soon / Later boundaries. Protected deployment and a fresh sentence-by-sentence live proof remain AWF-WO-007 gates before this source may be called Public & live |
 | `/me` and `/admin` | **Coming soon** | No family `/me` or owner `/admin` route exists. `/app/audit` is a private genealogy-readiness view and `/app/api/admin` is an API-key operator surface; neither is the family usage/stats contract |
 | Support Desk | **In design / deferred dependency** | `/contact` exists, but no registered Assist With Life Support Desk source key or header/footer desk link is present. Link it only when the shared desk is live; do not market it beforehand |
-| Brand, design, and themes | **Intentional product-specific difference; Coming soon accessibility floor** | Preserve Discover Their Stories’ compass, parchment, teal/rust, archival annotations, evidence-thread motif, typography, and editorial voice as the product's own design system. The designed philosophy reader already supports light/dark; the product UI does not yet prove first-class light/dark coverage. The family swatches `#8FD7B4` and `#245A43` identify Family History in shared portfolio wayfinding; they do not replace or dictate the product palette |
+| Brand, design, and themes | **Intentional product-specific difference; Current Assist With Family History identity release in progress; Coming soon accessibility floor** | Present **Assist With Family History** as the one enduring product identity while preserving the compass, parchment, teal/rust, archival annotations, evidence-thread motif, typography, and editorial voice as its own design system. “Discover Their Stories” remains only in historical evidence or genuinely required technical identifiers. The designed philosophy reader already supports light/dark; the product UI does not yet prove first-class light/dark coverage. The family swatches `#8FD7B4` and `#245A43` identify Family History in shared portfolio wayfinding; they do not replace or dictate the product palette |
 | Dense information | **Intentional product-specific difference; Partial / verified foundation; Coming soon dependable behavior** | Family History may be denser than a sibling because evidence comparison requires it. People reads are capped and the operations view has a contained table, filters, sorting controls, and bounded rendering. Cursor pagination, table-first people view, click-to-sort columns, remembered preferences, account-saved views, and complete phone drill-down are not verified. The family contract supplies performance and phone-usability guardrails, not a uniform layout |
 | Family navigation | **Coming soon** | No family catalog row exists in the public or signed-in shell. It must show the whole verified roster without leaking cross-site counts or activity |
 | Launch stage | **Current / verified soft-launch production for public setup and bounded authenticated MCP acceptance** | The real domain, public setup/discovery, fail-closed anonymous boundary, and one isolated authenticated research-to-story lifecycle are proven. This is not a big/public launch: normal fresh-device email verification, broad client availability, reconnect, immediate JWT revocation, catalog listing, and real-family usage remain separate proof or product gates |
@@ -1488,10 +1488,13 @@ archive,” “imports everything,” “proves your ancestry,” “writes the 
 story,” “works with any AI,” “connects all your accounts,”** or **“publishes for
 you”** unless the exact narrower statement is currently verified.
 
-Use **Family History** for the enduring product identity. Use **Discover Their
-Stories** for the current repository/application name where compatibility,
-delivery, or historical precision requires it. This philosophy does not claim
-that branding, domains, redirects, or provider configuration have changed.
+Use **Assist With Family History** for the complete product name and **Family
+History** where the shorter form is clearer. “Discover Their Stories” is a
+retired product name and may remain only in historical evidence or a genuinely
+required technical identifier. The normal public address is
+`assistwithfamilyhistory.com`; old bookmarks should resolve there without
+making the retired identity the user-visible destination. Provider and live
+status remain evidence-gated until the protected release is verified.
 
 ## Distinctive design and interaction character
 
@@ -1576,10 +1579,10 @@ change the application.
   captions, family annotations, and a visible evidence thread—over a generic
   chatbot, SaaS dashboard, or glowing autonomous-AI aesthetic.
 
-The current public source is only a partial foundation. It has `/updates`,
-roadmap/status copy, privacy copy, `/llms.txt`, `/ai`, and `/ai.txt`, but no
-front-page FAQ, complete family `/ai` invitation, family row, or Support Desk
-link. The setup surfaces now distinguish the proven production backend and one
+The version 2.0.0 public source has `/updates`, roadmap/status copy, privacy
+copy, `/llms.txt`, `/ai`, `/ai.txt`, an eight-question front-page FAQ, and an
+early family `/ai` invitation. It still has no verified family row or Support
+Desk link. The setup surfaces distinguish the proven production backend and one
 disposable named-client lifecycle from still-Partial broad client compatibility,
 fresh-device email, reconnect, and immediate JWT revocation. The current `/about` local-only
 storage/export statement also conflicts with the Convex-backed architecture,
@@ -1850,6 +1853,15 @@ before it was run.
 
 ## Changelog
 
+- **1.7.0 · 2026-08-13** — established Assist With Family History as the one
+  enduring public and signed-in product identity and
+  `assistwithfamilyhistory.com` as the normal public address. Retired Discover
+  Their Stories from product language while preserving historical evidence and
+  genuinely required repository/provider identifiers. Kept the archival
+  compass, parchment, teal/rust, annotations, evidence-thread motifs,
+  typography, and calm editorial voice as Family History's distinctive design
+  system. Recorded the protected rebrand and provider/live proof as active
+  AWF-WO-007 work rather than claiming it complete before deployment.
 - **1.6.1 · 2026-08-12** — recorded the production MCP and disposable public
   PKCE client acceptance: real discovery/challenge, explicit consent, token
   exchange, official-client research-to-story saves and correction, canonical

@@ -1,4 +1,4 @@
-# Discover Their Stories
+# Assist With Family History
 
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?logo=typescript)](https://www.typescriptlang.org/)
@@ -6,11 +6,11 @@
 
 **A Family History AI Toolset** - Go beyond names and dates. Research deeply, tell stories, create content.
 
-![Discover Their Stories Homepage](https://img.shields.io/badge/Status-Active%20Development-brightgreen)
+![Assist With Family History Homepage](https://img.shields.io/badge/Status-Active%20Development-brightgreen)
 
 ## 🌟 Overview
 
-Discover Their Stories is a platform for family historians who want to go beyond collecting names and dates. It transforms genealogical data into compelling narratives using AI assistance.
+Assist With Family History is a platform for family historians who want to go beyond collecting names and dates. It transforms genealogical data into compelling narratives using AI assistance.
 
 The canonical product direction, domain model, responsibility split, design
 character, and evidence-backed family alignment live in the
@@ -343,4 +343,4 @@ Created by [@scottjarvie](https://github.com/scottjarvie)
 
 ---
 
-*Discover Their Stories - Because every ancestor has a story worth telling.*
+*Assist With Family History - Because every ancestor has a story worth telling.*

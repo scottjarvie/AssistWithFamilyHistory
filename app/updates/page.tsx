@@ -9,7 +9,7 @@ import { createPageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = createPageMetadata({
   title: "What's New",
-  description: "Created, fixed, and upgraded changes in Discover Their Stories.",
+  description: "Created, fixed, and upgraded changes in Assist With Family History.",
   path: "/updates",
 });
 

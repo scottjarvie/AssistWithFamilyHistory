@@ -32,11 +32,11 @@ function isAbsoluteUrl(value: string): boolean {
 
 // -- 1. Behavioral: normalizeSiteUrl strips all whitespace + trailing slashes --
 const normalizeCases: Array<[string, string]> = [
-  ["https://discovertheirstories.com\n", "https://discovertheirstories.com"],
-  ["https://discovertheirstories.com/\n", "https://discovertheirstories.com"],
-  ["https://discovertheirstories.com/", "https://discovertheirstories.com"],
-  ["  https://discovertheirstories.com  ", "https://discovertheirstories.com"],
-  ["https://discovertheirstories.com\r\n", "https://discovertheirstories.com"],
+  ["https://assistwithfamilyhistory.com\n", "https://assistwithfamilyhistory.com"],
+  ["https://assistwithfamilyhistory.com/\n", "https://assistwithfamilyhistory.com"],
+  ["https://assistwithfamilyhistory.com/", "https://assistwithfamilyhistory.com"],
+  ["  https://assistwithfamilyhistory.com  ", "https://assistwithfamilyhistory.com"],
+  ["https://assistwithfamilyhistory.com\r\n", "https://assistwithfamilyhistory.com"],
 ];
 
 for (const [input, expected] of normalizeCases) {

@@ -62,7 +62,7 @@ export function AppMobileNav({ accountMode, vaultOwnerId, clerkEnabled }: Sideba
           <div className="w-8 h-8 bg-amber-700 rounded-lg flex items-center justify-center flex-shrink-0">
             <BookOpen className="w-5 h-5 text-white" />
           </div>
-          <span className="font-semibold text-sm">Discover Their Stories</span>
+          <span className="font-semibold text-sm">Family History</span>
         </SafeLink>
 
         <Sheet>
@@ -90,7 +90,7 @@ export function AppMobileNav({ accountMode, vaultOwnerId, clerkEnabled }: Sideba
                 <div className="w-8 h-8 bg-amber-700 rounded-lg flex items-center justify-center flex-shrink-0">
                   <BookOpen className="w-5 h-5 text-white" />
                 </div>
-                <span className="font-semibold text-sm">Discover Their Stories</span>
+                <span className="font-semibold text-sm">Family History</span>
               </SafeLink>
             </div>
             <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
@@ -148,15 +148,15 @@ export function AppSidebar({ accountMode, vaultOwnerId, clerkEnabled }: SidebarA
       <div className="p-4 border-b border-stone-800">
         <SafeLink
           href="/"
-          aria-label={collapsed ? "Discover Their Stories home" : undefined}
-          title={collapsed ? "Discover Their Stories home" : undefined}
+          aria-label={collapsed ? "Assist With Family History home" : undefined}
+          title={collapsed ? "Assist With Family History home" : undefined}
           className="flex items-center gap-3"
         >
           <div className="w-8 h-8 bg-amber-700 rounded-lg flex items-center justify-center flex-shrink-0">
             <BookOpen className="w-5 h-5 text-white" />
           </div>
           {!collapsed && (
-            <span className="font-semibold text-sm">Discover Their Stories</span>
+            <span className="font-semibold text-sm">Family History</span>
           )}
         </SafeLink>
       </div>

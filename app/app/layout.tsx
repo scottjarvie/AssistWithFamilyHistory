@@ -25,7 +25,7 @@ import { getVaultAccessContext } from "@/lib/vault/server";
 
 export const metadata: Metadata = createPageMetadata({
   title: "Workspace",
-  description: "Use the Discover Their Stories workspace tools for import, analysis, and output generation.",
+  description: "Keep people, relationships, sources, research findings, and stories connected in your private Family History workspace.",
   path: "/app",
 });
 
@@ -58,7 +58,7 @@ export default async function AppLayout({
         {children}
         <footer className="border-t border-stone-200 px-4 py-6 text-sm text-stone-500 md:px-8">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-2">
-            <span>Discover Their Stories</span>
+            <span>Assist With Family History</span>
             <SafeLink href="/privacy" className="hover:text-stone-900 hover:underline">
               Privacy
             </SafeLink>

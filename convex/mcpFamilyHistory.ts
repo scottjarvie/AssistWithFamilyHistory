@@ -28,7 +28,7 @@ function ownerFromPrincipal(principal: McpPrincipal): string {
     throw new Error("MCP_FAMILY_HISTORY_ERROR:" + JSON.stringify({
       code: "AUTH_REQUIRED",
       message: "A verified Family History OAuth identity is required.",
-      recovery: "Reconnect the MCP server and sign in to Discover Their Stories.",
+      recovery: "Reconnect the MCP server and sign in to Assist With Family History.",
     }));
   }
   return owner;

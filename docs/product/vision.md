@@ -1,10 +1,10 @@
-# Discover Their Stories - Vision & Goals
+# Assist With Family History - Vision & Goals
 
 *Last updated: 2026-05-20*
 
 ## The Big Picture
 
-**Discover Their Stories** isn't just genealogy software. It's about transforming family history from a names-and-dates collection exercise into a deep, meaningful connection with ancestors as *real people*.
+**Assist With Family History** isn't just genealogy software. It's about transforming family history from a names-and-dates collection exercise into a deep, meaningful connection with ancestors as *real people*.
 
 It is also an **AI family history lab**: an experimental product asking what modern AI can unlock for genealogy, ancestor context, research discovery, and story creation. Some ideas should become durable product surfaces. Others can stay in a clearly labeled experimental area while we learn whether they are useful.
 

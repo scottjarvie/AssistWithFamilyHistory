@@ -28,14 +28,14 @@ export function CTASection() {
         <div>
           <div className="inline-flex items-center gap-2 rounded-full border border-[#f2d7af66] bg-[#f7f3e81a] px-4 py-2 text-sm text-[#f2e1c4]">
             <Wrench className="h-4 w-4" />
-            Useful now, still under construction
+            Soft launch · useful now, still growing
           </div>
           <h2 className="mt-8 max-w-3xl text-4xl leading-tight text-[#fff6e5] sm:text-5xl" data-display="true">
-            Best for curious researchers, family historians, and beta testers.
+            Keep the useful result after the conversation ends.
           </h2>
           <p className="mt-6 max-w-3xl text-lg leading-8 text-[#ecdeca]">
-            Come in if you are comfortable with an evolving workflow and want to help shape what
-            AI-assisted ancestor research and storytelling should become.
+            Begin with a person, a relationship, a source, or a question. Work by hand or bring a
+            compatible chosen AI; the workspace keeps the evidence, uncertainty, and next step.
           </p>
 
           <div className="mt-10 flex flex-col gap-4 sm:flex-row">
@@ -45,7 +45,7 @@ export function CTASection() {
               className="h-[3.25rem] rounded-full bg-[#f8ebd5] px-8 text-base font-semibold text-[#1d3540] shadow-[0_20px_30px_-24px_#000] hover:bg-[#fff2df]"
             >
               <SafeLink href="/app" className="flex items-center gap-2">
-                Open the beta workspace
+                Open your workspace
                 <ArrowRight className="h-4 w-4" />
               </SafeLink>
             </Button>
@@ -59,7 +59,7 @@ export function CTASection() {
                 href="mailto:features@discovertheirstories.com"
                 className="flex items-center gap-2"
               >
-                Send beta feedback
+                Share feedback
                 <Mail className="h-4 w-4" />
               </SafeLink>
             </Button>
@@ -67,18 +67,18 @@ export function CTASection() {
         </div>
 
         <div className="border border-[#f3dfbe55] bg-[#f8ebd512] p-6 text-[#ecdeca]">
-          <p className="text-xs uppercase tracking-[0.24em] text-[#f2d7af]">Good fit right now</p>
+          <p className="text-xs uppercase tracking-[0.24em] text-[#f2d7af]">Current</p>
           <ul className="mt-5 space-y-4 text-sm leading-6">
-            <li>People testing FamilySearch capture and import workflows.</li>
-            <li>Researchers who want a vault-first place to collect evidence and context.</li>
-            <li>Family historians experimenting with AI-generated story drafts.</li>
+            <li>People, places, sources, research operations, and private story drafts.</li>
+            <li>A four-state Queue that preserves directives and results across sessions.</li>
+            <li>A bounded remote connection proven with one compatible OAuth client.</li>
           </ul>
           <div className="my-6 h-px bg-[#f3dfbe33]" />
-          <p className="text-xs uppercase tracking-[0.24em] text-[#f2d7af]">Not yet</p>
+          <p className="text-xs uppercase tracking-[0.24em] text-[#f2d7af]">Not implied</p>
           <ul className="mt-5 space-y-4 text-sm leading-6">
-            <li>Not a polished public genealogy platform.</li>
-            <li>Not a finished publishing system.</li>
-            <li>Not a replacement for careful researcher judgment.</li>
+            <li>No automatic access to every genealogy provider.</li>
+            <li>No universal AI-client compatibility or unattended research.</li>
+            <li>No replacement for careful researcher judgment or human publication review.</li>
           </ul>
         </div>
       </div>

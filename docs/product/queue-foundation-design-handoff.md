@@ -143,7 +143,7 @@ Claude Design may decide final page composition, card layout, responsive informa
 - Permission denied, backend unavailable, empty, retry, disconnected-AI, and expired-handoff states need complete treatments.
 - Human-only claim/checkpoint/complete remains usable with no AI connection.
 - Destructive deletion requires explicit confirmation; publication/merge/access controls do not belong in generic Queue actions.
-- Preserve Discover Their Stories' archival research-to-story character and existing signed-in shell seams. This handoff does not authorize a new navigation destination or a generic sibling visual design.
+- Preserve Assist With Family History' archival research-to-story character and existing signed-in shell seams. This handoff does not authorize a new navigation destination or a generic sibling visual design.
 
 ## Verification boundary
 

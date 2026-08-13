@@ -1,6 +1,6 @@
 # AI Family History Lab
 
-Discover Their Stories is an experiment in what modern AI can make possible for family history, genealogy, and connection to ancestors.
+Assist With Family History is an experiment in what modern AI can make possible for family history, genealogy, and connection to ancestors.
 
 The product is not only a genealogy database, and it is not only a story writer. It is a lab for gathering ancestor context, trying many tools, learning which workflows matter, and turning the useful pieces into grounded stories and shareable family-history experiences.
 

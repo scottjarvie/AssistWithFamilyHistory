@@ -1,6 +1,6 @@
 # Agent Operating Rules
 
-This repo builds Discover Their Stories, a FamilySearch-first family history vault, research operations queue, and story-writing workflow. Treat genealogy data as private by default, especially living people, memories, notes, and raw imported artifacts.
+This repo builds Assist With Family History, a FamilySearch-first family history vault, research operations queue, and story-writing workflow. Treat genealogy data as private by default, especially living people, memories, notes, and raw imported artifacts.
 
 This project follows the repository-owned Assist tracker operating standard in
 [`docs/tracker/GUIDE.md`](docs/tracker/GUIDE.md). Historical Linear references

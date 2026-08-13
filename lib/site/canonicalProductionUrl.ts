@@ -1,17 +1,17 @@
-const CANONICAL_PRODUCTION_HOST = "discovertheirstories.com";
+const CANONICAL_PRODUCTION_HOST = "assistwithfamilyhistory.com";
 
 const PRODUCTION_REDIRECT_HOSTS = new Set([
-  "assistwithfamilyhistory.com",
+  "discovertheirstories.com",
   "tell-their-stories.vercel.app",
   "tell-their-stories-jarvies-projects.vercel.app",
   "tell-their-stories-jarvie-jarvies-projects.vercel.app",
 ]);
 
 /**
- * Keep every production alias on the one origin authorized by Clerk.
+ * Keep legacy production addresses on the enduring Family History origin.
  *
- * This runs before Clerk middleware so an alias can never attempt to load the
- * canonical production publishable key from an unapproved browser origin.
+ * This runs before Clerk middleware so old bookmarks and provider redirect
+ * targets cannot leave the retired product name in the browser address bar.
  */
 export function canonicalizeProductionUrl(requestUrl: string) {
   const canonicalUrl = new URL(requestUrl);

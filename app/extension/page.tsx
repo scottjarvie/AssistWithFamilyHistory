@@ -29,7 +29,7 @@ import { createPageMetadata } from "@/lib/seo";
 export const metadata: Metadata = createPageMetadata({
   title: "Extension",
   description:
-    "Install the FamilySearch capture extension and import capture packages into the Discover Their Stories research vault.",
+    "Install the FamilySearch capture extension and import capture packages into the Assist With Family History research vault.",
   path: "/extension",
 });
 
@@ -161,7 +161,7 @@ export default function ExtensionPage() {
                 Capture is the beginning, not the finished story.
               </h2>
               <p className="mt-4 text-base leading-7 text-[#56615d] md:text-lg">
-                Discover Their Stories preserves the path from source material
+                Assist With Family History preserves the path from source material
                 to reviewed writing. Each stage keeps the evidence and its
                 uncertainty visible.
               </p>

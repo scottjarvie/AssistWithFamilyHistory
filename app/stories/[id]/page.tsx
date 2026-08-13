@@ -317,7 +317,7 @@ export default async function PublicStoryPage({
 
         <section className="px-4 py-10 text-center sm:px-6 lg:px-8">
           <Button asChild variant="outline" className="border-[#9f5a2d66] text-[#7c4425] hover:bg-[#efe4cd]">
-            <Link href="/">Learn about Discover Their Stories</Link>
+            <Link href="/">Learn about Assist With Family History</Link>
           </Button>
         </section>
       </main>

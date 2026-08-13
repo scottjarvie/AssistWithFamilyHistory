@@ -257,4 +257,4 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
-console.log("Discover Their Stories Service Worker initialized");
+console.log("Assist With Family History Service Worker initialized");

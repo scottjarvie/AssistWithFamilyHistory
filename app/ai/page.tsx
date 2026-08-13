@@ -88,7 +88,7 @@ export default function AiSetupPage() {
               <div className="absolute -left-7 top-12 hidden h-px w-14 bg-[#d8b16d] lg:block" aria-hidden="true" />
               <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#98702b]">Canonical connection address</p>
               <code className="mt-4 block overflow-x-auto border-y border-[#d8cfbd] py-5 font-mono text-sm font-semibold text-[#245a43]">
-                https://discovertheirstories.com/mcp
+                https://assistwithfamilyhistory.com/mcp
               </code>
               <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
                 <div><p className="text-3xl font-semibold">12</p><p className="mt-1 text-xs leading-5 text-[#687169]">workflow tools from first brief to complete-result save</p></div>
@@ -130,8 +130,8 @@ export default function AiSetupPage() {
               <ol className="mt-9 space-y-6">
                 {[
                   ["Choose a compatible client", "It must support remote Streamable HTTP MCP and OAuth. Exact menu names differ by client."],
-                  ["Add the MCP address", "Use https://discovertheirstories.com/mcp as the server URL."],
-                  ["Sign in and review consent", "Use the same Discover Their Stories account whose private vault you want your AI to assist."],
+                  ["Add the MCP address", "Use https://assistwithfamilyhistory.com/mcp as the server URL."],
+                  ["Sign in and review consent", "Use the same Assist With Family History account whose private vault you want your AI to assist."],
                   ["Ask for the Family History brief", "Your AI should call get_family_history_brief first, then search and hydrate before changing records."],
                 ].map(([title, copy], index) => (
                   <li key={title} className="grid grid-cols-[2.5rem_1fr] gap-4">

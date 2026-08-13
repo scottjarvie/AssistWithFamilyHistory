@@ -12,8 +12,12 @@ import {
 } from "../../lib/mcp/contract";
 
 const SERVER_NAME = "assist-with-family-history";
-const SERVER_VERSION = "0.1.0";
-const DEFAULT_RESOURCE = "https://discovertheirstories.com/mcp";
+const SERVER_VERSION = "0.2.0";
+const DEFAULT_RESOURCE = "https://assistwithfamilyhistory.com/mcp";
+const LEGACY_RESOURCE_HOST = "discovertheirstories.com";
+const LEGACY_ISSUER_HOST = "clerk.discovertheirstories.com";
+const CANONICAL_RESOURCE_HOST = "assistwithfamilyhistory.com";
+const CANONICAL_ISSUER_HOST = "clerk.assistwithfamilyhistory.com";
 const mcp = (internal as any).mcpFamilyHistory;
 const vault = (internal as any).vault;
 const queue = (internal as any).queue;
@@ -31,6 +35,15 @@ function requiredUrl(name: "MCP_RESOURCE_URL" | "MCP_AUTH_SERVER_URL") {
     : process.env.MCP_AUTH_SERVER_URL?.trim() || process.env.CLERK_JWT_ISSUER_DOMAIN?.trim();
   if (!raw) throw new Error(`Missing ${name}.`);
   const url = new URL(raw);
+  // The protected deployment that changes Clerk's primary domain can still
+  // receive the prior production env value. Normalize only those two exact
+  // retired hosts; preview, development, and synthetic issuers stay untouched.
+  if (name === "MCP_RESOURCE_URL" && url.hostname === LEGACY_RESOURCE_HOST) {
+    url.hostname = CANONICAL_RESOURCE_HOST;
+  }
+  if (name === "MCP_AUTH_SERVER_URL" && url.hostname === LEGACY_ISSUER_HOST) {
+    url.hostname = CANONICAL_ISSUER_HOST;
+  }
   if (url.protocol !== "https:" && url.hostname !== "localhost") throw new Error(`${name} must be HTTPS.`);
   if (url.username || url.password || url.search || url.hash) throw new Error(`${name} must not contain credentials, query, or fragment.`);
   if (name === "MCP_RESOURCE_URL" && url.pathname !== "/mcp") throw new Error("MCP_RESOURCE_URL must identify the canonical /mcp resource.");

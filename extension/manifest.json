@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Discover Their Stories - FamilySearch Capture",
+  "name": "Assist With Family History - FamilySearch Capture",
   "version": "1.0.0",
-  "description": "Capture FamilySearch sources and memories for the Discover Their Stories research vault",
+  "description": "Capture FamilySearch sources and memories for the Assist With Family History research vault",
   "permissions": [
     "activeTab",
     "storage"

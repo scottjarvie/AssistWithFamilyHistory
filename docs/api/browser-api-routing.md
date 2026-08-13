@@ -4,7 +4,7 @@ Last updated: 2026-05-21
 
 ## Purpose
 
-This document tells agents which environment to use for core Discover Their Stories workflows.
+This document tells agents which environment to use for core Assist With Family History workflows.
 
 The project intentionally uses both browser-led workflows and internal APIs. Do not force every workflow into an API route, and do not use browser automation as a workaround for missing provider approval or missing safety gates.
 

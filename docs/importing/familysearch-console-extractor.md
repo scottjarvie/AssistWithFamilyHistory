@@ -2,7 +2,7 @@
 
 The Chrome extension in `extension/` is the preferred FamilySearch source capture path. Use this console workflow only as a fallback for local/internal recovery, debugging, or pages the extension cannot yet capture. For the current operating rules, see `docs/importing/familysearch-source-capture-runbook.md`.
 
-A set of browser console scripts and Node.js importers to extract structured genealogical data from FamilySearch.org and import it into the Discover Their Stories Convex database.
+A set of browser console scripts and Node.js importers to extract structured genealogical data from FamilySearch.org and import it into the Assist With Family History Convex database.
 
 ## 🎯 Purpose
 
@@ -244,7 +244,7 @@ Potential improvements:
 
 ## 📄 License
 
-Part of the Discover Their Stories project. For internal use.
+Part of the Assist With Family History project. For internal use.
 
 ---
 

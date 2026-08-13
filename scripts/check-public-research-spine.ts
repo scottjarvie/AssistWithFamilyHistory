@@ -40,7 +40,7 @@ const homeAnchor = [...marketingNavMarkup.matchAll(/<a\b[^>]*>/g)]
 assert.ok(homeAnchor, "Marketing navigation must render a home anchor");
 assert.match(
   homeAnchor,
-  /aria-label="Discover Their Stories home"/,
+  /aria-label="Assist With Family History home"/,
   "The compass-only mobile home link must keep an accessible name",
 );
 

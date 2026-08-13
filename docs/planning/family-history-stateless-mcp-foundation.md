@@ -28,7 +28,7 @@ exposing database CRUD:
 
 ## Connection and identity contract
 
-- Canonical resource: `https://discovertheirstories.com/mcp`.
+- Canonical resource: `https://assistwithfamilyhistory.com/mcp`.
 - Transport: stateless remote Streamable HTTP MCP. The v2 server implements the
   modern 2026-07-28 request shape and retains a stateless 2025-era fallback
   through the same tool factory.

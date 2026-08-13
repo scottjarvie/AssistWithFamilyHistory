@@ -75,12 +75,12 @@ for (const className of [
 }
 assert.match(
   sidebarSource,
-  /<div className="[^"]*shrink-0[^"]*border-b[^"]*">[\s\S]*?Discover Their Stories/,
+  /<div className="[^"]*shrink-0[^"]*border-b[^"]*">[\s\S]*?Assist With Family History/,
   "The mobile sheet header must remain fixed while navigation scrolls"
 );
 assert.match(
   sidebarSource,
-  /aria-label=\{collapsed \? "Discover Their Stories home" : undefined\}/
+  /aria-label=\{collapsed \? "Assist With Family History home" : undefined\}/
 );
 assert.match(
   sidebarSource,

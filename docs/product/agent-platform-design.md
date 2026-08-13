@@ -1,4 +1,4 @@
-# Discover Their Stories — AI Agent Platform: Design & Roadmap
+# Assist With Family History — AI Agent Platform: Design & Roadmap
 
 Status: active design/build history. Last reconciled: 2026-08-09.
 
@@ -11,7 +11,7 @@ Status: active design/build history. Last reconciled: 2026-08-09.
 
 ## Vision
 
-Make Discover Their Stories the platform where a person points ANY AI agent (Claude Code,
+Make Assist With Family History the platform where a person points ANY AI agent (Claude Code,
 Codex, Claude Cowork, etc.) at the site and the agent autonomously does family-history work in
 plain language — acquiring sources, storing the full spectrum of context with provenance and
 privacy, and producing grounded stories + visualizations — while the human watches tasks run and
@@ -90,7 +90,7 @@ makes zero network calls to the app. There is no Convex blob storage (`ctx.stora
 
 Decision (Scott, 2026-05-29): **acquisition is the agent's job; enablement is ours.** Each user's
 own AI agent visits the genealogy/record/newspaper sites, fetches the data, and owns the access and
-terms-of-service decisions. Discover Their Stories does NOT crawl providers itself. Instead we
+terms-of-service decisions. Assist With Family History does NOT crawl providers itself. Instead we
 provide:
 
 - A robust, provider-neutral ingestion API (`POST /api/v1/intake` over the `IntakeEnvelope`) that

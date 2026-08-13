@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Discover Their Stories Story Agent API Skeleton
+  title: Assist With Family History Story Agent API Skeleton
   version: 2026-05-21
   summary: Internal planning skeleton for story writer, reviewer, and trusted publisher agents.
   description: >

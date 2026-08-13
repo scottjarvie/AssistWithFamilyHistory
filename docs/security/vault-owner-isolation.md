@@ -2,7 +2,7 @@
 
 Last updated: 2026-07-12.
 
-Discover Their Stories treats every vault as private tenant data. The browser,
+Assist With Family History treats every vault as private tenant data. The browser,
 URL arguments, Next routes, and client-supplied vault owner are not security
 authorities. Convex verifies the caller at the data boundary.
 

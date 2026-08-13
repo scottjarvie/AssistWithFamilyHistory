@@ -101,6 +101,18 @@ describe("stateless Family History MCP transport", () => {
     await expect(anonymous.json()).resolves.toMatchObject({ error: "invalid_token" });
   });
 
+  test("normalizes only the retired production resource and issuer hosts", async () => {
+    vi.stubEnv("MCP_RESOURCE_URL", "https://discovertheirstories.com/mcp");
+    vi.stubEnv("MCP_AUTH_SERVER_URL", "https://clerk.discovertheirstories.com");
+    const t = convexTest(schema, modules);
+
+    const metadata = await t.fetch("/.well-known/oauth-protected-resource/mcp");
+    await expect(metadata.json()).resolves.toMatchObject({
+      resource: "https://assistwithfamilyhistory.com/mcp",
+      authorization_servers: ["https://clerk.assistwithfamilyhistory.com"],
+    });
+  });
+
   test("an authenticated modern client lists the complete bounded tool catalog without a session", async () => {
     const t = convexTest(schema, modules);
     const response = await t.fetch("/mcp", modernRequest("tools/list", await accessToken()));

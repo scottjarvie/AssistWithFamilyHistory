@@ -6,7 +6,7 @@ Reconciled: 2026-07-17 against main `9e2b1ce`, production public routes, open PR
 
 ## Decision
 
-Discover Their Stories will describe one evidence-to-story journey everywhere:
+Assist With Family History will describe one evidence-to-story journey everywhere:
 
 > **Capture → Vault → Research → Story**
 
@@ -26,8 +26,8 @@ Privacy, provenance, uncertainty, and publish readiness are cross-cutting meanin
 
 ### Production
 
-- `https://discovertheirstories.com/`, `/features`, `/extension`, `/privacy`, `/roadmap`, and `/updates` returned HTTP 200 on 2026-07-17.
-- The live extension page still renders the legacy presentation while the other public routes expose the shared AI Heritage Studio shell.
+- `https://assistwithfamilyhistory.com/`, `/features`, `/extension`, `/privacy`, `/roadmap`, and `/updates` returned HTTP 200 on 2026-07-17.
+- The live extension page still renders the legacy presentation while the other public routes expose the older shared product shell.
 - Production public routes are evidence for the current mismatch, not permission to inspect authenticated routes or family-history data.
 
 ### Open PR ownership

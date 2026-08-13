@@ -7,7 +7,7 @@ import { createPageMetadata } from "@/lib/seo";
 
 const statusGroups = [
   {
-    title: "Working Now",
+    title: "Current",
     icon: CheckCircle2,
     tone: "text-[#4f765d]",
     items: [
@@ -19,7 +19,7 @@ const statusGroups = [
     ],
   },
   {
-    title: "Being Worked On",
+    title: "Coming Soon",
     icon: Clock3,
     tone: "text-[#9f5a2d]",
     items: [
@@ -30,7 +30,7 @@ const statusGroups = [
     ],
   },
   {
-    title: "Being Explored",
+    title: "Later",
     icon: FlaskConical,
     tone: "text-[#5b6d7a]",
     items: [
@@ -45,7 +45,7 @@ const statusGroups = [
 export const metadata: Metadata = createPageMetadata({
   title: "Features",
   description:
-    "See what is working now, being worked on, and being explored in Discover Their Stories.",
+    "See what is working now, being worked on, and being explored in Assist With Family History.",
   path: "/features",
 });
 
@@ -57,13 +57,13 @@ export default function FeaturesPage() {
         <section className="border-b border-[#d8c7a7] bg-[#efe4cd] px-4 py-12 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-6xl">
             <Badge className="mb-5 border-[#9f5a2d33] bg-white/60 text-[#7c4425] hover:bg-white/60">
-              Public beta feature map
+              Soft-launch capability map
             </Badge>
             <h1 className="max-w-4xl font-[family-name:var(--font-cormorant-garamond)] text-5xl font-semibold leading-[0.95] text-[#1d212a] sm:text-6xl">
               Tools for turning research into ancestor stories.
             </h1>
             <p className="mt-5 max-w-3xl text-lg leading-8 text-[#5f5542]">
-              This is not a mass-market genealogy site yet. It is a working beta for collecting the evidence, context, relationships, places, and memories needed to speak for ancestors with care.
+              This is a durable research-to-story workspace in soft launch. It is a working beta for collecting the evidence, context, relationships, places, and memories needed to speak for ancestors with care.
             </p>
           </div>
         </section>

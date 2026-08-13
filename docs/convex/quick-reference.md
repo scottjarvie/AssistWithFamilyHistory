@@ -1,4 +1,4 @@
-# Convex Quick Reference - Discover Their Stories
+# Convex Quick Reference - Assist With Family History
 
 ## Common Patterns
 

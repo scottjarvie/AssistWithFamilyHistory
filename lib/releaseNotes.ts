@@ -38,11 +38,68 @@ export function releaseItemsForCategory(entry: ReleaseEntry, category: ReleaseCa
   return sortReleaseItems(entry.items.filter((item) => item.category === category));
 }
 
-export const appVersion = "1.1.1";
+export const appVersion = "2.0.0";
 
 export const releaseNotes: ReleaseEntry[] = [
   {
     version: appVersion,
+    status: "In review",
+    releasedAt: "2026-08-13T16:00:00-07:00",
+    timezone: "America/Phoenix",
+    title: "One clear home for family-history work",
+    summary: "The product, workspace, AI connection, and normal public address now share one enduring identity: Assist With Family History.",
+    items: [
+      {
+        id: "assist-with-family-history-identity",
+        category: "upgraded",
+        impactTier: "major",
+        impactRank: 1,
+        short: "Unified the public site, signed-in workspace, Queue, extension, metadata, and guides under Assist With Family History.",
+        long: {
+          what: "Retired the old product name from current user-facing surfaces while preserving the archival compass, parchment, evidence-thread design, and historical or required technical identifiers.",
+          why: "People should encounter the same product promise and name before sign-in, inside the workspace, and when connecting their chosen AI.",
+          where: "Public pages, app shell, Queue language, FamilySearch capture extension, metadata, social images, and current setup documentation.",
+        },
+        sourceRefs: ["AWF-0035", "PR-42"],
+        audiences: ["public", "signed-in"],
+      },
+      {
+        id: "canonical-family-history-domain",
+        category: "fixed",
+        impactTier: "major",
+        impactRank: 2,
+        short: "Made assistwithfamilyhistory.com the normal product and sign-in destination.",
+        long: {
+          what: "Reversed the temporary compatibility redirect so old product and deployment addresses resolve to the enduring Family History domain while preserving protected paths and safe redirect targets.",
+          why: "The earlier emergency repair restored the form, but it left the retired identity in the address bar. The product-correct repair keeps the secure sign-in boundary and the new canonical home together.",
+          where: "Public routes, /sign-in, /sign-up, protected /app routes, canonical metadata, and legacy-domain redirects.",
+        },
+        sourceRefs: ["AWF-0035", "AWF-WO-007"],
+        audiences: ["public", "signed-in"],
+      },
+      {
+        id: "research-to-story-front-door",
+        category: "created",
+        impactTier: "meaningful",
+        impactRank: 1,
+        short: "Created a clearer research-to-story front door and practical FAQ.",
+        long: {
+          what: "The homepage now explains the person / your AI / durable workspace split, shows the clue-to-evidence-to-story trail, and answers eight concrete questions about privacy, authority, imports, evidence, and current capability.",
+          why: "A careful family-history workspace should be understandable before someone signs in or grants an AI connection.",
+          where: "Homepage and Connect your AI setup page.",
+        },
+        sourceRefs: ["AWF-0035", "Family-History-Project-Philosophy-1.7.0"],
+        audiences: ["public", "agent"],
+      },
+    ],
+    whatToCheck: [
+      "Open assistwithfamilyhistory.com on desktop and phone and confirm the Assist With Family History identity, research-to-story promise, FAQ, and current-status language are clear.",
+      "Open assistwithfamilyhistory.com/app while signed out, complete the normal sign-in journey, and confirm the workspace stays on the Family History address.",
+      "Confirm /ai, /ai.txt, /llms.txt, /mcp discovery, and the anonymous OAuth challenge all use the Family History resource address.",
+    ],
+  },
+  {
+    version: "1.1.1",
     status: "Backend live",
     releasedAt: "2026-08-12T16:08:00-07:00",
     timezone: "America/Phoenix",
@@ -131,7 +188,7 @@ export const releaseNotes: ReleaseEntry[] = [
     releasedAt: "2026-06-19T09:09:20-04:00",
     timezone: "America/New_York",
     title: "Initial release-log baseline",
-    summary: "This started the public, privacy-safe release log for Discover Their Stories.",
+    summary: "This started the public, privacy-safe release log under the product's former Discover Their Stories name.",
     items: [
       {
         id: "updates-baseline",
