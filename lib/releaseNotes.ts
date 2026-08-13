@@ -38,11 +38,82 @@ export function releaseItemsForCategory(entry: ReleaseEntry, category: ReleaseCa
   return sortReleaseItems(entry.items.filter((item) => item.category === category));
 }
 
-export const appVersion = "2.0.0";
+export const appVersion = "2.0.1";
 
 export const releaseNotes: ReleaseEntry[] = [
   {
     version: appVersion,
+    status: "In review",
+    releasedAt: "2026-08-13T16:00:00-07:00",
+    timezone: "America/Phoenix",
+    title: "A useful first step in an empty workspace",
+    summary: "Newcomers now see the two working ways to begin and reach the current OAuth MCP setup from the signed-in workspace and Queue.",
+    items: [
+      {
+        id: "empty-workspace-first-step",
+        category: "created",
+        impactTier: "meaningful",
+        impactRank: 1,
+        short: "Fixed the empty dashboard so its first actions work before any family records exist.",
+        long: {
+          what: "A genuinely empty vault now offers a reviewed capture or chosen-AI connection instead of sending someone to story review and research operations with nothing to work on.",
+          why: "A new person should understand how to begin without guessing which downstream workspace might create the first record.",
+          where: "Signed-in dashboard when people, places, stories, imports, documents, and open tasks are all empty.",
+        },
+        sourceRefs: ["AWF-0036"],
+        audiences: ["signed-in"],
+      },
+      {
+        id: "current-ai-setup-route",
+        category: "fixed",
+        impactTier: "meaningful",
+        impactRank: 2,
+        short: "Fixed signed-in AI wayfinding so normal setup leads to the current OAuth MCP guide.",
+        long: {
+          what: "Your AI navigation and the Queue connection note now link to Connect your AI. The older key console remains available by direct address but clearly describes itself as a partial developer path.",
+          why: "Newcomers should not be sent to copy a key for a verification path that is still rolling out when the safer account-based connection is already live.",
+          where: "App navigation, Queue, /ai, and the legacy /app/api page.",
+        },
+        sourceRefs: ["AWF-0036"],
+        audiences: ["signed-in", "agent"],
+      },
+      {
+        id: "legacy-api-hydration",
+        category: "fixed",
+        impactTier: "supporting",
+        impactRank: 1,
+        short: "Fixed the legacy API console's browser hydration error.",
+        long: {
+          what: "Server and browser output now use the same canonical product address in the example commands.",
+          why: "Direct compatibility visitors no longer encounter a hidden React mismatch while deciding which AI connection path to use.",
+          where: "Legacy /app/api developer console.",
+        },
+        sourceRefs: ["AWF-0036"],
+        audiences: ["signed-in"],
+      },
+      {
+        id: "empty-workspace-privacy-cue",
+        category: "upgraded",
+        impactTier: "supporting",
+        impactRank: 1,
+        short: "Added a first-screen reminder that imports, research, and publishing remain person-controlled.",
+        long: {
+          what: "The empty state says plainly that nothing enters the vault, runs, or publishes automatically.",
+          why: "The first screen should establish the authority boundary before someone brings private family material into the workspace.",
+          where: "Signed-in empty dashboard.",
+        },
+        sourceRefs: ["AWF-0036"],
+        audiences: ["signed-in"],
+      },
+    ],
+    whatToCheck: [
+      "Sign into an empty workspace and confirm the first actions are Bring in a capture and Connect your AI.",
+      "Open Your Queue and use See setup to reach /ai without creating a directive.",
+      "Open Your AI in app navigation and confirm it leads to current OAuth MCP setup, not the legacy key console.",
+    ],
+  },
+  {
+    version: "2.0.0",
     status: "Public & live",
     releasedAt: "2026-08-13T14:23:32-07:00",
     timezone: "America/Phoenix",

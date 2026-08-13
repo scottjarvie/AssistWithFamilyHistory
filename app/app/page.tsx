@@ -52,6 +52,14 @@ export default async function DashboardPage() {
     );
   }
 
+  const isEmptyWorkspace =
+    summary.counts.people === 0 &&
+    summary.counts.places === 0 &&
+    summary.counts.stories === 0 &&
+    summary.counts.imports === 0 &&
+    summary.counts.documents === 0 &&
+    summary.counts.openTasks === 0;
+
   const workflowStations = [
     {
       title: "Intake",
@@ -82,26 +90,58 @@ export default async function DashboardPage() {
   return (
     <div className="p-4 sm:p-8">
       <section className="relative overflow-hidden border border-stone-200 bg-[#1f2f35] px-6 py-8 text-white shadow-[0_24px_60px_rgba(28,25,23,0.18)] sm:px-8">
-        <Badge className="mb-4 bg-white/10 text-white hover:bg-white/10">Story-first research workspace</Badge>
+        <Badge className="mb-4 bg-white/10 text-white hover:bg-white/10">
+          {isEmptyWorkspace ? "Your private workspace is ready" : "Story-first research workspace"}
+        </Badge>
         <div className="grid gap-8 lg:grid-cols-[1.4fr_0.9fr]">
           <div>
-            <h1 className="max-w-3xl font-[family-name:var(--font-cormorant-garamond)] text-4xl font-semibold leading-tight sm:text-5xl">
-              Collect the operating data, understand the context, then tell the story well.
-            </h1>
-            <p className="mt-4 max-w-2xl text-sm text-stone-200 sm:text-base">
-              This dashboard is the working room: intake records, build the vault, chase the research gaps, and move finished drafts into Story Studio for review and explicit publishing.
-            </p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Button asChild className="bg-amber-600 text-white hover:bg-amber-500">
-                <Link href="/app/stories">
-                  Open Story Studio
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-              <Button asChild variant="outline" className="border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white">
-                <Link href="/app/operations">Work Research Queue</Link>
-              </Button>
-            </div>
+            {isEmptyWorkspace ? (
+              <>
+                <h1 className="max-w-3xl font-[family-name:var(--font-cormorant-garamond)] text-4xl font-semibold leading-tight sm:text-5xl">
+                  Begin with evidence. Build the story from there.
+                </h1>
+                <p className="mt-4 max-w-2xl text-sm leading-7 text-stone-200 sm:text-base">
+                  Your vault is empty and private. Bring in a capture you have reviewed, or connect your chosen AI to preserve people, relationships, events, sources, findings, and drafts as the work develops.
+                </p>
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <Button asChild className="bg-amber-600 text-white hover:bg-amber-500">
+                    <Link href="/app/imports">
+                      Bring in a capture
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline" className="border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white">
+                    <Link href="/ai">
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      Connect your AI
+                    </Link>
+                  </Button>
+                </div>
+                <p className="mt-5 max-w-2xl border-l border-amber-400/45 pl-4 text-xs leading-6 text-stone-300">
+                  Nothing is imported, researched, or published automatically. You choose what enters this family workspace and what may leave it.
+                </p>
+              </>
+            ) : (
+              <>
+                <h1 className="max-w-3xl font-[family-name:var(--font-cormorant-garamond)] text-4xl font-semibold leading-tight sm:text-5xl">
+                  Collect the operating data, understand the context, then tell the story well.
+                </h1>
+                <p className="mt-4 max-w-2xl text-sm text-stone-200 sm:text-base">
+                  This dashboard is the working room: intake records, build the vault, chase the research gaps, and move finished drafts into Story Studio for review and explicit publishing.
+                </p>
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <Button asChild className="bg-amber-600 text-white hover:bg-amber-500">
+                    <Link href="/app/stories">
+                      Open Story Studio
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline" className="border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white">
+                    <Link href="/app/operations">Work Research Queue</Link>
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">

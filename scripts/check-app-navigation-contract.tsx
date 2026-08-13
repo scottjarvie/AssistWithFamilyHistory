@@ -4,16 +4,16 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   BookOpen,
+  Bot,
   ClipboardList,
   ExternalLink,
   FileUp,
   FlaskConical,
   Gauge,
-  KeyRound,
+  Inbox,
   LayoutDashboard,
   MapPinned,
   PenTool,
-  ShieldAlert,
   TableProperties,
   Users,
   Clock,
@@ -27,7 +27,10 @@ import {
 const expectedSections = [
   {
     label: "Workflow",
-    items: [{ href: "/app", label: "Dashboard", icon: LayoutDashboard, exact: true }],
+    items: [
+      { href: "/app", label: "Dashboard", icon: LayoutDashboard, exact: true },
+      { href: "/app/queue", label: "Your Queue", icon: Inbox },
+    ],
   },
   {
     label: "Vault",
@@ -38,7 +41,7 @@ const expectedSections = [
     ],
   },
   {
-    label: "Research Queue",
+    label: "Research",
     items: [
       { href: "/app/operations", label: "Research Queue", icon: TableProperties },
       { href: "/app/research", label: "Research Log", icon: ClipboardList },
@@ -64,10 +67,9 @@ const expectedSections = [
     ],
   },
   {
-    label: "Agents",
+    label: "Your AI",
     items: [
-      { href: "/app/api", label: "API Center", icon: KeyRound },
-      { href: "/app/api/admin", label: "Admin API", icon: ShieldAlert },
+      { href: "/ai", label: "Connect your AI", icon: Bot },
     ],
   },
   {
