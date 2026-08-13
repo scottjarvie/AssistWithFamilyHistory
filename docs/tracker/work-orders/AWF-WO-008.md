@@ -98,6 +98,13 @@ privacy cue, Queue setup link, signed-in Connect your AI navigation, current
 horizontal overflow. Home, `/ai`, `/ai.txt`, and `/updates` returned 200;
 anonymous `/mcp` returned the canonical 401 OAuth resource challenge.
 
+Release-record PR #46 passed Actions `31752470821`, merged as
+`9ecdcc567abed12feb54a4a64a366436cec97a0b`, and passed exact-main Actions
+`31752621780`. Final production deployment
+`dpl_3JGRAM5X3DHN8yEFR8fkv6PsPsoq` reached Ready from
+`2026-08-13T16:06:56-07:00`; live `/updates` showed v2.0.1 as **Public & live**
+at 390×844 with zero console errors.
+
 One initial pre-fix runner echoed a short-lived one-use URL scoped only to the
 empty test identity. The resulting exact session was revoked. The final
 non-echoing acceptance created one exact session, revoked it after the run, and
@@ -114,3 +121,5 @@ all credential artifacts were removed.
 - 2026-08-13 · Codex — shipped version 2.0.1 through PR #45, completed exact-main
   and production proof, revoked the isolated session, and closed execution with
   independent audit still `not-audited`.
+- 2026-08-13 · Codex — merged protected release-record PR #46 and verified its
+  exact-main CI, final normal production deployment, and live Updates status.
