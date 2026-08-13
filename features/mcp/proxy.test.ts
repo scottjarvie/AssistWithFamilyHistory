@@ -44,4 +44,37 @@ describe("branded Family History MCP proxy", () => {
     expect(oversized.status).toBe(413);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  test("returns a live upstream stream without forwarding stale framing headers", async () => {
+    vi.stubEnv("CONVEX_SITE_URL", SITE_URL);
+    let releaseChunk!: () => void;
+    const chunkReady = new Promise<void>((resolve) => { releaseChunk = resolve; });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(new ReadableStream({
+      async start(controller) {
+        await chunkReady;
+        controller.enqueue(new TextEncoder().encode('{"resource":"streamed"}'));
+        controller.close();
+      },
+    }), {
+      headers: {
+        "content-type": "application/json",
+        "content-length": "999",
+        "content-encoding": "gzip",
+        "transfer-encoding": "chunked",
+      },
+    })));
+
+    let settled = false;
+    const responsePromise = proxyFamilyHistoryMcpRequest(
+      new Request("https://discovertheirstories.com/.well-known/oauth-protected-resource/mcp"),
+      "/.well-known/oauth-protected-resource/mcp",
+    ).then((response) => { settled = true; return response; });
+    await vi.waitFor(() => expect(settled).toBe(true));
+    const response = await responsePromise;
+    expect(response.headers.get("content-length")).toBeNull();
+    expect(response.headers.get("content-encoding")).toBeNull();
+    expect(response.headers.get("transfer-encoding")).toBeNull();
+    releaseChunk();
+    await expect(response.json()).resolves.toEqual({ resource: "streamed" });
+  });
 });
