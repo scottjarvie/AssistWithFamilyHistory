@@ -122,3 +122,41 @@ server is `https://clerk.discovertheirstories.com`. Public `/ai`, `/ai.txt`, and
 `/updates` also returned HTTP 200. An anonymous initialize request to `/mcp`
 returned HTTP 401 with the Family History bearer challenge and the canonical
 resource-metadata URL. These receipts supersede the transient bodyless response.
+
+## Canonical Assist With Family History rebrand acceptance
+
+Version 2.0.0 supersedes the old public resource address while preserving this
+dated evidence. Protected PR #43 merged as
+`989cecbef5ba38196732549e0a5105443756cac8`; exact-main Actions
+`31745343870` passed, and Vercel production deployment
+`dpl_FXKaH6pN8HG2DS1spSEeCRFZjmRv` reached Ready at
+`2026-08-13T14:23:32-07:00` after deploying the reviewed Convex functions.
+
+The current metadata resource is `https://assistwithfamilyhistory.com/mcp` and
+its authorization server is `https://clerk.assistwithfamilyhistory.com`.
+Anonymous MCP returns the corresponding 401 resource challenge. A new
+disposable public PKCE client completed explicit consent with only `openid` and
+`offline_access`; its `at+jwt` matched the retained test subject and client. The
+official MCP client listed all twelve tools and completed an empty-vault brief
+and no-match search without writes. The signed-in web workspace and Queue also
+showed zero records/items without browser or backend errors.
+
+The domain migration exposed one missing provider dependency: Clerk had no
+`convex` JWT template, so the first signed-in Queue read failed closed during
+token minting. The required template now persists with a 60-second lifetime,
+five-second clock skew, and only `aud: convex`. It grants no extra product scope
+or user metadata.
+
+Cleanup deleted the disposable OAuth client, revoked every exact-test-user
+session, and removed all token/config artifacts; final inspection found zero
+OAuth applications and zero active sessions. During an earlier timed-out run,
+runner output included a five-minute one-use sign-in URL scoped only to this
+empty test identity. That token and every exact-user session were revoked
+immediately, its generated files were removed, and a zero-session provider
+check passed before work resumed. No provider secret, deploy key, Scott
+credential, family record, or other tenant data was exposed.
+
+The retained boundary is unchanged: one labeled empty non-privileged identity
+and the minimal required `convex` template. Fresh-device email verification,
+refresh/reconnect, immediate issued-JWT revocation, and independent audit remain
+unproved.
