@@ -1,6 +1,6 @@
 # Family History stateless MCP foundation
 
-> Status: implemented in source; local proof in progress; deployed and named-client proof separate
+> Status: merged source and protected preview proven; production and named-client proof separate
 >
 > Date: 2026-08-12
 >
@@ -98,7 +98,7 @@ external-provider action.
 
 ## Current, Partial, Later
 
-### Current in source and focused local proof
+### Current in merged source and isolated proof
 
 - Branded `/mcp` proxy and Convex stateless handler.
 - OAuth protected-resource metadata and real anonymous resource challenge.
@@ -113,8 +113,13 @@ external-provider action.
 - The configured provider issuer may validate tokens, but registration,
   authorization, consent, scopes, redirect behavior, reconnect, and revocation
   must be exercised with a compatible named client before being called current.
-- Source/local/CI proof does not establish production Convex deployment,
-  Vercel routing, public reachability, or an authenticated production vault.
+- PR #35 merged as `8efa93e`; both PR-head and merged-main CI passed the full
+  verify/build/smoke workflow. Vercel preview
+  `BJktQcJzBpSoJUzEg6A1bN6xKDKt` is Ready for PR head `de425bc`.
+- Source/local/CI/preview proof does not establish production Convex
+  deployment, public routing, or an authenticated production vault. Vercel
+  production remained on `e4d1e35` and the new public routes returned 404 on
+  2026-08-12.
 - The official v2 MCP client plus a generated signed JWT and isolated synthetic
   tenant prove protocol negotiation, catalog discovery, a canonical write, and
   the resource/owner boundary in the real handler; they are not a provider
@@ -138,8 +143,8 @@ external-provider action.
 | Canonical product visibility | MCP writes read through existing vault/Queue product functions | Convex runtime and signed transport tests |
 | OAuth edge | metadata, anonymous challenge, exact issuer/access-token JWT | official-client and signed transport tests |
 | Local app | `/ai`, `/ai.txt`, `/mcp` method behavior and responsive setup UI | route smoke and browser proof |
-| Protected release | PR review and exact-head CI | GitHub evidence after publication |
-| Deployment | exact commit and provider deployment | Vercel/Convex evidence after merge |
+| Protected release | PR review and exact-head CI | PR #35; runs `31650777583` and `31650932302` passed |
+| Deployment | exact commit and provider deployment | preview `BJktQcJzBpSoJUzEg6A1bN6xKDKt` Ready for `de425bc`; production unproved |
 | Named client | registration, consent, tool list, write, reconnect/revoke | unproved until a sanctioned compatible client path exists |
 
 Synthetic proof uses the official v2 MCP client, generated signing keys,

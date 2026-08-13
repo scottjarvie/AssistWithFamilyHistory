@@ -21,13 +21,12 @@ tenant isolation, bounded authority, replay safety, and human publication gates.
 
 ## Current truth
 
-The existing owner-scoped vault and Queue supply the canonical durable records,
-but `origin/main` at `6e346cb` has no remote MCP route, OAuth resource challenge,
-chosen-AI setup page, or external domain workflow catalog. Scott's coordinator
-delegation is the approved scope for this independent tranche. Source and
-focused synthetic runtime proof are now implemented on the dedicated branch;
-full verification and every protected-release/deployment/live layer remain in
-progress and are not inferred from that local evidence.
+The existing owner-scoped vault and Queue supply the canonical durable records.
+Scott's coordinator delegation approved this independent tranche. The source,
+focused synthetic proof, protected PR, PR-head CI, merged-main CI, and Vercel
+preview are complete. Production promotion, live public routes, production
+Convex behavior, provider registration/consent, a named client, and independent
+audit remain separate and are not inferred from those completed layers.
 
 ## Sequence
 
@@ -92,12 +91,19 @@ any broader public/security posture remain explicit owner gates.
 
 ## Execution evidence
 
-Source and focused runtime proof are in progress. The current synthetic suite
-uses the official v2 MCP client, generated signing keys, isolated in-memory
-Convex tenants, and explicitly marked records; it reads or writes no provider
-or production data. Protected
-release, deployment, live behavior, and independent audit are still separate
-pending proof layers.
+Source, focused runtime proof, and the protected code release are complete.
+PR #35 merged as `8efa93e`; PR CI `31650777583` and exact merged-main CI
+`31650932302` passed. The current synthetic suite uses the official v2 MCP
+client, generated signing keys, isolated in-memory Convex tenants, and
+explicitly marked records; it reads or writes no provider or production data.
+
+Vercel preview `BJktQcJzBpSoJUzEg6A1bN6xKDKt` is Ready for source `de425bc`
+and remains SSO-protected. Vercel production still identifies `e4d1e35`, and
+the new public routes returned 404 on 2026-08-12. Production promotion,
+production Convex behavior, provider registration/consent, a named client,
+reconnect, revocation, and independent audit therefore remain separate and
+unproved. Execution stays active and audit stays `not-audited` at this owner
+gate.
 
 ## History
 
@@ -107,3 +113,7 @@ pending proof layers.
   clean `origin/main` commit `6e346cb` on a dedicated branch.
 - 2026-08-12 · Codex — passed the first backend and signed transport proof,
   including canonical record writes and Queue activity visible to product reads.
+- 2026-08-12 · Codex — merged protected PR #35 as `8efa93e`; PR-head and
+  merged-main CI passed, and the Vercel preview is Ready. Stopped before manual
+  production promotion or Clerk client/consent work; public production remains
+  on `e4d1e35`, so the Work Order remains active and unaudited.
