@@ -43,8 +43,8 @@ export const appVersion = "2.0.0";
 export const releaseNotes: ReleaseEntry[] = [
   {
     version: appVersion,
-    status: "In review",
-    releasedAt: "2026-08-13T16:00:00-07:00",
+    status: "Public & live",
+    releasedAt: "2026-08-13T14:23:32-07:00",
     timezone: "America/Phoenix",
     title: "One clear home for family-history work",
     summary: "The product, workspace, AI connection, and normal public address now share one enduring identity: Assist With Family History.",
@@ -60,7 +60,7 @@ export const releaseNotes: ReleaseEntry[] = [
           why: "People should encounter the same product promise and name before sign-in, inside the workspace, and when connecting their chosen AI.",
           where: "Public pages, app shell, Queue language, FamilySearch capture extension, metadata, social images, and current setup documentation.",
         },
-        sourceRefs: ["AWF-0035", "PR-42"],
+        sourceRefs: ["AWF-0035", "PR-43"],
         audiences: ["public", "signed-in"],
       },
       {
@@ -74,7 +74,7 @@ export const releaseNotes: ReleaseEntry[] = [
           why: "The earlier emergency repair restored the form, but it left the retired identity in the address bar. The product-correct repair keeps the secure sign-in boundary and the new canonical home together.",
           where: "Public routes, /sign-in, /sign-up, protected /app routes, canonical metadata, and legacy-domain redirects.",
         },
-        sourceRefs: ["AWF-0035", "AWF-WO-007"],
+        sourceRefs: ["AWF-0035", "AWF-WO-007", "PR-42", "PR-43"],
         audiences: ["public", "signed-in"],
       },
       {

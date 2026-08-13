@@ -1,7 +1,7 @@
 ---
 id: AWF-WO-007
 title: Rebrand and release the canonical Assist With Family History experience
-execution: active
+execution: complete
 audit: not-audited
 cards: AWF-0035
 created: 2026-08-13
@@ -89,13 +89,14 @@ outside the grant.
 
 ## Current truth
 
-The source orientation, route/brand inventory, implementation, full local
-verification, responsive review, and narrow Clerk/Vercel domain preparation are
-complete. The code and current docs now use Assist With Family History as the
-durable identity and the normal resource/domain address; version 2.0.0 is In
-review. The earlier PR #42 sign-in proof is retained as the emergency first
-phase. Protected release, production proof, authenticated cleanup, and
-independent audit remain separate unfinished facts.
+The source orientation, route/brand inventory, implementation, full local and
+responsive verification, protected release, Clerk/Vercel/Convex configuration,
+public proof, isolated signed-in web proof, disposable PKCE MCP proof, and exact
+cleanup are complete. The code and current docs use Assist With Family History
+as the durable identity and `assistwithfamilyhistory.com` as the normal product,
+sign-in, and MCP resource address. Version 2.0.0 is Public & live. The earlier
+PR #42 repair remains the emergency first phase; independent audit is still
+separate and `not-audited`.
 
 ## Execution evidence
 
@@ -118,8 +119,43 @@ Vercel's next production deployment has the new public key, canonical site URL,
 and server-side issuer. A narrowly coded compatibility bridge maps only the two
 retired production Convex resource/issuer hosts during the atomic protected
 deployment; synthetic and development issuers remain environment-driven.
-Protected-review and live evidence remain pending and are not inferred from
-these local/provider preparation facts.
+PR #43 passed Actions `31745140417` and Vercel preview, then merged as
+`989cecbef5ba38196732549e0a5105443756cac8`. Exact-main Actions
+`31745343870` passed. Vercel deployment
+`dpl_FXKaH6pN8HG2DS1spSEeCRFZjmRv` reached Ready at
+`2026-08-13T14:23:32-07:00` and deployed the reviewed Convex functions.
+
+The normal home, AI guides, updates, and sign-in returned 200; retired product
+and Vercel hosts preserved their path in 308 redirects to the normal address.
+Phone and desktop signed-out `/app` reached “Sign in to Assist With Family
+History” with the canonical return target, no overflow, and no console errors.
+OAuth metadata names `https://assistwithfamilyhistory.com/mcp` and
+`https://clerk.assistwithfamilyhistory.com`; anonymous MCP returns a real 401
+resource challenge.
+
+The first signed-in acceptance exposed a missing standard Clerk `convex` JWT
+template: identity succeeded but Queue token minting failed closed. A minimal
+template now persists with a 60-second lifetime, five-second skew, and only
+`aud: convex`. The repeated 390-pixel run showed an empty signed-in workspace,
+all four empty Queue states, no overflow, and no browser/backend errors. A
+disposable public PKCE client then received explicit consent for only `openid
+offline_access`; its new-issuer `at+jwt` matched the retained test subject and
+client. The official MCP client listed all twelve tools and completed the
+empty-vault brief and no-match search without any writes.
+
+Cleanup deleted the disposable OAuth client, revoked all exact-test-user
+sessions, and removed every generated token/config artifact; final provider
+inspection found zero OAuth applications and zero active sessions. Only the
+labeled empty non-privileged identity and required minimal `convex` template
+remain. Fresh-device email verification, refresh/reconnect, immediate issued-JWT
+revocation, and independent audit remain unproved.
+
+During an earlier timed-out acceptance attempt, runner error output included a
+five-minute one-use sign-in URL scoped only to the empty test identity. It
+included no provider secret, deploy key, Scott credential, or family data. The
+token and every exact-user session were revoked immediately, generated files
+were removed, and a zero-active-session provider check passed before work
+resumed.
 
 ## History
 
@@ -132,3 +168,6 @@ these local/provider preparation facts.
 - 2026-08-13 · Codex — completed source and provider preparation, passed full
   local and responsive verification, and moved version 2.0.0 to In review;
   protected release and live acceptance continue.
+- 2026-08-13 · Codex — merged PR #43, passed exact-main CI and production
+  Vercel/Convex deployment, completed canonical public/web/OAuth/MCP acceptance
+  and cleanup, moved version 2.0.0 to Public & live, and left audit separate.
