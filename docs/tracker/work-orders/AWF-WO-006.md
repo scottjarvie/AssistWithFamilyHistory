@@ -1,7 +1,7 @@
 ---
 id: AWF-WO-006
 title: Ship the first stateless chosen-AI workspace connection
-execution: active
+execution: complete
 audit: not-audited
 cards: AWF-0033
 created: 2026-08-12
@@ -21,13 +21,14 @@ tenant isolation, bounded authority, replay safety, and human publication gates.
 
 ## Current truth
 
-The existing owner-scoped vault and Queue supply the canonical durable records.
-Scott's coordinator delegation approved this independent tranche and later the
-recommended production-only promotion. The source, focused synthetic proof,
-protected PR, CI, preview, exact-SHA production frontend, `/ai`, and `/ai.txt`
-are complete. The production Convex MCP routes remain stale or mis-targeted;
-provider deployment configuration, authenticated named-client proof, and
-independent audit remain separate and are not inferred from completed layers.
+The owner-scoped vault and Queue supply the canonical durable records. Source,
+focused synthetic proof, protected PR/CI, public setup routes, production
+Convex deployment, OAuth resource challenge, disposable named-client consent,
+official-client research-to-story workflow, canonical UI reflection, and exact
+fixture cleanup are complete. The retained identity is empty and
+non-privileged. Fresh-device email verification and immediate issued-JWT
+revocation remain separate gaps; AWF-0034 owns the latter. Independent audit
+remains `not-audited`.
 
 ## Sequence
 
@@ -91,10 +92,11 @@ policy, production data, real-user access, private secrets, billing, DNS, and
 any broader public/security posture remain explicit owner gates.
 
 Scott additionally approved retaining one clearly labeled production test
-identity after the production promotion, but only for authenticated MCP
-acceptance: no real family records, elevated role, or retained fixtures,
-clients, sessions, or connections. Account creation is deferred because the
-production MCP edge and sanctioned named-client path do not yet exist.
+identity, ordinary production deployment correction, standard PKCE client
+setup, and an exact-user Clerk sign-in token when fresh-device verification
+blocked the otherwise normal test path. No global verification policy changed,
+and no real family records, elevated role, or retained fixtures, clients,
+sessions, or connections were authorized.
 
 ## Execution evidence
 
@@ -111,14 +113,29 @@ main run was fixed by protected PR #37, merged as `8573e49`. Exact merged-main
 CI `31659124591` passed, and Vercel deployment
 `2fkWTCPfArALkLdRWYR9krDmUFyz` succeeded for that exact SHA.
 
-Public `/ai`, `/ai.txt`, and `/updates` return 200. Protected-resource metadata
-and anonymous `POST /mcp` return upstream plain 404 without an OAuth challenge,
-showing that the production Convex HTTP routes were not deployed to the target
-used by the frontend. Fixing or inspecting the deploy key/target needs provider
-access and secret handling outside the current authorization. No test account
-was created, no provider policy changed, and no production family data or Scott
-account was used. Execution stays active and audit stays `not-audited` at this
-narrower provider gate.
+The provider gate was resolved by pointing Vercel production at Convex
+`accomplished-dodo-308`, installing the reviewed Convex code, and keeping the
+personal development deployment out of production scope. Public `/ai`,
+`/ai.txt`, and `/updates` return 200; metadata returns the canonical resource;
+anonymous MCP returns a real 401 resource challenge.
+
+One retained empty test identity used explicit PKCE consent and the official v2
+client to list twelve tools, save a complete synthetic research result, search
+and hydrate it, correct its story, read Queue, and observe the same canonical
+records in the signed-in person/story UI. Human publish gates remained closed.
+Every fixture, activity row, receipt, record key, disposable client, session,
+and local token artifact was then removed; final brief/search returned zero.
+
+The original Convex deploy key was submitted once to a Clerk password form and
+treated as exposed. It was revoked and replaced by a deploy-only production
+key. The final protected truth deployment verifies replacement capability. The
+detailed non-sensitive record is
+`docs/operations/family-history-mcp-production-acceptance-2026-08-12.md`.
+
+Fresh-device email delivery/code entry and refresh/reconnect remain unproved.
+Clerk cannot revoke issued JWT access tokens; AWF-0034 records that separate
+security/provider choice. Execution is complete and audit stays
+`not-audited`.
 
 ## History
 
@@ -139,3 +156,11 @@ narrower provider gate.
 - 2026-08-12 · Codex — completed the exact-SHA frontend promotion and main CI,
   then observed the stale production Convex 404 boundary. Stopped before
   provider configuration or account creation and left the release In review.
+- 2026-08-12 · Scott via coordinator delegation — expanded the safe boundary to
+  ordinary production Convex correction, one retained empty test identity,
+  standard PKCE provider setup, synthetic live acceptance, and exact-user
+  sign-in-token use without global verification changes.
+- 2026-08-12 · Codex — completed production OAuth/MCP/UI acceptance and cleanup,
+  rotated the exposed deploy key to deploy-only scope, retained only the empty
+  labeled identity, moved execution to complete, and left independent audit
+  separate.

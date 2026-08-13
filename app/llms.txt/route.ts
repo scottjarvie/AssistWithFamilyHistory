@@ -18,7 +18,7 @@ const BODY = [
   "- You acquire data from external genealogy/record/newspaper sites and own those access decisions.",
   "  This platform stores, organizes, privacy-gates, and helps turn it into grounded stories.",
   "- Everything you store lands PRIVATE and UNREVIEWED until a human reviews it.",
-  "- A first stateless remote MCP foundation is present. Named-client OAuth compatibility remains Partial until exact live proof.",
+  "- The stateless remote MCP backend and one disposable public PKCE client lifecycle are production-proven. Broad client compatibility, fresh-device email, reconnect, and immediate issued-JWT revocation remain Partial.",
   "",
   "## Principles",
   "- Evidence vs conclusion: raw record data never overwrites confirmed facts — agents propose, humans confirm.",
