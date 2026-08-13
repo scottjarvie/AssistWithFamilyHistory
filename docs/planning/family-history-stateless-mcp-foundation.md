@@ -1,6 +1,7 @@
 # Family History stateless MCP foundation
 
-> Status: merged source and protected preview proven; production and named-client proof separate
+> Status: production backend and one disposable named-client lifecycle proven;
+> fresh-device email and immediate JWT revocation remain Partial
 >
 > Date: 2026-08-12
 >
@@ -98,7 +99,7 @@ external-provider action.
 
 ## Current, Partial, Later
 
-### Current in merged source and isolated proof
+### Current in production and isolated proof
 
 - Branded `/mcp` proxy and Convex stateless handler.
 - OAuth protected-resource metadata and real anonymous resource challenge.
@@ -107,19 +108,31 @@ external-provider action.
   complete-result transactions, and MCP-attributed activity.
 - Queue read/continuation as the explicit OAuth chosen-AI actor.
 - `/ai`, `/ai.txt`, and `/llms.txt` setup/discovery surfaces.
+- Production protected-resource discovery, anonymous OAuth challenge, explicit
+  PKCE consent, token exchange, twelve-tool official-client discovery, complete
+  result save, granular correction, Queue read, canonical UI reflection, and
+  exact synthetic cleanup. See the dated production acceptance report.
 
-### Partial until exact deployed proof
+### Partial after exact deployed proof
 
-- The configured provider issuer may validate tokens, but registration,
-  authorization, consent, scopes, redirect behavior, reconnect, and revocation
-  must be exercised with a compatible named client before being called current.
+- Dynamic client registration is not available on the current Clerk instance.
+  A disposable public PKCE client proved authorization, explicit consent,
+  redirect/state, token exchange, and the authenticated MCP/UI workflow, then
+  was deleted.
+- Fresh-device password sign-in reached Clerk email verification, but mailbox
+  delivery and code entry remain unproved. The accepted run used a one-time,
+  exact-user Clerk sign-in token without changing global verification policy.
+- Refresh/reconnect was not exercised. Clerk's revocation endpoint rejects JWT
+  access tokens, and the issued access JWT remained valid after client deletion
+  until its expiry. Local copies were destroyed; AWF-0034 owns enforceable
+  immediate revocation.
 - PR #35 merged as `8efa93e`; both PR-head and merged-main CI passed the full
   verify/build/smoke workflow. Vercel preview
   `BJktQcJzBpSoJUzEg6A1bN6xKDKt` is Ready for PR head `de425bc`.
-- Source/local/CI/preview proof does not establish production Convex
-  deployment, public routing, or an authenticated production vault. Vercel
-  production remained on `e4d1e35` and the new public routes returned 404 on
-  2026-08-12.
+- Production Vercel now targets Convex deployment `accomplished-dodo-308`.
+  Public setup routes, discovery, anonymous challenge, authenticated official
+  client calls, and signed-in canonical UI reflection were observed on
+  2026-08-12 with a retained empty test identity.
 - The official v2 MCP client plus a generated signed JWT and isolated synthetic
   tenant prove protocol negotiation, catalog discovery, a canonical write, and
   the resource/owner boundary in the real handler; they are not a provider
@@ -144,9 +157,11 @@ external-provider action.
 | OAuth edge | metadata, anonymous challenge, exact issuer/access-token JWT | official-client and signed transport tests |
 | Local app | `/ai`, `/ai.txt`, `/mcp` method behavior and responsive setup UI | route smoke and browser proof |
 | Protected release | PR review and exact-head CI | PR #35; runs `31650777583` and `31650932302` passed |
-| Deployment | exact commit and provider deployment | preview `BJktQcJzBpSoJUzEg6A1bN6xKDKt` Ready for `de425bc`; production unproved |
-| Named client | registration, consent, tool list, write, reconnect/revoke | unproved until a sanctioned compatible client path exists |
+| Deployment | exact commit and provider deployment | production Vercel and Convex `accomplished-dodo-308` live; final truth PR re-verifies the rotated deploy key |
+| Named client | registration, consent, tool list, write, reconnect/revoke | disposable public PKCE client proved consent, tool list, complete write, correction, UI reflection, client/session/fixture cleanup; reconnect and immediate JWT revocation remain Partial |
 
 Synthetic proof uses the official v2 MCP client, generated signing keys,
-isolated in-memory owners, and clearly marked records. It never reads or writes
-real genealogy data or another person's account.
+isolated in-memory owners, and clearly marked records. Production acceptance
+used only the retained labeled test identity and marked synthetic records, then
+removed every fixture and local token artifact. It never read or wrote real
+genealogy data or another person's account.

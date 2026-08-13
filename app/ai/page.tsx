@@ -49,6 +49,7 @@ const current = [
   "OAuth identity selects the vault on the server; tools cannot name another owner.",
   "Writes use stable create keys, operation receipts, and optimistic correction checks.",
   "Story tools save private drafts or request review; they cannot publish.",
+  "Production PKCE consent, complete-result saves, corrections, and web-workspace reflection passed with an empty synthetic account.",
 ];
 
 export default function AiSetupPage() {
@@ -163,7 +164,7 @@ export default function AiSetupPage() {
               <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#245a43]">Current in this release</p>
               <ul className="mt-5 space-y-3">{current.map((item) => <li key={item} className="flex gap-2 text-sm leading-6"><CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-[#245a43]" aria-hidden="true" />{item}</li>)}</ul>
             </article>
-            <article className="rounded-3xl border border-[#d2bd8d] bg-[#fbf4e4] p-7"><p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#98702b]">Partial until live proof</p><p className="mt-5 text-sm leading-7 text-[#5f665f]">A compatible client still needs the deployed Clerk OAuth flow to allow its registration and consent path. This page does not claim a named client, mobile setup, production token, reconnect, or revocation journey until that exact path is exercised.</p></article>
+            <article className="rounded-3xl border border-[#d2bd8d] bg-[#fbf4e4] p-7"><p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#98702b]">Partial after live proof</p><p className="mt-5 text-sm leading-7 text-[#5f665f]">One disposable public PKCE client completed production consent and the full MCP-to-web workflow. Dynamic client registration, broad client compatibility, fresh-device email verification, refresh/reconnect, mobile setup, and immediate revocation of issued Clerk JWT access tokens are not yet claimed.</p></article>
             <article className="rounded-3xl border border-[#ccb7ad] bg-[#f8efeb] p-7"><p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#9f5a2d]">Later, not implied</p><p className="mt-5 text-sm leading-7 text-[#5f665f]">Granular connection grants, private media delivery, mobile-specific setup, identity merges, deletion, publishing, external site actions, and cross-family collaboration remain outside this first foundation.</p></article>
           </div>
         </section>

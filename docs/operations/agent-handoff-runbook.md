@@ -4,9 +4,10 @@
 > evidence-readiness export. The product Queue backend is defined in
 > [`queue-foundation-design-handoff.md`](../product/queue-foundation-design-handoff.md)
 > and uses `queueItems` plus exactly Needs You / Working / Waiting for your AI /
-> Done. Neither surface is a live MCP connection. Incoming chosen-AI identity
-> remains blocked until the credential-resolution boundary is implemented and
-> proven.
+> Done. These legacy surfaces are distinct from the production stateless MCP
+> connection at `/mcp`. That connection resolves the Clerk OAuth subject to the
+> private vault server-side and exposes the bounded Queue tools as
+> `oauth-chosen-ai`; it does not turn an operations handoff into authority.
 
 This project can use agents for meaningful work, but the operations surface should decide what agents are allowed to do instead of letting each agent infer it from the UI.
 
@@ -21,9 +22,11 @@ This project can use agents for meaningful work, but the operations surface shou
 
 ## Agent-Ready Surfaces
 
-- Product Queue internal tool contract: bounded list/read plus assigned-actor
-  claim, checkpoint, exact user question, and completion. These tools are
-  source-complete but intentionally not exposed to external clients yet.
+- Product Queue MCP contract: bounded list/read plus assigned-actor claim,
+  checkpoint, exact user question, and completion through `get_queue` and
+  `update_queue`. The production connection is live, but an empty-Queue read is
+  the only named-client Queue proof so far; a full assigned-item round trip is
+  still separate.
 
 - `/api/operations/queue`: read-only queue and filters.
 - `/api/operations/queue?format=handoff`: compact JSON handoff packet with recommended agent type, review level, prompt, routes, and reason per row.

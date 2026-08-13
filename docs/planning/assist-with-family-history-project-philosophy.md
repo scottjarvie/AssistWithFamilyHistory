@@ -2,13 +2,13 @@
 
 > **Philosophy status:** Canonical product identity and claim boundary
 >
-> **Product document version:** 1.6.0
+> **Product document version:** 1.6.1
 >
 > **Philosophy date:** 2026-08-11
 >
 > **Capability evidence last verified:** 2026-08-12
 >
-> **Repository evidence revision:** `AWF-WO-006 source foundation — protected release and named-client proof remain separate`
+> **Repository evidence revision:** `AWF-WO-006 production MCP and disposable named-client acceptance complete; audit separate`
 >
 > **Scope:** Product truth, language, trust, and design direction—not an
 > implementation plan, production claim, or permission to change application
@@ -136,18 +136,18 @@ Use these status labels throughout this revision:
 | Queue context objects | **Intentional product-specific difference; Current / verified repository backend foundation** | Optional owner-verified references use three Family History groups: research subject (person, relationship, place, event), evidence (source, citation, media, context item), or work thread (research task/check, story, import run, provisional relative). Directive-only creation remains valid. Project/collection adapters stay unimplemented because no matching durable model exists |
 | Prompt and research-loop library | **In design** | A small curated menu may help the person's chosen AI begin useful family-history work. Every prompt or loop is optional, editable, combinable, and ignorable, with version/freshness/provenance/limits metadata. It is assistance, not a required workflow or site-owned automation engine |
 | Internal project tracker | **Current / verified — independent audit pending** | `docs/tracker/` carries canonical Cards, Work Orders, Guide, factual metadata, and generated Kanban/Work Orders readers in Family History's archival identity. Current instructions use that durable source rather than mandatory Linear. State commit `dc30429` proved the lightweight GitHub path, Vercel ignored-build cancellation, and retained live deployment. AWF-WO-001 keeps completed execution separate from AWF-0004's future independent audit; do not confuse this build tracker with the product Queue |
-| MCP and AI setup paths | **Current / verified source and isolated official-client foundation; Partial deployed/named-client journey** | `/mcp`, protected-resource metadata, `/ai`, `/ai.txt`, and twelve Family History workflow tools now cover bounded brief/search/context, canonical people/relationship/event/evidence/research/story saves, one-call complete results, granular corrections, and Queue continuation. OAuth tokens select the owner server-side; operations are replay-safe; living-person discovery and public story gates stay bounded. The official v2 MCP client plus generated signed-token tests prove negotiation, discovery, a canonical write, and product reads through the real stateless handler with isolated synthetic tenants. Provider registration/consent, a named compatible client, production authentication, reconnect, and revocation remain unproved and must not be inferred from source, local, CI, or deployment evidence |
+| MCP and AI setup paths | **Current / verified production backend and disposable named-client workflow; Partial fresh-device/reconnect/revocation journey** | `/mcp`, protected-resource metadata, `/ai`, `/ai.txt`, and twelve Family History workflow tools cover bounded brief/search/context, canonical people/relationship/event/evidence/research/story saves, one-call complete results, granular corrections, and Queue continuation. Production PKCE consent, token exchange, official-client workflow, canonical UI reflection, and synthetic cleanup passed with one retained empty identity. Fresh-device email delivery/code entry and refresh/reconnect remain unproved. Clerk cannot immediately revoke issued JWT access tokens; AWF-0034 owns that separate provider/security decision |
 | Activity and provenance | **Current / verified Queue-specific history and partial wider foundation; Coming soon complete product contract** | Queue state-changing commands now emit append-only, actor-attributed history and idempotency receipts that share the item's deletion lifecycle. Import runs, research logs, story review events, source links, model/prompt fields, and `agentActivity` remain separate partial foundations; the repo still does not prove one complete history for every meaningful product create, change, or delete |
 | Access and sharing | **Current / verified Private and guarded Public foundations; In design Unlisted and Trusted** | Use one selected-object visibility vocabulary for appropriate stories, collections, and source/record surfaces: Private, Unlisted, Trusted, Public. Trusted collaboration uses simple Viewer, Contributor, Editor, and Owner roles scoped to the relevant boundary. Sharing stays deliberate, reviewable, revocable, and subject to living/sensitive review; complete invite, link, role, and visibility lifecycles are not verified |
-| Identity boundary | **Current / verified source foundation; Unknown deployed state** | Source supports per-site Clerk identity and owner isolation when configured, plus local/guest modes for controlled environments. No shared Assist identity or cross-site session is claimed, and exact deployed Clerk/trust-boundary configuration is not proven here |
+| Identity boundary | **Current / verified production Family History identity and owner isolation; Partial broader sign-in proof** | The production MCP and web app resolved the same retained test subject to one empty private vault, with no tenant selector, elevated role, or cross-family access. A one-time exact-user Clerk sign-in token left global verification unchanged. Fresh-device email verification remains unproved; no shared Assist identity or cross-site session is claimed |
 | Export and deletion | **Coming soon** | Person context-pack export and key revocation are narrower current tools. No complete owner export, `/settings/data`, `/delete-account`, coordinated record/account deletion, attachment purge, or content-bearing-history purge is verified |
-| Public truth surfaces and honesty | **Partial / verified source; Coming soon alignment** | `/updates`, public marketing, roadmap, privacy, and `/llms.txt` exist in source. The home page lacks the required FAQ and `/ai` invitation; `/updates` lacks the exact **Local / In review / Backend live / Public & live** labels and AI-written 1.1.1 release habit; and stale or unverified public statements need a separate sentence-by-sentence honesty pass before a big/public launch |
+| Public truth surfaces and honesty | **Partial / verified source and live release surface; Coming soon wider alignment** | `/updates` now uses the exact **Local / In review / Backend live / Public & live** vocabulary and carries the AI-written 1.1.1 MCP release. Public marketing, roadmap, privacy, and `/llms.txt` exist. The home page still lacks the required FAQ and complete `/ai` invitation, and stale or unverified public statements need a separate sentence-by-sentence honesty pass before a big/public launch |
 | `/me` and `/admin` | **Coming soon** | No family `/me` or owner `/admin` route exists. `/app/audit` is a private genealogy-readiness view and `/app/api/admin` is an API-key operator surface; neither is the family usage/stats contract |
 | Support Desk | **In design / deferred dependency** | `/contact` exists, but no registered Assist With Life Support Desk source key or header/footer desk link is present. Link it only when the shared desk is live; do not market it beforehand |
 | Brand, design, and themes | **Intentional product-specific difference; Coming soon accessibility floor** | Preserve Discover Their Stories’ compass, parchment, teal/rust, archival annotations, evidence-thread motif, typography, and editorial voice as the product's own design system. The designed philosophy reader already supports light/dark; the product UI does not yet prove first-class light/dark coverage. The family swatches `#8FD7B4` and `#245A43` identify Family History in shared portfolio wayfinding; they do not replace or dictate the product palette |
 | Dense information | **Intentional product-specific difference; Partial / verified foundation; Coming soon dependable behavior** | Family History may be denser than a sibling because evidence comparison requires it. People reads are capped and the operations view has a contained table, filters, sorting controls, and bounded rendering. Cursor pagination, table-first people view, click-to-sort columns, remembered preferences, account-saved views, and complete phone drill-down are not verified. The family contract supplies performance and phone-usability guardrails, not a uniform layout |
 | Family navigation | **Coming soon** | No family catalog row exists in the public or signed-in shell. It must show the whole verified roster without leaking cross-site counts or activity |
-| Launch stage | **Unknown current publication state; adopted sequence** | Repository and public-copy evidence cannot prove the real domain, Assist With Life catalog listing, deployment, or authenticated operation. Do not call this soft-launched, big/public-launched, or production-ready without fresh external proof |
+| Launch stage | **Current / verified soft-launch production for public setup and bounded authenticated MCP acceptance** | The real domain, public setup/discovery, fail-closed anonymous boundary, and one isolated authenticated research-to-story lifecycle are proven. This is not a big/public launch: normal fresh-device email verification, broad client availability, reconnect, immediate JWT revocation, catalog listing, and real-family usage remain separate proof or product gates |
 | Native privacy and review readiness | **Later guardrail only** | No native package is claimed or currently designed. Revisit native review requirements only after substantial recurring website use demonstrates a distinct native job; this does not shape the present product philosophy or website experience |
 
 This matrix is the current contradiction/adoption record. The dated capability
@@ -1304,7 +1304,7 @@ or an older production observation is not sufficient by itself.
 | Story Studio and publication | Draft/review/published states, reviewer assignment, evidence/context/privacy/living-person gates, explicit human confirmation, public story DTO filtering, and unpublish paths | **Current / verified repository foundation.** Optional passage-to-evidence reader links and selected-object visibility beyond the guarded story path remain **In design**; public availability is **Unknown** pending deployed user-path proof |
 | Collaboration and bounded sharing | Owner-scoped private vault operations plus guarded public-story publication; no complete invite, role, interpretation, or unlisted-link path | **Current / verified Private and guarded Public foundations.** Selected-object Private / Unlisted / Trusted / Public visibility, Viewer / Contributor / Editor / Owner roles, shared evidence with separate interpretations, and living/sensitive review are **In design** |
 | Scoped authority | Scope vocabulary, API-key mint/list/suspend/revoke primitives, owner checks, story roles, guarded publish actions, selected review/audit events, and bounded Queue command scopes | **Current / verified partial foundation.** Queue commands do not grant domain authority, but no complete grant yet binds an external chosen AI, scope, permitted data, operation/external-action category, approval, expiry/revocation, and attributable result. Incoming API-key resolution remains unfinished; self-asserted story headers are not a public authorization model |
-| API and AI connections | Internal app APIs, API-key management, Queue scope presets, `agentActivity`, capability manifest, story OpenAPI skeleton, `/api/capabilities`, API Center source, `/llms.txt`, plus `/mcp`, `/ai`, and `/ai.txt` | **Current / verified source and isolated official-client foundation; Partial deployed connection.** Twelve stateless MCP workflow tools resolve the owner from an exact-issuer, Clerk-shaped OAuth access token with an OAuth client identifier, keep reads bounded, and write canonical records with receipts and human publication gates. Ordinary Clerk session JWTs are rejected. The official v2 client and a generated signed token have exercised the real handler and isolated tenants. No provider registration/consent, named client, production-authenticated journey, reconnect, revocation, or `/settings/ai` path is claimed |
+| API and AI connections | Internal app APIs, API-key management, Queue scope presets, `agentActivity`, capability manifest, story OpenAPI skeleton, `/api/capabilities`, API Center source, `/llms.txt`, plus `/mcp`, `/ai`, and `/ai.txt` | **Current / verified production MCP and disposable named-client lifecycle; Partial reconnect and immediate revocation.** Twelve stateless workflow tools resolve the owner from an exact-issuer Clerk OAuth access token with a client identifier, keep reads bounded, and write canonical records with receipts and human publication gates. Ordinary Clerk session JWTs are rejected. A public PKCE client proved consent, token exchange, complete saves, corrections, Queue read, UI reflection, and fixture/client/session cleanup. Dynamic registration, fresh-device email completion, refresh/reconnect, immediate JWT revocation, and `/settings/ai` remain unproved |
 | Search and retrieval | Person/place/stories views, owner-scoped API reads, context packs, filters, and queue exports | **Current / verified narrow retrieval surfaces.** Universal search across the full information model is **In design** |
 | Visualization | People/place workspaces and data suitable for relational views; Timeline route is explicitly a placeholder | **Current / verified partial foundation; In design full experience.** Do not claim timeline, pedigree, map, heatmap, or general graph experiences as shipped |
 | Retention, export, and deletion | Person context-pack export, low-level record operations, and key revocation plus a documented lifecycle gap | **Current / verified narrow tools; Coming soon complete contract.** No complete owner-vault export, coordinated retention policy, `/settings/data`, `/delete-account`, or cross-store deletion workflow is verified |
@@ -1321,8 +1321,8 @@ and must not borrow the **Coming soon** label.
 Do not claim these as current merely because the information model anticipates
 them or a planning artifact names them:
 
-- universal “works with any AI” compatibility, a named-client provider consent
-  journey, production-authenticated reconnect/revocation, or granular client grants;
+- universal “works with any AI” compatibility, production-authenticated
+  refresh/reconnect, immediate issued-JWT revocation, or granular client grants;
 - people/relationship-first onboarding or automatic construction of a connected
   family picture from an external service;
 - automatic record import or direct FamilySearch/provider API access;
@@ -1579,8 +1579,9 @@ change the application.
 The current public source is only a partial foundation. It has `/updates`,
 roadmap/status copy, privacy copy, `/llms.txt`, `/ai`, and `/ai.txt`, but no
 front-page FAQ, complete family `/ai` invitation, family row, or Support Desk
-link. The new setup surfaces keep provider/named-client proof Partial rather
-than treating `/llms.txt` or source implementation as a live connection. The current `/about` local-only
+link. The setup surfaces now distinguish the proven production backend and one
+disposable named-client lifecycle from still-Partial broad client compatibility,
+fresh-device email, reconnect, and immediate JWT revocation. The current `/about` local-only
 storage/export statement also conflicts with the Convex-backed architecture,
 and source alone cannot prove that “working now” claims are deployed. Those
 public-copy corrections belong to a separate implementation and live-proof
@@ -1849,6 +1850,13 @@ before it was run.
 
 ## Changelog
 
+- **1.6.1 · 2026-08-12** — recorded the production MCP and disposable public
+  PKCE client acceptance: real discovery/challenge, explicit consent, token
+  exchange, official-client research-to-story saves and correction, canonical
+  signed-in UI reflection, human publish gates, exact fixture/client/session
+  cleanup, and the retained empty non-privileged identity. Kept fresh-device
+  email, refresh/reconnect, immediate Clerk JWT revocation, and independent
+  audit separate; AWF-0034 owns the revocation decision.
 - **1.6.0 · 2026-08-12** — recorded the AWF-WO-006 source and isolated official
   v2 client MCP foundation: twelve product-native research-to-story tools,
   a stateless protected resource, server-derived vault identity, bounded reads,

@@ -43,7 +43,7 @@ export const appVersion = "1.1.1";
 export const releaseNotes: ReleaseEntry[] = [
   {
     version: appVersion,
-    status: "In review",
+    status: "Backend live",
     releasedAt: "2026-08-12T16:08:00-07:00",
     timezone: "America/Phoenix",
     title: "Your AI can preserve the research trail",
@@ -122,7 +122,7 @@ export const releaseNotes: ReleaseEntry[] = [
     ],
     whatToCheck: [
       "Read /ai on desktop or phone and confirm the setup and Partial boundaries are clear.",
-      "If you have a sanctioned compatible client, confirm all twelve tools appear before saving anything.",
+      "If you have a sanctioned compatible client, confirm all twelve tools appear before saving anything. Fresh-device email verification and immediate JWT revocation remain Partial.",
     ],
   },
   {
