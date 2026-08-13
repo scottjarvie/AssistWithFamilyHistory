@@ -33,6 +33,21 @@ export async function proxyFamilyHistoryMcpRequest(request: Request, path: strin
     redirect: "manual",
     cache: "no-store",
   });
-  const responseBody = await upstream.arrayBuffer();
-  return new Response(responseBody, { status: upstream.status, headers: upstream.headers });
+  const responseHeaders = new Headers(upstream.headers);
+  // Fetch owns transfer framing. Forwarding hop-by-hop or encoded byte-length
+  // headers after it has exposed a response stream can make a second server
+  // emit a successful response with no body.
+  for (const name of [
+    "connection",
+    "content-encoding",
+    "content-length",
+    "keep-alive",
+    "proxy-authenticate",
+    "proxy-authorization",
+    "te",
+    "trailer",
+    "transfer-encoding",
+    "upgrade",
+  ]) responseHeaders.delete(name);
+  return new Response(upstream.body, { status: upstream.status, headers: responseHeaders });
 }

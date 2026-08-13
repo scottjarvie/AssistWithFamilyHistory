@@ -101,3 +101,15 @@ protected truth PR is the capability check for that replacement key.
 - Clerk JWT access tokens are not immediately revocable under the current
   provider posture; AWF-0034 records the smallest next security decision.
 - Independent Work Order audit remains separate and `not-audited`.
+
+## Post-acceptance transport repair
+
+The exact-main deployment for the acceptance record re-exposed a transport
+framing defect: direct Convex metadata returned its 264-byte JSON, while the
+branded proxy returned HTTP 200 with an empty body. The proxy had consumed the
+upstream body and forwarded byte/framing headers owned by the first HTTP hop.
+PR #40 streams the upstream body and removes hop-by-hop, encoded-length, and
+encoding headers before Vercel frames the downstream response. Its regression
+test proves the proxy returns before a delayed upstream chunk and never
+forwards stale framing headers. Final live proof below refers to the repaired
+deployment, not the transient bodyless response.
