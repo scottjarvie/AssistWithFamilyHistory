@@ -7,7 +7,7 @@
     "dev": "next dev --webpack --port 3443",
     "build": "next build",
     "start": "next start --port 3443",
-    "test": "node --import tsx --test scripts/test-vault-core.ts scripts/test-vault-migration.ts scripts/test-person-snapshot-parity.ts scripts/test-context-coverage-parity.ts scripts/test-context-gates.ts scripts/test-family-tree.ts scripts/test-task-lifecycle.ts scripts/test-queue-contract.ts scripts/test-agent-auth.ts scripts/test-vercel-build.ts scripts/test-public-story-error.ts scripts/test-story-publish-gate.ts scripts/test-ai-redaction.ts scripts/test-public-text-redaction.ts",
+    "test": "node --import tsx --test scripts/test-vault-core.ts scripts/test-vault-migration.ts scripts/test-person-snapshot-parity.ts scripts/test-context-coverage-parity.ts scripts/test-context-gates.ts scripts/test-family-tree.ts scripts/test-task-lifecycle.ts scripts/test-queue-contract.ts scripts/test-agent-auth.ts scripts/test-vercel-build.ts scripts/test-public-story-error.ts scripts/test-story-publish-gate.ts scripts/test-ai-redaction.ts scripts/test-public-text-redaction.ts scripts/test-canonical-production-url.ts",
     "test:process-route": "vitest run --config vitest.process.config.ts",
     "test:coverage": "node --import tsx --test --experimental-test-coverage scripts/test-vault-core.ts scripts/test-vault-migration.ts scripts/test-person-snapshot-parity.ts scripts/test-context-coverage-parity.ts scripts/test-context-gates.ts scripts/test-family-tree.ts scripts/test-task-lifecycle.ts scripts/test-queue-contract.ts scripts/test-agent-auth.ts scripts/test-vercel-build.ts scripts/test-public-story-error.ts scripts/test-story-publish-gate.ts scripts/test-ai-redaction.ts scripts/test-public-text-redaction.ts",
     "lint": "eslint",

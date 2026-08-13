@@ -1,6 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { isAnonymousVaultEnabled, isClerkEnabled } from "@/lib/clerk/config";
+import { canonicalizeProductionUrl } from "@/lib/site/canonicalProductionUrl";
 import { VAULT_PREVIEW_COOKIE } from "@/lib/vault/constants";
 import { PROTECTED_ROUTE_PATTERNS } from "@/lib/vault/protectedRoutes";
 
@@ -9,12 +10,6 @@ const isProtectedRoute = createRouteMatcher([...PROTECTED_ROUTE_PATTERNS]);
 const hasClerkKeys = isClerkEnabled();
 const requireAuth = process.env.REQUIRE_AUTH === "true";
 const allowAnonymousVault = isAnonymousVaultEnabled();
-
-const legacyHosts = new Set([
-  "tell-their-stories.vercel.app",
-  "tell-their-stories-jarvies-projects.vercel.app",
-  "tell-their-stories-jarvie-jarvies-projects.vercel.app",
-]);
 
 function getGuestVaultOwner(existingValue?: string | null) {
   const trimmedValue = existingValue?.trim();
@@ -27,10 +22,8 @@ function getGuestVaultOwner(existingValue?: string | null) {
 
 const authMiddleware = clerkMiddleware(
   async (auth, req) => {
-    if (legacyHosts.has(req.nextUrl.host)) {
-      const redirectUrl = new URL(req.url);
-      redirectUrl.protocol = "https:";
-      redirectUrl.host = "discovertheirstories.com";
+    const redirectUrl = canonicalizeProductionUrl(req.url);
+    if (redirectUrl) {
       return NextResponse.redirect(redirectUrl, 308);
     }
 
