@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "2.0.0",
+    "from": "7a2421c",
+    "to": "350dc44eb1c26bcc3eb173d3e2f0452fe9b602da",
+    "cutoff": "2026-08-13T14:18:30-07:00"
+  },
+  "sources": [
+    {
+      "id": "pr-42",
+      "title": "Restore sign-in from the Family History alias",
+      "disposition": "group",
+      "releaseItemId": "canonical-family-history-domain",
+      "reason": "Emergency first phase of the same canonical sign-in outcome"
+    },
+    {
+      "id": "commit-350dc44eb1c2",
+      "title": "Make Assist With Family History the canonical product",
+      "disposition": "include",
+      "releaseItemId": "assist-with-family-history-identity"
+    },
+    {
+      "id": "tracker-awf-0035",
+      "title": "Explain the research-to-story workspace and chosen-AI boundary",
+      "disposition": "include",
+      "releaseItemId": "research-to-story-front-door"
+    }
+  ]
+}
