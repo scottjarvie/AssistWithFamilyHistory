@@ -111,5 +111,14 @@ upstream body and forwarded byte/framing headers owned by the first HTTP hop.
 PR #40 streams the upstream body and removes hop-by-hop, encoded-length, and
 encoding headers before Vercel frames the downstream response. Its regression
 test proves the proxy returns before a delayed upstream chunk and never
-forwards stale framing headers. Final live proof below refers to the repaired
-deployment, not the transient bodyless response.
+forwards stale framing headers. It merged as
+`0813ee5e6d876056b8d3b5785f1c44f884e6cfa2`; exact-main Actions run
+`31663379479` passed, and production deployment
+`9CL2UJzYrT1Q8HqToSUc2uTLTuCf` reached `Ready` for that SHA.
+
+The repaired public alias returned HTTP 200 with a 264-byte metadata document
+whose resource is `https://discovertheirstories.com/mcp` and whose authorization
+server is `https://clerk.discovertheirstories.com`. Public `/ai`, `/ai.txt`, and
+`/updates` also returned HTTP 200. An anonymous initialize request to `/mcp`
+returned HTTP 401 with the Family History bearer challenge and the canonical
+resource-metadata URL. These receipts supersede the transient bodyless response.
