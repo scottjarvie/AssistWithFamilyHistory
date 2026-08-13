@@ -7,7 +7,7 @@
     "publicApi": false
   },
   "mcp": {
-    "resource": "https://discovertheirstories.com/mcp",
+    "resource": "https://assistwithfamilyhistory.com/mcp",
     "transport": "stateless-streamable-http",
     "oauth": "protected-resource metadata plus exact-issuer Clerk-shaped OAuth access-token JWT verification; ordinary session JWTs are rejected",
     "ownerBoundary": "The verified OAuth subject selects the vault server-side. No MCP tool accepts an owner, user, workspace, or vault identifier.",

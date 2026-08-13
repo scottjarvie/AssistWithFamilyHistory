@@ -4,10 +4,10 @@ export function GET() {
   const body = [
     "# Assist With Family History — agent setup",
     "",
-    "Product: Discover Their Stories is the user's durable private family-history research-to-story workspace. The assistant reasons, researches, compares, corrects, and drafts; the product owns identity, permissions, records, provenance, workflow state, and human review.",
-    "MCP endpoint: https://discovertheirstories.com/mcp",
+    "Product: Assist With Family History is the user's durable private family-history research-to-story workspace. The assistant reasons, researches, compares, corrects, and drafts; the product owns identity, permissions, records, provenance, workflow state, and human review.",
+    "MCP endpoint: https://assistwithfamilyhistory.com/mcp",
     "Transport: remote Streamable HTTP MCP with OAuth. Modern 2026-07-28 requests and stateless 2025-era fallback share one tool factory.",
-    "Setup page: https://discovertheirstories.com/ai",
+    "Setup page: https://assistwithfamilyhistory.com/ai",
     "",
     "## Required workflow",
     "1. Call get_family_history_brief first.",

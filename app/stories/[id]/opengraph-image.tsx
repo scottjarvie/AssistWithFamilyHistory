@@ -71,7 +71,7 @@ export default async function StoryOpenGraphImage({
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 28, color: "#6b5d46" }}>
           <div>{preview.eyebrow}</div>
-          <div>discovertheirstories.com</div>
+          <div>assistwithfamilyhistory.com</div>
         </div>
       </div>
     ),

@@ -1,8 +1,8 @@
 {
-  "name": "discover-their-stories",
-  "version": "1.1.1",
+  "name": "assist-with-family-history",
+  "version": "2.0.0",
   "private": true,
-  "description": "A Family History AI Toolset - Go beyond names and dates",
+  "description": "A durable, user-controlled family-history research-to-story workspace",
   "scripts": {
     "dev": "next dev --webpack --port 3443",
     "build": "next build",

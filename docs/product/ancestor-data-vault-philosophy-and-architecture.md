@@ -6,7 +6,7 @@ Status: draft product architecture. This document is a research-backed direction
 
 ## Philosophy
 
-Discover Their Stories should be built around one core idea:
+Assist With Family History should be built around one core idea:
 
 > Preserve the originals, extract the meaningful bits, keep uncertainty visible, and use every reviewed piece of data to drive the next research step and the eventual story.
 

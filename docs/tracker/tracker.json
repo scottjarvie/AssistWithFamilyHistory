@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "project": "Assist With Family History",
   "repository": "github.com/scottjarvie/discover-their-stories",
-  "projectUrl": "https://discovertheirstories.com",
+  "projectUrl": "https://assistwithfamilyhistory.com",
   "idPrefix": "AWF",
   "projectPhilosophy": "../planning/assist-with-family-history-project-philosophy.md",
   "familyCore": {
@@ -13,7 +13,7 @@
     "url": "https://github.com/scottjarvie/assistwithlife/blob/main/planning/assist-with-sites-core-philosophy.md"
   },
   "guide": "GUIDE.md",
-  "lastUpdated": "2026-08-11",
+  "lastUpdated": "2026-08-13",
   "palette": {
     "paper": "#f7f3e8",
     "paperSurface": "#fffdf7",

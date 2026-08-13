@@ -133,7 +133,7 @@ export function queueHandoffCopy(item: QueueItemRecord): string {
       return "A retry is scheduled, but nothing is running between attempts.";
     }
     if (item.condition === "disconnected") {
-      return "Saved for your AI, but no AI is connected through Discover Their Stories. Nothing is running.";
+      return "Saved for your AI, but no AI is connected through Assist With Family History. Nothing is running.";
     }
     return "Left for your AI. Nothing is running until an authorized AI claims it.";
   }

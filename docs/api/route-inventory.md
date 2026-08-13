@@ -6,7 +6,7 @@ Last updated: 2026-07-12
 
 This inventory classifies every current `app/api/**/route.ts` surface. The machine-readable companion is [`capability-manifest.json`](capability-manifest.json).
 
-Discover Their Stories has useful internal APIs, but they are not yet a public or stable agent API. Treat them as internal app routes unless this inventory says otherwise. Future OpenAPI and capability docs should start from this table.
+Assist With Family History has useful internal APIs, but they are not yet a public or stable agent API. Treat them as internal app routes unless this inventory says otherwise. Future OpenAPI and capability docs should start from this table.
 
 ## Owner And Auth Baseline
 

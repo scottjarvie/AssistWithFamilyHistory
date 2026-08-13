@@ -24,30 +24,30 @@ import { createPageMetadata } from "@/lib/seo";
 export const metadata: Metadata = createPageMetadata({
   title: "About",
   description:
-    "Learn the mission behind Discover Their Stories and the principles guiding this family history platform.",
+    "Learn why Assist With Family History keeps evidence, uncertainty, relationships, research, and stories connected under your control.",
   path: "/about",
 });
 
 const principles = [
   {
     icon: Heart,
-    title: "Storytelling First",
-    description: "We believe family history is about stories, not just data. Every ancestor was a person with hopes, fears, and a life worth remembering.",
+    title: "Evidence and story stay connected",
+    description: "A meaningful story can remain readable while a curious person follows important details back to sources, context, uncertainty, and later corrections.",
   },
   {
     icon: Shield,
-    title: "Your Data, Your Control",
-    description: "All your work stays on your computer. We don't store your family data on servers. Export everything in open formats.",
+    title: "Your family history, your authority",
+    description: "The private workspace is owner-scoped. Reading, changing, sharing, exporting, and publishing are separate operations rather than one blanket permission.",
   },
   {
     icon: Lightbulb,
-    title: "AI as Assistant",
-    description: "AI helps with the heavy lifting—analysis, synthesis, writing—but you stay in control. The human researcher makes the decisions.",
+    title: "Your AI remains your choice",
+    description: "Your chosen AI can reason, compare, research, and draft. Family History keeps the durable records and enforces its own data and tool boundary.",
   },
   {
     icon: Users,
-    title: "Built for Researchers",
-    description: "Created by genealogists who understand the unique challenges of family history research. We know what matters.",
+    title: "Uncertainty belongs in the record",
+    description: "Candidate identities, conflicting evidence, family lore, inference, and historical context remain visible instead of being flattened into one official answer.",
   },
 ];
 
@@ -60,7 +60,7 @@ export default function AboutPage() {
           {/* Header */}
           <div className="text-center mb-16">
             <h1 className="text-4xl sm:text-5xl font-bold text-stone-900 mb-6">
-              About Discover Their Stories
+              About Assist With Family History
             </h1>
             <p className="text-xl text-stone-500">
               A different approach to family history tools
@@ -77,14 +77,14 @@ export default function AboutPage() {
                 the beginning.
               </p>
               <p className="text-stone-600 leading-relaxed">
-                <strong>Discover Their Stories</strong> picks up where the tree ends. We help you 
-                go deeper into the research, understand the context of your ancestors&apos; lives, 
-                and transform that research into content your family will actually read and cherish.
+                <strong>Assist With Family History</strong> preserves the trail behind the tree. It
+                connects people and relationships with events, places, sources, questions,
+                interpretations, and stories so useful work can survive the current conversation.
               </p>
               <p className="text-stone-600 leading-relaxed">
-                With AI assistance, we make the tedious parts faster—extracting information, 
-                identifying patterns, suggesting connections—so you can spend your time on 
-                what matters: understanding and sharing the lives of those who came before.
+                Your chosen AI can help gather, compare, and draft under your direction. The
+                workspace keeps what came from a source distinct from what was inferred, disputed,
+                remembered, or added as wider historical context—and lets you correct the result.
               </p>
             </div>
           </section>
@@ -125,8 +125,8 @@ export default function AboutPage() {
                   <div>
                     <h3 className="font-semibold text-stone-900">Extract</h3>
                     <p className="text-stone-500">
-                      Use our browser extension to capture sources from FamilySearch. 
-                      All the indexed information, citations, and context—extracted in seconds.
+                      Begin with a person and known relationship, or preserve the source, memory,
+                      place, event, or question that brought you here.
                     </p>
                   </div>
                 </li>
@@ -137,8 +137,8 @@ export default function AboutPage() {
                   <div>
                     <h3 className="font-semibold text-stone-900">Document</h3>
                     <p className="text-stone-500">
-                      The raw data becomes a clean evidence document—organized, 
-                      searchable, and stored locally on your computer.
+                      Keep original material, citations, extracts, confidence, conflicts, and
+                      capture provenance connected to every relevant person and event.
                     </p>
                   </div>
                 </li>
@@ -149,8 +149,8 @@ export default function AboutPage() {
                   <div>
                     <h3 className="font-semibold text-stone-900">Contextualize</h3>
                     <p className="text-stone-500">
-                      AI analyzes your sources—finding patterns, identifying conflicts, 
-                      grouping duplicates, and suggesting research directions.
+                      Compare evidence and context without silently turning a proposal into a fact.
+                      Unresolved gaps become durable research work rather than lost chat history.
                     </p>
                   </div>
                 </li>
@@ -161,8 +161,8 @@ export default function AboutPage() {
                   <div>
                     <h3 className="font-semibold text-stone-900">Tell</h3>
                     <p className="text-stone-500">
-                      Transform your research into stories, timelines, and shareable 
-                      content that brings your ancestors to life for your family.
+                      Build a private, source-aware story, follow details back to their evidence,
+                      and keep publication as a separate human-reviewed decision.
                     </p>
                   </div>
                 </li>
@@ -173,7 +173,7 @@ export default function AboutPage() {
           {/* Open Source Note */}
           <section className="text-center">
             <p className="text-stone-500">
-              Discover Their Stories is a personal project built with love for family history.
+              Assist your AI, so it can assist you with family history.
             </p>
           </section>
         </div>

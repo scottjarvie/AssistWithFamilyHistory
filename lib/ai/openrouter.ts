@@ -46,8 +46,8 @@ export async function chatCompletion({
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${config.apiKey}`,
-        "HTTP-Referer": "https://discovertheirstories.com",
-        "X-Title": "Discover Their Stories",
+        "HTTP-Referer": "https://assistwithfamilyhistory.com",
+        "X-Title": "Assist With Family History",
       },
       body: JSON.stringify({
         model: config.model,
@@ -119,8 +119,8 @@ export async function* streamChatCompletion({
     headers: {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${config.apiKey}`,
-      "HTTP-Referer": "https://discovertheirstories.com",
-      "X-Title": "Discover Their Stories",
+      "HTTP-Referer": "https://assistwithfamilyhistory.com",
+      "X-Title": "Assist With Family History",
     },
     body: JSON.stringify({
       model: config.model,

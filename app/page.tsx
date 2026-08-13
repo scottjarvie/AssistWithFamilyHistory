@@ -1,5 +1,5 @@
 /**
- * Homepage - Discover Their Stories
+ * Homepage - Assist With Family History
  * 
  * Purpose: Marketing landing page for the platform
  * 
@@ -25,13 +25,14 @@ import { Footer } from "@/components/layout/Footer";
 import { Hero } from "@/components/marketing/Hero";
 import { FeatureShowcase } from "@/components/marketing/FeatureShowcase";
 import { CTASection } from "@/components/marketing/CTASection";
+import { FamilyHistoryFaq } from "@/components/marketing/FamilyHistoryFaq";
 import type { Metadata } from "next";
 import { createPageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = createPageMetadata({
   title: "Home",
   description:
-    "A private beta workspace for AI-assisted genealogy research, operating data, and ancestor story drafting.",
+    "A durable, user-controlled family-history research-to-story workspace for connected evidence, context, corrections, and meaningful stories.",
   path: "/",
 });
 
@@ -42,6 +43,7 @@ export default function HomePage() {
       <main className="overflow-x-hidden">
         <Hero />
         <FeatureShowcase />
+        <FamilyHistoryFaq />
         <CTASection />
       </main>
       <Footer />

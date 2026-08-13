@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const alt = "Discover Their Stories";
+export const alt = "Assist With Family History";
 export const size = {
   width: 1200,
   height: 630,
@@ -36,7 +36,7 @@ export default function OpenGraphImage() {
             Research deeply, document evidence, and turn genealogy records into narratives.
           </div>
         </div>
-        <div style={{ fontSize: 28, color: "#57534e" }}>discovertheirstories.com</div>
+        <div style={{ fontSize: 28, color: "#57534e" }}>assistwithfamilyhistory.com</div>
       </div>
     ),
     {

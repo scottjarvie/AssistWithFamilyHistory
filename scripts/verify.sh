@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Discover Their Stories — full verification.
+# Assist With Family History — full verification.
 #
 # Runs typecheck, lint, test, every `check:*` contract, and the production
 # build, recording each result. Designed as the single command an auditor

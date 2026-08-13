@@ -7,7 +7,7 @@ import { createPageMetadata } from "@/lib/seo";
 
 const roadmap = [
   {
-    phase: "Working Now",
+    phase: "Current",
     icon: CheckCircle2,
     copy: "Enough is in place for real beta work: capture, merge, browse, inspect, draft, review, and publish intentionally.",
     items: [
@@ -18,7 +18,7 @@ const roadmap = [
     ],
   },
   {
-    phase: "Being Worked On",
+    phase: "Coming Soon",
     icon: Clock3,
     copy: "The next layer is making the app feel like a story workshop instead of just a data store.",
     items: [
@@ -29,7 +29,7 @@ const roadmap = [
     ],
   },
   {
-    phase: "Being Explored",
+    phase: "Later",
     icon: FlaskConical,
     copy: "These are likely side tools, but they need to serve the main goal: better researched ancestor stories.",
     items: [
@@ -44,7 +44,7 @@ const roadmap = [
 export const metadata: Metadata = createPageMetadata({
   title: "Roadmap",
   description:
-    "A transparent beta roadmap for Discover Their Stories: what works now, what is being built, and what is being explored.",
+    "A transparent beta roadmap for Assist With Family History: what is current, coming soon, and later.",
   path: "/roadmap",
 });
 
@@ -56,7 +56,7 @@ export default function RoadmapPage() {
         <section className="border-b border-[#d8c7a7] bg-[#1f2f35] px-4 py-12 text-white sm:px-6 lg:px-8">
           <div className="mx-auto max-w-5xl">
             <Badge className="mb-5 bg-white/10 text-white hover:bg-white/10">
-              Honest beta roadmap
+              Honest soft-launch roadmap
             </Badge>
             <h1 className="max-w-4xl font-[family-name:var(--font-cormorant-garamond)] text-5xl font-semibold leading-[0.95] sm:text-6xl">
               Build toward stories, without pretending everything is finished.
@@ -98,7 +98,7 @@ export default function RoadmapPage() {
               </p>
             </div>
             <a href="/app" className="inline-flex items-center gap-2 text-sm font-semibold text-[#7c4425]">
-              Enter the studio
+              Open the workspace
               <ArrowRight className="h-4 w-4" />
             </a>
           </div>

@@ -1,6 +1,6 @@
 # Product Map
 
-Discover Their Stories is an AI-assisted genealogy research and storytelling workspace. The product should help users gather operating data, reason about it, and turn it into shareable ancestor stories.
+Assist With Family History is an AI-assisted genealogy research and storytelling workspace. The product should help users gather operating data, reason about it, and turn it into shareable ancestor stories.
 
 It should also operate as an AI family history lab: a place to try many tools and workflows while the product learns what helps users understand ancestors and tell better stories.
 

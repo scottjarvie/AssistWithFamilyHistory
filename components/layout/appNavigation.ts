@@ -114,11 +114,11 @@ export const appNavigationSections = [
     ],
   },
   {
-    label: "Agents",
+    label: "Your AI",
     items: [
       {
         href: "/app/api",
-        label: "API Center",
+        label: "AI access",
         icon: KeyRound,
       },
       {

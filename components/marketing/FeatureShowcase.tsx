@@ -20,21 +20,21 @@ interface JourneyStage {
 
 const journeyStages: JourneyStage[] = [
   {
-    label: "Functioning now",
-    summary: "The parts beta testers can use today.",
+    label: "Current",
+    summary: "Verified parts of the soft-launch workspace.",
     icon: CheckCircle2,
     borderClass: "border-[#476553]",
     headingClass: "text-[#476553]",
     features: [
       { name: "FamilySearch capture import", status: "working", href: "/extension" },
-      { name: "People, places, sources, memories vault", status: "working", href: "/app/people" },
-      { name: "Research operations queue", status: "working", href: "/app/operations" },
-      { name: "Story Writer v1", status: "working", href: "/app/story-writer" },
+      { name: "People, places, sources, and memories", status: "working", href: "/app/people" },
+      { name: "Research operations and product Queue", status: "working", href: "/app/queue" },
+      { name: "Private story drafting and review", status: "working", href: "/app/story-writer" },
     ],
   },
   {
-    label: "Being worked on",
-    summary: "The next layer that makes the workflow clearer and more useful.",
+    label: "Coming soon",
+    summary: "Committed work required before a wider public launch.",
     icon: Clock3,
     borderClass: "border-[#9f5a2d]",
     headingClass: "text-[#9f5a2d]",
@@ -46,8 +46,8 @@ const journeyStages: JourneyStage[] = [
     ],
   },
   {
-    label: "Being explored",
-    summary: "Promising side tools that may become first-class features.",
+    label: "Later",
+    summary: "Useful directions that are not promises or launch claims.",
     icon: Search,
     borderClass: "border-[#234d5e]",
     headingClass: "text-[#234d5e]",
@@ -62,8 +62,8 @@ const journeyStages: JourneyStage[] = [
 
 const statusLabel: Record<StageStatus, string> = {
   working: "Works",
-  "in-progress": "In progress",
-  exploring: "Exploring",
+  "in-progress": "Coming soon",
+  exploring: "Later",
 };
 
 const statusClass: Record<StageStatus, string> = {
@@ -78,14 +78,13 @@ export function FeatureShowcase() {
       <div className="absolute inset-x-0 top-0 h-px bg-[#b79f7a]" />
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl">
-          <p className="text-xs uppercase tracking-[0.24em] text-[#5f665f]">Transparent beta status</p>
+          <p className="text-xs uppercase tracking-[0.24em] text-[#5f665f]">Honest soft-launch status</p>
           <h2 className="mt-5 text-4xl leading-tight text-[#1d212a] sm:text-5xl" data-display="true">
-            What is real, what is next, and what is still speculative.
+            Current, coming soon, and later—kept deliberately separate.
           </h2>
           <p className="mt-5 max-w-3xl text-lg leading-relaxed text-[#4e5a64]">
-            This site is intentionally open about its stage. Some pieces are already useful for
-            research. Some are under active construction. Some are ideas being tested with real
-            family history workflows before they become product promises.
+            Active controls work today. Committed launch work is labeled Coming soon, while ideas
+            that still need real use and product learning remain Later.
           </p>
         </div>
 
@@ -136,13 +135,13 @@ export function FeatureShowcase() {
           <div>
             <p className="text-xs uppercase tracking-[0.24em] text-[#6d6249]">The operating thesis</p>
             <p className="mt-4 text-3xl leading-tight text-[#1d212a]" data-display="true">
-              Better stories require better research data first.
+              A family tree shows connections. Family History preserves why they are believed.
             </p>
           </div>
           <p className="text-base leading-8 text-[#4e5a64]">
-            The project is not trying to be a polished family-tree replacement yet. It is testing
-            whether AI can help a researcher gather stronger evidence, understand places and
-            events, notice missing work, and turn that into stories with enough context to matter.
+            Your AI can help gather and compare. The workspace keeps evidence, uncertainty,
+            context, questions, and stories connected so a correction can travel through the
+            trail without erasing how the earlier understanding was reached.
           </p>
         </div>
       </div>

@@ -6,7 +6,7 @@
  * root (NOT under /api) so it is publicly reachable. No vault data.
  */
 const BODY = [
-  "# Discover Their Stories",
+  "# Assist With Family History",
   "A family-history AI platform. Point your AI agent here to help gather, organize, and tell your family's story.",
   "",
   "## For AI agents",

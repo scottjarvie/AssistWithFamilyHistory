@@ -22,7 +22,7 @@ export function MarketingNav() {
         <div className="flex h-[4.5rem] items-center justify-between">
           <SafeLink
             href="/"
-            aria-label="Discover Their Stories home"
+            aria-label="Assist With Family History home"
             className="group flex items-center gap-3"
           >
             <div className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[#b79f7a77] bg-[#efe4cd] shadow-[0_10px_30px_-20px_#000] transition-transform duration-300 group-hover:scale-105">
@@ -30,12 +30,8 @@ export function MarketingNav() {
               <Compass className="h-5 w-5 text-[#234d5e]" />
             </div>
             <div className="hidden sm:block">
-              <p className="text-xl font-semibold leading-none text-[#1d212a]" data-display="true">
-                Discover Their Stories
-              </p>
-              <p className="mt-1 text-[11px] uppercase tracking-[0.22em] text-[#6f664f]">
-                AI Heritage Studio
-              </p>
+              <p className="text-[10px] font-semibold uppercase leading-none tracking-[0.2em] text-[#6f664f]">Assist With</p>
+              <p className="mt-1 text-xl font-semibold leading-none text-[#1d212a]" data-display="true">Family History</p>
             </div>
           </SafeLink>
 
@@ -57,7 +53,7 @@ export function MarketingNav() {
               className="h-11 rounded-full border border-[#1f45547a] bg-[#234d5e] px-6 text-sm font-semibold tracking-wide text-[#f7f3e8] shadow-[0_12px_25px_-16px_#0f2730] hover:bg-[#1f4554]"
             >
               <SafeLink href="/app" className="flex items-center gap-2">
-                Enter Studio
+                Open workspace
                 <Sparkles className="h-4 w-4" />
               </SafeLink>
             </Button>
@@ -95,7 +91,7 @@ export function MarketingNav() {
                 className="mt-2 h-11 rounded-full border border-[#1f45547a] bg-[#234d5e] text-[#f7f3e8] hover:bg-[#1f4554]"
               >
                 <SafeLink href="/app" onClick={() => setMobileMenuOpen(false)}>
-                  Enter Studio
+                  Open workspace
                 </SafeLink>
               </Button>
             </div>

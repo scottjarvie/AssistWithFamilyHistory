@@ -28,8 +28,8 @@ export function Footer() {
               <Compass className="h-5 w-5 text-[#f2d7af]" />
             </div>
             <div>
-              <p className="text-xl text-[#fff6e5]" data-display="true">Discover Their Stories</p>
-              <p className="text-[11px] uppercase tracking-[0.22em] text-[#b8a987]">AI Heritage Studio</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#b8a987]">Assist With</p>
+              <p className="mt-1 text-xl text-[#fff6e5]" data-display="true">Family History</p>
             </div>
           </div>
 
@@ -61,7 +61,7 @@ export function Footer() {
           </nav>
 
           <p className="max-w-xs text-sm leading-6 text-[#b8a987]">
-            Public beta workspace for evidence-grounded ancestor stories.
+            A durable research-to-story workspace for you and your chosen AI.
           </p>
         </div>
       </div>

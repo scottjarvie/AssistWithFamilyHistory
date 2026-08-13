@@ -19,7 +19,7 @@ function normalizeDescription(description: string): string {
   }
 
   const separator = trimmed.endsWith(".") ? " " : ". ";
-  const expanded = `${trimmed}${separator}Includes source documentation, AI analysis, and exportable dossiers.`;
+  const expanded = `${trimmed}${separator}Keep evidence, context, uncertainty, and stories connected.`;
 
   if (expanded.length > 160) {
     return `${expanded.slice(0, 157).trimEnd()}...`;
@@ -38,7 +38,7 @@ function normalizeDescription(description: string): string {
 function normalizeTitle(title: string): string {
   const baseTitle = `${title} | ${SITE_NAME}`;
   const withQualifier =
-    baseTitle.length < 30 ? `${baseTitle} | Genealogy AI` : baseTitle;
+    baseTitle.length < 30 ? `${baseTitle} | Family history workspace` : baseTitle;
 
   if (withQualifier.length <= 60) {
     return withQualifier;
@@ -86,7 +86,7 @@ export const defaultMetadata: Metadata = {
   },
   description: SITE_DESCRIPTION,
   openGraph: {
-    title: `${SITE_NAME} | Family History AI Tools`,
+    title: `${SITE_NAME} | Research-to-story workspace`,
     description: SITE_DESCRIPTION,
     type: "website",
     siteName: SITE_NAME,

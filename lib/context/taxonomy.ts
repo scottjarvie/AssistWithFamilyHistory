@@ -492,7 +492,7 @@ export function listArtifactRoutes(): ArtifactRoute[] {
  */
 export function buildContextSchemaDocument() {
   return {
-    name: "Discover Their Stories — Context Store Taxonomy",
+    name: "Assist With Family History — Context Store Taxonomy",
     version: TAXONOMY_VERSION,
     audience: "ai-agents",
     summary:

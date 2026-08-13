@@ -6,7 +6,7 @@ import { createPageMetadata } from "@/lib/seo";
 export const metadata: Metadata = createPageMetadata({
   title: "Privacy Policy",
   description:
-    "Privacy policy for Discover Their Stories, including local storage behavior and AI processing controls.",
+    "Privacy policy for Assist With Family History, including local storage behavior and AI processing controls.",
   path: "/privacy",
 });
 
@@ -22,7 +22,7 @@ export default function PrivacyPage() {
           <section className="mb-8 space-y-3">
             <h2 className="text-2xl font-semibold text-stone-900">Data Storage</h2>
             <p className="text-stone-600">
-              Discover Their Stories stores structured genealogy data in Convex when the vault backend is configured.
+              Assist With Family History stores structured genealogy data in Convex when the vault backend is configured.
               Raw capture packages, legacy source-document artifacts, and generated markdown exports are also stored locally under `data/source-docs/` for artifact retention and export.
             </p>
           </section>
@@ -48,7 +48,7 @@ export default function PrivacyPage() {
             <p className="text-stone-600">
               Questions about this policy can be sent to{" "}
               <a className="text-amber-700 hover:underline" href="mailto:privacy@discovertheirstories.com">
-                privacy@discovertheirstories.com
+                Contact the privacy team
               </a>
               .
             </p>

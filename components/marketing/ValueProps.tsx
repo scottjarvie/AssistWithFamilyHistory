@@ -45,7 +45,7 @@ export function ValueProps() {
         <div className="mb-14 text-center">
           <p className="text-xs uppercase tracking-[0.24em] text-[#5f665f]">Why This Matters</p>
           <h2 className="mt-5 text-4xl text-[#1d212a] sm:text-5xl" data-display="true">
-            Why Discover Their Stories?
+            Why Assist With Family History?
           </h2>
           <p className="mx-auto mt-5 max-w-3xl text-lg leading-relaxed text-[#4e5a64]">
             Find more, write better, preserve what matters.

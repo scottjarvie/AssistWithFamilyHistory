@@ -1,7 +1,7 @@
 # Assist With Family History tracker guide
 
 This repository-owned tracker is the durable owner-and-AI view of work for
-Assist With Family History / Discover Their Stories. It travels with every
+Assist With Family History. It travels with every
 authorized clone. Markdown is canonical; the generated board and guide are
 zero-setup readers, not separate sources of truth.
 

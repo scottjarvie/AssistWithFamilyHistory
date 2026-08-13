@@ -1,5 +1,5 @@
 /**
- * Root Layout - Discover Their Stories
+ * Root Layout - Assist With Family History
  * 
  * Purpose: Main application layout wrapping all pages
  * 
