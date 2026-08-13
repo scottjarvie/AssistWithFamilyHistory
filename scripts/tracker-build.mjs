@@ -207,6 +207,14 @@ for (const card of cards) {
 
 const DATA = JSON.stringify(cards.map(({ body, html, ...rest }) => rest));
 const WORK_ORDER_DATA = JSON.stringify(workOrders.map(({ body, html, ...rest }) => rest));
+const trackerUpdated = [...cards, ...workOrders]
+  .map((item) => item.updated || item.created)
+  .filter(Boolean)
+  .sort()
+  .at(-1);
+if (!/^\d{4}-\d{2}-\d{2}$/.test(trackerUpdated || "")) {
+  throw new Error("tracker records must provide a canonical YYYY-MM-DD updated date");
+}
 
 /* Raw markdown bodies power the copy-as-prompt buttons. */
 const RAW = JSON.stringify(Object.fromEntries(cards.map((c) => [c.id, c.body])));
@@ -511,7 +519,7 @@ ${SHARED_CSS}
 <a class="skip" href="#workspace">Skip to tracker</a>
 <header>
   <h1>${REPO_NAME} — tracker</h1>
-  <span class="sub">What's moving now, what's queued, and the few things waiting on you · ${cards.length} cards · ${new Date().toISOString().slice(0, 10)}</span>
+  <span class="sub">What's moving now, what's queued, and the few things waiting on you · ${cards.length} cards · ${trackerUpdated}</span>
   <span class="spacer"></span>
   <nav aria-label="Tracker links">
     <a class="btn" href="${SITE_URL}">Project</a>
