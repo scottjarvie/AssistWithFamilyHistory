@@ -43,8 +43,8 @@ export const appVersion = "2.0.1";
 export const releaseNotes: ReleaseEntry[] = [
   {
     version: appVersion,
-    status: "In review",
-    releasedAt: "2026-08-13T16:00:00-07:00",
+    status: "Public & live",
+    releasedAt: "2026-08-13T15:55:48-07:00",
     timezone: "America/Phoenix",
     title: "A useful first step in an empty workspace",
     summary: "Newcomers now see the two working ways to begin and reach the current OAuth MCP setup from the signed-in workspace and Queue.",
@@ -60,7 +60,7 @@ export const releaseNotes: ReleaseEntry[] = [
           why: "A new person should understand how to begin without guessing which downstream workspace might create the first record.",
           where: "Signed-in dashboard when people, places, stories, imports, documents, and open tasks are all empty.",
         },
-        sourceRefs: ["AWF-0036"],
+        sourceRefs: ["AWF-0036", "PR-45"],
         audiences: ["signed-in"],
       },
       {
@@ -74,7 +74,7 @@ export const releaseNotes: ReleaseEntry[] = [
           why: "Newcomers should not be sent to copy a key for a verification path that is still rolling out when the safer account-based connection is already live.",
           where: "App navigation, Queue, /ai, and the legacy /app/api page.",
         },
-        sourceRefs: ["AWF-0036"],
+        sourceRefs: ["AWF-0036", "PR-45"],
         audiences: ["signed-in", "agent"],
       },
       {
@@ -88,7 +88,7 @@ export const releaseNotes: ReleaseEntry[] = [
           why: "Direct compatibility visitors no longer encounter a hidden React mismatch while deciding which AI connection path to use.",
           where: "Legacy /app/api developer console.",
         },
-        sourceRefs: ["AWF-0036"],
+        sourceRefs: ["AWF-0036", "PR-45"],
         audiences: ["signed-in"],
       },
       {
@@ -102,7 +102,7 @@ export const releaseNotes: ReleaseEntry[] = [
           why: "The first screen should establish the authority boundary before someone brings private family material into the workspace.",
           where: "Signed-in empty dashboard.",
         },
-        sourceRefs: ["AWF-0036"],
+        sourceRefs: ["AWF-0036", "PR-45"],
         audiences: ["signed-in"],
       },
     ],
