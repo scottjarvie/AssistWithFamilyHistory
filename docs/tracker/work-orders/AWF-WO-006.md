@@ -22,11 +22,12 @@ tenant isolation, bounded authority, replay safety, and human publication gates.
 ## Current truth
 
 The existing owner-scoped vault and Queue supply the canonical durable records.
-Scott's coordinator delegation approved this independent tranche. The source,
-focused synthetic proof, protected PR, PR-head CI, merged-main CI, and Vercel
-preview are complete. Production promotion, live public routes, production
-Convex behavior, provider registration/consent, a named client, and independent
-audit remain separate and are not inferred from those completed layers.
+Scott's coordinator delegation approved this independent tranche and later the
+recommended production-only promotion. The source, focused synthetic proof,
+protected PR, CI, preview, exact-SHA production frontend, `/ai`, and `/ai.txt`
+are complete. The production Convex MCP routes remain stale or mis-targeted;
+provider deployment configuration, authenticated named-client proof, and
+independent audit remain separate and are not inferred from completed layers.
 
 ## Sequence
 
@@ -89,6 +90,12 @@ normal protected release, and removable test records. Provider registration or
 policy, production data, real-user access, private secrets, billing, DNS, and
 any broader public/security posture remain explicit owner gates.
 
+Scott additionally approved retaining one clearly labeled production test
+identity after the production promotion, but only for authenticated MCP
+acceptance: no real family records, elevated role, or retained fixtures,
+clients, sessions, or connections. Account creation is deferred because the
+production MCP edge and sanctioned named-client path do not yet exist.
+
 ## Execution evidence
 
 Source, focused runtime proof, and the protected code release are complete.
@@ -98,12 +105,20 @@ client, generated signing keys, isolated in-memory Convex tenants, and
 explicitly marked records; it reads or writes no provider or production data.
 
 Vercel preview `BJktQcJzBpSoJUzEg6A1bN6xKDKt` is Ready for source `de425bc`
-and remains SSO-protected. Vercel production still identifies `e4d1e35`, and
-the new public routes returned 404 on 2026-08-12. Production promotion,
-production Convex behavior, provider registration/consent, a named client,
-reconnect, revocation, and independent audit therefore remain separate and
-unproved. Execution stays active and audit stays `not-audited` at this owner
-gate.
+and remains SSO-protected. Scott approved production-only promotion; PR #36
+merged as `4b43075`. A date-dependent generated-tracker failure in its exact
+main run was fixed by protected PR #37, merged as `8573e49`. Exact merged-main
+CI `31659124591` passed, and Vercel deployment
+`2fkWTCPfArALkLdRWYR9krDmUFyz` succeeded for that exact SHA.
+
+Public `/ai`, `/ai.txt`, and `/updates` return 200. Protected-resource metadata
+and anonymous `POST /mcp` return upstream plain 404 without an OAuth challenge,
+showing that the production Convex HTTP routes were not deployed to the target
+used by the frontend. Fixing or inspecting the deploy key/target needs provider
+access and secret handling outside the current authorization. No test account
+was created, no provider policy changed, and no production family data or Scott
+account was used. Execution stays active and audit stays `not-audited` at this
+narrower provider gate.
 
 ## History
 
@@ -117,3 +132,10 @@ gate.
   merged-main CI passed, and the Vercel preview is Ready. Stopped before manual
   production promotion or Clerk client/consent work; public production remains
   on `e4d1e35`, so the Work Order remains active and unaudited.
+- 2026-08-12 · Scott via coordinator delegation — approved the recommended
+  production-only promotion and later retention of one isolated production test
+  identity; kept provider policy, named-client setup, Scott's account, and real
+  family data outside scope.
+- 2026-08-12 · Codex — completed the exact-SHA frontend promotion and main CI,
+  then observed the stale production Convex 404 boundary. Stopped before
+  provider configuration or account creation and left the release In review.
