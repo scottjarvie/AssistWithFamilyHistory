@@ -44,6 +44,7 @@ export interface ApiKeyRow {
 }
 
 const STALE_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
+const PUBLIC_APP_ORIGIN = "https://assistwithfamilyhistory.com";
 
 const TIER_STYLES: Record<ApiKeyRow["tier"], string> = {
   trial: "bg-stone-100 text-stone-700",
@@ -282,10 +283,10 @@ export function ApiKeyManager({
         <CardContent>
           <pre className="overflow-x-auto rounded-lg bg-stone-900 px-4 py-3 text-xs leading-6 text-stone-100">
 {`# 1. Learn what this platform stores (public, live now)
-curl ${typeof window !== "undefined" ? window.location.origin : ""}/context-schema
+curl ${PUBLIC_APP_ORIGIN}/context-schema
 
 # 2. Verify your key (rolling out)
-curl -H "Authorization: Bearer dts_live_..." ${typeof window !== "undefined" ? window.location.origin : ""}/api/v1/me`}
+curl -H "Authorization: Bearer dts_live_..." ${PUBLIC_APP_ORIGIN}/api/v1/me`}
           </pre>
         </CardContent>
       </Card>

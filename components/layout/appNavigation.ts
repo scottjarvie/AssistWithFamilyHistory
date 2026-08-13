@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  Bot,
   ClipboardList,
   Clock,
   ExternalLink,
@@ -7,11 +8,9 @@ import {
   FlaskConical,
   Gauge,
   Inbox,
-  KeyRound,
   LayoutDashboard,
   MapPinned,
   PenTool,
-  ShieldAlert,
   TableProperties,
   Users,
   type LucideIcon,
@@ -117,14 +116,9 @@ export const appNavigationSections = [
     label: "Your AI",
     items: [
       {
-        href: "/app/api",
-        label: "AI access",
-        icon: KeyRound,
-      },
-      {
-        href: "/app/api/admin",
-        label: "Admin API",
-        icon: ShieldAlert,
+        href: "/ai",
+        label: "Connect your AI",
+        icon: Bot,
       },
     ],
   },

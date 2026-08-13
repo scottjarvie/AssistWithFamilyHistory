@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { SafeLink } from "@/components/layout/SafeLink";
 import {
   QUEUE_STATE_PRESENTATION,
   canPersonClaim,
@@ -735,9 +736,13 @@ export function QueueWorkspace() {
               <Button onClick={() => setShowNew(true)} className="bg-[#d8b16d] text-[#24312c] hover:bg-[#e2bf80]">
                 <Plus aria-hidden="true" /> Leave a directive
               </Button>
-              <p className="flex items-center gap-2 text-xs leading-5 text-[#d3cec1]">
+              <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs leading-5 text-[#d3cec1]">
                 <Bot className="h-4 w-4 shrink-0 text-[#d8b16d]" aria-hidden="true" />
-                A compatible AI can connect through MCP and OAuth. Nothing runs until it deliberately claims a directive.
+                <span>A compatible AI can connect through MCP and OAuth.</span>
+                <SafeLink href="/ai" className="font-semibold text-[#f0cf92] underline decoration-[#f0cf92]/45 underline-offset-4 hover:text-white">
+                  See setup
+                </SafeLink>
+                <span>Nothing runs until it deliberately claims a directive.</span>
               </p>
             </div>
           </div>

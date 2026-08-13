@@ -1,6 +1,6 @@
 {
   "name": "assist-with-family-history",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "private": true,
   "description": "A durable, user-controlled family-history research-to-story workspace",
   "scripts": {
