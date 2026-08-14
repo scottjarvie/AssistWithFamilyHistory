@@ -14,6 +14,7 @@ ROUTE_GATES=(
   "Intake|/app/imports"
   "Operations|/app/operations"
   "People and places|/app/people"
+  "People and places|/app/people/new"
   "People and places|/app/places"
   "Research and story tools|/app/research"
   "Research and story tools|/app/story-writer"

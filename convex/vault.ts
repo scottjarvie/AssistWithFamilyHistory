@@ -2118,8 +2118,35 @@ export const getDashboardSummary = internalQuery({
     const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
     const peopleRows = buildPeopleRows(snapshot);
     const personById = new Map(snapshot.people.map((person) => [String(person._id), person]));
+    const firstQueueItem = await ctx.db
+      .query("queueItems")
+      .withIndex("by_owner", (q) => q.eq("vaultOwnerId", normalizeVaultOwnerId(args.vaultOwnerId)))
+      .first();
+    const firstStartEligible =
+      !firstQueueItem &&
+      snapshot.people.length === 0 &&
+      snapshot.relationships.length === 0 &&
+      snapshot.events.length === 0 &&
+      snapshot.personEvents.length === 0 &&
+      snapshot.places.length === 0 &&
+      snapshot.sources.length === 0 &&
+      snapshot.citations.length === 0 &&
+      snapshot.citationLinks.length === 0 &&
+      snapshot.sourceFacts.length === 0 &&
+      snapshot.media.length === 0 &&
+      snapshot.contextItems.length === 0 &&
+      snapshot.importRuns.length === 0 &&
+      snapshot.researchTasks.length === 0 &&
+      snapshot.researchLog.length === 0 &&
+      snapshot.documents.length === 0 &&
+      snapshot.stories.length === 0 &&
+      snapshot.storyReviewEvents.length === 0 &&
+      snapshot.historicalContext.length === 0 &&
+      snapshot.researchChecks.length === 0 &&
+      snapshot.provisionalRelatives.length === 0;
 
     return {
+      firstStartEligible,
       counts: {
         people: snapshot.people.length,
         places: snapshot.places.length,

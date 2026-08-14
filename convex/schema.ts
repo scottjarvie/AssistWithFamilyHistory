@@ -112,12 +112,28 @@ export default defineSchema({
     // Notes and tags
     notes: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
+
+    // How this record first entered the private workspace. Older records do
+    // not have this field; new manual-start records keep a visible, durable
+    // distinction between a person's statement and sourced evidence.
+    creationProvenance: v.optional(
+      v.object({
+        actorKind: v.union(v.literal("user"), v.literal("chosen_ai"), v.literal("first_party_ai"), v.literal("system")),
+        actorId: v.string(),
+        method: v.union(v.literal("manual_first_start"), v.literal("import"), v.literal("mcp"), v.literal("legacy")),
+        evidenceStatus: v.union(v.literal("unsourced"), v.literal("source_linked")),
+        operationId: v.string(),
+        recordedAt: v.number(),
+      })
+    ),
+    creationRole: v.optional(v.union(v.literal("starting_person"), v.literal("related_person"))),
     
     // Metadata
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_owner", ["vaultOwnerId"])
+    .index("by_owner_creation_operation", ["vaultOwnerId", "creationProvenance.operationId"])
     .index("by_fsId", ["fsId"])
     .index("by_surname", ["name.surname"])
     .index("by_research_status", ["researchStatus"])
@@ -189,6 +205,17 @@ export default defineSchema({
     // FamilySearch integration
     familySearchId: v.optional(v.string()),
     importKey: v.optional(v.string()),
+
+    creationProvenance: v.optional(
+      v.object({
+        actorKind: v.union(v.literal("user"), v.literal("chosen_ai"), v.literal("first_party_ai"), v.literal("system")),
+        actorId: v.string(),
+        method: v.union(v.literal("manual_first_start"), v.literal("import"), v.literal("mcp"), v.literal("legacy")),
+        evidenceStatus: v.union(v.literal("unsourced"), v.literal("source_linked")),
+        operationId: v.string(),
+        recordedAt: v.number(),
+      })
+    ),
     
     // Metadata
     createdAt: v.number(),

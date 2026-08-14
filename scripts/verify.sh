@@ -38,6 +38,7 @@ steps=(
   "check:queue-foundation"
   "check:context-pack-contract"
   "check:privacy-ai-safety"
+  "check:private-first-start"
   "check:review-gates"
   "check:story-fixtures"
   "check:story-publish"

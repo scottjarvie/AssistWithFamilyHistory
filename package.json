@@ -1,6 +1,6 @@
 {
   "name": "assist-with-family-history",
-  "version": "2.0.2",
+  "version": "2.1.0",
   "private": true,
   "description": "A durable, user-controlled family-history research-to-story workspace",
   "scripts": {
@@ -36,6 +36,7 @@
     "check:queue-foundation": "tsx scripts/check-queue-foundation.ts",
     "check:context-pack-contract": "tsx scripts/check-context-pack-contract.ts",
     "check:privacy-ai-safety": "tsx scripts/check-privacy-ai-safety.ts",
+    "check:private-first-start": "tsx scripts/check-private-first-start.tsx",
     "check:review-gates": "tsx scripts/check-review-gates.ts",
     "check:story-fixtures": "tsx scripts/check-story-fixtures.ts",
     "check:story-publish": "tsx scripts/check-story-publish-safety.ts",

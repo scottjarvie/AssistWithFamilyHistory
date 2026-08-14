@@ -1,5 +1,5 @@
 import { SafeLink as Link } from "@/components/layout/SafeLink";
-import { ArrowRight, BookOpen, Database, FileUp, Sparkles, TableProperties } from "lucide-react";
+import { ArrowRight, BookOpen, Database, FileUp, Sparkles, TableProperties, UsersRound } from "lucide-react";
 import type { Metadata } from "next";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -52,13 +52,7 @@ export default async function DashboardPage() {
     );
   }
 
-  const isEmptyWorkspace =
-    summary.counts.people === 0 &&
-    summary.counts.places === 0 &&
-    summary.counts.stories === 0 &&
-    summary.counts.imports === 0 &&
-    summary.counts.documents === 0 &&
-    summary.counts.openTasks === 0;
+  const isEmptyWorkspace = summary.firstStartEligible;
 
   const workflowStations = [
     {
@@ -98,15 +92,16 @@ export default async function DashboardPage() {
             {isEmptyWorkspace ? (
               <>
                 <h1 className="max-w-3xl font-[family-name:var(--font-cormorant-garamond)] text-4xl font-semibold leading-tight sm:text-5xl">
-                  Begin with evidence. Build the story from there.
+                  Begin with someone you know. Build the evidence from there.
                 </h1>
                 <p className="mt-4 max-w-2xl text-sm leading-7 text-stone-200 sm:text-base">
-                  Your vault is empty and private. Bring in a capture you have reviewed, or connect your chosen AI to preserve people, relationships, events, sources, findings, and drafts as the work develops.
+                  Your workspace is empty and private. Start with two people and one known connection. Sources, dates, places, and stories can grow around them when you are ready.
                 </p>
                 <div className="mt-6 flex flex-wrap gap-3">
                   <Button asChild className="bg-amber-600 text-white hover:bg-amber-500">
-                    <Link href="/app/imports">
-                      Bring in a capture
+                    <Link href="/app/people/new">
+                      <UsersRound className="mr-2 h-4 w-4" />
+                      Add your first connection
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>
@@ -116,6 +111,11 @@ export default async function DashboardPage() {
                       Connect your AI
                     </Link>
                   </Button>
+                </div>
+                <div className="mt-3">
+                  <Link href="/app/imports" className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-stone-200 underline decoration-white/30 underline-offset-4 hover:text-white">
+                    <FileUp className="h-4 w-4" /> Or bring in a capture you have reviewed
+                  </Link>
                 </div>
                 <p className="mt-5 max-w-2xl border-l border-amber-400/45 pl-4 text-xs leading-6 text-stone-300">
                   Nothing is imported, researched, or published automatically. You choose what enters this family workspace and what may leave it.

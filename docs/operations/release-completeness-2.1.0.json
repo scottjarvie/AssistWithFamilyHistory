@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "2.1.0",
+    "from": "c1bd7cfd121228e08fbf48a3ba9f630143017cf5",
+    "to": "pending-protected-review",
+    "cutoff": "2026-08-14T08:33:01-07:00"
+  },
+  "sources": [
+    {
+      "id": "tracker-awf-0006-first-start",
+      "title": "Begin with one person and one known relationship",
+      "disposition": "include",
+      "releaseItemId": "private-family-first-start"
+    },
+    {
+      "id": "tracker-awf-0006-provenance",
+      "title": "Keep the starting statement visibly unsourced",
+      "disposition": "include",
+      "releaseItemId": "first-start-provenance-boundary"
+    },
+    {
+      "id": "tracker-awf-0006-ai-choice",
+      "title": "Create an AI handoff only when chosen",
+      "disposition": "include",
+      "releaseItemId": "optional-first-ai-handoff"
+    }
+  ]
+}

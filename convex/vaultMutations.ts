@@ -49,6 +49,19 @@ const relationshipFactValidator = v.object({
   description: v.optional(v.string()),
 });
 
+const firstStartPersonValidator = v.object({
+  given: v.string(),
+  surname: v.optional(v.string()),
+  living: v.boolean(),
+});
+
+function cleanFirstStartName(value: string, label: string, required: boolean): string {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (required && !normalized) throw new Error(`${label} is required`);
+  if (normalized.length > 100) throw new Error(`${label} must be 100 characters or fewer`);
+  return normalized;
+}
+
 const researchCheckStatusValidator = v.union(
   v.literal("missing"),
   v.literal("in_progress"),
@@ -388,6 +401,147 @@ export const upsertPerson = mutation({
     });
 
     return { personId, created: true };
+  },
+});
+
+/**
+ * Create the smallest useful private family picture in one transaction.
+ *
+ * This is intentionally narrower than a general tree editor: it only runs in
+ * a workspace with no durable content, records two people and one explicit
+ * relationship, and marks the information as the user's unsourced statement.
+ * The operation id makes a lost-response retry safe without creating a second
+ * family pair.
+ */
+export const startPrivateWorkspace = mutation({
+  args: {
+    vaultOwnerId: v.string(),
+    operationId: v.string(),
+    startingPerson: firstStartPersonValidator,
+    relatedPerson: firstStartPersonValidator,
+    relationship: v.union(v.literal("parent"), v.literal("child"), v.literal("partner")),
+  },
+  handler: async (ctx, args) => {
+    const { owner: vaultOwnerId } = await authorizeTenantMutation(
+      ctx,
+      "vaultMutations.startPrivateWorkspace",
+      args.vaultOwnerId,
+    );
+    const operationId = args.operationId.trim();
+    if (!operationId || operationId.length > 160) {
+      throw new Error("First-start operation id must be between 1 and 160 characters");
+    }
+
+    const existingOperation = await ctx.db
+      .query("persons")
+      .withIndex("by_owner_creation_operation", (q) =>
+        q.eq("vaultOwnerId", vaultOwnerId).eq("creationProvenance.operationId", operationId),
+      )
+      .collect();
+    if (existingOperation.length > 0) {
+      const starting = existingOperation.find((person) => person.creationRole === "starting_person");
+      const related = existingOperation.find((person) => person.creationRole === "related_person");
+      if (!starting || !related) throw new Error("First-start retry could not recover the complete family pair");
+      const relationships = await ctx.db
+        .query("relationships")
+        .withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId))
+        .collect();
+      const relationship = relationships.find(
+        (row) => row.creationProvenance?.operationId === operationId,
+      );
+      if (!relationship) throw new Error("First-start retry could not recover the relationship");
+      return {
+        startingPersonId: starting._id,
+        relatedPersonId: related._id,
+        relationshipId: relationship._id,
+        deduplicated: true,
+      };
+    }
+
+    const workspaceChecks = await Promise.all([
+      ctx.db.query("persons").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
+      ctx.db.query("relationships").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
+      ctx.db.query("events").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
+      ctx.db.query("personEvents").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
+      ctx.db.query("places").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
+      ctx.db.query("sources").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
+      ctx.db.query("citations").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
+      ctx.db.query("citationLinks").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
+      ctx.db.query("sourceFacts").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
+      ctx.db.query("media").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
+      ctx.db.query("contextItems").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
+      ctx.db.query("stories").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
+      ctx.db.query("importRuns").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
+      ctx.db.query("documents").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
+      ctx.db.query("researchTasks").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
+      ctx.db.query("researchLog").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
+      ctx.db.query("storyReviewEvents").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
+      ctx.db.query("provisionalRelatives").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
+      ctx.db.query("researchChecks").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
+      ctx.db.query("historicalContext").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
+      ctx.db.query("queueItems").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
+    ]);
+    if (workspaceChecks.some(Boolean)) {
+      throw new Error("First start is only available in an empty private workspace");
+    }
+
+    const identity = await ctx.auth.getUserIdentity();
+    const now = Date.now();
+    const provenance = {
+      actorKind: "user" as const,
+      actorId: identity?.subject ?? vaultOwnerId,
+      method: "manual_first_start" as const,
+      evidenceStatus: "unsourced" as const,
+      operationId,
+      recordedAt: now,
+    };
+    const startingName = {
+      given: cleanFirstStartName(args.startingPerson.given, "First person's given name", true),
+      surname: cleanFirstStartName(args.startingPerson.surname ?? "", "First person's family name", false),
+    };
+    const relatedName = {
+      given: cleanFirstStartName(args.relatedPerson.given, "Related person's given name", true),
+      surname: cleanFirstStartName(args.relatedPerson.surname ?? "", "Related person's family name", false),
+    };
+
+    const startingPersonId = await ctx.db.insert("persons", {
+      vaultOwnerId,
+      name: startingName,
+      sex: "unknown",
+      living: args.startingPerson.living,
+      researchStatus: "basic",
+      creationProvenance: provenance,
+      creationRole: "starting_person",
+      createdAt: now,
+      updatedAt: now,
+    });
+    const relatedPersonId = await ctx.db.insert("persons", {
+      vaultOwnerId,
+      name: relatedName,
+      sex: "unknown",
+      living: args.relatedPerson.living,
+      researchStatus: "basic",
+      creationProvenance: provenance,
+      creationRole: "related_person",
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const type = args.relationship === "partner" ? ("Couple" as const) : ("ParentChild" as const);
+    const person1 = args.relationship === "parent" ? relatedPersonId : startingPersonId;
+    const person2 = args.relationship === "parent" ? startingPersonId : relatedPersonId;
+    const relationshipId = await ctx.db.insert("relationships", {
+      vaultOwnerId,
+      type,
+      childRelationType: type === "ParentChild" ? "Unknown" : undefined,
+      person1,
+      person2,
+      creationProvenance: provenance,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return { startingPersonId, relatedPersonId, relationshipId, deduplicated: false };
   },
 });
 
