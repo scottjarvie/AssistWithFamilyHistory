@@ -20,6 +20,12 @@
       "releaseItemId": "first-start-provenance-boundary"
     },
     {
+      "id": "tracker-awf-0006-wayfinding",
+      "title": "Make family the empty workspace primary action",
+      "disposition": "include",
+      "releaseItemId": "empty-workspace-family-wayfinding"
+    },
+    {
       "id": "tracker-awf-0006-ai-choice",
       "title": "Create an AI handoff only when chosen",
       "disposition": "include",

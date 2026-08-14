@@ -78,6 +78,20 @@ export const releaseNotes: ReleaseEntry[] = [
         audiences: ["signed-in", "agent"],
       },
       {
+        id: "empty-workspace-family-wayfinding",
+        category: "fixed",
+        impactTier: "meaningful",
+        impactRank: 1,
+        short: "Fixed the empty workspace so its primary action begins with family, not a provider or AI.",
+        long: {
+          what: "The dashboard and People empty state now lead to the private family connection flow, while reviewed capture and AI setup remain nearby optional paths.",
+          why: "A newcomer should not need another service or tool before the product can hold the first thing they know about their family.",
+          where: "Signed-in empty dashboard and People.",
+        },
+        sourceRefs: ["AWF-0006", "AWF-WO-010"],
+        audiences: ["signed-in"],
+      },
+      {
         id: "optional-first-ai-handoff",
         category: "upgraded",
         impactTier: "meaningful",
