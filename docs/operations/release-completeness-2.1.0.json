@@ -3,7 +3,7 @@
   "release": {
     "version": "2.1.0",
     "from": "c1bd7cfd121228e08fbf48a3ba9f630143017cf5",
-    "to": "pending-protected-review",
+    "to": "f248de5850c3880ce07dd57b51d5ed938edec9f5",
     "cutoff": "2026-08-14T08:33:01-07:00"
   },
   "sources": [
