@@ -3,10 +3,31 @@
   "release": {
     "version": "2.0.2",
     "from": "e28e379a6bd5509b5f1b242ed9cb22a705703fcd",
-    "to": "HEAD",
+    "to": "58a791864cfdfa9630483086661f1def00d56e6e",
     "cutoff": "2026-08-13T20:47:34-07:00"
   },
   "sources": [
+    {
+      "id": "pr-48",
+      "title": "Join Queue handoffs to saved family work",
+      "disposition": "group",
+      "releaseItemId": "queue-saved-work-bridge",
+      "reason": "Protected implementation source"
+    },
+    {
+      "id": "pr-49",
+      "title": "Authenticate the synthetic acceptance cleanup boundary",
+      "disposition": "group",
+      "releaseItemId": "bounded-joined-acceptance-cleanup",
+      "reason": "Protected tenant-boundary source"
+    },
+    {
+      "id": "pr-50",
+      "title": "Deploy the cleanup boundary through Convex code generation",
+      "disposition": "group",
+      "releaseItemId": "bounded-joined-acceptance-cleanup",
+      "reason": "Protected production code-generation source"
+    },
     {
       "id": "tracker-awf-0037-bridge",
       "title": "Join Queue completion to the canonical saved person and story",
