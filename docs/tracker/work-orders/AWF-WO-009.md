@@ -90,9 +90,14 @@ the exclusions.
 
 ## Current truth
 
-Execution is active and audit remains `not-audited`. Orientation and the narrow
-visibility reproduction are complete. Focused source repair and exact cleanup
-tests pass. Protected release and live lifecycle proof continue.
+Execution remains active and audit remains `not-audited`. The source repair,
+cleanup rail, full verification, protected review, exact-main CI, Convex deploy,
+Vercel production deploy, and public boundary proof are complete. The final
+authenticated joined lifecycle is blocked only by the available isolated
+browser hosts: local Chromium cannot start inside the macOS sandbox, and the
+sanctioned in-app runner hung past one-use-token expiry before returning a
+signed-out empty route. No fixture was created; both attempts ended with zero
+active exact-user sessions and deleted disposable clients.
 
 ## Execution evidence
 
@@ -104,9 +109,19 @@ rail is inert outside production deployment `accomplished-dodo-308`, the exact
 retained test subject, and a unique marked run key; it also refuses external
 references and bounded-scan overflow.
 
+`pnpm verify` passed 47/47. PR #48 merged as `3da3d4a`, PR #49 as `915f99f`,
+and the Convex generated-type repair PR #50 as `58a7918`. Exact-main Actions
+`31772638150` passed, and production deployment
+`dpl_FRzBKunKnoJUtVRNfbJmqzcUr2JN` reached Ready for `58a7918`. The canonical
+public site, AI guide, updates, OAuth discovery, and anonymous MCP resource
+challenge passed. Detailed proof and the remaining gate are recorded in
+`docs/operations/family-history-joined-newcomer-acceptance-2026-08-13.md`.
+
 ## History
 
 - 2026-08-13 · Scott via coordinator delegation — authorized the bounded goal
   and routine safe live proof through cleanup and protected release.
 - 2026-08-13 · Codex — activated execution after full repo/product orientation;
   protected delivery and live proof continue.
+- 2026-08-13 · Codex — completed protected production delivery and public proof;
+  exact authenticated acceptance remains environment-blocked after safe cleanup.
