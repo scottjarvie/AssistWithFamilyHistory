@@ -38,11 +38,68 @@ export function releaseItemsForCategory(entry: ReleaseEntry, category: ReleaseCa
   return sortReleaseItems(entry.items.filter((item) => item.category === category));
 }
 
-export const appVersion = "2.0.1";
+export const appVersion = "2.0.2";
 
 export const releaseNotes: ReleaseEntry[] = [
   {
     version: appVersion,
+    status: "In review",
+    releasedAt: "2026-08-13T20:47:34-07:00",
+    timezone: "America/Phoenix",
+    title: "Queue leads back to the work your AI saved",
+    summary: "A completed chosen-AI handoff now gives newcomers a safe path from the Queue result into the private person and story records preserved in their workspace.",
+    items: [
+      {
+        id: "queue-saved-work-bridge",
+        category: "created",
+        impactTier: "meaningful",
+        impactRank: 1,
+        short: "Created an Open saved work bridge for completed Queue handoffs.",
+        long: {
+          what: "When a chosen AI completes a directive with canonical Family History result paths, Queue presents direct actions for the saved person workspace, private story draft, or research view.",
+          why: "A newcomer should not have to search the whole vault after the handoff says the result is done.",
+          where: "Signed-in Queue detail for completed directives.",
+        },
+        sourceRefs: ["AWF-0037", "AWF-WO-009"],
+        audiences: ["signed-in"],
+      },
+      {
+        id: "queue-result-reference-guidance",
+        category: "fixed",
+        impactTier: "meaningful",
+        impactRank: 2,
+        short: "Fixed Queue completion guidance so a chosen AI returns usable Family History paths.",
+        long: {
+          what: "The MCP Queue tool now tells a connected AI to include the signed-in person and story paths when it hands back durable work.",
+          why: "The product already preserved result references, but neither the AI contract nor Queue made them useful to the person receiving the result.",
+          where: "Remote update_queue tool guidance and signed-in Queue result presentation.",
+        },
+        sourceRefs: ["AWF-0037"],
+        audiences: ["signed-in", "agent"],
+      },
+      {
+        id: "bounded-joined-acceptance-cleanup",
+        category: "upgraded",
+        impactTier: "supporting",
+        impactRank: 1,
+        short: "Upgraded live workflow proof with exact synthetic-fixture cleanup guards.",
+        long: {
+          what: "The acceptance rail is restricted to one labeled test identity, one production deployment, unique marked run keys, bounded scans, and an explicit confirmation; it refuses any graph reused by unmarked work.",
+          why: "Soft-launch proof can exercise the real joined workflow without broad deletion or contact with another family's records.",
+          where: "Internal production acceptance support and focused adversarial tests.",
+        },
+        sourceRefs: ["AWF-0037", "AWF-WO-009"],
+        audiences: ["admin", "agent"],
+      },
+    ],
+    whatToCheck: [
+      "Complete a marked Queue directive through a sanctioned chosen-AI connection and confirm Saved in your workspace offers the person and private story actions.",
+      "Open both actions and confirm they stay inside the signed-in owner's Family History workspace.",
+      "Confirm external or opaque result references never become Queue navigation links.",
+    ],
+  },
+  {
+    version: "2.0.1",
     status: "Public & live",
     releasedAt: "2026-08-13T15:55:48-07:00",
     timezone: "America/Phoenix",

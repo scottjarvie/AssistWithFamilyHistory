@@ -448,7 +448,7 @@ export function createFamilyHistoryServer(actionCtx: ActionCtx, principal: Verif
 
   server.registerTool("update_queue", {
     title: "Update Family History Queue",
-    description: "Claim, checkpoint, pause for the user, complete, or report failure for work assigned to the OAuth chosen-AI identity. Requires exact current version and replay-safe operation ID.",
+    description: "Claim, checkpoint, pause for the user, complete, or report failure for work assigned to the OAuth chosen-AI identity. Requires exact current version and replay-safe operation ID. When completing saved work, include signed-in product paths such as /app/people/{id} and /app/stories/{id} in resultRefs so the person can open the durable result from Queue.",
     inputSchema: z.discriminatedUnion("action", [
       z.object({ action: z.literal("claim"), operationId, queueItemId: id, expectedVersion: z.number().int().min(1), leaseMs: z.number().int().min(60_000).max(1_800_000), nextStep: z.string().min(1).max(1_000) }).strict(),
       z.object({ action: z.literal("checkpoint"), operationId, queueItemId: id, expectedVersion: z.number().int().min(1), leaseMs: z.number().int().min(60_000).max(1_800_000), nextStep: z.string().min(1).max(1_000) }).strict(),
