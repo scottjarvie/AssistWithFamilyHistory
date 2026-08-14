@@ -1,12 +1,29 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- The fixture guard normalizes mapped IDs across a fixed table allowlist. */
 import { v } from "convex/values";
+import type { FunctionReference } from "convex/server";
 
 import type { Doc, Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { action, internalQuery, mutation, type ActionCtx, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { authorizeTenantAction, authorizeTenantMutation, type TenantAccessDecision } from "./access";
 
-const acceptanceInternal = (internal as any).mcpAcceptanceFixture;
+type AcceptanceInspection = {
+  exists: boolean;
+  counts: Record<string, number>;
+};
+
+const inspectInternalRef: FunctionReference<
+  "query",
+  "internal",
+  { runKey: string },
+  AcceptanceInspection
+> = (
+  internal as unknown as {
+    mcpAcceptanceFixture: {
+      inspectInternal: FunctionReference<"query", "internal", { runKey: string }, AcceptanceInspection>;
+    };
+  }
+).mcpAcceptanceFixture.inspectInternal;
 
 export const FAMILY_HISTORY_ACCEPTANCE_PREFIX = "codex-test:awf-joined:";
 export const FAMILY_HISTORY_ACCEPTANCE_MARKER = "[SYNTHETIC QA - DELETE ME]";
@@ -258,9 +275,9 @@ export const inspectInternal = internalQuery({
 
 export const inspect = action({
   args: { vaultOwnerId: v.string(), runKey: v.string() },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<AcceptanceInspection> => {
     await authorizeAcceptanceAction(ctx, args.vaultOwnerId);
-    return await ctx.runQuery(acceptanceInternal.inspectInternal, { runKey: args.runKey });
+    return await ctx.runQuery(inspectInternalRef, { runKey: args.runKey });
   },
 });
 
