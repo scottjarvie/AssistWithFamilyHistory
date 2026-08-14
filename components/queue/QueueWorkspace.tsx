@@ -3,6 +3,7 @@
 import {
   Archive,
   ArrowRight,
+  ArrowUpRight,
   Bot,
   Check,
   ChevronDown,
@@ -41,6 +42,7 @@ import {
   queueFocusLabel,
   queueFocusText,
   queueHandoffCopy,
+  queueResultLink,
   type QueueActivityRecord,
   type QueueItemRecord,
 } from "@/lib/queue/presentation";
@@ -407,6 +409,10 @@ function QueueDetail({
     }
     return [...groups.entries()];
   }, [item.context]);
+  const resultLinks = useMemo(
+    () => (item.resultRefs ?? []).map(queueResultLink).filter((link) => link !== null),
+    [item.resultRefs],
+  );
 
   useEffect(() => setAction(null), [item._id, item.version]);
 
@@ -459,6 +465,23 @@ function QueueDetail({
               {item.state === "working" && item.activeActorKind === "user" ? <UserRound className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /> : <Bot className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />}
               {queueHandoffCopy(item)}
             </p>
+            {resultLinks.length > 0 ? (
+              <div className="mt-5 border-t border-[#d7cfbf] pt-4">
+                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#98702b]">Saved in your workspace</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {resultLinks.map((link) => (
+                    <SafeLink
+                      key={link.href}
+                      href={link.href}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-[#9eb4a6] bg-[#eff5f0] px-3 py-1.5 text-xs font-semibold text-[#245a43] transition-colors hover:border-[#668b75] hover:bg-[#e5eee8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#245a43]"
+                    >
+                      {link.label}
+                      <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+                    </SafeLink>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </section>
 
           <div className="mt-5 flex flex-wrap gap-2">

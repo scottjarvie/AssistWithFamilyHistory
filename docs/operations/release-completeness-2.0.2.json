@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "2.0.2",
+    "from": "e28e379a6bd5509b5f1b242ed9cb22a705703fcd",
+    "to": "HEAD",
+    "cutoff": "2026-08-13T20:47:34-07:00"
+  },
+  "sources": [
+    {
+      "id": "tracker-awf-0037-bridge",
+      "title": "Join Queue completion to the canonical saved person and story",
+      "disposition": "include",
+      "releaseItemId": "queue-saved-work-bridge"
+    },
+    {
+      "id": "tracker-awf-0037-guidance",
+      "title": "Return usable signed-in result paths from the chosen AI",
+      "disposition": "include",
+      "releaseItemId": "queue-result-reference-guidance"
+    },
+    {
+      "id": "tracker-awf-0037-cleanup",
+      "title": "Add exact marked live-acceptance cleanup",
+      "disposition": "include",
+      "releaseItemId": "bounded-joined-acceptance-cleanup"
+    }
+  ]
+}

@@ -77,6 +77,31 @@ export type QueueActivityRecord = {
   createdAt: number;
 };
 
+export type QueueResultLink = {
+  href: string;
+  label: string;
+};
+
+const QUEUE_RESULT_ROUTES: Array<{ pattern: RegExp; label: string }> = [
+  { pattern: /^\/app\/people\/[A-Za-z0-9_-]+$/, label: "Open person workspace" },
+  { pattern: /^\/app\/stories\/[A-Za-z0-9_-]+$/, label: "Open story draft" },
+  { pattern: /^\/app\/research$/, label: "Open research findings" },
+  { pattern: /^\/app\/people$/, label: "Open people" },
+  { pattern: /^\/app\/stories$/, label: "Open Story Studio" },
+];
+
+/**
+ * Queue result references are written by a chosen AI and therefore remain
+ * untrusted text. Only known signed-in product routes become links; external,
+ * malformed, and legacy opaque references stay in the durable ledger without
+ * becoming navigation targets.
+ */
+export function queueResultLink(ref: string): QueueResultLink | null {
+  const normalized = ref.trim();
+  const route = QUEUE_RESULT_ROUTES.find(({ pattern }) => pattern.test(normalized));
+  return route ? { href: normalized, label: route.label } : null;
+}
+
 export const QUEUE_STATE_PRESENTATION: Record<
   QueueState,
   { label: string; short: string; accent: string; wash: string }
