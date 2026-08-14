@@ -1,12 +1,15 @@
 ---
 id: AWF-WO-010
 title: Make one person and relationship the first private workspace start
-execution: active
+execution: ready
 audit: not-audited
 cards: AWF-0006
 created: 2026-08-14
 updated: 2026-08-14
 proposed-by: Codex from Scott's portfolio reset
+approved-by: Scott via coordinator delegation
+approved-on: 2026-08-14
+executed-by: Codex
 ---
 
 ## Goal
@@ -86,16 +89,17 @@ turning onboarding into a broad tree builder.
 ## Human gates
 
 Scott explicitly selected this outcome as the next soft-launch goal. Execution
-is Active; routine implementation, protected release, and marked synthetic
-proof need no further approval inside the exclusions.
+is Ready for the remaining browser-host proof; routine marked synthetic proof
+needs no further approval inside the exclusions.
 
 ## Current truth
 
-The bounded source slice is implemented on a protected release branch. It adds
+The bounded slice is released in production. It adds
 an empty-workspace first start, a canonical idempotent owner-scoped mutation,
 visible manual unsourced provenance, normal People/person visibility, and an
-explicit optional Queue handoff. Preview, exact-main deployment, and live
-signed-in acceptance remain before completion.
+explicit optional Queue handoff. Exact-main deployment and anonymous live proof
+are complete. Isolated signed-in creation, UI/Queue visibility, responsive
+interaction, and exact synthetic cleanup remain before completion.
 
 ## Execution evidence
 
@@ -105,11 +109,22 @@ signed-in acceptance remain before completion.
 - Typecheck, lint, protected-route, trust-boundary, owned-table, Convex auth and
   visibility, person-identifier, focused first-start, and production webpack
   build checks passed locally on 2026-08-14.
-- Deployed phone/desktop interaction, exact-main release, and signed-in
-  synthetic lifecycle evidence remain open.
+- Signed-in phone/desktop interaction and synthetic lifecycle evidence remain
+  open; protected release and exact-main deployment are complete.
+- PR #53 merged as `83bc85907a6ac66da064adbe32ba8cc3e22bc205`;
+  exact-main Actions `31816195194` passed the full verify, build, server, and
+  route-smoke lane; production deployment `5909121902` completed successfully.
+- The canonical `/updates` rendered 2.1.0 at 390×844 with zero console errors.
+  Anonymous page and POST access failed closed with Clerk and created no data.
+  The retained identity had no reusable credential/session in the approved
+  browser host, so no live family fixture was created and nothing required
+  cleanup.
 
 ## History
 
+- 2026-08-14 · Codex — released the source through PR #53 and exact-main
+  production, then returned execution to Ready with the signed-in browser-host
+  acceptance gap explicit and no live fixture created.
 - 2026-08-14 · Codex — activated from Scott's explicit next-goal direction and
   implemented the bounded source slice; protected release proof continues.
 - 2026-08-14 · Codex — proposed from the Core/Project Philosophy and live empty-

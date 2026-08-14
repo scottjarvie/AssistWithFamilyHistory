@@ -43,8 +43,8 @@ export const appVersion = "2.1.0";
 export const releaseNotes: ReleaseEntry[] = [
   {
     version: appVersion,
-    status: "In review",
-    releasedAt: "2026-08-14T08:33:01-07:00",
+    status: "Public & live",
+    releasedAt: "2026-08-14T08:48:22-07:00",
     timezone: "America/Phoenix",
     title: "Begin with one private family connection",
     summary: "A newcomer can now create two people and their known relationship directly in a private workspace, with clear evidence boundaries and an optional chosen-AI handoff.",
