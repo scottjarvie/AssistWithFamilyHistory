@@ -86,7 +86,7 @@ export const releaseNotes: ReleaseEntry[] = [
         long: {
           what: "The acceptance rail is restricted to one labeled test identity, one production deployment, unique marked run keys, bounded scans, and an explicit confirmation; it refuses any graph reused by unmarked work.",
           why: "Soft-launch proof can exercise the real joined workflow without broad deletion or contact with another family's records.",
-          where: "Internal production acceptance support and focused adversarial tests.",
+          where: "User-scoped production acceptance support and focused adversarial tests.",
         },
         sourceRefs: ["AWF-0037", "AWF-WO-009"],
         audiences: ["admin", "agent"],
