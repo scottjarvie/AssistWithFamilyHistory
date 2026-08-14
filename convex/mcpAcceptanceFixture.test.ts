@@ -165,7 +165,8 @@ describe("Family History joined MCP acceptance cleanup", () => {
       });
     });
 
-    const before = await t.query(internal.mcpAcceptanceFixture.inspect, { runKey: RUN_KEY });
+    const owner = t.withIdentity({ subject: OWNER });
+    const before = await owner.action(api.mcpAcceptanceFixture.inspect, { vaultOwnerId: OWNER, runKey: RUN_KEY });
     expect(before).toMatchObject({
       exists: true,
       counts: {
@@ -186,11 +187,12 @@ describe("Family History joined MCP acceptance cleanup", () => {
         agentActivity: 3,
       },
     });
-    await expect(t.mutation(internal.mcpAcceptanceFixture.clear, {
+    await expect(owner.mutation(api.mcpAcceptanceFixture.clear, {
+      vaultOwnerId: OWNER,
       runKey: RUN_KEY,
       confirmation: FAMILY_HISTORY_ACCEPTANCE_CONFIRMATION,
     })).resolves.toMatchObject({ removed: true });
-    await expect(t.query(internal.mcpAcceptanceFixture.inspect, { runKey: RUN_KEY }))
+    await expect(owner.action(api.mcpAcceptanceFixture.inspect, { vaultOwnerId: OWNER, runKey: RUN_KEY }))
       .resolves.toMatchObject({ exists: false });
     await expect(t.run(async (ctx) => ({
       people: (await ctx.db.query("persons").collect()).map((row) => row.name.given),
@@ -204,15 +206,25 @@ describe("Family History joined MCP acceptance cleanup", () => {
   test("fails closed outside the exact deployment and without exact confirmation", async () => {
     vi.stubEnv("CONVEX_CLOUD_URL", "https://somewhere-else.convex.cloud");
     const outside = convexTest(schema, modules);
-    await expect(outside.query(internal.mcpAcceptanceFixture.inspect, { runKey: RUN_KEY }))
+    await expect(outside.withIdentity({ subject: OWNER }).action(api.mcpAcceptanceFixture.inspect, { vaultOwnerId: OWNER, runKey: RUN_KEY }))
       .rejects.toThrow("not enabled on this Convex deployment");
 
     vi.stubEnv("CONVEX_CLOUD_URL", "https://accomplished-dodo-308.convex.cloud");
     const production = convexTest(schema, modules);
-    await expect(production.mutation(internal.mcpAcceptanceFixture.clear, {
+    await expect(production.withIdentity({ subject: OWNER }).mutation(api.mcpAcceptanceFixture.clear, {
+      vaultOwnerId: OWNER,
       runKey: RUN_KEY,
       confirmation: "delete everything",
     })).rejects.toThrow("Exact Family History joined-acceptance cleanup confirmation is required");
+  });
+
+  test("requires the exact authenticated synthetic identity", async () => {
+    vi.stubEnv("CONVEX_CLOUD_URL", "https://accomplished-dodo-308.convex.cloud");
+    const t = convexTest(schema, modules);
+    await expect(t.action(api.mcpAcceptanceFixture.inspect, { vaultOwnerId: OWNER, runKey: RUN_KEY }))
+      .rejects.toThrow("requires the exact authenticated synthetic test identity");
+    await expect(t.withIdentity({ subject: "user_someone_else" }).action(api.mcpAcceptanceFixture.inspect, { vaultOwnerId: OWNER, runKey: RUN_KEY }))
+      .rejects.toThrow("requires the exact authenticated synthetic test identity");
   });
 
   test("refuses cleanup when an unmarked record reuses the synthetic person", async () => {
@@ -244,7 +256,8 @@ describe("Family History joined MCP acceptance cleanup", () => {
       });
     });
 
-    await expect(t.mutation(internal.mcpAcceptanceFixture.clear, {
+    await expect(t.withIdentity({ subject: OWNER }).mutation(api.mcpAcceptanceFixture.clear, {
+      vaultOwnerId: OWNER,
       runKey: RUN_KEY,
       confirmation: FAMILY_HISTORY_ACCEPTANCE_CONFIRMATION,
     })).rejects.toThrow("an unmarked record references the marked acceptance graph");

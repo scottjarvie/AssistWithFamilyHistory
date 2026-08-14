@@ -2,7 +2,11 @@
 import { v } from "convex/values";
 
 import type { Doc, Id } from "./_generated/dataModel";
-import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { internal } from "./_generated/api";
+import { action, internalQuery, mutation, type ActionCtx, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { authorizeTenantAction, authorizeTenantMutation, type TenantAccessDecision } from "./access";
+
+const acceptanceInternal = (internal as any).mcpAcceptanceFixture;
 
 export const FAMILY_HISTORY_ACCEPTANCE_PREFIX = "codex-test:awf-joined:";
 export const FAMILY_HISTORY_ACCEPTANCE_MARKER = "[SYNTHETIC QA - DELETE ME]";
@@ -13,6 +17,25 @@ const RETAINED_TEST_SUBJECT = "user_3HqFpM96Ck1hTJZajDX893sWnPm";
 const MAX_ROWS_PER_TABLE = 100;
 
 type FixtureCtx = MutationCtx | QueryCtx;
+
+function assertAcceptanceOwner(
+  decision: TenantAccessDecision,
+): asserts decision is TenantAccessDecision & { allowed: true; owner: string } {
+  if (!decision.allowed || decision.owner !== RETAINED_TEST_SUBJECT) {
+    throw new Error("Family History joined-acceptance cleanup requires the exact authenticated synthetic test identity.");
+  }
+}
+
+async function authorizeAcceptanceAction(ctx: ActionCtx, suppliedOwner: string) {
+  const decision = await authorizeTenantAction(
+    ctx,
+    "mcpAcceptanceFixture.inspect",
+    suppliedOwner,
+    (entry) => ctx.runMutation(internal.trustBoundary.recordShadowDenial, entry),
+  );
+  assertAcceptanceOwner(decision);
+  return decision.owner;
+}
 
 function assertAcceptanceDeployment() {
   const cloudUrl = process.env.CONVEX_CLOUD_URL?.trim() || process.env.CONVEX_URL?.trim() || "";
@@ -225,7 +248,7 @@ function counts(graph: Awaited<ReturnType<typeof fixtureGraph>>) {
   };
 }
 
-export const inspect = internalQuery({
+export const inspectInternal = internalQuery({
   args: { runKey: v.string() },
   handler: async (ctx, args) => {
     const graph = await fixtureGraph(ctx, args.runKey);
@@ -233,9 +256,19 @@ export const inspect = internalQuery({
   },
 });
 
-export const clear = internalMutation({
-  args: { runKey: v.string(), confirmation: v.string() },
+export const inspect = action({
+  args: { vaultOwnerId: v.string(), runKey: v.string() },
   handler: async (ctx, args) => {
+    await authorizeAcceptanceAction(ctx, args.vaultOwnerId);
+    return await ctx.runQuery(acceptanceInternal.inspectInternal, { runKey: args.runKey });
+  },
+});
+
+export const clear = mutation({
+  args: { vaultOwnerId: v.string(), runKey: v.string(), confirmation: v.string() },
+  handler: async (ctx, args) => {
+    const decision = await authorizeTenantMutation(ctx, "mcpAcceptanceFixture.clear", args.vaultOwnerId);
+    assertAcceptanceOwner(decision);
     if (args.confirmation !== FAMILY_HISTORY_ACCEPTANCE_CONFIRMATION) {
       throw new Error("Exact Family History joined-acceptance cleanup confirmation is required.");
     }

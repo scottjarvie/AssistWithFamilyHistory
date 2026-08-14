@@ -99,7 +99,7 @@ tests pass. Protected release and live lifecycle proof continue.
 The implementation preserves the existing product model rather than adding raw
 CRUD: server-derived identity, bounded reads, replay-safe writes, canonical
 source/citation/finding/story records, and the exact four-state Queue. The
-result-link bridge accepts only known signed-in app routes. The internal cleanup
+result-link bridge accepts only known signed-in app routes. The user-authenticated cleanup
 rail is inert outside production deployment `accomplished-dodo-308`, the exact
 retained test subject, and a unique marked run key; it also refuses external
 references and bounded-scan overflow.
