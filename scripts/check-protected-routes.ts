@@ -27,8 +27,10 @@ function toApiPath(filePath: string) {
 
 const expectedProtected = [
   "/app",
+  "/app/people/new",
   "/app/operations",
   "/api/people",
+  "/api/first-start",
   "/api/people/abc/context-pack",
   "/api/import",
   "/api/process",

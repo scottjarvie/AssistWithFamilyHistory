@@ -126,7 +126,13 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
       <section className="rounded-[2rem] border border-stone-200 bg-white px-6 py-6 shadow-sm sm:px-8">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <Badge variant="secondary" className="mb-4">{workspace.person.fsId || "Research subject"}</Badge>
+            <div className="mb-4 flex flex-wrap gap-2">
+              <Badge variant="secondary">{workspace.person.fsId || "Research subject"}</Badge>
+              <Badge variant="outline">{workspace.person.living ? "Living" : "Deceased"}</Badge>
+              {workspace.person.creationProvenance?.evidenceStatus === "unsourced" ? (
+                <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">Starting statement · needs a source</Badge>
+              ) : null}
+            </div>
             <h1 className="font-[family-name:var(--font-cormorant-garamond)] text-4xl font-semibold text-stone-900 sm:text-5xl">
               {workspace.person.displayName}
             </h1>
@@ -136,6 +142,11 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
               {workspace.person.death?.date?.original ? `to ${workspace.person.death.date.original}` : ""}
               {workspace.person.death?.place?.original ? ` · ${workspace.person.death.place.original}` : ""}
             </p>
+            {workspace.person.creationProvenance?.method === "manual_first_start" ? (
+              <p className="mt-4 max-w-2xl border-l-2 border-amber-500 pl-4 text-sm leading-6 text-stone-600">
+                Added privately by you as part of the first family connection. It is not treated as sourced evidence until a source is linked and reviewed.
+              </p>
+            ) : null}
             <div className="mt-5 flex flex-wrap gap-3">
               <Button asChild className="bg-amber-700 hover:bg-amber-800">
                 <SafeLink href={`/app/people/${routeId}/ai`}>Run AI Analysis</SafeLink>

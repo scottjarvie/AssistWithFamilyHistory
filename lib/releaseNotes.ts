@@ -38,11 +38,83 @@ export function releaseItemsForCategory(entry: ReleaseEntry, category: ReleaseCa
   return sortReleaseItems(entry.items.filter((item) => item.category === category));
 }
 
-export const appVersion = "2.0.2";
+export const appVersion = "2.1.0";
 
 export const releaseNotes: ReleaseEntry[] = [
   {
     version: appVersion,
+    status: "In review",
+    releasedAt: "2026-08-14T08:33:01-07:00",
+    timezone: "America/Phoenix",
+    title: "Begin with one private family connection",
+    summary: "A newcomer can now create two people and their known relationship directly in a private workspace, with clear evidence boundaries and an optional chosen-AI handoff.",
+    items: [
+      {
+        id: "private-family-first-start",
+        category: "created",
+        impactTier: "major",
+        impactRank: 1,
+        short: "Created a direct private first start with one person and one known relationship.",
+        long: {
+          what: "An empty workspace now guides someone through two people, explicit living or deceased status, their relationship, and a review step before saving the connected pair.",
+          why: "Family history should begin with the family connection someone already knows, without requiring an import or AI connection.",
+          where: "Signed-in empty dashboard, People, and the new private first-start flow.",
+        },
+        sourceRefs: ["AWF-0006", "AWF-WO-010"],
+        audiences: ["signed-in"],
+      },
+      {
+        id: "first-start-provenance-boundary",
+        category: "upgraded",
+        impactTier: "meaningful",
+        impactRank: 1,
+        short: "Made the starting statement and its missing evidence visible after save.",
+        long: {
+          what: "The product records who supplied the starting people and relationship, marks the statements as unsourced, and keeps that cue visible in People and the person workspace.",
+          why: "A known family connection is a useful starting statement, but it should not quietly become a proven fact.",
+          where: "Private first-start review, People list, and person workspace.",
+        },
+        sourceRefs: ["AWF-0006", "AWF-WO-010"],
+        audiences: ["signed-in", "agent"],
+      },
+      {
+        id: "empty-workspace-family-wayfinding",
+        category: "fixed",
+        impactTier: "meaningful",
+        impactRank: 1,
+        short: "Fixed the empty workspace so its primary action begins with family, not a provider or AI.",
+        long: {
+          what: "The dashboard and People empty state now lead to the private family connection flow, while reviewed capture and AI setup remain nearby optional paths.",
+          why: "A newcomer should not need another service or tool before the product can hold the first thing they know about their family.",
+          where: "Signed-in empty dashboard and People.",
+        },
+        sourceRefs: ["AWF-0006", "AWF-WO-010"],
+        audiences: ["signed-in"],
+      },
+      {
+        id: "optional-first-ai-handoff",
+        category: "upgraded",
+        impactTier: "meaningful",
+        impactRank: 2,
+        short: "Kept the chosen-AI handoff off by default and created it only after an explicit choice.",
+        long: {
+          what: "Someone may ask their chosen AI to research the newly saved connection, but the private records are committed first and no Queue directive exists unless the person selects that option.",
+          why: "AI should be a chosen participant in the workflow, not a condition of starting a family record.",
+          where: "Private first-start review and Queue.",
+        },
+        sourceRefs: ["AWF-0006", "AWF-WO-010"],
+        audiences: ["signed-in", "agent"],
+      },
+    ],
+    whatToCheck: [
+      "Open an empty signed-in workspace and choose Add your first connection.",
+      "Review two people, explicit living or deceased states, and the relationship before saving.",
+      "Confirm People and the person workspace retain the connected record and its needs-a-source cue.",
+      "Confirm Queue stays empty unless Ask your chosen AI is explicitly selected.",
+    ],
+  },
+  {
+    version: "2.0.2",
     status: "In review",
     releasedAt: "2026-08-13T20:47:34-07:00",
     timezone: "America/Phoenix",

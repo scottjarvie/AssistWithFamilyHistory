@@ -1,7 +1,7 @@
 ---
 id: AWF-WO-010
 title: Make one person and relationship the first private workspace start
-execution: proposed
+execution: active
 audit: not-audited
 cards: AWF-0006
 created: 2026-08-14
@@ -85,23 +85,32 @@ turning onboarding into a broad tree builder.
 
 ## Human gates
 
-This Work Order is Proposed. Scott's portfolio reset establishes its priority
-and intended outcome, but execution should move to Ready only when a worker is
-actually taking this bounded software slice. Routine implementation and marked
-synthetic proof then need no further approval inside the exclusions.
+Scott explicitly selected this outcome as the next soft-launch goal. Execution
+is Active; routine implementation, protected release, and marked synthetic
+proof need no further approval inside the exclusions.
 
 ## Current truth
 
-No product code changed in this hygiene pass. The Work Order is a concise next
-slice, not a claim that manual person/relationship onboarding exists.
+The bounded source slice is implemented on a protected release branch. It adds
+an empty-workspace first start, a canonical idempotent owner-scoped mutation,
+visible manual unsourced provenance, normal People/person visibility, and an
+explicit optional Queue handoff. Preview, exact-main deployment, and live
+signed-in acceptance remain before completion.
 
 ## Execution evidence
 
-None. This Work Order is Proposed, not approved or active. The philosophy,
-current empty-workspace release, and canonical data model justify the scope;
-they do not prove implementation.
+- `convex/privateFirstStart.test.ts`: atomic creation, no Queue by default,
+  idempotent replay, second-start refusal, and cross-owner rejection.
+- `pnpm test`: 107 tests passed; `pnpm test:convex`: 98 tests passed.
+- Typecheck, lint, protected-route, trust-boundary, owned-table, Convex auth and
+  visibility, person-identifier, focused first-start, and production webpack
+  build checks passed locally on 2026-08-14.
+- Deployed phone/desktop interaction, exact-main release, and signed-in
+  synthetic lifecycle evidence remain open.
 
 ## History
 
+- 2026-08-14 · Codex — activated from Scott's explicit next-goal direction and
+  implemented the bounded source slice; protected release proof continues.
 - 2026-08-14 · Codex — proposed from the Core/Project Philosophy and live empty-
   workspace evidence during Scott's portfolio reset.

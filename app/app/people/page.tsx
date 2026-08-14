@@ -1,5 +1,5 @@
 import { SafeLink as Link } from "@/components/layout/SafeLink";
-import { Search, UserRound, FileText, Images, Sparkles } from "lucide-react";
+import { Search, UserRound, FileText, Images, Sparkles, Plus } from "lucide-react";
 import type { Metadata } from "next";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,21 +54,27 @@ export default async function PeoplePage({
   const client = await getAuthedConvexClient();
   const { vaultOwnerId } = await getVaultAccessContext();
   let people;
+  let firstStartEligible = false;
 
   try {
-    people = await client.action(api.vaultReads.getPeopleExplorer, {
-      vaultOwnerId,
-      search: params.q || undefined,
-      researchStatus:
-        params.status === "not_started" ||
-        params.status === "basic" ||
-        params.status === "in_progress" ||
-        params.status === "thorough" ||
-        params.status === "complete"
-          ? params.status
-          : undefined,
-      limit: visibleCount + 1,
-    });
+    const [peopleResult, summary] = await Promise.all([
+      client.action(api.vaultReads.getPeopleExplorer, {
+        vaultOwnerId,
+        search: params.q || undefined,
+        researchStatus:
+          params.status === "not_started" ||
+          params.status === "basic" ||
+          params.status === "in_progress" ||
+          params.status === "thorough" ||
+          params.status === "complete"
+            ? params.status
+            : undefined,
+        limit: visibleCount + 1,
+      }),
+      client.action(api.vaultReads.getDashboardSummary, { vaultOwnerId }),
+    ]);
+    people = peopleResult;
+    firstStartEligible = summary.firstStartEligible;
   } catch (error) {
     const issue = getConvexRuntimeIssue(error);
 
@@ -96,9 +102,15 @@ export default async function PeoplePage({
             Browse each ancestor as a living research workspace with sources, places, memories, documents, and AI context packs.
           </p>
         </div>
-        <Button asChild className="bg-amber-700 hover:bg-amber-800">
-          <Link href="/app/imports">Import FamilySearch Capture</Link>
-        </Button>
+        {firstStartEligible ? (
+          <Button asChild className="min-h-11 bg-[#234d5e] hover:bg-[#173c49]">
+            <Link href="/app/people/new"><Plus className="mr-2 h-4 w-4" /> Start with two people</Link>
+          </Button>
+        ) : (
+          <Button asChild className="bg-amber-700 hover:bg-amber-800">
+            <Link href="/app/imports">Import FamilySearch Capture</Link>
+          </Button>
+        )}
       </div>
 
       <form className="mb-6 rounded-[1.75rem] border border-stone-200 bg-white p-4 shadow-sm">
@@ -127,7 +139,16 @@ export default async function PeoplePage({
         {visiblePeople.length === 0 ? (
           <Card className="col-span-full border-dashed">
             <CardContent className="py-14 text-center text-stone-500">
-              No people match this filter yet. Try importing a FamilySearch capture or widening the search.
+              {firstStartEligible ? (
+                <>
+                  <p>No people are here yet. Begin privately with two people and one known relationship.</p>
+                  <Button asChild className="mt-5 min-h-11 bg-[#234d5e] hover:bg-[#173c49]">
+                    <Link href="/app/people/new">Start your first connection</Link>
+                  </Button>
+                </>
+              ) : (
+                <p>No people match this filter. Widen the search or clear the research-state filter.</p>
+              )}
             </CardContent>
           </Card>
         ) : (
@@ -146,7 +167,10 @@ export default async function PeoplePage({
                       </CardDescription>
                     </div>
                     <div className="text-right">
-                      <Badge variant="secondary">{person.fsId || "No FS ID"}</Badge>
+                      <Badge variant="secondary">{person.living ? "Living" : "Deceased"}</Badge>
+                      {person.creationProvenance?.evidenceStatus === "unsourced" ? (
+                        <p className="mt-2 text-xs font-medium text-amber-700">Starting statement · needs a source</p>
+                      ) : null}
                       <p className="mt-2 text-xs uppercase tracking-[0.2em] text-stone-400">
                         {person.researchStatus.replace(/_/g, " ")}
                       </p>

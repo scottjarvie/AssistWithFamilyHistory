@@ -180,6 +180,17 @@
       "notes": "Private vault metadata."
     },
     {
+      "route": "/api/first-start",
+      "methods": ["POST"],
+      "capability": "private_family_first_start",
+      "environment": "browser",
+      "agentSupport": "not-supported",
+      "reviewLevel": "owner-scoped-reviewed-write",
+      "risk": "medium",
+      "scopes": [],
+      "notes": "Internal human first-start route. It derives the owner server-side, writes only to a genuinely empty workspace, uses an idempotent operation ID, records unsourced provenance, and does not create an AI handoff."
+    },
+    {
       "route": "/api/import",
       "methods": ["POST"],
       "capability": "capture_import",
