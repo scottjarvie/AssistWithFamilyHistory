@@ -1,11 +1,11 @@
 ---
 id: AWF-WO-009
 title: Prove the joined newcomer Queue-to-sourced-result workflow
-execution: active
+execution: ready
 audit: not-audited
 cards: AWF-0037
 created: 2026-08-13
-updated: 2026-08-13
+updated: 2026-08-14
 proposed-by: Codex from Scott's direct delegation
 approved-by: Scott via coordinator delegation
 approved-on: 2026-08-13
@@ -90,7 +90,7 @@ the exclusions.
 
 ## Current truth
 
-Execution remains active and audit remains `not-audited`. The source repair,
+Execution is ready to resume and audit remains `not-audited`. The source repair,
 cleanup rail, full verification, protected review, exact-main CI, Convex deploy,
 Vercel production deploy, and public boundary proof are complete. The final
 authenticated joined lifecycle is blocked only by the available isolated
@@ -119,6 +119,9 @@ challenge passed. Detailed proof and the remaining gate are recorded in
 
 ## History
 
+- 2026-08-14 · Codex portfolio reset — moved execution from Active to Ready
+  because no worker can currently complete the browser-host acceptance; kept
+  the finished release evidence and exact cleanup boundary intact.
 - 2026-08-13 · Scott via coordinator delegation — authorized the bounded goal
   and routine safe live proof through cleanup and protected release.
 - 2026-08-13 · Codex — activated execution after full repo/product orientation;

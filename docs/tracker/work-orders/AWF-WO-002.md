@@ -1,11 +1,11 @@
 ---
 id: AWF-WO-002
 title: Make the private-beta first-use journey truthful and provable
-execution: proposed
+execution: superseded
 audit: not-audited
-cards: AWF-0005 AWF-0006 AWF-0007 AWF-0012
+cards: AWF-0005 AWF-0007 AWF-0012
 created: 2026-08-08
-updated: 2026-08-08
+updated: 2026-08-14
 proposed-by: Codex
 ---
 
@@ -18,14 +18,12 @@ crossing privacy or owner boundaries.
 
 ## Current truth
 
-Current `main` is clean at `6febd109b7942cf81706723a8fc77be1ac08be21`
-and passes all 46 repository verification steps. The public site is live on
-READY deployment `dpl_4x1uoNBMJCR1VgA33UWHFRo3F2kA`; Assist With Life labels
-the workspace live and links to it. The home page is coherent private-beta
-positioning, but About contradicts the Convex storage architecture, the sign-in
-entry does not teach the first useful workflow, and no current authenticated
-production capture-to-story proof was available. The older fixture report is
-local/dev evidence and explicitly leaves production privacy verification open.
+This original four-Card bundle is superseded. Later protected releases fixed
+the public promise, canonical identity, sign-in, empty-workspace guidance,
+Queue, and chosen-AI setup in smaller slices with exact evidence. AWF-0005 is
+closed against those releases. The still-useful direct person/relationship
+start moved to proposed AWF-WO-010. Capture-to-story and broader identity/
+recovery proof remain Later Cards rather than one ceremonial mega-journey.
 
 ## Sequence
 
@@ -100,12 +98,15 @@ the final audit result.
 
 ## Execution evidence
 
-None yet. This Work Order is Proposed, not approved or active. The audit and
-tracker-state publication that created this proposal are intake evidence, not
-implementation or completion evidence for its Cards.
+No implementation is attributed to this Work Order. It is superseded by the
+smaller completed AWF-WO-007/AWF-WO-008 releases and proposed AWF-WO-010. The
+original intake evidence remains useful historical context, not current scope.
 
 ## History
 
+- 2026-08-14 · Codex portfolio reset — superseded the oversized pre-rebrand
+  bundle, closed its shipped public-truth outcome, and moved the one remaining
+  first-use job into AWF-WO-010.
 - 2026-08-08 · Codex — proposed from a Core v1.6.3 compliance and product-gap
   audit of tracker truth, current source, all 46 local checks, public routes,
   responsive signed-out journeys, Assist With Life listing, and Vercel state.
