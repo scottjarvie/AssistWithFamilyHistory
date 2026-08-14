@@ -116,5 +116,12 @@ for (const required of [
 assert.match(board, /role="status" aria-live="polite"/);
 assert.doesNotMatch(board, /drag-handle|data-reorder-card|reorder-control|⠿|⋮⋮/);
 assert.match(board, /@media \(prefers-reduced-motion: reduce\)/);
+for (const selector of ["filters", "orderbar", "viewbar", "specs", "work-order", "spec-cards"]) {
+  assert.match(
+    board,
+    new RegExp(`\\.${selector}(?: button| \\{)[\\s\\S]{0,260}?min-height:\\s*44px`),
+    `board ${selector} controls must preserve the 44px touch target`,
+  );
+}
 
 console.log(`tracker verified: ${cards.length} Cards, ${orders.length} Work Orders, generated parity and JavaScript syntax`);

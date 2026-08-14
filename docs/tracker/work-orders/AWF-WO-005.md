@@ -1,11 +1,11 @@
 ---
 id: AWF-WO-005
 title: Ship the product-native Queue experience
-execution: active
+execution: complete
 audit: follow-up-needed
 cards: AWF-0029, AWF-0030
 created: 2026-08-12
-updated: 2026-08-12
+updated: 2026-08-14
 proposed-by: Codex
 approved-by: Scott
 approved-on: 2026-08-12
@@ -22,14 +22,12 @@ status.
 
 ## Current truth
 
-PR #32 repaired Queue-local tenancy and expiry on main and AWF-WO-004 records
-that protected release. This phase began from clean remote main
-`81ce70cf6cc7109c374256fca0f05eac6fe73c84`. The configured local environment
-uses Clerk test keys and a development Convex deployment. A disposable
-`queue-proof+clerk_test_*@example.com` identity authenticated locally, and the
-current Queue functions were deployed only to that development Convex target.
-No real family data, production user, secret, provider policy, or production
-database was used.
+Execution is complete. The product-native Queue, navigation, exact four states,
+activity, bounded reads/actions, isolation, cleanup, protected release, and
+production deployment are proven. Later canonical-domain and empty-workspace
+acceptance removed the old Vercel access decision. The independent audit stays
+`follow-up-needed` only because the joined Queue → OAuth MCP → saved-work
+browser lifecycle remains unproved in AWF-0037.
 
 ## Sequence
 
@@ -141,6 +139,9 @@ fixtures are not advertised as a connection.
 
 ## History
 
+- 2026-08-14 · Codex portfolio reset — marked execution complete and retired
+  the obsolete Vercel access gate; preserved follow-up-needed for AWF-0037's
+  exact browser-host joined-acceptance limit.
 - 2026-08-12 · Scott — approved Queue as an independent product lane: establish
   isolated authenticated proof, then ship the product-native Queue screen and
   navigation through normal protected release and safe cleanup.

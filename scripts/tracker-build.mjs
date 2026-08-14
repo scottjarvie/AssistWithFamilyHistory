@@ -373,7 +373,7 @@ ${SHARED_CSS}
   .filters { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 20px 12px; align-items: center; }
   .filters .flabel { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--faint); margin-right: 2px; }
   .filters button {
-    font: inherit; font-size: 12.5px; min-height: 32px; padding: 3px 10px;
+    font: inherit; font-size: 12.5px; min-height: 44px; padding: 7px 10px;
     border: 1px solid var(--line); border-radius: 999px; cursor: pointer;
     background: var(--surface); color: var(--soft);
   }
@@ -386,14 +386,14 @@ ${SHARED_CSS}
   .orderbar strong { color:var(--groove-2); }
   .orderbar .order-state { font:12px/1.4 ui-monospace,monospace; }
   .orderbar .order-help { flex:1 1 300px; margin:0; font-size:12.5px; }
-  .orderbar button { min-height:40px; padding:7px 12px; border:1px solid var(--line);
+  .orderbar button { min-height:44px; padding:7px 12px; border:1px solid var(--line);
     border-radius:8px; background:var(--surface); color:var(--ink); font:inherit; cursor:pointer; }
   .orderbar button:disabled { cursor:not-allowed; opacity:.55; }
   .orderbar.storage-warning { border-color:var(--gold); }
   .viewbar { position:sticky; top:0; z-index:20; display:flex; gap:8px;
     align-items:center; padding:10px 20px; background:color-mix(in srgb,var(--paper) 92%,transparent);
     border-block:1px solid var(--line); backdrop-filter:blur(10px); }
-  .viewbar button { min-height:42px; padding:7px 14px; border:1px solid var(--line);
+  .viewbar button { min-height:44px; padding:7px 14px; border:1px solid var(--line);
     border-radius:999px; background:var(--surface); color:var(--ink); font:inherit; cursor:pointer; }
   .viewbar button[aria-selected="true"] { background:var(--groove); color:var(--paper);
     border-color:var(--groove); }
@@ -403,7 +403,7 @@ ${SHARED_CSS}
   .specs { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 20px 12px; align-items: center; }
   .specs .flabel { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--faint); }
   .specs button {
-    font: inherit; font-size: 13px; min-height: 40px; padding: 6px 14px;
+    font: inherit; font-size: 13px; min-height: 44px; padding: 6px 14px;
     border: 1.5px solid var(--gold); border-radius: 8px; cursor: pointer;
     background: var(--surface); color: var(--ink); font-weight: 600;
   }
@@ -425,7 +425,7 @@ ${SHARED_CSS}
   .work-order .meter { height:8px; overflow:hidden; background:var(--paper-2); border-radius:99px; }
   .work-order .meter span { display:block; height:100%; background:var(--groove-2); }
   .work-order .order-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
-  .work-order button { min-height:40px; padding:7px 12px; font:inherit; cursor:pointer;
+  .work-order button { min-height:44px; padding:7px 12px; font:inherit; cursor:pointer;
     border:1px solid var(--line); border-radius:8px; color:var(--ink); background:var(--paper-2); }
   .run-now { margin:0 20px 14px; padding:12px 16px; border-left:4px solid var(--groove-2);
     background:var(--groove-wash); border-radius:0 10px 10px 0; }
@@ -495,8 +495,8 @@ ${SHARED_CSS}
   }
   .spec-cards { margin: 10px 0; }
   .spec-cards button {
-    font: inherit; font-size: 12.5px; margin: 0 6px 6px 0; min-height: 32px;
-    padding: 3px 10px; cursor: pointer; border: 1px solid var(--line);
+    font: inherit; font-size: 12.5px; margin: 0 6px 6px 0; min-height: 44px;
+    padding: 7px 10px; cursor: pointer; border: 1px solid var(--line);
     border-radius: 6px; background: var(--paper-2); color: var(--ink);
   }
   @media (max-width: 700px) {

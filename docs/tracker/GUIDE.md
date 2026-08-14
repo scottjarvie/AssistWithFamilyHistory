@@ -19,6 +19,17 @@ zero-setup readers, not separate sources of truth.
 `guide.html` are generated reading views. Supporting specifications and dated
 reports remain evidence, not new tracker concepts.
 
+## Requirements and supporting specifications
+
+The board exposes each Card's concise `contract` as the at-a-glance
+requirement. Card detail carries current truth, constraints, evidence, and
+completion checks. A Work Order carries the executable requirements, sequence,
+dependencies, exclusions, stop rules, verification, and human gates for a
+bounded slice. If a longer supporting specification is genuinely needed, link
+it from the Card and Work Order and keep it in the repository's existing
+product, design, or operations docs. A spec is supporting evidence—not a
+fourth tracker lane, separate backlog, or competing source of status.
+
 ## One-minute orientation
 
 Open `board.html`. Start with **Needs You**, then scan **Doing** and **Next**.
