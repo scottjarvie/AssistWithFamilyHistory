@@ -3,7 +3,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 const boardUrl = pathToFileURL(path.join(process.cwd(), "docs/tracker/board.html")).href;
-const storageKey = "assist-tracker-personal-order:github.com/scottjarvie/discover-their-stories:v1";
+const storageKey = "assist-tracker-personal-order:github.com/scottjarvie/AssistWithFamilyHistory:v1";
 const lane = (status: string) => `.col[data-lane="${status}"]`;
 
 async function clearViewerPreferences(page: Page) {

@@ -123,10 +123,12 @@ export function resolveLocalArtifactPath(
  * Convex is the canonical store (GEN-91). The local `data/` tree is a
  * dev-only convenience mirror. In production (Vercel) the filesystem is
  * ephemeral and must never be a source of truth, so FS writes are skipped
- * there. Set DTS_LOCAL_FS=1 to force-enable, or DTS_LOCAL_FS=0 to force-disable.
+ * there. Set AWF_LOCAL_FS=1 to force-enable, or AWF_LOCAL_FS=0 to
+ * force-disable. The retired DTS_LOCAL_FS name still works as a fallback so
+ * existing local setups keep behaving.
  */
 export function isLocalFsEnabled(): boolean {
-  const flag = process.env.DTS_LOCAL_FS;
+  const flag = process.env.AWF_LOCAL_FS ?? process.env.DTS_LOCAL_FS;
   if (flag === "1" || flag === "true") return true;
   if (flag === "0" || flag === "false") return false;
   return process.env.NODE_ENV !== "production";

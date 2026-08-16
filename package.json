@@ -25,7 +25,7 @@
     "check:project-philosophy": "node scripts/check-family-history-project-philosophy.mjs",
     "tracker:build": "node scripts/tracker-build.mjs",
     "tracker:verify": "node scripts/verify-tracker.mjs",
-    "tracker:verify-browser": "playwright test tests/e2e/tracker-reader-ordering.spec.ts --browser=chromium --workers=1 --output=/tmp/dts-tracker-playwright",
+    "tracker:verify-browser": "playwright test tests/e2e/tracker-reader-ordering.spec.ts --browser=chromium --workers=1 --output=/tmp/awf-tracker-playwright",
     "tracker:state-check": "node scripts/commit-tracker-state.mjs --check",
     "tracker:commit-state": "node scripts/commit-tracker-state.mjs",
     "verify:ci-state-classifier": "node scripts/verify-ci-change-classifier.mjs",

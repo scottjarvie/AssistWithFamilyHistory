@@ -60,7 +60,7 @@ When you do ask, explain the technical question in plain language and state the 
 
 Use the smallest meaningful verification for the route. For a full check the single command is:
 
-- `pnpm verify` — runs typecheck, lint, test, every `check:*` contract, and the production build in one pass. ~24s. Logs at `/tmp/dts-verify-*.log` per step if anything fails.
+- `pnpm verify` — runs typecheck, lint, test, every `check:*` contract, and the production build in one pass. ~24s. Logs at `/tmp/awf-verify-*.log` per step if anything fails.
 
 For targeted work pick from:
 
