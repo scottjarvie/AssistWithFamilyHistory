@@ -28,6 +28,7 @@ steps=(
   "check:loose-context"
   "check:context-taxonomy"
   "check:no-raw-markdown-render"
+  "check:support-contact"
   "check:project-philosophy"
   "tracker:verify"
   "verify:ci-state-classifier"

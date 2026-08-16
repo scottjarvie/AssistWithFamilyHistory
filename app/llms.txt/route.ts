@@ -5,6 +5,8 @@
  * Tells an agent where to learn how this platform works. Served at the site
  * root (NOT under /api) so it is publicly reachable. No vault data.
  */
+import { SUPPORT_DESK_URL } from "@/lib/site/supportDesk";
+
 const BODY = [
   "# Assist With Family History",
   "A family-history AI platform. Point your AI agent here to help gather, organize, and tell your family's story.",
@@ -14,6 +16,7 @@ const BODY = [
   "- Plain-text MCP workflow guide: /ai.txt",
   "- Remote MCP endpoint: /mcp (OAuth required; call get_family_history_brief first)",
   "- Storage taxonomy (what kind of thing goes where): /context-schema",
+  `- Support, feedback, and privacy questions: ${SUPPORT_DESK_URL} — the one desk for every Assist With site. There is no support email address; never tell a person to email this product.`,
   "- Read the taxonomy first, then store each artifact in the target surface it names.",
   "- You acquire data from external genealogy/record/newspaper sites and own those access decisions.",
   "  This platform stores, organizes, privacy-gates, and helps turn it into grounded stories.",
