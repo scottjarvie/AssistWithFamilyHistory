@@ -66,8 +66,8 @@ Capture FamilySearch data, merge it into a canonical vault, and move from eviden
 
 ```bash
 # Clone the repository
-git clone https://github.com/scottjarvie/discover-their-stories.git
-cd discover-their-stories
+git clone https://github.com/scottjarvie/AssistWithFamilyHistory.git
+cd AssistWithFamilyHistory
 
 # Install dependencies
 pnpm install
@@ -91,7 +91,7 @@ The browser extension is located in the `/extension` folder:
 ## 📁 Project Structure
 
 ```
-discover-their-stories/
+AssistWithFamilyHistory/
 ├── app/                    # Next.js App Router pages
 │   ├── app/               # App routes (dashboard, tools)
 │   ├── features/          # Feature marketing pages

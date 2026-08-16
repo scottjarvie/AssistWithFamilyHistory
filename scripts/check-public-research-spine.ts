@@ -49,7 +49,7 @@ assert.match(extensionPage, /<Footer\s*\/>/);
 assert.match(extensionPage, /<ResearchSpine activeStage="capture"\s*\/>/);
 assert.match(
   extensionPage,
-  /\/extension-download\/discover-their-stories-extension\.zip/,
+  /\/extension-download\/assist-with-family-history-extension\.zip/,
 );
 assert.match(extensionPage, /href="\/app\/imports"/);
 assert.match(extensionPage, /Private by default/);

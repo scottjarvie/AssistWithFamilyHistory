@@ -1,6 +1,6 @@
 [project]
 domains = []
-name = "discover-their-stories"
+name = "assist-with-family-history"
 
 [crawler]
 max_pages = 100

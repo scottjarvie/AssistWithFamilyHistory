@@ -71,7 +71,7 @@ start=$(date +%s)
 
 for step in "${steps[@]}"; do
   step_start=$(date +%s)
-  if pnpm -s "$step" >/tmp/dts-verify-"${step//:/_}".log 2>&1; then
+  if pnpm -s "$step" >/tmp/awf-verify-"${step//:/_}".log 2>&1; then
     step_end=$(date +%s)
     elapsed=$((step_end - step_start))
     printf '  ✓ %-44s %3ds\n' "$step" "$elapsed"
@@ -95,10 +95,10 @@ printf '  total:  %ds\n' "$total"
 
 if [ "${#failed[@]}" -gt 0 ]; then
   echo
-  echo "Failed steps (logs at /tmp/dts-verify-*.log):"
+  echo "Failed steps (logs at /tmp/awf-verify-*.log):"
   for step in "${failed[@]}"; do
     echo "  - $step  (tail:)"
-    tail -5 /tmp/dts-verify-"${step//:/_}".log | sed 's/^/      /'
+    tail -5 /tmp/awf-verify-"${step//:/_}".log | sed 's/^/      /'
   done
   exit 1
 fi
