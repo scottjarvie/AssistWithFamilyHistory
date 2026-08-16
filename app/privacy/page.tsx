@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
 import { MarketingNav } from "@/components/layout/MarketingNav";
 import { Footer } from "@/components/layout/Footer";
+import { SafeAnchor } from "@/components/layout/SafeLink";
 import { createPageMetadata } from "@/lib/seo";
+import {
+  NO_DIRECT_EMAIL_STATEMENT,
+  SUPPORT_DESK_LABEL,
+  SUPPORT_DESK_URL,
+} from "@/lib/site/supportDesk";
 
 export const metadata: Metadata = createPageMetadata({
   title: "Privacy Policy",
@@ -46,11 +52,17 @@ export default function PrivacyPage() {
           <section className="space-y-3">
             <h2 className="text-2xl font-semibold text-stone-900">Contact</h2>
             <p className="text-stone-600">
-              Questions about this policy can be sent to{" "}
-              <a className="text-amber-700 hover:underline" href="mailto:privacy@discovertheirstories.com">
-                Contact the privacy team
-              </a>
-              .
+              Bring questions about this policy to{" "}
+              <SafeAnchor
+                className="text-amber-700 hover:underline"
+                href={SUPPORT_DESK_URL}
+                rel="noreferrer"
+                target="_blank"
+              >
+                {SUPPORT_DESK_LABEL}
+              </SafeAnchor>
+              , the one support desk for every Assist With site.{" "}
+              {NO_DIRECT_EMAIL_STATEMENT}
             </p>
           </section>
         </div>

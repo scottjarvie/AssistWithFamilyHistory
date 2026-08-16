@@ -1,32 +1,36 @@
 import type { Metadata } from "next";
 import { MarketingNav } from "@/components/layout/MarketingNav";
 import { Footer } from "@/components/layout/Footer";
+import { SafeAnchor } from "@/components/layout/SafeLink";
 import { createPageMetadata } from "@/lib/seo";
+import {
+  NO_DIRECT_EMAIL_STATEMENT,
+  SUPPORT_DESK_LABEL,
+  SUPPORT_DESK_URL,
+} from "@/lib/site/supportDesk";
 
 export const metadata: Metadata = createPageMetadata({
   title: "Contact",
-  description: "Contact information for support, feature requests, and privacy questions.",
+  description:
+    "Support, feature requests, and privacy questions for Assist With Family History all go through Assist With Life Support.",
   path: "/contact",
 });
 
 const contactItems = [
   {
     title: "General Support",
-    email: "support@discovertheirstories.com",
-    label: "Email support",
+    label: "Open a support request",
     description: "Questions about setup, usage, and troubleshooting.",
   },
   {
     title: "Feature Requests",
-    email: "features@discovertheirstories.com",
     label: "Share product feedback",
     description: "Suggestions for new tools, improvements, and workflows.",
   },
   {
     title: "Privacy Questions",
-    email: "privacy@discovertheirstories.com",
-    label: "Contact the privacy team",
-    description: "Questions about local storage, processing, or data handling.",
+    label: "Ask a privacy question",
+    description: "Questions about storage, processing, or data handling.",
   },
 ];
 
@@ -39,7 +43,17 @@ export default function ContactPage() {
           <div className="mb-10 text-center">
             <h1 className="mb-4 text-4xl font-bold text-stone-900">Contact</h1>
             <p className="text-stone-500">
-              Reach out with support requests, feedback, or ideas for the roadmap.
+              Support for every Assist With site runs through{" "}
+              <SafeAnchor
+                className="text-amber-700 hover:underline"
+                href={SUPPORT_DESK_URL}
+                rel="noreferrer"
+                target="_blank"
+              >
+                {SUPPORT_DESK_LABEL}
+              </SafeAnchor>
+              . {NO_DIRECT_EMAIL_STATEMENT} Bring a support request, feedback, or a
+              privacy question there and it reaches the same place.
             </p>
           </div>
 
@@ -48,9 +62,14 @@ export default function ContactPage() {
               <article key={item.title} className="rounded-xl border border-stone-200 bg-white p-6">
                 <h2 className="mb-2 text-lg font-semibold text-stone-900">{item.title}</h2>
                 <p className="mb-4 text-sm text-stone-500">{item.description}</p>
-                <a className="text-amber-700 hover:underline" href={`mailto:${item.email}`}>
+                <SafeAnchor
+                  className="text-amber-700 hover:underline"
+                  href={SUPPORT_DESK_URL}
+                  rel="noreferrer"
+                  target="_blank"
+                >
                   {item.label}
-                </a>
+                </SafeAnchor>
               </article>
             ))}
           </div>
