@@ -518,7 +518,16 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
                     confidence: string;
                     status: string;
                     conflictReason?: string;
-                  }>).slice(0, 12).map((fact) => (
+                  }>)
+                    // This list shows the first twelve facts. A conflict is the
+                    // only one of these that is asking the person for something,
+                    // so it must never be the row that falls off the end. Stable
+                    // otherwise: everything else keeps its existing order.
+                    .slice()
+                    .sort((a, b) =>
+                      Number(b.status === "conflict") - Number(a.status === "conflict")
+                    )
+                    .slice(0, 12).map((fact) => (
                     <div key={fact._id} className="rounded-md border border-stone-200 bg-white px-4 py-3">
                       <div className="flex items-start justify-between gap-3">
                         <p className="font-medium text-stone-900">{fact.factType.replace(/_/g, " ")}</p>
