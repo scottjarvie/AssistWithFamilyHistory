@@ -106,7 +106,6 @@ const CONFLICT_RESOLUTION_AUTHORITY = {
     "A settled conflict keeps the reading that lost. Never delete the record you decided against.",
 } as const;
 
-
 export function buildContextPack(workspace: ContextPackWorkspace, gates: ContextPackGates) {
   const evidenceTrace = workspace.sources.map((entry) => ({
     sourceId: entry.source._id,

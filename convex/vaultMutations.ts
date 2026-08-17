@@ -1231,10 +1231,11 @@ export const resolveSourceFactConflict = mutation({
             ? person.death?.date?.original
             : undefined;
 
+    // `conflictReason` is deliberately left in place. The reason the two records
+    // were said to disagree stays on the row beside the decision, so the
+    // disagreement is still legible after it has been settled.
     await ctx.db.patch(args.sourceFactId, {
       status: args.resolution,
-      // The reason the conflict was raised stays on the row alongside the
-      // decision, so the disagreement itself is still legible after it is settled.
       updatedAt: now,
     });
 
