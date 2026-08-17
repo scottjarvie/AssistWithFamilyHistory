@@ -917,7 +917,35 @@ export default defineSchema({
     summary: v.string(),
     details: v.optional(v.string()),
     outputRefs: v.optional(v.array(v.string())),
+
+    /**
+     * SELF-REPORTED, NOT PROVENANCE. Free text the writing client chose to send
+     * about itself ("gpt-5", "some-model-v2", or nothing at all). It is
+     * optional, unverifiable, and trivially wrong — a client can name any model
+     * it likes, or omit it. Treat it as a display hint only.
+     *
+     * The authoritative answer to "who wrote this" is `creationProvenance`
+     * below, which the server derives and the client cannot influence. Never
+     * make a trust, access, or audit decision from `model`.
+     */
     model: v.optional(v.string()),
+
+    /**
+     * Server-derived origin. Same shape as `persons` and `relationships`, so one
+     * field answers "who first put this here" across the vault. Absent on rows
+     * written before this existed.
+     */
+    creationProvenance: v.optional(
+      v.object({
+        actorKind: v.union(v.literal("user"), v.literal("chosen_ai"), v.literal("first_party_ai"), v.literal("system")),
+        actorId: v.string(),
+        method: v.union(v.literal("manual_first_start"), v.literal("import"), v.literal("mcp"), v.literal("legacy")),
+        evidenceStatus: v.union(v.literal("unsourced"), v.literal("source_linked")),
+        operationId: v.string(),
+        recordedAt: v.number(),
+      })
+    ),
+
     createdAt: v.number(),
     updatedAt: v.number(),
     completedAt: v.optional(v.number()),
