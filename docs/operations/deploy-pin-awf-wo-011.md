@@ -4,8 +4,8 @@ One job: name the exact commit Codex deploys, and the exact worktree that holds
 it. Read with `docs/operations/bring-your-ai-provider-actions.md` item 0.
 
 ```
-PINNED_SHA=3e3484eb5ff8485af2e1894b3c6a5a4e2d599880
-DEPLOY=/Users/scottjarvie/IDE/AssistWithFamilyHistory/.claude/worktrees/deploy-3e3484e
+PINNED_SHA=2751a34600747abf5bed1029bd1c52f07bf85dae
+DEPLOY=/Users/scottjarvie/IDE/AssistWithFamilyHistory/.claude/worktrees/deploy-2751a34
 ```
 
 That worktree already exists on disk with `pnpm install --frozen-lockfile`
@@ -14,7 +14,8 @@ steps** — so Codex can `cd` into it and go straight to item 0e.
 
 ## This pin is current as of 2026-08-17
 
-`3e3484e` is the merge of PR #64, which cleared the release blocker. Before it,
+`2751a34` is `origin/main`. It contains the merge of PR #64 (`3e3484e`), which
+cleared the release blocker, plus this file. Before that fix,
 `origin/main` was **not deployable at all**: every production build since PR #58
 failed inside the Vercel build's own `convex deploy` step on three TypeScript
 errors in `convex/mcpGrants.ts`, and production stayed on `862a224` (PR #57).
@@ -41,23 +42,27 @@ What PR #64 changed, for the deploy decision:
 - `2d25eb6` — a later pin whose worktree has been **removed**, both because it
   predates the build fix and because it did not contain media bytes. If you find
   a `deploy-2d25eb6` directory, it is stale; do not deploy it.
+- `3e3484e` — the PR #64 merge. Correct and deployable; superseded only by this
+  file, which is why the pin now names the commit that contains both.
 
-Only `deploy-3e3484e` should exist. Confirm with
+Only `deploy-2751a34` should exist. Confirm with
 `git -C /Users/scottjarvie/IDE/AssistWithFamilyHistory worktree list`.
 
 ## Confirm before deploying anything
 
 ```bash
 MAIN=/Users/scottjarvie/IDE/AssistWithFamilyHistory
-PINNED_SHA=3e3484eb5ff8485af2e1894b3c6a5a4e2d599880
+PINNED_SHA=2751a34600747abf5bed1029bd1c52f07bf85dae
 DEPLOY="$MAIN/.claude/worktrees/deploy-${PINNED_SHA:0:7}"
 
 git -C "$MAIN" fetch origin
 git -C "$DEPLOY" rev-parse HEAD                      # must equal $PINNED_SHA
 git -C "$DEPLOY" status --porcelain                  # must be empty
 
-# Must print nothing. Any path means main has moved on and this pin is stale —
-# stop and re-pin deliberately.
+# Must list NOTHING, or at most this very file — a later edit to the pin note
+# itself is the one tolerated difference, because writing it necessarily moves
+# main one docs commit past the commit it names. Any application, convex/, or
+# schema path means main has moved on and this pin is stale: stop and re-pin.
 git -C "$MAIN" diff --name-only "$PINNED_SHA" origin/main
 ```
 
