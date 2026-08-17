@@ -3,28 +3,46 @@
 One job: name the exact commit Codex deploys, and the exact worktree that holds
 it. Read with `docs/operations/bring-your-ai-provider-actions.md` item 0.
 
-**Pinned SHA:** _recorded immediately after the readiness PR merged — see the
-line below._
-
-**Deploy worktree:** `/Users/scottjarvie/IDE/AssistWithFamilyHistory/.claude/worktrees/deploy-<sha7>`
-
 ```
-PINNED_SHA=<recorded after merge>
+PINNED_SHA=78dd1a50663d271bc00f8658bb6548ac1e5ef6e4
+DEPLOY=/Users/scottjarvie/IDE/AssistWithFamilyHistory/.claude/worktrees/deploy-78dd1a5
 ```
 
-Confirm before deploying anything:
+That worktree already exists on disk with `pnpm install --frozen-lockfile`
+completed, so Codex can `cd` into it and start at item 0b.
+
+## Why the pin is not simply `origin/main`
+
+`78dd1a5` is the commit that made this release deployable. The only commit after
+it is the one that added *this file* and a `.gitignore` line — no application
+code, no Convex function, no schema. So `origin/main` is one docs commit ahead of
+the pin by design, and that is the one difference the check below tolerates.
+
+## Confirm before deploying anything
 
 ```bash
 MAIN=/Users/scottjarvie/IDE/AssistWithFamilyHistory
+PINNED_SHA=78dd1a50663d271bc00f8658bb6548ac1e5ef6e4
 DEPLOY="$MAIN/.claude/worktrees/deploy-${PINNED_SHA:0:7}"
+
 git -C "$MAIN" fetch origin
-git -C "$MAIN" rev-parse origin/main     # must equal $PINNED_SHA
-git -C "$DEPLOY" rev-parse HEAD          # must equal $PINNED_SHA
-git -C "$DEPLOY" status --porcelain      # must be empty
+git -C "$DEPLOY" rev-parse HEAD                      # must equal $PINNED_SHA
+git -C "$DEPLOY" status --porcelain                  # must be empty
+
+# Must list ONLY docs/ and .gitignore. Any other path means main has moved on
+# and this pin is stale — stop and re-pin deliberately.
+git -C "$MAIN" diff --name-only "$PINNED_SHA" origin/main
 ```
 
-If `origin/main` has moved past the pinned SHA, do not silently deploy the newer
-commit. Re-read what landed, decide deliberately, and re-pin here.
+If `origin/main` has grown application, Convex, or schema changes since the pin,
+do not silently deploy either commit. Read what landed, decide, and rewrite this
+file with the new SHA and a fresh worktree.
 
-Never deploy from `/Users/scottjarvie/IDE/AssistWithFamilyHistory` itself. It is
-a working checkout and can drift.
+## Rules that do not bend
+
+- Never deploy from `/Users/scottjarvie/IDE/AssistWithFamilyHistory` itself. It
+  is a working checkout and can drift.
+- Keep the deploy worktree free of `.env.local`. See the `CONVEX_DEPLOY_KEY`
+  warning in the runbook's item 0a.
+- One deploy act: publish the pinned worktree to Vercel Production. The build
+  wrapper deploys Convex first. Do not also run `convex deploy` by hand.
