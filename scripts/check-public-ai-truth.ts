@@ -15,8 +15,11 @@
  *      lifecycle with receipts. Until then, naming one is a guess dressed up as
  *      a promise, and the reader is the one who finds out it was wrong.
  *
- * This check also refuses a deployed-proof claim on a public surface while the
- * connection has only source-and-test proof behind it.
+ * This check also polices the residue in both directions. The connection IS
+ * deployed, so a public surface may say so — but it may not claim any assistant
+ * has been verified, and it may no longer claim it is "awaiting deployed proof",
+ * which was true for a while and then quietly became the least true sentence on
+ * the site.
  */
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -199,9 +202,20 @@ for (const file of [path.join(root, "app/ai/page.tsx"), path.join(root, "app/ai.
 }
 assert.match(
   aiPage,
-  /not proof from a deployment/i,
-  "/ai must say plainly that its evidence is source and tests, not a deployment",
+  /no assistant has yet completed a whole\s+connection here/i,
+  "/ai must say plainly that being deployed is not proof that a reader's own assistant works",
 );
+// The residue is real-client proof, not deployed proof. The code IS deployed, so
+// a public surface that still says "awaiting deployed proof" is now the lie.
+for (const file of [path.join(root, "app/ai/page.tsx"), path.join(root, "app/ai.txt/route.ts")]) {
+  const source = readFileSync(file, "utf8");
+  if (/awaiting deployed proof|not (?:yet )?(?:been )?proved against the live site/i.test(source)) {
+    failures.push(
+      `${path.relative(root, file)} says the connection awaits deployed proof. It is deployed; ` +
+        "the honest residue is real-client proof.",
+    );
+  }
+}
 assert.match(
   aiPage,
   /We do not name assistants that work here/i,

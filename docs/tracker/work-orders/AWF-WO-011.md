@@ -62,11 +62,23 @@ their history.
 
 ## Current truth
 
-**Current:** branded stateless Streamable HTTP `/mcp`; protected-resource
-discovery and anonymous challenge; server-derived owner; twelve bounded,
-workflow-native tools; idempotent saves; optimistic corrections; canonical UI
-reflection; Queue continuation; `/ai` and `/ai.txt`; one disposable PKCE
-official-client lifecycle and exact cleanup.
+**Current, and deployed to production:** branded stateless Streamable HTTP
+`/mcp`; protected-resource discovery and anonymous challenge; server-derived
+owner; **fourteen** bounded, workflow-native `family_history_*` tools plus the
+**twelve** pre-namespace aliases kept on the same handlers and the same
+permission (26 callable names, six scopes — see `lib/mcp/catalog.ts`);
+person-approved durable product grants re-resolved on every request; enforced
+scopes and record boundaries; immediate revocation; batch record saves;
+protected evidence byte delivery; idempotent saves; optimistic corrections;
+canonical UI reflection; Queue continuation; the `/app/settings/ai` connection
+centre; `/ai` and `/ai.txt` generated from the enforced catalog; one disposable
+PKCE official-client lifecycle and exact cleanup.
+
+**Deployed, 2026-08-17.** Vercel auto-deploys `main`, so the release went out
+when the build fix merged; there was no manual deploy act. Live `/updates`
+serves the `media-evidence-bytes` item (introduced in `1b7d9e9`, PR #61, which is
+not an ancestor of `862a224`) and live `/ai.txt` lists the fourteen
+`family_history_*` names. See `docs/operations/how-production-deploys.md`.
 
 **Provider truth, CONFIRMED 2026-08-17:** Clerk production Dynamic Client
 Registration is **live** — `clerk.assistwithfamilyhistory.com` advertises
@@ -77,12 +89,25 @@ strict validation already written and unused. This supersedes the 2026-08-16
 "neither is advertised" finding recorded below, and resolves Human gate 2's
 onboarding half.
 
-**Partial:** OAuth still carries provider identity scopes rather than enforced
-Family History scopes in production; the durable product grant, active-grant
-check, immediate revocation, protected evidence retrieval, connection
-management, media byte delivery, joined Queue-to-reviewed-result proof,
-refresh/reconnect, and mobile setup are built in source but unproved against the
-deployed site; no client is named as compatible.
+**Partial — the gap is a live client lifecycle, not a deployment.** The one thing
+still missing is that **no real AI client has completed a connection lifecycle
+against the deployed site.** Nobody has run: discovery → registration → consent →
+`tools/list` → a bounded read → a write → an evidence fetch → revoke → denied
+next call, from an actual assistant, with receipts. Until one does, the following
+are built, deployed, and covered by tests, but unproved *in a real client's
+hands*: joined Queue-to-reviewed-result work, refresh/reconnect, mobile setup,
+and browser-visible reflection of an AI's writes. **No client is named as
+compatible, and none may be until it proves it.** AWF-0043 owns that lifecycle.
+
+Two correction of record, both previously stated wrongly here:
+
+- **OAuth never carried provider identity scopes as the authorization.** It was
+  never the token's `scope` claim that decided anything. Authorization is the
+  durable database grant, resolved fresh on every request
+  (`lib/mcp/authorize.ts:362`, `convex/httpRoutes/mcp.ts` → `convex/mcpGrants.ts`),
+  which is exactly why turning a connection off denies its very next call.
+- **"Unproved against the deployed site" is no longer the residue.** The code is
+  deployed. The residue is real-client proof.
 
 **Later / excluded:** publishing, permanent deletion, identity merge, sharing
 grants, complete export, autonomous FamilySearch/provider actions, cross-family
@@ -302,7 +327,7 @@ neither CIMD nor DCR.
 copy-paste runbook — pinned exact-SHA deploy worktree, backend-first ordering,
 the Convex-vs-Vercel environment split, four post-deploy checks, and every
 `pnpm mcp:lifecycle` requirement including its four human pauses.
-`docs/operations/deploy-pin-awf-wo-011.md` names the exact commit to deploy.
+`docs/archive/2026-08-awf-wo-011-deploy/deploy-pin-awf-wo-011.md` names the exact commit to deploy.
 
 **Not claimed.** No deploy, no provider change, no secret or environment value
 read, no real family record touched. AWF-0043 moves to `needs-you` because the
@@ -349,7 +374,7 @@ by this lane.
 
 `pnpm verify` passes all 56 steps, including the new
 `pnpm check:media-bytes` contract guard. Deploy and live proof remain Codex's,
-against the pinned commit in `docs/operations/deploy-pin-awf-wo-011.md`.
+against the pinned commit in `docs/archive/2026-08-awf-wo-011-deploy/deploy-pin-awf-wo-011.md`.
 
 **Not claimed.** No deploy, no provider change, no secret or environment value
 read, no real family record touched, and no client named.

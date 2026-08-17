@@ -65,9 +65,10 @@ const TOOL_COUNT = FAMILY_HISTORY_TOOLS.length;
 const ALIAS_COUNT = FAMILY_HISTORY_TOOLS.filter((tool) => tool.alias).length;
 
 /**
- * What exists in this repository's source and passes its tests. Deliberately
- * NOT a claim about a deployment or about any particular assistant: neither has
- * been proved, and saying so would be the easiest lie on this page to tell.
+ * What exists, is deployed to this site, and passes its tests. Deliberately NOT
+ * a claim about any particular assistant: no client has proved a whole
+ * lifecycle here, and saying one has would be the easiest lie on this page to
+ * tell.
  */
 const currentInSource = [
   `${TOOL_COUNT} Family History tools share one stateless connection address, with ${ALIAS_COUNT} older names kept working as aliases.`,
@@ -239,7 +240,7 @@ export default function AiSetupPage() {
         <section className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:px-10">
           <div className="grid gap-8 lg:grid-cols-3">
             <article className="rounded-3xl border border-[#9eb4a6] bg-[#eff5f0] p-7">
-              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#245a43]">Built and passing its tests</p>
+              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#245a43]">Built, live, and passing its tests</p>
               <ul className="mt-5 space-y-3">
                 {currentInSource.map((item) => (
                   <li key={item} className="flex gap-2 text-sm leading-6">
@@ -249,17 +250,20 @@ export default function AiSetupPage() {
                 ))}
               </ul>
               <p className="mt-5 border-t border-[#9eb4a6] pt-4 text-sm leading-7 text-[#5f665f]">
-                This is proof from source and tests. It is not proof from a deployment, and it is not
-                proof that your particular assistant works.
+                All of this is running on this site, and it passes its tests. That is not the same as
+                proof that your particular assistant works: no assistant has yet completed a whole
+                connection here.
               </p>
             </article>
             <article className="rounded-3xl border border-[#d2bd8d] bg-[#fbf4e4] p-7">
               <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#98702b]">Not yet proved</p>
               <p className="mt-5 text-sm leading-7 text-[#5f665f]">
-                None of the above has been proved against the live site, and no assistant has completed
-                a full lifecycle here. Client identity documents and self-registration are not offered
-                by the sign-in provider yet. Files that are only stored as a reference come back saying
-                honestly that their bytes are not available rather than pretending to deliver them.
+                No assistant has completed a full connection here yet — sign in, approve, read, write,
+                revoke — so we name none as working. Self-registration is available: the sign-in
+                provider does publish a registration endpoint, so a client that registers itself can
+                get through. Client identity documents are not offered by the provider yet. Files that
+                are only stored as a reference come back saying honestly that their bytes are not
+                available rather than pretending to deliver them.
               </p>
             </article>
             <article className="rounded-3xl border border-[#ccb7ad] bg-[#f8efeb] p-7">

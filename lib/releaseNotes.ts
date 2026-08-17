@@ -43,15 +43,19 @@ export const appVersion = "2.1.0";
 export const releaseNotes: ReleaseEntry[] = [
   {
     version: "2.2.0",
-    // Deliberately "Local": every item below is real in this repository's
-    // source and passes its tests, and none of it has run against the
-    // deployed site. Calling it live before the deploy would be the easiest
-    // lie on this page to tell.
-    status: "Local",
+    // "Public & live": this release is deployed. Pushing to `main` deploys
+    // production through `scripts/vercel-build.mjs`, and the live site serves
+    // every item below. It sat at "Local" after the deploy had already
+    // happened, which made this page the least true page on the site — the
+    // opposite of the mistake the status vocabulary exists to prevent.
+    //
+    // What is still unproved is narrower and is said in the summary: no real
+    // AI client has completed a lifecycle against it.
+    status: "Public & live",
     releasedAt: "2026-08-17T22:10:00-07:00",
     timezone: "America/Phoenix",
     title: "Bring the AI you already use, and let it read the record",
-    summary: "You can approve a narrow, revocable connection for the AI you already use, and give it the actual scanned record to read rather than only its title. Built and tested here; not yet running on the live site.",
+    summary: "You can approve a narrow, revocable connection for the AI you already use, and give it the actual scanned record to read rather than only its title. This is running on the live site. No assistant has yet completed a whole connection here, so we still name none as working.",
     items: [
       {
         id: "media-evidence-bytes",
