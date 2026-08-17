@@ -57,3 +57,6 @@ next-env.d.ts
 # macOS
 ._*
 .env*.local
+
+# deploy worktrees (pinned exact-SHA deploy sources, never committed)
+/.claude/worktrees/

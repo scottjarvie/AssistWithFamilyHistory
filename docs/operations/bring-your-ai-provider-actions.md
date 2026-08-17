@@ -31,11 +31,25 @@ what changes in observable behaviour, and how to undo it.
 
 ## 0. Deploy the release from a pinned, clean worktree
 
-Production currently predates PR #58. A read-only probe on 2026-08-17 confirms
-it: `https://assistwithfamilyhistory.com/app/settings/ai` answers **404**, so the
-connection centre is not deployed yet. The `/mcp` challenge and the
-protected-resource metadata are already correct and branded, which is why this
-release is additive rather than corrective.
+Production currently predates PR #58 — **proved, not assumed.** Read-only probes
+on 2026-08-17:
+
+- `https://assistwithfamilyhistory.com/ai.txt` is generated from
+  `lib/mcp/catalog.ts`, so it is a live readout of the deployed tool surface. It
+  lists the **twelve legacy names only** — `get_family_history_brief`,
+  `save_person`, `save_complete_result` and the rest — with no `family_history_*`
+  name anywhere, and states in its own words: *"Current in production: …
+  twelve tools"*. Its "Later" line still names *"granular grant UI"* and
+  *"private media delivery"*, which are exactly what PR #58 delivers.
+- `https://assistwithfamilyhistory.com/app/settings/ai` answers **404**, so the
+  connection centre is not deployed.
+- `/mcp` already returns the correct branded 401 challenge and
+  `/.well-known/oauth-protected-resource/mcp` already returns the canonical
+  resource, so the transport and OAuth layers need nothing.
+
+That is why this release is additive rather than corrective. `/ai.txt` is also
+the cheapest post-deploy signal: after the deploy it must list fourteen
+`family_history_*` names instead of twelve legacy ones.
 
 ### 0a. Never deploy from a local checkout
 
@@ -57,10 +71,16 @@ DEPLOY="$MAIN/.claude/worktrees/deploy-${SHA:0:7}"
 cd "$DEPLOY" && pnpm install --frozen-lockfile
 ```
 
-**Pinned deploy SHA for this release:** see
-`docs/operations/deploy-pin-awf-wo-011.md` — a one-line record written after the
-readiness PR merged, so the SHA in it is the exact post-merge `origin/main`
-commit and the worktree path is already on disk.
+**Pinned deploy SHA for this release:**
+`78dd1a50663d271bc00f8658bb6548ac1e5ef6e4`, and the worktree already exists at
+
+```
+/Users/scottjarvie/IDE/AssistWithFamilyHistory/.claude/worktrees/deploy-78dd1a5
+```
+
+with `pnpm install --frozen-lockfile` already completed. See
+`docs/operations/deploy-pin-awf-wo-011.md` for the staleness check — `origin/main`
+is deliberately one docs-only commit ahead of the pin.
 
 Verify the worktree is exactly what you think it is before going further:
 
@@ -80,23 +100,53 @@ at the one step that needs them (item 4's lifecycle run, which reads them from
 the shell) rather than dropping a file into the tree where later commands can
 pick it up silently.
 
+> ### ⚠️ `convex deploy` targets **production by default** — there is no `--prod`
+>
+> Verified against the CLI this repo resolves (`convex` pinned `^1.32.0`,
+> installed **1.39.1**): `convex deploy --help` says *"By default, this deploys
+> to your prod deployment."* and lists **no `--prod` flag**. This is the opposite
+> of what most people assume, and it is worth reading twice:
+>
+> - `convex env`, `convex dashboard`, and `convex dev` default to your **dev**
+>   deployment and need `--prod` to reach production.
+> - `convex deploy` defaults to **production** and cannot be told otherwise by
+>   `CONVEX_DEPLOYMENT`. A `dev:` value in `CONVEX_DEPLOYMENT` does **not** make
+>   `convex deploy` safe — it still deploys that project's default production
+>   deployment. A `convex deploy` typed in an ordinary dev checkout *is* a
+>   production deploy.
+>
+> Never type `convex deploy --prod`; it is not a real flag and reads as though a
+> plain `convex deploy` were the safe one.
+>
 > ### ⚠️ `CONVEX_DEPLOY_KEY` in `.env.local` overrides everything
 >
 > The Convex CLI reads `CONVEX_DEPLOY_KEY` from `.env.local` **itself**, not
 > only from the shell. A `prod:` key sitting in that file silently retargets
-> *every* Convex command — `codegen`, `dev`, `env set` — at **production**, even
-> in a shell you believe is clean. Verified 2026-08-17: neither
+> *every* Convex command at **production**, even in a shell you believe is
+> clean. Verified 2026-08-17: neither
 > `/Users/scottjarvie/IDE/AssistWithFamilyHistory/.env.local` nor the deploy
 > worktree contains a `CONVEX_DEPLOY_KEY`, so the trap is not armed today — but
 > confirm it again before running anything that can write:
 >
 > ```bash
 > grep -c CONVEX_DEPLOY_KEY "$DEPLOY/.env.local" 2>/dev/null || echo "no .env.local — good"
-> cd "$DEPLOY" && pnpm exec convex dashboard --no-open   # prints the deployment it would target
+>
+> # Print the deployment a Convex command would actually touch. Without --prod
+> # this shows the DEV deployment and proves nothing about production.
+> cd "$DEPLOY" && pnpm exec convex dashboard --no-open --prod
+>
+> # Show exactly what a deploy would push, without pushing it.
+> cd "$DEPLOY" && pnpm exec convex deploy --dry-run -v
 > ```
 >
-> Run that `dashboard --no-open` check before any Convex command in this
-> document. It is the only way to know which deployment you are about to touch.
+> `--dry-run` prints the generated configuration and the full listing of changes
+> — the function modules and the schema it would push — and exits without
+> deploying. For this release the listing should name the `mcp*` modules and the
+> two new tables from 0d, and nothing outside the repository's `convex/`
+> directory. If it names a deployment you do not recognise, stop.
+>
+> Run both checks before any Convex command in this document. They are the only
+> way to know which deployment you are about to touch.
 
 ### 0b. Re-run the gate on the pinned worktree
 
@@ -122,9 +172,10 @@ the frontend. That is the ordering this release needs: the new `family_history_*
 tools and the new tables must exist before any page can call them.
 
 So the deploy is a single act — publishing `$SHA` to Vercel Production — not two.
-Do not run `pnpm exec convex deploy --prod` by hand as well; that would deploy the
-backend twice and, if run from the wrong directory, could target the wrong
-project (see the warning in item 3).
+**Do not also run `convex deploy` by hand.** It takes no `--prod` flag because it
+already targets production by default (see the warning in 0a), so a hand-typed
+`convex deploy` is a second, unversioned production backend deploy from whatever
+directory you happened to be standing in.
 
 ```bash
 cd "$DEPLOY"
@@ -139,7 +190,9 @@ Confirm afterwards that the build log contains
 The whole delta is **additive**. Verified by diffing `convex/schema.ts` between
 the pre-#58 baseline (`862a224`, the first parent of merge `fbed586`) and
 `origin/main`: 91 inserted lines, 1 changed line, and that one change is an index
-list gaining a member.
+list gaining a member. `/ai.txt`'s twelve-tool readout above is the independent
+live confirmation that `862a224` really is what production runs, rather than an
+assumption inherited from the PR description.
 
 **Two new tables**
 
@@ -292,12 +345,16 @@ they cannot see Vercel's.** `convex/auth.config.ts`, `convex/access.ts`, and
 
 > ### ⚠️ Target the right Convex deployment
 >
-> `pnpm exec convex env list --prod` resolves the project from `CONVEX_DEPLOYMENT` in
-> the local `.env.local`. On a developer machine that is usually a *different
-> Convex project*, and the command will happily print "No environment variables
-> set" for a deployment that has nothing to do with this site. That happened
-> while writing this runbook. Get the real production deployment name from the
-> value Vercel actually ships:
+> `--prod` means *"this **project's** default production deployment"* — and the
+> project is resolved from `CONVEX_DEPLOYMENT` / `convex.json` in whatever
+> directory you are standing in. On a developer machine that is often a
+> *different Convex project*, so `pnpm exec convex env list --prod` will happily
+> print "No environment variables set" for a production deployment that has
+> nothing to do with this site. That happened while writing this runbook.
+>
+> The cure is to name the deployment explicitly with `--deployment <name>`
+> rather than trusting `--prod`. Get the real name from the value Vercel
+> actually ships:
 >
 > ```bash
 > # Pull OUTSIDE the deploy worktree — never leave an env file in the tree.
@@ -307,20 +364,20 @@ they cannot see Vercel's.** `convex/auth.config.ts`, `convex/access.ts`, and
 > rm -rf "$TMPENV"                                 # it holds secrets; do not keep it
 > ```
 >
-> Then read that deployment's variables in the **Convex dashboard** (Settings →
-> Environment Variables) for the project that owns `<name>`, or run the CLI with
-> that deployment explicitly. Confirming in the dashboard is the safer path.
->
-> Before *any* Convex CLI command below, print what it would actually target:
+> Then either read the variables in the **Convex dashboard** (Settings →
+> Environment Variables) for the project that owns `<name>`, or pass that name
+> to every CLI call:
 >
 > ```bash
-> cd "$DEPLOY" && pnpm exec convex dashboard --no-open
+> cd "$DEPLOY"
+> pnpm exec convex dashboard --no-open --deployment <name>   # confirm the target first
+> pnpm exec convex env list --deployment <name>
 > ```
 >
 > Everything in this section is a **read** against the production deployment.
 > `pnpm exec convex env set` is the only write, and it is conditional — run it
 > only if a value is genuinely wrong, and only after `convex dashboard
-> --no-open` has confirmed the target.
+> --no-open --deployment <name>` has confirmed the target.
 
 ### Convex deployment env vars (set with `pnpm exec convex env set`, or the dashboard)
 
@@ -334,14 +391,17 @@ they cannot see Vercel's.** `convex/auth.config.ts`, `convex/access.ts`, and
 Read them without changing anything:
 
 ```bash
-pnpm exec convex env list    # run against the CORRECT deployment — see the warning above
+CX=<name>          # the deployment you just read out of Vercel — never assume it
+pnpm exec convex env list --deployment "$CX"
 ```
 
-Set one only if it is genuinely wrong:
+Set one only if it is genuinely wrong. Naming the deployment is not optional
+here; a bare `env set` writes to your **dev** deployment and looks like it
+worked:
 
 ```bash
-pnpm exec convex env set MCP_RESOURCE_URL https://assistwithfamilyhistory.com/mcp
-pnpm exec convex env set MCP_AUTH_SERVER_URL https://clerk.assistwithfamilyhistory.com
+pnpm exec convex env set --deployment "$CX" MCP_RESOURCE_URL https://assistwithfamilyhistory.com/mcp
+pnpm exec convex env set --deployment "$CX" MCP_AUTH_SERVER_URL https://clerk.assistwithfamilyhistory.com
 ```
 
 ### Vercel Production env vars
@@ -529,6 +589,24 @@ Expected: the same shape `family_history_get_brief` returns, and **not** an
 `UNKNOWN_TOOL` refusal. Aliases are deliberately absent from the advertised
 catalogue in (ii) — they are accepted, not advertised. Seeing 26 tools rather
 than 14 would itself be the bug.
+
+Cheapest version of the same check, needing no token at all — `/ai.txt` is
+generated from the same catalogue:
+
+```bash
+curl -sS https://assistwithfamilyhistory.com/ai.txt | sed -n '/^## Tools/,/^$/p'
+```
+
+Before the deploy this lists twelve bare legacy names. After it,
+`app/ai.txt/route.ts` renders each canonical tool with its scope and its alias
+in brackets, so one command confirms (ii) and (iii) at once:
+
+```
+- family_history_get_brief (context:read, read-only) [alias: get_family_history_brief] — …
+- family_history_get_evidence (evidence:read, read-only) — …
+```
+
+Fourteen lines, twelve of them carrying `[alias: …]`.
 
 ### (iv) `/app/settings/ai` is reachable and renders the grant UI
 
