@@ -258,10 +258,10 @@ remain explicit gates even after scope approval.
 On 2026-08-16:
 
 - Project Philosophy render/check passed with SHA-256
-  `387f95b5832867173238e945d49e47e823512a288c874647b497860c5bec6b6f`;
-- tracker build/parity verified the proposed Work Order and grouped Cards;
-- `pnpm verify` passed all 48 steps after the clean checkout's dependencies were
-  synchronized to its existing lockfile; and
+  `98468363478a834f7eee75e402e9dad4c181d4e6eaa04ceec147b0f696bdf5b1`;
+- tracker build/parity verified the approved Work Order and grouped Cards;
+- `pnpm verify` passed all 49 steps on the merged branch after dependencies were
+  synchronized to the lockfile; and
 - rendered tracker checks at 1280px and 390px found AWF-WO-011 and its Cards,
   zero page-level horizontal overflow, and no console warnings.
 
