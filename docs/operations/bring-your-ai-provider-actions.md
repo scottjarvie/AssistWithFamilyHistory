@@ -446,11 +446,9 @@ pnpm dlx vercel@latest deploy --prod --yes
 # Do NOT also run `convex deploy` by hand. The build already did it.
 
 # ── after · the cheapest proof it landed ──────────────────────────────────────
-pnpm dlx vercel@latest ls --prod | head -3      # newest must be Ready, at $SHA
-curl -sS https://assistwithfamilyhistory.com/ai.txt | grep -c family_history_
-# expect 14 canonical names, where production previously listed twelve legacy ones
-curl -sS -o /dev/null -w '%{http_code}\n' https://assistwithfamilyhistory.com/app/settings/ai
-# expect 200, where production previously answered 404
+pnpm check:production-live
+# Probes the live site and asserts the deployed catalogue matches this commit.
+# Do NOT hand-roll a curl against /app/settings/ai to decide this — see 3b(iv).
 ```
 
 Then run the four fuller checks in 3b, and only after those, the live lifecycle
@@ -894,12 +892,23 @@ Fourteen lines, twelve of them carrying `[alias: …]`.
 ### (iv) `/app/settings/ai` is reachable and renders the grant UI
 
 ```bash
-curl -sS -o /dev/null -w '%{http_code}\n' https://assistwithfamilyhistory.com/app/settings/ai
+pnpm check:production-live
 ```
 
-Expected after deploy: **not 404**. Signed out it redirects to sign-in
-(`REQUIRE_AUTH` posture); today, pre-deploy, it is a flat 404, which is the
-clearest single signal of whether this release landed.
+Signed out, this route answers **`307 → /sign-in`** to a browser — that is the
+`REQUIRE_AUTH` posture working. It is not a freshness signal, and the check
+above deliberately proves freshness from `/ai.txt` instead.
+
+> **Do not probe this route with a bare `curl`.** A request that does not send
+> `Accept: text/html` is treated by Clerk as a data request and rewritten to
+> **404** (`x-clerk-auth-reason: protect-rewrite`), on every build, forever.
+> This document previously called that 404 "the clearest single signal of
+> whether this release landed". It is the opposite: it is constant, so it can
+> only ever produce a false negative. On 2026-08-17 it convinced several
+> sessions in a row that a correct, healthy production deployment had failed,
+> and a recovery effort was queued against a release that had already shipped.
+> An auth refusal and a missing route look identical from outside; prove
+> freshness from an unauthenticated, content-bearing surface.
 
 Then open it signed in as the synthetic acceptance identity and confirm by eye:
 the pending request appears with the client's observed name (**not** a tool name
