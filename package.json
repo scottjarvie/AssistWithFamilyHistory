@@ -71,6 +71,7 @@
     "check:settings-responsive": "tsx scripts/check-settings-responsive.ts",
     "check:connection-center": "tsx scripts/check-connection-center.ts",
     "check:public-ai-truth": "tsx scripts/check-public-ai-truth.ts",
+    "check:production-live": "tsx scripts/check-production-live.ts",
     "mcp:lifecycle": "tsx scripts/mcp-lifecycle.ts",
     "test:convex": "vitest run"
   },

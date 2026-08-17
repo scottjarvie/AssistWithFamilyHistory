@@ -19,6 +19,27 @@ already on its way out.
 There is nothing else to do. No pinned worktree, no manual `vercel deploy`, no
 hand-run `convex deploy`.
 
+## How to tell what production is serving
+
+Run `pnpm check:production-live`. It asks the live site for `/ai.txt` — public,
+unauthenticated, and generated from `lib/mcp/catalog.ts` — and fails if any
+canonical tool or product permission in *this* commit is missing from the
+deployed copy. That makes it a real fingerprint of the running build.
+
+**Never decide freshness from the status code of a route under `/app`.** Those
+are protected, so a signed-out request gets an auth refusal, and Clerk
+content-negotiates it: a browser (`Accept: text/html`) is redirected `307` to
+`/sign-in`, while anything else — `curl`'s wildcard Accept included — is
+rewritten to a flat **404**, marked `x-clerk-auth-reason: protect-rewrite`. That
+404 is identical on every build. It cannot distinguish a stale deploy from a
+current one, and it never becomes a 200 while signed out.
+
+This is not hypothetical. On 2026-08-17, `curl .../app/settings/ai` → 404 was
+read as proof that production was still serving a pre-release commit. It was
+not: production was current and healthy, and the whole recovery effort was
+chasing a header. An auth refusal and a missing route look the same from
+outside; only one of them changes when you deploy.
+
 ## Consequences worth knowing
 
 - **A red Vercel build means production is stale, not that nothing happened.**
