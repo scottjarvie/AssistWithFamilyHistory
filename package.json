@@ -59,6 +59,7 @@
     "smoke:routes": "bash scripts/smoke-routes.sh",
     "check:protected-routes": "tsx scripts/check-protected-routes.ts",
     "check:person-identifiers": "tsx scripts/check-person-identifiers.ts",
+    "check:convex-bindings-fresh": "tsx scripts/check-convex-bindings-fresh.ts",
     "check:convex-visibility": "tsx scripts/check-convex-visibility.ts",
     "check:trust-boundary": "tsx scripts/check-trust-boundary.ts",
     "check:convex-client-auth": "tsx scripts/check-convex-client-auth.ts",

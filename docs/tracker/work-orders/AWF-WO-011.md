@@ -419,6 +419,56 @@ Convex environment variable was written or removed, no secret value was read
 (the production `NEXT_PUBLIC_CONVEX_URL` is marked Sensitive and stayed
 unreadable), and no real family record was accessed.
 
+### Release blocker cleared, and the gate that will catch it next time — 2026-08-17 (Claude)
+
+**Production can build again.** The three `convex/mcpGrants.ts` TypeScript errors
+that failed all five production deployments since PR #58 are fixed, and the
+class of failure they belong to now fails at PR time instead of at deploy time.
+
+**The fix.** The two read bodies moved out of their `internalQuery` wrappers into
+plain helpers (`readConnections`, `readRecentActivity`), and the two actions now
+declare their return types explicitly as `ConnectionsView` /
+`ConnectionActivityView`, derived from those helpers with
+`Awaited<ReturnType<typeof …>>`. Because the helpers never reference `internal`,
+the annotation cannot drift from what the query actually returns, and the
+inference cycle disappears. The `(internal as any)` casts are gone and the
+call sites now use properly typed `internal.mcpGrants.*` references. Nothing is
+suppressed with `any` or `@ts-ignore`. The diff is pure code motion: the grant
+model, per-request re-resolution, consent snapshot, boundary and scope
+enforcement are byte-identical, and their tests were not touched.
+
+**Proved the way it failed.** `convex/_generated/api.d.ts` was regenerated with
+real codegen against the **dev** deployment `impressive-labrador-64` (confirmed
+with `npx convex dashboard --no-open` before every command; production was never
+targeted and `--prod` was never passed). Against those fresh bindings the
+typecheck stage reproduced all three errors exactly — TS7022 on `grants` and
+`listConnections`, TS7023 on the handler — and passes cleanly after the fix. The
+regenerated bindings are committed, so the stale file stops masking errors: it
+had been generated before the seven `http`/`mcp*` modules existed.
+
+**The systemic gate.** `scripts/check-convex-bindings-fresh.ts` regenerates the
+expected `api.d.ts` from the modules on disk — deterministically, with no
+network, no deploy key and no Convex deployment — and fails if the checked-in
+file differs. That one guarantee makes the ordinary `typecheck` step a genuine
+fresh-bindings typecheck, which is precisely what the local gate could not do
+before. It runs first in `pnpm verify`, so it is already covered by CI (the
+change classifier always runs the full gate on pull requests). Verified against
+the pre-fix bindings: it fails and names the seven missing modules.
+
+**One safety finding, now recorded in the runbook.** §0e pre-flight 3 called a
+bare `pnpm exec convex deploy --dry-run -v`. On this machine that resolves to
+`gallant-mallard-74` — the unrelated personal project — and it still prompts
+*"push to your prod deployment … now?"*, which is a real push if answered yes.
+The step now passes `--deployment accomplished-dodo-308` explicitly.
+
+`pnpm verify` passes all 57 steps (56 plus the new gate).
+`docs/operations/bring-your-ai-provider-actions.md` §0·0 records the fix and §0e
+is un-gated.
+
+**Not claimed.** Nothing was deployed. No provider setting, secret, environment
+variable, production deployment, or real family record was touched. The dev
+deployment received the ordinary codegen push and nothing else.
+
 ## History
 
 - 2026-08-16 · Scott via coordinator delegation — requested a substantial,
@@ -455,3 +505,10 @@ unreadable), and no real family record was accessed.
   delta, and found the actual blocker: every production build since PR #58 has
   failed on a `convex deploy` typecheck the local gate cannot reproduce. No
   provider, secret, environment, deployment, or real-data change.
+- 2026-08-17 · Claude — cleared that blocker. Gave `convex/mcpGrants.ts` explicit
+  return types with no `any` or suppression, regenerated and committed the Convex
+  bindings against the dev deployment, and added the
+  `check:convex-bindings-fresh` gate so a stale-bindings inference cycle fails on
+  the PR rather than in the Vercel build. Un-gated §0e of the provider runbook and
+  made its dry-run pre-flight name its deployment explicitly. No provider, secret,
+  environment, production-deployment, or real-data change.
