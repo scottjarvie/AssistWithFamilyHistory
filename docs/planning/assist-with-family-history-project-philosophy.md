@@ -2,13 +2,13 @@
 
 > **Philosophy status:** Canonical product identity and claim boundary
 >
-> **Product document version:** 1.7.1
+> **Product document version:** 1.8.0
 >
 > **Philosophy date:** 2026-08-16
 >
-> **Capability evidence last verified:** 2026-08-12
+> **Capability evidence last verified:** 2026-08-16
 >
-> **Repository evidence revision:** `AWF-WO-007 Assist With Family History identity release active; prior production MCP acceptance retained; audit separate`
+> **Repository evidence revision:** `AWF-WO-011 Bring Your AI alignment approved and Ready; production stateless MCP foundation retained; grants/client proof Partial`
 >
 > **Scope:** Product truth, language, trust, and design direction—not an
 > implementation plan, production claim, or permission to change application
@@ -93,6 +93,13 @@ provenance only and are not a current operating dependency.
 > optional prompt/loop library are preserved as product direction rather than
 > claimed current implementation.
 
+> **Bring Your AI implementation alignment:** 2026-08-16 — the adopted family
+> MCP/OAuth standard in Assist With Life draft PR #16 now defines the next
+> connection outcome. AWF-WO-011 and
+> `docs/planning/family-history-bring-your-ai-alignment.md` apply it to Family
+> History. This planning adoption does not claim the upstream draft is merged,
+> that provider settings changed, or that any named client is compatible.
+
 Core v1.6.3 reorganizes rather than changes Family History's installed
 operating contract: §16.1 owns the Cards / Work Orders / Guide tracker rules,
 §16.2 owns state-versus-software publishing and its three provider proof gates,
@@ -136,7 +143,7 @@ Use these status labels throughout this revision:
 | Queue context objects | **Intentional product-specific difference; Current / verified repository backend foundation** | Optional owner-verified references use three Family History groups: research subject (person, relationship, place, event), evidence (source, citation, media, context item), or work thread (research task/check, story, import run, provisional relative). Directive-only creation remains valid. Project/collection adapters stay unimplemented because no matching durable model exists |
 | Prompt and research-loop library | **In design** | A small curated menu may help the person's chosen AI begin useful family-history work. Every prompt or loop is optional, editable, combinable, and ignorable, with version/freshness/provenance/limits metadata. It is assistance, not a required workflow or site-owned automation engine |
 | Internal project tracker | **Current / verified — independent audit pending** | `docs/tracker/` carries canonical Cards, Work Orders, Guide, factual metadata, and generated Kanban/Work Orders readers in Family History's archival identity. Current instructions use that durable source rather than mandatory Linear. State commit `dc30429` proved the lightweight GitHub path, Vercel ignored-build cancellation, and retained live deployment. AWF-WO-001 keeps completed execution separate from AWF-0004's future independent audit; do not confuse this build tracker with the product Queue |
-| MCP and AI setup paths | **Current / verified canonical production backend and disposable named-client workflow; Partial fresh-device/reconnect/revocation journey** | `/mcp`, protected-resource metadata, `/ai`, `/ai.txt`, and twelve Family History workflow tools cover bounded brief/search/context, canonical people/relationship/event/evidence/research/story saves, one-call complete results, granular corrections, and Queue continuation. The `assistwithfamilyhistory.com` issuer/resource migration passed new explicit PKCE consent, token exchange, official-client listing plus empty brief/search reads, canonical Queue/UI proof, and cleanup with one retained empty identity. Fresh-device email delivery/code entry and refresh/reconnect remain unproved. Clerk cannot immediately revoke issued JWT access tokens; AWF-0034 owns that separate provider/security decision |
+| MCP and AI setup paths | **Current / verified stateless production foundation; Partial metadata-first connection, product-grant, revocation, and named-client journey** | `/mcp`, protected-resource metadata, `/ai`, `/ai.txt`, and twelve Family History workflow tools cover bounded brief/search/context, canonical source-aware saves, one-call complete results, granular corrections, and Queue continuation. The canonical issuer/resource migration passed explicit PKCE consent, official-client listing, empty brief/search reads, Queue/UI proof, and cleanup with one retained empty identity. The edge derives owner identity securely, but token scopes are parsed rather than enforced on domain tools, Queue scopes are hard-coded, and no owner-visible product grant, record boundary, immediate issued-token revocation, or protected evidence batch exists. Live 2026-08-16 provider metadata advertised neither Client ID Metadata Documents nor DCR. AWF-WO-011 owns the metadata-first, narrow-grant, review-first, revoke/reconnect, and exact-client outcome; no named client is currently claimed compatible |
 | Activity and provenance | **Current / verified Queue-specific history and partial wider foundation; Coming soon complete product contract** | Queue state-changing commands now emit append-only, actor-attributed history and idempotency receipts that share the item's deletion lifecycle. Import runs, research logs, story review events, source links, model/prompt fields, and `agentActivity` remain separate partial foundations; the repo still does not prove one complete history for every meaningful product create, change, or delete |
 | Access and sharing | **Current / verified Private and guarded Public foundations; In design Unlisted and Trusted** | Use one selected-object visibility vocabulary for appropriate stories, collections, and source/record surfaces: Private, Unlisted, Trusted, Public. Trusted collaboration uses simple Viewer, Contributor, Editor, and Owner roles scoped to the relevant boundary. Sharing stays deliberate, reviewable, revocable, and subject to living/sensitive review; complete invite, link, role, and visibility lifecycles are not verified |
 | Identity boundary | **Current / verified production Family History identity and owner isolation; Partial broader sign-in proof** | The production MCP and web app resolved the same retained test subject to one empty private vault, with no tenant selector, elevated role, or cross-family access. A one-time exact-user Clerk sign-in token left global verification unchanged. Fresh-device email verification remains unproved; no shared Assist identity or cross-site session is claimed |
@@ -1013,10 +1020,12 @@ must follow the relevant sections below.
 ## How your AI and the Family History Queue work
 
 Family History is designed to work alongside the AI environment a person
-chooses, not replace it. A person may continue working in ChatGPT, Codex,
-Claude, OpenClaude, Gemini, Hermes, or a future compatible system. These names
-are examples of user choice—not a preferred vendor list or a claim that direct
-integration with each client is currently shipped.
+chooses, not replace it. Claude, ChatGPT, Codex, Grok, Hermes, and other
+conforming clients are intended connection targets. These names describe user
+choice—not a preferred vendor list or a claim that direct integration with any
+named client is currently shipped. A name becomes current only after that exact
+client completes discovery, consent, scoped work, correction, revoke,
+reconnect, and cleanup proof.
 
 The enduring split is:
 
@@ -1053,6 +1062,12 @@ the permitted scope.
 Family History then preserves the useful result beyond that conversation. The
 person can inspect it visually, see where it came from, correct it, connect it
 to related people and evidence, and decide what should happen next.
+
+The normal connected-AI result should arrive as sourced proposed or review-
+ready work, not as a silent promotion of an uncertain claim. The product keeps
+the AI/client identity, sources, conflicts, uncertainty, review state, and
+correction history. The person remains authoritative for accepted conclusions,
+identity merges, sharing, and publication.
 
 ### Begin in Family History
 
@@ -1304,7 +1319,7 @@ or an older production observation is not sufficient by itself.
 | Story Studio and publication | Draft/review/published states, reviewer assignment, evidence/context/privacy/living-person gates, explicit human confirmation, public story DTO filtering, and unpublish paths | **Current / verified repository foundation.** Optional passage-to-evidence reader links and selected-object visibility beyond the guarded story path remain **In design**; public availability is **Unknown** pending deployed user-path proof |
 | Collaboration and bounded sharing | Owner-scoped private vault operations plus guarded public-story publication; no complete invite, role, interpretation, or unlisted-link path | **Current / verified Private and guarded Public foundations.** Selected-object Private / Unlisted / Trusted / Public visibility, Viewer / Contributor / Editor / Owner roles, shared evidence with separate interpretations, and living/sensitive review are **In design** |
 | Scoped authority | Scope vocabulary, API-key mint/list/suspend/revoke primitives, owner checks, story roles, guarded publish actions, selected review/audit events, and bounded Queue command scopes | **Current / verified partial foundation.** Queue commands do not grant domain authority, but no complete grant yet binds an external chosen AI, scope, permitted data, operation/external-action category, approval, expiry/revocation, and attributable result. Incoming API-key resolution remains unfinished; self-asserted story headers are not a public authorization model |
-| API and AI connections | Internal app APIs, API-key management, Queue scope presets, `agentActivity`, capability manifest, story OpenAPI skeleton, `/api/capabilities`, API Center source, `/llms.txt`, plus `/mcp`, `/ai`, and `/ai.txt` | **Current / verified production MCP and disposable named-client lifecycle; Partial reconnect and immediate revocation.** Twelve stateless workflow tools resolve the owner from an exact-issuer Clerk OAuth access token with a client identifier, keep reads bounded, and write canonical records with receipts and human publication gates. Ordinary Clerk session JWTs are rejected. A public PKCE client proved consent, token exchange, complete saves, corrections, Queue read, UI reflection, and fixture/client/session cleanup. Dynamic registration, fresh-device email completion, refresh/reconnect, immediate JWT revocation, and `/settings/ai` remain unproved |
+| API and AI connections | Internal app APIs, API-key management, Queue scope presets, `agentActivity`, capability manifest, story OpenAPI skeleton, `/api/capabilities`, API Center source, `/llms.txt`, plus `/mcp`, `/ai`, and `/ai.txt` | **Current / verified stateless production foundation; Partial complete Bring Your AI connection.** Twelve workflow tools resolve the owner from an exact-issuer Clerk OAuth access token with a client identifier, keep reads bounded, and write canonical records with receipts and human publication gates. Ordinary Clerk session JWTs are rejected. A disposable public PKCE client proved provider consent, complete saves, corrections, Queue read, UI reflection, and cleanup. Product scopes are not enforced from the token, Queue scopes are assigned internally, no durable owner-visible connection grant exists, protected evidence delivery is incomplete, and issued JWT access is not immediately revocable. Live provider metadata on 2026-08-16 advertised neither Client ID Metadata Documents nor DCR. AWF-WO-011 keeps every named client Partial until its exact lifecycle proof |
 | Search and retrieval | Person/place/stories views, owner-scoped API reads, context packs, filters, and queue exports | **Current / verified narrow retrieval surfaces.** Universal search across the full information model is **In design** |
 | Visualization | People/place workspaces and data suitable for relational views; Timeline route is explicitly a placeholder | **Current / verified partial foundation; In design full experience.** Do not claim timeline, pedigree, map, heatmap, or general graph experiences as shipped |
 | Retention, export, and deletion | Person context-pack export, low-level record operations, and key revocation plus a documented lifecycle gap | **Current / verified narrow tools; Coming soon complete contract.** No complete owner-vault export, coordinated retention policy, `/settings/data`, `/delete-account`, or cross-store deletion workflow is verified |
@@ -1321,8 +1336,10 @@ and must not borrow the **Coming soon** label.
 Do not claim these as current merely because the information model anticipates
 them or a planning artifact names them:
 
-- universal “works with any AI” compatibility, production-authenticated
-  refresh/reconnect, immediate issued-JWT revocation, or granular client grants;
+- universal “works with any AI” compatibility, a named compatible client,
+  Client ID Metadata Document onboarding, DCR fallback, product-enforced OAuth
+  scopes/grants, production-authenticated refresh/reconnect, immediate issued-
+  JWT revocation, or granular client grants;
 - people/relationship-first onboarding or automatic construction of a connected
   family picture from an external service;
 - automatic record import or direct FamilySearch/provider API access;
@@ -1856,6 +1873,18 @@ before it was run.
 
 ## Changelog
 
+- **1.8.0 · 2026-08-16** — restated chosen-AI capability truth against the
+  adopted family Bring Your AI MCP/OAuth standard. The stateless production
+  `/mcp` foundation and its twelve workflow tools remain Current, but token
+  scopes are parsed rather than enforced on domain tools, Queue scopes are
+  assigned internally, no owner-visible product grant or record boundary
+  exists, protected evidence delivery is incomplete, issued JWT access is not
+  immediately revocable, and live provider metadata on 2026-08-16 advertised
+  neither Client ID Metadata Documents nor a registration endpoint. No named
+  client is claimed compatible; a name becomes current only after that exact
+  client completes discovery, consent, scoped work, correction, revoke,
+  reconnect, and cleanup proof. AWF-WO-011 and
+  `docs/planning/family-history-bring-your-ai-alignment.md` own the outcome.
 - **1.7.1 · 2026-08-16** — recorded Scott's portfolio support decision: no
   Assist With site runs a mailbox or an email server, and every support,
   feedback, and privacy question goes to the one live Assist With Life support
