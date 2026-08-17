@@ -1,4 +1,5 @@
 import type { Doc } from "./_generated/dataModel";
+import { canonicalReadingForFactType } from "../lib/vault/conflictResolution";
 
 type ContextPackCitation = Pick<
   Doc<"citations">,
@@ -105,22 +106,6 @@ const CONFLICT_RESOLUTION_AUTHORITY = {
     "A settled conflict keeps the reading that lost. Never delete the record you decided against.",
 } as const;
 
-/**
- * The reading this vault currently concludes for a fact type, which is the
- * other side of a conflict the FamilySearch importer flagged: it compares an
- * indexed source field against the capture header for name, birth, and death
- * (`lib/familysearch/sourceFacts.ts` findSourceFactConflicts). Fact types with
- * no canonical person field return undefined rather than a guess.
- */
-function canonicalReadingFor(
-  person: ContextPackWorkspace["person"],
-  factType: Doc<"sourceFacts">["factType"]
-) {
-  if (factType === "name") return person.displayName || undefined;
-  if (factType === "birth") return person.birth?.date?.original || undefined;
-  if (factType === "death") return person.death?.date?.original || undefined;
-  return undefined;
-}
 
 export function buildContextPack(workspace: ContextPackWorkspace, gates: ContextPackGates) {
   const evidenceTrace = workspace.sources.map((entry) => ({
@@ -189,7 +174,7 @@ export function buildContextPack(workspace: ContextPackWorkspace, gates: Context
         confidence: fact.confidence,
         conflictReason: fact.conflictReason,
         // The reading the vault currently concludes — the side it disagrees with.
-        canonicalReading: canonicalReadingFor(workspace.person, fact.factType),
+        canonicalReading: canonicalReadingForFactType(workspace.person, fact.factType),
         evidence: describeCitation(String(fact.citationId)),
         // The other citations this one was recorded as disagreeing with. A
         // resolution has to weigh these and must not delete them.

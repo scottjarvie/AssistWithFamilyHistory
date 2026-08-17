@@ -8,6 +8,11 @@ import {
   evaluateStoryPublishGate,
 } from "../lib/stories/publishSafety";
 import {
+  assessConflictResolution,
+  describeConflictResolution,
+} from "../lib/vault/conflictResolution";
+import { TASK_DONE_NOTES_MIN } from "../lib/operations/taskLifecycle";
+import {
   authorizeOwnedReferenceMutation,
   authorizeTenantMutation,
   getTrustBoundaryMode,
@@ -1156,6 +1161,160 @@ export const upsertSourceFact = mutation({
       createdAt: now,
     });
     return { sourceFactId, created: true };
+  },
+});
+
+/**
+ * AWF-0046: the closing move on a conflict.
+ *
+ * A census says 1847 and a headstone says 1849. Deciding which one to believe,
+ * and writing down why, is the actual work of genealogy. Until now the vault
+ * could only say "these disagree": `upsertSourceFact` above was the only writer
+ * of `sourceFacts.status`, its one caller was the FamilySearch importer, and no
+ * surface could move a fact out of `conflict`. The badge was permanent.
+ *
+ * Three things this deliberately does NOT do:
+ *
+ * - It does not delete the reading that lost. `rejected` is a recorded
+ *   judgment, not an erasure; a reader a year from now must be able to see what
+ *   was weighed. The row, its citation, and its source all stay.
+ * - It does not rewrite the person's canonical fact. Source facts have never
+ *   silently overwritten a conclusion, and accepting a source reading is a
+ *   statement about the evidence, not an edit to the person record. Changing
+ *   the canonical birth date remains a separate, deliberate act.
+ * - It is not reachable by a connected AI. This is a public `mutation` in
+ *   `vaultMutations`, which the MCP surface never calls — MCP dispatches only
+ *   to `internal.*` functions in `convex/mcpFamilyHistory.ts`. An AI may
+ *   propose a resolution on the `conflict_resolution` research task; the person
+ *   confirms it here. Card AWF-0046 holds the open question of whether that
+ *   line should ever move.
+ */
+export const resolveSourceFactConflict = mutation({
+  args: {
+    vaultOwnerId: v.string(),
+    sourceFactId: v.id("sourceFacts"),
+    resolution: v.union(v.literal("accepted"), v.literal("rejected")),
+    reason: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const { owner: vaultOwnerId } = await authorizeTenantMutation(
+      ctx,
+      "vaultMutations.resolveSourceFactConflict",
+      args.vaultOwnerId,
+    );
+    const fact = await ctx.db.get(args.sourceFactId);
+    if (!fact || !matchesVaultOwner(fact.vaultOwnerId, vaultOwnerId)) {
+      throw new Error("Source fact not found");
+    }
+    const person = await authorizeOwnedReferenceMutation(
+      ctx,
+      "vaultMutations.resolveSourceFactConflict",
+      vaultOwnerId,
+      await ctx.db.get(fact.personId),
+      "Source fact person",
+    );
+
+    const verdict = assessConflictResolution({
+      currentStatus: fact.status,
+      resolution: args.resolution,
+      reason: args.reason,
+    });
+    if (!verdict.allowed) throw new Error(verdict.message);
+
+    const now = Date.now();
+    const canonicalReading =
+      fact.factType === "name"
+        ? formatPersonName(person)
+        : fact.factType === "birth"
+          ? person.birth?.date?.original
+          : fact.factType === "death"
+            ? person.death?.date?.original
+            : undefined;
+
+    await ctx.db.patch(args.sourceFactId, {
+      status: args.resolution,
+      // The reason the conflict was raised stays on the row alongside the
+      // decision, so the disagreement itself is still legible after it is settled.
+      updatedAt: now,
+    });
+
+    const summary = describeConflictResolution({
+      factType: fact.factType,
+      label: fact.label,
+      sourceReading: fact.value,
+      canonicalReading,
+      resolution: args.resolution,
+    });
+
+    await ctx.db.insert("researchLog", {
+      vaultOwnerId,
+      entityType: "person",
+      entityId: fact.personId,
+      activityType: "other",
+      status: "done",
+      summary,
+      details: [
+        `Source fact ID: ${String(args.sourceFactId)}`,
+        `Source reading: ${fact.value}`,
+        `This vault's reading: ${canonicalReading || "not recorded on the person"}`,
+        fact.conflictReason ? `Why it was flagged: ${fact.conflictReason}` : null,
+        `Decision: ${args.resolution}`,
+        `Reason given: ${verdict.reason}`,
+        "The reading decided against is kept, not deleted.",
+      ].filter(Boolean).join("\n"),
+      outputRefs: [
+        `sourceFact:${String(args.sourceFactId)}`,
+        `citation:${String(fact.citationId)}`,
+        `source:${String(fact.sourceId)}`,
+      ],
+      createdAt: now,
+      updatedAt: now,
+      completedAt: now,
+    });
+
+    // The importer opens one `conflict_resolution` task per person, covering
+    // every flagged fact at once. Closing it while other conflicts are still
+    // open would hide them, so it closes only when the last one is settled —
+    // as a consequence of the resolution, not independently of it.
+    const remaining = filterByVaultOwner(
+      await ctx.db
+        .query("sourceFacts")
+        .withIndex("by_person", (q) => q.eq("personId", fact.personId))
+        .collect(),
+      vaultOwnerId,
+    ).filter((row) => row.status === "conflict");
+
+    let closedTaskId: string | null = null;
+    if (remaining.length === 0) {
+      const tasks = filterByVaultOwner(
+        await ctx.db
+          .query("researchTasks")
+          .withIndex("by_person", (q) => q.eq("personId", fact.personId))
+          .collect(),
+        vaultOwnerId,
+      ).filter((task) => task.type === "conflict_resolution" && task.status !== "done");
+      for (const task of tasks) {
+        const notes = [task.notes, summary, `Reason: ${verdict.reason}`]
+          .filter(Boolean)
+          .join("\n");
+        await ctx.db.patch(task._id, {
+          status: "done",
+          // `advanceResearchTask` requires a real summary before a task may be
+          // marked done. Honour the same floor here rather than routing around it.
+          notes: notes.length >= TASK_DONE_NOTES_MIN ? notes : summary,
+          completedAt: now,
+          updatedAt: now,
+        });
+        closedTaskId = String(task._id);
+      }
+    }
+
+    return {
+      sourceFactId: args.sourceFactId,
+      status: args.resolution,
+      remainingConflicts: remaining.length,
+      closedTaskId,
+    };
   },
 });
 

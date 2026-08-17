@@ -29,6 +29,8 @@ import { getVaultAccessContext } from "@/lib/vault/server";
 import { ResearchChecksPanel } from "@/components/vault/ResearchChecksPanel";
 import { MediaPrivacyReviewPanel } from "@/components/vault/MediaPrivacyReviewPanel";
 import { ContextItemsPanel } from "@/components/vault/ContextItemsPanel";
+import { SourceFactConflictResolver } from "@/components/vault/SourceFactConflictResolver";
+import { canonicalReadingForFactType } from "@/lib/vault/conflictResolution";
 import { publicStoryPath } from "@/lib/stories/slug";
 
 interface PageProps {
@@ -505,7 +507,7 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
               <Card className="border-stone-200 bg-stone-50/60">
                 <CardHeader>
                   <CardTitle>Source-backed facts</CardTitle>
-                  <CardDescription>Indexed fields captured as citation-backed candidates. Conflicts require review before canonical facts change.</CardDescription>
+                  <CardDescription>Indexed fields captured as citation-backed candidates. Where two records disagree, you decide which one to believe — and the reading you decide against stays here rather than being deleted.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-3 md:grid-cols-2">
                   {(sourceFacts as Array<{
@@ -525,6 +527,19 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
                       <p className="mt-2 text-sm text-stone-600">{fact.label}: {fact.value}</p>
                       <p className="mt-1 text-xs text-stone-500">Confidence: {fact.confidence}</p>
                       {fact.conflictReason ? <p className="mt-2 text-xs text-amber-800">{fact.conflictReason}</p> : null}
+                      {/*
+                        AWF-0046: the vault could enter the conflict state and never
+                        leave it. This is the closing move, and it is deliberately
+                        person-only — a connected AI may propose an answer on the
+                        conflict_resolution research task, but settling a
+                        disagreement between two records is the researcher's call.
+                      */}
+                      {fact.status === "conflict" ? (
+                        <SourceFactConflictResolver
+                          fact={fact}
+                          canonicalReading={canonicalReadingForFactType(workspace.person, fact.factType)}
+                        />
+                      ) : null}
                     </div>
                   ))}
                 </CardContent>

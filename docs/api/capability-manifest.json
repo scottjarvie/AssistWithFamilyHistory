@@ -327,6 +327,21 @@
       "notes": "completionSource=ai_agent requires summary, notes, and confidence gates."
     },
     {
+      "route": "/api/operations/conflicts",
+      "methods": [
+        "POST"
+      ],
+      "capability": "source_fact_conflict_resolve",
+      "environment": "browser",
+      "agentSupport": "not-supported",
+      "reviewLevel": "trusted-human-only",
+      "risk": "medium",
+      "scopes": [
+        "owner_only"
+      ],
+      "notes": "AWF-0046. Deciding which of two disagreeing records to believe is the researcher's judgment call. A chosen AI may flag a conflict and propose an answer on the conflict_resolution research task, but may never settle one. The losing reading is kept, not deleted."
+    },
+    {
       "route": "/api/operations/provisional",
       "methods": [
         "POST"

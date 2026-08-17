@@ -203,4 +203,68 @@ describe("stateless Family History MCP durable operations", () => {
       },
     })).rejects.toThrow(/FORBIDDEN/);
   });
+
+  // AWF-0046. A connected AI may say "these two records disagree" and may keep
+  // working on the disagreeing fact. It may not decide which record wins. The
+  // consent screen for `family_history:research:write` promises the person the
+  // AI "cannot accept a conclusion for you", and without this guard the AI
+  // could settle a conflict simply by re-saving the fact with a new status.
+  test("a connected AI may flag a conflict but may not take a fact out of conflict", async () => {
+    const t = convexTest(schema, modules);
+    const grantId = await seedGrant(t, { vaultOwnerId: OWNER_A });
+    const person = await t.mutation(internal.mcpFamilyHistory.savePerson, {
+      principal: principal(), grantId, operationId: "operation-conflict-person", requestHash: "hash-conflict-person",
+      input: { ...personInput("person:conflict:one", "Jonas"), living: false },
+    });
+
+    const evidenceInput = (status: string, label: string) => ({
+      source: {
+        mode: "create", createKey: "source:parish-register:jonas", title: "Parish baptism register",
+        type: "church_record", repository: "Synthetic proof repository",
+      },
+      citation: {
+        mode: "create", createKey: "citation:parish-register:jonas", confidence: "high",
+        page: "Entry 44", extractedText: "Synthetic evidence: baptised 1849.",
+      },
+      links: [{ targetType: "person", targetId: person.person.id, field: "birth" }],
+      facts: [{
+        factKey: "fact:birth:jonas", personId: person.person.id,
+        factType: "birth", label, value: "1849", confidence: "medium", status,
+      }],
+    });
+
+    // Flagging is allowed — this is the AI doing exactly what it should.
+    const flagged = await t.mutation(internal.mcpFamilyHistory.saveSourceEvidence, {
+      principal: principal(), grantId, operationId: "operation-conflict-flag", requestHash: "hash-conflict-flag",
+      input: evidenceInput("conflict", "Baptism year"),
+    });
+    expect(flagged.evidence.factIds).toHaveLength(1);
+
+    // Settling it is not.
+    await expect(t.mutation(internal.mcpFamilyHistory.saveSourceEvidence, {
+      principal: principal(), grantId, operationId: "operation-conflict-accept", requestHash: "hash-conflict-accept",
+      input: evidenceInput("accepted", "Baptism year"),
+    })).rejects.toThrow(/FORBIDDEN/);
+
+    await expect(t.mutation(internal.mcpFamilyHistory.saveSourceEvidence, {
+      principal: principal(), grantId, operationId: "operation-conflict-reject", requestHash: "hash-conflict-reject",
+      input: evidenceInput("rejected", "Baptism year"),
+    })).rejects.toThrow(/FORBIDDEN/);
+
+    // The AI is not locked out of the record: it may keep improving the
+    // conflicting fact, it just may not decide the disagreement.
+    const refined = await t.mutation(internal.mcpFamilyHistory.saveSourceEvidence, {
+      principal: principal(), grantId, operationId: "operation-conflict-refine", requestHash: "hash-conflict-refine",
+      input: evidenceInput("conflict", "Baptism year (register entry)"),
+    });
+    expect(refined.evidence.factIds).toHaveLength(1);
+
+    const workspace = await t.query(internal.vault.getPersonWorkspace, {
+      vaultOwnerId: OWNER_A,
+      personIdentifier: person.person.id,
+    });
+    const facts = workspace?.sourceFacts ?? [];
+    expect(facts).toHaveLength(1);
+    expect(facts[0]).toMatchObject({ status: "conflict", label: "Baptism year (register entry)" });
+  });
 });

@@ -6,6 +6,7 @@ import { internalMutation, internalQuery } from "./_generated/server";
 import { FAMILY_HISTORY_MCP_LIMITS } from "../lib/mcp/contract";
 import { matchesVaultOwner } from "./vaultCore";
 import { assertGrantPermits } from "./mcpGrants";
+import { mayAiSetSourceFactStatus } from "../lib/vault/conflictResolution";
 
 const principalValidator = v.object({
   issuer: v.string(),
@@ -542,6 +543,20 @@ async function saveSourceEvidenceRecord(ctx: MutationCtx, owner: string, input: 
     const existing = mapping
       ? await owned(ctx, "sourceFacts", mapping.recordId, owner, "Source fact")
       : null;
+    // AWF-0046: a connected AI may raise a conflict and may keep working on a
+    // conflicting fact, but it may not take one OUT of conflict. Settling a
+    // disagreement between two records is the researcher's judgment call, and
+    // the consent screen for this permission already promises the person that
+    // it "cannot accept a conclusion for you" (lib/mcp/catalog.ts). Without
+    // this guard an AI could resolve a conflict simply by re-saving the fact
+    // with a different status.
+    if (!mayAiSetSourceFactStatus(existing?.status, fact.status ?? "candidate")) {
+      machineError(
+        "FORBIDDEN",
+        "This fact is flagged as a conflict, and only the person can decide which record to believe.",
+        "Leave the status as \"conflict\" and propose your answer on the conflict_resolution research task with family_history_save_research_work, including the evidence on both sides. The person confirms it in the web app.",
+      );
+    }
     const payload = {
       vaultOwnerId: owner,
       personId: fact.personId,

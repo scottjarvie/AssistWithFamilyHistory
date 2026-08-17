@@ -78,7 +78,7 @@ export const FAMILY_HISTORY_SCOPE_INFO: readonly ScopeInfo[] = [
       "Save people, relationships, events, sources, citations, candidate facts, and research tasks or findings as proposed work you can review.",
     writes: true,
     limit:
-      "Proposals only. It cannot accept a conclusion for you, merge identities, publish, delete, or export anything.",
+      "Proposals only. It cannot accept a conclusion for you, settle a conflict between two records, merge identities, publish, delete, or export anything.",
   },
   {
     scope: "family_history:story:draft",
@@ -123,6 +123,10 @@ export const NEVER_EXPOSED: readonly string[] = [
 ];
 
 export const NEVER_PERMITTED: readonly string[] = [
+  // AWF-0046: an AI may flag a conflict and propose an answer with evidence.
+  // Deciding which record to believe is the researcher's judgment call, and is
+  // enforced in convex/mcpFamilyHistory.ts via mayAiSetSourceFactStatus.
+  "Settling a conflict between two records — flagging one and proposing an answer is allowed",
   "Archiving or restoring records",
   "Exporting the vault",
   "Permanently deleting anything",
@@ -260,7 +264,7 @@ export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
     writes: true,
     title: "Save source evidence",
     description:
-      "Save a source plus one citation, target links, and candidate/accepted/conflicting source facts in one replay-safe call. Evidence never silently overwrites a person's canonical conclusions.",
+      "Save a source plus one citation, target links, and candidate/accepted/conflicting source facts in one replay-safe call. Evidence never silently overwrites a person's canonical conclusions. You may FLAG a conflict by saving a fact with status \"conflict\", and you may keep working on a conflicting fact, but you may not take one out of conflict — deciding which record to believe is the person's call. Propose your answer, with the evidence on both sides, on the conflict_resolution research task via family_history_save_research_work.",
     humanSummary: "Records a source, a citation, and the facts it supports.",
     implementedBy: "convex/mcpFamilyHistory.saveSourceEvidence",
     sunsetNote: ALIAS_SUNSET,
