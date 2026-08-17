@@ -2,7 +2,19 @@ import type { Doc } from "./_generated/dataModel";
 
 type ContextPackCitation = Pick<
   Doc<"citations">,
-  "_id" | "confidence" | "isEvidence" | "page" | "editedText" | "extractedText" | "notes"
+  | "_id"
+  | "sourceId"
+  | "confidence"
+  | "isEvidence"
+  | "page"
+  | "editedText"
+  | "extractedText"
+  | "notes"
+  // AWF-0046: `conflictsWith` has been declared on the schema and validated on
+  // write since the citation model landed, and no surface has ever read it. It
+  // is the one field that says "these two records disagree", so the conflict
+  // export below reads it to carry the losing reading alongside the winning one.
+  | "conflictsWith"
 > & {
   field?: string;
 };
@@ -74,6 +86,42 @@ function truncateText(value: string | undefined, maxLength: number) {
   return compact.length <= maxLength ? compact : `${compact.slice(0, maxLength - 3)}...`;
 }
 
+/**
+ * AWF-0046: the resolution authority line, stated in the export itself.
+ *
+ * Deciding which record to believe is the researcher's judgment call, and the
+ * `family_history:research:write` consent screen already promises the person
+ * that a connected AI "cannot accept a conclusion for you"
+ * (`lib/mcp/catalog.ts` FAMILY_HISTORY_SCOPE_INFO). A conflict therefore
+ * travels to the AI with its authority attached rather than as a bare row an
+ * AI might read as work to finish. The AI may gather, weigh, and propose; the
+ * person confirms.
+ */
+const CONFLICT_RESOLUTION_AUTHORITY = {
+  decidedBy: "person",
+  aiMay: "propose a resolution with evidence, recorded on the conflict_resolution research task",
+  aiMayNot: "accept, reject, or otherwise settle a conflicting source fact",
+  losingReading:
+    "A settled conflict keeps the reading that lost. Never delete the record you decided against.",
+} as const;
+
+/**
+ * The reading this vault currently concludes for a fact type, which is the
+ * other side of a conflict the FamilySearch importer flagged: it compares an
+ * indexed source field against the capture header for name, birth, and death
+ * (`lib/familysearch/sourceFacts.ts` findSourceFactConflicts). Fact types with
+ * no canonical person field return undefined rather than a guess.
+ */
+function canonicalReadingFor(
+  person: ContextPackWorkspace["person"],
+  factType: Doc<"sourceFacts">["factType"]
+) {
+  if (factType === "name") return person.displayName || undefined;
+  if (factType === "birth") return person.birth?.date?.original || undefined;
+  if (factType === "death") return person.death?.date?.original || undefined;
+  return undefined;
+}
+
 export function buildContextPack(workspace: ContextPackWorkspace, gates: ContextPackGates) {
   const evidenceTrace = workspace.sources.map((entry) => ({
     sourceId: entry.source._id,
@@ -94,6 +142,63 @@ export function buildContextPack(workspace: ContextPackWorkspace, gates: Context
   const reviewedContextItems = workspace.contextItems.filter(
     gates.isContextPackEligibleContextItem
   );
+
+  // AWF-0046: the actual unresolved conflicts.
+  //
+  // `unresolvedConflicts` used to be an alias for the import-warning strings,
+  // so an AI asked to help resolve a conflict received a list that did not
+  // contain any conflicts. These are the `sourceFacts` rows the vault really
+  // marked `status: "conflict"`, each carried with both readings and the
+  // citation behind them, so a proposal can cite what it weighed.
+  //
+  // No new privacy surface: every row here is already exported verbatim in
+  // `structured.sourceFacts` and in the "Source-Backed Facts" markdown section.
+  const citationById = new Map(
+    workspace.citations.map((citation) => [String(citation._id), citation])
+  );
+  const sourceById = new Map(
+    workspace.sources.map((entry) => [String(entry.source._id), entry.source])
+  );
+  const describeCitation = (citationId: string) => {
+    const citation = citationById.get(citationId);
+    if (!citation) return { citationId };
+    const source = sourceById.get(String(citation.sourceId));
+    return {
+      citationId,
+      sourceId: citation.sourceId,
+      sourceTitle: source?.title,
+      confidence: citation.confidence,
+      isEvidence: citation.isEvidence,
+      page: citation.page,
+      text: truncateText(citation.editedText || citation.extractedText || citation.notes, 240),
+    };
+  };
+  const unresolvedConflicts = workspace.sourceFacts
+    .filter((fact) => fact.status === "conflict")
+    .map((fact) => {
+      const citation = citationById.get(String(fact.citationId));
+      return {
+        sourceFactId: fact._id,
+        personId: fact.personId,
+        factType: fact.factType,
+        label: fact.label,
+        // The reading the source carries — the side that disagrees.
+        sourceReading: fact.value,
+        date: fact.date,
+        place: fact.place,
+        confidence: fact.confidence,
+        conflictReason: fact.conflictReason,
+        // The reading the vault currently concludes — the side it disagrees with.
+        canonicalReading: canonicalReadingFor(workspace.person, fact.factType),
+        evidence: describeCitation(String(fact.citationId)),
+        // The other citations this one was recorded as disagreeing with. A
+        // resolution has to weigh these and must not delete them.
+        conflictsWith: (citation?.conflictsWith ?? []).map((otherId) =>
+          describeCitation(String(otherId))
+        ),
+        authority: CONFLICT_RESOLUTION_AUTHORITY,
+      };
+    });
   const storyClaimReadiness = {
     evidenceSources: workspace.sources.length,
     citedClaims: workspace.citations.length,
@@ -170,7 +275,12 @@ export function buildContextPack(workspace: ContextPackWorkspace, gates: Context
     evidenceTrace,
     storyClaimReadiness,
     openResearchTasks: workspace.researchTasks.filter((task) => task.status !== "done"),
-    unresolvedConflicts: storyClaimReadiness.unresolvedImportWarnings,
+    // AWF-0046: these two used to be the same list under two names. They are
+    // different things: a conflict is two records disagreeing about a fact, an
+    // import warning is a capture that needed a human look.
+    unresolvedConflicts,
+    unresolvedImportWarnings: storyClaimReadiness.unresolvedImportWarnings,
+    conflictResolutionAuthority: CONFLICT_RESOLUTION_AUTHORITY,
     recentImports: workspace.importRuns.slice(0, 5),
   };
 
@@ -297,10 +407,27 @@ export function buildContextPack(workspace: ContextPackWorkspace, gates: Context
       .filter((task) => task.status !== "done")
       .map((task) => `- ${task.title}: ${task.description || task.type}`),
     "",
-    "## Unresolved Import Warnings",
+    "## Unresolved Conflicts",
+    "",
+    `- Who decides: ${CONFLICT_RESOLUTION_AUTHORITY.decidedBy}. A connected AI may ${CONFLICT_RESOLUTION_AUTHORITY.aiMay}. It may not ${CONFLICT_RESOLUTION_AUTHORITY.aiMayNot}.`,
+    `- ${CONFLICT_RESOLUTION_AUTHORITY.losingReading}`,
     "",
     ...(structured.unresolvedConflicts.length > 0
-      ? structured.unresolvedConflicts.map((warning) => `- ${warning}`)
+      ? structured.unresolvedConflicts.flatMap((conflict) => [
+          `- ${conflict.factType} (${conflict.label}): source reads "${conflict.sourceReading}"${conflict.evidence.sourceTitle ? ` in ${conflict.evidence.sourceTitle}` : ""} [${conflict.confidence}] vs this vault's "${conflict.canonicalReading ?? "no recorded reading"}"`,
+          ...(conflict.conflictReason ? [`  - Why flagged: ${conflict.conflictReason}`] : []),
+          ...(conflict.evidence.text ? [`  - Cited text: ${conflict.evidence.text}`] : []),
+          ...conflict.conflictsWith.map(
+            (other) =>
+              `  - Also disagrees with: ${other.sourceTitle ?? "a citation in this vault"}${other.text ? ` - ${other.text}` : ""}`
+          ),
+        ])
+      : ["- No source-backed facts are currently flagged as conflicting."]),
+    "",
+    "## Unresolved Import Warnings",
+    "",
+    ...(structured.unresolvedImportWarnings.length > 0
+      ? structured.unresolvedImportWarnings.map((warning) => `- ${warning}`)
       : ["- No unresolved import warnings recorded."]),
   ].join("\n");
 

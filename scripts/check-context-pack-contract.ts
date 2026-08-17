@@ -161,9 +161,27 @@ for (const token of [
   "Research pack:",
   "Review/privacy:",
   "categoryBlocks",
+  // AWF-0046: `unresolvedConflicts` must carry the sourceFacts rows the vault
+  // marked `status: "conflict"`, and import warnings must keep their own name.
+  // Behavioral coverage lives in scripts/test-context-pack-conflicts.ts.
+  "unresolvedConflicts",
+  "unresolvedImportWarnings",
+  "## Unresolved Conflicts",
+  "conflictResolutionAuthority",
+  "conflictsWith",
+  "canonicalReading",
+  "sourceReading",
 ]) {
   assert(contextPackSource.includes(token), `Context pack export is missing ${token}`);
 }
+
+// AWF-0046: the exact regression this replaced. `unresolvedConflicts` was
+// assigned the import-warning array, so an AI asked to resolve a conflict was
+// handed a list with no conflicts in it. Re-aliasing the two must fail here.
+assert(
+  !contextPackSource.includes("unresolvedConflicts: storyClaimReadiness.unresolvedImportWarnings"),
+  "unresolvedConflicts must not be aliased to import warnings — they are different things",
+);
 
 const storyReviewSource = readFileSync("app/app/stories/[storyId]/page.tsx", "utf8");
 for (const token of [

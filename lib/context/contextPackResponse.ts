@@ -35,6 +35,20 @@ const StoryClaimReadinessSchema = z
   })
   .loose();
 
+// AWF-0046: a conflict travels as an object carrying both readings, the
+// citation behind the disagreeing one, and who may settle it — never as a bare
+// warning string. Validating the shape here is what makes a regression to the
+// old string array visible at the API boundary instead of silently downstream.
+const UnresolvedConflictSchema = z
+  .object({
+    sourceFactId: z.string(),
+    factType: z.string(),
+    sourceReading: z.string(),
+    canonicalReading: z.string().optional(),
+    conflictReason: z.string().optional(),
+  })
+  .loose();
+
 const StructuredSchema = z
   .object({
     person: z
@@ -54,6 +68,8 @@ const StructuredSchema = z
       .loose(),
     historicalContext: z.array(HistoricalContextEntrySchema).optional(),
     storyClaimReadiness: StoryClaimReadinessSchema.optional(),
+    unresolvedConflicts: z.array(UnresolvedConflictSchema).optional(),
+    unresolvedImportWarnings: z.array(z.string()).optional(),
   })
   .loose();
 
