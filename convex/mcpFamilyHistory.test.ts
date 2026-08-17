@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import { convexTest } from "convex-test";
 import schema from "./schema";
 import { internal } from "./_generated/api";
+import { seedGrant } from "../lib/mcp/testSupport";
 
 const modules = import.meta.glob("./**/*.ts");
 const OWNER_A = "user_mcp_owner_AAAAAAAAAAAA";
@@ -38,10 +39,11 @@ describe("stateless Family History MCP durable operations", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-12T15:00:00Z"));
     const t = convexTest(schema, modules);
+    const grantId = await seedGrant(t, { vaultOwnerId: OWNER_A });
     const input = personInput("person:owner-a:ada", "Ada", "private living-person note");
 
     const first = await t.mutation(internal.mcpFamilyHistory.savePerson, {
-      principal: principal(),
+      principal: principal(), grantId,
       operationId: "operation-person-ada",
       requestHash: "hash-person-ada",
       input,
@@ -49,7 +51,7 @@ describe("stateless Family History MCP durable operations", () => {
     expect(first).toMatchObject({ deduplicated: false, person: { created: true } });
 
     const replay = await t.mutation(internal.mcpFamilyHistory.savePerson, {
-      principal: principal(),
+      principal: principal(), grantId,
       operationId: "operation-person-ada",
       requestHash: "hash-person-ada",
       input,
@@ -57,7 +59,7 @@ describe("stateless Family History MCP durable operations", () => {
     expect(replay).toMatchObject({ deduplicated: true, person: { created: true } });
 
     await expect(t.mutation(internal.mcpFamilyHistory.savePerson, {
-      principal: principal(),
+      principal: principal(), grantId,
       operationId: "operation-person-ada",
       requestHash: "different-hash",
       input: personInput("person:owner-a:other", "Other"),
@@ -81,17 +83,18 @@ describe("stateless Family History MCP durable operations", () => {
 
   test("rejects stale corrections and cross-vault relationship references", async () => {
     const t = convexTest(schema, modules);
+    const grantId = await seedGrant(t, { vaultOwnerId: OWNER_A });
     const ownerAPerson = await t.mutation(internal.mcpFamilyHistory.savePerson, {
-      principal: principal(), operationId: "operation-person-owner-a", requestHash: "hash-a",
+      principal: principal(), grantId, operationId: "operation-person-owner-a", requestHash: "hash-a",
       input: personInput("person:owner-a:one", "Owner A"),
     });
     const ownerBPerson = await t.mutation(internal.mcpFamilyHistory.savePerson, {
-      principal: principal(OWNER_B), operationId: "operation-person-owner-b", requestHash: "hash-b",
+      principal: principal(OWNER_B), grantId: await seedGrant(t, { vaultOwnerId: OWNER_B }), operationId: "operation-person-owner-b", requestHash: "hash-b",
       input: personInput("person:owner-b:one", "Owner B"),
     });
 
     await expect(t.mutation(internal.mcpFamilyHistory.savePerson, {
-      principal: principal(), operationId: "operation-stale-update", requestHash: "hash-stale",
+      principal: principal(), grantId, operationId: "operation-stale-update", requestHash: "hash-stale",
       input: {
         mode: "update",
         personId: ownerAPerson.person.id,
@@ -101,7 +104,7 @@ describe("stateless Family History MCP durable operations", () => {
     })).rejects.toThrow(/STALE_VERSION/);
 
     await expect(t.mutation(internal.mcpFamilyHistory.saveRelationship, {
-      principal: principal(), operationId: "operation-cross-vault", requestHash: "hash-cross-vault",
+      principal: principal(), grantId, operationId: "operation-cross-vault", requestHash: "hash-cross-vault",
       input: {
         mode: "create",
         createKey: "relationship:cross-vault",
@@ -114,13 +117,14 @@ describe("stateless Family History MCP durable operations", () => {
 
   test("saves provenance-rich evidence into canonical UI records", async () => {
     const t = convexTest(schema, modules);
+    const grantId = await seedGrant(t, { vaultOwnerId: OWNER_A });
     const person = await t.mutation(internal.mcpFamilyHistory.savePerson, {
-      principal: principal(), operationId: "operation-evidence-person", requestHash: "hash-evidence-person",
+      principal: principal(), grantId, operationId: "operation-evidence-person", requestHash: "hash-evidence-person",
       input: { ...personInput("person:evidence:one", "Eliza"), living: false },
     });
 
     const evidence = await t.mutation(internal.mcpFamilyHistory.saveSourceEvidence, {
-      principal: principal(), operationId: "operation-evidence-save", requestHash: "hash-evidence-save",
+      principal: principal(), grantId, operationId: "operation-evidence-save", requestHash: "hash-evidence-save",
       input: {
         source: {
           mode: "create", createKey: "source:1900-census:eliza", title: "1900 United States census",
@@ -151,13 +155,14 @@ describe("stateless Family History MCP durable operations", () => {
 
   test("one complete-result call creates research, event, and private story work atomically", async () => {
     const t = convexTest(schema, modules);
+    const grantId = await seedGrant(t, { vaultOwnerId: OWNER_A });
     const person = await t.mutation(internal.mcpFamilyHistory.savePerson, {
-      principal: principal(), operationId: "operation-complete-person", requestHash: "hash-complete-person",
+      principal: principal(), grantId, operationId: "operation-complete-person", requestHash: "hash-complete-person",
       input: { ...personInput("person:complete:one", "Mara"), living: false },
     });
 
     const completed = await t.mutation(internal.mcpFamilyHistory.saveCompleteResult, {
-      principal: principal(), operationId: "operation-complete-result", requestHash: "hash-complete-result",
+      principal: principal(), grantId, operationId: "operation-complete-result", requestHash: "hash-complete-result",
       input: {
         personId: person.person.id,
         summary: "Saved a synthetic census finding and a cited draft narrative.",
@@ -191,7 +196,7 @@ describe("stateless Family History MCP durable operations", () => {
     expect(workspace?.researchLog).toHaveLength(1);
 
     await expect(t.mutation(internal.mcpFamilyHistory.saveStoryWork, {
-      principal: principal(), operationId: "operation-forbidden-publish", requestHash: "hash-forbidden-publish",
+      principal: principal(), grantId, operationId: "operation-forbidden-publish", requestHash: "hash-forbidden-publish",
       input: {
         mode: "create", createKey: "story:forbidden:publish", personId: person.person.id,
         type: "biography", title: "Must remain private", content: "Private draft", status: "published",

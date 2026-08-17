@@ -182,8 +182,8 @@ export default function SourceDocsFeaturePage() {
                     In-App Processing
                   </h3>
                   <p className="text-stone-600 text-sm">
-                    Connect your OpenRouter API key and process directly in the app. 
-                    Choose from Claude, GPT-4, Gemini, and more.
+                    Connect your OpenRouter API key and process directly in the app,
+                    choosing from the models your own key gives you access to.
                   </p>
                 </div>
                 <div>

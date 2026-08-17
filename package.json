@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit",
     "verify": "bash scripts/verify.sh",
     "check:api-inventory": "tsx scripts/check-api-inventory.ts",
+    "check:mcp-contract": "tsx scripts/check-mcp-contract.ts",
     "check:capture-validation": "tsx scripts/check-capture-validation.ts",
     "check:intake-envelope": "tsx scripts/check-intake-envelope.ts",
     "check:source-facts": "tsx scripts/check-source-facts.ts",
@@ -63,6 +64,12 @@
     "check:owned-tables-parity": "tsx scripts/check-owned-tables-parity.ts",
     "check:safelink-suppression": "tsx scripts/check-safelink-suppression.ts",
     "check:no-plain-next-link": "tsx scripts/check-no-plain-next-link.ts",
+    "check:app-navigation": "tsx scripts/check-app-navigation-contract.tsx",
+    "check:navigation-accessibility": "tsx scripts/check-navigation-accessibility.tsx",
+    "check:settings-responsive": "tsx scripts/check-settings-responsive.ts",
+    "check:connection-center": "tsx scripts/check-connection-center.ts",
+    "check:public-ai-truth": "tsx scripts/check-public-ai-truth.ts",
+    "mcp:lifecycle": "tsx scripts/mcp-lifecycle.ts",
     "test:convex": "vitest run"
   },
   "dependencies": {

@@ -32,6 +32,16 @@ export const FAMILY_HISTORY_ACCEPTANCE_CONFIRMATION = "clear_marked_family_histo
 const PRODUCTION_DEPLOYMENT = "accomplished-dodo-308";
 const RETAINED_TEST_SUBJECT = "user_3HqFpM96Ck1hTJZajDX893sWnPm";
 const MAX_ROWS_PER_TABLE = 100;
+/**
+ * A full connection lifecycle writes one activity row per tools/call, including
+ * every deliberate refusal, so the receipt ceiling that suited a handful of
+ * writes is too tight for the eleven-point ladder. This is still a hard bound
+ * inside the bounded owner scan above it — it is a bigger ceiling, not an
+ * unbounded one.
+ */
+const MAX_ACTIVITY_ROWS = MAX_ROWS_PER_TABLE;
+/** One run should approve one connection. More than this is a mistake, not a run. */
+const MAX_MARKED_GRANTS = 4;
 
 type FixtureCtx = MutationCtx | QueryCtx;
 
@@ -76,7 +86,7 @@ function assertRunKey(value: string) {
   return runKey;
 }
 
-async function boundedOwnerRows<T extends "persons" | "relationships" | "events" | "personEvents" | "sources" | "citations" | "citationLinks" | "sourceFacts" | "researchTasks" | "researchLog" | "queueItems" | "stories" | "storyReviewEvents" | "agentActivity" | "mcpOperations" | "mcpRecordKeys" | "media" | "documents">(
+async function boundedOwnerRows<T extends "persons" | "relationships" | "events" | "personEvents" | "sources" | "citations" | "citationLinks" | "sourceFacts" | "researchTasks" | "researchLog" | "queueItems" | "stories" | "storyReviewEvents" | "agentActivity" | "mcpOperations" | "mcpRecordKeys" | "media" | "documents" | "mcpGrants">(
   ctx: FixtureCtx,
   table: T,
   owner: string,
@@ -129,7 +139,7 @@ async function fixtureGraph(ctx: FixtureCtx, runKeyInput: string) {
   const owner = assertAcceptanceDeployment();
   const runKey = assertRunKey(runKeyInput);
   const graph = await mappedRows(ctx, runKey, owner);
-  const [queueRows, operations, activity, personEvents, citationLinks, reviewEvents, allRelationships, allSourceFacts, allResearchTasks, allResearchLog, allStories, allMedia, allDocuments] = await Promise.all([
+  const [queueRows, operations, activity, personEvents, citationLinks, reviewEvents, allRelationships, allSourceFacts, allResearchTasks, allResearchLog, allStories, allMedia, allDocuments, allGrants] = await Promise.all([
     boundedOwnerRows(ctx, "queueItems", owner),
     boundedOwnerRows(ctx, "mcpOperations", owner),
     boundedOwnerRows(ctx, "agentActivity", owner),
@@ -143,6 +153,7 @@ async function fixtureGraph(ctx: FixtureCtx, runKeyInput: string) {
     boundedOwnerRows(ctx, "stories", owner),
     boundedOwnerRows(ctx, "media", owner),
     boundedOwnerRows(ctx, "documents", owner),
+    boundedOwnerRows(ctx, "mcpGrants", owner),
   ]);
   if (graph.mappings.length > 20) {
     throw new Error("Refusing cleanup because the marked MCP record graph exceeded its safety ceiling.");
@@ -220,12 +231,90 @@ async function fixtureGraph(ctx: FixtureCtx, runKeyInput: string) {
     throw new Error("Refusing cleanup because a marked story-review event crosses outside the acceptance graph.");
   }
 
+  /* ------------------------------------------------- grants and clients */
+
+  // A grant is part of this run only when the connecting software carried the
+  // run key in the name it announced. `observedClientName` is written once, when
+  // the pending request is raised, and approval never rewrites it — so it is the
+  // one field a person's own labelling cannot accidentally erase. The label the
+  // person typed is accepted as a second visible marker.
+  const grantCarriesRunKey = (row: Doc<"mcpGrants">) =>
+    (row.observedClientName?.includes(runKey) ?? false) ||
+    row.label.includes(runKey) ||
+    row.clientId.includes(runKey);
+  const grants = allGrants.filter(grantCarriesRunKey);
+  if (grants.length > MAX_MARKED_GRANTS) {
+    throw new Error("Refusing cleanup because the run key matched more than one connection graph.");
+  }
+  if (grants.some((row) => !(row.observedClientName ?? row.label).includes(FAMILY_HISTORY_ACCEPTANCE_MARKER))) {
+    throw new Error("Refusing cleanup because a marked connection lacks its visible synthetic acceptance marker.");
+  }
+  const grantIds = idSet(grants);
+  const grantClientIds = new Set(grants.map((row) => row.clientId));
+
+  // A client identifier shared with an unmarked connection is not this run's to
+  // clean up: removing its cached registration would reach outside the fixture.
+  if (allGrants.some((row) => !grantIds.has(String(row._id)) && grantClientIds.has(row.clientId))) {
+    throw new Error("Refusing cleanup because an unmarked connection shares this run's client identifier.");
+  }
+
+  // `mcpClientRegistrations` is keyed by client identifier and has no vault
+  // owner, so it is reached only through the marked grants' own client ids and
+  // never scanned broadly.
+  const registrations: Array<Doc<"mcpClientRegistrations">> = [];
+  for (const clientId of grantClientIds) {
+    const rows = await ctx.db
+      .query("mcpClientRegistrations")
+      .withIndex("by_clientId", (q) => q.eq("clientId", clientId))
+      .take(6);
+    for (const row of rows) {
+      const marked =
+        row.clientId.includes(runKey) || (row.clientName?.includes(runKey) ?? false);
+      if (!marked) {
+        throw new Error("Refusing cleanup because a client registration for this run carries no synthetic marker.");
+      }
+      registrations.push(row);
+    }
+  }
+
+  /* --------------------------------------------------------- receipts */
+
   const fixtureOperations = operations.filter((row) => row.operationId.startsWith(`${runKey}:`));
-  const fixtureActivity = activity.filter((row) => row.requestId.startsWith(`${runKey}:`));
-  if (fixtureOperations.length > 20 || fixtureActivity.length > 20) {
+  // Activity written through the live transport carries the transport's own
+  // request id, not the run key, so grant-linked rows are collected as well.
+  // Both paths stay inside the same bounded owner scan.
+  const fixtureActivity = activity.filter(
+    (row) =>
+      row.requestId.startsWith(`${runKey}:`) ||
+      (row.grantId ? grantIds.has(String(row.grantId)) : false) ||
+      (row.clientId?.includes(runKey) ?? false),
+  );
+  if (fixtureOperations.length > 20) {
     throw new Error("Refusing cleanup because the marked MCP receipt graph exceeded its safety ceiling.");
   }
-  const exists = queueItems.length + graph.mappings.length + fixtureOperations.length + fixtureActivity.length > 0;
+  if (fixtureActivity.length > MAX_ACTIVITY_ROWS) {
+    throw new Error("Refusing cleanup because the marked MCP activity graph exceeded its safety ceiling.");
+  }
+  // Nothing outside the deleted set may still point at a grant about to go.
+  if (
+    activity.some(
+      (row) =>
+        row.grantId &&
+        grantIds.has(String(row.grantId)) &&
+        !fixtureActivity.some((kept) => String(kept._id) === String(row._id)),
+    )
+  ) {
+    throw new Error("Refusing cleanup because an unmarked activity row references the marked connection.");
+  }
+
+  const exists =
+    queueItems.length +
+      graph.mappings.length +
+      fixtureOperations.length +
+      fixtureActivity.length +
+      grants.length +
+      registrations.length >
+    0;
   return {
     exists,
     owner,
@@ -236,6 +325,8 @@ async function fixtureGraph(ctx: FixtureCtx, runKeyInput: string) {
     queueReceipts,
     operations: fixtureOperations,
     activity: fixtureActivity,
+    grants,
+    registrations,
     personEvents: relatedPersonEvents,
     citationLinks: relatedCitationLinks,
     storyReviewEvents: relatedReviewEvents,
@@ -262,6 +353,8 @@ function counts(graph: Awaited<ReturnType<typeof fixtureGraph>>) {
     mcpOperations: graph.operations.length,
     mcpRecordKeys: graph.mappings.length,
     agentActivity: graph.activity.length,
+    mcpGrants: graph.grants.length,
+    mcpClientRegistrations: graph.registrations.length,
   };
 }
 
@@ -308,8 +401,12 @@ export const clear = mutation({
     for (const row of graph.relationships) await ctx.db.delete(row._id);
     for (const row of graph.persons) await ctx.db.delete(row._id);
     for (const row of graph.operations) await ctx.db.delete(row._id);
+    // Activity references the grant, so it goes first; the grant and its cached
+    // client registration go last, leaving no row pointing at a deleted id.
     for (const row of graph.activity) await ctx.db.delete(row._id);
     for (const row of graph.mappings) await ctx.db.delete(row._id);
+    for (const row of graph.grants) await ctx.db.delete(row._id);
+    for (const row of graph.registrations) await ctx.db.delete(row._id);
     return { removed: true as const, runKey: graph.runKey, counts: removed };
   },
 });

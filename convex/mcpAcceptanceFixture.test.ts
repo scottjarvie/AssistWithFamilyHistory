@@ -9,15 +9,22 @@ import {
   FAMILY_HISTORY_ACCEPTANCE_PREFIX,
 } from "./mcpAcceptanceFixture";
 
+import { seedGrant } from "../lib/mcp/testSupport";
+
 const modules = import.meta.glob("./**/*.ts");
 const OWNER = "user_3HqFpM96Ck1hTJZajDX893sWnPm";
 const RUN_KEY = `${FAMILY_HISTORY_ACCEPTANCE_PREFIX}joined-workflow-test`;
+// A live provider issues an opaque client identifier that cannot carry a run
+// key, so the acceptance client id here is opaque too. The run is recognised by
+// the name the connecting software announced, which is the field a real harness
+// genuinely controls.
+const ACCEPTANCE_CLIENT_ID = "synthetic-acceptance-client";
 
 function mcpPrincipal() {
   return {
     issuer: "https://clerk.assistwithfamilyhistory.com",
     subject: OWNER,
-    clientId: "synthetic-acceptance-client",
+    clientId: ACCEPTANCE_CLIENT_ID,
     scopes: ["openid", "offline_access"],
   };
 }
@@ -28,11 +35,24 @@ function queuePrincipal() {
     actorId: "oauth-chosen-ai",
     actorKind: "chosen_ai" as const,
     scopes: ["queue:read", "queue:claim", "queue:update", "queue:complete"],
-    credentialId: "synthetic-acceptance-client",
+    credentialId: ACCEPTANCE_CLIENT_ID,
   };
 }
 
 async function saveJoinedFixture(t: ReturnType<typeof convexTest>) {
+  // Every MCP write now needs an approved product grant, at the transport and
+  // again inside the mutation.
+  // The grant itself is part of the acceptance graph now, so it carries the
+  // same visible marker every other synthetic row does. `observedClientName` is
+  // what the connecting software announced and is never rewritten by approval,
+  // which is why cleanup keys on it.
+  const grantId = await seedGrant(t, {
+    vaultOwnerId: OWNER,
+    clientId: ACCEPTANCE_CLIENT_ID,
+    issuer: "https://clerk.assistwithfamilyhistory.com",
+    observedClientName: `${FAMILY_HISTORY_ACCEPTANCE_MARKER} ${RUN_KEY}`,
+    label: `${FAMILY_HISTORY_ACCEPTANCE_MARKER} ${RUN_KEY} connection`,
+  });
   const queue = await t.withIdentity({ subject: OWNER }).mutation(api.queue.createQueueItem, {
     vaultOwnerId: OWNER,
     directive: `${FAMILY_HISTORY_ACCEPTANCE_MARKER} ${RUN_KEY} Check the marked census clue and preserve one sourced private result.`,
@@ -50,6 +70,7 @@ async function saveJoinedFixture(t: ReturnType<typeof convexTest>) {
   });
   const person = await t.mutation(internal.mcpFamilyHistory.savePerson, {
     principal: mcpPrincipal(),
+    grantId,
     operationId: `${RUN_KEY}:save-person`,
     requestHash: "fixture-person-hash",
     input: {
@@ -64,6 +85,7 @@ async function saveJoinedFixture(t: ReturnType<typeof convexTest>) {
   });
   const evidence = await t.mutation(internal.mcpFamilyHistory.saveSourceEvidence, {
     principal: mcpPrincipal(),
+    grantId,
     operationId: `${RUN_KEY}:save-evidence`,
     requestHash: "fixture-evidence-hash",
     input: {
@@ -95,6 +117,7 @@ async function saveJoinedFixture(t: ReturnType<typeof convexTest>) {
   });
   const completedResult = await t.mutation(internal.mcpFamilyHistory.saveCompleteResult, {
     principal: mcpPrincipal(),
+    grantId,
     operationId: `${RUN_KEY}:save-complete-result`,
     requestHash: "fixture-complete-hash",
     input: {
@@ -134,6 +157,37 @@ async function saveJoinedFixture(t: ReturnType<typeof convexTest>) {
       }],
     },
   });
+  // The cached client registration and the transport's own activity rows are
+  // part of the connection graph a real run leaves behind. The activity row here
+  // deliberately does NOT carry the run key in its requestId: a live transport
+  // stamps its own request id, so cleanup has to find it through `grantId`.
+  await t.run(async (ctx) => {
+    const now = Date.now();
+    await ctx.db.insert("mcpClientRegistrations", {
+      clientId: ACCEPTANCE_CLIENT_ID,
+      clientName: `${FAMILY_HISTORY_ACCEPTANCE_MARKER} ${RUN_KEY}`,
+      redirectUris: ["https://localhost:7777/callback"],
+      provenance: "manual" as const,
+      validatedAt: now,
+      lastFetchedAt: now,
+      expiresAt: now + 86_400_000,
+      status: "valid" as const,
+    });
+    await ctx.db.insert("agentActivity", {
+      vaultOwnerId: OWNER,
+      requestId: "transport-request-01JSYNTHETIC",
+      principalKind: "mcp" as const,
+      route: "/mcp",
+      method: "tools/call",
+      scope: "family_history_get_brief",
+      outcome: "ok" as const,
+      statusCode: 200,
+      createdAt: now,
+      grantId: ctx.db.normalizeId("mcpGrants", grantId)!,
+      clientId: ACCEPTANCE_CLIENT_ID,
+    });
+  });
+
   const storyId = completedResult.saved.stories[0].id;
   await t.mutation(internal.queue.agentCompleteQueueItem, {
     principal: queuePrincipal(),
@@ -184,7 +238,10 @@ describe("Family History joined MCP acceptance cleanup", () => {
         stories: 1,
         mcpOperations: 3,
         mcpRecordKeys: 7,
-        agentActivity: 3,
+        // Three run-key-prefixed rows plus the grant-linked transport row.
+        agentActivity: 4,
+        mcpGrants: 1,
+        mcpClientRegistrations: 1,
       },
     });
     await expect(owner.mutation(api.mcpAcceptanceFixture.clear, {
@@ -200,7 +257,19 @@ describe("Family History joined MCP acceptance cleanup", () => {
       sources: (await ctx.db.query("sources").collect()).length,
       stories: (await ctx.db.query("stories").collect()).length,
       operations: (await ctx.db.query("mcpOperations").collect()).length,
-    }))).resolves.toEqual({ people: ["Unrelated"], queue: 0, sources: 0, stories: 0, operations: 0 });
+      grants: (await ctx.db.query("mcpGrants").collect()).length,
+      registrations: (await ctx.db.query("mcpClientRegistrations").collect()).length,
+      activity: (await ctx.db.query("agentActivity").collect()).length,
+    }))).resolves.toEqual({
+      people: ["Unrelated"],
+      queue: 0,
+      sources: 0,
+      stories: 0,
+      operations: 0,
+      grants: 0,
+      registrations: 0,
+      activity: 0,
+    });
   });
 
   test("fails closed outside the exact deployment and without exact confirmation", async () => {
@@ -261,5 +330,71 @@ describe("Family History joined MCP acceptance cleanup", () => {
       runKey: RUN_KEY,
       confirmation: FAMILY_HISTORY_ACCEPTANCE_CONFIRMATION,
     })).rejects.toThrow("an unmarked record references the marked acceptance graph");
+  });
+
+  test("refuses cleanup when a real connection shares the run's client identifier", async () => {
+    vi.stubEnv("CONVEX_CLOUD_URL", "https://accomplished-dodo-308.convex.cloud");
+    vi.stubEnv("TRUST_BOUNDARY_MODE", "enforce");
+    const t = convexTest(schema, modules);
+    await saveJoinedFixture(t);
+    // An unmarked grant on the same client id means removing that client's
+    // cached registration would reach outside this run.
+    await seedGrant(t, {
+      vaultOwnerId: OWNER,
+      clientId: ACCEPTANCE_CLIENT_ID,
+      issuer: "https://clerk.assistwithfamilyhistory.com",
+      observedClientName: "somebody's real assistant",
+      label: "A real connection",
+    });
+
+    await expect(t.withIdentity({ subject: OWNER }).mutation(api.mcpAcceptanceFixture.clear, {
+      vaultOwnerId: OWNER,
+      runKey: RUN_KEY,
+      confirmation: FAMILY_HISTORY_ACCEPTANCE_CONFIRMATION,
+    })).rejects.toThrow("an unmarked connection shares this run's client identifier");
+  });
+
+  test("refuses cleanup when a client registration for this run carries no marker", async () => {
+    vi.stubEnv("CONVEX_CLOUD_URL", "https://accomplished-dodo-308.convex.cloud");
+    vi.stubEnv("TRUST_BOUNDARY_MODE", "enforce");
+    const t = convexTest(schema, modules);
+    await saveJoinedFixture(t);
+    await t.run(async (ctx) => {
+      const now = Date.now();
+      await ctx.db.insert("mcpClientRegistrations", {
+        clientId: ACCEPTANCE_CLIENT_ID,
+        clientName: "an unmarked cached client document",
+        redirectUris: ["https://localhost:7777/callback"],
+        provenance: "cimd" as const,
+        validatedAt: now,
+        lastFetchedAt: now,
+        expiresAt: now + 86_400_000,
+        status: "valid" as const,
+      });
+    });
+
+    await expect(t.withIdentity({ subject: OWNER }).mutation(api.mcpAcceptanceFixture.clear, {
+      vaultOwnerId: OWNER,
+      runKey: RUN_KEY,
+      confirmation: FAMILY_HISTORY_ACCEPTANCE_CONFIRMATION,
+    })).rejects.toThrow("carries no synthetic marker");
+  });
+
+  test("refuses cleanup when a connection is marked by run key but not by the visible marker", async () => {
+    vi.stubEnv("CONVEX_CLOUD_URL", "https://accomplished-dodo-308.convex.cloud");
+    const t = convexTest(schema, modules);
+    await seedGrant(t, {
+      vaultOwnerId: OWNER,
+      clientId: `another-client:${RUN_KEY}`,
+      issuer: "https://clerk.assistwithfamilyhistory.com",
+      observedClientName: RUN_KEY,
+      label: RUN_KEY,
+    });
+
+    await expect(t.withIdentity({ subject: OWNER }).mutation(api.mcpAcceptanceFixture.clear, {
+      vaultOwnerId: OWNER,
+      runKey: RUN_KEY,
+      confirmation: FAMILY_HISTORY_ACCEPTANCE_CONFIRMATION,
+    })).rejects.toThrow("a marked connection lacks its visible synthetic acceptance marker");
   });
 });

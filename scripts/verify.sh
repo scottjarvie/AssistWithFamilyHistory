@@ -21,6 +21,7 @@ steps=(
   "test:process-route"
   "test:convex"
   "check:api-inventory"
+  "check:mcp-contract"
   "check:capture-validation"
   "check:intake-envelope"
   "check:source-facts"
@@ -63,6 +64,11 @@ steps=(
   "check:owned-tables-parity"
   "check:safelink-suppression"
   "check:no-plain-next-link"
+  "check:app-navigation"
+  "check:navigation-accessibility"
+  "check:settings-responsive"
+  "check:connection-center"
+  "check:public-ai-truth"
   "build"
 )
 

@@ -11,9 +11,11 @@ import {
   FlaskConical,
   Gauge,
   Inbox,
+  KeyRound,
   LayoutDashboard,
   MapPinned,
   PenTool,
+  PlugZap,
   TableProperties,
   Users,
   Clock,
@@ -70,6 +72,12 @@ const expectedSections = [
     label: "Your AI",
     items: [
       { href: "/ai", label: "Connect your AI", icon: Bot },
+      { href: "/app/settings/ai", label: "AI Connections", icon: PlugZap },
+      // The API Center and its Admin surface were real pages with no navigation
+      // entry at all, so nothing reachable ever linked to them. The
+      // isNavItemActive("/app/api/admin", "/app/api") assertion below has always
+      // anticipated this entry.
+      { href: "/app/api", label: "API Center", icon: KeyRound },
     ],
   },
   {
