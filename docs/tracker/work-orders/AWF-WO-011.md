@@ -354,6 +354,71 @@ against the pinned commit in `docs/operations/deploy-pin-awf-wo-011.md`.
 **Not claimed.** No deploy, no provider change, no secret or environment value
 read, no real family record touched, and no client named.
 
+### Deploy target verified, and the real blocker found — 2026-08-17 (Claude)
+
+A deploy attempt stopped on two red flags. Both are now explained, and neither
+was what it looked like. This lane changed nothing outside the repository: every
+finding came from a read-only probe or a read-only CLI call.
+
+**The production Convex deployment is `accomplished-dodo-308`, not
+`gallant-mallard-74`.** Proved without any credential, by asking each candidate
+deployment which MCP resource it serves:
+`https://accomplished-dodo-308.convex.site/.well-known/oauth-protected-resource/mcp`
+returns exactly what the branded site returns, while `gallant-mallard-74`
+answers *"This Convex deployment does not have HTTP actions enabled."*
+`accomplished-dodo-308` is also the deployment named in the 2026-08-12
+production acceptance record.
+
+**`gallant-mallard-74` is the Production deployment of an unrelated Convex
+project, `the-jarvie-3c75f`** — the personal project whose Development
+deployment, `impressive-labrador-64`, is what `.env.local` uses for local work.
+It has no functions, no HTTP actions, and no schema. That one fact explains both
+red flags: `CLERK_JWT_ISSUER_DOMAIN` was genuinely absent *there* (it has no
+environment variables at all, while the live branded 401 proves it is set on the
+real deployment), and the "huge legacy index set across dozens of old tables"
+was simply this repository's entire schema diffed against an empty deployment.
+
+**Cleanup owed, not an incident.** The stopped attempt set
+`CLERK_JWT_ISSUER_DOMAIN` on `gallant-mallard-74`. That deployment serves
+nothing and has no functions that could act on an issuer, so no product
+behaviour changed. The removal command is recorded in
+`docs/operations/bring-your-ai-provider-actions.md` §0·0.
+
+**The true schema delta is unchanged and matches what was reviewed.**
+`git diff --numstat 862a224..origin/main -- convex/schema.ts` → `101 1`: two new
+tables (`mcpGrants`, `mcpClientRegistrations`), two new optional fields on
+`agentActivity` (`grantId`, `clientId`), one new index on an existing table
+(`agentActivity.by_owner_grant`), and the single deleted line is an index list
+gaining a member. Nothing legacy, nothing removed, no migration.
+
+**The real blocker: production has not built since PR #58.** The live site runs
+`862a224` (PR #57). All five production deployments since — `fbed586`,
+`78dd1a5`, `34c413e`, `1b7d9e9`, `2d25eb6` — are in **Error**, every one failing
+inside the `convex deploy` step of `scripts/vercel-build.mjs` with the same
+three TypeScript errors in `convex/mcpGrants.ts` (TS7022 on `grants` and
+`listConnections`, TS7023 on its handler). The push itself is fine — the same
+log line reports *"No indexes are deleted by this push"* — the typecheck that
+`convex deploy` runs afterwards is what fails.
+
+**Why the gate missed it.** `convex/_generated/api.d.ts` is checked in and
+predates these modules (`grep -c mcpGrants` → `0`), so locally
+`(internal as any).mcpGrants` is `any` and no inference cycle exists.
+`convex deploy` regenerates the bindings, `internal.mcpGrants` becomes properly
+typed, and `listConnections` lands inside its own inferred return type. Neither
+`pnpm verify` nor `pnpm exec tsc --noEmit -p convex/tsconfig.json` can see this,
+which is worth fixing as its own small piece of work.
+
+**Next safe action.** Merge a focused PR that gives `convex/mcpGrants.ts`
+explicit type annotations, confirm the resulting production build reaches Ready,
+then run the single deploy instruction now in
+`docs/operations/bring-your-ai-provider-actions.md` §0e. No provider change, no
+manual `convex deploy`, and no environment write is needed for any of it.
+
+**Not claimed.** Nothing was deployed, no provider setting was touched, no
+Convex environment variable was written or removed, no secret value was read
+(the production `NEXT_PUBLIC_CONVEX_URL` is marked Sensitive and stayed
+unreadable), and no real family record was accessed.
+
 ## History
 
 - 2026-08-16 · Scott via coordinator delegation — requested a substantial,
@@ -383,3 +448,10 @@ read, no real family record touched, and no client named.
   Independently re-probed the provider and recorded confirmed live Clerk DCR,
   making it the approved soft-launch path and deferring CIMD. No provider,
   secret, environment, deployment, or real-data change.
+- 2026-08-17 · Claude — investigated a stopped deploy attempt. Verified by
+  read-only probe that production Convex is `accomplished-dodo-308` and that
+  `gallant-mallard-74` is an empty deployment of an unrelated project, which
+  explains both of the attempt's red flags. Re-derived the true additive schema
+  delta, and found the actual blocker: every production build since PR #58 has
+  failed on a `convex deploy` typecheck the local gate cannot reproduce. No
+  provider, secret, environment, deployment, or real-data change.
