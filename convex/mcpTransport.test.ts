@@ -109,27 +109,51 @@ describe("stateless Family History MCP transport", () => {
   });
 
   /**
-   * A conformant client should not have to read our prose to learn that six
-   * `family_history:*` permissions exist. Before this, the protected-resource
-   * document advertised where to authorize but never what could be asked for,
-   * so a client could only request nothing or guess.
+   * The product scope vocabulary is published for a human reader under a
+   * vendor-prefixed key, and must NEVER appear as RFC 9728 `scopes_supported`.
    *
-   * The equality assertion is the point: it fails the moment someone hand-types
-   * a scope into the metadata response or adds one to the catalog without the
-   * other, which is exactly how an advertisement drifts from what is enforced.
+   * A conforming client treats `scopes_supported` as an instruction and copies
+   * those values into the `scope` parameter of its authorization request. Clerk
+   * is the authorization server and can only issue its own identity scopes, so
+   * advertising `family_history:*` there makes OAuth fail with
+   * `Invalid scope requested` before consent — which is exactly what happened to
+   * a sibling Assist product with a real client.
+   *
+   * Two assertions, doing two different jobs: the equality catches drift between
+   * what is published and what is enforced, and the absence check stops the
+   * dangerous field ever coming back.
    */
-  test("advertises exactly the six enforced permissions as scopes_supported", async () => {
-    const t = convexTest(schema, modules);
-    const metadata = await t.fetch("/.well-known/oauth-protected-resource/mcp");
-    const document = (await metadata.json()) as { scopes_supported?: unknown };
+  describe("the product scope vocabulary is discoverable without instructing a client", () => {
+    test("publishes the six enforced permissions under the vendor-prefixed key", async () => {
+      const t = convexTest(schema, modules);
+      const metadata = await t.fetch("/.well-known/oauth-protected-resource/mcp");
+      const document = (await metadata.json()) as Record<string, unknown>;
 
-    expect(document.scopes_supported).toEqual([...FAMILY_HISTORY_SCOPES]);
-    expect(document.scopes_supported).toHaveLength(6);
-    // Nothing outside the ceiling may be advertised, ever. An advertised scope
-    // that has no tool and no code path is a promise the server cannot keep.
-    for (const scope of document.scopes_supported as string[]) {
-      expect(scope.startsWith("family_history:")).toBe(true);
-    }
+      const published = document["x-assistwithfamilyhistory.productScopes"];
+      expect(published).toEqual([...FAMILY_HISTORY_SCOPES]);
+      expect(published).toHaveLength(6);
+      // Nothing outside the ceiling may be published, ever. A published scope
+      // with no tool and no code path is a promise the server cannot keep.
+      for (const scope of published as string[]) {
+        expect(scope.startsWith("family_history:")).toBe(true);
+      }
+    });
+
+    test("does not emit scopes_supported, which would tell clients to ask Clerk for scopes it cannot issue", async () => {
+      const t = convexTest(schema, modules);
+      const metadata = await t.fetch("/.well-known/oauth-protected-resource/mcp");
+      const document = (await metadata.json()) as Record<string, unknown>;
+
+      // Asserted against the PARSED DOCUMENT, deliberately — not against the
+      // source text and not against the raw body. The comment that explains this
+      // rule necessarily names the field, so a substring search would fail on
+      // its own explanation.
+      expect(Object.keys(document)).not.toContain("scopes_supported");
+      expect("scopes_supported" in document).toBe(false);
+      // Nor under any other spelling a future edit might reach for.
+      expect(Object.keys(document)).not.toContain("scope");
+      expect(Object.keys(document)).not.toContain("scopes");
+    });
   });
 
   /**

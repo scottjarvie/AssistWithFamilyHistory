@@ -1034,12 +1034,45 @@ configured now:
   to expire;
 - scopes, record boundaries, and the Queue principal all derive from the grant;
 - the protected-resource document at
-  `/.well-known/oauth-protected-resource/mcp` advertises `scopes_supported` — the
-  six `family_history:*` permissions, generated from `lib/mcp/catalog.ts`, the
-  same module the edge enforces with. A conformant client can now *discover* the
-  permission vocabulary instead of having to read this repository's prose. That
-  was added on 2026-08-17 and needs no provider change. Advertising a scope is
-  not granting it: the grant still decides everything.
+  `/.well-known/oauth-protected-resource/mcp` publishes the six
+  `family_history:*` permissions under the vendor-prefixed key
+  `x-assistwithfamilyhistory.productScopes`, generated from `lib/mcp/catalog.ts`,
+  the same module the edge enforces with. It informs a reader and instructs
+  nobody. Added 2026-08-17; needs no provider change.
 
 None of that depends on items 1–3. They make client identity honest and close
 the cross-resource replay gap; they are not what makes the permission real.
+
+### Why the product scopes are NOT published as `scopes_supported`
+
+Worth writing down, because it is a trap that has now caught three sibling
+Assist products — **and because the family standard does not currently state this
+rule anywhere,** despite a sibling repository's commit message implying it does.
+That documentation gap is the reason the same mistake keeps being made; until the
+standard says it, each product has to carry the reasoning itself. This section is
+Family History's copy.
+
+RFC 9728's `scopes_supported` reads like documentation and is not. **A conforming
+client copies those values into the `scope` parameter of its authorization
+request to the authorization server.** Our authorization server is Clerk, whose
+own `scopes_supported` is `openid profile email public_metadata private_metadata
+offline_access` — it has never heard of `family_history:context:read`. Publishing
+the product vocabulary there therefore instructs every conformant client to ask
+Clerk for permissions it cannot issue, and OAuth dies with
+`Invalid scope requested` **before a consent screen ever renders.**
+
+This is observed behaviour, not a reading of the spec: a sibling Assist product
+advertised its own `finance:*` vocabulary this way and a real client failed on
+exactly that error pre-consent; two others removed or reverted the identical
+change.
+
+The vendor-prefixed key gets the discoverability without the instruction, since
+clients ignore keys they do not recognise. `convex/mcpTransport.test.ts` asserts
+both halves — the vocabulary matches the enforced ceiling exactly, and
+`scopes_supported` is absent from the parsed document.
+
+Nothing about this touches the authority model. The six permissions are real and
+enforced. What was wrong was only ever the discovery channel: a permission the
+*product* grants is not a scope the *provider* issues, and one field conflated
+them. `/ai.txt` now also tells a connecting AI, in words, not to put
+`family_history:*` in its OAuth scope request.

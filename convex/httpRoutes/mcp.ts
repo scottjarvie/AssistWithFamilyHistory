@@ -83,18 +83,37 @@ function protectedResourceMetadata(resource: URL, issuer: URL) {
     resource_name: "Assist With Family History",
     authorization_servers: [issuer.toString().replace(/\/$/, "")],
     bearer_methods_supported: ["header"],
-    // The permission vocabulary, spelled out for a conformant client that has
-    // not read our documentation. Without this a client can discover *where* to
-    // authorize but has no machine-readable way to learn that six
-    // `family_history:*` permissions exist, so it can only ask for nothing or
-    // guess. Sourced directly from the module the edge enforces with, so the
-    // advertisement and the ceiling cannot drift — `convex/mcpTransport.test.ts`
-    // holds the parity test that fails if this list is ever hand-maintained.
+    // ------------------------------------------- the product scope vocabulary
     //
-    // Advertising a scope is not granting it. The authorization that decides
-    // anything is still the durable product grant the person approved, resolved
-    // fresh on every request; a token's `scope` claim is never consulted.
-    scopes_supported: [...FAMILY_HISTORY_SCOPES],
+    // Published under a VENDOR-NAMESPACED key, and deliberately NOT as
+    // RFC 9728 `scopes_supported`. This distinction is load-bearing, so here is
+    // the whole reason.
+    //
+    // `scopes_supported` is not documentation for a human reader. A conforming
+    // client reads it as an instruction and copies those values into the
+    // `scope` parameter of its authorization request to the authorization
+    // server. Our authorization server is Clerk, and Clerk can only issue its
+    // own identity scopes — it has never heard of `family_history:context:read`.
+    // So advertising these six there tells every conformant client to ask for
+    // permissions that can only be refused, and OAuth fails with
+    // `Invalid scope requested` before a browser window ever opens.
+    //
+    // That is empirical, not theoretical. A sibling Assist product advertised
+    // its own product vocabulary this way and a real client broke on exactly
+    // that error, before consent. Two other sibling products have since removed
+    // or reverted the identical advertisement.
+    //
+    // A vendor-prefixed key informs a reader and instructs nobody: clients
+    // ignore keys they do not recognise. Still spread from the module the edge
+    // enforces with, so the published vocabulary and the enforced ceiling
+    // cannot drift — `convex/mcpTransport.test.ts` holds the parity test, and it
+    // also asserts that `scopes_supported` is absent so this cannot regress.
+    //
+    // None of this changes the authority model. These six are real and enforced;
+    // the authorization that decides anything is the durable product grant the
+    // person approved, resolved fresh on every request. A token's `scope` claim
+    // is never consulted. What was wrong was only ever the discovery channel.
+    "x-assistwithfamilyhistory.productScopes": [...FAMILY_HISTORY_SCOPES],
     resource_documentation: new URL("/ai", resource.origin).toString(),
   }), {
     headers: {
