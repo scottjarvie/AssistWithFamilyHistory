@@ -5,7 +5,7 @@ execution: active
 audit: not-audited
 cards: AWF-0034, AWF-0038, AWF-0040, AWF-0041, AWF-0042, AWF-0043
 created: 2026-08-16
-updated: 2026-08-16
+updated: 2026-08-17
 proposed-by: Codex from Scott's Bring Your AI delegation
 approved-by: Scott
 approved-on: 2026-08-16
@@ -272,6 +272,32 @@ has not been opened in a real browser, and no client is named. No provider
 setting, secret, environment variable, deployment, or real family record was
 touched.
 
+### Deploy readiness — 2026-08-17 (Claude)
+
+**Ready for production deploy — awaiting Codex.** Verified on a clean worktree
+of `origin/main` (`fbed586`) rather than any local checkout: `pnpm verify`
+passes all 55 steps and `pnpm exec tsc --noEmit -p convex/tsconfig.json` is
+clean. No repo-side defect was found, so nothing needed fixing.
+
+The schema delta production receives is entirely additive — two new tables
+(`mcpGrants`, `mcpClientRegistrations`), two optional `agentActivity` fields,
+one new index — with nothing removed, renamed, or newly required. Existing rows
+stay valid without a migration.
+
+Read-only production probes confirm the pre-#58 baseline: `/app/settings/ai`
+404s, `/mcp` already returns the branded 401 challenge, and Clerk advertises
+neither CIMD nor DCR.
+
+`docs/operations/bring-your-ai-provider-actions.md` is refreshed into a
+copy-paste runbook — pinned exact-SHA deploy worktree, backend-first ordering,
+the Convex-vs-Vercel environment split, four post-deploy checks, and every
+`pnpm mcp:lifecycle` requirement including its four human pauses.
+`docs/operations/deploy-pin-awf-wo-011.md` names the exact commit to deploy.
+
+**Not claimed.** No deploy, no provider change, no secret or environment value
+read, no real family record touched. AWF-0043 moves to `needs-you` because the
+only remaining acts are credentialed and human.
+
 ## History
 
 - 2026-08-16 · Scott via coordinator delegation — requested a substantial,
@@ -290,3 +316,8 @@ touched.
   connection experience (AWF-0042), and the scripted lifecycle harness with its
   locally provable rungs (AWF-0043, still `doing` pending a live run). Moved this
   Work Order to `execution: active`. Audit remains independent and `not-audited`.
+- 2026-08-17 · Claude — verified repo-side production-deploy readiness on a
+  clean worktree, enumerated the additive schema delta, and refreshed the
+  provider/deploy runbook so Codex can execute without reverse-engineering it.
+  Moved AWF-0043 to `needs-you`. Execution stays `active` and audit stays
+  independent and `not-audited`.
