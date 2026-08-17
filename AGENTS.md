@@ -73,6 +73,16 @@ For targeted work pick from:
 
 For UI work, run browser checks on desktop and mobile breakpoints where relevant, inspect console errors, and note what changed visually.
 
+`pnpm verify` deliberately excludes the one browser check this repo owns, because
+it must stay runnable on a fresh clone with no browser binary installed. Run it
+yourself after touching the tracker board, its generator, or its Cards and Work
+Orders:
+
+- `pnpm tracker:verify-browser` — 6 Playwright checks of the generated board's
+  reordering behavior. Needs Chromium: `pnpm exec playwright install chromium`.
+
+CI runs it on every full-scope pull request, so it can no longer fail silently.
+
 ## State Publication Boundary
 
 Tracker and Project Philosophy content may use the narrow state path only after

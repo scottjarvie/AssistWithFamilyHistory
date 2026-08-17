@@ -63,6 +63,21 @@ jobs:
         if: steps.ci_scope.outputs.run_full == 'true'
         run: pnpm verify
 
+      # The tracker board is the durable owner-and-AI view of this project's
+      # work, and its reordering behavior is only provable in a browser.
+      # `pnpm tracker:verify-browser` was in neither `pnpm verify` nor CI, so it
+      # sat red on main for an unknown length of time while nobody was told.
+      # It stays out of `pnpm verify` on purpose — that command must run on a
+      # fresh clone with no browser binary — and lives here, where the browser
+      # is installed deterministically and a failure is reported.
+      - name: Install Chromium for browser checks
+        if: steps.ci_scope.outputs.run_full == 'true'
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Tracker reader browser checks
+        if: steps.ci_scope.outputs.run_full == 'true'
+        run: pnpm tracker:verify-browser
+
       - name: Start app
         if: steps.ci_scope.outputs.run_full == 'true'
         run: |
