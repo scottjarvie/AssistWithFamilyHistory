@@ -1,4 +1,5 @@
 import { FAMILY_HISTORY_MCP_TOOL_NAMES } from "@/lib/mcp/contract";
+import { SUPPORT_DESK_URL } from "@/lib/site/supportDesk";
 
 export function GET() {
   const body = [
@@ -8,6 +9,7 @@ export function GET() {
     "MCP endpoint: https://assistwithfamilyhistory.com/mcp",
     "Transport: remote Streamable HTTP MCP with OAuth. Modern 2026-07-28 requests and stateless 2025-era fallback share one tool factory.",
     "Setup page: https://assistwithfamilyhistory.com/ai",
+    `Support: ${SUPPORT_DESK_URL} is the one support desk for every Assist With site. No Assist With site has a support, feedback, or privacy email address, so never tell a person to email this product.`,
     "",
     "## Required workflow",
     "1. Call get_family_history_brief first.",

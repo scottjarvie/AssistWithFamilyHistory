@@ -150,7 +150,7 @@ Use these status labels throughout this revision:
 | Export and deletion | **Coming soon** | Person context-pack export and key revocation are narrower current tools. No complete owner export, `/settings/data`, `/delete-account`, coordinated record/account deletion, attachment purge, or content-bearing-history purge is verified |
 | Public truth surfaces and honesty | **Current / verified version 2.0.0 Public & live** | `/updates` uses the exact **Local / In review / Backend live / Public & live** vocabulary and version 2.0.0 is Public & live after full local, protected, production, responsive, signed-out, isolated signed-in, OAuth, and MCP verification. Public marketing, roadmap, privacy, `/llms.txt`, the home FAQ, and `/ai` use the enduring product identity and Current / Coming soon / Later boundaries. AWF-WO-007 records the exact proof and remaining gaps |
 | `/me` and `/admin` | **Coming soon** | No family `/me` or owner `/admin` route exists. `/app/audit` is a private genealogy-readiness view and `/app/api/admin` is an API-key operator surface; neither is the family usage/stats contract |
-| Support Desk | **In design / deferred dependency** | `/contact` exists, but no registered Assist With Life Support Desk source key or header/footer desk link is present. Link it only when the shared desk is live; do not market it beforehand |
+| Support Desk | **Current / verified single support route; In design registered source key and shell desk link** | Scott's portfolio decision: no Assist With site runs a mailbox or an email server, and every support, feedback, and privacy question for the whole family goes to the one live Assist With Life support desk at `https://assistwithlife.com/support`. `/contact`, `/privacy`, the marketing call to action, `/llms.txt`, and `/ai.txt` now send people and AI agents there and say plainly that direct email contact is not available; `check:support-contact` keeps a `mailto:` or contact address from returning. No registered Support Desk source key or header/footer desk link exists yet |
 | Brand, design, and themes | **Intentional product-specific difference; Current Assist With Family History production identity; Coming soon accessibility floor** | Present **Assist With Family History** as the one enduring product identity while preserving the compass, parchment, teal/rust, archival annotations, evidence-thread motif, typography, and editorial voice as its own design system. “Discover Their Stories” remains only in historical evidence or genuinely required technical identifiers. Version 2.0.0 proves the public, signed-in, Queue, extension, metadata, AI/MCP, current-doc, Clerk, and normal-domain identity. The designed philosophy reader already supports light/dark; the product UI does not yet prove first-class light/dark coverage. The family swatches `#8FD7B4` and `#245A43` identify Family History in shared portfolio wayfinding; they do not replace or dictate the product palette |
 | Dense information | **Intentional product-specific difference; Partial / verified foundation; Coming soon dependable behavior** | Family History may be denser than a sibling because evidence comparison requires it. People reads are capped and the operations view has a contained table, filters, sorting controls, and bounded rendering. Cursor pagination, table-first people view, click-to-sort columns, remembered preferences, account-saved views, and complete phone drill-down are not verified. The family contract supplies performance and phone-usability guardrails, not a uniform layout |
 | Family navigation | **Coming soon** | No family catalog row exists in the public or signed-in shell. It must show the whole verified roster without leaking cross-site counts or activity |
@@ -1598,8 +1598,11 @@ change the application.
 
 The version 2.0.0 public source has `/updates`, roadmap/status copy, privacy
 copy, `/llms.txt`, `/ai`, `/ai.txt`, an eight-question front-page FAQ, and an
-early family `/ai` invitation. It still has no verified family row or Support
-Desk link. The setup surfaces distinguish the proven production backend and one
+early family `/ai` invitation. `/contact`, `/privacy`, the marketing call to
+action, `/llms.txt`, and `/ai.txt` now route every support, feedback, and
+privacy question to the live Assist With Life support desk and state plainly
+that direct email contact is not available; no verified family row or shell
+Support Desk link exists yet. The setup surfaces distinguish the proven production backend and one
 disposable named-client lifecycle from still-Partial broad client compatibility,
 fresh-device email, reconnect, and immediate JWT revocation. The current `/about` local-only
 storage/export statement also conflicts with the Convex-backed architecture,
@@ -1870,6 +1873,27 @@ before it was run.
 
 ## Changelog
 
+- **1.8.0 · 2026-08-16** — restated chosen-AI capability truth against the
+  adopted family Bring Your AI MCP/OAuth standard. The stateless production
+  `/mcp` foundation and its twelve workflow tools remain Current, but token
+  scopes are parsed rather than enforced on domain tools, Queue scopes are
+  assigned internally, no owner-visible product grant or record boundary
+  exists, protected evidence delivery is incomplete, issued JWT access is not
+  immediately revocable, and live provider metadata on 2026-08-16 advertised
+  neither Client ID Metadata Documents nor a registration endpoint. No named
+  client is claimed compatible; a name becomes current only after that exact
+  client completes discovery, consent, scoped work, correction, revoke,
+  reconnect, and cleanup proof. AWF-WO-011 and
+  `docs/planning/family-history-bring-your-ai-alignment.md` own the outcome.
+- **1.7.1 · 2026-08-16** — recorded Scott's portfolio support decision: no
+  Assist With site runs a mailbox or an email server, and every support,
+  feedback, and privacy question goes to the one live Assist With Life support
+  desk at `https://assistwithlife.com/support`. `/contact`, `/privacy`, the
+  marketing call to action, `/llms.txt`, and `/ai.txt` now direct people and AI
+  agents there and say plainly that direct email contact is not available. The
+  former `@discovertheirstories.com` support, features, and privacy addresses
+  were never receivable and are gone, with `check:support-contact` guarding
+  their return.
 - **1.7.0 · 2026-08-13** — established Assist With Family History as the one
   enduring public and signed-in product identity and
   `assistwithfamilyhistory.com` as the normal public address. Retired Discover

@@ -29,8 +29,8 @@ export default function OpenGraphImage() {
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={{ display: "flex", flexDirection: "column", fontSize: 84, fontWeight: 700, lineHeight: 1.05 }}>
-            <span>Discover Their</span>
-            <span>Stories</span>
+            <span>Assist With</span>
+            <span>Family History</span>
           </div>
           <div style={{ fontSize: 34, maxWidth: "85%", color: "#44403c" }}>
             Research deeply, document evidence, and turn genealogy records into narratives.

@@ -16,8 +16,13 @@
  */
 
 import { Button } from "@/components/ui/button";
-import { SafeLink } from "@/components/layout/SafeLink";
-import { ArrowRight, Mail, Wrench } from "lucide-react";
+import { SafeAnchor, SafeLink } from "@/components/layout/SafeLink";
+import { ArrowRight, LifeBuoy, Wrench } from "lucide-react";
+import {
+  NO_DIRECT_EMAIL_STATEMENT,
+  SUPPORT_DESK_LABEL,
+  SUPPORT_DESK_URL,
+} from "@/lib/site/supportDesk";
 
 export function CTASection() {
   return (
@@ -55,15 +60,22 @@ export function CTASection() {
               size="lg"
               className="h-[3.25rem] rounded-full border-[#f3dfbe80] bg-transparent px-8 text-base text-[#fff4e1] hover:bg-[#f8ebd511] hover:text-[#fff4e1]"
             >
-              <SafeLink
-                href="mailto:features@discovertheirstories.com"
+              <SafeAnchor
+                href={SUPPORT_DESK_URL}
+                rel="noreferrer"
+                target="_blank"
                 className="flex items-center gap-2"
               >
                 Share feedback
-                <Mail className="h-4 w-4" />
-              </SafeLink>
+                <LifeBuoy className="h-4 w-4" />
+              </SafeAnchor>
             </Button>
           </div>
+
+          <p className="mt-5 max-w-3xl text-sm leading-6 text-[#ecdeca]">
+            Support for every Assist With site runs through {SUPPORT_DESK_LABEL}.{" "}
+            {NO_DIRECT_EMAIL_STATEMENT}
+          </p>
         </div>
 
         <div className="border border-[#f3dfbe55] bg-[#f8ebd512] p-6 text-[#ecdeca]">

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "project": "Assist With Family History",
-  "repository": "github.com/scottjarvie/discover-their-stories",
+  "repository": "github.com/scottjarvie/AssistWithFamilyHistory",
   "projectUrl": "https://assistwithfamilyhistory.com",
   "idPrefix": "AWF",
   "projectPhilosophy": "../planning/assist-with-family-history-project-philosophy.md",

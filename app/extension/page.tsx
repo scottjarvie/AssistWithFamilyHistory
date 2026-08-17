@@ -119,7 +119,7 @@ export default function ExtensionPage() {
                 className="h-12 rounded-full bg-[#234d5e] px-7 text-[#f7f3e8] shadow-[0_16px_35px_-22px_#132b35] hover:bg-[#1f4554]"
               >
                 <a
-                  href="/extension-download/discover-their-stories-extension.zip"
+                  href="/extension-download/assist-with-family-history-extension.zip"
                   download
                 >
                   <Download aria-hidden="true" className="mr-2 h-5 w-5" />
@@ -262,7 +262,7 @@ export default function ExtensionPage() {
                   </p>
                   <Button asChild variant="outline" size="sm" className="mt-4 border-[#9f5a2d66] text-[#7a4525]">
                     <a
-                      href="/extension-download/discover-their-stories-extension.zip"
+                      href="/extension-download/assist-with-family-history-extension.zip"
                       download
                     >
                       <Download aria-hidden="true" className="mr-2 h-4 w-4" />
@@ -335,7 +335,7 @@ export default function ExtensionPage() {
             <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
               <Button asChild size="lg" className="h-12 rounded-full bg-[#f7f3e8] px-7 text-[#234d5e] hover:bg-[#fffaf2]">
                 <a
-                  href="/extension-download/discover-their-stories-extension.zip"
+                  href="/extension-download/assist-with-family-history-extension.zip"
                   download
                 >
                   <Download aria-hidden="true" className="mr-2 h-5 w-5" />
