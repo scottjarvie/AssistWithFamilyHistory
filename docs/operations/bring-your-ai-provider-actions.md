@@ -11,8 +11,14 @@
 >
 > **Repo-side readiness, verified 2026-08-17 on a clean worktree of
 > `origin/main`:** `pnpm verify` passes all 55 steps, and
-> `pnpm exec tsc --noEmit -p convex/tsconfig.json` is clean, so the Convex function
-> set compiles before anything is pushed at production.
+> `pnpm exec tsc --noEmit -p convex/tsconfig.json` is clean.
+>
+> **⚠️ That gate is not sufficient, and the deploy is currently blocked.** The
+> production Vercel build fails inside its own `convex deploy` step on a
+> TypeScript error the local gate cannot see. Production is still serving
+> `862a224`. Read **0·0 first** — it also names the correct production Convex
+> deployment, `accomplished-dodo-308`, and explains what `gallant-mallard-74`
+> is.
 
 ## Why this file exists
 
@@ -28,6 +34,112 @@ what changes in observable behaviour, and how to undo it.
 ---
 
 # SEND TO CODEX
+
+## 0·0. Read this first — the two facts that were missing on 2026-08-17
+
+A deploy attempt on 2026-08-17 stopped on two red flags. Both are now explained,
+and one of them is a real blocker that no deploy procedure can work around.
+Nothing below was assumed; every claim names the read-only command that proved
+it.
+
+### The production Convex deployment is `accomplished-dodo-308`
+
+Not `gallant-mallard-74`. Proved by asking each candidate deployment directly
+which MCP resource it serves — only one answers as this product:
+
+```bash
+curl -sS https://accomplished-dodo-308.convex.site/.well-known/oauth-protected-resource/mcp
+# → {"resource":"https://assistwithfamilyhistory.com/mcp", … }   ← byte-identical
+#   to what https://assistwithfamilyhistory.com/.well-known/oauth-protected-resource/mcp
+#   returns through the branded Vercel proxy.
+
+curl -sS https://gallant-mallard-74.convex.site/.well-known/oauth-protected-resource/mcp
+# → "This Convex deployment does not have HTTP actions enabled."
+```
+
+`accomplished-dodo-308` is also the deployment named in
+`docs/operations/family-history-mcp-production-acceptance-2026-08-12.md`, and it
+returns the same branded `WWW-Authenticate: Bearer realm="assist-with-family-history"`
+challenge that the live site returns.
+
+### What `gallant-mallard-74` actually is, and the cleanup it needs
+
+It is the **Production deployment of an unrelated Convex project**,
+`the-jarvie-3c75f` — the personal project whose *Development* deployment,
+`impressive-labrador-64`, is what this repository's `.env.local` points at for
+local work. It has **no HTTP actions, no functions, and no schema at all.**
+
+That single fact explains both red flags from the stopped attempt:
+
+- **"CLERK_JWT_ISSUER_DOMAIN missing in production"** was true *of that
+  deployment*, which has no environment variables — while the live site's
+  working branded 401 proves the variable is set where it matters, on
+  `accomplished-dodo-308`.
+- **"a huge legacy index set across dozens of old tables"** was not a legacy
+  index set at all. Diffing this repository's full schema against an *empty*
+  deployment necessarily proposes creating every table and every index the
+  product has ever had. Against the correct deployment the delta is the small
+  additive one in 0d.
+
+This is exactly the trap the warning in item 3 describes: `--prod` means *this
+project's* production deployment, and on a developer machine the resolved
+project is usually the wrong one.
+
+> **⚠️ Cleanup owed.** The stopped attempt set
+> `CLERK_JWT_ISSUER_DOMAIN=https://clerk.assistwithfamilyhistory.com` on
+> `gallant-mallard-74`. That deployment does not serve this product and does not
+> need it. It is inert — an unused deployment with no functions cannot act on an
+> issuer — so this is tidiness, not an incident, and no product behaviour
+> changed. Remove it when convenient:
+>
+> ```bash
+> pnpm exec convex env remove CLERK_JWT_ISSUER_DOMAIN --deployment gallant-mallard-74
+> ```
+>
+> Confirm first with `pnpm exec convex dashboard --no-open --deployment gallant-mallard-74`,
+> and do **not** run any `env` command against that name without `--deployment`.
+
+### The blocker: production builds have been failing since PR #58
+
+**The live site is running commit `862a224` (PR #57).** Every production build
+since has failed, all five with the same error. Read-only check:
+
+```bash
+pnpm dlx vercel@latest ls --prod
+pnpm dlx vercel@latest inspect <the newest Error deployment url> --logs | tail -40
+```
+
+| Commit | State |
+| --- | --- |
+| `2d25eb6`, `1b7d9e9`, `34c413e`, `78dd1a5`, `fbed586` | **Error** |
+| `862a224` (PR #57) | Ready — **this is what production is serving** |
+
+The failure is inside the `convex deploy` step of `scripts/vercel-build.mjs`,
+and it is a TypeScript error, not a schema or environment problem:
+
+```
+✔ No indexes are deleted by this push
+convex/mcpGrants.ts:61  error TS7022: 'grants' implicitly has type 'any' …
+convex/mcpGrants.ts:387 error TS7022: 'listConnections' implicitly has type 'any' …
+convex/mcpGrants.ts:389 error TS7023: 'handler' implicitly has return type 'any' …
+```
+
+**Why the repo gate does not catch it.** `convex/_generated/api.d.ts` is checked
+in and predates these modules — `grep -c mcpGrants convex/_generated/api.d.ts`
+returns `0`. Locally, `const grants = (internal as any).mcpGrants` therefore
+resolves to `any` and nothing is circular, so
+`pnpm exec tsc --noEmit -p convex/tsconfig.json` passes. `convex deploy`
+regenerates those bindings from the real function set, `internal.mcpGrants`
+becomes properly typed, and `listConnections` ends up referenced inside its own
+inferred return type. The cycle only exists once the generated types are fresh.
+
+**Consequence for this runbook:** the deploy in 0c cannot succeed until
+`convex/mcpGrants.ts` carries explicit type annotations. That is a normal code
+fix through a normal PR — not a deploy step, not a provider change, and not
+something to work around by deploying Convex by hand. Tracked as the next safe
+action in AWF-WO-011.
+
+---
 
 ## 0. Deploy the release from a pinned, clean worktree
 
@@ -187,12 +299,21 @@ Confirm afterwards that the build log contains
 
 ### 0d. What production's database receives
 
-The whole delta is **additive**. Verified by diffing `convex/schema.ts` between
-the pre-#58 baseline (`862a224`, the first parent of merge `fbed586`) and
-`origin/main`: 91 inserted lines, 1 changed line, and that one change is an index
-list gaining a member. `/ai.txt`'s twelve-tool readout above is the independent
-live confirmation that `862a224` really is what production runs, rather than an
-assumption inherited from the PR description.
+The whole delta is **additive**. Re-verified 2026-08-17 by diffing
+`convex/schema.ts` between the pre-#58 baseline (`862a224`) and `origin/main`
+(`2d25eb6`):
+
+```bash
+git diff --numstat 862a224..origin/main -- convex/schema.ts
+# → 101   1   convex/schema.ts
+```
+
+101 added lines and exactly one changed line, and that one change is an index
+list gaining a member. Two independent readouts confirm `862a224` really is what
+production runs, rather than an assumption inherited from the PR description:
+`/ai.txt`'s twelve-tool listing above, and the Vercel production deployment
+record (`vercel ls --prod` → `862a224` is the newest **Ready** production
+deployment; see 0·0).
 
 **Two new tables**
 
@@ -222,6 +343,63 @@ that somehow acquired a grant carries it through claim rather than orphaning it.
 
 **Rollback:** redeploy the previous Vercel production deployment. The two new
 tables simply go unread; they hold no data any pre-#58 code path depends on.
+
+### 0e. The whole deploy, as one exact instruction
+
+Everything above in one copy-and-paste block. It is deliberately a single act:
+three pre-flight reads that can only fail closed, then one publish. Run it top to
+bottom in one shell, and stop at the first line that disagrees with its comment.
+
+> **Do not start this until the PR that fixes `convex/mcpGrants.ts` is merged**
+> (see 0·0). Until then the Vercel build will fail inside `convex deploy` and
+> production will simply stay on `862a224` — safe, but no further along.
+
+```bash
+# ── pre-flight 1 · pin an exact commit and a clean worktree ───────────────────
+MAIN=/Users/scottjarvie/IDE/AssistWithFamilyHistory
+git -C "$MAIN" fetch origin
+SHA=$(git -C "$MAIN" rev-parse origin/main)
+DEPLOY="$MAIN/.claude/worktrees/deploy-${SHA:0:7}"
+[ -d "$DEPLOY" ] || git -C "$MAIN" worktree add "$DEPLOY" "$SHA"
+cd "$DEPLOY" && pnpm install --frozen-lockfile
+
+git -C "$DEPLOY" rev-parse HEAD        # must equal $SHA
+git -C "$DEPLOY" status --porcelain    # must print nothing
+ls "$DEPLOY"/.env.local 2>/dev/null && echo "STOP: env file in the deploy tree"
+
+# ── pre-flight 2 · confirm the Convex target is the one serving the site ──────
+curl -sS https://accomplished-dodo-308.convex.site/.well-known/oauth-protected-resource/mcp
+curl -sS https://assistwithfamilyhistory.com/.well-known/oauth-protected-resource/mcp
+# the two lines above must be identical. If they are not, STOP.
+
+pnpm exec convex env list --deployment accomplished-dodo-308
+# must show CLERK_JWT_ISSUER_DOMAIN = https://clerk.assistwithfamilyhistory.com
+
+# ── pre-flight 3 · see what would be pushed, without pushing it ───────────────
+pnpm exec convex deploy --dry-run -v
+# expect: the repository's own convex/ modules, the two new tables from 0d, and
+# "No indexes are deleted by this push". If it proposes creating dozens of
+# tables, you are pointed at an empty deployment — STOP and re-read 0·0.
+
+# ── pre-flight 4 · the repo's own gate ────────────────────────────────────────
+pnpm verify                                     # expect: All 55 verification steps passed.
+pnpm exec tsc --noEmit -p convex/tsconfig.json  # expect: no output, exit 0
+# Note: this gate does NOT reproduce the convex deploy typecheck (see 0·0).
+
+# ── the deploy · one act, Convex first, then the frontend ─────────────────────
+pnpm dlx vercel@latest deploy --prod --yes
+# Do NOT also run `convex deploy` by hand. The build already did it.
+
+# ── after · the cheapest proof it landed ──────────────────────────────────────
+pnpm dlx vercel@latest ls --prod | head -3      # newest must be Ready, at $SHA
+curl -sS https://assistwithfamilyhistory.com/ai.txt | grep -c family_history_
+# expect 14 canonical names, where production previously listed twelve legacy ones
+curl -sS -o /dev/null -w '%{http_code}\n' https://assistwithfamilyhistory.com/app/settings/ai
+# expect 200, where production previously answered 404
+```
+
+Then run the four fuller checks in 3b, and only after those, the live lifecycle
+in item 4.
 
 ---
 
@@ -371,27 +549,33 @@ they cannot see Vercel's.** `convex/auth.config.ts`, `convex/access.ts`, and
 > nothing to do with this site. That happened while writing this runbook.
 >
 > The cure is to name the deployment explicitly with `--deployment <name>`
-> rather than trusting `--prod`. Get the real name from the value Vercel
-> actually ships:
+> rather than trusting `--prod`. **The name is `accomplished-dodo-308`**,
+> verified 2026-08-17 in 0·0 by asking each candidate deployment which MCP
+> resource it serves. Do not re-derive it by guesswork:
 >
 > ```bash
-> # Pull OUTSIDE the deploy worktree — never leave an env file in the tree.
-> TMPENV=$(mktemp -d)
-> (cd "$DEPLOY" && pnpm dlx vercel@latest env pull "$TMPENV/prod.env" --environment=production --yes)
-> grep NEXT_PUBLIC_CONVEX_URL "$TMPENV/prod.env"   # → https://<name>.convex.cloud
-> rm -rf "$TMPENV"                                 # it holds secrets; do not keep it
-> ```
->
-> Then either read the variables in the **Convex dashboard** (Settings →
-> Environment Variables) for the project that owns `<name>`, or pass that name
-> to every CLI call:
->
-> ```bash
+> CX=accomplished-dodo-308
 > cd "$DEPLOY"
-> pnpm exec convex dashboard --no-open --deployment <name>   # confirm the target first
-> pnpm exec convex env list --deployment <name>
+> pnpm exec convex dashboard --no-open --deployment "$CX"   # confirm the target first
+> pnpm exec convex env list --deployment "$CX"
 > ```
 >
+> Re-prove the name yourself in one command if you want to, without any
+> credential:
+>
+> ```bash
+> curl -sS https://accomplished-dodo-308.convex.site/.well-known/oauth-protected-resource/mcp
+> # must equal what https://assistwithfamilyhistory.com/.well-known/oauth-protected-resource/mcp returns
+> ```
+>
+> `NEXT_PUBLIC_CONVEX_URL` on Vercel Production is marked **Sensitive**, so
+> `vercel env pull` returns it as `[SENSITIVE]` and cannot confirm the name. The
+> stale `NEXT_PUBLIC_CONVEX_SITE_URL` in that project points at
+> `industrious-cardinal-204`, which no current code path reads —
+> `grep -rn NEXT_PUBLIC_CONVEX_SITE_URL` finds it only in `.env.example`. Do not
+> take it for the deployment name.
+>
+
 > Everything in this section is a **read** against the production deployment.
 > `pnpm exec convex env set` is the only write, and it is conditional — run it
 > only if a value is genuinely wrong, and only after `convex dashboard
