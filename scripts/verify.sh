@@ -21,6 +21,7 @@ steps=(
   "test:process-route"
   "test:convex"
   "check:api-inventory"
+  "check:mcp-contract"
   "check:capture-validation"
   "check:intake-envelope"
   "check:source-facts"

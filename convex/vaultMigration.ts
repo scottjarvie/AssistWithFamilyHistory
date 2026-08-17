@@ -59,6 +59,9 @@ const OWNED_TABLES = [
   "agentActivity",
   "mcpOperations",
   "mcpRecordKeys",
+  // A guest can only reach a grant by connecting an AI before signing up, but
+  // if one exists it must follow them rather than being orphaned.
+  "mcpGrants",
 ] as const satisfies readonly TableNames[];
 
 export const GUEST_PREFIX = "guest_";

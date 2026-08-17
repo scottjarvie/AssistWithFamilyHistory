@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit",
     "verify": "bash scripts/verify.sh",
     "check:api-inventory": "tsx scripts/check-api-inventory.ts",
+    "check:mcp-contract": "tsx scripts/check-mcp-contract.ts",
     "check:capture-validation": "tsx scripts/check-capture-validation.ts",
     "check:intake-envelope": "tsx scripts/check-intake-envelope.ts",
     "check:source-facts": "tsx scripts/check-source-facts.ts",

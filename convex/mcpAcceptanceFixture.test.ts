@@ -9,6 +9,8 @@ import {
   FAMILY_HISTORY_ACCEPTANCE_PREFIX,
 } from "./mcpAcceptanceFixture";
 
+import { seedGrant } from "../lib/mcp/testSupport";
+
 const modules = import.meta.glob("./**/*.ts");
 const OWNER = "user_3HqFpM96Ck1hTJZajDX893sWnPm";
 const RUN_KEY = `${FAMILY_HISTORY_ACCEPTANCE_PREFIX}joined-workflow-test`;
@@ -33,6 +35,13 @@ function queuePrincipal() {
 }
 
 async function saveJoinedFixture(t: ReturnType<typeof convexTest>) {
+  // Every MCP write now needs an approved product grant, at the transport and
+  // again inside the mutation.
+  const grantId = await seedGrant(t, {
+    vaultOwnerId: OWNER,
+    clientId: "synthetic-acceptance-client",
+    issuer: "https://clerk.assistwithfamilyhistory.com",
+  });
   const queue = await t.withIdentity({ subject: OWNER }).mutation(api.queue.createQueueItem, {
     vaultOwnerId: OWNER,
     directive: `${FAMILY_HISTORY_ACCEPTANCE_MARKER} ${RUN_KEY} Check the marked census clue and preserve one sourced private result.`,
@@ -50,6 +59,7 @@ async function saveJoinedFixture(t: ReturnType<typeof convexTest>) {
   });
   const person = await t.mutation(internal.mcpFamilyHistory.savePerson, {
     principal: mcpPrincipal(),
+    grantId,
     operationId: `${RUN_KEY}:save-person`,
     requestHash: "fixture-person-hash",
     input: {
@@ -64,6 +74,7 @@ async function saveJoinedFixture(t: ReturnType<typeof convexTest>) {
   });
   const evidence = await t.mutation(internal.mcpFamilyHistory.saveSourceEvidence, {
     principal: mcpPrincipal(),
+    grantId,
     operationId: `${RUN_KEY}:save-evidence`,
     requestHash: "fixture-evidence-hash",
     input: {
@@ -95,6 +106,7 @@ async function saveJoinedFixture(t: ReturnType<typeof convexTest>) {
   });
   const completedResult = await t.mutation(internal.mcpFamilyHistory.saveCompleteResult, {
     principal: mcpPrincipal(),
+    grantId,
     operationId: `${RUN_KEY}:save-complete-result`,
     requestHash: "fixture-complete-hash",
     input: {

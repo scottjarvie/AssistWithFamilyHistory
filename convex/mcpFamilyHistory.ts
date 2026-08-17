@@ -5,6 +5,7 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { internalMutation, internalQuery } from "./_generated/server";
 import { FAMILY_HISTORY_MCP_LIMITS } from "../lib/mcp/contract";
 import { matchesVaultOwner } from "./vaultCore";
+import { assertGrantPermits } from "./mcpGrants";
 
 const principalValidator = v.object({
   issuer: v.string(),
@@ -179,6 +180,7 @@ async function finishOperation(
   args: {
     owner: string;
     principal: McpPrincipal;
+    grantId?: string;
     operationId: string;
     toolName: string;
     requestHash: string;
@@ -212,6 +214,10 @@ async function finishOperation(
     statusCode: 200,
     createdAt: now,
     detail: cleanText(args.detail, "activity detail", 300),
+    grantId: args.grantId
+      ? (ctx.db.normalizeId("mcpGrants", args.grantId) ?? undefined)
+      : undefined,
+    clientId: args.principal.clientId,
   });
   return result;
 }
@@ -220,6 +226,7 @@ async function operation(
   ctx: MutationCtx,
   args: {
     principal: McpPrincipal;
+    grantId?: string;
     operationId: string;
     toolName: string;
     requestHash: string;
@@ -228,6 +235,15 @@ async function operation(
   work: (owner: string) => Promise<{ result: Record<string, unknown>; detail: string }>,
 ) {
   const owner = ownerFromPrincipal(args.principal);
+  // Defense in depth. The transport already resolved and checked this grant;
+  // the data layer refuses independently so a transport bug or a future caller
+  // cannot turn an unapproved connection into a write.
+  await assertGrantPermits(ctx, {
+    owner,
+    grantId: args.grantId,
+    toolName: args.toolName,
+    input: args.input,
+  });
   const operationId = cleanText(args.operationId, "operationId", FAMILY_HISTORY_MCP_LIMITS.operationId, true)!;
   const replay = await replayReceipt(ctx, owner, operationId, args.toolName, args.requestHash);
   if (replay) return replay;
@@ -816,37 +832,37 @@ export const getRecordContext = internalQuery({
 });
 
 export const savePerson = internalMutation({
-  args: { principal: principalValidator, operationId: v.string(), requestHash: v.string(), input: v.any() },
+  args: { principal: principalValidator, grantId: v.optional(v.string()), operationId: v.string(), requestHash: v.string(), input: v.any() },
   handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_person" }, async (owner) => ({ result: { person: await savePersonRecord(ctx, owner, args.input) }, detail: "Saved a person record through MCP." })),
 });
 
 export const saveRelationship = internalMutation({
-  args: { principal: principalValidator, operationId: v.string(), requestHash: v.string(), input: v.any() },
+  args: { principal: principalValidator, grantId: v.optional(v.string()), operationId: v.string(), requestHash: v.string(), input: v.any() },
   handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_relationship" }, async (owner) => ({ result: { relationship: await saveRelationshipRecord(ctx, owner, args.input) }, detail: "Saved a relationship record through MCP." })),
 });
 
 export const saveEvent = internalMutation({
-  args: { principal: principalValidator, operationId: v.string(), requestHash: v.string(), input: v.any() },
+  args: { principal: principalValidator, grantId: v.optional(v.string()), operationId: v.string(), requestHash: v.string(), input: v.any() },
   handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_event" }, async (owner) => ({ result: { event: await saveEventRecord(ctx, owner, args.input) }, detail: "Saved an event and additive person roles through MCP." })),
 });
 
 export const saveSourceEvidence = internalMutation({
-  args: { principal: principalValidator, operationId: v.string(), requestHash: v.string(), input: v.any() },
+  args: { principal: principalValidator, grantId: v.optional(v.string()), operationId: v.string(), requestHash: v.string(), input: v.any() },
   handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_source_evidence" }, async (owner) => ({ result: { evidence: await saveSourceEvidenceRecord(ctx, owner, args.input) }, detail: "Saved source, citation, evidence links, and source facts through MCP." })),
 });
 
 export const saveResearchWork = internalMutation({
-  args: { principal: principalValidator, operationId: v.string(), requestHash: v.string(), input: v.any() },
+  args: { principal: principalValidator, grantId: v.optional(v.string()), operationId: v.string(), requestHash: v.string(), input: v.any() },
   handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_research_work" }, async (owner) => ({ result: { research: await saveResearchRecord(ctx, owner, args.input) }, detail: "Saved research task or finding through MCP." })),
 });
 
 export const saveStoryWork = internalMutation({
-  args: { principal: principalValidator, operationId: v.string(), requestHash: v.string(), input: v.any() },
+  args: { principal: principalValidator, grantId: v.optional(v.string()), operationId: v.string(), requestHash: v.string(), input: v.any() },
   handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_story_work" }, async (owner) => ({ result: { story: await saveStoryRecord(ctx, owner, args.input) }, detail: "Saved private story work through MCP." })),
 });
 
 export const saveCompleteResult = internalMutation({
-  args: { principal: principalValidator, operationId: v.string(), requestHash: v.string(), input: v.any() },
+  args: { principal: principalValidator, grantId: v.optional(v.string()), operationId: v.string(), requestHash: v.string(), input: v.any() },
   handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_complete_result" }, async (owner) => {
     const cap = FAMILY_HISTORY_MCP_LIMITS.completeResultRowsPerKind;
     for (const [kind, rows] of Object.entries({ events: args.input.events ?? [], relationships: args.input.relationships ?? [], evidence: args.input.evidence ?? [], stories: args.input.stories ?? [] })) {
@@ -869,5 +885,272 @@ export const saveCompleteResult = internalMutation({
     for (const item of args.input.stories ?? []) stories.push(await saveStoryRecord(ctx, owner, item));
     results.stories = stories;
     return { result: { saved: results, summary: cleanText(args.input.summary, "complete result summary", 1_000, true) }, detail: "Saved one complete Family History result atomically through MCP." };
+  }),
+});
+
+/* ------------------------------------------------------------------- batch */
+
+/**
+ * Resolve a person reference that may name a person created in THIS call.
+ *
+ * A census page is the real case: an AI extracts a household, creates a dozen
+ * people, and immediately needs to relate them. Making it round-trip for ids
+ * would mean a dozen approvals and a dozen chances to drift. So relationship,
+ * event, evidence, and story items may name a person by the `createKey` used
+ * earlier in the same call — an index into the caller's own arrays, never a
+ * guessed id.
+ */
+async function resolveBatchPerson(
+  ctx: MutationCtx,
+  owner: string,
+  batch: Map<string, string>,
+  ref: { id?: unknown; createKey?: unknown },
+  label: string,
+): Promise<string> {
+  if (typeof ref.id === "string" && ref.id.trim()) return ref.id.trim();
+  if (typeof ref.createKey === "string" && ref.createKey.trim()) {
+    const key = ref.createKey.trim();
+    const inBatch = batch.get(key);
+    if (inBatch) return inBatch;
+    const mapping = await mappedRecord(ctx, owner, "person", key);
+    if (mapping) return mapping.recordId;
+    machineError(
+      "VALIDATION_ERROR",
+      `${label} names a createKey that was not created in this call and does not already exist.`,
+      "Put the person in the people array of this same call, or use an id returned by search or context.",
+    );
+  }
+  machineError(
+    "VALIDATION_ERROR",
+    `${label} needs either a person id or the createKey of a person in this call.`,
+    "Add personId, or add the person to the people array and reference its createKey.",
+  );
+}
+
+type BatchItemResult = {
+  index: number;
+  createKey?: string;
+  id?: string;
+  status: "created" | "updated" | "skipped" | "failed";
+  reason?: string;
+  whatToDo?: string;
+};
+
+function failureOf(error: unknown, index: number, createKey?: string): BatchItemResult {
+  const raw = error instanceof Error ? error.message : String(error);
+  const marker = "MCP_FAMILY_HISTORY_ERROR:";
+  const at = raw.indexOf(marker);
+  if (at >= 0) {
+    try {
+      const parsed = JSON.parse(raw.slice(at + marker.length)) as {
+        code?: string;
+        message?: string;
+        recovery?: string;
+      };
+      return {
+        index,
+        createKey,
+        status: "failed",
+        reason: `${parsed.code ?? "INTERNAL_ERROR"}: ${parsed.message ?? "This row could not be saved."}`,
+        whatToDo: parsed.recovery ?? "Correct this row and send it again on its own.",
+      };
+    } catch {
+      /* fall through to the stable shape below */
+    }
+  }
+  return {
+    index,
+    createKey,
+    status: "failed",
+    reason: "INTERNAL_ERROR: this row could not be saved.",
+    whatToDo: "Correct this row and send it again on its own. The rows that succeeded are already saved.",
+  };
+}
+
+/**
+ * One call, one approval, one transaction, per-item results.
+ *
+ * Failures are caught INSIDE the mutation on purpose: one bad row must not
+ * discard a good pass. A partial answer with its gaps named beats a refusal.
+ * Use save_complete_result when the caller genuinely wants all-or-nothing.
+ */
+export const saveRecords = internalMutation({
+  args: { principal: principalValidator, grantId: v.optional(v.string()), operationId: v.string(), requestHash: v.string(), input: v.any() },
+  handler: (ctx, args) => operation(ctx, { ...args, toolName: "family_history_save_records" }, async (owner) => {
+    const input = args.input ?? {};
+    const caps: Array<[string, number]> = [
+      ["people", FAMILY_HISTORY_MCP_LIMITS.batchPeople],
+      ["relationships", FAMILY_HISTORY_MCP_LIMITS.batchRelationships],
+      ["events", FAMILY_HISTORY_MCP_LIMITS.batchEvents],
+      ["evidence", FAMILY_HISTORY_MCP_LIMITS.batchEvidence],
+      ["stories", FAMILY_HISTORY_MCP_LIMITS.batchStories],
+    ];
+    for (const [key, cap] of caps) {
+      const rows = input[key] ?? [];
+      if (!Array.isArray(rows)) {
+        machineError("VALIDATION_ERROR", `${key} must be a list.`, `Send ${key} as an array or omit it.`);
+      }
+      if (rows.length > cap) {
+        machineError(
+          "VALIDATION_ERROR",
+          `This batch has more ${key} than one call may carry.`,
+          `Send at most ${cap} ${key} per call and continue in a second call with a new operationId.`,
+        );
+      }
+    }
+
+    const batchPeople = new Map<string, string>();
+    const results: Record<string, BatchItemResult[]> = {
+      people: [], relationships: [], events: [], evidence: [], stories: [],
+    };
+    const counts = { created: 0, updated: 0, skipped: 0, failed: 0 };
+    const record = (kind: string, item: BatchItemResult) => {
+      results[kind].push(item);
+      counts[item.status] += 1;
+    };
+
+    for (const [index, item] of (input.people ?? []).entries()) {
+      const createKey = typeof item?.createKey === "string" ? item.createKey : undefined;
+      try {
+        const saved = await savePersonRecord(ctx, owner, item);
+        if (createKey) batchPeople.set(createKey, String(saved.id));
+        record("people", {
+          index,
+          createKey,
+          id: String(saved.id),
+          status: saved.created ? "created" : item?.mode === "create" ? "skipped" : "updated",
+          ...(saved.created || item?.mode !== "create"
+            ? {}
+            : { reason: "Already saved under this createKey.", whatToDo: "Nothing to do; the earlier record was reused." }),
+        });
+      } catch (error) {
+        record("people", failureOf(error, index, createKey));
+      }
+    }
+
+    for (const [index, item] of (input.relationships ?? []).entries()) {
+      const createKey = typeof item?.createKey === "string" ? item.createKey : undefined;
+      try {
+        const resolved = { ...item };
+        if (item?.mode === "create") {
+          resolved.person1 = await resolveBatchPerson(ctx, owner, batchPeople, { id: item.person1, createKey: item.person1CreateKey }, "person1");
+          resolved.person2 = await resolveBatchPerson(ctx, owner, batchPeople, { id: item.person2, createKey: item.person2CreateKey }, "person2");
+        }
+        delete resolved.person1CreateKey;
+        delete resolved.person2CreateKey;
+        const saved = await saveRelationshipRecord(ctx, owner, resolved);
+        record("relationships", {
+          index,
+          createKey,
+          id: String(saved.id),
+          status: saved.created ? "created" : item?.mode === "create" ? "skipped" : "updated",
+        });
+      } catch (error) {
+        record("relationships", failureOf(error, index, createKey));
+      }
+    }
+
+    for (const [index, item] of (input.events ?? []).entries()) {
+      const createKey = typeof item?.createKey === "string" ? item.createKey : undefined;
+      try {
+        const resolved = { ...item };
+        if (Array.isArray(item?.personRoles)) {
+          resolved.personRoles = [];
+          for (const role of item.personRoles) {
+            resolved.personRoles.push({
+              role: role.role,
+              personId: await resolveBatchPerson(ctx, owner, batchPeople, { id: role.personId, createKey: role.personCreateKey }, "personRoles.personId"),
+            });
+          }
+        }
+        const saved = await saveEventRecord(ctx, owner, resolved);
+        record("events", {
+          index,
+          createKey,
+          id: String(saved.id),
+          status: saved.created ? "created" : item?.mode === "create" ? "skipped" : "updated",
+        });
+      } catch (error) {
+        record("events", failureOf(error, index, createKey));
+      }
+    }
+
+    for (const [index, item] of (input.evidence ?? []).entries()) {
+      const createKey = typeof item?.source?.createKey === "string" ? item.source.createKey : undefined;
+      try {
+        const resolved = { ...item };
+        if (Array.isArray(item?.links)) {
+          resolved.links = [];
+          for (const link of item.links) {
+            resolved.links.push(
+              link.targetType === "person"
+                ? { ...link, targetId: await resolveBatchPerson(ctx, owner, batchPeople, { id: link.targetId, createKey: link.targetCreateKey }, "links.targetId"), targetCreateKey: undefined }
+                : link,
+            );
+          }
+          resolved.links = resolved.links.map((link: any) => {
+            const copy = { ...link };
+            delete copy.targetCreateKey;
+            return copy;
+          });
+        }
+        if (Array.isArray(item?.facts)) {
+          resolved.facts = [];
+          for (const fact of item.facts) {
+            const copy = { ...fact };
+            copy.personId = await resolveBatchPerson(ctx, owner, batchPeople, { id: fact.personId, createKey: fact.personCreateKey }, "facts.personId");
+            delete copy.personCreateKey;
+            resolved.facts.push(copy);
+          }
+        }
+        const saved = await saveSourceEvidenceRecord(ctx, owner, resolved);
+        record("evidence", {
+          index,
+          createKey,
+          id: String(saved.citationId),
+          status: saved.sourceCreated || saved.citationCreated ? "created" : "updated",
+        });
+      } catch (error) {
+        record("evidence", failureOf(error, index, createKey));
+      }
+    }
+
+    for (const [index, item] of (input.stories ?? []).entries()) {
+      const createKey = typeof item?.createKey === "string" ? item.createKey : undefined;
+      try {
+        const resolved = { ...item };
+        if (item?.personCreateKey || item?.personId) {
+          resolved.personId = await resolveBatchPerson(ctx, owner, batchPeople, { id: item.personId, createKey: item.personCreateKey }, "story.personId");
+        }
+        delete resolved.personCreateKey;
+        const saved = await saveStoryRecord(ctx, owner, resolved);
+        record("stories", {
+          index,
+          createKey,
+          id: String(saved.id),
+          status: saved.created ? "created" : item?.mode === "create" ? "skipped" : "updated",
+        });
+      } catch (error) {
+        record("stories", failureOf(error, index, createKey));
+      }
+    }
+
+    const summary = cleanText(input.summary, "batch summary", 1_000, true)!;
+    return {
+      result: {
+        summary,
+        results,
+        counts,
+        provenance: {
+          clientId: args.principal.clientId,
+          grantId: args.grantId ?? null,
+          at: Date.now(),
+        },
+        note: counts.failed > 0
+          ? "Some rows did not save. Everything else in this call did. Fix the failed rows and send only those again with a new operationId."
+          : "Every row in this call was saved.",
+      },
+      detail: `Saved a batch through MCP: ${counts.created} created, ${counts.updated} updated, ${counts.skipped} already present, ${counts.failed} failed.`,
+    };
   }),
 });

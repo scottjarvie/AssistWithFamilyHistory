@@ -22,6 +22,18 @@ export const FAMILY_HISTORY_MCP_LIMITS = {
   briefRows: 12,
   contextRows: 50,
   completeResultRowsPerKind: 10,
+  /** family_history_save_records — one source page's worth of work, per kind. */
+  batchPeople: 50,
+  batchRelationships: 50,
+  batchEvents: 50,
+  batchEvidence: 20,
+  batchStories: 10,
+  /** family_history_get_evidence — protected delivery budget. */
+  evidenceItems: 10,
+  evidencePerItemBytes: 2 * 1024 * 1024,
+  evidenceTotalBytes: 6 * 1024 * 1024,
+  /** Client ID Metadata Document fetch ceiling. */
+  clientMetadataBytes: 32 * 1024,
   operationId: 160,
   recordKey: 128,
   shortText: 500,
@@ -32,6 +44,14 @@ export const FAMILY_HISTORY_MCP_LIMITS = {
 
 export type McpMachineErrorCode =
   | "AUTH_REQUIRED"
+  // Product-grant codes. OAuth identity is not product authority: these say so
+  // in machine-readable form and each carries a `recovery` that tells the AI to
+  // ask the person, not to retry harder.
+  | "GRANT_REQUIRED"
+  | "GRANT_REVOKED"
+  | "GRANT_EXPIRED"
+  | "SCOPE_NOT_GRANTED"
+  | "OUTSIDE_GRANT_BOUNDARY"
   | "FORBIDDEN"
   | "NOT_FOUND"
   | "VALIDATION_ERROR"

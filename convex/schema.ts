@@ -1451,9 +1451,99 @@ export default defineSchema({
     statusCode: v.number(),
     createdAt: v.number(),
     detail: v.optional(v.string()),
+    // Which approved connection did this, so the connection centre can show a
+    // person "what this AI has been doing" without a second activity table.
+    grantId: v.optional(v.id("mcpGrants")),
+    clientId: v.optional(v.string()),
   })
     .index("by_owner", ["vaultOwnerId"])
-    .index("by_owner_request", ["vaultOwnerId", "requestId"]),
+    .index("by_owner_request", ["vaultOwnerId", "requestId"])
+    .index("by_owner_grant", ["vaultOwnerId", "grantId"]),
+
+  /**
+   * MCP PRODUCT GRANTS
+   *
+   * The durable answer to "what did this person allow this AI to do?", which
+   * OAuth identity alone cannot answer. Every `/mcp` request resolves one of
+   * these; absent, pending, expired, denied, or revoked all fail closed.
+   *
+   * The owner is always server-derived from the verified OAuth subject. A
+   * client never supplies an owner, a vault, or a grant selector.
+   */
+  mcpGrants: defineTable({
+    vaultOwnerId: v.string(),
+    /** Verified from the access token, never from a request body. */
+    clientId: v.string(),
+    issuer: v.string(),
+    /** What the person named this connection. */
+    label: v.string(),
+    /** What the client called itself. A label for the person, never authority. */
+    observedClientName: v.optional(v.string()),
+    clientProvenance: v.union(v.literal("cimd"), v.literal("dcr"), v.literal("manual")),
+    clientMetadataUrl: v.optional(v.string()),
+    /** Always a subset of the scope ceiling in lib/mcp/catalog.ts. */
+    scopes: v.array(v.string()),
+    boundary: v.object({
+      kind: v.union(
+        v.literal("whole_workspace"),
+        v.literal("selected_people"),
+        v.literal("queue_only"),
+      ),
+      personIds: v.optional(v.array(v.string())),
+      queueItemIds: v.optional(v.array(v.string())),
+    }),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("active"),
+      v.literal("revoked"),
+      v.literal("expired"),
+      v.literal("denied"),
+    ),
+    requestedAt: v.number(),
+    consentedAt: v.optional(v.number()),
+    issuedAt: v.optional(v.number()),
+    expiresAt: v.optional(v.number()),
+    lastUsedAt: v.optional(v.number()),
+    revokedAt: v.optional(v.number()),
+    revokedReason: v.optional(v.string()),
+    useCount: v.number(),
+    lastToolName: v.optional(v.string()),
+    /**
+     * JSON string of exactly what the person was shown when they approved:
+     * scope labels, boundary, expiry, and the never-lists. Kept verbatim so a
+     * later catalog edit cannot rewrite history.
+     */
+    consentSnapshot: v.optional(v.string()),
+    updatedAt: v.number(),
+  })
+    .index("by_owner", ["vaultOwnerId"])
+    .index("by_owner_status", ["vaultOwnerId", "status"])
+    .index("by_owner_client", ["vaultOwnerId", "clientId"]),
+
+  /**
+   * VALIDATED MCP CLIENT REGISTRATIONS
+   *
+   * Client ID Metadata Documents (preferred) and bounded DCR fallback records.
+   * A row here means the document was fetched and passed strict validation; it
+   * is never by itself a permission — that is always the grant above.
+   */
+  mcpClientRegistrations: defineTable({
+    clientId: v.string(),
+    metadataUrl: v.optional(v.string()),
+    metadataHash: v.optional(v.string()),
+    clientName: v.optional(v.string()),
+    redirectUris: v.array(v.string()),
+    tokenEndpointAuthMethod: v.optional(v.string()),
+    provenance: v.union(v.literal("cimd"), v.literal("dcr"), v.literal("manual")),
+    validatedAt: v.number(),
+    lastFetchedAt: v.number(),
+    /** Cache TTL boundary. After this the document is re-fetched, not trusted. */
+    expiresAt: v.number(),
+    status: v.union(v.literal("valid"), v.literal("rejected"), v.literal("stale")),
+    rejectionReason: v.optional(v.string()),
+  })
+    .index("by_clientId", ["clientId"])
+    .index("by_provenance_validated", ["provenance", "validatedAt"]),
 
   /**
    * MCP OPERATION RECEIPTS

@@ -6,13 +6,20 @@ import { exportJWK, generateKeyPair, SignJWT, type KeyLike } from "jose";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import schema from "./schema";
 import { api } from "./_generated/api";
-import { FAMILY_HISTORY_MCP_TOOL_NAMES } from "../lib/mcp/contract";
+import { FAMILY_HISTORY_ALL_TOOL_NAMES } from "../lib/mcp/catalog";
+import { seedGrant } from "../lib/mcp/testSupport";
 
 const modules = import.meta.glob("./**/*.ts");
 const RESOURCE = "https://family-history.example.test/mcp";
 const ISSUER = "https://identity.example.test";
 const SUBJECT = "user_mcp_transport_AAAAAAAAA";
 const PROTOCOL_VERSION = "2026-07-28";
+const CLIENT_ID = "synthetic-client";
+
+/** Put an approved connection in place; every tool now requires one. */
+async function approvedConnection(t: ReturnType<typeof convexTest>) {
+  return await seedGrant(t, { vaultOwnerId: SUBJECT, clientId: CLIENT_ID, issuer: ISSUER });
+}
 
 let privateKey: KeyLike;
 let jwk: JsonWebKey;
@@ -115,12 +122,15 @@ describe("stateless Family History MCP transport", () => {
 
   test("an authenticated modern client lists the complete bounded tool catalog without a session", async () => {
     const t = convexTest(schema, modules);
+    await approvedConnection(t);
     const response = await t.fetch("/mcp", modernRequest("tools/list", await accessToken()));
     expect(response.status).toBe(200);
     expect(response.headers.get("mcp-session-id")).toBeNull();
     const payload = await response.json();
     expect(payload.error).toBeUndefined();
-    expect(payload.result.tools.map((tool: { name: string }) => tool.name)).toEqual(FAMILY_HISTORY_MCP_TOOL_NAMES);
+    expect(payload.result.tools.map((tool: { name: string }) => tool.name).sort()).toEqual(
+      [...FAMILY_HISTORY_ALL_TOOL_NAMES].sort(),
+    );
     for (const tool of payload.result.tools) {
       expect(tool.inputSchema?.properties?.ownerId).toBeUndefined();
       expect(tool.inputSchema?.properties?.vaultOwnerId).toBeUndefined();
@@ -129,6 +139,7 @@ describe("stateless Family History MCP transport", () => {
 
   test("the official v2 MCP client negotiates, lists tools, and saves through the stateless handler", async () => {
     const t = convexTest(schema, modules);
+    await approvedConnection(t);
     const token = await accessToken();
     const client = new Client(
       { name: "family-history-official-client-proof", version: "1.0.0" },
@@ -151,7 +162,7 @@ describe("stateless Family History MCP transport", () => {
 
     await client.connect(transport);
     const catalog = await client.listTools();
-    expect(catalog.tools.map((tool) => tool.name)).toEqual(FAMILY_HISTORY_MCP_TOOL_NAMES);
+    expect(catalog.tools.map((tool) => tool.name).sort()).toEqual([...FAMILY_HISTORY_ALL_TOOL_NAMES].sort());
     const result = await client.callTool({
       name: "save_person",
       arguments: {
@@ -170,6 +181,7 @@ describe("stateless Family History MCP transport", () => {
 
   test("an authenticated modern client writes a canonical person without supplying tenant identity", async () => {
     const t = convexTest(schema, modules);
+    await approvedConnection(t);
     const response = await t.fetch("/mcp", modernRequest("tools/call", await accessToken(), {
       name: "save_person",
       arguments: {
@@ -203,6 +215,7 @@ describe("stateless Family History MCP transport", () => {
 
   test("the OAuth chosen-AI identity claims Queue work and the normal product read sees it", async () => {
     const t = convexTest(schema, modules);
+    await approvedConnection(t);
     const created = await t.withIdentity({ subject: SUBJECT }).mutation(api.queue.createQueueItem, {
       vaultOwnerId: SUBJECT,
       directive: "Review the synthetic census clue and preserve a sourced finding.",
