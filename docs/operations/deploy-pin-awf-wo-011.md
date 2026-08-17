@@ -11,12 +11,46 @@ DEPLOY=/Users/scottjarvie/IDE/AssistWithFamilyHistory/.claude/worktrees/deploy-7
 That worktree already exists on disk with `pnpm install --frozen-lockfile`
 completed, so Codex can `cd` into it and start at item 0b.
 
-## Why the pin is not simply `origin/main`
+## THE PIN IS STALE AS OF 2026-08-17 — read this before deploying
 
-`78dd1a5` is the commit that made this release deployable. The only commit after
-it is the one that added *this file* and a `.gitignore` line — no application
-code, no Convex function, no schema. So `origin/main` is one docs commit ahead of
-the pin by design, and that is the one difference the check below tolerates.
+**`origin/main` has grown application, Convex, and schema changes since
+`78dd1a5`.** The tolerance described below no longer holds, and the confirm
+step will correctly refuse.
+
+PR #61 (`1b7d9e9`, "Let a chosen AI read the scanned record, not only its
+title") landed AWF-0045: real media evidence bytes. Deploying `78dd1a5` would
+ship the chosen-AI connection with `family_history_get_evidence` still returning
+`BYTES_NOT_AVAILABLE` for every image and recording — that is, without the thing
+family history research actually runs on.
+
+What #61 changed, for the deploy decision:
+
+- **Schema: additive only.** `media.storageId` (optional `Id<"_storage">`) and
+  `media.sizeBytes` (optional number). Nothing removed, renamed, or newly
+  required; existing rows stay valid with no migration.
+- **Convex:** `vaultMutations.startMediaUpload`, `vaultMutations.attachMediaFile`,
+  `vault.getOwnedMediaFile`, `vaultReads.getOwnedMediaFile`, and stored-byte
+  delivery in `mcpEvidence` / `httpRoutes/mcp`.
+- **Next:** `POST /api/media/upload`, `GET /api/media/[mediaId]/file`.
+- **No new environment variable or secret.** Bytes go to Convex file storage,
+  which is private by construction and needs no configuration. The Convex/Vercel
+  environment split in the runbook is unchanged.
+- `pnpm verify` passes all 56 steps on `1b7d9e9`; head CI on #61 was green.
+
+**Codex owns this decision.** The recommendation is to re-pin to `1b7d9e9` (or
+whatever `origin/main` is when you start) and create a fresh deploy worktree,
+because the media-bytes work is part of the same AWF-WO-011 outcome and adds no
+deploy-time configuration. If you re-pin, rewrite the `PINNED_SHA` and `DEPLOY`
+block above, re-run the confirm step, and delete the now-stale
+`deploy-78dd1a5` worktree so nobody deploys it by muscle memory.
+
+## Why the original pin was not simply `origin/main`
+
+`78dd1a5` is the commit that made this release deployable. At the time this file
+was written, the only commit after it added *this file* and a `.gitignore` line —
+no application code, no Convex function, no schema — so `origin/main` was one
+docs commit ahead of the pin by design, and that was the one difference the check
+below tolerated. That is no longer the situation; see the section above.
 
 ## Confirm before deploying anything
 
