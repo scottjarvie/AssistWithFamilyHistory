@@ -10,7 +10,6 @@
  * immediate. An already-issued Clerk access token stops mattering the moment
  * the grant leaves `active` — we never wait for the JWT to expire.
  */
-/* eslint-disable @typescript-eslint/no-explicit-any -- The checked-in generated api predates these modules. */
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
@@ -55,11 +54,6 @@ const boundaryValidator = v.object({
   personIds: v.optional(v.array(v.string())),
   queueItemIds: v.optional(v.array(v.string())),
 });
-
-// The checked-in convex/_generated/api.d.ts predates these modules, so newer
-// modules are addressed the same way the rest of the MCP surface does it.
-const grants = (internal as any).mcpGrants;
-const shadowRecorder = internal.trustBoundary.recordShadowDenial;
 
 function machineError(code: string, message: string, recovery: string): never {
   throw new Error(`MCP_FAMILY_HISTORY_ERROR:${JSON.stringify({ code, message, recovery })}`);
@@ -312,88 +306,114 @@ export async function assertGrantPermits(
 
 /* ------------------------------------------------ owner-scoped product reads */
 
+/**
+ * The connection-centre read, as a plain function.
+ *
+ * It sits outside the `internalQuery` wrapper deliberately. The action further
+ * down has to declare its return type explicitly, because inferring it would
+ * require the type of `internal`, which requires the type of this module, which
+ * requires that action — the circle `convex deploy` reports as TS7022/TS7023
+ * once real generated bindings exist. Deriving the annotation from this helper
+ * keeps the declared type honest: it is literally what the query returns, so
+ * the two cannot drift apart.
+ */
+async function readConnections(ctx: QueryCtx, vaultOwnerId: string) {
+  const rows = await ctx.db
+    .query("mcpGrants")
+    .withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId))
+    .order("desc")
+    .take(100);
+  const now = Date.now();
+  return {
+    scopeInfo: FAMILY_HISTORY_SCOPE_INFO,
+    neverExposed: NEVER_EXPOSED,
+    neverPermitted: NEVER_PERMITTED,
+    connections: rows.map((row) => ({
+      id: row._id,
+      label: row.label,
+      observedClientName: row.observedClientName ?? null,
+      clientId: row.clientId,
+      issuer: row.issuer,
+      clientProvenance: row.clientProvenance,
+      clientMetadataUrl: row.clientMetadataUrl ?? null,
+      scopes: clampToScopeCeiling(row.scopes),
+      boundary: row.boundary,
+      // Expiry is decided in code at read time, so a row that has aged out
+      // reads as expired even before anything rewrites its status.
+      status: row.status === "active" && isGrantExpired(row, now) ? "expired" : row.status,
+      requestedAt: row.requestedAt,
+      consentedAt: row.consentedAt ?? null,
+      issuedAt: row.issuedAt ?? null,
+      expiresAt: row.expiresAt ?? null,
+      lastUsedAt: row.lastUsedAt ?? null,
+      lastToolName: row.lastToolName ?? null,
+      revokedAt: row.revokedAt ?? null,
+      revokedReason: row.revokedReason ?? null,
+      useCount: row.useCount,
+      consentSnapshot: row.consentSnapshot ?? null,
+    })),
+  };
+}
+
+/** Exactly what the connection centre is handed. */
+export type ConnectionsView = Awaited<ReturnType<typeof readConnections>>;
+
 export const listConnectionsInternal = internalQuery({
   args: { vaultOwnerId: v.string() },
-  handler: async (ctx, { vaultOwnerId }) => {
-    const rows = await ctx.db
-      .query("mcpGrants")
-      .withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId))
-      .order("desc")
-      .take(100);
-    const now = Date.now();
-    return {
-      scopeInfo: FAMILY_HISTORY_SCOPE_INFO,
-      neverExposed: NEVER_EXPOSED,
-      neverPermitted: NEVER_PERMITTED,
-      connections: rows.map((row) => ({
-        id: row._id,
-        label: row.label,
-        observedClientName: row.observedClientName ?? null,
-        clientId: row.clientId,
-        issuer: row.issuer,
-        clientProvenance: row.clientProvenance,
-        clientMetadataUrl: row.clientMetadataUrl ?? null,
-        scopes: clampToScopeCeiling(row.scopes),
-        boundary: row.boundary,
-        // Expiry is decided in code at read time, so a row that has aged out
-        // reads as expired even before anything rewrites its status.
-        status: row.status === "active" && isGrantExpired(row, now) ? "expired" : row.status,
-        requestedAt: row.requestedAt,
-        consentedAt: row.consentedAt ?? null,
-        issuedAt: row.issuedAt ?? null,
-        expiresAt: row.expiresAt ?? null,
-        lastUsedAt: row.lastUsedAt ?? null,
-        lastToolName: row.lastToolName ?? null,
-        revokedAt: row.revokedAt ?? null,
-        revokedReason: row.revokedReason ?? null,
-        useCount: row.useCount,
-        consentSnapshot: row.consentSnapshot ?? null,
-      })),
-    };
-  },
+  handler: async (ctx, { vaultOwnerId }) => await readConnections(ctx, vaultOwnerId),
 });
+
+/** The activity read, kept outside the wrapper for the same reason as above. */
+async function readRecentActivity(
+  ctx: QueryCtx,
+  args: { vaultOwnerId: string; grantId?: Id<"mcpGrants">; limit?: number },
+) {
+  const limit = Math.max(1, Math.min(Math.floor(args.limit ?? 50), 200));
+  const rows = args.grantId
+    ? await ctx.db
+        .query("agentActivity")
+        .withIndex("by_owner_grant", (q) =>
+          q.eq("vaultOwnerId", args.vaultOwnerId).eq("grantId", args.grantId),
+        )
+        .order("desc")
+        .take(limit)
+    : await ctx.db
+        .query("agentActivity")
+        .withIndex("by_owner", (q) => q.eq("vaultOwnerId", args.vaultOwnerId))
+        .order("desc")
+        .take(limit);
+  return rows
+    .filter((row) => row.principalKind === "mcp")
+    .map((row) => ({
+      id: row._id,
+      at: row.createdAt,
+      tool: row.scope ?? null,
+      outcome: row.outcome,
+      detail: row.detail ?? null,
+      grantId: row.grantId ?? null,
+      clientId: row.clientId ?? null,
+    }));
+}
+
+/** Exactly what the activity list is handed. */
+export type ConnectionActivityView = Awaited<ReturnType<typeof readRecentActivity>>;
 
 export const recentActivityInternal = internalQuery({
   args: { vaultOwnerId: v.string(), grantId: v.optional(v.id("mcpGrants")), limit: v.optional(v.number()) },
-  handler: async (ctx, args) => {
-    const limit = Math.max(1, Math.min(Math.floor(args.limit ?? 50), 200));
-    const rows = args.grantId
-      ? await ctx.db
-          .query("agentActivity")
-          .withIndex("by_owner_grant", (q) =>
-            q.eq("vaultOwnerId", args.vaultOwnerId).eq("grantId", args.grantId),
-          )
-          .order("desc")
-          .take(limit)
-      : await ctx.db
-          .query("agentActivity")
-          .withIndex("by_owner", (q) => q.eq("vaultOwnerId", args.vaultOwnerId))
-          .order("desc")
-          .take(limit);
-    return rows
-      .filter((row) => row.principalKind === "mcp")
-      .map((row) => ({
-        id: row._id,
-        at: row.createdAt,
-        tool: row.scope ?? null,
-        outcome: row.outcome,
-        detail: row.detail ?? null,
-        grantId: row.grantId ?? null,
-        clientId: row.clientId ?? null,
-      }));
-  },
+  handler: async (ctx, args) => await readRecentActivity(ctx, args),
 });
 
 export const listConnections = action({
   args: { vaultOwnerId: v.string() },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<ConnectionsView> => {
     const decision = await authorizeTenantAction(
       ctx,
       "mcpGrants.listConnections",
       args.vaultOwnerId,
-      (entry: TrustBoundaryShadowEntry) => ctx.runMutation(shadowRecorder, entry),
+      (entry: TrustBoundaryShadowEntry) =>
+        ctx.runMutation(internal.trustBoundary.recordShadowDenial, entry),
     );
-    return await ctx.runQuery(grants.listConnectionsInternal, {
+    return await ctx.runQuery(internal.mcpGrants.listConnectionsInternal, {
       vaultOwnerId: decision.owner,
     });
   },
@@ -405,14 +425,15 @@ export const recentConnectionActivity = action({
     grantId: v.optional(v.id("mcpGrants")),
     limit: v.optional(v.number()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<ConnectionActivityView> => {
     const decision = await authorizeTenantAction(
       ctx,
       "mcpGrants.recentConnectionActivity",
       args.vaultOwnerId,
-      (entry: TrustBoundaryShadowEntry) => ctx.runMutation(shadowRecorder, entry),
+      (entry: TrustBoundaryShadowEntry) =>
+        ctx.runMutation(internal.trustBoundary.recordShadowDenial, entry),
     );
-    return await ctx.runQuery(grants.recentActivityInternal, {
+    return await ctx.runQuery(internal.mcpGrants.recentActivityInternal, {
       vaultOwnerId: decision.owner,
       grantId: args.grantId,
       limit: args.limit,

@@ -15,6 +15,10 @@
 set +e
 
 steps=(
+  # Runs before typecheck on purpose: it proves the checked-in Convex bindings
+  # match the modules on disk, which is what makes the typecheck below a real
+  # typecheck against fresh bindings rather than against stale `any`s.
+  "check:convex-bindings-fresh"
   "typecheck"
   "lint"
   "test"

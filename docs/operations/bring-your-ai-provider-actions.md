@@ -99,7 +99,15 @@ project is usually the wrong one.
 > Confirm first with `pnpm exec convex dashboard --no-open --deployment gallant-mallard-74`,
 > and do **not** run any `env` command against that name without `--deployment`.
 
-### The blocker: production builds have been failing since PR #58
+### The blocker: production builds were failing since PR #58 — now fixed
+
+> **✅ Resolved.** `convex/mcpGrants.ts` now carries explicit return-type
+> annotations and the checked-in Convex bindings have been regenerated, so
+> `convex deploy` typechecks cleanly. A new `check:convex-bindings-fresh` gate
+> in `pnpm verify` fails at PR time whenever the checked-in bindings drift from
+> the modules on disk, which is what let this class of error reach a deploy.
+> The deploy in 0e is no longer gated. The history below is kept because the
+> diagnosis is the reason the new gate exists.
 
 **The live site is running commit `862a224` (PR #57).** Every production build
 since has failed, all five with the same error. Read-only check:
@@ -124,20 +132,29 @@ convex/mcpGrants.ts:387 error TS7022: 'listConnections' implicitly has type 'any
 convex/mcpGrants.ts:389 error TS7023: 'handler' implicitly has return type 'any' …
 ```
 
-**Why the repo gate does not catch it.** `convex/_generated/api.d.ts` is checked
-in and predates these modules — `grep -c mcpGrants convex/_generated/api.d.ts`
-returns `0`. Locally, `const grants = (internal as any).mcpGrants` therefore
-resolves to `any` and nothing is circular, so
-`pnpm exec tsc --noEmit -p convex/tsconfig.json` passes. `convex deploy`
+**Why the repo gate did not catch it.** `convex/_generated/api.d.ts` is checked
+in and predated these modules — `grep -c mcpGrants convex/_generated/api.d.ts`
+returned `0`. Locally, `const grants = (internal as any).mcpGrants` therefore
+resolved to `any` and nothing was circular, so
+`pnpm exec tsc --noEmit -p convex/tsconfig.json` passed. `convex deploy`
 regenerates those bindings from the real function set, `internal.mcpGrants`
-becomes properly typed, and `listConnections` ends up referenced inside its own
-inferred return type. The cycle only exists once the generated types are fresh.
+becomes properly typed, and `listConnections` ended up referenced inside its own
+inferred return type. The cycle only existed once the generated types were fresh.
 
-**Consequence for this runbook:** the deploy in 0c cannot succeed until
-`convex/mcpGrants.ts` carries explicit type annotations. That is a normal code
-fix through a normal PR — not a deploy step, not a provider change, and not
-something to work around by deploying Convex by hand. Tracked as the next safe
-action in AWF-WO-011.
+**How it was fixed.** Two changes, one to the code and one to the gate:
+
+1. `convex/mcpGrants.ts` — the two read bodies moved into plain helper functions
+   (`readConnections`, `readRecentActivity`), and the two actions now declare
+   their return types explicitly as `ConnectionsView` / `ConnectionActivityView`,
+   derived from those helpers. Because the helpers never touch `internal`, the
+   annotation is honest — it is literally what the query returns — and the
+   inference cycle is gone. The `(internal as any)` casts were removed; nothing
+   is papered over with `any` or `@ts-ignore`, and no runtime behaviour changed.
+2. `scripts/check-convex-bindings-fresh.ts` — a new `pnpm verify` step that
+   regenerates the expected `api.d.ts` from the modules on disk (no network, no
+   deploy key) and requires the checked-in file to match. Once the bindings are
+   provably fresh, the ordinary `typecheck` step *is* a fresh-bindings typecheck,
+   so an inference cycle now fails on the PR instead of in the Vercel build.
 
 ---
 
@@ -264,7 +281,7 @@ pick it up silently.
 
 ```bash
 cd "$DEPLOY"
-pnpm verify                                        # expect: All 55 verification steps passed.
+pnpm verify                                        # expect: All 57 verification steps passed.
 pnpm exec tsc --noEmit -p convex/tsconfig.json      # expect: no output, exit 0
 ```
 
@@ -350,9 +367,9 @@ Everything above in one copy-and-paste block. It is deliberately a single act:
 three pre-flight reads that can only fail closed, then one publish. Run it top to
 bottom in one shell, and stop at the first line that disagrees with its comment.
 
-> **Do not start this until the PR that fixes `convex/mcpGrants.ts` is merged**
-> (see 0·0). Until then the Vercel build will fail inside `convex deploy` and
-> production will simply stay on `862a224` — safe, but no further along.
+> **Ready to run.** The `convex/mcpGrants.ts` blocker described in 0·0 is fixed
+> and merged, and `pnpm verify` now reproduces the `convex deploy` typecheck via
+> `check:convex-bindings-fresh`. Deploy `origin/main` as written below.
 
 ```bash
 # ── pre-flight 1 · pin an exact commit and a clean worktree ───────────────────
@@ -376,15 +393,21 @@ pnpm exec convex env list --deployment accomplished-dodo-308
 # must show CLERK_JWT_ISSUER_DOMAIN = https://clerk.assistwithfamilyhistory.com
 
 # ── pre-flight 3 · see what would be pushed, without pushing it ───────────────
-pnpm exec convex deploy --dry-run -v
+# ⚠️ Pass --deployment explicitly. A bare `convex deploy --dry-run` resolves the
+# target from the logged-in device, which on Scott's machine is the UNRELATED
+# personal project (gallant-mallard-74) — and it still prompts
+# "push to your prod deployment … now?", which is a real push if answered yes.
+pnpm exec convex deploy --dry-run -v --deployment accomplished-dodo-308
 # expect: the repository's own convex/ modules, the two new tables from 0d, and
 # "No indexes are deleted by this push". If it proposes creating dozens of
 # tables, you are pointed at an empty deployment — STOP and re-read 0·0.
 
 # ── pre-flight 4 · the repo's own gate ────────────────────────────────────────
-pnpm verify                                     # expect: All 55 verification steps passed.
+pnpm verify                                     # expect: All 57 verification steps passed.
 pnpm exec tsc --noEmit -p convex/tsconfig.json  # expect: no output, exit 0
-# Note: this gate does NOT reproduce the convex deploy typecheck (see 0·0).
+# check:convex-bindings-fresh (step 1) proves the checked-in Convex bindings match
+# the modules on disk, so the typecheck above is a real fresh-bindings typecheck —
+# the same thing `convex deploy` does. This is what 0·0 said the gate used to miss.
 
 # ── the deploy · one act, Convex first, then the frontend ─────────────────────
 pnpm dlx vercel@latest deploy --prod --yes
