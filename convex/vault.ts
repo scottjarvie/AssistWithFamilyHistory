@@ -1539,6 +1539,39 @@ export const getPersonWorkspace = internalQuery({
   },
 });
 
+/**
+ * Resolve a stored media file for its owner, as a short-lived signed URL the
+ * *server* uses to stream the bytes.
+ *
+ * The signed URL never reaches a browser or a model: `/api/media/[mediaId]/file`
+ * fetches it server-side and streams the result under the person's own session,
+ * and the MCP transport reads the object directly. That keeps a raw storage
+ * link on the never-exposed list while still letting the vault serve the scan
+ * it holds.
+ */
+export const getOwnedMediaFile = internalQuery({
+  args: {
+    vaultOwnerId: v.string(),
+    mediaId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const owner = normalizeVaultOwnerId(args.vaultOwnerId);
+    const id = ctx.db.normalizeId("media", args.mediaId);
+    const row = id ? await ctx.db.get(id) : null;
+    // One shape for "no such item" and "someone else's item" — a media route
+    // must never work as an existence oracle for another person's vault.
+    if (!row || !matchesVaultOwner(row.vaultOwnerId, owner) || !row.storageId) return null;
+    const url = await ctx.storage.getUrl(row.storageId);
+    if (!url) return null;
+    return {
+      url,
+      mimeType: row.mimeType ?? "application/octet-stream",
+      title: row.title,
+      sizeBytes: row.sizeBytes ?? null,
+    };
+  },
+});
+
 export const getStoriesIndex = internalQuery({
   args: {
     vaultOwnerId: v.string(),

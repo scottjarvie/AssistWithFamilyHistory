@@ -75,6 +75,7 @@ const currentInSource = [
   "Turning a connection off takes effect on its very next request, because the permission is re-checked every time rather than waiting for a sign-in to expire.",
   "A whole source's worth of records saves in one call, reporting each row's own outcome instead of discarding the pass.",
   "Reviewed, AI-allowed files are delivered through the connection itself; a storage link is never handed to a model.",
+  "A scan or photograph you upload is stored privately here, so your AI can read the record itself rather than only its title — and an item that holds a link somewhere else says so honestly instead of pretending.",
   "An unknown tool, a tool outside the permission, and another person's record all return the same refusal, so nothing can be discovered by probing.",
 ];
 

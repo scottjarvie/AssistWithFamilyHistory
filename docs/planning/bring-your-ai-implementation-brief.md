@@ -227,6 +227,7 @@ output: { delivered: [{id, kind, title, mimeType, sizeBytes}],
           skipped:   [{id, kind, reason, whatToDo}],
           note }
 content blocks: text for documents, image for image mime types, resource/blob otherwise
+delivery order: stored vault files first, then document text, then remote references
 ```
 
 Gate: `aiUseAllowed === true && reviewStatus === "reviewed" && rightsStatus !== "restricted"`,
@@ -240,14 +241,46 @@ budget 6 MiB with a running budget that turns exhaustion into a skip.
 transport action, which fetches the bytes; the model-facing result never
 contains it.
 
-**Honest limit, deliberately surfaced rather than hidden:** `documents` rows
-really do hold `contentMarkdown`/`contentText` in Convex, so those are delivered
-as genuine text. `media` rows hold `filePath`/`url` references, and the byte
-store (`lib/storage/objectStore.ts`, Backblaze B2) lives in the Node/Next
-runtime with no caller anywhere yet. Media with a fetchable HTTPS `url` is
-delivered; everything else returns metadata with `BYTES_NOT_AVAILABLE` and a
-useful `whatToDo`. The encoder is built so wiring B2 later is a source swap at
-the `fetchable` list, not a redesign. `/ai.txt` says this plainly.
+**Real media bytes — 2026-08-17 (AWF-0045).** Three kinds of item exist, in
+descending order of trust:
+
+1. **Stored files** (`media.storageId`) — bytes the vault holds, in private
+   Convex file storage. The transport calls `actionCtx.storage.get` and reads
+   the object directly, so no URL is minted at any point. This is the path a
+   person's own upload takes, and it is why an AI can now read a scanned census
+   page rather than only its title.
+2. **Documents** — `contentMarkdown`/`contentText` genuinely in Convex.
+3. **Remote references** (`media.url`) — usually a FamilySearch memory, which
+   answers the person's signed-in browser and generally no server. One fetch is
+   attempted and failure is reported honestly.
+
+**Why Convex storage rather than `lib/storage/objectStore.ts` (B2).** B2 needs
+six deploy-time secrets that only Codex/Scott can set, and either a public
+bucket — a publicly readable URL for a private family photograph, the exact
+opposite of protected delivery — or presigning inside the Convex runtime. Convex
+file storage is private by construction, readable only by owner-checked server
+code, and needs no environment variable at all, so the whole outcome shipped
+repo-side with nothing blocked. `objectStore.ts` remains uncalled and is still
+the right tool for its actual job: cheap CDN egress for *public* story imagery.
+
+`BYTES_NOT_AVAILABLE` still means what it says — a row holding only a `filePath`
+hint, or a remote reference the server cannot read — and its `whatToDo` now
+names the real fix, which is for the person to upload the file to that item.
+`/ai.txt` and `/ai` say this plainly.
+
+**The gates did not move.** Owner, grant boundary, `reviewStatus === "reviewed"`,
+`aiUseAllowed === true`, and rights-not-restricted are all checked before a
+stored file is even offered for delivery, and an item whose recorded
+`sizeBytes` exceeds the per-item cap is skipped before its bytes are read.
+`scripts/check-media-bytes.ts` asserts that ordering, asserts that no upload
+path can set or accept AI-use permission, and asserts that neither the transport
+nor the owner file route ever mints, returns, or redirects to a storage URL.
+
+**Human surfaces.** `POST /api/media/upload` stores bytes (owner-authenticated,
+type-checked, 25 MiB cap, straight to storage rather than through a function
+argument). `GET /api/media/[mediaId]/file` streams them back to the owner and
+never returns the signed URL it used; a missing item and another owner's item
+both answer 404.
 
 Person documents carry no separate AI-use review flag in the schema, so the
 living-person rule that governs the rest of this surface governs them: a
@@ -330,12 +363,21 @@ in this repository.
   bad row does not discard the pass and every failure carries reason +
   `whatToDo`; `operationId` replay idempotent and `createKey` replay reuses;
   over-cap refused before anything is written.
-- `convex/mcpEvidence.test.ts` (8) — unreviewed / not-AI-allowed /
+- `convex/mcpEvidence.test.ts` (12) — unreviewed / not-AI-allowed /
   rights-restricted / oversize all skip and deliver nothing; reference-only media
   returns `BYTES_NOT_AVAILABLE`; documents return real text; living-person
   documents withheld; `selected_people` boundary enforced per item; another
   owner's evidence and an invented id indistinguishable; a grant without
-  `evidence:read` cannot call the tool at all.
+  `evidence:read` cannot call the tool at all. Four cases added 2026-08-17 for
+  stored files: a stored scan is offered with no URL anywhere in the result and
+  wins over a remote reference on the same row; the same five gates refuse it;
+  another owner's stored file refuses identically; an over-budget stored file is
+  skipped before any bytes are read.
+- `convex/mcpLifecycleLadder.test.ts` rung 6 (added 2026-08-17) — the first
+  local proof of **real evidence bytes** end to end through the official MCP
+  client: a reviewed stored PNG arrives as an image block whose bytes are
+  byte-identical to what was stored, while a reference-only row on the same call
+  is refused as `BYTES_NOT_AVAILABLE` without leaking its path.
 - `convex/mcpClientTrust.test.ts` (13) — redirect refused (both status and
   `redirected`), oversize by declared length and by body, non-JSON, wrong
   `client_id`, missing/insecure redirect URIs, PKCE not declared, confidential

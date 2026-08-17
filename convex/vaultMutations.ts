@@ -1159,6 +1159,126 @@ export const upsertSourceFact = mutation({
   },
 });
 
+/**
+ * Media byte storage.
+ *
+ * Family history research runs on scanned records and photographs. Until a
+ * scan's *bytes* live in the vault, a chosen AI cannot read the census page —
+ * only its title — because the `url` on an imported media row points at
+ * FamilySearch, which answers the person's own signed-in browser and nothing
+ * else. Convex file storage is private: an object is readable only by
+ * owner-checked server code, never by URL, which is exactly the property the
+ * protected evidence delivery needs.
+ */
+export const startMediaUpload = mutation({
+  args: { vaultOwnerId: v.string() },
+  handler: async (ctx, args) => {
+    await authorizeTenantMutation(ctx, "vaultMutations.startMediaUpload", args.vaultOwnerId);
+    return { uploadUrl: await ctx.storage.generateUploadUrl() };
+  },
+});
+
+/**
+ * Attach uploaded bytes to a media row — a new one, or an existing row that
+ * until now held only a remote reference.
+ *
+ * Review state is deliberately NOT set here. A newly uploaded file arrives
+ * `unreviewed` with `aiUseAllowed: false`, so putting a file in the vault never
+ * silently widens what an AI may read; the person still decides that in the
+ * media review panel. Re-attaching bytes to a reviewed row resets it to
+ * unreviewed for the same reason — the bytes under a review are not the bytes
+ * the person reviewed.
+ */
+export const attachMediaFile = mutation({
+  args: {
+    vaultOwnerId: v.string(),
+    mediaId: v.optional(v.id("media")),
+    storageId: v.id("_storage"),
+    title: v.string(),
+    type: v.union(
+      v.literal("photo"),
+      v.literal("document"),
+      v.literal("scan"),
+      v.literal("video"),
+      v.literal("audio"),
+      v.literal("other")
+    ),
+    mimeType: v.string(),
+    sizeBytes: v.number(),
+    description: v.optional(v.string()),
+    personIds: v.optional(v.array(v.id("persons"))),
+  },
+  handler: async (ctx, args) => {
+    const { owner: vaultOwnerId } = await authorizeTenantMutation(
+      ctx,
+      "vaultMutations.attachMediaFile",
+      args.vaultOwnerId,
+    );
+    for (const personId of args.personIds ?? []) {
+      await authorizeOwnedReferenceMutation(
+        ctx,
+        "vaultMutations.attachMediaFile",
+        vaultOwnerId,
+        await ctx.db.get(personId),
+        "Media person",
+      );
+    }
+
+    const now = Date.now();
+    const shared = {
+      storageId: args.storageId,
+      title: args.title,
+      type: args.type,
+      mimeType: args.mimeType,
+      sizeBytes: args.sizeBytes,
+      description: args.description,
+      // A file the person just handed the product is not yet a file they said
+      // an AI may read. That stays a separate, deliberate act.
+      reviewStatus: "unreviewed" as const,
+      aiUseAllowed: false,
+      privacyLevel: "private" as const,
+      updatedAt: now,
+    };
+
+    if (args.mediaId) {
+      const existing = await ctx.db.get(args.mediaId);
+      await authorizeOwnedReferenceMutation(
+        ctx,
+        "vaultMutations.attachMediaFile",
+        vaultOwnerId,
+        existing,
+        "Media item",
+      );
+      // Replacing bytes leaves no orphan behind.
+      if (existing?.storageId && existing.storageId !== args.storageId) {
+        await ctx.storage.delete(existing.storageId);
+      }
+      await ctx.db.patch(args.mediaId, {
+        ...shared,
+        rightsStatus: existing?.rightsStatus ?? "unknown",
+        personIds: Array.from(
+          new Set([...(existing?.personIds ?? []), ...(args.personIds ?? [])]),
+        ),
+        privacyReviewNote:
+          "A file was attached or replaced, so this item needs review again before an AI may read it.",
+        reviewedAt: undefined,
+      });
+      return { mediaId: args.mediaId, created: false };
+    }
+
+    const mediaId = await ctx.db.insert("media", {
+      ...shared,
+      vaultOwnerId,
+      rightsStatus: "unknown",
+      personIds: args.personIds ?? [],
+      privacyReviewNote:
+        "Uploaded to the vault. Set its rights and review it before an AI may read it.",
+      createdAt: now,
+    });
+    return { mediaId, created: true };
+  },
+});
+
 export const reviewMedia = mutation({
   args: {
     vaultOwnerId: v.string(),

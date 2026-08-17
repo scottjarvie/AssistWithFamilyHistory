@@ -76,6 +76,15 @@ export const getPersonWorkspace = action({
     }),
 });
 
+export const getOwnedMediaFile = action({
+  args: { vaultOwnerId: v.string(), mediaId: v.string() },
+  handler: async (ctx, args): Promise<FunctionReturnType<typeof vaultInternal.getOwnedMediaFile>> =>
+    ctx.runQuery(vaultInternal.getOwnedMediaFile, {
+      ...args,
+      vaultOwnerId: await authorizedOwner(ctx, "vault.getOwnedMediaFile", args.vaultOwnerId),
+    }),
+});
+
 export const getStoriesIndex = action({
   args: { vaultOwnerId: v.string() },
   handler: async (ctx, args): Promise<FunctionReturnType<typeof vaultInternal.getStoriesIndex>> =>

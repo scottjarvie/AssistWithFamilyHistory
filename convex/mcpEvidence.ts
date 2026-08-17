@@ -5,13 +5,21 @@
  * fetch a private file itself. A raw storage URL is on the NEVER_EXPOSED list;
  * bytes come back through this connection or they do not come back at all.
  *
- * HONEST LIMIT, and the reason `BYTES_NOT_AVAILABLE` exists:
- * `media` rows in this product carry `filePath`/`url` references, and the byte
- * store (`lib/storage/objectStore.ts`, Backblaze B2) lives in the Node/Next
- * runtime, not the Convex runtime — today nothing writes to it. So we deliver
- * bytes where a fetchable `url` genuinely exists, deliver `documents` text
- * (which really is stored in Convex), and return honest metadata plus a
- * recovery for everything else. We do not pretend byte delivery works.
+ * Three kinds of item exist, in descending order of trust:
+ *
+ * 1. **Stored files** (`storageId`) — bytes the vault actually holds, in
+ *    private Convex file storage. The transport reads the object directly, so
+ *    a scanned census page reaches a model as image bytes and no link is ever
+ *    minted. This is the path a person's own upload takes.
+ * 2. **Documents** — person document text, which genuinely lives in Convex.
+ * 3. **Remote references** (`url`) — usually a FamilySearch memory. These load
+ *    in the person's signed-in browser and generally nowhere else, so the
+ *    server attempts one fetch and reports honestly when it fails.
+ *
+ * `BYTES_NOT_AVAILABLE` still exists, and still means what it says: a row that
+ * holds only a `filePath` hint, or a remote reference the server cannot read,
+ * comes back as honest metadata plus a recovery. We do not pretend byte
+ * delivery works where it does not.
  */
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
@@ -50,7 +58,7 @@ export const EVIDENCE_SKIP_GUIDANCE: Record<EvidenceSkipReason, string> = {
   TOO_LARGE:
     "This item is larger than one protected delivery allows. Ask for it on its own, or work from its title and description.",
   BYTES_NOT_AVAILABLE:
-    "Assist With Family History holds a reference to this file but not its bytes, so there is nothing to deliver. Use its title, description, and any linked citation, and tell the person the original file is not reachable from here.",
+    "Assist With Family History holds a reference to this file but not its bytes, so there is nothing to deliver. Use its title, description, and any linked citation, and tell the person that uploading the file to this item would let you read it.",
   OUTSIDE_GRANT_BOUNDARY:
     "This item is not inside the part of the research this connection was approved for. Stay with the records this connection already returned.",
 };
@@ -75,8 +83,9 @@ function boundaryAllowsPerson(
 
 /**
  * Resolve one batch of evidence items. Text that genuinely lives in Convex is
- * returned inline; anything whose bytes live behind a URL is handed to the
- * transport action to fetch under a byte budget, so this query stays pure.
+ * returned inline; stored files and remote references are handed to the
+ * transport action, which reads or fetches them under a byte budget, so this
+ * query stays pure.
  */
 export const getEvidenceBatch = internalQuery({
   args: {
@@ -101,6 +110,17 @@ export const getEvidenceBatch = internalQuery({
       mimeType: string;
       sizeBytes: number;
       text: string;
+    }> = [];
+    // Bytes the vault actually holds. The transport reads these objects
+    // directly out of private storage — no URL is minted, so there is nothing
+    // for a model or a proxy to follow.
+    const stored: Array<{
+      id: string;
+      kind: string;
+      title: string;
+      mimeType: string;
+      storageId: string;
+      sizeBytes: number | null;
     }> = [];
     const fetchable: Array<{
       id: string;
@@ -139,6 +159,26 @@ export const getEvidenceBatch = internalQuery({
         }
         if (row.rightsStatus === "restricted") {
           skipped.push(skip(item.id, item.kind, "RIGHTS_RESTRICTED"));
+          continue;
+        }
+        if (row.storageId) {
+          // A file the vault holds. Refuse it here rather than spending the
+          // transport's budget on an object we already know is over the cap.
+          if (
+            typeof row.sizeBytes === "number" &&
+            row.sizeBytes > FAMILY_HISTORY_MCP_LIMITS.evidencePerItemBytes
+          ) {
+            skipped.push(skip(item.id, item.kind, "TOO_LARGE"));
+            continue;
+          }
+          stored.push({
+            id: String(row._id),
+            kind: "media",
+            title: row.title,
+            mimeType: row.mimeType ?? "application/octet-stream",
+            storageId: row.storageId,
+            sizeBytes: typeof row.sizeBytes === "number" ? row.sizeBytes : null,
+          });
           continue;
         }
         if (!row.url || !/^https:\/\//i.test(row.url)) {
@@ -204,6 +244,6 @@ export const getEvidenceBatch = internalQuery({
       }
     }
 
-    return { delivered, fetchable, skipped };
+    return { delivered, stored, fetchable, skipped };
   },
 });

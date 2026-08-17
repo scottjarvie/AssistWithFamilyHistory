@@ -582,9 +582,19 @@ export default defineSchema({
     description: v.optional(v.string()),
     
     // File location
+    //
+    // `storageId` is the only one of these that is actually bytes the vault
+    // holds. `filePath` is a legacy local-mirror hint and `url` is a remote
+    // reference (usually a FamilySearch memory) that only the person's own
+    // signed-in browser can load — no server, and therefore no AI, can read it.
+    // Uploaded files land in Convex file storage, which is private: nothing but
+    // owner-checked server code can read a stored object, so a protected
+    // delivery can hand an AI the actual scan without ever handing out a link.
+    storageId: v.optional(v.id("_storage")),
     filePath: v.optional(v.string()),
     url: v.optional(v.string()),
     mimeType: v.optional(v.string()),
+    sizeBytes: v.optional(v.number()),
     
     // Date
     date: v.optional(
