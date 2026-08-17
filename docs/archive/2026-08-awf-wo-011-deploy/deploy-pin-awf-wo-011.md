@@ -1,4 +1,13 @@
-# Pinned deploy source — AWF-WO-011 production release
+# ARCHIVED — Pinned deploy source, AWF-WO-011 production release
+
+> **Archived 2026-08-17. Do not follow this.** The whole pinned-worktree deploy
+> ceremony described below was moot: Vercel auto-deploys `main`, so the release
+> went out the moment the fix merged, with no manual deploy act at all. The one
+> true fact now lives in `docs/operations/how-production-deploys.md`.
+>
+> Kept because the diagnosis of *why* five production builds failed, and why the
+> `check:convex-bindings-fresh` gate exists, is real history worth preserving.
+> The `deploy-2751a34` worktree this file names is no longer needed.
 
 One job: name the exact commit Codex deploys, and the exact worktree that holds
 it. Read with `docs/operations/bring-your-ai-provider-actions.md` item 0.

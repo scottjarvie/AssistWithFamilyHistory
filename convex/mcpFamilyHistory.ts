@@ -222,6 +222,45 @@ async function finishOperation(
   return result;
 }
 
+/**
+ * Where a record came from, derived entirely on the server.
+ *
+ * Nothing in here can be supplied, shaped, or contradicted by the caller.
+ * `actorId` is the OAuth `client_id` the transport verified against the
+ * provider's JWKS; `operationId` is the replay key already validated above;
+ * `recordedAt` is our clock. A connected AI therefore cannot stamp a record as
+ * hand-entered, and a person's own entry can never be mistaken for an AI's.
+ *
+ * This is the same shape `convex/vaultMutations.ts` writes for a person's manual
+ * first start, so one field answers "who first put this here" for every record
+ * in the vault, whatever door it came through.
+ */
+type McpProvenance = {
+  actorKind: "chosen_ai";
+  actorId: string;
+  method: "mcp";
+  evidenceStatus: "unsourced";
+  operationId: string;
+  recordedAt: number;
+};
+
+function mcpProvenance(principal: McpPrincipal, operationId: string): McpProvenance {
+  return {
+    actorKind: "chosen_ai",
+    actorId: principal.clientId,
+    method: "mcp",
+    // A person row created through MCP carries no citation of its own at the
+    // moment of insert, even when the same pass also saves sources: the link
+    // between a person and its evidence lives in citationLinks and sourceFacts,
+    // and claiming `source_linked` here would be the record asserting its own
+    // sourcing. Evidence status stays "unsourced" until something actually
+    // sources it.
+    evidenceStatus: "unsourced",
+    operationId,
+    recordedAt: Date.now(),
+  };
+}
+
 async function operation(
   ctx: MutationCtx,
   args: {
@@ -232,7 +271,7 @@ async function operation(
     requestHash: string;
     input: any;
   },
-  work: (owner: string) => Promise<{ result: Record<string, unknown>; detail: string }>,
+  work: (owner: string, provenance: McpProvenance) => Promise<{ result: Record<string, unknown>; detail: string }>,
 ) {
   const owner = ownerFromPrincipal(args.principal);
   // Defense in depth. The transport already resolved and checked this grant;
@@ -247,11 +286,11 @@ async function operation(
   const operationId = cleanText(args.operationId, "operationId", FAMILY_HISTORY_MCP_LIMITS.operationId, true)!;
   const replay = await replayReceipt(ctx, owner, operationId, args.toolName, args.requestHash);
   if (replay) return replay;
-  const completed = await work(owner);
+  const completed = await work(owner, mcpProvenance(args.principal, operationId));
   return finishOperation(ctx, { ...args, owner, operationId, ...completed });
 }
 
-async function savePersonRecord(ctx: MutationCtx, owner: string, input: any) {
+async function savePersonRecord(ctx: MutationCtx, owner: string, input: any, provenance: McpProvenance) {
   const now = Date.now();
   await assertOwnedPlaceRefs(ctx, owner, input, "Person place");
   if (input.mode === "create") {
@@ -277,6 +316,12 @@ async function savePersonRecord(ctx: MutationCtx, owner: string, input: any) {
       researchPriority: input.researchPriority,
       notes: cleanText(input.notes, "person notes", FAMILY_HISTORY_MCP_LIMITS.notes),
       tags: input.tags,
+      // The stamp that makes an AI-created person visibly an AI-created person.
+      // Without it, telling the two apart meant joining through mcpRecordKeys —
+      // so a person row was, on its own, silent about where it came from. Every
+      // other MCP write path already stamps something (`importKey: "mcp:*"`,
+      // `generatedBy: "ai"`, `aiSuggested`); persons were the gap.
+      creationProvenance: provenance,
       createdAt: now,
       updatedAt: now,
     });
@@ -293,7 +338,7 @@ async function savePersonRecord(ctx: MutationCtx, owner: string, input: any) {
   return { id: row._id, created: false, updatedAt: now };
 }
 
-async function saveRelationshipRecord(ctx: MutationCtx, owner: string, input: any) {
+async function saveRelationshipRecord(ctx: MutationCtx, owner: string, input: any, provenance: McpProvenance) {
   const now = Date.now();
   await assertOwnedPlaceRefs(ctx, owner, input, "Relationship place");
   if (input.mode === "create") {
@@ -315,6 +360,9 @@ async function saveRelationshipRecord(ctx: MutationCtx, owner: string, input: an
       facts: input.facts,
       familySearchId: input.familySearchId,
       importKey: `mcp:${createKey}`,
+      // Same server-derived stamp as persons. A relationship an AI proposed
+      // should be as visibly AI-proposed as the people it connects.
+      creationProvenance: provenance,
       createdAt: now,
       updatedAt: now,
     });
@@ -522,7 +570,7 @@ async function saveSourceEvidenceRecord(ctx: MutationCtx, owner: string, input: 
   return { sourceId, citationId, sourceCreated, citationCreated, linkIds, factIds, updatedAt: now };
 }
 
-async function saveResearchRecord(ctx: MutationCtx, owner: string, input: any) {
+async function saveResearchRecord(ctx: MutationCtx, owner: string, input: any, provenance: McpProvenance) {
   const now = Date.now();
   const result: Record<string, unknown> = { updatedAt: now };
   if (input.task) {
@@ -583,7 +631,13 @@ async function saveResearchRecord(ctx: MutationCtx, owner: string, input: any) {
           summary: finding.summary,
           details: cleanText(finding.details, "research finding details", FAMILY_HISTORY_MCP_LIMITS.notes),
           outputRefs: finding.outputRefs,
-          model: finding.model,
+          // Self-reported and untrusted: a client can name any model it likes,
+          // or none. It is kept because a person may find it useful to see, and
+          // bounded so it cannot be used as a smuggling channel. It is NOT the
+          // provenance — `creationProvenance` below is, and the client cannot
+          // touch that.
+          model: cleanText(finding.model, "finding.model (self-reported)", FAMILY_HISTORY_MCP_LIMITS.shortText),
+          creationProvenance: provenance,
           createdAt: now,
           updatedAt: now,
           completedAt: (finding.status ?? "done") === "done" ? now : undefined,
@@ -601,6 +655,10 @@ async function saveResearchRecord(ctx: MutationCtx, owner: string, input: any) {
         finding.entityId ?? (row.entityId ? String(row.entityId) : undefined),
       );
       const patch = pickDefined(finding, ["entityType", "entityId", "activityType", "status", "summary", "details", "outputRefs", "model"]);
+      // Still self-reported on a correction, and still bounded. A correction can
+      // never rewrite `creationProvenance`: who first wrote a record is not a
+      // field a later caller gets to edit.
+      if (patch.model !== undefined) patch.model = cleanText(patch.model, "finding.model (self-reported)", FAMILY_HISTORY_MCP_LIMITS.shortText);
       await ctx.db.patch(row._id, { ...patch, completedAt: finding.status === "done" ? now : row.completedAt, updatedAt: now });
       findingId = row._id;
     }
@@ -833,12 +891,12 @@ export const getRecordContext = internalQuery({
 
 export const savePerson = internalMutation({
   args: { principal: principalValidator, grantId: v.optional(v.string()), operationId: v.string(), requestHash: v.string(), input: v.any() },
-  handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_person" }, async (owner) => ({ result: { person: await savePersonRecord(ctx, owner, args.input) }, detail: "Saved a person record through MCP." })),
+  handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_person" }, async (owner, provenance) => ({ result: { person: await savePersonRecord(ctx, owner, args.input, provenance) }, detail: "Saved a person record through MCP." })),
 });
 
 export const saveRelationship = internalMutation({
   args: { principal: principalValidator, grantId: v.optional(v.string()), operationId: v.string(), requestHash: v.string(), input: v.any() },
-  handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_relationship" }, async (owner) => ({ result: { relationship: await saveRelationshipRecord(ctx, owner, args.input) }, detail: "Saved a relationship record through MCP." })),
+  handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_relationship" }, async (owner, provenance) => ({ result: { relationship: await saveRelationshipRecord(ctx, owner, args.input, provenance) }, detail: "Saved a relationship record through MCP." })),
 });
 
 export const saveEvent = internalMutation({
@@ -853,7 +911,7 @@ export const saveSourceEvidence = internalMutation({
 
 export const saveResearchWork = internalMutation({
   args: { principal: principalValidator, grantId: v.optional(v.string()), operationId: v.string(), requestHash: v.string(), input: v.any() },
-  handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_research_work" }, async (owner) => ({ result: { research: await saveResearchRecord(ctx, owner, args.input) }, detail: "Saved research task or finding through MCP." })),
+  handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_research_work" }, async (owner, provenance) => ({ result: { research: await saveResearchRecord(ctx, owner, args.input, provenance) }, detail: "Saved research task or finding through MCP." })),
 });
 
 export const saveStoryWork = internalMutation({
@@ -863,16 +921,16 @@ export const saveStoryWork = internalMutation({
 
 export const saveCompleteResult = internalMutation({
   args: { principal: principalValidator, grantId: v.optional(v.string()), operationId: v.string(), requestHash: v.string(), input: v.any() },
-  handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_complete_result" }, async (owner) => {
+  handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_complete_result" }, async (owner, provenance) => {
     const cap = FAMILY_HISTORY_MCP_LIMITS.completeResultRowsPerKind;
     for (const [kind, rows] of Object.entries({ events: args.input.events ?? [], relationships: args.input.relationships ?? [], evidence: args.input.evidence ?? [], stories: args.input.stories ?? [] })) {
       if (!Array.isArray(rows) || rows.length > cap) machineError("VALIDATION_ERROR", `Complete result ${kind} exceed the safe batch limit.`, `Use at most ${cap} ${kind} per complete result or split the work.`);
     }
     if (args.input.personId) await owned(ctx, "persons", args.input.personId, owner, "Complete-result person");
     const results: Record<string, unknown> = {};
-    if (args.input.person) results.person = await savePersonRecord(ctx, owner, args.input.person);
+    if (args.input.person) results.person = await savePersonRecord(ctx, owner, args.input.person, provenance);
     const relationships = [];
-    for (const item of args.input.relationships ?? []) relationships.push(await saveRelationshipRecord(ctx, owner, item));
+    for (const item of args.input.relationships ?? []) relationships.push(await saveRelationshipRecord(ctx, owner, item, provenance));
     results.relationships = relationships;
     const events = [];
     for (const item of args.input.events ?? []) events.push(await saveEventRecord(ctx, owner, item));
@@ -880,7 +938,7 @@ export const saveCompleteResult = internalMutation({
     const evidence = [];
     for (const item of args.input.evidence ?? []) evidence.push(await saveSourceEvidenceRecord(ctx, owner, item));
     results.evidence = evidence;
-    if (args.input.research) results.research = await saveResearchRecord(ctx, owner, args.input.research);
+    if (args.input.research) results.research = await saveResearchRecord(ctx, owner, args.input.research, provenance);
     const stories = [];
     for (const item of args.input.stories ?? []) stories.push(await saveStoryRecord(ctx, owner, item));
     results.stories = stories;
@@ -976,7 +1034,7 @@ function failureOf(error: unknown, index: number, createKey?: string): BatchItem
  */
 export const saveRecords = internalMutation({
   args: { principal: principalValidator, grantId: v.optional(v.string()), operationId: v.string(), requestHash: v.string(), input: v.any() },
-  handler: (ctx, args) => operation(ctx, { ...args, toolName: "family_history_save_records" }, async (owner) => {
+  handler: (ctx, args) => operation(ctx, { ...args, toolName: "family_history_save_records" }, async (owner, provenance) => {
     const input = args.input ?? {};
     const caps: Array<[string, number]> = [
       ["people", FAMILY_HISTORY_MCP_LIMITS.batchPeople],
@@ -1012,7 +1070,7 @@ export const saveRecords = internalMutation({
     for (const [index, item] of (input.people ?? []).entries()) {
       const createKey = typeof item?.createKey === "string" ? item.createKey : undefined;
       try {
-        const saved = await savePersonRecord(ctx, owner, item);
+        const saved = await savePersonRecord(ctx, owner, item, provenance);
         if (createKey) batchPeople.set(createKey, String(saved.id));
         record("people", {
           index,
@@ -1038,7 +1096,7 @@ export const saveRecords = internalMutation({
         }
         delete resolved.person1CreateKey;
         delete resolved.person2CreateKey;
-        const saved = await saveRelationshipRecord(ctx, owner, resolved);
+        const saved = await saveRelationshipRecord(ctx, owner, resolved, provenance);
         record("relationships", {
           index,
           createKey,

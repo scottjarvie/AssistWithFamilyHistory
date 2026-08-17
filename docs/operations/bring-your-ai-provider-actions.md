@@ -1,24 +1,44 @@
 # Bring Your AI — provider actions
 
-> Status: refreshed from source and from read-only production probes,
-> 2026-08-17. **Nothing in this document has been performed.** No provider
-> dashboard, setting, secret, environment variable, deployment, or real family
-> record was touched while building AWF-WO-011 or while verifying this runbook.
+> Status: reconciled against live production probes, 2026-08-17.
 >
-> Everything here is a change outside the repository — in Clerk, in Convex
-> environment configuration, or in a deployment — and therefore sits behind the
-> human gate in AWF-WO-011 (Human gates 2 and 3).
+> **✅ The release is deployed.** The AWF-WO-011 code is running on
+> `assistwithfamilyhistory.com`. Section 0 below is kept as the historical
+> record of a deploy that has already happened; **do not perform it again.**
+> Deployment is not a ceremony in this repository: Vercel auto-deploys `main`,
+> and `scripts/vercel-build.mjs` deploys Convex first as part of that build.
+> Pushing to `main` *is* the deploy.
 >
-> **Repo-side readiness, verified 2026-08-17 on a clean worktree of
-> `origin/main`:** `pnpm verify` passes all 55 steps, and
+> Proof, re-probed read-only:
+>
+> ```bash
+> curl -s https://assistwithfamilyhistory.com/updates | grep -c media-evidence-bytes   # → 1
+> curl -s https://assistwithfamilyhistory.com/ai.txt | grep -c family_history_get_evidence
+> ```
+>
+> The live `/updates` page carries the `media-evidence-bytes` release item, which
+> was introduced in `1b7d9e9` (PR #61) and is **not** an ancestor of `862a224`.
+> Live `/ai.txt` lists the fourteen `family_history_*` names, not the twelve
+> legacy ones. Both facts are impossible unless production is newer than
+> `862a224`. Any sentence anywhere claiming production serves `862a224` is stale
+> and wrong; where one survives below it is marked as history.
+>
+> **What is still not done.** Everything in this file that is a *provider*
+> change — a Clerk dashboard setting, a Convex environment variable, a token
+> posture — remains unperformed. No provider dashboard, secret, environment
+> variable, or real family record has been touched. And no real AI client has
+> completed a lifecycle against the deployed site: the honest residue is
+> **awaiting real-client proof**, never "awaiting deployed proof".
+>
+> **Repo-side gate, verified on a clean worktree of `origin/main`:** `pnpm verify`
+> passes all **57** steps — `check:convex-bindings-fresh` is deliberately the
+> *first* step, immediately before `typecheck`, so the typecheck runs against
+> provably fresh Convex bindings — and
 > `pnpm exec tsc --noEmit -p convex/tsconfig.json` is clean.
 >
-> **⚠️ That gate is not sufficient, and the deploy is currently blocked.** The
-> production Vercel build fails inside its own `convex deploy` step on a
-> TypeScript error the local gate cannot see. Production is still serving
-> `862a224`. Read **0·0 first** — it also names the correct production Convex
-> deployment, `accomplished-dodo-308`, and explains what `gallant-mallard-74`
-> is.
+> Read **0·0** for the correct production Convex deployment,
+> `accomplished-dodo-308`, and what `gallant-mallard-74` is. That part has not
+> changed and still matters.
 
 ## Why this file exists
 
@@ -37,10 +57,12 @@ what changes in observable behaviour, and how to undo it.
 
 ## 0·0. Read this first — the two facts that were missing on 2026-08-17
 
-A deploy attempt on 2026-08-17 stopped on two red flags. Both are now explained,
-and one of them is a real blocker that no deploy procedure can work around.
-Nothing below was assumed; every claim names the read-only command that proved
-it.
+A deploy attempt on 2026-08-17 stopped on two red flags. Both are now explained
+and both are resolved — the second was a genuine build blocker, since fixed, and
+production released itself through Vercel's auto-deploy of `main` as soon as the
+fix merged. Nothing below was assumed; every claim names the read-only command
+that proved it. The first subsection is still live guidance you need; the second
+and third are history.
 
 ### The production Convex deployment is `accomplished-dodo-308`
 
@@ -109,8 +131,11 @@ project is usually the wrong one.
 > The deploy in 0e is no longer gated. The history below is kept because the
 > diagnosis is the reason the new gate exists.
 
-**The live site is running commit `862a224` (PR #57).** Every production build
-since has failed, all five with the same error. Read-only check:
+**History — this is no longer the state.** For a stretch on 2026-08-17 the live
+site was running commit `862a224` (PR #57) because every production build since
+had failed, all five with the same error. Once the fix below landed on `main`,
+Vercel's ordinary auto-deploy of `main` built and released it, and production
+moved past `862a224`. Read-only check:
 
 ```bash
 pnpm dlx vercel@latest ls --prod
@@ -120,7 +145,7 @@ pnpm dlx vercel@latest inspect <the newest Error deployment url> --logs | tail -
 | Commit | State |
 | --- | --- |
 | `2d25eb6`, `1b7d9e9`, `34c413e`, `78dd1a5`, `fbed586` | **Error** |
-| `862a224` (PR #57) | Ready — **this is what production is serving** |
+| `862a224` (PR #57) | Ready — what production served *while the builds were broken* |
 
 The failure is inside the `convex deploy` step of `scripts/vercel-build.mjs`,
 and it is a TypeScript error, not a schema or environment problem:
@@ -158,10 +183,16 @@ inferred return type. The cycle only existed once the generated types were fresh
 
 ---
 
-## 0. Deploy the release from a pinned, clean worktree
+## 0. Deploy the release — HISTORICAL, already done
 
-Production currently predates PR #58 — **proved, not assumed.** Read-only probes
-on 2026-08-17:
+> **Do not perform this section.** It records the state of production *before*
+> the release and the reasoning used at the time. The release has since gone out
+> through Vercel's ordinary auto-deploy of `main`. There is no pinned-worktree
+> deploy ceremony in this repository; see
+> `docs/operations/how-production-deploys.md`.
+
+At the time of writing, production predated PR #58 — **proved, not assumed.**
+Read-only probes on 2026-08-17, before the deploy:
 
 - `https://assistwithfamilyhistory.com/ai.txt` is generated from
   `lib/mcp/catalog.ts`, so it is a live readout of the deployed tool surface. It
@@ -208,7 +239,7 @@ cd "$DEPLOY" && pnpm install --frozen-lockfile
 ```
 
 with `pnpm install --frozen-lockfile` already completed. See
-`docs/operations/deploy-pin-awf-wo-011.md` for the staleness check — `origin/main`
+`docs/archive/2026-08-awf-wo-011-deploy/deploy-pin-awf-wo-011.md` for the staleness check — `origin/main`
 is deliberately one docs-only commit ahead of the pin.
 
 Verify the worktree is exactly what you think it is before going further:
@@ -326,11 +357,12 @@ git diff --numstat 862a224..origin/main -- convex/schema.ts
 ```
 
 101 added lines and exactly one changed line, and that one change is an index
-list gaining a member. Two independent readouts confirm `862a224` really is what
-production runs, rather than an assumption inherited from the PR description:
-`/ai.txt`'s twelve-tool listing above, and the Vercel production deployment
-record (`vercel ls --prod` → `862a224` is the newest **Ready** production
-deployment; see 0·0).
+list gaining a member. Two independent readouts confirmed `862a224` was what
+production ran *at that moment*, rather than an assumption inherited from the PR
+description: `/ai.txt`'s twelve-tool listing above, and the Vercel production
+deployment record (`vercel ls --prod` → `862a224` was then the newest **Ready**
+production deployment; see 0·0). Production has since moved past it, and live
+`/ai.txt` now lists the fourteen `family_history_*` names.
 
 **Two new tables**
 
@@ -505,6 +537,32 @@ DCR and does not itself require CIMD-first; do not cite it for this rule.
 ---
 
 ## 2. Emit a resource-specific audience on MCP access tokens
+
+> **Decision recorded 2026-08-17: the resource server keeps
+> validate-when-present, accept-when-absent — and this is now a considered
+> posture rather than a stopgap.** The reasoning, also written beside the check
+> in `convex/httpRoutes/mcp.ts` and pinned by four tests in
+> `convex/mcpTransport.test.ts`:
+>
+> 1. `aud` exists to stop a token minted for resource A being replayed at
+>    resource B. To reach that point here, a token must first pass an **exact
+>    issuer pin** — `jwtVerify` is given one configured issuer. A token from any
+>    other Assist product's Clerk instance is refused outright, audience or no
+>    audience. Cross-product replay is already closed.
+> 2. The residual case is a *different OAuth application on this same Clerk
+>    instance*. Such a token gets past verification and then does nothing,
+>    because authorization is the durable product grant keyed by
+>    (issuer, subject, clientId) — an unapproved client is refused
+>    `GRANT_REQUIRED` on its first call and cannot even learn that a record
+>    exists.
+> 3. Making `aud` **required** today would therefore add no protection while
+>    returning 401 to every client, because the production Clerk instance does
+>    not mint the claim. That is a self-inflicted outage in exchange for a
+>    defence already provided twice over.
+>
+> So this item is **defence in depth worth having, not a gap that blocks
+> anything.** If Clerk gains RFC 8707 resource indicators, emit the claim and
+> tighten the check to required in one line.
 
 **Where:** Clerk Dashboard → production instance → the OAuth/token
 configuration that controls access-token claims (audience / resource
@@ -974,7 +1032,47 @@ configured now:
 - revocation takes effect on the very next request, because the grant is
   re-resolved per request and the transport is stateless — no waiting for a JWT
   to expire;
-- scopes, record boundaries, and the Queue principal all derive from the grant.
+- scopes, record boundaries, and the Queue principal all derive from the grant;
+- the protected-resource document at
+  `/.well-known/oauth-protected-resource/mcp` publishes the six
+  `family_history:*` permissions under the vendor-prefixed key
+  `x-assistwithfamilyhistory.productScopes`, generated from `lib/mcp/catalog.ts`,
+  the same module the edge enforces with. It informs a reader and instructs
+  nobody. Added 2026-08-17; needs no provider change.
 
 None of that depends on items 1–3. They make client identity honest and close
 the cross-resource replay gap; they are not what makes the permission real.
+
+### Why the product scopes are NOT published as `scopes_supported`
+
+Worth writing down, because it is a trap that has now caught three sibling
+Assist products — **and because the family standard does not currently state this
+rule anywhere,** despite a sibling repository's commit message implying it does.
+That documentation gap is the reason the same mistake keeps being made; until the
+standard says it, each product has to carry the reasoning itself. This section is
+Family History's copy.
+
+RFC 9728's `scopes_supported` reads like documentation and is not. **A conforming
+client copies those values into the `scope` parameter of its authorization
+request to the authorization server.** Our authorization server is Clerk, whose
+own `scopes_supported` is `openid profile email public_metadata private_metadata
+offline_access` — it has never heard of `family_history:context:read`. Publishing
+the product vocabulary there therefore instructs every conformant client to ask
+Clerk for permissions it cannot issue, and OAuth dies with
+`Invalid scope requested` **before a consent screen ever renders.**
+
+This is observed behaviour, not a reading of the spec: a sibling Assist product
+advertised its own `finance:*` vocabulary this way and a real client failed on
+exactly that error pre-consent; two others removed or reverted the identical
+change.
+
+The vendor-prefixed key gets the discoverability without the instruction, since
+clients ignore keys they do not recognise. `convex/mcpTransport.test.ts` asserts
+both halves — the vocabulary matches the enforced ceiling exactly, and
+`scopes_supported` is absent from the parsed document.
+
+Nothing about this touches the authority model. The six permissions are real and
+enforced. What was wrong was only ever the discovery channel: a permission the
+*product* grants is not a scope the *provider* issues, and one field conflated
+them. `/ai.txt` now also tells a connecting AI, in words, not to put
+`family_history:*` in its OAuth scope request.
