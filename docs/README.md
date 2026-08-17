@@ -27,6 +27,7 @@ Durable guidance that stays accurate as the product evolves.
 - [Agent operations and handoff runbook](operations/agent-handoff-runbook.md)
 - [Family History Queue foundation and Claude Design handoff](product/queue-foundation-design-handoff.md)
 - [Family History stateless MCP foundation](planning/family-history-stateless-mcp-foundation.md)
+- [Family History Bring Your AI alignment](planning/family-history-bring-your-ai-alignment.md)
 - [Family History MCP production acceptance — 2026-08-12](operations/family-history-mcp-production-acceptance-2026-08-12.md)
 - [Product health gates and person route QA](operations/product-health-gates.md)
 - [GEN-87/88 guarded Convex rollout](operations/gen-87-clerk-convex-auth-setup.md)
