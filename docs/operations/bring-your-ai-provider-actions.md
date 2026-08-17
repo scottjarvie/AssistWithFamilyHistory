@@ -236,9 +236,26 @@ surface that publishes the authorization-server metadata at
 - `client_id_metadata_document_supported` — the CIMD path, preferred; or
 - **Dynamic Client Registration**, which publishes a `registration_endpoint`.
 
-**Current observed truth (read-only probe, re-confirmed 2026-08-17):** the live
-metadata advertises **neither**. Only a manually pre-registered client can
-connect today. Re-check it yourself in one command:
+**Current observed truth — CONFIRMED 2026-08-17: Dynamic Client Registration is
+NOW LIVE on production.** `clerk.assistwithfamilyhistory.com` advertises
+`"registration_endpoint": "https://clerk.assistwithfamilyhistory.com/oauth/register"`.
+It still does **not** advertise `client_id_metadata_document_supported`.
+
+**This changes the decision in this section.** DCR is the approved soft-launch
+path: a conforming client can now self-register and begin OAuth without anyone
+hand-creating a client for it, which is the whole point of the connection. CIMD
+is **deferred** — it remains the preferred long-term identifier and the strict
+validation in `lib/mcp/clientMetadata.ts` stays ready for the day Clerk offers
+it, but it is not a launch blocker and no work is queued against it.
+
+Because DCR is a public client-creation surface, the bounded posture already in
+`convex/mcpClientTrust.ts` is what keeps it safe: `MAX_DCR_REGISTRATIONS = 50`,
+a 30-day expiry, and an owner-visible inventory. Self-registered clients are
+still recorded as `trusted: false` — a token was issued to that client and
+nothing more is claimed — and a registration is never authority: the person's
+product grant is, and it is refused by default.
+
+Re-check the live truth yourself in one command:
 
 ```bash
 curl -sS https://clerk.assistwithfamilyhistory.com/.well-known/oauth-authorization-server \
@@ -268,9 +285,10 @@ registration endpoint, and `MAX_DCR_REGISTRATIONS = 50` plus a 30-day expiry in
 `convex/mcpClientTrust.ts` exist so that even a bounded fallback stays
 inventoried and cleanable.
 
-**Recommendation:** prefer CIMD. If Clerk does not offer it, keep manual
-pre-registration for acceptance work and treat DCR as a separate, explicitly
-approved decision rather than a shortcut.
+**Recommendation, as of 2026-08-17:** proceed on DCR, which is live and is the
+approved soft-launch path. Keep the bounded registration posture as written.
+Prefer CIMD when Clerk offers it, and treat that as a later improvement to
+client identity rather than outstanding work.
 
 **Rollback:** turn the setting off in the same place. Existing grants are
 unaffected — a grant is a product record, not a provider record — and
@@ -727,8 +745,9 @@ if anything unmarked references the marked graph.
 ## Explicitly NOT done, and not to be done without a separate decision
 
 - No token server was written. The provider remains the authorization server.
-- DCR was **not** enabled, and no public registration endpoint exists in this
-  repository.
+- No public registration endpoint exists in **this repository**. DCR is served
+  by Clerk, and as of 2026-08-17 it is live there (§1). Nobody in this lane
+  enabled it, and nothing here should re-enable, disable, or reconfigure it.
 - No secret, environment variable, or deployment was created or changed. The
   2026-08-17 readiness pass **listed environment-variable names** on Vercel
   Production and made unauthenticated GET/POST probes of the public production

@@ -57,7 +57,7 @@ export function GET() {
     "## Current / Partial / Later",
     "Current in production: endpoint, OAuth challenge/metadata, bounded reads, server-derived owner, replay-safe writes, canonical UI-visible records, explicit PKCE consent, one disposable named-client research-to-story lifecycle, and exact synthetic cleanup.",
     "Built and awaiting deployed proof: person-approved product grants, server-enforced scopes, record boundaries, immediate revocation, batch record saves, and protected evidence delivery.",
-    "Partial: family_history_get_evidence returns real text for person documents, which are stored here. Media rows currently hold a file reference rather than bytes in most cases, and those items come back skipped with BYTES_NOT_AVAILABLE rather than a pretend delivery.",
+    "Current in source and tests: family_history_get_evidence returns real bytes for media the person uploaded into the vault — a scanned record reaches you as an image block, read straight from private storage with no link involved — and real text for person documents. Imported rows that hold only a file reference elsewhere still come back skipped with BYTES_NOT_AVAILABLE rather than a pretend delivery; the person can upload the file to that item to make it readable.",
     "Partial after exact deployed proof: Client ID Metadata Document discovery, dynamic client registration, broad client compatibility, fresh-device email verification, mobile setup, and refresh/reconnect.",
     "Later: publishing, deletion, identity merge, export, external provider actions, wider client matrix.",
     "",

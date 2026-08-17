@@ -668,17 +668,19 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
           </div>
         </TabsContent>
 
-        <TabsContent value="memories">
+        <TabsContent value="memories" className="space-y-4">
+          {/* The panel always renders, because its upload control is how a
+              person puts a scan into the vault at all — including the first
+              one, when there is nothing here to import against yet. */}
+          <MediaPrivacyReviewPanel media={media} personId={String(workspace.person._id)} />
           {media.length === 0 ? (
             <EmptyWorkspaceState
               title="No memories imported yet"
-              description="Import a FamilySearch memories capture to enrich this person with photos, scans, and media for later story writing."
+              description="Upload a scan, photo, or recording above, or import a FamilySearch memories capture to enrich this person for later story writing."
               actionHref="/app/imports"
               actionLabel="Import Memories"
             />
-          ) : (
-            <MediaPrivacyReviewPanel media={media} />
-          )}
+          ) : null}
         </TabsContent>
 
         <TabsContent value="documents">

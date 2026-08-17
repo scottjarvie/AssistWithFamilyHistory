@@ -14,15 +14,17 @@
  * Proved here (server behaviour, no live endpoint):
  *   1 anonymous challenge · 2 branded protected-resource metadata ·
  *   3 discovery filtered by grant and empty without one · 4 out-of-scope refusal
- *   without leakage · 7 batch save, correction, stale-write refusal ·
+ *   without leakage · 6 real evidence bytes out of vault storage ·
+ *   7 batch save, correction, stale-write refusal ·
  *   8 unknown-tool / ungranted / cross-owner refusals byte-identical ·
  *   9 operationId replay · 10 revoke denies the very next call and discovery.
  *
  * NOT proved here, and honestly still awaiting a live run:
- *   5 a real Queue assignment made by a person · 6 real evidence bytes ·
- *   10's reconnect half (a person re-approving in the product) · 11 cleanup
- *   against the acceptance deployment (`convex/mcpAcceptanceFixture.test.ts`
- *   proves the cleanup logic, not a live residue-free re-query).
+ *   5 a real Queue assignment made by a person · 6's other half (a person's own
+ *   upload travelling through the browser to storage) · 10's reconnect half (a
+ *   person re-approving in the product) · 11 cleanup against the acceptance
+ *   deployment (`convex/mcpAcceptanceFixture.test.ts` proves the cleanup logic,
+ *   not a live residue-free re-query).
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { convexTest } from "convex-test";
@@ -213,6 +215,103 @@ describe("chosen-AI lifecycle ladder (locally provable rungs)", () => {
     expect(payload).not.toContain(OWNER);
     expect(payload).not.toContain("vaultOwnerId");
     expect(payload).not.toContain(notGranted);
+  });
+
+  test("6 · a reviewed stored scan arrives as real image bytes, and a reference-only row does not", async () => {
+    const t = convexTest(schema, modules);
+    const token = await accessToken(OWNER);
+    await seedGrant(t, {
+      vaultOwnerId: OWNER,
+      clientId: CLIENT_ID,
+      issuer: ISSUER,
+      scopes: ["family_history:evidence:read"],
+    });
+
+    // A one-pixel PNG standing in for a scanned census page: small, but real
+    // bytes that must survive storage, the budget check, and base64 transport.
+    const scanBytes = Uint8Array.from(
+      atob(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+      ),
+      (character) => character.charCodeAt(0),
+    );
+
+    const { storedId, referenceOnlyId } = await t.run(async (ctx) => {
+      const personId = await ctx.db.insert("persons", {
+        vaultOwnerId: OWNER,
+        name: { given: "Ladder", surname: "Ancestor" },
+        sex: "unknown",
+        living: false,
+        researchStatus: "basic",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      const storageId = await ctx.storage.store(new Blob([scanBytes as BlobPart], { type: "image/png" }));
+      const reviewed = {
+        vaultOwnerId: OWNER,
+        type: "scan" as const,
+        personIds: [personId],
+        mimeType: "image/png",
+        reviewStatus: "reviewed" as const,
+        aiUseAllowed: true,
+        rightsStatus: "owned" as const,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      return {
+        storedId: await ctx.db.insert("media", {
+          ...reviewed,
+          title: "1900 census page",
+          storageId,
+          sizeBytes: scanBytes.byteLength,
+        }),
+        // Same review state, no bytes: the honest half of the promise.
+        referenceOnlyId: await ctx.db.insert("media", {
+          ...reviewed,
+          title: "Memory we only hold a link to",
+          filePath: "people/ladder/never-uploaded.jpg",
+        }),
+      };
+    });
+
+    const client = await connect(t, token);
+    const result = await callTool(client, "family_history_get_evidence", {
+      items: [
+        { kind: "media", id: String(storedId) },
+        { kind: "media", id: String(referenceOnlyId) },
+      ],
+    });
+    await client.close();
+
+    expect(result.isError).toBeFalsy();
+
+    const summary = result.structuredContent as {
+      delivered: Array<{ id: string; title: string; mimeType: string; sizeBytes: number }>;
+      skipped: Array<{ id: string; reason: string; whatToDo: string }>;
+    };
+    expect(summary.delivered).toHaveLength(1);
+    expect(summary.delivered[0]).toMatchObject({
+      id: String(storedId),
+      title: "1900 census page",
+      mimeType: "image/png",
+      sizeBytes: scanBytes.byteLength,
+    });
+
+    // The model receives an actual image block whose bytes round-trip exactly.
+    const image = (result.content as Array<{ type: string; data?: string; mimeType?: string }>).find(
+      (block) => block.type === "image",
+    );
+    expect(image?.mimeType).toBe("image/png");
+    expect(Uint8Array.from(atob(image!.data!), (character) => character.charCodeAt(0))).toEqual(scanBytes);
+
+    // And the row that holds only a reference is refused honestly rather than
+    // dressed up as a delivery or handed over as a link to go fetch.
+    expect(summary.skipped).toHaveLength(1);
+    expect(summary.skipped[0]).toMatchObject({
+      id: String(referenceOnlyId),
+      reason: "BYTES_NOT_AVAILABLE",
+    });
+    expect(JSON.stringify(result)).not.toContain("never-uploaded.jpg");
   });
 
   test("7 · one batch save, one correction, and a stale write refused", async () => {

@@ -42,6 +42,97 @@ export const appVersion = "2.1.0";
 
 export const releaseNotes: ReleaseEntry[] = [
   {
+    version: "2.2.0",
+    // Deliberately "Local": every item below is real in this repository's
+    // source and passes its tests, and none of it has run against the
+    // deployed site. Calling it live before the deploy would be the easiest
+    // lie on this page to tell.
+    status: "Local",
+    releasedAt: "2026-08-17T22:10:00-07:00",
+    timezone: "America/Phoenix",
+    title: "Bring the AI you already use, and let it read the record",
+    summary: "You can approve a narrow, revocable connection for the AI you already use, and give it the actual scanned record to read rather than only its title. Built and tested here; not yet running on the live site.",
+    items: [
+      {
+        id: "media-evidence-bytes",
+        category: "created",
+        impactTier: "major",
+        impactRank: 1,
+        short: "Created real file delivery, so your AI can read the scan instead of only its title.",
+        long: {
+          what: "You can upload a scan, photograph, record PDF, transcript, or recording to a person from the Memories tab. It is stored privately here, and once you mark it reviewed with usable rights and allow AI use, a connected AI receives the file itself through the connection. Nothing is ever handed over as a link. An item that only points at a file somewhere else says so honestly instead of pretending.",
+          why: "Family history runs on scanned records and photographs. An assistant that cannot see the census page cannot do the work.",
+          where: "Person workspace Memories tab, and the chosen-AI connection.",
+        },
+        sourceRefs: ["AWF-0045", "AWF-WO-011"],
+        audiences: ["signed-in", "agent"],
+      },
+      {
+        id: "upload-is-not-permission",
+        category: "created",
+        impactTier: "meaningful",
+        impactRank: 1,
+        short: "Created a clear separation between storing a file and letting an AI read it.",
+        long: {
+          what: "Every uploaded file arrives private, unreviewed, and not allowed for AI use, and replacing a file resets its review. Allowing AI use stays a separate, deliberate step you take in the review panel.",
+          why: "Putting a family photograph somewhere safe should never quietly widen what any assistant can see.",
+          where: "Person workspace Memories tab.",
+        },
+        sourceRefs: ["AWF-0045", "AWF-WO-011"],
+        audiences: ["signed-in"],
+      },
+      {
+        id: "memories-had-no-way-in",
+        category: "fixed",
+        impactTier: "meaningful",
+        impactRank: 1,
+        short: "Fixed a Memories tab that could only ever be filled by an import.",
+        long: {
+          what: "The Memories tab offered no way to add anything of your own: the only route in was a FamilySearch import, so a scan on your desk had nowhere to go. It now takes files directly, and each item says plainly whether the file is held here or only pointed at somewhere else.",
+          why: "Much of the evidence a family already has never came from a provider, and the product should be able to hold it.",
+          where: "Person workspace Memories tab.",
+        },
+        sourceRefs: ["AWF-0045", "AWF-WO-011"],
+        audiences: ["signed-in"],
+      },
+      {
+        id: "connection-is-a-grant",
+        category: "created",
+        impactTier: "major",
+        impactRank: 2,
+        short: "Created a connection permission you approve, narrow, and take back at any time.",
+        long: {
+          what: "Signing in no longer behaves like blanket authority. A connection carries the permission you approved, limited to the people you chose and the six things it may do, and turning it off denies its very next request rather than waiting for a sign-in to expire.",
+          why: "You should be able to hand an assistant a narrow, reversible piece of your research rather than all of it.",
+          where: "Settings, AI connections.",
+        },
+        sourceRefs: ["AWF-0040", "AWF-0042", "AWF-WO-011"],
+        audiences: ["signed-in", "agent"],
+      },
+      {
+        id: "one-call-record-saves",
+        category: "upgraded",
+        impactTier: "meaningful",
+        impactRank: 2,
+        short: "Upgraded saving so a whole source's worth of records lands in one approval.",
+        long: {
+          what: "An assistant can save the people, relationships, events, evidence, and story work from one source in a single call, reporting each row's own outcome instead of discarding the whole pass because one row was wrong.",
+          why: "Approving thirty tiny writes one at a time is how careful review turns into reflexive clicking.",
+          where: "The chosen-AI connection, reflected in the normal workspace.",
+        },
+        sourceRefs: ["AWF-0041", "AWF-WO-011"],
+        audiences: ["signed-in", "agent"],
+      },
+    ],
+    whatToCheck: [
+      "Open a person, go to Memories, and upload a scan or photograph.",
+      "Confirm it arrives private, unreviewed, and not allowed for AI use.",
+      "Mark it reviewed with usable rights, allow AI use, and confirm a connected AI receives the file itself.",
+      "Confirm an item that only holds a link elsewhere reports honestly that it cannot be delivered.",
+      "Open Settings, AI connections, and confirm approving, narrowing, and revoking behave as described.",
+    ],
+  },
+  {
     version: appVersion,
     status: "Public & live",
     releasedAt: "2026-08-14T08:48:22-07:00",

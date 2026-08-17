@@ -614,6 +614,45 @@ export function createFamilyHistoryServer(
         delivered.push({ id: item.id, kind: item.kind, title: item.title, mimeType: item.mimeType, sizeBytes: item.sizeBytes });
       }
 
+      // Files the vault holds come first: they are the evidence a person
+      // deliberately put here, they are read straight out of private storage
+      // with no URL involved, and they are the only media path that reliably
+      // works. A scanned census page reaches the model as real image bytes.
+      for (const item of batch.stored) {
+        if (spent >= FAMILY_HISTORY_MCP_LIMITS.evidenceTotalBytes) {
+          skipped.push({
+            id: item.id,
+            kind: item.kind,
+            reason: "TOO_LARGE",
+            whatToDo: "This call's delivery budget ran out before this item. Ask for it in a second, smaller call.",
+          });
+          continue;
+        }
+        try {
+          const blob = await actionCtx.storage.get(item.storageId as any);
+          if (!blob) throw new Error("missing");
+          const bytes = new Uint8Array(await blob.arrayBuffer());
+          if (bytes.byteLength > FAMILY_HISTORY_MCP_LIMITS.evidencePerItemBytes) {
+            skipped.push({ id: item.id, kind: item.kind, reason: "TOO_LARGE", whatToDo: EVIDENCE_SKIP_GUIDANCE.TOO_LARGE });
+            continue;
+          }
+          if (spent + bytes.byteLength > FAMILY_HISTORY_MCP_LIMITS.evidenceTotalBytes) {
+            skipped.push({
+              id: item.id,
+              kind: item.kind,
+              reason: "TOO_LARGE",
+              whatToDo: "This call's delivery budget ran out before this item. Ask for it in a second, smaller call.",
+            });
+            continue;
+          }
+          spent += bytes.byteLength;
+          content.push(evidenceBlock(item, bytes));
+          delivered.push({ id: item.id, kind: item.kind, title: item.title, mimeType: item.mimeType, sizeBytes: bytes.byteLength });
+        } catch {
+          skipped.push({ id: item.id, kind: item.kind, reason: "BYTES_NOT_AVAILABLE", whatToDo: EVIDENCE_SKIP_GUIDANCE.BYTES_NOT_AVAILABLE });
+        }
+      }
+
       for (const item of batch.fetchable) {
         if (spent >= FAMILY_HISTORY_MCP_LIMITS.evidenceTotalBytes) {
           skipped.push({

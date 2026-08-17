@@ -63,6 +63,10 @@ async function seedMedia(
   );
 }
 
+async function storeBytes(t: ReturnType<typeof convexTest>, bytes: Uint8Array) {
+  return await t.run(async (ctx) => ctx.storage.store(new Blob([bytes as BlobPart])));
+}
+
 async function batch(
   t: ReturnType<typeof convexTest>,
   grantId: string,
@@ -127,7 +131,89 @@ describe("evidence gating", () => {
 
     const result = await batch(t, grantId, [{ kind: "media", id: String(referenceOnly) }]);
     expect(result.skipped[0]).toMatchObject({ reason: "BYTES_NOT_AVAILABLE" });
-    expect(result.skipped[0].whatToDo).toContain("not reachable");
+    expect(result.skipped[0].whatToDo).toContain("uploading the file");
+  });
+
+  test("a stored file is offered as bytes the vault holds, with no URL anywhere in the result", async () => {
+    const t = convexTest(schema, modules);
+    const grantId = await seedGrant(t, { vaultOwnerId: OWNER });
+    const person = await seedPerson(t, OWNER);
+    const storageId = await storeBytes(t, new Uint8Array([1, 2, 3, 4, 5]));
+    const scan = await seedMedia(t, OWNER, [person], {
+      storageId,
+      sizeBytes: 5,
+      // A stored file wins even when a remote reference is also present: the
+      // bytes the vault holds are the ones the server can actually read.
+      url: "https://www.familysearch.org/service/memories/private.jpg",
+    });
+
+    const result = await batch(t, grantId, [{ kind: "media", id: String(scan) }]);
+    expect(result.fetchable).toHaveLength(0);
+    expect(result.skipped).toHaveLength(0);
+    expect(result.stored).toHaveLength(1);
+    expect(result.stored[0]).toMatchObject({ kind: "media", mimeType: "image/jpeg", sizeBytes: 5 });
+    expect(JSON.stringify(result.stored)).not.toContain("https://");
+  });
+
+  test("the same review, rights, and boundary gates govern a stored file", async () => {
+    const t = convexTest(schema, modules);
+    const grantId = await seedGrant(t, { vaultOwnerId: OWNER });
+    const person = await seedPerson(t, OWNER);
+    const unreviewed = await seedMedia(t, OWNER, [person], {
+      storageId: await storeBytes(t, new Uint8Array([9])),
+      sizeBytes: 1,
+      reviewStatus: "unreviewed",
+    });
+    const notAllowed = await seedMedia(t, OWNER, [person], {
+      storageId: await storeBytes(t, new Uint8Array([9])),
+      sizeBytes: 1,
+      aiUseAllowed: false,
+    });
+    const restricted = await seedMedia(t, OWNER, [person], {
+      storageId: await storeBytes(t, new Uint8Array([9])),
+      sizeBytes: 1,
+      rightsStatus: "restricted",
+    });
+
+    const result = await batch(t, grantId, [
+      { kind: "media", id: String(unreviewed) },
+      { kind: "media", id: String(notAllowed) },
+      { kind: "media", id: String(restricted) },
+    ]);
+    expect(result.stored).toHaveLength(0);
+    expect(result.skipped.map((row) => row.reason)).toEqual([
+      "NOT_REVIEWED",
+      "AI_USE_NOT_ALLOWED",
+      "RIGHTS_RESTRICTED",
+    ]);
+  });
+
+  test("another owner's stored file is refused with the same shape as a missing one", async () => {
+    const t = convexTest(schema, modules);
+    const grantId = await seedGrant(t, { vaultOwnerId: OWNER });
+    const otherPerson = await seedPerson(t, OTHER);
+    const theirs = await seedMedia(t, OTHER, [otherPerson], {
+      storageId: await storeBytes(t, new Uint8Array([7, 7])),
+      sizeBytes: 2,
+    });
+
+    const result = await batch(t, grantId, [{ kind: "media", id: String(theirs) }]);
+    expect(result.stored).toHaveLength(0);
+    expect(result.skipped[0].reason).toBe("OUTSIDE_GRANT_BOUNDARY");
+  });
+
+  test("a stored file bigger than one delivery is skipped before any bytes are read", async () => {
+    const t = convexTest(schema, modules);
+    const grantId = await seedGrant(t, { vaultOwnerId: OWNER });
+    const person = await seedPerson(t, OWNER);
+    const huge = await seedMedia(t, OWNER, [person], {
+      storageId: await storeBytes(t, new Uint8Array([1])),
+      sizeBytes: FAMILY_HISTORY_MCP_LIMITS.evidencePerItemBytes + 1,
+    });
+
+    const result = await batch(t, grantId, [{ kind: "media", id: String(huge) }]);
+    expect(result.stored).toHaveLength(0);
+    expect(result.skipped[0].reason).toBe("TOO_LARGE");
   });
 
   test("person documents come back as real text, and living-person documents do not", async () => {

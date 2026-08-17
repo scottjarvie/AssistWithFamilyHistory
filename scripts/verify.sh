@@ -40,6 +40,7 @@ steps=(
   "check:queue-foundation"
   "check:context-pack-contract"
   "check:privacy-ai-safety"
+  "check:media-bytes"
   "check:private-first-start"
   "check:review-gates"
   "check:story-fixtures"

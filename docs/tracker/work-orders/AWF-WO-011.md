@@ -3,7 +3,7 @@ id: AWF-WO-011
 title: Let a person bring a chosen AI into bounded, reviewable Family History work
 execution: active
 audit: not-audited
-cards: AWF-0034, AWF-0038, AWF-0040, AWF-0041, AWF-0042, AWF-0043
+cards: AWF-0034, AWF-0038, AWF-0040, AWF-0041, AWF-0042, AWF-0043, AWF-0045
 created: 2026-08-16
 updated: 2026-08-17
 proposed-by: Codex from Scott's Bring Your AI delegation
@@ -49,7 +49,8 @@ drafting inside the exact permission the person granted.
 2. **Authorization** — AWF-0040 product-owned grants, record boundaries, narrow
    scopes, enforcement, activity, expiry, and revoke.
 3. **Family History workflow** — AWF-0041 provenance-aware brief/evidence,
-   one-call review-first save, namespaced tools, and correction.
+   one-call review-first save, namespaced tools, and correction; AWF-0045 real
+   media evidence bytes, so an AI can read the scanned record itself.
 4. **Human experience** — AWF-0042 public setup, authenticated connection
    center, generated AI guide, and manual Queue fallback.
 5. **Proof and truth** — AWF-0043 full client lifecycle, UI reflection,
@@ -67,12 +68,21 @@ workflow-native tools; idempotent saves; optimistic corrections; canonical UI
 reflection; Queue continuation; `/ai` and `/ai.txt`; one disposable PKCE
 official-client lifecycle and exact cleanup.
 
-**Partial:** live provider discovery advertises neither Client ID Metadata
-Documents nor DCR; OAuth carries provider identity scopes rather than enforced
-Family History scopes; no durable product grant or active-grant check exists;
-issued JWT access is not immediately revocable; protected evidence retrieval,
-connection management, joined Queue-to-reviewed-result proof, refresh/reconnect,
-mobile setup, and any named-client compatibility remain unproved.
+**Provider truth, CONFIRMED 2026-08-17:** Clerk production Dynamic Client
+Registration is **live** — `clerk.assistwithfamilyhistory.com` advertises
+`registration_endpoint: https://clerk.assistwithfamilyhistory.com/oauth/register`,
+independently re-probed read-only on 2026-08-17. DCR is the **approved
+soft-launch path**; **CIMD is deferred** pending provider support, with its
+strict validation already written and unused. This supersedes the 2026-08-16
+"neither is advertised" finding recorded below, and resolves Human gate 2's
+onboarding half.
+
+**Partial:** OAuth still carries provider identity scopes rather than enforced
+Family History scopes in production; the durable product grant, active-grant
+check, immediate revocation, protected evidence retrieval, connection
+management, media byte delivery, joined Queue-to-reviewed-result proof,
+refresh/reconnect, and mobile setup are built in source but unproved against the
+deployed site; no client is named as compatible.
 
 **Later / excluded:** publishing, permanent deletion, identity merge, sharing
 grants, complete export, autonomous FamilySearch/provider actions, cross-family
@@ -298,6 +308,52 @@ the Convex-vs-Vercel environment split, four post-deploy checks, and every
 read, no real family record touched. AWF-0043 moves to `needs-you` because the
 only remaining acts are credentialed and human.
 
+### Media evidence bytes, and confirmed provider truth — 2026-08-17 (Claude)
+
+**The completeness inspection found one genuine product gap, and it is closed
+in source.** `family_history_get_evidence` delivered real text for person
+documents and `BYTES_NOT_AVAILABLE` for every image and recording. Family
+history research runs on scanned records and photographs, so an AI that cannot
+see the census page cannot do the product's core work.
+
+The cause was not the connection. It was that **the vault had nowhere to put a
+file**: a `media` row could hold a `filePath` hint or a FamilySearch `url` that
+only the person's own signed-in browser can load, so the transport's one remote
+fetch was always going to fail and no upload path existed to produce a row that
+could succeed. `lib/storage/objectStore.ts` (B2) would not have closed it
+either — six deploy-time secrets and a public bucket, and a publicly readable
+URL for a private family photograph is the opposite of what protected delivery
+is for.
+
+AWF-0045 gives media a private byte store (Convex file storage), a
+person-facing upload on the Memories tab, an owner-authenticated file route
+that streams bytes and never returns the signed URL it used, and stored-byte
+delivery through the **unchanged** gates: owner, grant boundary, reviewed,
+AI-use allowed, rights not restricted, and the 2 MiB / 6 MiB budgets. An upload
+grants no AI permission by itself — every file arrives private, unreviewed, and
+`aiUseAllowed: false`, and replacing bytes resets review. **No new environment
+variable or secret is required**, so nothing here waits on Codex or Scott.
+
+**Acceptance ladder rung 6 — real evidence bytes — is now proved locally for the
+first time**, end to end through the official MCP client, asserting the
+delivered bytes are byte-identical to the stored scan and that a reference-only
+row is still refused honestly without leaking its path. Rung 6's other half, a
+person's own upload travelling through a real browser, remains for the live run.
+
+**Provider truth, CONFIRMED.** An independent read-only probe on 2026-08-17
+found Clerk production DCR live at `/oauth/register`. AWF-0038, this Work
+Order's Current truth, and
+`docs/operations/bring-your-ai-provider-actions.md` §1 now record DCR as the
+approved soft-launch path and CIMD as deferred. No provider setting was changed
+by this lane.
+
+`pnpm verify` passes all 56 steps, including the new
+`pnpm check:media-bytes` contract guard. Deploy and live proof remain Codex's,
+against the pinned commit in `docs/operations/deploy-pin-awf-wo-011.md`.
+
+**Not claimed.** No deploy, no provider change, no secret or environment value
+read, no real family record touched, and no client named.
+
 ## History
 
 - 2026-08-16 · Scott via coordinator delegation — requested a substantial,
@@ -321,3 +377,9 @@ only remaining acts are credentialed and human.
   provider/deploy runbook so Codex can execute without reverse-engineering it.
   Moved AWF-0043 to `needs-you`. Execution stays `active` and audit stays
   independent and `not-audited`.
+- 2026-08-17 · Claude — inspected the shipped Bring Your AI implementation
+  against the adopted standard and closed the one genuine product gap it found:
+  media evidence bytes (new Card AWF-0045), proving acceptance rung 6 locally.
+  Independently re-probed the provider and recorded confirmed live Clerk DCR,
+  making it the approved soft-launch path and deferring CIMD. No provider,
+  secret, environment, deployment, or real-data change.

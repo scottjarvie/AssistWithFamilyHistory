@@ -267,6 +267,36 @@
       "notes": "Use ?preview=true for side-effect-free validation. FamilySearch provider API access is pending; browser/user-initiated packages only."
     },
     {
+      "route": "/api/media/[mediaId]/file",
+      "methods": [
+        "GET"
+      ],
+      "capability": "media_file_read",
+      "environment": "browser",
+      "agentSupport": "not-supported",
+      "reviewLevel": "owner-only",
+      "risk": "medium",
+      "scopes": [
+        "owner_session"
+      ],
+      "notes": "Streams a stored media file to its owner. The signed storage URL is resolved server-side and never returned. A missing item and another owner's item both answer 404. An AI reaches media through family_history_get_evidence, never this route."
+    },
+    {
+      "route": "/api/media/upload",
+      "methods": [
+        "POST"
+      ],
+      "capability": "media_file_upload",
+      "environment": "browser",
+      "agentSupport": "not-supported",
+      "reviewLevel": "trusted-human-review",
+      "risk": "medium",
+      "scopes": [
+        "owner_session"
+      ],
+      "notes": "Stores a scan, photo, record PDF, or recording in private Convex file storage so protected evidence delivery can hand an AI the record itself. Every upload arrives private, unreviewed, and aiUseAllowed:false; replacing bytes resets review."
+    },
+    {
       "route": "/api/media/review",
       "methods": [
         "POST"
