@@ -4,6 +4,7 @@ import {
   Bot,
   Braces,
   CheckCircle2,
+  Eye,
   FileSearch,
   Fingerprint,
   GitBranch,
@@ -15,6 +16,12 @@ import {
 import { Footer } from "@/components/layout/Footer";
 import { MarketingNav } from "@/components/layout/MarketingNav";
 import { SafeLink } from "@/components/layout/SafeLink";
+import {
+  FAMILY_HISTORY_SCOPE_INFO,
+  FAMILY_HISTORY_TOOLS,
+  NEVER_EXPOSED,
+  NEVER_PERMITTED,
+} from "@/lib/mcp/catalog";
 import { createPageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = createPageMetadata({
@@ -23,33 +30,52 @@ export const metadata: Metadata = createPageMetadata({
   path: "/ai",
 });
 
+/**
+ * The three jobs the catalog actually covers, each counting its own real tools
+ * so this page cannot claim a capability the server does not register. The tool
+ * names, the permission list, and both never-lists on this page all come from
+ * `lib/mcp/catalog.ts` — the same module the MCP edge enforces with.
+ */
 const toolGroups = [
   {
     label: "Orient",
     icon: FileSearch,
-    tools: "Brief · bounded search · record context",
-    copy: "Your AI starts with a compact map, searches summaries, then opens only the people, evidence, events, research, or stories needed for the work.",
+    scopes: ["family_history:context:read", "family_history:queue:read"] as const,
+    copy: "Your AI starts with a compact map, searches summaries, then opens only the people, evidence, events, research, or stories the work needs — inside the boundary you approved.",
   },
   {
     label: "Preserve",
     icon: Archive,
-    tools: "People · relationships · events · source evidence",
-    copy: "Structured saves land in the same private vault the web workspace reads. Evidence remains separate from conclusions, with citations and provenance intact.",
+    scopes: ["family_history:evidence:read", "family_history:research:write"] as const,
+    copy: "Structured saves land in the same private vault the web workspace reads. Evidence stays separate from conclusions, with citations and provenance intact.",
   },
   {
     label: "Continue",
     icon: ScrollText,
-    tools: "Research findings · story drafts · Queue",
-    copy: "A finished research pass can be saved atomically, while smaller correction tools and the four-state Queue keep long work understandable across sessions.",
+    scopes: ["family_history:story:draft", "family_history:queue:work"] as const,
+    copy: "A whole source's worth of records saves in one call with per-item results, while private drafts and the four-state Queue keep long work understandable across sessions.",
   },
 ] as const;
 
-const current = [
-  "Twelve Family History workflow tools share one stateless MCP endpoint.",
-  "OAuth identity selects the vault on the server; tools cannot name another owner.",
-  "Writes use stable create keys, operation receipts, and optimistic correction checks.",
-  "Story tools save private drafts or request review; they cannot publish.",
-  "Production PKCE consent, complete-result saves, corrections, and web-workspace reflection passed with an empty synthetic account.",
+function toolsForScopes(scopes: readonly string[]) {
+  return FAMILY_HISTORY_TOOLS.filter((tool) => scopes.includes(tool.requiredScope));
+}
+
+const TOOL_COUNT = FAMILY_HISTORY_TOOLS.length;
+const ALIAS_COUNT = FAMILY_HISTORY_TOOLS.filter((tool) => tool.alias).length;
+
+/**
+ * What exists in this repository's source and passes its tests. Deliberately
+ * NOT a claim about a deployment or about any particular assistant: neither has
+ * been proved, and saying so would be the easiest lie on this page to tell.
+ */
+const currentInSource = [
+  `${TOOL_COUNT} Family History tools share one stateless connection address, with ${ALIAS_COUNT} older names kept working as aliases.`,
+  "Signing in never grants authority on its own: every request resolves the permission the person approved, and fails closed without one.",
+  "Turning a connection off takes effect on its very next request, because the permission is re-checked every time rather than waiting for a sign-in to expire.",
+  "A whole source's worth of records saves in one call, reporting each row's own outcome instead of discarding the pass.",
+  "Reviewed, AI-allowed files are delivered through the connection itself; a storage link is never handed to a model.",
+  "An unknown tool, a tool outside the permission, and another person's record all return the same refusal, so nothing can be discovered by probing.",
 ];
 
 export default function AiSetupPage() {
@@ -91,8 +117,10 @@ export default function AiSetupPage() {
                 https://assistwithfamilyhistory.com/mcp
               </code>
               <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                <div><p className="text-3xl font-semibold">12</p><p className="mt-1 text-xs leading-5 text-[#687169]">workflow tools from first brief to complete-result save</p></div>
+                <div><p className="text-3xl font-semibold">{TOOL_COUNT}</p><p className="mt-1 text-xs leading-5 text-[#687169]">workflow tools from first brief to complete-result save</p></div>
+                <div><p className="text-3xl font-semibold">{FAMILY_HISTORY_SCOPE_INFO.length}</p><p className="mt-1 text-xs leading-5 text-[#687169]">permissions you choose from — there is no seventh</p></div>
                 <div><p className="text-3xl font-semibold">0</p><p className="mt-1 text-xs leading-5 text-[#687169]">owner or workspace IDs accepted from an AI</p></div>
+                <div><p className="text-3xl font-semibold">0</p><p className="mt-1 text-xs leading-5 text-[#687169]">assistants named as working, until one proves it</p></div>
               </div>
               <p className="mt-7 flex gap-2 border-t border-[#d8cfbd] pt-5 text-xs leading-5 text-[#687169]">
                 <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0 text-[#245a43]" aria-hidden="true" />
@@ -109,12 +137,14 @@ export default function AiSetupPage() {
               <h2 className="mt-4 font-[family-name:var(--font-cormorant-garamond)] text-4xl font-semibold leading-tight sm:text-5xl">From a clue to a grounded story—without losing the receipts.</h2>
             </div>
             <div className="grid gap-4 md:grid-cols-3">
-              {toolGroups.map(({ label, icon: Icon, tools, copy }, index) => (
+              {toolGroups.map(({ label, icon: Icon, scopes, copy }, index) => (
                 <article key={label} className="queue-paper relative rounded-3xl border border-[#cfc3af] p-6 shadow-[0_20px_45px_-38px_#24312c]">
                   <span className="absolute right-5 top-4 font-mono text-[10px] text-[#98702b]">0{index + 1}</span>
                   <Icon className="h-7 w-7 text-[#245a43]" aria-hidden="true" />
                   <h3 className="mt-5 text-2xl font-semibold">{label}</h3>
-                  <p className="mt-2 font-mono text-[10px] uppercase leading-5 tracking-[0.12em] text-[#98702b]">{tools}</p>
+                  <p className="mt-2 font-mono text-[10px] leading-5 text-[#98702b]">
+                    {toolsForScopes(scopes).map((tool) => tool.name).join(" · ")}
+                  </p>
                   <p className="mt-4 text-sm leading-7 text-[#5f665f]">{copy}</p>
                 </article>
               ))}
@@ -131,8 +161,8 @@ export default function AiSetupPage() {
                 {[
                   ["Choose a compatible client", "It must support remote Streamable HTTP MCP and OAuth. Exact menu names differ by client."],
                   ["Add the MCP address", "Use https://assistwithfamilyhistory.com/mcp as the server URL."],
-                  ["Sign in and review consent", "Use the same Assist With Family History account whose private vault you want your AI to assist."],
-                  ["Ask for the Family History brief", "Your AI should call get_family_history_brief first, then search and hydrate before changing records."],
+                  ["Sign in, then approve what it may do", "Signing in proves whose workspace it is; it does not decide what the AI may do. Its first call is refused and waits for you at /app/settings/ai, where you choose the permissions, the records, and how long it lasts."],
+                  ["Ask for the Family History brief", "Your AI should call family_history_get_brief first, then search and hydrate before changing records."],
                 ].map(([title, copy], index) => (
                   <li key={title} className="grid grid-cols-[2.5rem_1fr] gap-4">
                     <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#98702b]/40 font-mono text-xs font-semibold text-[#98702b]">{index + 1}</span>
@@ -158,14 +188,101 @@ export default function AiSetupPage() {
           </div>
         </section>
 
+        <section className="border-y border-[#cfc3af] bg-[#fffaf2]">
+          <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:px-10">
+            <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#98702b]">Permissions</p>
+            <h2 className="mt-4 max-w-3xl font-[family-name:var(--font-cormorant-garamond)] text-4xl font-semibold sm:text-5xl">
+              You choose from exactly {FAMILY_HISTORY_SCOPE_INFO.length} permissions. There is no seventh.
+            </h2>
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-[#5f665f]">
+              This list is generated from the same catalog the server enforces, so what you read here
+              and what the connection can actually do cannot drift apart.
+            </p>
+            <ul className="mt-9 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {FAMILY_HISTORY_SCOPE_INFO.map((scope) => (
+                <li key={scope.scope} className="rounded-3xl border border-[#cfc3af] bg-[#fffaf2] p-6">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#98702b]">
+                    {scope.writes ? "Can change things" : "Read only"}
+                  </p>
+                  <h3 className="mt-3 text-xl font-semibold">{scope.label}</h3>
+                  <p className="mt-3 text-sm leading-7 text-[#5f665f]">{scope.grants}</p>
+                  <p className="mt-3 border-t border-[#e3d9c6] pt-3 text-sm leading-7 text-[#687169]">
+                    <span className="font-semibold text-[#5f665f]">Still cannot: </span>
+                    {scope.limit}
+                  </p>
+                </li>
+              ))}
+            </ul>
+
+            <div className="mt-12 grid gap-6 lg:grid-cols-2">
+              <article className="rounded-3xl border border-[#cfc3af] p-7">
+                <p className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-[#98702b]">
+                  <Eye className="h-4 w-4" aria-hidden="true" /> Never shown to any AI
+                </p>
+                <ul className="mt-5 space-y-2 text-sm leading-7 text-[#5f665f]">
+                  {NEVER_EXPOSED.map((entry) => <li key={entry}>{entry}</li>)}
+                </ul>
+              </article>
+              <article className="rounded-3xl border border-[#cfc3af] p-7">
+                <p className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-[#98702b]">
+                  <LockKeyhole className="h-4 w-4" aria-hidden="true" /> Never allowed, whatever you approve
+                </p>
+                <ul className="mt-5 space-y-2 text-sm leading-7 text-[#5f665f]">
+                  {NEVER_PERMITTED.map((entry) => <li key={entry}>{entry}</li>)}
+                </ul>
+              </article>
+            </div>
+          </div>
+        </section>
+
         <section className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:px-10">
           <div className="grid gap-8 lg:grid-cols-3">
             <article className="rounded-3xl border border-[#9eb4a6] bg-[#eff5f0] p-7">
-              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#245a43]">Current in this release</p>
-              <ul className="mt-5 space-y-3">{current.map((item) => <li key={item} className="flex gap-2 text-sm leading-6"><CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-[#245a43]" aria-hidden="true" />{item}</li>)}</ul>
+              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#245a43]">Built and passing its tests</p>
+              <ul className="mt-5 space-y-3">
+                {currentInSource.map((item) => (
+                  <li key={item} className="flex gap-2 text-sm leading-6">
+                    <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-[#245a43]" aria-hidden="true" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-5 border-t border-[#9eb4a6] pt-4 text-sm leading-7 text-[#5f665f]">
+                This is proof from source and tests. It is not proof from a deployment, and it is not
+                proof that your particular assistant works.
+              </p>
             </article>
-            <article className="rounded-3xl border border-[#d2bd8d] bg-[#fbf4e4] p-7"><p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#98702b]">Partial after live proof</p><p className="mt-5 text-sm leading-7 text-[#5f665f]">One disposable public PKCE client completed production consent and the full MCP-to-web workflow. Dynamic client registration, broad client compatibility, fresh-device email verification, refresh/reconnect, mobile setup, and immediate revocation of issued Clerk JWT access tokens are not yet claimed.</p></article>
-            <article className="rounded-3xl border border-[#ccb7ad] bg-[#f8efeb] p-7"><p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#9f5a2d]">Later, not implied</p><p className="mt-5 text-sm leading-7 text-[#5f665f]">Granular connection grants, private media delivery, mobile-specific setup, identity merges, deletion, publishing, external site actions, and cross-family collaboration remain outside this first foundation.</p></article>
+            <article className="rounded-3xl border border-[#d2bd8d] bg-[#fbf4e4] p-7">
+              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#98702b]">Not yet proved</p>
+              <p className="mt-5 text-sm leading-7 text-[#5f665f]">
+                None of the above has been proved against the live site, and no assistant has completed
+                a full lifecycle here. Client identity documents and self-registration are not offered
+                by the sign-in provider yet. Files that are only stored as a reference come back saying
+                honestly that their bytes are not available rather than pretending to deliver them.
+              </p>
+            </article>
+            <article className="rounded-3xl border border-[#ccb7ad] bg-[#f8efeb] p-7">
+              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#9f5a2d]">Later, not implied</p>
+              <p className="mt-5 text-sm leading-7 text-[#5f665f]">
+                Publishing, deletion, identity merges, export, sharing changes, acting on FamilySearch
+                or any other outside site, and cross-family collaboration are outside this connection
+                entirely. They have no tool and no permission that could turn them on.
+              </p>
+            </article>
+          </div>
+
+          <div className="mt-10 rounded-3xl border border-[#cfc3af] bg-[#fffaf2] p-7">
+            <h2 className="font-[family-name:var(--font-cormorant-garamond)] text-3xl font-semibold">
+              We do not name assistants that work here.
+            </h2>
+            <p className="mt-4 max-w-3xl text-sm leading-7 text-[#5f665f]">
+              Any assistant that speaks remote Streamable HTTP MCP with OAuth is an intended client.
+              None is a claimed one. A name goes on this page only after that exact assistant has been
+              taken through the whole thing — discover, approve, list tools, read, save, correct, get
+              refused where it should be, lose access the moment the connection is turned off, and
+              reconnect — with the receipts kept. Until then, naming one would be a guess dressed up as
+              a promise, and you would be the one to find out it was wrong.
+            </p>
           </div>
         </section>
       </main>

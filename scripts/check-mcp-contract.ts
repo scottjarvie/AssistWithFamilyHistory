@@ -178,6 +178,45 @@ assert.ok(
   "MCP writes must re-validate the grant inside the mutation",
 );
 
+/* ---------------------------------------- raw-wire responses stay conforming */
+
+// Two responses are written straight onto the wire, bypassing the MCP server
+// that would normally stamp protocol revision 2026-07-28's required
+// discriminator: the empty tool catalog for an unapproved connection, and the
+// preflight refusal for a tool the grant does not cover. Without `resultType` a
+// conforming client rejects both as malformed — so the person's AI sees a broken
+// server instead of "ask them to approve this", which is the exact opposite of
+// what those two branches exist to do.
+const jsonRpcResults: string[] = [];
+for (let index = transport.indexOf('jsonrpc: "2.0"'); index >= 0; index = transport.indexOf('jsonrpc: "2.0"', index + 1)) {
+  jsonRpcResults.push(transport.slice(index, index + 700));
+}
+assert.ok(jsonRpcResults.length >= 2, "the empty-catalog and preflight-refusal wire paths must both exist");
+for (const block of jsonRpcResults) {
+  assert.ok(
+    block.includes('resultType: "complete"'),
+    "every hand-written JSON-RPC result must carry the protocol revision's required resultType",
+  );
+}
+// A complete tools/list result additionally owes cache fields, and an empty
+// catalog must never be cached: the person may approve a second from now.
+const emptyCatalog = jsonRpcResults.find((block) => block.includes("tools: []"));
+assert.ok(emptyCatalog, "the empty tool catalog response must exist");
+assert.ok(emptyCatalog!.includes("ttlMs: 0"), "an empty tool catalog must not be cached");
+assert.ok(emptyCatalog!.includes('cacheScope: "private"'), "a grant-dependent catalog is private");
+
+// The connection label must come from the client's own clientInfo, not from the
+// Mcp-Name header — that header carries the tool being called, so reading it
+// labelled a person's connection with something like "save_person".
+assert.ok(
+  transport.includes("io.modelcontextprotocol/clientInfo"),
+  "observedClientName must read the client's declared clientInfo",
+);
+assert.ok(
+  !/observedClientName[\s\S]{0,400}headers\.get\("mcp-name"\)/.test(transport),
+  "observedClientName must not read the Mcp-Name header; that header names the tool",
+);
+
 /* ------------------------------------------------- published guidance parity */
 
 const aiTxt = readFileSync("app/ai.txt/route.ts", "utf8");

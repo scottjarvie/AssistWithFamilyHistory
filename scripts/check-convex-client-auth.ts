@@ -21,7 +21,9 @@ const publicStoryQueries = new Set([
   "api.vault.getPublishedStory",
   "api.vault.getPublishedStoryByIdentifier",
 ]);
-const explicitTokenCliFiles = new Set(["scripts/audit-vault.ts"]);
+// CLI tooling that attaches its own explicit short-lived token. Both are
+// operator-run scripts, never part of a request path.
+const explicitTokenCliFiles = new Set(["scripts/audit-vault.ts", "scripts/mcp-lifecycle.ts"]);
 const excludedDirectories = new Set([
   ".next",
   "__tests__",

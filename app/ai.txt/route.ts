@@ -17,7 +17,7 @@ export function GET() {
     `Support: ${SUPPORT_DESK_URL} is the one support desk for every Assist With site. No Assist With site has a support, feedback, or privacy email address, so never tell a person to email this product.`,
     "",
     "## Approval comes from the person, not from signing in",
-    "Signing in proves whose vault this is. It does not decide what your connection may do. The first call from a connection the person has not approved returns the machine error GRANT_REQUIRED. When you see it, stop and ask the person to approve the connection at https://assistwithfamilyhistory.com/settings/ai, choosing which permissions and which records it covers. Do not retry in a loop.",
+    "Signing in proves whose vault this is. It does not decide what your connection may do. The first call from a connection the person has not approved returns the machine error GRANT_REQUIRED. When you see it, stop and ask the person to approve the connection at https://assistwithfamilyhistory.com/app/settings/ai, choosing which permissions and which records it covers. Do not retry in a loop.",
     "Other grant errors: GRANT_REVOKED (they turned it off — stop), GRANT_EXPIRED (ask them to renew), SCOPE_NOT_GRANTED (use only the tools tools/list returned for this connection), OUTSIDE_GRANT_BOUNDARY (that record is outside what they approved).",
     "tools/list is filtered by what the person approved. Trust it; it is the exact surface this connection has.",
     "",

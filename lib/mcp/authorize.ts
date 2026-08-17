@@ -71,7 +71,13 @@ export type AccessPermit = {
 
 export type AccessDecision = AccessPermit | AccessRefusal;
 
-export const CONNECTION_SETTINGS_URL = "https://assistwithfamilyhistory.com/settings/ai";
+/**
+ * Where a person actually approves a connection. Every refusal points here, so
+ * it has to be the real route: signed-in surfaces live under `/app` per the
+ * app's navigation contract, and `/settings/ai` redirects here for anyone who
+ * types the shorter form.
+ */
+export const CONNECTION_SETTINGS_URL = "https://assistwithfamilyhistory.com/app/settings/ai";
 
 /**
  * One keyed refusal dictionary. Every entry says what happened AND what to do,

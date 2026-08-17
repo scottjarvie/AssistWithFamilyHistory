@@ -1,7 +1,7 @@
 ---
 id: AWF-WO-011
 title: Let a person bring a chosen AI into bounded, reviewable Family History work
-execution: ready
+execution: active
 audit: not-audited
 cards: AWF-0034, AWF-0038, AWF-0040, AWF-0041, AWF-0042, AWF-0043
 created: 2026-08-16
@@ -197,20 +197,20 @@ checks, keep that client unverified instead of weakening the product.
 
 ## Execution evidence
 
-Planning evidence is complete and execution has not begun. The 2026-08-16
-audit read the adopted family standard and paired Core sections, canonical
-Project Philosophy, tracker, Queue, identity/auth, MCP transport/tools, setup
-surfaces, FamilySearch evidence contracts, and dated acceptance reports. It
-also ran public read-only probes of the branded protected-resource metadata,
-anonymous MCP challenge, Clerk authorization-server/OpenID metadata, and
-`/ai.txt`.
+### Planning — 2026-08-16 (Codex)
+
+Planning evidence is complete. The 2026-08-16 audit read the adopted family
+standard and paired Core sections, canonical Project Philosophy, tracker, Queue,
+identity/auth, MCP transport/tools, setup surfaces, FamilySearch evidence
+contracts, and dated acceptance reports. It also ran public read-only probes of
+the branded protected-resource metadata, anonymous MCP challenge, Clerk
+authorization-server/OpenID metadata, and `/ai.txt`.
 
 The durable result is the supporting alignment document, revised capability
 truth, updated AWF-0034/AWF-0038, new grouped Cards AWF-0040 through AWF-0043,
-and this Proposed Work Order. No application/schema implementation, provider
-setting, client registration, token, account, secret, deployment, or production
-data changed. Implementation and all later proof remain pending scope approval
-and the stated security/provider gate.
+and this Work Order. No application/schema implementation, provider setting,
+client registration, token, account, secret, deployment, or production data
+changed at that point.
 
 Project Philosophy render/check, tracker build/parity, and all 49 `pnpm verify`
 steps passed. Manual generated-reader checks at desktop and phone widths found
@@ -218,6 +218,59 @@ the proposed Work Order and Cards with no page overflow or console warnings.
 The optional tracker-reader Playwright suite passed four of six scenarios;
 AWF-0044 records its stale Work Order count assertion and desktop pointer-drag
 gap as separate tracker software work.
+
+### Backend spine — 2026-08-16 (Claude)
+
+AWF-0040 and AWF-0041 were implemented: the six-scope ceiling, the single pure
+authorizer, per-request grant resolution, record boundaries, immediate
+revocation, namespaced tools with compatibility aliases, the batch save with
+per-item results, and the protected evidence batch. `pnpm verify` passed all 50
+steps. Working notes are in
+`docs/planning/bring-your-ai-implementation-brief.md`.
+
+### Connection experience, harness, and public truth — 2026-08-16 (Claude)
+
+AWF-0042 delivered `/app/settings/ai`, and AWF-0043's harness now exists as
+runnable code rather than a written procedure.
+
+- The connection centre renders its consent screen from `lib/mcp/catalog.ts`,
+  the same module the edge enforces with, and
+  `scripts/check-connection-center.ts` fails the build if any scope, either
+  never-list, any boundary choice, the immediate-revocation promise, or the
+  no-pre-ticked-permission rule stops reaching the markup.
+- `/ai` and `/ai.txt` are generated from that catalog, and
+  `scripts/check-public-ai-truth.ts` proves the parity and enforces the
+  no-named-client rule across 18 public files.
+- `scripts/mcp-lifecycle.ts` (`pnpm mcp:lifecycle`, deliberately NOT in
+  `pnpm verify`) walks all eleven acceptance points as a real MCP client. Eight
+  of them are additionally proved locally in `convex/mcpLifecycleLadder.test.ts`.
+- `convex/mcpAcceptanceFixture.ts` now covers `mcpGrants`,
+  `mcpClientRegistrations`, and grant-linked `agentActivity`, with its bounded-
+  scan, visible-marker, and unmarked-reference-refusal posture unchanged.
+
+**Three defects this stage found and fixed.** The empty tool catalog and the
+preflight refusal were written straight onto the wire without protocol revision
+2026-07-28's required `resultType`, so a conforming client rejected both as
+malformed — the actionable "ask the person to approve this" refusal never
+reached a real AI. `observedClientName` was reading the `Mcp-Name` header, which
+carries the tool being called, so a person's connection would have been labelled
+something like `save_person`. All three are guarded by
+`scripts/check-mcp-contract.ts` now. Source review had not caught any of them;
+connecting a real client did.
+
+**A navigation orphan, fixed.** `/app/api` and `/app/api/admin` were real pages
+with no navigation entry at all and were therefore unreachable, even though
+`scripts/check-app-navigation-contract.tsx` already asserted the active-state
+behaviour of the entry that was never added. Three existing check scripts —
+`check-app-navigation-contract`, `check-navigation-accessibility`, and
+`check-settings-responsive` — had no package script and never ran anywhere,
+which is how the orphan survived. All three are now wired into `pnpm verify`
+alongside the two new ones.
+
+**Not claimed.** Nothing here has run against the deployed site, `/app/settings/ai`
+has not been opened in a real browser, and no client is named. No provider
+setting, secret, environment variable, deployment, or real family record was
+touched.
 
 ## History
 
@@ -233,3 +286,7 @@ gap as separate tracker software work.
   `planning/mcp-program-2026-08.md` in Assist With Life. The provider,
   production-identity, secret, and real-family-data gates in Human gates 2 and 3
   remain in force.
+- 2026-08-16 · Claude — executed the backend spine (AWF-0040, AWF-0041), the
+  connection experience (AWF-0042), and the scripted lifecycle harness with its
+  locally provable rungs (AWF-0043, still `doing` pending a live run). Moved this
+  Work Order to `execution: active`. Audit remains independent and `not-audited`.

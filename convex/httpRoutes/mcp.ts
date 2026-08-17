@@ -814,7 +814,24 @@ function grantRefusalResponse(body: unknown, resolution: GrantResolution): Respo
   // connection. The `instructions` returned at initialize say what to do.
   if (message.method === "tools/list" && permittedTools(resolution, Date.now()).length === 0) {
     return Response.json(
-      { jsonrpc: "2.0", id: message.id, result: { tools: [] } },
+      // `resultType` is required by protocol revision 2026-07-28 and the MCP
+      // server is not in this path to stamp it. Without it a conforming client
+      // rejects the empty catalog as a malformed response, which is the one
+      // thing this branch exists to avoid.
+      {
+        jsonrpc: "2.0",
+        id: message.id,
+        result: {
+          resultType: "complete",
+          // Never cached: the person may approve this connection a second from
+          // now, and a cached empty catalog would keep telling their AI it has
+          // no tools long after they said yes. Private because the answer is
+          // one person's grant, not a property of the server.
+          ttlMs: 0,
+          cacheScope: "private",
+          tools: [],
+        },
+      },
       { headers: { "Cache-Control": "no-store" } },
     );
   }
@@ -824,7 +841,16 @@ function grantRefusalResponse(body: unknown, resolution: GrantResolution): Respo
   const decision = decideToolAccess({ toolName: name, resolution, now: Date.now(), input: undefined });
   if (decision.allowed) return null;
   return Response.json(
-    { jsonrpc: "2.0", id: message.id, result: refusalResult(decision) },
+    {
+      jsonrpc: "2.0",
+      id: message.id,
+      // This refusal is written straight onto the wire, bypassing the MCP server
+      // that would normally stamp the revision's required discriminator. Without
+      // it a conforming 2026-07-28 client rejects the whole response as
+      // malformed and the person's AI sees a broken server instead of the
+      // actionable "ask them to approve this" message we wrote for it.
+      result: { resultType: "complete", ...refusalResult(decision) },
+    },
     { headers: { "Cache-Control": "no-store" } },
   );
 }
@@ -855,6 +881,15 @@ async function handleMcp(actionCtx: ActionCtx, request: Request) {
     return new Response(JSON.stringify({ error: "request_too_large", error_description: "Family History MCP requests are limited to 256 KiB." }), { status: 413, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
   }
 
+  // Parsed before the grant is resolved because the client's self-declared name
+  // travels in the body, not in a header.
+  let parsedBody: unknown = null;
+  try {
+    parsedBody = JSON.parse(new TextDecoder().decode(rawBody));
+  } catch {
+    parsedBody = null;
+  }
+
   // Resolve the product grant on EVERY request. The transport is stateless, so
   // this is what makes revocation immediate: an already-issued Clerk access
   // token stops mattering the moment the grant leaves `active`. We never wait
@@ -863,15 +898,9 @@ async function handleMcp(actionCtx: ActionCtx, request: Request) {
     issuer: principalIssuer,
     subject,
     clientId: auth.clientId,
-    observedClientName: observedClientName(request),
+    observedClientName: observedClientName(parsedBody, request),
   });
 
-  let parsedBody: unknown = null;
-  try {
-    parsedBody = JSON.parse(new TextDecoder().decode(rawBody));
-  } catch {
-    parsedBody = null;
-  }
   const refusal = grantRefusalResponse(parsedBody, resolution);
   if (refusal) {
     const method = (parsedBody as { method?: unknown })?.method;
@@ -908,13 +937,29 @@ async function handleMcp(actionCtx: ActionCtx, request: Request) {
 }
 
 /**
- * What the client called itself, taken from the MCP client info header when it
- * is present. It is stored as a LABEL for the person to recognise, never as
- * authority: the only identity that decides anything is the verified client_id.
+ * What the client called itself. It is stored as a LABEL for the person to
+ * recognise, never as authority: the only identity that decides anything is the
+ * verified client_id.
+ *
+ * It is read from the request body's `clientInfo`, which protocol revision
+ * 2026-07-28 repeats on every message precisely so a stateless server can see it
+ * without a session. The `Mcp-Name` header is NOT the client's name — that
+ * header carries the tool being called — so reading it here labelled a person's
+ * connection with something like "save_person". The user-agent is the last
+ * resort, and an empty name is better than a wrong one.
  */
-function observedClientName(request: Request): string | undefined {
-  const raw = request.headers.get("mcp-name") ?? request.headers.get("user-agent");
-  return raw ? raw.slice(0, 120) : undefined;
+function observedClientName(body: unknown, request: Request): string | undefined {
+  const params = (body as { params?: Record<string, unknown> } | null)?.params;
+  const meta = params?._meta as Record<string, unknown> | undefined;
+  const fromMeta = (meta?.["io.modelcontextprotocol/clientInfo"] as { name?: unknown } | undefined)?.name;
+  const fromInitialize = (params?.clientInfo as { name?: unknown } | undefined)?.name;
+  const raw =
+    (typeof fromMeta === "string" ? fromMeta : undefined) ??
+    (typeof fromInitialize === "string" ? fromInitialize : undefined) ??
+    request.headers.get("user-agent") ??
+    undefined;
+  const trimmed = raw?.trim();
+  return trimmed ? trimmed.slice(0, 120) : undefined;
 }
 
 export function registerMcpRoutes(http: HttpRouter) {

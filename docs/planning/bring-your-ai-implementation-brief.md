@@ -375,3 +375,112 @@ in this repository.
    the UI will want to echo.
 3. `convex/mcpGrants.ts` — the lifecycle functions the connection centre calls.
 4. `convex/mcpGrantEnforcement.test.ts` — the behaviour the UI must not weaken.
+
+---
+
+# What was actually built (connection experience, harness, public truth, 2026-08-16)
+
+> Continues the backend-spine section above. Everything here is in the working
+> tree on `claude/bring-your-ai-implementation`. No provider setting, secret,
+> environment variable, deployment, or real family record was touched.
+
+## Files
+
+| File | What it is |
+| --- | --- |
+| `app/app/settings/ai/page.tsx` | The connection centre. Server component; follows `app/app/api/page.tsx`, not the legacy localStorage Settings page. |
+| `app/settings/ai/page.tsx` | Redirect to the above. Every grant refusal points a person here after their AI is turned away, which is the worst moment to meet a 404. |
+| `components/ai/AiConnectionCenter.tsx` | The consent screen, narrow/revoke controls, safe activity, stale-tool recovery, and the manual brief. Renders its scope copy and both never-lists from `lib/mcp/catalog.ts`. |
+| `lib/mcp/connectionApi.ts` | Typed references to the grant lifecycle. The checked-in generated `api.d.ts` predates `mcpGrants`, so these are declared once instead of casting `api` to `any` at every call site. |
+| `app/api/ai-connections/route.ts` | The Clerk-protected write path. Validates shape, derives the owner from the session, hands the decision to the owner-scoped Convex mutations that authorize again. Widening is not reachable. |
+| `scripts/mcp-lifecycle.ts` | The eleven-point ladder as a runnable harness. `pnpm mcp:lifecycle`. Deliberately not in `pnpm verify`. |
+| `convex/mcpLifecycleLadder.test.ts` | Eight of the eleven rungs proved locally with the same official client and protocol pin. |
+| `scripts/check-connection-center.ts` | Connection-centre honesty invariants. In `pnpm verify`. |
+| `scripts/check-public-ai-truth.ts` | `/ai` + `/ai.txt` catalog parity and the no-named-client rule. In `pnpm verify`. |
+
+## Three interoperability defects the harness found
+
+Source review had missed all three. Connecting a real MCP client found them in
+minutes, which is the argument for the harness existing at all.
+
+1. **Hand-written wire responses were malformed.** The empty tool catalog and the
+   preflight refusal are both written straight onto the wire, bypassing the MCP
+   server that stamps protocol revision 2026-07-28's required `resultType`. A
+   conforming client rejected both as malformed — so the carefully written
+   "ask the person to approve this connection" refusal never reached a real AI,
+   and an unapproved connection saw a broken server rather than an empty list.
+   Both now carry `resultType: "complete"`.
+2. **An empty tool catalog could be cached.** A `complete` list result also owes
+   `ttlMs` and `cacheScope`. The empty catalog now declares `ttlMs: 0` and
+   `cacheScope: "private"` — a person may approve a second from now, and a cached
+   empty list would keep telling their AI it has no tools long after they said yes.
+3. **`observedClientName` read the wrong header.** It read `Mcp-Name`, which in
+   this revision carries the *tool being called*, not the client's name. A
+   person's connection would have been labelled something like `save_person`. It
+   now reads `clientInfo` from the body, which the revision repeats on every
+   message precisely so a stateless server can see it. `handleMcp` parses the
+   body before resolving the grant as a result.
+
+All three are guarded by `scripts/check-mcp-contract.ts`.
+
+## The refusal URL was wrong
+
+Every refusal pointed at `https://assistwithfamilyhistory.com/settings/ai`, but
+signed-in surfaces live under `/app` per the navigation contract. The constant
+now names `/app/settings/ai` and `/settings/ai` redirects there.
+
+## A navigation orphan, and why it survived
+
+`app/app/api/page.tsx` (API Center) and `app/app/api/admin/page.tsx` were real
+pages with **no navigation entry at all** — unreachable from anywhere in the
+product — even though `scripts/check-app-navigation-contract.tsx:96` already
+asserted `isNavItemActive("/app/api/admin", "/app/api") === true`, anticipating
+the entry that was never added.
+
+It survived because three check scripts —
+`check-app-navigation-contract.tsx`, `check-navigation-accessibility.tsx`, and
+`check-settings-responsive.ts` — existed with no `package.json` entry and ran
+nowhere. All three are now wired in, alongside `check:connection-center` and
+`check:public-ai-truth`. All three passed unchanged, so nothing was hiding
+behind them; the orphan was invisible for want of a *different* assertion, and
+the missing wiring meant nobody would have noticed if one had started failing.
+
+## Acceptance fixture, extended
+
+`convex/mcpAcceptanceFixture.ts` now covers `mcpGrants`,
+`mcpClientRegistrations`, and grant-linked `agentActivity` rows, with its safety
+posture unchanged: bounded owner scans, visible synthetic markers, and a refusal
+when anything unmarked references the marked graph.
+
+Two decisions worth recording:
+
+- **A run is recognised by `observedClientName`, not by the client id.** A live
+  provider issues an opaque client identifier the harness cannot choose; the
+  name the connecting software announces is the field a harness genuinely
+  controls, and approval never rewrites it.
+- **`mcpClientRegistrations` has no vault owner**, so it is reached only through
+  the marked grants' own client ids and never scanned broadly. If a registration
+  under one of those client ids carries no marker, or an unmarked grant shares
+  the client id, cleanup refuses — removing that cache would reach outside the
+  fixture.
+
+The activity ceiling rose from 20 to 100 rows because a full eleven-point run
+writes one activity row per call including every deliberate refusal. It is still
+a hard bound inside the bounded owner scan.
+
+## What the harness proves today, and what it does not
+
+**Proved locally**, in `convex/mcpLifecycleLadder.test.ts`, with a real
+`new Client(...)` pinned to `2026-07-28`: the anonymous challenge (1), branded
+protected-resource metadata (2), discovery empty without a grant and filtered by
+it afterwards (3), an out-of-scope call refusing without leakage (4), a batch
+save with per-item results followed by a correction and a refused stale write
+(7), unknown / ungranted / invented / cross-owner refusals being byte-identical
+(8), `operationId` replay returning the stored receipt without writing twice (9),
+and revocation denying the very next call and emptying discovery on a
+still-valid token (10).
+
+**Awaiting a live run with Scott's credentials**: a real Queue assignment made by
+a person (5), real evidence bytes (6), the reconnect half of (10), and the live
+zero-residue re-query against the acceptance deployment (11). The harness
+implements all of them; none has been executed, and no credentials were sought.

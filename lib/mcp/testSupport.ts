@@ -16,6 +16,8 @@ export type SeedGrantOptions = {
   status?: "pending" | "active" | "revoked" | "expired" | "denied";
   expiresAt?: number | null;
   label?: string;
+  /** What the connecting software called itself. Acceptance fixtures mark this. */
+  observedClientName?: string;
 };
 
 type RunnableTest = {
@@ -36,7 +38,7 @@ export async function seedGrant(t: RunnableTest, options: SeedGrantOptions): Pro
       clientId: options.clientId ?? "synthetic-mcp-client",
       issuer: options.issuer ?? "https://identity.example.test",
       label: options.label ?? "Synthetic test connection",
-      observedClientName: "synthetic-test-client",
+      observedClientName: options.observedClientName ?? "synthetic-test-client",
       clientProvenance: "manual" as const,
       scopes: options.scopes ?? [...FAMILY_HISTORY_SCOPES],
       boundary: options.boundary ?? { kind: "whole_workspace" as const },

@@ -138,6 +138,47 @@ fail-closed, which is correct, but it looks like an outage to a person.
 
 ---
 
+## 4. Run the live lifecycle once, with the synthetic acceptance identity
+
+**Where:** a terminal, after AWF-0040 through AWF-0042 are released.
+
+**What to run:**
+
+```
+MCP_LIFECYCLE_ENDPOINT=https://assistwithfamilyhistory.com/mcp \
+MCP_LIFECYCLE_RUN_KEY=codex-test:awf-joined:<unique-run-name> \
+MCP_LIFECYCLE_TOKEN=<access token for the retained synthetic subject> \
+MCP_LIFECYCLE_OWNER_ID=<the retained synthetic subject> \
+NEXT_PUBLIC_CONVEX_URL=<production Convex URL> \
+CONVEX_AUTH_TOKEN=<short-lived token for that same subject> \
+pnpm mcp:lifecycle
+```
+
+Optionally set `MCP_LIFECYCLE_TOKEN_OTHER_OWNER` to prove the cross-owner half
+of step 8 for real, and `MCP_LIFECYCLE_EVIDENCE_IDS` (`media:<id>,document:<id>`)
+to exercise real evidence delivery in step 6. Both are skipped honestly if absent.
+
+**Why a human must do it:** the harness pauses at the two points that are
+genuinely a person's act — approving the connection at
+`https://assistwithfamilyhistory.com/app/settings/ai` and later turning it off —
+because a harness that could do those itself would be proving the wrong thing.
+It also needs credentials, which the engineering agent has neither sought nor
+been given.
+
+**Safety:** the harness refuses to start unless the run key matches
+`codex-test:awf-joined:`. It reads the token from the environment only, never
+accepts it as an argument, and never prints it. Everything it writes carries the
+visible synthetic marker, and step 11 removes exactly that marked graph and
+re-queries for zero residue.
+
+**What to record:** paste the final JSON summary line into AWF-0043. Only after
+it passes end to end may that exact client's name appear on `/ai`.
+
+**Rollback:** run `mcpAcceptanceFixture.clear` with the same run key. It refuses
+if anything unmarked references the marked graph.
+
+---
+
 ## Explicitly NOT done, and not to be done without a separate decision
 
 - No token server was written. The provider remains the authorization server.
@@ -155,7 +196,7 @@ The product-grant layer works today against the provider exactly as it is
 configured now:
 
 - an unapproved connection sees zero tools and gets `GRANT_REQUIRED` with a
-  recovery that names `https://assistwithfamilyhistory.com/settings/ai`;
+  recovery that names `https://assistwithfamilyhistory.com/app/settings/ai`;
 - revocation takes effect on the very next request, because the grant is
   re-resolved per request and the transport is stateless — no waiting for a JWT
   to expire;

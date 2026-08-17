@@ -284,7 +284,7 @@ export async function assertGrantPermits(
     machineError(
       "GRANT_REQUIRED",
       "This AI connection has not been approved for Assist With Family History yet.",
-      "Ask the person to approve the connection at https://assistwithfamilyhistory.com/settings/ai, then retry.",
+      "Ask the person to approve the connection at https://assistwithfamilyhistory.com/app/settings/ai, then retry.",
     );
   }
   const normalized = ctx.db.normalizeId("mcpGrants", params.grantId);
@@ -293,7 +293,7 @@ export async function assertGrantPermits(
     machineError(
       "GRANT_REQUIRED",
       "This AI connection has not been approved for Assist With Family History yet.",
-      "Ask the person to approve the connection at https://assistwithfamilyhistory.com/settings/ai, then retry.",
+      "Ask the person to approve the connection at https://assistwithfamilyhistory.com/app/settings/ai, then retry.",
     );
   }
   const resolution: GrantResolution =
