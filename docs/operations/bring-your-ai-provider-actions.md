@@ -538,6 +538,32 @@ DCR and does not itself require CIMD-first; do not cite it for this rule.
 
 ## 2. Emit a resource-specific audience on MCP access tokens
 
+> **Decision recorded 2026-08-17: the resource server keeps
+> validate-when-present, accept-when-absent — and this is now a considered
+> posture rather than a stopgap.** The reasoning, also written beside the check
+> in `convex/httpRoutes/mcp.ts` and pinned by four tests in
+> `convex/mcpTransport.test.ts`:
+>
+> 1. `aud` exists to stop a token minted for resource A being replayed at
+>    resource B. To reach that point here, a token must first pass an **exact
+>    issuer pin** — `jwtVerify` is given one configured issuer. A token from any
+>    other Assist product's Clerk instance is refused outright, audience or no
+>    audience. Cross-product replay is already closed.
+> 2. The residual case is a *different OAuth application on this same Clerk
+>    instance*. Such a token gets past verification and then does nothing,
+>    because authorization is the durable product grant keyed by
+>    (issuer, subject, clientId) — an unapproved client is refused
+>    `GRANT_REQUIRED` on its first call and cannot even learn that a record
+>    exists.
+> 3. Making `aud` **required** today would therefore add no protection while
+>    returning 401 to every client, because the production Clerk instance does
+>    not mint the claim. That is a self-inflicted outage in exchange for a
+>    defence already provided twice over.
+>
+> So this item is **defence in depth worth having, not a gap that blocks
+> anything.** If Clerk gains RFC 8707 resource indicators, emit the claim and
+> tighten the check to required in one line.
+
 **Where:** Clerk Dashboard → production instance → the OAuth/token
 configuration that controls access-token claims (audience / resource
 indicators, RFC 8707).
@@ -1006,7 +1032,14 @@ configured now:
 - revocation takes effect on the very next request, because the grant is
   re-resolved per request and the transport is stateless — no waiting for a JWT
   to expire;
-- scopes, record boundaries, and the Queue principal all derive from the grant.
+- scopes, record boundaries, and the Queue principal all derive from the grant;
+- the protected-resource document at
+  `/.well-known/oauth-protected-resource/mcp` advertises `scopes_supported` — the
+  six `family_history:*` permissions, generated from `lib/mcp/catalog.ts`, the
+  same module the edge enforces with. A conformant client can now *discover* the
+  permission vocabulary instead of having to read this repository's prose. That
+  was added on 2026-08-17 and needs no provider change. Advertising a scope is
+  not granting it: the grant still decides everything.
 
 None of that depends on items 1–3. They make client identity honest and close
 the cross-resource replay gap; they are not what makes the permission real.

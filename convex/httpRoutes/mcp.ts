@@ -9,7 +9,7 @@ import {
   FAMILY_HISTORY_MCP_LIMITS,
   hashMcpInput,
 } from "../../lib/mcp/contract";
-import { findTool } from "../../lib/mcp/catalog";
+import { FAMILY_HISTORY_SCOPES, findTool } from "../../lib/mcp/catalog";
 import {
   CONNECTION_SETTINGS_URL,
   decideToolAccess,
@@ -83,6 +83,18 @@ function protectedResourceMetadata(resource: URL, issuer: URL) {
     resource_name: "Assist With Family History",
     authorization_servers: [issuer.toString().replace(/\/$/, "")],
     bearer_methods_supported: ["header"],
+    // The permission vocabulary, spelled out for a conformant client that has
+    // not read our documentation. Without this a client can discover *where* to
+    // authorize but has no machine-readable way to learn that six
+    // `family_history:*` permissions exist, so it can only ask for nothing or
+    // guess. Sourced directly from the module the edge enforces with, so the
+    // advertisement and the ceiling cannot drift — `convex/mcpTransport.test.ts`
+    // holds the parity test that fails if this list is ever hand-maintained.
+    //
+    // Advertising a scope is not granting it. The authorization that decides
+    // anything is still the durable product grant the person approved, resolved
+    // fresh on every request; a token's `scope` claim is never consulted.
+    scopes_supported: [...FAMILY_HISTORY_SCOPES],
     resource_documentation: new URL("/ai", resource.origin).toString(),
   }), {
     headers: {
@@ -123,14 +135,39 @@ async function verifyOAuth(request: Request, resource: URL, issuer: URL): Promis
         : null;
     if (!clientId) throw new Error("OAuth token is missing its client identifier.");
     if (clientId.length > 160) throw new Error("OAuth client identifier is too long.");
-    // Resource-specific audience. When the provider states an audience or a
-    // resource indicator we hold it to this exact resource, so a token minted
-    // for a different Assist product cannot be replayed here. When the provider
-    // omits the claim entirely — which the current production instance does —
-    // we accept the token rather than break the one client whose lifecycle is
-    // already proved, and the product grant remains the real authorization.
-    // Tightening this to "required" is a provider-side change, written up in
-    // docs/operations/bring-your-ai-provider-actions.md.
+    // ---------------------------------------------------------------- audience
+    //
+    // DECIDED POSTURE: validate-when-present, accept-when-absent. This is a
+    // deliberate choice, not an oversight, and here is the whole reasoning so
+    // nobody has to reconstruct it.
+    //
+    // What `aud` normally protects against is a token minted for resource A
+    // being replayed at resource B. For that to happen here, an attacker needs a
+    // token this endpoint will accept, which means a token from *this exact
+    // issuer* — `jwtVerify` above pins `issuer` to one configured value, so a
+    // token from any other Assist product's Clerk instance is already rejected
+    // outright, audience claim or not. Cross-product replay is closed by the
+    // issuer pin.
+    //
+    // That leaves one residual case: a *different OAuth application on this same
+    // Clerk instance* minting a token with the same issuer. That token gets past
+    // this function — and then does nothing, because it carries its own
+    // `client_id`, and authorization is the durable product grant keyed by
+    // (issuer, subject, clientId). An unapproved client is refused
+    // GRANT_REQUIRED on its first call. It cannot read a name, cannot learn that
+    // a record exists, cannot probe the catalog.
+    //
+    // Requiring `aud` outright would therefore buy no new protection while
+    // breaking every client today: the production Clerk instance does not mint
+    // an audience or resource-indicator claim on these access tokens, so
+    // `required` means a 401 for everyone, including the one lifecycle already
+    // proved. It would be a self-inflicted outage in exchange for a defence the
+    // issuer pin and the grant already provide.
+    //
+    // When present we still hold it to this exact resource — free strictness, no
+    // compatibility cost. If Clerk later gains resource indicators (RFC 8707),
+    // flip this to required and delete this comment; that is a provider-side
+    // change, tracked in docs/operations/bring-your-ai-provider-actions.md.
     const audienceClaim = result.payload.aud ?? (result.payload as Record<string, unknown>).resource;
     const audiences = Array.isArray(audienceClaim)
       ? audienceClaim.filter((value): value is string => typeof value === "string")

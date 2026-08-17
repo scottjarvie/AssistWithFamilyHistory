@@ -6,7 +6,7 @@ import { exportJWK, generateKeyPair, SignJWT, type KeyLike } from "jose";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import schema from "./schema";
 import { api } from "./_generated/api";
-import { FAMILY_HISTORY_ALL_TOOL_NAMES } from "../lib/mcp/catalog";
+import { FAMILY_HISTORY_ALL_TOOL_NAMES, FAMILY_HISTORY_SCOPES } from "../lib/mcp/catalog";
 import { seedGrant } from "../lib/mcp/testSupport";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -106,6 +106,89 @@ describe("stateless Family History MCP transport", () => {
       'resource_metadata="https://family-history.example.test/.well-known/oauth-protected-resource/mcp"',
     );
     await expect(anonymous.json()).resolves.toMatchObject({ error: "invalid_token" });
+  });
+
+  /**
+   * A conformant client should not have to read our prose to learn that six
+   * `family_history:*` permissions exist. Before this, the protected-resource
+   * document advertised where to authorize but never what could be asked for,
+   * so a client could only request nothing or guess.
+   *
+   * The equality assertion is the point: it fails the moment someone hand-types
+   * a scope into the metadata response or adds one to the catalog without the
+   * other, which is exactly how an advertisement drifts from what is enforced.
+   */
+  test("advertises exactly the six enforced permissions as scopes_supported", async () => {
+    const t = convexTest(schema, modules);
+    const metadata = await t.fetch("/.well-known/oauth-protected-resource/mcp");
+    const document = (await metadata.json()) as { scopes_supported?: unknown };
+
+    expect(document.scopes_supported).toEqual([...FAMILY_HISTORY_SCOPES]);
+    expect(document.scopes_supported).toHaveLength(6);
+    // Nothing outside the ceiling may be advertised, ever. An advertised scope
+    // that has no tool and no code path is a promise the server cannot keep.
+    for (const scope of document.scopes_supported as string[]) {
+      expect(scope.startsWith("family_history:")).toBe(true);
+    }
+  });
+
+  /**
+   * The audience posture, pinned by test so it stays a decision rather than an
+   * accident. `aud` is validated when present and accepted when absent; the
+   * reasoning lives beside the check in `convex/httpRoutes/mcp.ts`.
+   */
+  describe("audience posture: validated when present, accepted when absent", () => {
+    async function tokenWithAudience(audience: string | undefined) {
+      const jwt = new SignJWT({ client_id: CLIENT_ID })
+        .setProtectedHeader({ alg: "RS256", kid: "synthetic-key", typ: "at+jwt" })
+        .setIssuer(ISSUER)
+        .setSubject(SUBJECT)
+        .setIssuedAt()
+        .setExpirationTime("5m");
+      if (audience !== undefined) jwt.setAudience(audience);
+      return jwt.sign(privateKey);
+    }
+
+    test("a token whose audience names this resource is accepted", async () => {
+      const t = convexTest(schema, modules);
+      await approvedConnection(t);
+      const response = await t.fetch("/mcp", modernRequest("tools/list", await tokenWithAudience(RESOURCE)));
+      expect(response.status).toBe(200);
+      expect((await response.json()).error).toBeUndefined();
+    });
+
+    test("a token minted for a different resource is refused", async () => {
+      const t = convexTest(schema, modules);
+      await approvedConnection(t);
+      const response = await t.fetch(
+        "/mcp",
+        modernRequest("tools/list", await tokenWithAudience("https://some-other-assist-product.example.test/mcp")),
+      );
+      expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toMatchObject({ error: "invalid_token" });
+    });
+
+    test("a token with no audience claim at all is accepted, because the issuer pin and the grant carry it", async () => {
+      const t = convexTest(schema, modules);
+      await approvedConnection(t);
+      const response = await t.fetch("/mcp", modernRequest("tools/list", await tokenWithAudience(undefined)));
+      expect(response.status).toBe(200);
+      expect((await response.json()).error).toBeUndefined();
+    });
+
+    test("an audience-less token from another issuer is still refused", async () => {
+      const t = convexTest(schema, modules);
+      await approvedConnection(t);
+      const foreign = await new SignJWT({ client_id: CLIENT_ID })
+        .setProtectedHeader({ alg: "RS256", kid: "synthetic-key", typ: "at+jwt" })
+        .setIssuer("https://identity.some-other-product.example.test")
+        .setSubject(SUBJECT)
+        .setIssuedAt()
+        .setExpirationTime("5m")
+        .sign(privateKey);
+      const response = await t.fetch("/mcp", modernRequest("tools/list", foreign));
+      expect(response.status).toBe(401);
+    });
   });
 
   test("normalizes only the retired production resource and issuer hosts", async () => {
