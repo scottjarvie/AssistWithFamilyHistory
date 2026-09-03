@@ -1,6 +1,6 @@
 # API Route Inventory
 
-Last updated: 2026-07-12
+Last updated: 2026-09-03
 
 ## Purpose
 
@@ -21,9 +21,11 @@ The public non-API route `/stories/[id]` is intentionally outside this
 inventory. Its two anonymous Convex queries enforce published status and build
 the redacted allowlisted DTO in the backend.
 
-## Capability Presets To Consider Later
+## Public HTTP API Capability Presets To Consider Later
 
-These are planning terms only. They are not implemented scopes yet.
+These are planning terms for a possible public HTTP API and are not implemented
+HTTP API scopes. They are separate from the seven enforced MCP product
+permissions in `lib/mcp/catalog.ts`.
 
 | Preset | Meaning | Current status |
 | --- | --- | --- |
@@ -76,11 +78,16 @@ These are planning terms only. They are not implemented scopes yet.
 
 - No OpenAPI document exists.
 - Machine-readable capability manifest exists, but it is still internal planning rather than a public contract.
-- No API key model, scopes, tiers, quotas, request IDs, or usage endpoint exists.
+- API-key mint/list/suspend/revoke lifecycle exists, but incoming API-key
+  resolution, stable public HTTP contracts, tiers, quotas, request IDs, and a
+  usage endpoint do not.
 - No `/me`, `/capabilities`, `/openapi`, or `/usage` first-success path exists.
 - Legacy raw/contextualized document routes blur read/write semantics and are documented as internal legacy browser workflows in [`legacy-document-route-boundary.md`](legacy-document-route-boundary.md).
 - Anonymous preview behavior needs product/security decision before public beta; see `GEN-39`.
-- Story writer vs trusted publisher authority is enforced for explicit agent roles, but issued API keys/scopes are not implemented yet.
+- Story writer vs trusted publisher authority is enforced for explicit agent
+  roles, but issued API keys are not accepted as incoming credentials. The MCP
+  product-grant system is separate and currently enforces seven person-approved
+  permissions across sixteen canonical tools.
 - Public beta is status-only for now: `published` means publicly renderable, while draft/review 404. Readable slugs and noindex/index metadata exist; richer sharing settings remain separate work.
 
 ## Completion Policy For Feature Work

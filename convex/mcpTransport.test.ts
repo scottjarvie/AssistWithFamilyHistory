@@ -108,6 +108,16 @@ describe("stateless Family History MCP transport", () => {
     await expect(anonymous.json()).resolves.toMatchObject({ error: "invalid_token" });
   });
 
+  test("publishes the same protected-resource metadata at the root compatibility path", async () => {
+    const t = convexTest(schema, modules);
+    const canonical = await t.fetch("/.well-known/oauth-protected-resource/mcp");
+    const compatibility = await t.fetch("/.well-known/oauth-protected-resource");
+
+    expect(compatibility.status).toBe(200);
+    expect(compatibility.headers.get("location")).toBeNull();
+    expect(await compatibility.json()).toEqual(await canonical.json());
+  });
+
   /**
    * The product scope vocabulary is published for a human reader under a
    * vendor-prefixed key, and must NEVER appear as RFC 9728 `scopes_supported`.

@@ -5,7 +5,7 @@ execution: active
 audit: not-audited
 cards: AWF-0034, AWF-0038, AWF-0040, AWF-0041, AWF-0042, AWF-0043, AWF-0045
 created: 2026-08-16
-updated: 2026-08-17
+updated: 2026-09-03
 proposed-by: Codex from Scott's Bring Your AI delegation
 approved-by: Scott
 approved-on: 2026-08-16
@@ -64,9 +64,9 @@ their history.
 
 **Current, and deployed to production:** branded stateless Streamable HTTP
 `/mcp`; protected-resource discovery and anonymous challenge; server-derived
-owner; **fourteen** bounded, workflow-native `family_history_*` tools plus the
+owner; **sixteen** bounded, workflow-native `family_history_*` tools plus the
 **twelve** pre-namespace aliases kept on the same handlers and the same
-permission (26 callable names, six scopes — see `lib/mcp/catalog.ts`);
+permission (28 callable names, seven scopes — see `lib/mcp/catalog.ts`);
 person-approved durable product grants re-resolved on every request; enforced
 scopes and record boundaries; immediate revocation; batch record saves;
 protected evidence byte delivery; idempotent saves; optimistic corrections;
@@ -116,6 +116,31 @@ works before its exact lifecycle proof.
 
 The supporting audit and technical product contract are in
 `docs/planning/family-history-bring-your-ai-alignment.md`.
+
+### Readiness and drift audit — 2026-09-03 (Codex)
+
+The audit corrected three forms of stale truth and one discovery gap without
+adding a domain tool or widening authority. The enforced catalog has sixteen
+canonical tools and seven person-approved permissions, while the public `/ai`
+grouping and machine manifest still reflected older shapes. Both are now
+derived or checked against the catalog, including the explicit authority model:
+OAuth defaults to no product access; the person chooses each ordinary
+permission; there is no current raised tier; destructive, public, sharing,
+identity, external-provider, billing, export, and archive actions have no
+issuable permission.
+
+Both standard protected-resource discovery spellings now resolve directly and
+return the same document without redirect. Outside-in probes confirmed the apex
+MCP challenge, resource-path metadata, Clerk DCR metadata, current public tool
+catalog, and the canonical no-redirect path; the `www` hostname still redirects
+machine requests to apex and remains a deployment-domain decision rather than a
+code claim.
+
+The audit also corrected the DCR boundary: Clerk offers registration, but the
+application cannot infer DCR provenance or import provider registrations from
+an opaque client id. The local bounded registration table is the currently
+unused CIMD validator/cache, not a provider-DCR inventory. A real named-client
+lifecycle remains the only route to a compatibility claim.
 
 ## Sequence
 

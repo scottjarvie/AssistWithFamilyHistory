@@ -46,8 +46,12 @@ const toolGroups = [
   {
     label: "Preserve",
     icon: Archive,
-    scopes: ["family_history:evidence:read", "family_history:research:write"] as const,
-    copy: "Structured saves land in the same private vault the web workspace reads. Evidence stays separate from conclusions, with citations and provenance intact.",
+    scopes: [
+      "family_history:evidence:read",
+      "family_history:evidence:write",
+      "family_history:research:write",
+    ] as const,
+    copy: "Reviewed files can be read, new evidence can be placed into private person-only review, and structured saves land in the same vault the web workspace reads. Evidence stays separate from conclusions, with citations and provenance intact.",
   },
   {
     label: "Continue",
@@ -120,7 +124,7 @@ export default function AiSetupPage() {
               </code>
               <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
                 <div><p className="text-3xl font-semibold">{TOOL_COUNT}</p><p className="mt-1 text-xs leading-5 text-[#687169]">workflow tools from first brief to complete-result save</p></div>
-                <div><p className="text-3xl font-semibold">{FAMILY_HISTORY_SCOPE_INFO.length}</p><p className="mt-1 text-xs leading-5 text-[#687169]">permissions you choose from — there is no seventh</p></div>
+                <div><p className="text-3xl font-semibold">{FAMILY_HISTORY_SCOPE_INFO.length}</p><p className="mt-1 text-xs leading-5 text-[#687169]">permissions you choose from — this is the whole list</p></div>
                 <div><p className="text-3xl font-semibold">0</p><p className="mt-1 text-xs leading-5 text-[#687169]">owner or workspace IDs accepted from an AI</p></div>
                 <div><p className="text-3xl font-semibold">0</p><p className="mt-1 text-xs leading-5 text-[#687169]">assistants named as working, until one proves it</p></div>
               </div>
@@ -194,7 +198,7 @@ export default function AiSetupPage() {
           <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:px-10">
             <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#98702b]">Permissions</p>
             <h2 className="mt-4 max-w-3xl font-[family-name:var(--font-cormorant-garamond)] text-4xl font-semibold sm:text-5xl">
-              You choose from exactly {FAMILY_HISTORY_SCOPE_INFO.length} permissions. There is no seventh.
+              You choose from exactly {FAMILY_HISTORY_SCOPE_INFO.length} permissions. Nothing outside this list can be approved.
             </h2>
             <p className="mt-4 max-w-2xl text-sm leading-7 text-[#5f665f]">
               This list is generated from the same catalog the server enforces, so what you read here

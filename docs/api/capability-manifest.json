@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "2026-08-12",
+  "schemaVersion": "2026-09-03",
   "status": "current-source-with-separated-deployment-proof",
   "defaultPolicy": {
     "ownerBoundary": "All private app APIs must resolve owner context before reading or writing vault data.",
@@ -9,22 +9,50 @@
   "mcp": {
     "resource": "https://assistwithfamilyhistory.com/mcp",
     "transport": "stateless-streamable-http",
-    "oauth": "protected-resource metadata plus exact-issuer Clerk-shaped OAuth access-token JWT verification; ordinary session JWTs are rejected",
+    "oauth": "protected-resource metadata at both the resource-path and origin compatibility spellings plus exact-issuer Clerk-shaped OAuth access-token JWT verification; ordinary session JWTs are rejected; provider DCR is advertised, while CIMD is deferred and its validator is not connected to requests",
     "ownerBoundary": "The verified OAuth subject selects the vault server-side. No MCP tool accepts an owner, user, workspace, or vault identifier.",
     "currentInSource": [
-      "get_family_history_brief",
-      "search_family_history",
-      "get_family_history_context",
-      "save_person",
-      "save_relationship",
-      "save_event",
-      "save_source_evidence",
-      "save_research_work",
-      "save_story_work",
-      "save_complete_result",
-      "get_queue",
-      "update_queue"
+      "family_history_get_brief",
+      "family_history_search",
+      "family_history_get_context",
+      "family_history_get_evidence",
+      "family_history_begin_evidence_upload",
+      "family_history_finish_evidence_upload",
+      "family_history_save_person",
+      "family_history_save_relationship",
+      "family_history_save_event",
+      "family_history_save_source_evidence",
+      "family_history_save_research_work",
+      "family_history_save_story_work",
+      "family_history_save_records",
+      "family_history_save_complete_result",
+      "family_history_get_queue",
+      "family_history_update_queue"
     ],
+    "authorityTiers": {
+      "defaultAfterOAuth": [],
+      "personApproved": [
+        "family_history:context:read",
+        "family_history:evidence:read",
+        "family_history:evidence:write",
+        "family_history:research:write",
+        "family_history:story:draft",
+        "family_history:queue:read",
+        "family_history:queue:work"
+      ],
+      "raisedOutsideOrdinaryApproval": [],
+      "reservedNeverIssuable": [
+        "Archiving or restoring records",
+        "Exporting the vault",
+        "Permanently deleting anything",
+        "Publishing a story or any other public action",
+        "Merging or splitting person identities",
+        "Granting, changing, or removing sharing and access",
+        "Acting on FamilySearch or any other outside provider",
+        "Billing, account, or subscription changes"
+      ],
+      "policy": "Family History intentionally grants nothing from OAuth sign-in alone. Every ordinary MCP permission is selected by the person; no current scope has a separate raised tier, and reserved authorities have no tool or issuable scope."
+    },
     "notExposed": [
       "delete",
       "publish",
@@ -32,7 +60,7 @@
       "sharing_or_collaboration_grants",
       "external_familysearch_actions"
     ],
-    "proofBoundary": "Source and isolated signed synthetic tests do not prove deployed provider consent, a named client, production authentication, reconnect, or revocation."
+    "proofBoundary": "Source, tests, protected release, live discovery/DCR metadata, production route behavior, and the isolated provider storage boundary are proven separately. No real AI client has completed registration, consent, direct evidence upload, person review, later evidence read, correction, revoke, reconnect, and exact cleanup as one lifecycle; no named client is claimed."
   },
   "scopePresets": {
     "read_only_assistant": "Owner-scoped reads for people, context packs, queue summaries, stories, and documents.",

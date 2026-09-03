@@ -24,6 +24,8 @@
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 
 import {
   FAMILY_HISTORY_SCOPE_INFO,
@@ -32,6 +34,7 @@ import {
   NEVER_PERMITTED,
 } from "../lib/mcp/catalog";
 import { GET as aiTxtGet } from "../app/ai.txt/route";
+import AiSetupPage from "../app/ai/page";
 
 const root = process.cwd();
 const failures: string[] = [];
@@ -76,6 +79,11 @@ assert.ok(
 /* ---------------------------------------------------- /ai is generated too */
 
 const aiPage = readFileSync(path.join(root, "app/ai/page.tsx"), "utf8");
+const aiPageMarkup = renderToStaticMarkup(React.createElement(AiSetupPage));
+const aiPageText = aiPageMarkup
+  .replaceAll("&#x27;", "'")
+  .replaceAll("&quot;", '"')
+  .replaceAll("&amp;", "&");
 assert.match(
   aiPage,
   /from "@\/lib\/mcp\/catalog"/,
@@ -96,14 +104,25 @@ assert.doesNotMatch(
   "/ai must count its tools from the catalog, not spell a number that will go stale",
 );
 for (const tool of FAMILY_HISTORY_TOOLS) {
-  if (aiPage.includes(tool.name)) {
-    assert.ok(catalogNames.has(tool.name), `/ai names ${tool.name}, which must be in the catalog`);
-  }
+  assert.ok(aiPageText.includes(tool.name), `/ai must render the tool ${tool.name}`);
 }
 const hardCodedToolNames = (aiPage.match(/\bfamily_history_[a-z_]+\b/g) ?? []).filter(
   (name) => !catalogNames.has(name),
 );
 assert.deepEqual(hardCodedToolNames, [], "/ai must not name a tool that is not in the catalog");
+for (const scope of FAMILY_HISTORY_SCOPE_INFO) {
+  assert.ok(aiPageText.includes(scope.label), `/ai must render the person-facing label for ${scope.scope}`);
+  assert.ok(aiPageText.includes(scope.grants), `/ai must render what ${scope.scope} grants`);
+  assert.ok(aiPageText.includes(scope.limit), `/ai must render the limit on ${scope.scope}`);
+}
+for (const entry of [...NEVER_EXPOSED, ...NEVER_PERMITTED]) {
+  assert.ok(aiPageText.includes(entry), `/ai must render the never-list entry: "${entry}"`);
+}
+assert.doesNotMatch(
+  aiPageText,
+  /there is no (?:sixth|seventh|eighth|ninth|tenth)/i,
+  "/ai must not pair a derived permission count with a hard-coded ordinal",
+);
 
 /* ------------------------------------------- no assistant is named as working */
 
