@@ -1,7 +1,7 @@
 ---
 id: AWF-WO-013
 title: Make Windows release verification trustworthy before publishing media changes
-execution: active
+execution: complete
 audit: not-audited
 cards: AWF-0049
 created: 2026-09-02
@@ -9,6 +9,9 @@ updated: 2026-09-02
 proposed-by: Codex
 approved-by: Scott
 approval-evidence: 2026-09-02 soft-launch instruction to update, upgrade, commit, publish, configure providers, and move without routine permission pauses
+executed-by: Codex
+executed-on: 2026-09-02
+completed-on: 2026-09-02
 ---
 
 ## Goal
@@ -19,10 +22,11 @@ local evidence instead of platform-noise exceptions.
 
 ## Current truth
 
-The branch normalizes only platform representation where content is the
+The merged implementation normalizes only platform representation where content is the
 contract, invokes the local TypeScript compiler directly for the extension,
 and selects Git Bash explicitly on Windows. `pnpm verify` passes all 58 steps
-locally in 211 seconds. GitHub CI has not yet supplied cross-platform proof.
+locally in 211 seconds. Protected pull request #70 and post-merge main-branch
+CI run 33714103064 passed the strict verify, app boot, and route smoke test.
 
 ## Sequence
 
@@ -63,8 +67,12 @@ gate or a proposal to weaken verification would require a new decision.
 ## Execution evidence
 
 On 2026-09-02, `pnpm verify` completed 58 of 58 steps successfully in 211
-seconds on Windows with Node 24.16.0, including the production build. The
-branch is awaiting GitHub CI proof.
+seconds on Windows with Node 24.16.0, including the production build. Pull
+request #70 then passed its CI and Vercel preview checks, and post-merge
+main-branch CI run 33714103064 passed under the pinned Node 20 runtime. The
+separate production provider deployment failure was caused by Convex native
+`sharp` packaging, not by the verification runner, and is tracked in the active
+media delivery order.
 
 ## History
 
@@ -73,3 +81,6 @@ branch is awaiting GitHub CI proof.
   setup, and online release.
 - 2026-09-02 · Codex — repaired the platform-specific verification failures
   and opened this bounded delivery record pending CI.
+- 2026-09-02 · Codex — completed this delivery record after protected PR and
+  post-merge main-branch CI passed; independent audit remains optional and
+  separately represented by `audit: not-audited`.
