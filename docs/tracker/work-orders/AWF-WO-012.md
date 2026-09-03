@@ -129,6 +129,13 @@ boundary, protected-route, client-auth, API-inventory, media-byte, review-gate,
 connection-center, public-AI-truth, owner-table, and Convex-visibility contracts.
 No deployed or provider-backed proof is implied by those local results.
 
+The first production deployment of merged pull request #70 built the Next.js
+application successfully but Convex rejected `mediaEvidenceStorage` because the
+Vercel Linux-x64 `sharp` binary was bundled for Convex's Linux-arm64 Node
+runtime. The focused hotfix marks `sharp` as a Convex server-installed external
+package so Convex installs the native binary for its own runtime. Production
+proof remains pending until the replacement deployment succeeds.
+
 Read-only provider evidence: the signed-in Vercel account contains the retained
 `assistwithfamilyhistory` project, connected to this GitHub repository and the
 active `assistwithfamilyhistory.com` Vercel CDN/domain. Its project
@@ -159,3 +166,7 @@ corresponding runtime and retained evidence exist.
   renditions, proposed date/GPS evidence, replay-safe same-origin chosen-AI
   upload, private person review, and clean-rendition retrieval. Provider audit
   remains blocked at Backblaze sign-in; no external state changed.
+- 2026-09-02 · Codex — merged pull request #70 after local and GitHub CI passed.
+  The production deployment then failed specifically at Convex native-module
+  analysis for `sharp`; recorded the failure and opened the documented
+  external-package hotfix rather than claiming deployment success.
