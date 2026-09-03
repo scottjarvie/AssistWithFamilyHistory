@@ -49,6 +49,47 @@ function storage(): EvidenceB2Store {
   return new EvidenceB2Store(privateConfig);
 }
 
+const STORAGE_PROBE_PREFIX = "codex-test:awf-media-provider:";
+
+function evidenceStores(): Record<"private" | "public", EvidenceB2Store> {
+  const privateConfig = loadEvidenceB2Config("private");
+  const publicConfig = loadEvidenceB2Config("public");
+  assertEvidenceBucketSeparation(privateConfig, publicConfig);
+  return {
+    private: new EvidenceB2Store(privateConfig),
+    public: new EvidenceB2Store(publicConfig),
+  };
+}
+
+async function verifyEvidenceStore(
+  store: EvidenceB2Store,
+  objectKey: string,
+  bytes: Uint8Array,
+): Promise<{ bucketClass: "private" | "public"; sizeBytes: number; sha256: string; cleanedUp: true }> {
+  let versionId: string | undefined;
+  try {
+    const written = await store.put({ objectKey, bytes, contentType: "text/plain" });
+    versionId = written.versionId;
+    const head = await store.head(objectKey, versionId);
+    const stored = await store.read(objectKey, versionId);
+    const expectedSha256 = sha256Hex(bytes);
+    if (head.sizeBytes !== bytes.byteLength || stored.byteLength !== bytes.byteLength) {
+      throw new Error(`${store.config.bucketClass} B2 probe byte length changed.`);
+    }
+    if (written.sha256 !== expectedSha256 || sha256Hex(stored) !== expectedSha256) {
+      throw new Error(`${store.config.bucketClass} B2 probe SHA-256 changed.`);
+    }
+    return {
+      bucketClass: store.config.bucketClass,
+      sizeBytes: stored.byteLength,
+      sha256: expectedSha256,
+      cleanedUp: true,
+    };
+  } finally {
+    if (versionId) await store.deleteVersion(objectKey, versionId);
+  }
+}
+
 function publicOrigin(): string {
   const raw = process.env.MCP_PUBLIC_ORIGIN?.trim() || "https://assistwithfamilyhistory.com";
   const url = new URL(raw);
@@ -141,6 +182,40 @@ export const authorizeMcpEvidenceRelay = action({
       contentType: relay.contentType,
       sizeBytes: relay.sizeBytes,
       sha256: relay.sha256,
+    };
+  },
+});
+
+/**
+ * Production-safe provider proof for operators. It writes only an explicit
+ * synthetic marker, verifies the exact version and bytes in both configured
+ * buckets, and removes each version before returning.
+ */
+export const verifyEvidenceStorageProvider = internalAction({
+  args: { runKey: v.string() },
+  handler: async (_ctx, args) => {
+    if (!args.runKey.startsWith(STORAGE_PROBE_PREFIX) || args.runKey.length > 120) {
+      throw new Error(`Storage probe runKey must start with ${STORAGE_PROBE_PREFIX}`);
+    }
+    const stores = evidenceStores();
+    const probeId = randomUUID();
+    const bytes = new TextEncoder().encode(
+      `[SYNTHETIC STORAGE PROBE - SAFE TO DELETE]\n${args.runKey}\n${probeId}\n`,
+    );
+    const objectRoot = `${stores.private.config.environment}/operational-probes/${probeId}`;
+    const results = [];
+    for (const bucketClass of ["private", "public"] as const) {
+      results.push(await verifyEvidenceStore(
+        stores[bucketClass],
+        `${objectRoot}/${bucketClass}.txt`,
+        bytes,
+      ));
+    }
+    return {
+      ok: true as const,
+      environment: stores.private.config.environment,
+      bucketSeparationVerified: stores.private.config.bucket !== stores.public.config.bucket,
+      results,
     };
   },
 });
