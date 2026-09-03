@@ -41,9 +41,11 @@ advertises an output schema, and closed-world tools omit `openWorldHint: false`.
 
 Exact issuer validation protects bearer tokens at the resource server. RFC
 9207 issuer validation occurs earlier, in the OAuth client authorization-code
-flow, so it cannot be claimed until a named-client lifecycle proves it. CIMD is
-the final specification's standard direction; the provider's live DCR endpoint
-is compatibility only. The 2025 stateless protocol fallback remains enabled
+flow, so it cannot be claimed until a named-client lifecycle proves it. The
+provider advertises support for the authorization-response issuer parameter,
+which makes that proof possible. CIMD is the final specification's standard
+direction; the provider's live DCR endpoint is compatibility only and no CIMD
+support is advertised. The 2025 stateless protocol fallback remains enabled
 without named-client evidence that it is needed. This order does not authorize
 removing it prematurely.
 
