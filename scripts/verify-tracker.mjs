@@ -14,7 +14,7 @@ const EXECUTION = new Set(["proposed", "ready", "active", "complete", "supersede
 const AUDIT = new Set(["not-audited", "passed", "follow-up-needed"]);
 
 function parse(file) {
-  const raw = fs.readFileSync(file, "utf8");
+  const raw = fs.readFileSync(file, "utf8").replace(/\r\n?/g, "\n");
   const match = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
   assert(match, `${path.relative(ROOT, file)}: missing frontmatter`);
   const meta = {};

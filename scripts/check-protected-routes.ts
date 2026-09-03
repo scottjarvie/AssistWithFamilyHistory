@@ -55,13 +55,18 @@ const expectedPublic = [
   "/updates",
   "/stories/abc",
   "/api/unknown",
+  "/api/mcp-media-upload/example/capability",
 ];
+
+const publicCapabilityRoutes = new Set([
+  "/api/mcp-media-upload/[uploadRef]/[token]",
+]);
 
 const failures: string[] = [];
 
 for (const routeFile of walkRouteFiles(path.join(process.cwd(), "app", "api"))) {
   const apiPath = toApiPath(routeFile);
-  if (!isProtectedAppPath(apiPath)) {
+  if (!isProtectedAppPath(apiPath) && !publicCapabilityRoutes.has(apiPath)) {
     failures.push(`API route is not in the protected route set: ${apiPath}`);
   }
 }

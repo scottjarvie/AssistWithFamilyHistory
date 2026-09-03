@@ -25,7 +25,7 @@
  * --------------------
  * It regenerates the expected `api.d.ts` deterministically from the modules on
  * disk — no network, no deploy key, no Convex deployment — and requires the
- * checked-in file to match byte for byte.
+ * checked-in file to match after normalizing platform line endings.
  *
  * That single guarantee is what makes the rest of the pipeline honest: once the
  * checked-in bindings are provably identical to freshly generated ones, the
@@ -142,8 +142,9 @@ function main(): void {
   const modulePaths = collectModulePaths(CONVEX_DIR).sort();
   const expected = renderBindings(modulePaths);
   const actual = readFileSync(BINDINGS, "utf8");
+  const normalizedActual = actual.replace(/\r\n?/g, "\n");
 
-  if (expected === actual) {
+  if (expected === normalizedActual) {
     console.log(
       `check:convex-bindings-fresh — OK (${modulePaths.length} modules; checked-in bindings match the modules on disk)`,
     );
@@ -152,7 +153,7 @@ function main(): void {
 
   const expectedModules = new Set(modulePaths);
   const declared = new Set(
-    [...actual.matchAll(/^import type \* as \S+ from "\.\.\/(.+)\.js";$/gm)].map((m) => m[1]),
+    [...normalizedActual.matchAll(/^import type \* as \S+ from "\.\.\/(.+)\.js";$/gm)].map((m) => m[1]),
   );
   const missing = [...expectedModules].filter((m) => !declared.has(m));
   const extra = [...declared].filter((m) => !expectedModules.has(m));

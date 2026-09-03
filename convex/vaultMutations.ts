@@ -1288,6 +1288,7 @@ export const reviewMedia = mutation({
     rightsStatus: rightsStatusValidator,
     aiUseAllowed: v.boolean(),
     privacyReviewNote: v.optional(v.string()),
+    metadataDecision: v.optional(v.union(v.literal("pending"), v.literal("accepted"), v.literal("declined"))),
   },
   handler: async (ctx, args) => {
     const { owner: vaultOwnerId } = await authorizeTenantMutation(
@@ -1295,22 +1296,34 @@ export const reviewMedia = mutation({
       "vaultMutations.reviewMedia",
       args.vaultOwnerId,
     );
+    const media = await ctx.db.get(args.mediaId);
     await authorizeOwnedReferenceMutation(
       ctx,
       "vaultMutations.reviewMedia",
       vaultOwnerId,
-      await ctx.db.get(args.mediaId),
+      media,
       "Media item",
     );
 
+    const now = Date.now();
+    const decidedAt = new Date(now).toISOString();
+    const metadataProposal = media?.metadataProposal && args.metadataDecision
+      ? {
+          ...media.metadataProposal,
+          decision: args.metadataDecision,
+          acceptedAt: args.metadataDecision === "accepted" ? decidedAt : undefined,
+          declinedAt: args.metadataDecision === "declined" ? decidedAt : undefined,
+        }
+      : media?.metadataProposal;
     await ctx.db.patch(args.mediaId, {
       privacyLevel: args.privacyLevel,
       reviewStatus: args.reviewStatus,
       rightsStatus: args.rightsStatus,
       aiUseAllowed: args.aiUseAllowed,
       privacyReviewNote: args.privacyReviewNote,
-      reviewedAt: Date.now(),
-      updatedAt: Date.now(),
+      metadataProposal,
+      reviewedAt: now,
+      updatedAt: now,
     });
 
     return { mediaId: args.mediaId };

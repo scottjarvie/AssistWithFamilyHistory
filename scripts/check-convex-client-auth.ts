@@ -24,6 +24,12 @@ const publicStoryQueries = new Set([
 // CLI tooling that attaches its own explicit short-lived token. Both are
 // operator-run scripts, never part of a request path.
 const explicitTokenCliFiles = new Set(["scripts/audit-vault.ts", "scripts/mcp-lifecycle.ts"]);
+// This route has no Clerk user by design. It holds an opaque, short-lived
+// upload capability and may call only the allowlisted Convex relay action,
+// whose data layer re-resolves the hashed session and every authority fact.
+const publicCapabilityRelayFiles = new Set([
+  "app/api/mcp-media-upload/[uploadRef]/[token]/route.ts",
+]);
 const excludedDirectories = new Set([
   ".next",
   "__tests__",
@@ -227,7 +233,10 @@ for (const file of files) {
           explicitTokenCliFiles.has(relative) &&
           source.includes("process.env.CONVEX_AUTH_TOKEN") &&
           /\.setAuth\s*\(/.test(source);
-        if (!isExplicitTokenCli) {
+        const isPublicCapabilityRelay =
+          publicCapabilityRelayFiles.has(relative)
+          && source.includes("mediaEvidenceStorage:authorizeMcpEvidenceRelay");
+        if (!isExplicitTokenCli && !isPublicCapabilityRelay) {
           failures.push(
             `${relative}:${lineOf(sourceFile, node)} constructs ConvexHttpClient directly; use ` +
               "getAuthedConvexClient or the explicit short-lived-token CLI pattern.",

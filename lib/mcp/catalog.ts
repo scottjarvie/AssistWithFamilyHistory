@@ -22,6 +22,7 @@
 export const FAMILY_HISTORY_SCOPES = [
   "family_history:context:read",
   "family_history:evidence:read",
+  "family_history:evidence:write",
   "family_history:research:write",
   "family_history:story:draft",
   "family_history:queue:read",
@@ -70,6 +71,15 @@ export const FAMILY_HISTORY_SCOPE_INFO: readonly ScopeInfo[] = [
     writes: false,
     limit:
       "Only reviewed, AI-allowed, unrestricted items inside your boundary. Delivered through this connection — the AI never receives a storage link it could share or scrape.",
+  },
+  {
+    scope: "family_history:evidence:write",
+    label: "Place new evidence in your private review queue",
+    grants:
+      "Upload an attributed image into private evidence storage and leave it unreviewed for you to inspect.",
+    writes: true,
+    limit:
+      "Upload only. It cannot review rights, approve AI use, accept extracted dates or locations, change conclusions, share, or publish. Provider URLs are never returned.",
   },
   {
     scope: "family_history:research:write",
@@ -216,6 +226,26 @@ export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
       "BATCH. Ask for up to 10 evidence items at once by {kind,id} and receive the reviewed, AI-allowed ones as content blocks. Anything not delivered comes back in `skipped` with an exact reason and what to do. Never ask the person for a storage link; this is the only supported way to see a private file.",
     humanSummary: "Receives the contents of files you marked reviewed and AI-allowed.",
     implementedBy: "convex/mcpEvidence.getEvidenceBatch",
+  },
+  {
+    name: "family_history_begin_evidence_upload",
+    requiredScope: "family_history:evidence:write",
+    writes: true,
+    title: "Begin a private evidence upload",
+    description:
+      "Authorize one replay-safe JPEG, PNG, or WebP upload for a person inside this connection's boundary. Returns a short-lived same-origin PUT capability, never a private storage URL. Supply the exact byte length and SHA-256, then call family_history_finish_evidence_upload with the same operationId and uploadRef.",
+    humanSummary: "Starts a private, checksum-bound evidence upload for your review.",
+    implementedBy: "convex/mediaEvidenceStorage.beginMcpEvidenceUpload",
+  },
+  {
+    name: "family_history_finish_evidence_upload",
+    requiredScope: "family_history:evidence:write",
+    writes: true,
+    title: "Finish a private evidence upload",
+    description:
+      "Verify the exact uploaded bytes, create metadata-clean viewing copies, extract camera date and GPS only as reversible private proposals, and leave the result Private, unreviewed, rights-unknown, and unavailable to future AI reads until the person approves it.",
+    humanSummary: "Verifies an upload and places it in your private review queue.",
+    implementedBy: "convex/mediaEvidenceStorage.finishMcpEvidenceUpload",
   },
   {
     name: "family_history_save_person",

@@ -24,6 +24,8 @@ import type * as mcpEvidence from "../mcpEvidence.js";
 import type * as mcpFamilyHistory from "../mcpFamilyHistory.js";
 import type * as mcpGrants from "../mcpGrants.js";
 import type * as media from "../media.js";
+import type * as mediaEvidenceControl from "../mediaEvidenceControl.js";
+import type * as mediaEvidenceStorage from "../mediaEvidenceStorage.js";
 import type * as personEvents from "../personEvents.js";
 import type * as persons from "../persons.js";
 import type * as places from "../places.js";
@@ -63,6 +65,8 @@ declare const fullApi: ApiFromModules<{
   mcpFamilyHistory: typeof mcpFamilyHistory;
   mcpGrants: typeof mcpGrants;
   media: typeof media;
+  mediaEvidenceControl: typeof mediaEvidenceControl;
+  mediaEvidenceStorage: typeof mediaEvidenceStorage;
   personEvents: typeof personEvents;
   persons: typeof persons;
   places: typeof places;

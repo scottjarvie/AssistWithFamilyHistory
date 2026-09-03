@@ -1,10 +1,10 @@
 # Family History MCP and evidence-media adoption
 
-**Status:** Proposed product-specific implementation brief
-**Date:** 2026-08-30
-**Repository baseline:** `origin/main` at `01a6e743ca99b6aabf31975c31009146383eaa87`
+**Status:** Active; first image upload/review/read slice implemented locally, provider and release proof pending
+**Date:** 2026-09-02
+**Repository baseline:** `origin/main` at `ac47339`
 **Tracker:** AWF-WO-012 and AWF-0046 through AWF-0048
-**Family inputs:** `assist-with-life` commit `ee63aaf`, especially
+**Family inputs:** `assist-with-life` commit `6d256fb`, especially
 `planning/assist-media-storage-standard.md`,
 `planning/mcp-connector-playbook.md`,
 `planning/bring-your-ai-mcp-oauth-standard.md`, and
@@ -64,6 +64,30 @@ story, merges identities, changes access, or acts in FamilySearch on its own.
 - Source/deploy and a disposable protocol client exist, but no named AI client
   has proved the complete current research-to-story media lifecycle.
 
+### Implemented on the active branch on 2026-09-02
+
+- The MCP catalog has sixteen canonical tools and seven product permissions:
+  the new permission is the separately approved evidence-write authority, and
+  the two new tools begin and finish one checksum-bound private image upload.
+- A same-origin relay accepts only the opaque session capability plus exact
+  bytes. It re-resolves type, length and SHA-256 from Convex, forwards to a
+  server-only B2 URL, and never returns that provider URL to the client.
+- The original is pinned by bucket, opaque key, provider version, SHA-256,
+  length and decoded type. Tiny, medium and large viewing copies are decoded,
+  auto-oriented and re-encoded without EXIF/GPS/XMP, with transformation and
+  source hash in every rendition manifest.
+- Embedded camera time and GPS become reversible structured proposals. Camera
+  capture time, scan time, file-modified time, upload time and inferred
+  historical-event date remain distinct fields. Exact GPS begins private,
+  associated with the person-media record, and withheld from disclosure; the
+  signed-in person can accept or decline the proposal without publishing it.
+- Reviewed B2 evidence is read only through the clean medium rendition. The
+  exact original has no ordinary UI or MCP read path. Reference-only remote
+  URLs are no longer fetched server-side and remain honestly unavailable.
+- This slice is intentionally incomplete: JPEG/PNG/WebP only, no provider or
+  deploy state, no migration, and no claimed PDF/audio/video/batch/named-client
+  proof.
+
 ### Later under this Proposed program
 
 - Dedicated encrypted private B2 storage for family-history evidence, with
@@ -108,6 +132,16 @@ story, merges identities, changes access, or acts in FamilySearch on its own.
    `family_history:evidence:write`; do not hide file creation inside research
    proposal, story draft, or the default grant. Uploading sensitive family
    evidence is different authority from saving an attributed text proposal.
+8. **This project uses exactly two B2 buckets.** One project-specific Private
+   bucket holds exact originals and all non-public renditions. One separately
+   scoped project-specific Public bucket is reserved for future human-approved
+   publication. Do not create the generic four-bucket example and do not reuse
+   a sibling product's bucket or key.
+9. **Time and place metadata are proposed evidence.** Embedded GPS defaults to
+   the person-media association unless the person declines or deliberately
+   re-associates it with an event/place. Exact coordinates remain private;
+   publication strips GPS from image bytes and may disclose structured place
+   only at the precision the person authorized.
 
 ## Storage and control-plane contract
 
@@ -130,9 +164,10 @@ The upload lifecycle is:
    the approved people/work boundary and target record relationships, validates
    supported type and size, and binds `opId + expectedSha256 + length + type +
    target links + provenance declaration` into one durable session.
-2. It returns one session-bounded presigned PUT and required headers. A byte-
-   capable client uploads the real file without base64 passing through model
-   text.
+2. It returns one session-bounded, first-party PUT capability and required
+   headers. The same-origin relay consumes the B2 signed URL server-to-server,
+   so a byte-capable client uploads the real file without base64 passing through
+   model text and without allowlisting the storage provider.
 3. `family_history_finish_evidence_upload` rechecks the current grant and
    target reach, verifies actual length/hash/type and complete decode, creates
    source-exact and safe-working manifest roles where required, and atomically
@@ -147,6 +182,17 @@ The upload lifecycle is:
 
 Inline bytes are optional only for tiny fully decoded images proved reliable
 in a named client. They are never the normal scan, PDF, audio, or video path.
+
+For restricted clients, allow the exact product hostname—not “all domains.” In
+Claude, an allowlist change applies only to a new conversation, so close the
+old conversation and start a new one before diagnosing the relay as broken.
+
+High-volume work keeps one receipt per item and bounded concurrency. Begin,
+upload and finish are independently retryable; the session expires; the same
+operation and bytes replay; changed intent conflicts; failures retain a
+reconcilable receipt; duplicates remain attributable evidence instead of being
+destructively deduplicated. Multi-file resumability and partial-batch retry are
+still required before this program is complete.
 
 ## Tool rhythm
 
@@ -230,7 +276,7 @@ migration evidence separate. This Work Order is only specified.
 > AGENTS.md, the Family History Project Philosophy, the ancestor-vault product
 > architecture, tracker Guide, FamilySearch capture/storage and runbook docs,
 > AWF-WO-011, AWF-0041, AWF-0045, this brief, and the four family sources at
-> `assist-with-life` commit `ee63aaf`. Begin from the real foundation: fourteen
+> `assist-with-life` commit `6d256fb`. Begin from the real foundation: fourteen
 > namespaced tools plus aliases, person-approved grants, protected batch
 > evidence, private Convex byte storage, person review/rights/AI-use gates, and
 > reference-only FamilySearch media. Do not reopen those decisions or adapt the

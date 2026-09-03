@@ -21,7 +21,7 @@ import {
 import { EVIDENCE_SKIP_GUIDANCE } from "../mcpEvidence";
 
 const SERVER_NAME = "assist-with-family-history";
-const SERVER_VERSION = "0.2.0";
+const SERVER_VERSION = "0.3.0";
 const DEFAULT_RESOURCE = "https://assistwithfamilyhistory.com/mcp";
 const LEGACY_RESOURCE_HOST = "discovertheirstories.com";
 const LEGACY_ISSUER_HOST = "clerk.discovertheirstories.com";
@@ -31,6 +31,7 @@ const mcp = (internal as any).mcpFamilyHistory;
 const vault = (internal as any).vault;
 const queue = (internal as any).queue;
 const evidence = (internal as any).mcpEvidence;
+const mediaEvidence = (internal as any).mediaEvidenceStorage;
 const grants = (internal as any).mcpGrants;
 
 type VerifiedPrincipal = {
@@ -585,6 +586,23 @@ export function createFamilyHistoryServer(
     }
   };
 
+  const writeAction = async (toolName: string, fn: any, input: Record<string, unknown>) => {
+    try {
+      const { operationId: op, ...semanticInput } = input;
+      const result = toolResult(await actionCtx.runAction(fn, {
+        principal,
+        grantId,
+        operationId: op,
+        requestHash: await hashMcpInput({ toolName, ...semanticInput }),
+        input: semanticInput,
+      }));
+      await touch(toolName);
+      return result;
+    } catch (error) {
+      return toolError(error);
+    }
+  };
+
   const readOnly = { readOnlyHint: true, destructiveHint: false, idempotentHint: true };
   const writeSafe = { readOnlyHint: false, destructiveHint: false, idempotentHint: true };
 
@@ -709,8 +727,11 @@ export function createFamilyHistoryServer(
         }
       }
 
-      for (const item of batch.fetchable) {
-        if (spent >= FAMILY_HISTORY_MCP_LIMITS.evidenceTotalBytes) {
+      // B2-backed evidence is always the metadata-clean medium rendition.
+      // The private provider URL is minted and consumed server-to-server and
+      // never enters this tool result.
+      for (const item of batch.b2Stored ?? []) {
+        if (spent + item.sizeBytes > FAMILY_HISTORY_MCP_LIMITS.evidenceTotalBytes) {
           skipped.push({
             id: item.id,
             kind: item.kind,
@@ -720,22 +741,15 @@ export function createFamilyHistoryServer(
           continue;
         }
         try {
-          const response = await fetch(item.url, { redirect: "follow" });
+          const signed = await actionCtx.runAction(mediaEvidence.signMcpEvidenceRead, {
+            principal,
+            grantId,
+            mediaId: item.id,
+          });
+          const response = await fetch(signed.url, { redirect: "error" });
           if (!response.ok) throw new Error("unavailable");
           const bytes = new Uint8Array(await response.arrayBuffer());
-          if (bytes.byteLength > FAMILY_HISTORY_MCP_LIMITS.evidencePerItemBytes) {
-            skipped.push({ id: item.id, kind: item.kind, reason: "TOO_LARGE", whatToDo: EVIDENCE_SKIP_GUIDANCE.TOO_LARGE });
-            continue;
-          }
-          if (spent + bytes.byteLength > FAMILY_HISTORY_MCP_LIMITS.evidenceTotalBytes) {
-            skipped.push({
-              id: item.id,
-              kind: item.kind,
-              reason: "TOO_LARGE",
-              whatToDo: "This call's delivery budget ran out before this item. Ask for it in a second, smaller call.",
-            });
-            continue;
-          }
+          if (bytes.byteLength !== item.sizeBytes) throw new Error("length changed");
           spent += bytes.byteLength;
           content.push(evidenceBlock(item, bytes));
           delivered.push({ id: item.id, kind: item.kind, title: item.title, mimeType: item.mimeType, sizeBytes: bytes.byteLength });
@@ -760,6 +774,40 @@ export function createFamilyHistoryServer(
       return toolError(error);
     }
   });
+
+  registerTool("family_history_begin_evidence_upload", {
+    inputSchema: z.object({
+      operationId,
+      personId: id,
+      sourceId: id.optional(),
+      title: z.string().trim().min(1).max(200),
+      description: z.string().trim().max(2_000).optional(),
+      fileName: z.string().trim().min(1).max(240),
+      contentType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+      sizeBytes: z.number().int().min(1).max(25 * 1024 * 1024),
+      sha256: z.string().regex(/^[a-fA-F0-9]{64}$/),
+      fileModifiedTime: z.string().datetime().optional(),
+      scanTime: z.string().datetime().optional(),
+      inferredHistoricalEventDate: z.string().datetime().optional(),
+    }).strict(),
+    annotations: writeSafe,
+  }, (input: any) => writeAction(
+    "family_history_begin_evidence_upload",
+    mediaEvidence.beginMcpEvidenceUpload,
+    input,
+  ));
+
+  registerTool("family_history_finish_evidence_upload", {
+    inputSchema: z.object({
+      operationId,
+      uploadRef: z.string().min(20).max(120),
+    }).strict(),
+    annotations: writeSafe,
+  }, (input: any) => writeAction(
+    "family_history_finish_evidence_upload",
+    mediaEvidence.finishMcpEvidenceUpload,
+    input,
+  ));
 
   registerTool("family_history_save_person", {
     inputSchema: withOperation(personSave),

@@ -18,6 +18,7 @@ const RequestSchema = z.object({
   rightsStatus: RightsStatusEnum,
   aiUseAllowed: z.boolean().optional(),
   privacyReviewNote: z.string().optional(),
+  metadataDecision: z.enum(["pending", "accepted", "declined"]).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -40,9 +41,9 @@ export async function POST(request: NextRequest) {
     const aiUseAllowed = parsed.data.aiUseAllowed === true;
     const privacyReviewNote = parsed.data.privacyReviewNote?.trim() || undefined;
 
-    if (aiUseAllowed && (privacyLevel === "private" || reviewStatus !== "reviewed" || rightsStatus === "unknown" || rightsStatus === "restricted")) {
+    if (aiUseAllowed && (reviewStatus !== "reviewed" || rightsStatus === "unknown" || rightsStatus === "restricted")) {
       return NextResponse.json(
-        { error: "AI use requires reviewed, non-private media with usable rights." },
+        { error: "AI use requires reviewed media with usable rights. The item may remain private." },
         { status: 400 }
       );
     }
@@ -56,6 +57,7 @@ export async function POST(request: NextRequest) {
       rightsStatus,
       aiUseAllowed,
       privacyReviewNote,
+      metadataDecision: parsed.data.metadataDecision,
     });
 
     return NextResponse.json({ success: true, ...result });
