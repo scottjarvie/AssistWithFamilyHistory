@@ -44,11 +44,12 @@ The full contract and copyable worker prompt are in
   one project-public bucket with encryption and version retention, each using
   a separate bucket-scoped key. Production Convex contains the bindings;
   Vercel and source control do not contain the B2 secrets. A guarded production
-  action for byte/hash/read/delete verification is deployed but not yet run.
+  run proved exact byte/hash reads, denial across the two credentials, exact-
+  version cleanup, and zero marked residue in both buckets.
 - **Still partial:** person uploads remain on the legacy private Convex path;
   connected-AI uploads currently admit JPEG, PNG, and WebP only; PDFs,
-  transcripts, audio, video, resumable multi-part batches, migration, provider
-  execution proof, real-upload proof, and named-client proof remain.
+  transcripts, audio, video, resumable multi-part batches, migration, real-
+  upload proof, and named-client proof remain.
 - **Later in this active order:** finish the remaining media classes and batch
   behavior, then run the full marked media-to-story acceptance/cleanup
   lifecycle.
@@ -121,8 +122,8 @@ generic four-bucket family example.
 On 2026-09-03 Scott explicitly authorized the Backblaze, Convex, and Vercel
 production work for this soft launch. That authorization was used only for the
 two Family History buckets, their corresponding restricted keys and Convex
-bindings, and normal reviewed deployment. The synthetic provider check's cloud
-object deletion still requires its separate action-time confirmation.
+bindings, normal reviewed deployment, and the marked synthetic provider proof.
+The separate action-time cleanup confirmation was received before execution.
 
 ## Execution evidence
 
@@ -159,11 +160,22 @@ writes to each configured bucket, verifies exact length and SHA-256 on the
 stored version, and removes that exact version in a `finally` cleanup. Full
 local verification passed all 58 commands in 186 seconds; GitHub and Vercel PR
 checks passed; the merge is on main as `1f9c090`; post-merge main CI passed; and
-the production Convex function list exposes the checker. The final Run action
-and its byte/hash/cleanup receipt remain pending action-time deletion
-confirmation, so provider-byte success is not yet claimed.
+the production Convex function list exposes the checker.
 
-Read-only provider evidence: the signed-in Vercel account contains the retained
+The first approved provider run proved the two configured buckets could store,
+reread, hash-check, and delete their exact synthetic versions. Because that
+checker only inferred bucket separation from different configured names,
+pull request #73 added actual cross-bucket listing denials and post-cleanup
+version counts. Its full 58-step local verification passed in 161 seconds; its
+GitHub and Vercel checks passed; it merged as `f798747`; production Vercel/
+Convex deployment succeeded; and post-merge main CI passed in 2 minutes 18
+seconds. The final production run returned `ok: true`, production environment,
+both cross-credential denials true, identical 144-byte hashes in both buckets,
+both exact-version cleanup results true, and residue counts of zero for both
+buckets. No real family data or other project resource was touched.
+
+Earlier read-only provider evidence, before the 2026-09-03 configuration,
+showed that the signed-in Vercel account contained the retained
 `assistwithfamilyhistory` project, connected to this GitHub repository and the
 active `assistwithfamilyhistory.com` Vercel CDN/domain. Its project
 environment-variable list contains Clerk/Convex/site bindings only—no B2 media
@@ -204,5 +216,9 @@ corresponding runtime and retained evidence exist.
 - 2026-09-03 · Scott and Codex — Scott authorized the Family History provider,
   Convex, and Vercel work; Codex created the isolated two-bucket topology and
   restricted keys, bound production Convex, and merged/deployed the guarded
-  provider checker in pull request #72. Live execution remains pending the
-  separate confirmation required for its immediate cleanup deletion.
+  provider checker in pull request #72.
+- 2026-09-03 · Scott and Codex — after action-time cleanup confirmation, Codex
+  ran the provider proof, strengthened it through pull request #73, deployed it,
+  and reran it successfully. Exact bytes/hashes, reciprocal credential denial,
+  exact-version deletion, and zero marked residue are now retained evidence;
+  real upload/person-review/named-client proof remains.
