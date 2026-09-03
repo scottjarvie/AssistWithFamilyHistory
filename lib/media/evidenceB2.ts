@@ -73,6 +73,18 @@ export function sha256Hex(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
+export function isEvidenceB2AccessDenied(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as {
+    name?: unknown;
+    Code?: unknown;
+    $metadata?: { httpStatusCode?: unknown };
+  };
+  const status = candidate.$metadata?.httpStatusCode;
+  const code = typeof candidate.Code === "string" ? candidate.Code : candidate.name;
+  return status === 401 || status === 403 || code === "AccessDenied" || code === "Unauthorized";
+}
+
 export function assertRelayCompatibleSignature(url: string): void {
   const parsed = new URL(url);
   const signedHeaders = (parsed.searchParams.get("X-Amz-SignedHeaders") ?? "").toLowerCase();
@@ -173,6 +185,26 @@ export class EvidenceB2Store {
       Key: objectKey,
       VersionId: versionId,
     }));
+  }
+
+  async countVersionEntries(prefix: string): Promise<number> {
+    let count = 0;
+    let keyMarker: string | undefined;
+    let versionIdMarker: string | undefined;
+    do {
+      const page = await this.client.send(new ListObjectVersionsCommand({
+        Bucket: this.config.bucket,
+        Prefix: prefix,
+        KeyMarker: keyMarker,
+        VersionIdMarker: versionIdMarker,
+      }));
+      count += [...(page.Versions ?? []), ...(page.DeleteMarkers ?? [])]
+        .filter((entry) => entry.Key?.startsWith(prefix) && entry.VersionId)
+        .length;
+      keyMarker = page.IsTruncated ? page.NextKeyMarker : undefined;
+      versionIdMarker = page.IsTruncated ? page.NextVersionIdMarker : undefined;
+    } while (keyMarker !== undefined || versionIdMarker !== undefined);
+    return count;
   }
 
   async deleteAllVersions(objectKey: string): Promise<void> {
