@@ -30,16 +30,43 @@ checked in the current release branch. Input schemas remain transport-owned,
 while result, error, receipt, and replay behavior remains distributed across
 handlers and tests. This order is only proposed; no contract refactor has begun.
 
+The final 2026-07-28 currency audit found the modern server posture sound but
+under-pinned at the product layer. The official v2 HTTP entry serves a fresh
+server per request, supplies `server/discover`, validates standard routing
+headers, and supplies private zero-TTL cache defaults. Existing Family History
+tests prove modern official-client calls without a session plus immediate grant
+narrowing and revocation, but do not directly assert discover, cache, or header
+failure contracts. All tool results already include structured content; none
+advertises an output schema, and closed-world tools omit `openWorldHint: false`.
+
+Exact issuer validation protects bearer tokens at the resource server. RFC
+9207 issuer validation occurs earlier, in the OAuth client authorization-code
+flow, so it cannot be claimed until a named-client lifecycle proves it. CIMD is
+the final specification's standard direction; the provider's live DCR endpoint
+is compatibility only. The 2025 stateless protocol fallback remains enabled
+without named-client evidence that it is needed. This order does not authorize
+removing it prematurely.
+
 ## Sequence
 
 1. Record the current operation-level contract from source and tests, including
    backing operations, privacy/provenance boundaries, schemas, results, errors,
    batch behavior, receipts, replay, and recovery.
-2. Choose the smallest canonical representation that avoids duplicating Zod
+2. Add explicit 2026-07-28 conformance checks for `server/discover`, modern
+   calls without initialize/session state, cache hints on granted list results,
+   and standard routing-header presence and mismatch rejection.
+3. Choose the smallest canonical representation that avoids duplicating Zod
    behavior or weakening Convex boundaries.
-3. Generate or validate the catalog, transport registration, public guides,
+4. Advertise useful output schemas and complete closed-world annotations for
+   exactly the existing sixteen tools, proving every current wire result still
+   validates and that `structuredContent` remains present.
+5. Generate or validate the catalog, transport registration, public guides,
    machine manifest, and lifecycle harness against that representation.
-4. Prove no wire, authority, privacy, or mutation behavior changed, then publish
+6. In the named-client lifecycle, prove RFC 9207 authorization-response issuer
+   validation and record whether that client empirically needs the 2025
+   stateless fallback. Keep CIMD first and DCR compatibility-only in truth
+   surfaces; do not change provider state in this order.
+7. Prove no wire, authority, privacy, or mutation behavior changed, then publish
    through the normal protected release path.
 
 ## Exclusions
@@ -49,6 +76,8 @@ handlers and tests. This order is only proposed; no contract refactor has begun.
 - No admin, delete, publish, merge, share, FamilySearch/provider action,
   billing, export, or archive/restore authority.
 - No provider credential or production-family-data work.
+- No new product tool. The audit found metadata and proof gaps, not a missing
+  Family History operation.
 
 ## Dependencies
 
@@ -67,6 +96,9 @@ separate approved outcome.
 ## Verification
 
 - Focused catalog/transport/handler/lifecycle parity tests.
+- Direct modern `server/discover`, no-session, cache-hint, and routing-header
+  conformance tests, plus schema validation of representative success and
+  refusal results for every registered tool family.
 - Existing denial, revocation, batch/replay, evidence, media, privacy, and
   connection-centre contracts.
 - Full `pnpm verify`, protected PR CI, exact-main deployment, live discovery and
@@ -95,3 +127,7 @@ authorize a new capability or provider change.
 - 2026-09-03 · Codex — proposed after comparing the current Family History
   implementation with proven contract-first and authority-tier patterns in the
   sibling Assist repositories.
+- 2026-09-03 · Codex — added the evidence-backed final 2026-07-28 protocol
+  delta: product-owned transport conformance checks, output schemas, complete
+  annotations, client-side issuer proof, and evidence-based legacy retention;
+  no new tool or authority is proposed.
