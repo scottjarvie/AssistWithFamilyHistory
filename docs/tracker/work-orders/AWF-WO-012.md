@@ -5,7 +5,7 @@ execution: active
 audit: not-audited
 cards: AWF-0046, AWF-0047, AWF-0048
 created: 2026-08-30
-updated: 2026-09-02
+updated: 2026-09-03
 proposed-by: Codex
 proposal-evidence: current origin/main MCP, grants, protected evidence, private Convex upload, FamilySearch boundary, tracker, Project Philosophy, family media standard, connector playbook, and success-scenario reconciliation
 ---
@@ -33,21 +33,25 @@ The full contract and copyable worker prompt are in
 - **Current:** namespaced workflow tools and aliases, person-approved grants,
   immediate revoke, protected batch evidence, person upload to private Convex
   Storage, review/rights/AI-use gates, and honest reference-only refusal.
-- **Implemented locally on the active branch:** a fail-closed two-bucket B2
+- **Merged and deployed:** a fail-closed two-bucket B2
   contract; exact private originals; three metadata-clean image renditions;
   version/hash/length/type/full-decode verification; durable replay-safe upload
   sessions; a same-origin relay; separate evidence-write consent; begin/finish
   MCP tools; person-only review handoff; structured camera/GPS proposals; and
   clean-rendition-only reads. Arbitrary server fetches of FamilySearch/media
   reference URLs were removed.
+- **Provider configured:** Backblaze contains exactly one project-private and
+  one project-public bucket with encryption and version retention, each using
+  a separate bucket-scoped key. Production Convex contains the bindings;
+  Vercel and source control do not contain the B2 secrets. A guarded production
+  action for byte/hash/read/delete verification is deployed but not yet run.
 - **Still partial:** person uploads remain on the legacy private Convex path;
   connected-AI uploads currently admit JPEG, PNG, and WebP only; PDFs,
   transcripts, audio, video, resumable multi-part batches, migration, provider
-  proof, deployment proof, real-byte proof, and named-client proof remain.
+  execution proof, real-upload proof, and named-client proof remain.
 - **Later in this active order:** finish the remaining media classes and batch
-  behavior, configure exactly one project-private and one project-public B2
-  bucket after provider inspection, and run the full marked media-to-story
-  acceptance/cleanup lifecycle.
+  behavior, then run the full marked media-to-story acceptance/cleanup
+  lifecycle.
 
 ## Sequence
 
@@ -114,6 +118,12 @@ retain the smallest separate gate described above. The desired provider shape
 is exactly two project-specific B2 buckets—one private and one public—not the
 generic four-bucket family example.
 
+On 2026-09-03 Scott explicitly authorized the Backblaze, Convex, and Vercel
+production work for this soft launch. That authorization was used only for the
+two Family History buckets, their corresponding restricted keys and Convex
+bindings, and normal reviewed deployment. The synthetic provider check's cloud
+object deletion still requires its separate action-time confirmation.
+
 ## Execution evidence
 
 On 2026-09-02 Codex fast-forwarded local `main` to `ac47339`, branched normally,
@@ -139,6 +149,19 @@ Vercel deployment `dpl_8d3HKVrShztuvfEYUZHRcWSp27LJ` completed successfully.
 The canonical homepage and OAuth resource metadata return 200, and the live AI
 guide publishes the evidence-write scope plus both upload tools. Provider-byte
 proof remains pending until Backblaze is configured.
+
+On 2026-09-03 Codex inventoried Backblaze, created exactly the private and
+public Family History buckets with default encryption and version retention,
+created separate read/write keys restricted to each bucket, and saved the
+masked production bindings in Convex only. Pull request #72 added an internal
+production-only provider checker that accepts only marked synthetic run keys,
+writes to each configured bucket, verifies exact length and SHA-256 on the
+stored version, and removes that exact version in a `finally` cleanup. Full
+local verification passed all 58 commands in 186 seconds; GitHub and Vercel PR
+checks passed; the merge is on main as `1f9c090`; post-merge main CI passed; and
+the production Convex function list exposes the checker. The final Run action
+and its byte/hash/cleanup receipt remain pending action-time deletion
+confirmation, so provider-byte success is not yet claimed.
 
 Read-only provider evidence: the signed-in Vercel account contains the retained
 `assistwithfamilyhistory` project, connected to this GitHub repository and the
@@ -178,3 +201,8 @@ corresponding runtime and retained evidence exist.
   #71; replacement Vercel/Convex production deployment completed, post-merge
   main CI passed verify plus route smoke tests, and public AI guidance exposed
   the new scope/tools. Backblaze bytes and named-client use remain unproved.
+- 2026-09-03 · Scott and Codex — Scott authorized the Family History provider,
+  Convex, and Vercel work; Codex created the isolated two-bucket topology and
+  restricted keys, bound production Convex, and merged/deployed the guarded
+  provider checker in pull request #72. Live execution remains pending the
+  separate confirmation required for its immediate cleanup deletion.
