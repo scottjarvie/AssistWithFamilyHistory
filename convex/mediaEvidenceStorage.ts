@@ -8,6 +8,7 @@ import { action, internalAction } from "./_generated/server";
 import {
   EvidenceB2Store,
   assertEvidenceBucketSeparation,
+  isEvidenceB2AccessDenied,
   loadEvidenceB2Config,
   sha256Hex,
 } from "../lib/media/evidenceB2";
@@ -88,6 +89,21 @@ async function verifyEvidenceStore(
   } finally {
     if (versionId) await store.deleteVersion(objectKey, versionId);
   }
+}
+
+async function verifyCredentialCannotListBucket(
+  source: EvidenceB2Store,
+  forbiddenBucket: string,
+  prefix: string,
+): Promise<true> {
+  const forbidden = new EvidenceB2Store({ ...source.config, bucket: forbiddenBucket });
+  try {
+    await forbidden.countVersionEntries(prefix);
+  } catch (error) {
+    if (isEvidenceB2AccessDenied(error)) return true;
+    throw error;
+  }
+  throw new Error(`${source.config.bucketClass} B2 credential unexpectedly listed the other bucket.`);
 }
 
 function publicOrigin(): string {
@@ -211,10 +227,31 @@ export const verifyEvidenceStorageProvider = internalAction({
         bytes,
       ));
     }
+    const residueCounts = {
+      private: await stores.private.countVersionEntries(objectRoot),
+      public: await stores.public.countVersionEntries(objectRoot),
+    };
+    if (residueCounts.private !== 0 || residueCounts.public !== 0) {
+      throw new Error("B2 probe cleanup left a marked synthetic version.");
+    }
+    const credentialIsolationVerified = {
+      privateCannotListPublic: await verifyCredentialCannotListBucket(
+        stores.private,
+        stores.public.config.bucket,
+        objectRoot,
+      ),
+      publicCannotListPrivate: await verifyCredentialCannotListBucket(
+        stores.public,
+        stores.private.config.bucket,
+        objectRoot,
+      ),
+    };
     return {
       ok: true as const,
       environment: stores.private.config.environment,
       bucketSeparationVerified: stores.private.config.bucket !== stores.public.config.bucket,
+      credentialIsolationVerified,
+      residueCounts,
       results,
     };
   },
