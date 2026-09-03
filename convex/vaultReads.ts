@@ -1,3 +1,5 @@
+"use node";
+
 import type {
   ApiFromModules,
   FilterApi,
@@ -9,6 +11,7 @@ import { internal } from "./_generated/api";
 import { action, type ActionCtx } from "./_generated/server";
 import { authorizeTenantAction, type TrustBoundaryShadowEntry } from "./access";
 import type * as vaultFunctions from "./vault";
+import { EvidenceB2Store, loadEvidenceB2Config } from "../lib/media/evidenceB2";
 
 type VaultInternalApi = FilterApi<
   ApiFromModules<{ vault: typeof vaultFunctions }>,
@@ -33,6 +36,13 @@ const storyWorkflowValidator = v.union(
   v.literal("ready_to_review"),
   v.literal("published"),
 );
+
+type OwnedMediaFileResponse = {
+  url: string;
+  mimeType: string;
+  title: string;
+  sizeBytes: number | null;
+} | null;
 
 async function authorizedOwner(ctx: ActionCtx, functionName: string, suppliedOwner: string) {
   const decision = await authorizeTenantAction(
@@ -78,11 +88,26 @@ export const getPersonWorkspace = action({
 
 export const getOwnedMediaFile = action({
   args: { vaultOwnerId: v.string(), mediaId: v.string() },
-  handler: async (ctx, args): Promise<FunctionReturnType<typeof vaultInternal.getOwnedMediaFile>> =>
-    ctx.runQuery(vaultInternal.getOwnedMediaFile, {
+  handler: async (
+    ctx,
+    args,
+  ): Promise<OwnedMediaFileResponse> => {
+    const file = await ctx.runQuery(vaultInternal.getOwnedMediaFile, {
       ...args,
       vaultOwnerId: await authorizedOwner(ctx, "vault.getOwnedMediaFile", args.vaultOwnerId),
-    }),
+    });
+    if (!file || !("b2" in file) || !file.b2) return file;
+    const config = loadEvidenceB2Config("private");
+    if (file.b2.bucketClass !== "private" || file.b2.bucketName !== config.bucket) {
+      throw new Error("Evidence manifest does not match the configured private bucket.");
+    }
+    return {
+      url: await new EvidenceB2Store(config).signGet(file.b2.objectKey, file.b2.versionId),
+      mimeType: file.mimeType,
+      title: file.title,
+      sizeBytes: file.sizeBytes,
+    };
+  },
 });
 
 export const getStoriesIndex = action({

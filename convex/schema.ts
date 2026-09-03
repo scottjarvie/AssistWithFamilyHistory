@@ -595,6 +595,87 @@ export default defineSchema({
     url: v.optional(v.string()),
     mimeType: v.optional(v.string()),
     sizeBytes: v.optional(v.number()),
+    // New B2 evidence rows pin exact provider versions. `storageId` above is
+    // retained only for pre-migration Convex objects; no new B2 path silently
+    // falls back to it.
+    mediaState: v.optional(v.union(
+      v.literal("authorized"),
+      v.literal("uploaded"),
+      v.literal("ready"),
+      v.literal("failed"),
+      v.literal("deleting"),
+      v.literal("deleted"),
+    )),
+    renditionState: v.optional(v.union(
+      v.literal("pending"),
+      v.literal("ready"),
+      v.literal("failed"),
+    )),
+    uploadSessionRef: v.optional(v.string()),
+    b2Original: v.optional(v.object({
+      bucketClass: v.union(v.literal("private"), v.literal("public")),
+      bucketName: v.string(),
+      objectKey: v.string(),
+      versionId: v.string(),
+      sha256: v.string(),
+      contentType: v.string(),
+      sizeBytes: v.number(),
+      width: v.optional(v.number()),
+      height: v.optional(v.number()),
+      metadataClean: v.boolean(),
+      verifiedAt: v.string(),
+      transformation: v.optional(v.string()),
+      sourceSha256: v.optional(v.string()),
+    })),
+    b2Renditions: v.optional(v.object({
+      tiny: v.object({
+        bucketClass: v.union(v.literal("private"), v.literal("public")),
+        bucketName: v.string(), objectKey: v.string(), versionId: v.string(), sha256: v.string(),
+        contentType: v.string(), sizeBytes: v.number(), width: v.optional(v.number()), height: v.optional(v.number()),
+        metadataClean: v.boolean(), verifiedAt: v.string(), transformation: v.optional(v.string()), sourceSha256: v.optional(v.string()),
+      }),
+      medium: v.object({
+        bucketClass: v.union(v.literal("private"), v.literal("public")),
+        bucketName: v.string(), objectKey: v.string(), versionId: v.string(), sha256: v.string(),
+        contentType: v.string(), sizeBytes: v.number(), width: v.optional(v.number()), height: v.optional(v.number()),
+        metadataClean: v.boolean(), verifiedAt: v.string(), transformation: v.optional(v.string()), sourceSha256: v.optional(v.string()),
+      }),
+      large: v.object({
+        bucketClass: v.union(v.literal("private"), v.literal("public")),
+        bucketName: v.string(), objectKey: v.string(), versionId: v.string(), sha256: v.string(),
+        contentType: v.string(), sizeBytes: v.number(), width: v.optional(v.number()), height: v.optional(v.number()),
+        metadataClean: v.boolean(), verifiedAt: v.string(), transformation: v.optional(v.string()), sourceSha256: v.optional(v.string()),
+      }),
+    })),
+    metadataProposal: v.optional(v.object({
+      temporal: v.object({
+        cameraCaptureTime: v.optional(v.string()),
+        scanTime: v.optional(v.string()),
+        fileModifiedTime: v.optional(v.string()),
+        uploadTime: v.string(),
+        inferredHistoricalEventDate: v.optional(v.string()),
+      }),
+      location: v.optional(v.object({
+        latitude: v.number(),
+        longitude: v.number(),
+        source: v.literal("embedded_gps"),
+        status: v.literal("proposed"),
+        association: v.union(v.literal("person_media"), v.literal("event"), v.literal("place")),
+        precision: v.literal("exact_private"),
+        disclosurePrecision: v.union(v.literal("withheld"), v.literal("locality"), v.literal("region")),
+      })),
+      extractedFromOriginalSha256: v.string(),
+      extractedAt: v.string(),
+      reversible: v.literal(true),
+      decision: v.union(v.literal("pending"), v.literal("accepted"), v.literal("declined")),
+      acceptedAt: v.optional(v.string()),
+      declinedAt: v.optional(v.string()),
+    })),
+    recordedVia: v.optional(v.object({
+      actorKind: v.union(v.literal("person"), v.literal("chosen_ai"), v.literal("migration")),
+      clientName: v.optional(v.string()),
+      grantId: v.optional(v.id("mcpGrants")),
+    })),
     
     // Date
     date: v.optional(
@@ -652,6 +733,50 @@ export default defineSchema({
     .index("by_source", ["sourceId"])
     .index("by_import_key", ["importKey"])
     .index("by_familySearchUrl", ["familySearchUrl"]),
+
+  /**
+   * Durable, replay-safe authorization for one exact evidence object.
+   * The row contains no bearer URL and no provider credential. Its opaque key
+   * and token hash let the same-origin relay re-resolve every authority fact.
+   */
+  mediaUploadSessions: defineTable({
+    vaultOwnerId: v.string(),
+    ref: v.string(),
+    sourceKind: v.union(v.literal("person"), v.literal("chosen_ai"), v.literal("migration")),
+    state: v.union(
+      v.literal("authorized"),
+      v.literal("uploaded"),
+      v.literal("ready"),
+      v.literal("failed"),
+      v.literal("expired"),
+    ),
+    grantId: v.optional(v.id("mcpGrants")),
+    clientId: v.optional(v.string()),
+    operationId: v.string(),
+    requestHash: v.string(),
+    title: v.string(),
+    description: v.optional(v.string()),
+    fileName: v.string(),
+    personIds: v.array(v.id("persons")),
+    sourceId: v.optional(v.id("sources")),
+    declaredContentType: v.string(),
+    declaredSizeBytes: v.number(),
+    expectedSha256: v.string(),
+    objectKey: v.string(),
+    relayTokenHash: v.string(),
+    fileModifiedTime: v.optional(v.string()),
+    scanTime: v.optional(v.string()),
+    inferredHistoricalEventDate: v.optional(v.string()),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+    finalizedAt: v.optional(v.number()),
+    failedAt: v.optional(v.number()),
+    failureCode: v.optional(v.string()),
+    mediaId: v.optional(v.id("media")),
+  })
+    .index("by_owner_ref", ["vaultOwnerId", "ref"])
+    .index("by_owner_operation", ["vaultOwnerId", "operationId"])
+    .index("by_ref", ["ref"]),
 
   /**
    * CONTEXT ITEMS

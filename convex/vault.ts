@@ -1560,7 +1560,16 @@ export const getOwnedMediaFile = internalQuery({
     const row = id ? await ctx.db.get(id) : null;
     // One shape for "no such item" and "someone else's item" — a media route
     // must never work as an existence oracle for another person's vault.
-    if (!row || !matchesVaultOwner(row.vaultOwnerId, owner) || !row.storageId) return null;
+    if (!row || !matchesVaultOwner(row.vaultOwnerId, owner)) return null;
+    if (row.mediaState === "ready" && row.b2Renditions?.medium) {
+      return {
+        b2: row.b2Renditions.medium,
+        mimeType: row.b2Renditions.medium.contentType,
+        title: row.title,
+        sizeBytes: row.b2Renditions.medium.sizeBytes,
+      };
+    }
+    if (!row.storageId) return null;
     const url = await ctx.storage.getUrl(row.storageId);
     if (!url) return null;
     return {

@@ -124,14 +124,14 @@ describe("stateless Family History MCP transport", () => {
    * dangerous field ever coming back.
    */
   describe("the product scope vocabulary is discoverable without instructing a client", () => {
-    test("publishes the six enforced permissions under the vendor-prefixed key", async () => {
+    test("publishes the seven enforced permissions under the vendor-prefixed key", async () => {
       const t = convexTest(schema, modules);
       const metadata = await t.fetch("/.well-known/oauth-protected-resource/mcp");
       const document = (await metadata.json()) as Record<string, unknown>;
 
       const published = document["x-assistwithfamilyhistory.productScopes"];
       expect(published).toEqual([...FAMILY_HISTORY_SCOPES]);
-      expect(published).toHaveLength(6);
+      expect(published).toHaveLength(7);
       // Nothing outside the ceiling may be published, ever. A published scope
       // with no tool and no code path is a promise the server cannot keep.
       for (const scope of published as string[]) {

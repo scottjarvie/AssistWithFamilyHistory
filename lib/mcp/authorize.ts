@@ -206,6 +206,16 @@ export function namedRecordsInInput(toolName: string, input: unknown): NamedReco
       // useless the moment one item was out of bounds.
       break;
     }
+    case "family_history_begin_evidence_upload": {
+      pushId(found.personIds, args.personId);
+      break;
+    }
+    case "family_history_finish_evidence_upload": {
+      // The opaque upload reference is re-resolved to the grant and person in
+      // Convex. Treating it as a person id here would make selected-person
+      // grants unusable; the data layer performs the authoritative re-check.
+      break;
+    }
     case "family_history_save_person": {
       pushId(found.personIds, args.personId);
       break;

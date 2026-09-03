@@ -48,7 +48,7 @@ function walk(dir: string): string[] {
 
 for (const root of ROOTS) {
   for (const file of walk(root)) {
-    const rel = path.relative(process.cwd(), file);
+    const rel = path.relative(process.cwd(), file).replaceAll("\\", "/");
     if (ALLOWLIST.has(rel)) continue;
     const source = readFileSync(file, "utf8");
     source.split("\n").forEach((line, index) => {

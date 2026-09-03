@@ -41,6 +41,16 @@ const PUBLIC_QUERY_ALLOWLIST: Record<string, string> = {
 // An entry here bypasses the authorizeTenantMutation requirement.
 const PUBLIC_MUTATION_SYSTEM_ALLOWLIST: Record<string, string> = {};
 
+// Public bearer-capability actions are exceptional. They must accept an opaque,
+// short-lived capability instead of an owner coordinate, resolve all tenant
+// authority server-side, and return a uniform refusal. This allowlist exists so
+// that such a route is visible and reviewed instead of pretending a Clerk
+// session is available where the protocol deliberately has none.
+const PUBLIC_ACTION_CAPABILITY_ALLOWLIST: Record<string, string> = {
+  "mediaEvidenceStorage.authorizeMcpEvidenceRelay":
+    "Resolves a short-lived hashed relay capability to one checksum-bound upload; accepts no owner or record coordinate.",
+};
+
 const GENERATED_SERVER_MODULE = "./_generated/server";
 const PUBLIC_BUILDERS = new Set<PublicFunctionKind>(["query", "mutation", "action"]);
 const convexDir = path.join(process.cwd(), "convex");
@@ -258,6 +268,7 @@ function validateAllowlist(name: string, entries: Record<string, string>) {
 
 validateAllowlist("PUBLIC_QUERY_ALLOWLIST", PUBLIC_QUERY_ALLOWLIST);
 validateAllowlist("PUBLIC_MUTATION_SYSTEM_ALLOWLIST", PUBLIC_MUTATION_SYSTEM_ALLOWLIST);
+validateAllowlist("PUBLIC_ACTION_CAPABILITY_ALLOWLIST", PUBLIC_ACTION_CAPABILITY_ALLOWLIST);
 
 const sourceFiles = readdirSync(convexDir, { withFileTypes: true })
   .filter(
@@ -352,6 +363,8 @@ for (const entry of inventory) {
   const requiredGuard = entry.kind === "action" ? "authorizeTenantAction" : "authorizeTenantMutation";
   const isSystemAllowlisted =
     entry.kind === "mutation" && Boolean(PUBLIC_MUTATION_SYSTEM_ALLOWLIST[entry.key]);
+  const isCapabilityAllowlisted =
+    entry.kind === "action" && Boolean(PUBLIC_ACTION_CAPABILITY_ALLOWLIST[entry.key]);
 
   const callsVerifiedActionHelper =
     entry.kind === "action" &&
@@ -359,6 +372,7 @@ for (const entry of inventory) {
 
   if (
     !isSystemAllowlisted &&
+    !isCapabilityAllowlisted &&
     !containsCall(handler, requiredGuard) &&
     !callsVerifiedActionHelper
   ) {
@@ -372,7 +386,7 @@ for (const entry of inventory) {
     continue;
   }
 
-  if (!isSystemAllowlisted) {
+  if (!isSystemAllowlisted && !isCapabilityAllowlisted) {
     const acceptedGuards = new Set([
       requiredGuard,
       ...(entry.kind === "action" ? [...entry.verifiedActionHelpers] : []),

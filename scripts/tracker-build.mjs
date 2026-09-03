@@ -62,8 +62,12 @@ const STATUSES = [
   ["done", "Done"],
 ];
 
+function normalizeNewlines(value) {
+  return value.replace(/\r\n?/g, "\n");
+}
+
 function parseFrontmatter(raw, file) {
-  const m = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+  const m = normalizeNewlines(raw).match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
   if (!m) throw new Error(`${file}: missing frontmatter`);
   const meta = { file };
   for (const line of m[1].split("\n")) {
@@ -121,6 +125,7 @@ function inline(s) {
     .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2">$1</a>');
 }
 function md(src) {
+  src = normalizeNewlines(src);
   const out = [];
   let list = null;
   let paragraph = [];

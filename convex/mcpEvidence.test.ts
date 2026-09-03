@@ -106,18 +106,18 @@ describe("evidence gating", () => {
     for (const row of result.skipped) expect(row.whatToDo.length).toBeGreaterThan(20);
   });
 
-  test("a reviewed, allowed item with a fetchable URL is offered for protected delivery, never as a link", async () => {
+  test("a reviewed remote reference stays user-mediated instead of becoming a server fetch", async () => {
     const t = convexTest(schema, modules);
     const grantId = await seedGrant(t, { vaultOwnerId: OWNER });
     const person = await seedPerson(t, OWNER);
     const allowed = await seedMedia(t, OWNER, [person], {});
 
     const result = await batch(t, grantId, [{ kind: "media", id: String(allowed) }]);
-    expect(result.fetchable).toHaveLength(1);
-    expect(result.skipped).toHaveLength(0);
-    // The URL exists only inside the server, for the transport to fetch. The
-    // model-facing shape the transport builds never contains it.
-    expect(result.fetchable[0].url).toContain("https://");
+    expect(result.fetchable).toHaveLength(0);
+    expect(result.skipped).toEqual([
+      expect.objectContaining({ reason: "BYTES_NOT_AVAILABLE" }),
+    ]);
+    expect(JSON.stringify(result)).not.toContain("media.example.test");
   });
 
   test("a media row with no fetchable bytes is honest about it instead of pretending", async () => {
@@ -296,9 +296,11 @@ describe("evidence respects the grant", () => {
       { kind: "media", id: String(insideMedia) },
       { kind: "media", id: String(outsideMedia) },
     ]);
-    expect(result.fetchable).toHaveLength(1);
-    expect(result.fetchable[0].id).toBe(String(insideMedia));
-    expect(result.skipped[0].reason).toBe("OUTSIDE_GRANT_BOUNDARY");
+    expect(result.fetchable).toHaveLength(0);
+    expect(result.skipped).toEqual([
+      expect.objectContaining({ id: String(insideMedia), reason: "BYTES_NOT_AVAILABLE" }),
+      expect.objectContaining({ id: String(outsideMedia), reason: "OUTSIDE_GRANT_BOUNDARY" }),
+    ]);
   });
 
   test("another owner's evidence and an invented id are indistinguishable", async () => {

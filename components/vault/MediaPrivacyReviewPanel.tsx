@@ -19,6 +19,8 @@ type MediaItem = {
   type: string;
   url?: string;
   storageId?: string;
+  b2Original?: { sha256: string };
+  b2Renditions?: { medium: { contentType: string } };
   sizeBytes?: number;
   description?: string;
   familySearchUrl?: string;
@@ -27,6 +29,22 @@ type MediaItem = {
   rightsStatus?: "unknown" | "owned" | "permitted" | "public_domain" | "restricted";
   aiUseAllowed?: boolean;
   privacyReviewNote?: string;
+  metadataProposal?: {
+    temporal: {
+      cameraCaptureTime?: string;
+      scanTime?: string;
+      fileModifiedTime?: string;
+      uploadTime: string;
+      inferredHistoricalEventDate?: string;
+    };
+    location?: {
+      latitude: number;
+      longitude: number;
+      association: "person_media" | "event" | "place";
+      disclosurePrecision: "withheld" | "locality" | "region";
+    };
+    decision: "pending" | "accepted" | "declined";
+  };
 };
 
 /**
@@ -81,6 +99,7 @@ export function MediaPrivacyReviewPanel({
           rightsStatus: item.rightsStatus ?? "unknown",
           aiUseAllowed: item.aiUseAllowed === true,
           privacyReviewNote: item.privacyReviewNote ?? "",
+          metadataDecision: item.metadataProposal?.decision ?? "pending",
         },
       ])
     )
@@ -157,7 +176,7 @@ export function MediaPrivacyReviewPanel({
             // reference that only this browser can follow — worth saying out
             // loud, because it is exactly the difference between an AI being
             // able to read the record and only being able to cite its title.
-            const held = Boolean(item.storageId);
+            const held = Boolean(item.storageId || item.b2Renditions?.medium);
             const previewSrc = held
               ? `/api/media/${item._id}/file`
               : item.url;
@@ -220,6 +239,36 @@ export function MediaPrivacyReviewPanel({
                   </div>
 
                   {item.description ? <p className="text-sm text-stone-600">{item.description}</p> : null}
+
+                  {item.metadataProposal ? (
+                    <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-stone-700">
+                      <p className="font-medium text-stone-900">Proposed metadata evidence</p>
+                      {item.metadataProposal.temporal.cameraCaptureTime ? (
+                        <p>Camera capture time: {item.metadataProposal.temporal.cameraCaptureTime}</p>
+                      ) : null}
+                      {item.metadataProposal.temporal.scanTime ? <p>Scan time: {item.metadataProposal.temporal.scanTime}</p> : null}
+                      {item.metadataProposal.temporal.fileModifiedTime ? <p>File-modified time: {item.metadataProposal.temporal.fileModifiedTime}</p> : null}
+                      <p>Vault upload time: {item.metadataProposal.temporal.uploadTime}</p>
+                      {item.metadataProposal.temporal.inferredHistoricalEventDate ? (
+                        <p>Inferred historical event date: {item.metadataProposal.temporal.inferredHistoricalEventDate}</p>
+                      ) : null}
+                      {item.metadataProposal.location ? (
+                        <p>
+                          Embedded GPS: {item.metadataProposal.location.latitude.toFixed(5)}, {item.metadataProposal.location.longitude.toFixed(5)}.
+                          Default association: this person&apos;s media. Disclosure remains withheld.
+                        </p>
+                      ) : null}
+                      <FieldSelect
+                        label="Metadata proposal"
+                        value={draft.metadataDecision}
+                        options={["pending", "accepted", "declined"]}
+                        onChange={(value) => updateDraft(item._id, { metadataDecision: value as typeof draft.metadataDecision })}
+                      />
+                      <p className="text-xs text-stone-600">
+                        Accepting this proposal does not publish a coordinate or turn a camera/scan time into a historical event date.
+                      </p>
+                    </div>
+                  ) : null}
 
                   <div className="grid gap-3 sm:grid-cols-2">
                     <FieldSelect

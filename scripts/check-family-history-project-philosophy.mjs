@@ -45,11 +45,12 @@ if (!existsSync(sourcePath) || !existsSync(outputPath)) {
   process.exit(1);
 }
 
-const [source, html, trackerMetadataRaw] = await Promise.all([
+const [sourceRaw, html, trackerMetadataRaw] = await Promise.all([
   readFile(sourcePath, "utf8"),
   readFile(outputPath, "utf8"),
   readFile(trackerMetadataPath, "utf8"),
 ]);
+const source = sourceRaw.replace(/\r\n?/g, "\n");
 const trackerMetadata = JSON.parse(trackerMetadataRaw);
 const familyCore = trackerMetadata.familyCore;
 const digest = createHash("sha256").update(source).digest("hex");

@@ -12,9 +12,10 @@
  *    a scanned census page reaches a model as image bytes and no link is ever
  *    minted. This is the path a person's own upload takes.
  * 2. **Documents** — person document text, which genuinely lives in Convex.
- * 3. **Remote references** (`url`) — usually a FamilySearch memory. These load
- *    in the person's signed-in browser and generally nowhere else, so the
- *    server attempts one fetch and reports honestly when it fails.
+ * 3. **Remote references** (`url`) — usually a FamilySearch memory. These stay
+ *    user-mediated. The server does not fetch arbitrary record URLs; the item
+ *    reports honestly that its bytes are unavailable until the person uploads
+ *    them through the vault.
  *
  * `BYTES_NOT_AVAILABLE` still exists, and still means what it says: a row that
  * holds only a `filePath` hint, or a remote reference the server cannot read,
@@ -122,12 +123,12 @@ export const getEvidenceBatch = internalQuery({
       storageId: string;
       sizeBytes: number | null;
     }> = [];
-    const fetchable: Array<{
+    const b2Stored: Array<{
       id: string;
       kind: string;
       title: string;
       mimeType: string;
-      url: string;
+      sizeBytes: number;
     }> = [];
     const skipped: Skip[] = [];
 
@@ -161,6 +162,21 @@ export const getEvidenceBatch = internalQuery({
           skipped.push(skip(item.id, item.kind, "RIGHTS_RESTRICTED"));
           continue;
         }
+        if (row.mediaState === "ready" && row.b2Renditions?.medium) {
+          const rendition = row.b2Renditions.medium;
+          if (rendition.sizeBytes > FAMILY_HISTORY_MCP_LIMITS.evidencePerItemBytes) {
+            skipped.push(skip(item.id, item.kind, "TOO_LARGE"));
+            continue;
+          }
+          b2Stored.push({
+            id: String(row._id),
+            kind: "media",
+            title: row.title,
+            mimeType: rendition.contentType,
+            sizeBytes: rendition.sizeBytes,
+          });
+          continue;
+        }
         if (row.storageId) {
           // A file the vault holds. Refuse it here rather than spending the
           // transport's budget on an object we already know is over the cap.
@@ -181,17 +197,10 @@ export const getEvidenceBatch = internalQuery({
           });
           continue;
         }
-        if (!row.url || !/^https:\/\//i.test(row.url)) {
-          skipped.push(skip(item.id, item.kind, "BYTES_NOT_AVAILABLE"));
-          continue;
-        }
-        fetchable.push({
-          id: String(row._id),
-          kind: "media",
-          title: row.title,
-          mimeType: row.mimeType ?? "application/octet-stream",
-          url: row.url,
-        });
+        // FamilySearch/private provider references remain browser-mediated.
+        // Fetching a caller-controlled remote URL here would create an SSRF
+        // path and would blur reference metadata into bytes the vault holds.
+        skipped.push(skip(item.id, item.kind, "BYTES_NOT_AVAILABLE"));
         continue;
       }
 
@@ -244,6 +253,8 @@ export const getEvidenceBatch = internalQuery({
       }
     }
 
-    return { delivered, stored, fetchable, skipped };
+    // Kept as an always-empty field for old internal consumers while the
+    // former arbitrary remote-fetch path is retired.
+    return { delivered, stored, b2Stored, fetchable: [] as never[], skipped };
   },
 });

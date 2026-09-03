@@ -282,6 +282,21 @@
       "notes": "Streams a stored media file to its owner. The signed storage URL is resolved server-side and never returned. A missing item and another owner's item both answer 404. An AI reaches media through family_history_get_evidence, never this route."
     },
     {
+      "route": "/api/mcp-media-upload/[uploadRef]/[token]",
+      "methods": [
+        "PUT"
+      ],
+      "capability": "mcp_private_evidence_byte_relay",
+      "environment": "mcp-first-party-relay",
+      "agentSupport": "guarded-write",
+      "reviewLevel": "opaque-session-capability",
+      "risk": "high",
+      "scopes": [
+        "family_history:evidence:write"
+      ],
+      "notes": "Relays one exact JPEG, PNG, or WebP upload. The caller supplies only an opaque short-lived bearer capability and bytes; Convex resolves owner, grant-bound session, key, type, length, and SHA-256. The provider URL is consumed server-to-server and never returned. Invalid, expired, revoked, reused, and cross-owner capabilities share one 404 shape."
+    },
+    {
       "route": "/api/media/upload",
       "methods": [
         "POST"
@@ -309,7 +324,7 @@
       "scopes": [
         "trusted_operator"
       ],
-      "notes": "Updates privacy, review, rights, AI-use, and review notes. AI use requires reviewed, non-private media with usable rights."
+      "notes": "Updates privacy, review, rights, AI-use, proposed date/location decision, and review notes. AI use requires reviewed media with usable rights but may remain private. Metadata acceptance never publishes a coordinate."
     },
     {
       "route": "/api/operations/checks",

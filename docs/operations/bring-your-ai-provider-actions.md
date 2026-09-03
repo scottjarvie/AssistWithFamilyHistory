@@ -1,5 +1,67 @@
 # Bring Your AI — provider actions
 
+## 2026-09-02 media evidence gate — what only Scott can do next
+
+The active media branch adds source code for a private B2 image path and two
+new MCP upload tools. It is **not deployed or provider-configured**. The live
+fourteen-tool/six-permission statements later in this file remain correct for
+the currently observed deployment; the branch will publish sixteen tools and
+seven product permissions only after its normal PR, CI, Convex-first Vercel
+build, and live proof all pass.
+
+Read-only audit on 2026-09-02 established three facts without reading any
+secret value:
+
+- The Vercel account has a project named `assistwithfamilyhistory`, but its
+  project variable names are Clerk/Convex/site bindings only. No B2 media
+  binding exists there.
+- The retained project is connected to
+  `scottjarvie/AssistWithFamilyHistory` and `assistwithfamilyhistory.com`; the
+  team-domain page reports Vercel CDN active. The overview's Production
+  Deployment card did not expose a deployment row during this audit, so use
+  the next normal PR plus Git-triggered build as the release proof rather than
+  trying to create or reconnect another project.
+- Backblaze opened at Sign In, so no Family History bucket or application-key
+  inventory was possible. Do not create buckets or keys until the signed-in
+  inventory proves whether suitable project-specific resources already exist.
+
+The smallest safe human sequence is:
+
+1. Sign in to Backblaze in the retained browser session. Inventory bucket
+   names, privacy class, lifecycle/version settings, encryption posture, CORS,
+   and bucket-scoped application-key names. Share names and non-secret settings
+   only; never paste key material into chat or tracker.
+2. Reuse suitable Family History resources if they already exist. Otherwise
+   create exactly one project-specific **Private** bucket and one separate
+   project-specific **Public** bucket. The public bucket is reserved and gets
+   no product write until a later human publication program. Do not reuse a
+   sibling product bucket and do not instantiate the generic four-bucket
+   example.
+3. Create or reuse least-privilege bucket-scoped credentials. The private
+   runtime needs list/read/write/delete-version capability for only the private
+   bucket; the public credential must be separate and scoped only to the public
+   bucket. Record the key names and scopes, never the values.
+4. Put `MEDIA_STORAGE_ENVIRONMENT=production`, both `B2_PRIVATE_*` and
+   `B2_PUBLIC_*` binding sets, and
+   `MCP_PUBLIC_ORIGIN=https://assistwithfamilyhistory.com` on the confirmed
+   production Convex deployment `accomplished-dodo-308`. The current
+   architecture signs and verifies B2 inside Convex; do not duplicate B2
+   secrets into Vercel unless source changes make Vercel a signer.
+5. In Vercel, keep the confirmed retained project, Git connection, and domain
+   attachment. A normal merge to `main` is the release path; do not press a
+   manual deployment button and do not run a bare `convex deploy`.
+6. Clerk needs no new OAuth identity scope. `family_history:evidence:write` is
+   a product grant displayed in Family History, not a Clerk scope. Existing
+   connections do not gain it silently; the person must deliberately add it.
+7. Before real family data, use a marked public-domain or synthetic deceased-
+   ancestor image. Prove begin → same-origin PUT → finish → private review →
+   clean rendition read → revoke/replay → exact version cleanup. Only then
+   consider a real item, and keep living-person material out of the first run.
+
+For Claude or another network-restricted client, allow only the exact product
+hostname. After changing Claude's allowlist, start a **new conversation**; an
+existing conversation retains the old network policy.
+
 > Status: reconciled against live production probes, 2026-08-17.
 >
 > **✅ The release is deployed.** The AWF-WO-011 code is running on

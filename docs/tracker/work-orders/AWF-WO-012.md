@@ -1,11 +1,11 @@
 ---
 id: AWF-WO-012
 title: Carry private family evidence safely between the person and their chosen AI
-execution: proposed
+execution: active
 audit: not-audited
 cards: AWF-0046, AWF-0047, AWF-0048
 created: 2026-08-30
-updated: 2026-08-30
+updated: 2026-09-02
 proposed-by: Codex
 proposal-evidence: current origin/main MCP, grants, protected evidence, private Convex upload, FamilySearch boundary, tracker, Project Philosophy, family media standard, connector playbook, and success-scenario reconciliation
 ---
@@ -33,10 +33,21 @@ The full contract and copyable worker prompt are in
 - **Current:** namespaced workflow tools and aliases, person-approved grants,
   immediate revoke, protected batch evidence, person upload to private Convex
   Storage, review/rights/AI-use gates, and honest reference-only refusal.
-- **Partial:** complete named-AI lifecycle; B2 exact manifests and safe
-  renditions; connected-AI upload; provider and real-byte proof for that path.
-- **Later in this proposal:** private B2 evidence foundation, direct upload,
-  person-review handoff, and full media-to-story acceptance/cleanup.
+- **Implemented locally on the active branch:** a fail-closed two-bucket B2
+  contract; exact private originals; three metadata-clean image renditions;
+  version/hash/length/type/full-decode verification; durable replay-safe upload
+  sessions; a same-origin relay; separate evidence-write consent; begin/finish
+  MCP tools; person-only review handoff; structured camera/GPS proposals; and
+  clean-rendition-only reads. Arbitrary server fetches of FamilySearch/media
+  reference URLs were removed.
+- **Still partial:** person uploads remain on the legacy private Convex path;
+  connected-AI uploads currently admit JPEG, PNG, and WebP only; PDFs,
+  transcripts, audio, video, resumable multi-part batches, migration, provider
+  proof, deployment proof, real-byte proof, and named-client proof remain.
+- **Later in this active order:** finish the remaining media classes and batch
+  behavior, configure exactly one project-private and one project-public B2
+  bucket after provider inspection, and run the full marked media-to-story
+  acceptance/cleanup lifecycle.
 
 ## Sequence
 
@@ -55,7 +66,8 @@ commit outside its manifest. AWF-0048 is the integrated proof gate.
 - Family History Project Philosophy, ancestor-vault architecture, tracker
   Guide, and user-mediated FamilySearch capture/runbooks.
 - AWF-WO-011, AWF-0041, and AWF-0045.
-- Family standards at `assist-with-life` commit `ee63aaf`.
+- Family standards at `assist-with-life` commit `6d256fb`, including media
+  standard v1.4, the MCP connector playbook v1.9, and the September lessons.
 - Existing protected PR/CI, Convex/Vercel, provider, synthetic fixture, and
   cleanup paths.
 
@@ -67,12 +79,14 @@ commit outside its manifest. AWF-0048 is the integrated proof gate.
   publication, export, permanent delete, or outside-world/provider action.
 - No generic CRUD, caller-supplied owner coordinate, public-storage fallback,
   or current-file migration without a separate approved program.
-- This Proposed Work Order authorizes no bucket, key, secret, provider,
+- This Active Work Order authorizes no bucket, key, secret, provider,
   billing, DNS, production data, deployment, or named-client claim.
 
 ## Stop rules
 
-Scott moves this Work Order to Ready before implementation. Stop again before
+Scott approved continuing this media/MCP alignment program through the
+2026-09-02 owner delegation. That satisfied the implementation gate and this
+order is Active. Stop again before
 provider/security posture, secrets, billing, DNS, production data, migration,
 deployment, public/trusted/unlisted visibility, or real-client setup not
 explicitly authorized. Routine architecture, additive schema, implementation,
@@ -93,18 +107,37 @@ PR mechanics belong to the executor after Ready.
 
 ## Human gates
 
-Scott's first gate is moving this proposal to Ready. Provider topology or
-credentials, billing, DNS, production data, migration execution, deployment,
+The implementation scope is approved. Provider topology or credentials,
+billing, DNS, production data, migration execution, deployment,
 public/trusted/unlisted visibility, and a real named-client connection each
-retain the smallest separate gate described above.
+retain the smallest separate gate described above. The desired provider shape
+is exactly two project-specific B2 buckets—one private and one public—not the
+generic four-bucket family example.
 
 ## Execution evidence
 
-Planning only. Current `origin/main`, the Project Philosophy and durable vault/
-FamilySearch docs, tracker, MCP/grants/evidence/private-upload source, and the
-pinned family standards were reconciled in an isolated worktree. No
-application, provider, secret, deployment, migration, production-data, or
-client state changed.
+On 2026-09-02 Codex fast-forwarded local `main` to `ac47339`, branched normally,
+reconciled the Project Philosophy/tracker/stable runbooks and the family
+standards at `assist-with-life` `6d256fb`, and audited current code before
+editing. The local implementation listed above has completed its local
+verification rung.
+
+Local verification now passes TypeScript, lint with no errors, the 107-test
+vault/privacy/story regression suite, the 189-test Convex suite, the eight-test
+media storage suite, production build, tracker parity, and the MCP, trust-
+boundary, protected-route, client-auth, API-inventory, media-byte, review-gate,
+connection-center, public-AI-truth, owner-table, and Convex-visibility contracts.
+No deployed or provider-backed proof is implied by those local results.
+
+Read-only provider evidence: the signed-in Vercel account contains the retained
+`assistwithfamilyhistory` project, connected to this GitHub repository and the
+active `assistwithfamilyhistory.com` Vercel CDN/domain. Its project
+environment-variable list contains Clerk/Convex/site bindings only—no B2 media
+bindings. The overview's Production Deployment card exposed no deployment row
+during this audit. Backblaze opened at its sign-in page, so bucket/key inventory
+could not be verified. No bucket, key, secret,
+environment value, deployment, DNS, production row, real family byte, or
+named-client state was created or changed.
 
 ## Tracker update and handoff
 
@@ -118,3 +151,11 @@ corresponding runtime and retained evidence exist.
   MCP adoption program from current `origin/main`; documentation/tracker only,
   with no application, provider, secret, deploy, migration, or production-data
   change.
+- 2026-09-02 · Scott via owner delegation — approved continuing the Family
+  History media/MCP alignment program while preserving the separate provider,
+  secret, deployment, domain, production-data, and named-client gates.
+- 2026-09-02 · Codex — moved the approved program into active execution and
+  built the first local vertical slice: exact private image originals, clean
+  renditions, proposed date/GPS evidence, replay-safe same-origin chosen-AI
+  upload, private person review, and clean-rendition retrieval. Provider audit
+  remains blocked at Backblaze sign-in; no external state changed.

@@ -1,10 +1,13 @@
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
 const root = process.cwd();
-const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+const require = createRequire(import.meta.url);
+const tsc = require.resolve("typescript/bin/tsc");
+const normalizeNewlines = (value: string) => value.replace(/\r\n?/g, "\n");
 
 const runtimeFiles = [
   ["content/extractor.js", "extension/content/extractor.js"],
@@ -16,8 +19,8 @@ const outDir = mkdtempSync(path.join(tmpdir(), "tts-extension-check-"));
 
 try {
   execFileSync(
-    pnpm,
-    ["exec", "tsc", "-p", "extension/tsconfig.json", "--outDir", outDir],
+    process.execPath,
+    [tsc, "-p", "extension/tsconfig.json", "--outDir", outDir],
     {
       cwd: root,
       stdio: "inherit",
@@ -27,7 +30,7 @@ try {
   const staleFiles = runtimeFiles.filter(([compiled, runtime]) => {
     const compiledText = readFileSync(path.join(outDir, compiled), "utf8");
     const runtimeText = readFileSync(path.join(root, runtime), "utf8");
-    return compiledText !== runtimeText;
+    return normalizeNewlines(compiledText) !== normalizeNewlines(runtimeText);
   });
 
   if (staleFiles.length > 0) {
