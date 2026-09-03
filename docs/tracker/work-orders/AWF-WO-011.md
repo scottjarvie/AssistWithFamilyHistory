@@ -142,6 +142,24 @@ an opaque client id. The local bounded registration table is the currently
 unused CIMD validator/cache, not a provider-DCR inventory. A real named-client
 lifecycle remains the only route to a compatibility claim.
 
+### Release evidence — 2026-09-03 (Codex)
+
+The discovery and capability-truth hardening shipped through protected pull
+request #74 and merged to `main` as `a913ff15b1ba310a59a8ec30b8044ca9a55498c1`.
+The pull request's full CI and Vercel preview passed; exact-main CI run
+33804597288 passed verification, app boot, and route smoke tests; and Vercel
+reported the merge deployment complete.
+
+The outside-in production checker then proved that all sixteen canonical tools
+and seven product permissions are live, the signed-out connection centre still
+redirects to sign-in, anonymous MCP receives the branded Bearer challenge, both
+protected-resource discovery spellings return the same document directly, Clerk
+DCR remains advertised, and provider identity scopes do not contain Family
+History product permissions. A computer-use inspection of the live `/ai` page
+confirmed the two upload tools, permission copy, and never-lists are rendered.
+The `www` hostname still returns 307 to apex for discovery and MCP POST, so the
+canonical client address remains `https://assistwithfamilyhistory.com/mcp`.
+
 ## Sequence
 
 1. Complete a read-only authorization architecture/threat-model spike. Compare
