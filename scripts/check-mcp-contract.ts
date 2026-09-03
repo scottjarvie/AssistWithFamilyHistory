@@ -236,6 +236,48 @@ assert.deepEqual(
 assert.equal(FAMILY_HISTORY_SCOPE_INFO.length, FAMILY_HISTORY_SCOPES.length);
 assert.ok(NEVER_EXPOSED.length >= 5 && NEVER_PERMITTED.length >= 5);
 
+/* -------------------------------- machine capability manifest parity */
+
+const capabilityManifest = JSON.parse(
+  readFileSync("docs/api/capability-manifest.json", "utf8"),
+) as {
+  mcp?: {
+    currentInSource?: string[];
+    authorityTiers?: {
+      defaultAfterOAuth?: string[];
+      personApproved?: string[];
+      raisedOutsideOrdinaryApproval?: string[];
+      reservedNeverIssuable?: string[];
+    };
+  };
+};
+
+assert.deepEqual(
+  capabilityManifest.mcp?.currentInSource,
+  [...FAMILY_HISTORY_CANONICAL_TOOL_NAMES],
+  "the capability manifest must list the canonical MCP catalog in catalog order",
+);
+assert.deepEqual(
+  capabilityManifest.mcp?.authorityTiers?.defaultAfterOAuth,
+  [],
+  "OAuth sign-in must grant no Family History product permission by default",
+);
+assert.deepEqual(
+  capabilityManifest.mcp?.authorityTiers?.personApproved,
+  [...FAMILY_HISTORY_SCOPES],
+  "the manifest's person-approved tier must equal the enforced scope ceiling",
+);
+assert.deepEqual(
+  capabilityManifest.mcp?.authorityTiers?.raisedOutsideOrdinaryApproval,
+  [],
+  "Family History has no current raised MCP tier; adding one requires an explicit product decision",
+);
+assert.deepEqual(
+  capabilityManifest.mcp?.authorityTiers?.reservedNeverIssuable,
+  [...NEVER_PERMITTED],
+  "the manifest's reserved tier must equal the catalog's never-permitted authority list",
+);
+
 console.log(
   `MCP contract assertions passed: ${FAMILY_HISTORY_CANONICAL_TOOL_NAMES.length} canonical tools, ${aliases.length} aliases, ${FAMILY_HISTORY_SCOPES.length} scopes.`,
 );

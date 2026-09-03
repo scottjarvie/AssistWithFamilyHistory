@@ -15,10 +15,14 @@ const outputPath = path.join(repositoryRoot, outputRelativePath);
 // The checked-in HTML is also the durable Family History design shell. This
 // renderer replaces every source-derived region while preserving its standalone
 // archival typography, palette, layout, theme control, and accessibility CSS.
-const [source, shell] = await Promise.all([
+const [sourceRaw, shell] = await Promise.all([
   readFile(sourcePath, "utf8"),
   readFile(outputPath, "utf8"),
 ]);
+// Render the canonical content identically on Windows and Unix. Without this,
+// CRLF blank lines are not empty after split("\n"), so headings and lists can
+// collapse into paragraphs even though the source itself is valid Markdown.
+const source = sourceRaw.replace(/\r\n?/g, "\n");
 
 const sourceSha256 = createHash("sha256").update(source).digest("hex");
 const title = source.match(/^#\s+(.+)$/m)?.[1];

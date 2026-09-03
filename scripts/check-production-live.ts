@@ -180,7 +180,9 @@ async function checkMcpChallenge() {
 }
 
 async function checkResourceMetadata() {
-  const response = await fetch(`${BASE}/.well-known/oauth-protected-resource/mcp`);
+  const pathSpecificUrl = `${BASE}/.well-known/oauth-protected-resource/mcp`;
+  const rootCompatibilityUrl = `${BASE}/.well-known/oauth-protected-resource`;
+  const response = await fetch(pathSpecificUrl, { redirect: "manual" });
   if (!response.ok) {
     fail("protected-resource metadata", `expected 200, got ${response.status}`);
     return null;
@@ -202,6 +204,36 @@ async function checkResourceMetadata() {
     return null;
   }
   ok("authorization server discoverable", authorizationServer);
+
+  const rootResponse = await fetch(rootCompatibilityUrl, { redirect: "manual" });
+  if (!rootResponse.ok) {
+    fail(
+      "root protected-resource compatibility metadata",
+      `expected direct 200, got ${rootResponse.status}`,
+    );
+  } else if (rootResponse.headers.has("location")) {
+    fail(
+      "root protected-resource compatibility metadata",
+      `returned a redirect location (${rootResponse.headers.get("location")})`,
+    );
+  } else {
+    const rootDoc = (await rootResponse.json()) as {
+      resource?: string;
+      authorization_servers?: string[];
+    };
+    if (JSON.stringify(rootDoc) !== JSON.stringify(doc)) {
+      fail(
+        "root protected-resource compatibility metadata",
+        "the root and resource-path discovery documents differ",
+      );
+    } else {
+      ok(
+        "root protected-resource compatibility metadata",
+        "direct 200 with the same document and no redirect",
+      );
+    }
+  }
+
   return authorizationServer;
 }
 

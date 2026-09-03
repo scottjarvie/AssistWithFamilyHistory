@@ -1009,7 +1009,10 @@ async function handleMcp(actionCtx: ActionCtx, request: Request) {
       "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
     } });
   }
-  if (url.pathname === "/.well-known/oauth-protected-resource/mcp") {
+  if (
+    url.pathname === "/.well-known/oauth-protected-resource/mcp" ||
+    url.pathname === "/.well-known/oauth-protected-resource"
+  ) {
     return request.method === "GET" ? protectedResourceMetadata(resource, issuer) : new Response("Method not allowed", { status: 405, headers: { Allow: "GET,OPTIONS" } });
   }
   if (url.pathname !== "/mcp") return new Response("Not found", { status: 404 });
@@ -1108,6 +1111,8 @@ function observedClientName(body: unknown, request: Request): string | undefined
 export function registerMcpRoutes(http: HttpRouter) {
   http.route({ path: "/mcp", method: "POST", handler: httpAction(handleMcp) });
   http.route({ path: "/mcp", method: "OPTIONS", handler: httpAction(handleMcp) });
+  http.route({ path: "/.well-known/oauth-protected-resource", method: "GET", handler: httpAction(handleMcp) });
+  http.route({ path: "/.well-known/oauth-protected-resource", method: "OPTIONS", handler: httpAction(handleMcp) });
   http.route({ path: "/.well-known/oauth-protected-resource/mcp", method: "GET", handler: httpAction(handleMcp) });
   http.route({ path: "/.well-known/oauth-protected-resource/mcp", method: "OPTIONS", handler: httpAction(handleMcp) });
 }
