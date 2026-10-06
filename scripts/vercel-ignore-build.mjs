@@ -3,13 +3,23 @@
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
-import {
-  hasStateCommitTrailer,
-  parseNameStatus,
-  rejectedStateChanges,
-} from "./lib/state-publication-contract.mjs";
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/i;
+
+// Paths no part of the running site reads: product and agent documentation,
+// the tracker, and root-level Markdown. A range that touches only these
+// produces a byte-identical site, so Vercel skips the build (preview or
+// production). Everything else, including any file the build or runtime could
+// read, builds normally.
+const DOCS_ONLY_PATHS = [
+  /^docs\//,
+  /^[^/]+\.md$/,
+  /^\.claude\//,
+];
+
+export function nonDocsPaths(paths) {
+  return paths.filter((file) => !DOCS_ONLY_PATHS.some((pattern) => pattern.test(file)));
+}
 
 function git(cwd, args, options = {}) {
   const output = execFileSync("git", args, { cwd, encoding: "utf8", ...options });
@@ -26,14 +36,14 @@ export function decideVercelBuild({ base, head, cwd = process.cwd(), runValidato
     assertCommit(cwd, base, "base");
     assertCommit(cwd, head, "head");
     git(cwd, ["merge-base", "--is-ancestor", base, head], { stdio: "ignore" });
-    const message = git(cwd, ["show", "--no-patch", "--format=%B", head]);
-    if (!hasStateCommitTrailer(message)) return { ignore: false, reason: "commit is not marked as a verified state publication", changes: [] };
-    const changes = parseNameStatus(git(cwd, ["diff", "--name-status", "--find-renames", base, head]));
+    // --no-renames lists both sides of a move, so a file moved out of docs/
+    // counts as a non-docs change.
+    const changes = git(cwd, ["diff", "--name-only", "--no-renames", base, head]).split("\n").filter(Boolean);
     if (!changes.length) return { ignore: false, reason: "commit range has no changed paths", changes };
-    const rejected = rejectedStateChanges(changes);
-    if (rejected.length) return { ignore: false, reason: `mixed, renamed, or non-state paths: ${rejected.map(({ raw }) => raw).join(", ")}`, changes };
+    const rejected = nonDocsPaths(changes);
+    if (rejected.length) return { ignore: false, reason: `site paths changed: ${rejected.slice(0, 5).join(", ")}${rejected.length > 5 ? ", ..." : ""}`, changes };
     if (runValidators) runValidators();
-    return { ignore: true, reason: `${changes.length} verified state-only change(s)`, changes };
+    return { ignore: true, reason: `${changes.length} docs-only change(s)`, changes };
   } catch (error) {
     return { ignore: false, reason: error instanceof Error ? error.message : String(error), changes: [] };
   }

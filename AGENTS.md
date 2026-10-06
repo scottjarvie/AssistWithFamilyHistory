@@ -71,6 +71,17 @@ For targeted work pick from:
 - targeted contracts such as `pnpm check:familysearch-capture`, `pnpm check:capture-validation`, `pnpm check:operations-handoff`, `pnpm check:agent-quality-gates`, `pnpm check:context-pack-contract`, or `pnpm check:place-era-packs`
 - `BASE_URL=http://127.0.0.1:3443 pnpm smoke:routes` after starting the local app
 
+### CI, Vercel, and the local preview
+
+CI is deliberately conservative; read
+[`docs/operations/ci-review-and-preview-policy.md`](docs/operations/ci-review-and-preview-policy.md)
+before touching `.github/workflows/` or `vercel.json`. In short: iterate on
+`pnpm preview:local` ([how-to](docs/operations/local-preview.md)) and run
+`pnpm verify` locally; push in batches, keep the PR as a draft while you are
+still iterating (drafts run no GitHub CI), and mark it ready once, when it is
+done. Vercel's preview build is the build check; GitHub CI runs the contract
+checks once per ready push.
+
 For UI work, run browser checks on desktop and mobile breakpoints where relevant, inspect console errors, and note what changed visually.
 
 ## State Publication Boundary
@@ -78,7 +89,7 @@ For UI work, run browser checks on desktop and mobile breakpoints where relevant
 Tracker and Project Philosophy content may use the narrow state path only after
 `pnpm tracker:commit-state --check` accepts the staged index. The exact state
 paths, local validators, required `skip-checks: true` trailer, trusted-owner
-direct-main rule, GitHub lightweight path, and Vercel ignored-build behavior are
+direct-main rule, and Vercel ignored-build behavior are
 documented in [`docs/tracker/GUIDE.md`](docs/tracker/GUIDE.md).
 
 Application code, schemas, generators, validators, workflows, dependencies,

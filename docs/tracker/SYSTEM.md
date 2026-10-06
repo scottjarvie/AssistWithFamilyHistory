@@ -27,12 +27,13 @@ markers.
 ## Publication boundary
 
 `scripts/lib/state-publication-contract.mjs` owns the exact state allowlist.
-The local helper, GitHub classifier, and Vercel classifier import the same
-contract. Guide and content updates are state; this SYSTEM file, generators,
+The local helper imports it. Vercel's ignored-build step
+(`scripts/vercel-ignore-build.mjs`) uses a broader docs-only rule, because no
+documentation path reaches the running site. Guide and content updates are state; this SYSTEM file, generators,
 validators, workflows, package scripts, repository instructions, and provider
 configuration are software and always use full safeguards.
 
-Vercel may ignore only a complete, marked, validator-passing state range from
-its last successful deployment. Missing history, malformed SHAs, renames,
+Vercel may ignore only a complete, docs-only, validator-passing range from its
+last successful deployment. Missing history, malformed SHAs, renames,
 mixed paths, failed validation, or any uncertainty returns the normal-build
 result.

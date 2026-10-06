@@ -102,9 +102,10 @@ git push origin HEAD:main
 
 The helper rejects mixed or uncertain changes, runs both tracker and Project
 Philosophy validators, requires local `main`, and writes the final
-`skip-checks: true` trailer. GitHub still runs its lightweight state-recording
-path. Vercel separately compares the complete range since its previous
-successful deployment and ignores only the same strict validated state class.
+`skip-checks: true` trailer. GitHub CI does not run on pushes to `main`.
+Vercel separately compares the complete range since its previous successful
+deployment and skips the build only when every changed path is documentation
+and the validators pass.
 Any uncertainty builds normally.
 
 Never use this route for software or open a skipped-check pull request. If

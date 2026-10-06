@@ -50,7 +50,9 @@ outside; only one of them changes when you deploy.
   the pull request instead of in the Vercel build. Check the build state after a
   merge; do not assume it went out.
 - **Never run `convex deploy`, `convex dev`, or `convex codegen` by hand in this
-  repository.** `convex deploy` takes no `--prod` flag because it already targets
+  repository.** (The one exception is `pnpm preview:local`, which runs
+  `convex dev` pinned to a throwaway backend on your own computer, with code
+  generation off; see `docs/operations/local-preview.md`.) `convex deploy` takes no `--prod` flag because it already targets
   production by default, and on a developer machine a bare invocation resolves to
   whatever project the local environment points at. In this repository it
   resolves to `gallant-mallard-74`, an unrelated personal project, and still

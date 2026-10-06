@@ -11,6 +11,9 @@
 #     docs/operations/product-health-gates.md)
 #   - build:extension (artifact build; check:extension already validates
 #     the checked-in artifacts against source)
+#
+# Set VERIFY_SKIP_BUILD=1 to leave out the production build. GitHub CI does
+# this because Vercel's preview build already proves the build on every PR.
 
 set +e
 
@@ -36,7 +39,6 @@ steps=(
   "check:support-contact"
   "check:project-philosophy"
   "tracker:verify"
-  "verify:ci-state-classifier"
   "verify:vercel-ignore-build"
   "check:import-regression"
   "check:agent-quality-gates"
@@ -75,8 +77,11 @@ steps=(
   "check:settings-responsive"
   "check:connection-center"
   "check:public-ai-truth"
-  "build"
 )
+
+if [ "${VERIFY_SKIP_BUILD:-}" != "1" ]; then
+  steps+=("build")
+fi
 
 passed=()
 failed=()

@@ -5,6 +5,7 @@
   "description": "A durable, user-controlled family-history research-to-story workspace",
   "scripts": {
     "dev": "next dev --webpack --port 3443",
+    "preview:local": "node scripts/preview-local.mjs",
     "build": "next build",
     "start": "next start --port 3443",
     "test": "node --import tsx --test scripts/test-vault-core.ts scripts/test-vault-migration.ts scripts/test-person-snapshot-parity.ts scripts/test-context-coverage-parity.ts scripts/test-context-gates.ts scripts/test-family-tree.ts scripts/test-task-lifecycle.ts scripts/test-queue-contract.ts scripts/test-agent-auth.ts scripts/test-vercel-build.ts scripts/test-public-story-error.ts scripts/test-story-publish-gate.ts scripts/test-ai-redaction.ts scripts/test-public-text-redaction.ts scripts/test-canonical-production-url.ts",
@@ -30,7 +31,6 @@
     "tracker:verify-browser": "playwright test tests/e2e/tracker-reader-ordering.spec.ts --browser=chromium --workers=1 --output=/tmp/awf-tracker-playwright",
     "tracker:state-check": "node scripts/commit-tracker-state.mjs --check",
     "tracker:commit-state": "node scripts/commit-tracker-state.mjs",
-    "verify:ci-state-classifier": "node scripts/verify-ci-change-classifier.mjs",
     "verify:vercel-ignore-build": "node scripts/verify-vercel-ignore-build.mjs",
     "check:import-regression": "tsx scripts/check-import-regression.ts",
     "check:agent-quality-gates": "tsx scripts/check-agent-quality-gates.ts",

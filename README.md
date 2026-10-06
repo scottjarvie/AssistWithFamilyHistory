@@ -78,6 +78,12 @@ pnpm dev
 
 Open [http://localhost:3443](http://localhost:3443) to see the app.
 
+For a full local preview with its own private practice database and sign-in
+switched off, run `pnpm preview:local` instead; see
+[docs/operations/local-preview.md](docs/operations/local-preview.md). How
+code review, Vercel, and GitHub CI split the checking is in
+[docs/operations/ci-review-and-preview-policy.md](docs/operations/ci-review-and-preview-policy.md).
+
 ### Browser Extension Setup
 
 The browser extension is located in the `/extension` folder:
