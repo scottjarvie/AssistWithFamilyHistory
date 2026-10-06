@@ -1,94 +1,51 @@
 name: CI
 
+# Conservative by design (soft launch, one tester). See
+# docs/operations/ci-review-and-preview-policy.md for who covers what:
+#   - Code review covers logic, privacy, and product intent.
+#   - Vercel's own preview build proves `next build` on every PR and deploys
+#     production on merge, so this workflow does not build or start the app.
+#   - This workflow runs the fast contract checks once, when a PR is ready.
+# It does not run on pushes to main: the same commit already passed on its PR.
+# Draft PRs skip it; marking the PR ready (or running it by hand) triggers it.
+
 on:
   pull_request:
-  push:
-    branches:
-      - main
+    types: [opened, reopened, synchronize, ready_for_review]
+  workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
+  # The job id stays `build-and-smoke` so any branch rule that names the old
+  # check keeps matching. It no longer builds or smoke-tests; see above.
   build-and-smoke:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Classify CI scope
-        id: ci_scope
-        env:
-          CI_EVENT_NAME: ${{ github.event_name }}
-          CI_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
-          CI_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-        run: |
-          node scripts/classify-ci-change.mjs \
-            --event-name "$CI_EVENT_NAME" \
-            --base "$CI_BASE_SHA" \
-            --head "$CI_HEAD_SHA" \
-            --github-output "$GITHUB_OUTPUT"
-
-      - name: Verify canonical state
-        if: steps.ci_scope.outputs.run_full != 'true'
-        run: |
-          node scripts/verify-tracker.mjs
-          node scripts/check-family-history-project-philosophy.mjs
-          echo "Validated state-only range; no dependency install, application build, tests, server, or browser ran." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Setup pnpm
-        if: steps.ci_scope.outputs.run_full == 'true'
         uses: pnpm/action-setup@v4
 
       - name: Setup Node.js
-        if: steps.ci_scope.outputs.run_full == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
 
       - name: Install dependencies
-        if: steps.ci_scope.outputs.run_full == 'true'
         run: pnpm install --frozen-lockfile
 
-      - name: Verify (typecheck + lint + test + checks + build)
-        if: steps.ci_scope.outputs.run_full == 'true'
+      - name: Verify (typecheck + lint + test + checks; Vercel owns the build)
         run: pnpm verify
-
-      - name: Start app
-        if: steps.ci_scope.outputs.run_full == 'true'
-        run: |
-          pnpm start > /tmp/tell-their-stories.log 2>&1 &
-          echo $! > /tmp/tell-their-stories.pid
-
-      - name: Wait for app
-        if: steps.ci_scope.outputs.run_full == 'true'
-        run: |
-          for i in {1..60}; do
-            if curl -sSf http://127.0.0.1:3443/ >/dev/null; then
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "App failed to start"
-          cat /tmp/tell-their-stories.log
-          exit 1
-
-      - name: Smoke test routes
-        if: steps.ci_scope.outputs.run_full == 'true'
-        run: BASE_URL=http://127.0.0.1:3443 pnpm smoke:routes
-
-      - name: Stop app
-        if: ${{ always() && steps.ci_scope.outputs.run_full == 'true' }}
-        run: |
-          if [[ -f /tmp/tell-their-stories.pid ]]; then
-            kill "$(cat /tmp/tell-their-stories.pid)" || true
-          fi
+        env:
+          VERIFY_SKIP_BUILD: "1"

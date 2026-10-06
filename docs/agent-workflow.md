@@ -81,7 +81,7 @@ State is narrowly limited to canonical Cards, Work Orders, Guide, factual
 tracker metadata, generated tracker readers, and the canonical Project
 Philosophy Markdown/HTML pair. After local validation, Scott's trusted owner
 identity may publish only those paths directly to `main` with the final
-`skip-checks: true` trailer. GitHub still records a lightweight required check;
+`skip-checks: true` trailer. GitHub CI does not run on pushes to `main`;
 Vercel separately ignores the build only when its complete range and validators
 agree. See the tracker Guide for the exact command.
 
