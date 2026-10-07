@@ -1,0 +1,259 @@
+{
+  "about": "Questions waiting on Scott and the record of how each was answered, for the Family History Site Guide. Rendered with docs/planning/site-guide.md; binding rulings are in its Decisions table. Proposal material only; nothing here is published site copy or a capability claim.",
+  "date": "2026-10-06",
+  "questions": [
+    {
+      "id": "adopt-guide",
+      "title": "Make this Site Guide the main document builders follow?",
+      "why": "The Project Philosophy is about 1,900 lines of trust rules, language rules and evidence history with no page inventory. Builders need one concrete source.",
+      "options": [
+        {
+          "id": "canonical",
+          "label": "Yes, canonical",
+          "detail": "The guide leads; the philosophy becomes the trust-rules and history reference."
+        },
+        {
+          "id": "draft",
+          "label": "Keep as draft",
+          "detail": "The philosophy stays official until the whole guide is reviewed."
+        }
+      ],
+      "recommend": "canonical",
+      "reason": "Builders need one concrete source, and Scriptures made the same move on 27 September.",
+      "answered": {
+        "date": "2026-10-06",
+        "choice": "canonical",
+        "note": ""
+      }
+    },
+    {
+      "id": "research-unit",
+      "title": "Organize research around Questions, or add a separate Projects block?",
+      "why": "A Question holds the AI's plan, what was searched, found and not found, and the conclusion. A Project is a folder for a piece of research work.",
+      "options": [
+        {
+          "id": "questions",
+          "label": "Questions",
+          "detail": "One research container that nests."
+        },
+        {
+          "id": "projects",
+          "label": "Projects",
+          "detail": "A familiar folder with no built-in sense of what is being answered."
+        },
+        {
+          "id": "both",
+          "label": "Both",
+          "detail": "Projects hold Questions; two blocks, two pages, more AI tools."
+        }
+      ],
+      "recommend": "questions",
+      "reason": "Nesting Questions covers what a Project folder would do without a second container.",
+      "answered": {
+        "date": "2026-10-06",
+        "choice": "both",
+        "note": "Projects hold Questions; Questions still nest. Projects also suit helping someone else or a client's request."
+      }
+    },
+    {
+      "id": "statement-name",
+      "title": "Call a source-backed statement a Fact, Claim or Detail?",
+      "why": "The word appears on every Person page and in every AI tool. Each statement has a state: Proposed, Accepted, Disputed or Rejected.",
+      "options": [
+        {
+          "id": "facts",
+          "label": "Facts",
+          "detail": "Friendly; the states show a fact can be wrong."
+        },
+        {
+          "id": "claims",
+          "label": "Claims",
+          "detail": "Precise in genealogy terms, a little colder."
+        },
+        {
+          "id": "details",
+          "label": "Details",
+          "detail": "Soft but vague."
+        }
+      ],
+      "recommend": "facts",
+      "reason": "The everyday word, with the states carrying the caution.",
+      "answered": {
+        "date": "2026-10-06",
+        "choice": "claims",
+        "note": ""
+      }
+    },
+    {
+      "id": "trees",
+      "title": "One family workspace per account, or several trees?",
+      "why": "One workspace keeps every person once; several trees suit separate research for different families.",
+      "options": [
+        {
+          "id": "one",
+          "label": "One workspace",
+          "detail": "Branches are views from a home person."
+        },
+        {
+          "id": "several",
+          "label": "Several trees",
+          "detail": "Separate containers; risk of duplicates and split sources."
+        }
+      ],
+      "recommend": "one",
+      "reason": "Avoids duplicates and hard merges later.",
+      "answered": {
+        "date": "2026-10-06",
+        "choice": "several",
+        "note": "Each tree is a separate workspace switched like a profile. Resources (websites, software), Preferences, Instructions, the AI connection and the Queue bridge trees. Reasons: helping other people with their trees; genealogists serving clients. Risks to be navigated with care."
+      }
+    },
+    {
+      "id": "photos",
+      "title": "Keep photos inside Sources, or a separate Photos collection?",
+      "why": "Every file needs one home. A photo is often evidence too.",
+      "options": [
+        {
+          "id": "sources",
+          "label": "Inside Sources",
+          "detail": "One home per file; the Sources grid is the gallery."
+        },
+        {
+          "id": "photos",
+          "label": "Separate Photos",
+          "detail": "Simpler model; evidence photos need a Source as well."
+        }
+      ],
+      "recommend": "sources",
+      "reason": "Keeps the evidence and the picture together.",
+      "answered": {
+        "date": "2026-10-06",
+        "choice": "sources",
+        "note": "Each file is connectable to every person, place, event, Project and Story it matters to, with face tags, portrait crops and AI-suggested connections the person accepts."
+      }
+    },
+    {
+      "id": "memories",
+      "title": "Store family memories as Notes and family-memory Sources, or as their own block?",
+      "why": "What the person remembers differs from an account recorded from a relative, which can be evidence.",
+      "options": [
+        {
+          "id": "notes-sources",
+          "label": "Notes and Sources",
+          "detail": "The person's words stay theirs; a relative's account can back a claim labelled as lore. Rename the Memories tab."
+        },
+        {
+          "id": "block",
+          "label": "Memories block",
+          "detail": "Easy to find, but cannot back a claim without also becoming a Source."
+        }
+      ],
+      "recommend": "notes-sources",
+      "reason": "Lore becomes usable, clearly labelled evidence.",
+      "answered": {
+        "date": "2026-10-06",
+        "choice": "notes-sources",
+        "note": ""
+      }
+    },
+    {
+      "id": "topics",
+      "title": "Add Topics as a main block for reusable historical context?",
+      "why": "Context such as a war, migration, faith or trade touches many lives and should be researched once.",
+      "options": [
+        {
+          "id": "yes",
+          "label": "Add Topics",
+          "detail": "Context saved once and shown everywhere it applies."
+        },
+        {
+          "id": "places",
+          "label": "Places only",
+          "detail": "Context that is not about one place has nowhere good to live."
+        }
+      ],
+      "recommend": "yes",
+      "reason": "Context research adds up over time instead of being redone per ancestor.",
+      "answered": {
+        "date": "2026-10-06",
+        "choice": "yes",
+        "note": ""
+      }
+    },
+    {
+      "id": "ai-approval",
+      "title": "Let signing in approve your AI, or keep a second approval step in Settings?",
+      "why": "Today a new connection sees no tools until the person ticks seven permissions. The family rule (1 September) is that Allow is the approval. The 6 October sibling comparison recommended keeping the extra step because records include living people.",
+      "options": [
+        {
+          "id": "sign-in",
+          "label": "Sign-in approves",
+          "detail": "Hard limits stay; living-person and private records unreadable to the AI until reviewed."
+        },
+        {
+          "id": "second-step",
+          "label": "Keep second step",
+          "detail": "One extra approval screen after Allow."
+        }
+      ],
+      "recommend": "sign-in",
+      "reason": "Protects living people record by record and matches every other Assist site.",
+      "answered": {
+        "date": "2026-10-06",
+        "choice": "sign-in",
+        "note": ""
+      }
+    },
+    {
+      "id": "sharing",
+      "title": "Leave sharing trees with relatives and clients out of the first builds?",
+      "why": "Unlisted links and collaborators (AWF-0014/0015) multiply every privacy rule.",
+      "options": [
+        {
+          "id": "not-yet",
+          "label": "Not yet",
+          "detail": "Core blocks and trees first; sharing one tree later."
+        },
+        {
+          "id": "now",
+          "label": "Include sharing now",
+          "detail": "Slower, with privacy rules on every new page."
+        }
+      ],
+      "recommend": "not-yet",
+      "reason": "Separate trees set up clean sharing later.",
+      "answered": {
+        "date": "2026-10-06",
+        "choice": "not-yet",
+        "note": "Existing guarded public-story publishing stays. Future sharing is per tree."
+      }
+    },
+    {
+      "id": "topics-scope",
+      "title": "Do Topics belong to the account or to each tree?",
+      "why": "Trees are separate workspaces. A Topic such as a war or a migration is useful context in any tree, but its connections to people belong to that tree.",
+      "options": [
+        {
+          "id": "account",
+          "label": "Account level",
+          "detail": "One Topic reused in every tree; its connections stay inside each tree."
+        },
+        {
+          "id": "tree",
+          "label": "Per tree",
+          "detail": "Each tree keeps its own Topics; context is researched again per tree."
+        }
+      ],
+      "recommend": "account",
+      "reason": "Context research is worth doing once, and keeping connections per tree preserves separation."
+    }
+  ],
+  "changes": [
+    "The Site Guide is canonical (edition 2), with the Project Philosophy kept as the trust-boundary and evidence reference.",
+    "Projects join the building blocks and hold Questions.",
+    "Claims replace Facts throughout.",
+    "Several trees, each a separate workspace, with account-level Resources, Preferences, Instructions, AI connection and Queue.",
+    "Photos stay inside Sources and connect to everything they matter to.",
+    "Signing in approves the AI; no new sharing in the first builds."
+  ]
+}
