@@ -14,7 +14,8 @@ dependency and must not block work.
    Work Orders before inventing work. Cards and Work Orders carry current
    priorities, blockers, approved scope, evidence, and handoff truth.
 2. Read the stable repo docs for architecture and verification:
-   - [`Assist With Family History Project Philosophy`](docs/planning/assist-with-family-history-project-philosophy.md) — canonical product purpose, domain language, responsibility split, design character, truth boundaries, and family-Core alignment
+   - [`Site Guide`](docs/planning/site-guide.md) — canonical product direction since 2026-10-06 (edition 2): building blocks, trees, pages, routes, navigation, AI tools, and dated Decisions. Open questions are in `docs/planning/site-guide-content.json`.
+   - [`Assist With Family History Project Philosophy`](docs/planning/assist-with-family-history-project-philosophy.md) — reference for trust boundaries, domain language, responsibility split, design character, truth boundaries, and capability-evidence history
    - `docs/README.md`
    - `docs/operations/agent-handoff-runbook.md`
    - `docs/operations/product-health-gates.md`

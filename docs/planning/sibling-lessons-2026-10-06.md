@@ -255,7 +255,7 @@ Don't copy Scriptures' entries without versions, or Plants' untyped release blob
 
 ## For the owner
 
-**Does approving a new AI connection need a second step?** The family standard's Core ruling is *Allow completes setup*: once a person signs in and clicks Allow, ordinary private reads and writes work. Family History instead holds every new connection at a pending grant until the person approves it again at `/app/settings/ai` (`lib/mcp/authorize.ts:88-94`, and the `GRANT_REQUIRED` text in `/ai.txt`). That extra step may be deliberate, because family records include living people. It is a product and privacy choice, so it isn't changed here.
+**Does approving a new AI connection need a second step?** The family standard's Core ruling is *Allow completes setup*: once a person signs in and clicks Allow, ordinary private reads and writes work. Family History instead holds every new connection at a pending grant until the person approves it again at `/app/settings/ai` (`lib/mcp/authorize.ts:88-94`, and the `GRANT_REQUIRED` text in `/ai.txt`). That extra step may be deliberate, because family records include living people. It is a product and privacy choice, so it isn't changed here. **Decided 6 October 2026:** Scott chose the family rule (signing in approves the AI), with living-person and private-memory records unreadable to the AI until reviewed. See the [Site Guide decisions](site-guide.md#decisions).
 
 ## Suggested order
 
