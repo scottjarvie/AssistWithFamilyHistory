@@ -43,7 +43,13 @@ for(const [file,names] of Object.entries(whitelist)){
  if(found.size!==names.length)throw Error('Missing approved handler '+file);
  let output=original;for(const [start,end] of replacements.reverse())output=output.slice(0,start)+'recordOnlyAction'+output.slice(end);
  output=output.replace(/(['"])(\.{1,2}(?:\/\.\.)*\/)_(?:generated)\/server(?:\.js)?\1/g,(_match,quote,prefix)=>`${quote}${prefix}_local/recordOnlyServer${quote}`);
- writeFileSync(resolve(target,'convex',file),'import {action as recordOnlyAction} from "./_generated/server";\n'+output);
+ const alias='import {action as recordOnlyAction} from "./_generated/server";\n';
+ const first=source.statements[0];
+ // Convex recognizes a runtime directive only before every import/statement.
+ if(first && ts.isExpressionStatement(first) && ts.isStringLiteral(first.expression) && first.expression.text==='use node') {
+  output=output.slice(0,first.end)+'\n'+alias+output.slice(first.end);
+ } else output=alias+output;
+ writeFileSync(resolve(target,'convex',file),output);
 }
 writeFileSync(resolve(target,'convex/crons.ts'),'import {cronJobs} from "convex/server";\nexport default cronJobs();\n');
 writeFileSync(resolve(target,'convex/auth.config.ts'),'export default {providers:[{domain:"https://improved-ram-86.clerk.accounts.dev",applicationID:"convex"}]};\n');

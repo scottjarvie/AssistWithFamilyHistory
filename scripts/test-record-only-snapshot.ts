@@ -36,3 +36,10 @@ test('each vetted statement calls raw builder only through its explicit approved
  assert.match(readFileSync('sandbox-backend/convex/vaultReads.ts','utf8'),/export const getOwnedMediaFile = action\(/);
  assert.match(readFileSync('sandbox-backend/convex/access.ts','utf8'),/return "enforce"/);
 });
+
+test('approved Node actions preserve the use-node directive before every import',()=>{
+ const original=readFileSync('convex/vaultReads.ts','utf8');const snapshot=readFileSync('sandbox-backend/convex/vaultReads.ts','utf8');
+ assert.match(original,/^"use node";/);assert.match(snapshot,/^"use node";/);
+ assert.ok(snapshot.indexOf('"use node";')<snapshot.indexOf('import {action as recordOnlyAction}'));
+ const media=readFileSync('sandbox-backend/convex/mediaEvidenceStorage.ts','utf8');assert.match(media,/^"use node";/);assert.match(media,/_local\/recordOnlyServer/);
+});
