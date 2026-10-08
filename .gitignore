@@ -66,3 +66,4 @@ next-env.d.ts
 sandbox-backend/
 sandbox-backend-before-source-owned-guard-20261007/
 .record-only-codegen-test-*/
+dependency-donor-receipt.json
