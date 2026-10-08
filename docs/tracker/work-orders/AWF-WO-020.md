@@ -49,3 +49,5 @@ Own browser sign-in and OS trust prompts if required. No secret disclosure in ch
 ## History
 
 2026-10-07 Codex: prepared source only under direct owner authorization; coordinator owns runtime acceptance.
+
+Production privacy blocker (coordinator verified 2026-10-07): explicit prod:gallant-mallard-74 environment read reports TRUST_BOUNDARY_MODE absent; deployed access.ts defaults shadow, recording owner denials without enforcing them. Local Live launcher now refuses account runtime until independently verified enforcement. No production configuration, source or deployment changed; separately authorized reviewed backend security repair is required. Native Sandbox always enforces original owner policy and is unaffected.

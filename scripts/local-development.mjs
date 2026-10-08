@@ -17,6 +17,7 @@ const permitted = new Set(['CONVEX_DEPLOYMENT','NEXT_PUBLIC_CONVEX_URL','NEXT_PU
 export function validate(mode, values, config) {
   if (!['live','sandbox'].includes(mode)) throw new Error('Mode must be live or sandbox');
   const binding = config[mode];
+  if (mode === "live" && binding?.ownerEnforcementVerified !== true) throw new Error(binding?.blocker || "Production owner enforcement has not been verified; local Live withheld.");
   if (!binding?.deployment) throw new Error(`${mode} binding is not verified: ${binding?.blocker || 'explicit backend and identity configuration required'}`);
   if (mode === 'sandbox' && (!binding.deployment.startsWith('anonymous:') || binding.deployment.split(':')[1] === config.live?.deployment?.split(':')[1])) throw new Error('Sandbox must be a separate, verified development backend');
   if (values.CONVEX_DEPLOYMENT !== binding.deployment) throw new Error('Deployment does not match the verified mode binding');

@@ -5,7 +5,9 @@
     "port": 3444,
     "deployment": "prod:gallant-mallard-74",
     "backendURL": "https://gallant-mallard-74.convex.cloud",
-    "clerkHost": "clerk.assistwithfamilyhistory.com"
+    "clerkHost": "clerk.assistwithfamilyhistory.com",
+    "ownerEnforcementVerified": false,
+    "blocker": "Explicit production metadata reports TRUST_BOUNDARY_MODE absent; deployed owner policy defaults shadow. Local Live account/privacy acceptance blocked until a separately authorized reviewed production enforcement repair."
   },
   "sandbox": {
     "port": 3443,

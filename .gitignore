@@ -64,3 +64,5 @@ next-env.d.ts
 .env.local-*
 .next-local-*
 sandbox-backend/
+sandbox-backend-before-source-owned-guard-20261007/
+.record-only-codegen-test-*/
