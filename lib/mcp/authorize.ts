@@ -254,8 +254,22 @@ export function namedRecordsInInput(toolName: string, input: unknown): NamedReco
       if (args.mode === "update") found.unattributable = true;
       break;
     }
+    case "family_history_add_source_content": {
+      // A source is not a person; selected-people grants cannot attribute it.
+      found.unattributable = true;
+      break;
+    }
     case "family_history_save_records":
     case "family_history_save_complete_result": {
+      // Places, topics and connections are workspace records, not people.
+      for (const key of ["places", "topics", "connections"]) {
+        if (Array.isArray(args[key]) && args[key].length > 0) found.unattributable = true;
+      }
+      for (const evidence of Array.isArray(args.evidence) ? args.evidence : []) {
+        for (const persona of Array.isArray(evidence?.personas) ? evidence.personas : []) {
+          pushId(found.personIds, persona?.personId);
+        }
+      }
       pushId(found.personIds, args.personId);
       pushId(found.personIds, args.person?.personId);
       for (const person of Array.isArray(args.people) ? args.people : []) {

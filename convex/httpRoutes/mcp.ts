@@ -264,7 +264,9 @@ const dateValue = z.object({
   day: z.number().int().min(1).max(31).optional(),
   approximate: z.boolean().optional(),
 }).strict();
-const placeRef = z.object({ original: z.string().min(1).max(500), placeId: id.optional() }).strict();
+// placeCreateKey names a place saved earlier in the same call (or under that
+// key before); the server swaps it for the place id before anything is stored.
+const placeRef = z.object({ original: z.string().min(1).max(500), placeId: id.optional(), placeCreateKey: createKey.optional() }).strict();
 const personName = z.object({
   given: z.string().trim().max(160),
   surname: z.string().trim().max(160),
@@ -307,7 +309,7 @@ const relationshipSave = z.discriminatedUnion("mode", [
 ]);
 
 const eventFields = {
-  type: z.enum(["birth", "death", "burial", "baptism", "christening", "marriage", "divorce", "immigration", "emigration", "residence", "occupation", "military", "census", "naturalization", "probate", "land_record", "custom"]).optional(),
+  type: z.enum(["birth", "death", "burial", "baptism", "christening", "marriage", "divorce", "immigration", "emigration", "residence", "occupation", "military", "census", "naturalization", "probate", "land_record", "adoption", "engagement", "confirmation", "ordination", "religious_ordinance", "religious_membership", "education", "graduation", "retirement", "funeral", "cremation", "custom"]).optional(),
   customType: z.string().max(160).optional(),
   date: dateValue.extend({ range: z.boolean().optional() }).optional(),
   endDate: dateValue.omit({ approximate: true }).optional(),
@@ -321,8 +323,14 @@ const eventSave = z.discriminatedUnion("mode", [
   z.object({ mode: z.literal("update"), eventId: id, expectedUpdatedAt: z.number(), ...eventFields }).strict(),
 ]);
 
-const sourceType = z.enum(["census", "vital_record", "church_record", "military", "immigration", "newspaper", "obituary", "photograph", "letter", "book", "website", "repository", "collection", "other"]);
+const sourceType = z.enum(["census", "vital_record", "church_record", "military", "immigration", "newspaper", "obituary", "photograph", "letter", "book", "website", "repository", "collection", "headstone", "journal", "family_bible", "family_memory", "oral_history", "probate", "land", "court", "directory", "school", "employment", "map", "other"]);
 const sourceFields = {
+  recordDate: z.string().max(160).optional(),
+  recordPlace: placeRef.optional(),
+  language: z.string().max(80).optional(),
+  citationText: z.string().max(FAMILY_HISTORY_MCP_LIMITS.notes).optional(),
+  imageUrl: z.string().url().max(2_000).optional(),
+  externalIds: z.array(z.object({ system: z.string().min(1).max(80), id: z.string().min(1).max(200), url: z.string().url().max(2_000).optional() }).strict()).max(20).optional(),
   title: z.string().trim().min(1).max(500).optional(), type: sourceType.optional(), repository: z.string().max(500).nullable().optional(),
   url: z.string().url().max(2_000).nullable().optional(), author: z.string().max(500).nullable().optional(), publicationDate: z.string().max(160).nullable().optional(),
   coverage: z.object({ temporal: z.object({ startYear: z.number().int().optional(), endYear: z.number().int().optional() }).strict().optional(), spatial: id.optional() }).strict().optional(),
@@ -342,11 +350,41 @@ const citationSave = z.discriminatedUnion("mode", [
   z.object({ mode: z.literal("create"), createKey, ...citationFields, confidence: z.enum(["very_high", "high", "medium", "low", "very_low"]) }).strict(),
   z.object({ mode: z.literal("update"), citationId: id, expectedUpdatedAt: z.number(), ...citationFields }).strict(),
 ]);
+const recordField = z.object({ label: z.string().trim().min(1).max(300), value: z.string().trim().min(1).max(2_000) }).strict();
+const sourceContent = z.object({
+  contentKey: createKey,
+  kind: z.enum(["indexed_fields", "transcription", "extract", "full_text", "translation", "abstract", "ai_reading"]),
+  title: z.string().max(500).optional(),
+  text: z.string().max(FAMILY_HISTORY_MCP_LIMITS.sourceContentText).optional(),
+  fields: z.array(recordField.extend({ personaKey: createKey.optional() })).max(200).optional(),
+  language: z.string().max(80).optional(),
+  location: z.string().max(500).optional(),
+  madeBy: z.object({ kind: z.enum(["record_creator", "indexer", "person", "chosen_ai", "other"]), name: z.string().max(160).optional() }).strict(),
+  method: z.string().max(500).optional(),
+  fromMediaId: id.optional(),
+  supersedesId: id.optional(),
+}).strict();
+const persona = z.object({
+  personaKey: createKey,
+  nameAsWritten: z.string().trim().min(1).max(500),
+  role: z.string().max(160).optional(),
+  sexAsWritten: z.string().max(80).optional(),
+  fields: z.array(recordField).max(60).optional(),
+  personId: id.optional(),
+  linkReason: z.string().max(1_000).optional(),
+}).strict();
+const claimExtras = {
+  originalText: z.string().max(FAMILY_HISTORY_MCP_LIMITS.notes).optional(),
+  informationKind: z.enum(["primary", "secondary", "family_lore", "undetermined"]).optional(),
+  personaKey: createKey.optional(),
+};
 const evidenceSave = z.object({
   source: sourceSave,
   citation: citationSave,
+  contents: z.array(sourceContent).max(FAMILY_HISTORY_MCP_LIMITS.contentsPerCall).optional(),
+  personas: z.array(persona).max(60).optional(),
   links: z.array(z.object({ targetType: z.enum(["person", "relationship", "event", "place"]), targetId: id, field: z.string().max(160).optional() }).strict()).max(30).optional(),
-  facts: z.array(z.object({ factKey: createKey, personId: id, factType: z.enum(["name", "sex", "birth", "death", "marriage", "census_residence", "residence", "occupation", "other"]), label: z.string().min(1).max(300), value: z.string().min(1).max(2_000), date: z.string().max(160).optional(), place: z.string().max(500).optional(), confidence: z.enum(["high", "medium", "low"]), status: z.enum(["candidate", "accepted", "conflict", "rejected"]).optional(), conflictReason: z.string().max(1_000).optional() }).strict()).max(30).optional(),
+  facts: z.array(z.object({ factKey: createKey, personId: id, factType: z.enum(["name", "sex", "birth", "death", "marriage", "census_residence", "residence", "occupation", "other"]), label: z.string().min(1).max(300), value: z.string().min(1).max(2_000), date: z.string().max(160).optional(), place: z.string().max(500).optional(), confidence: z.enum(["high", "medium", "low"]), status: z.enum(["candidate", "accepted", "conflict", "rejected"]).optional(), conflictReason: z.string().max(1_000).optional(), ...claimExtras }).strict()).max(30).optional(),
 }).strict();
 
 const researchTaskFields = {
@@ -443,6 +481,8 @@ const batchEventSave = z.discriminatedUnion("mode", [
 const batchEvidenceSave = z.object({
   source: sourceSave,
   citation: citationSave,
+  contents: z.array(sourceContent).max(FAMILY_HISTORY_MCP_LIMITS.contentsPerCall).optional(),
+  personas: z.array(persona.extend({ personCreateKey: createKey.optional() })).max(60).optional(),
   links: z.array(z.object({
     targetType: z.enum(["person", "relationship", "event", "place"]),
     targetId: id.optional(),
@@ -461,7 +501,56 @@ const batchEvidenceSave = z.object({
     confidence: z.enum(["high", "medium", "low"]),
     status: z.enum(["candidate", "accepted", "conflict", "rejected"]).optional(),
     conflictReason: z.string().max(1_000).optional(),
+    ...claimExtras,
   }).strict()).max(30).optional(),
+}).strict();
+
+const placeType = z.enum(["country", "state", "county", "city", "town", "village", "parish", "address", "region", "province", "district", "township", "neighborhood", "street", "building", "house", "farm", "church", "temple", "cemetery", "school", "hospital", "workplace", "ship", "other"]);
+const placeFields = {
+  name: z.string().trim().min(1).max(500).optional(),
+  fullName: z.string().trim().min(1).max(1_000).optional(),
+  type: placeType.optional(),
+  parentId: id.optional(),
+  parentCreateKey: createKey.optional(),
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
+  temporalDescription: z.object({ startYear: z.number().int().optional(), endYear: z.number().int().optional(), formerNames: z.array(z.string().max(500)).max(30).optional() }).strict().optional(),
+  alternateNames: z.array(z.object({ name: z.string().trim().min(1).max(500), startYear: z.number().int().optional(), endYear: z.number().int().optional(), language: z.string().max(80).optional(), note: z.string().max(500).optional() }).strict()).max(30).optional(),
+  description: optionalNotes,
+  notes: optionalNotes,
+  familySearchId: z.string().max(100).optional(),
+};
+const placeSave = z.discriminatedUnion("mode", [
+  z.object({ mode: z.literal("create"), createKey, ...placeFields, name: placeFields.name.unwrap(), type: placeType }).strict(),
+  z.object({ mode: z.literal("update"), placeId: id, expectedUpdatedAt: z.number(), ...placeFields }).strict(),
+]);
+
+const topicKind = z.enum(["religion", "ceremony", "custom", "occupation", "migration", "war", "event", "community", "institution", "ship", "law", "other"]);
+const topicFields = {
+  name: z.string().trim().min(1).max(500).optional(),
+  kind: topicKind.optional(),
+  description: optionalNotes,
+  alternateNames: z.array(z.string().trim().min(1).max(300)).max(30).optional(),
+  startYear: z.number().int().optional(),
+  endYear: z.number().int().optional(),
+  placeIds: z.array(id).max(30).optional(),
+  placeCreateKeys: z.array(createKey).max(30).optional(),
+  sourceRefs: z.array(z.string().max(500)).max(30).optional(),
+};
+const topicSave = z.discriminatedUnion("mode", [
+  z.object({ mode: z.literal("create"), createKey, ...topicFields, name: topicFields.name.unwrap(), kind: topicKind }).strict(),
+  z.object({ mode: z.literal("update"), topicId: id, expectedUpdatedAt: z.number(), ...topicFields }).strict(),
+]);
+
+const recordKind = z.enum(["person", "relationship", "event", "place", "source", "source_content", "persona", "citation", "claim", "media", "topic", "story", "research_finding"]);
+const connectionEnd = z.object({ kind: recordKind, id: id.optional(), createKey: createKey.optional() }).strict()
+  .refine((end) => Boolean(end.id) !== Boolean(end.createKey), { message: "Name the record by id or by createKey, not both." });
+const connectionSave = z.object({
+  createKey,
+  from: connectionEnd,
+  to: connectionEnd,
+  relation: z.enum(["about", "mentions", "depicts", "taken_at", "located_in", "member_of", "practiced", "participated_in", "worked_at", "lived_at", "buried_at", "supports", "contradicts", "possibly_same_as", "related"]),
+  reason: z.string().max(1_000).optional(),
 }).strict();
 
 const batchStorySave = z.discriminatedUnion("mode", [
@@ -614,7 +703,7 @@ export function createFamilyHistoryServer(
   registerTool("family_history_search", {
     inputSchema: z.object({
       query: z.string().trim().min(1).max(200),
-      kinds: z.array(z.enum(["person", "source", "story", "research_task", "research_finding", "event"])).max(6).optional(),
+      kinds: z.array(z.enum(["person", "source", "place", "topic", "story", "research_task", "research_finding", "event"])).max(8).optional(),
       limit: z.number().int().min(1).max(FAMILY_HISTORY_MCP_LIMITS.searchLimit).default(25),
     }).strict(),
     annotations: readOnly,
@@ -622,7 +711,7 @@ export function createFamilyHistoryServer(
 
   registerTool("family_history_get_context", {
     inputSchema: z.object({
-      kind: z.enum(["person", "story", "source", "event", "relationship", "research_task", "research_finding"]),
+      kind: z.enum(["person", "story", "source", "source_content", "place", "topic", "event", "relationship", "research_task", "research_finding"]),
       id,
     }).strict(),
     annotations: readOnly,
@@ -638,10 +727,14 @@ export function createFamilyHistoryServer(
     if (!decision.allowed) return refusalResult(decision);
     return read("family_history_get_context", async () => {
       if (input.kind === "person") {
-        return compactPersonWorkspace(await actionCtx.runQuery(vault.getPersonWorkspace, {
+        const workspace = compactPersonWorkspace(await actionCtx.runQuery(vault.getPersonWorkspace, {
           vaultOwnerId: principal.subject,
           personIdentifier: input.id,
         }));
+        if (!workspace?.person?._id) return workspace;
+        // The person as each record names them, and their typed connections.
+        const originals = await actionCtx.runQuery(mcp.getPersonOriginals, { principal, personId: String(workspace.person._id) });
+        return { ...workspace, ...originals, truncated: workspace.truncated || originals.truncated };
       }
       if (input.kind === "story") {
         return await actionCtx.runQuery(vault.getStoryReview, {
@@ -848,9 +941,21 @@ export function createFamilyHistoryServer(
       events: z.array(batchEventSave).max(FAMILY_HISTORY_MCP_LIMITS.batchEvents).optional(),
       evidence: z.array(batchEvidenceSave).max(FAMILY_HISTORY_MCP_LIMITS.batchEvidence).optional(),
       stories: z.array(batchStorySave).max(FAMILY_HISTORY_MCP_LIMITS.batchStories).optional(),
+      places: z.array(placeSave).max(FAMILY_HISTORY_MCP_LIMITS.batchPlaces).optional(),
+      topics: z.array(topicSave).max(FAMILY_HISTORY_MCP_LIMITS.batchTopics).optional(),
+      connections: z.array(connectionSave).max(FAMILY_HISTORY_MCP_LIMITS.batchConnections).optional(),
     }).strict(),
     annotations: writeSafe,
   }, (input: any) => write("family_history_save_records", mcp.saveRecords, input));
+
+  registerTool("family_history_add_source_content", {
+    inputSchema: z.object({
+      operationId,
+      sourceId: id,
+      contents: z.array(sourceContent).min(1).max(FAMILY_HISTORY_MCP_LIMITS.contentsPerCall),
+    }).strict(),
+    annotations: writeSafe,
+  }, (input: any) => write("family_history_add_source_content", mcp.addSourceContent, input));
 
   registerTool("family_history_save_complete_result", {
     inputSchema: z.object({

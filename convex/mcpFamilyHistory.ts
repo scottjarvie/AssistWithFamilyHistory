@@ -432,7 +432,7 @@ async function saveEventRecord(ctx: MutationCtx, owner: string, input: any) {
   return { id: eventId, created, updatedAt: now, createKey };
 }
 
-async function saveSourceEvidenceRecord(ctx: MutationCtx, owner: string, input: any) {
+async function saveSourceEvidenceRecord(ctx: MutationCtx, owner: string, input: any, provenance?: McpProvenance) {
   const now = Date.now();
   const sourceInput = input.source;
   await assertOwnedPlaceRefs(ctx, owner, sourceInput, "Source coverage place");
@@ -454,6 +454,13 @@ async function saveSourceEvidenceRecord(ctx: MutationCtx, owner: string, input: 
         author: sourceInput.author,
         publicationDate: sourceInput.publicationDate,
         coverage: sourceInput.coverage,
+        recordDate: sourceInput.recordDate,
+        recordPlace: sourceInput.recordPlace,
+        language: sourceInput.language,
+        citationText: cleanText(sourceInput.citationText, "source citationText", FAMILY_HISTORY_MCP_LIMITS.notes),
+        imageUrl: sourceInput.imageUrl,
+        externalIds: sourceInput.externalIds,
+        creationProvenance: provenance,
         notes: cleanText(sourceInput.notes, "source notes", FAMILY_HISTORY_MCP_LIMITS.notes),
         createdAt: now,
         updatedAt: now,
@@ -464,8 +471,12 @@ async function saveSourceEvidenceRecord(ctx: MutationCtx, owner: string, input: 
   } else {
     const row = await owned(ctx, "sources", sourceInput.sourceId, owner, "Source");
     assertFresh(row, sourceInput.expectedUpdatedAt, "Source");
-    const patch = pickDefined(sourceInput, ["title", "type", "repository", "url", "author", "publicationDate", "coverage", "notes"]);
+    const patch = pickDefined(sourceInput, [
+      "title", "type", "repository", "url", "author", "publicationDate", "coverage", "notes",
+      "recordDate", "recordPlace", "language", "citationText", "imageUrl", "externalIds",
+    ]);
     if (patch.notes !== undefined) patch.notes = cleanText(patch.notes, "source notes", FAMILY_HISTORY_MCP_LIMITS.notes);
+    if (patch.citationText !== undefined) patch.citationText = cleanText(patch.citationText, "source citationText", FAMILY_HISTORY_MCP_LIMITS.notes);
     await ctx.db.patch(row._id, { ...patch, updatedAt: now });
     sourceId = row._id;
   }
@@ -533,6 +544,17 @@ async function saveSourceEvidenceRecord(ctx: MutationCtx, owner: string, input: 
     }
   }
 
+  // The original record's own content and the people as it names them come
+  // before any claim, so a claim can point at the persona it was read from.
+  const contentIds = await appendSourceContents(ctx, owner, sourceId, input.contents ?? [], provenance);
+  const personaIdsByKey = new Map<string, Id<"recordPersonas">>();
+  const personaIds: string[] = [];
+  for (const persona of input.personas ?? []) {
+    const saved = await savePersonaRecord(ctx, owner, sourceId, persona, provenance);
+    personaIdsByKey.set(saved.personaKey, saved.id);
+    personaIds.push(String(saved.id));
+  }
+
   const factIds: string[] = [];
   for (const fact of input.facts ?? []) {
     await owned(ctx, "persons", fact.personId, owner, "Source fact person");
@@ -556,6 +578,9 @@ async function saveSourceEvidenceRecord(ctx: MutationCtx, owner: string, input: 
       confidence: fact.confidence,
       status: fact.status ?? "candidate",
       conflictReason: fact.conflictReason,
+      originalText: cleanText(fact.originalText, "fact originalText", FAMILY_HISTORY_MCP_LIMITS.notes),
+      informationKind: fact.informationKind,
+      personaId: fact.personaKey ? await personaFor(ctx, owner, sourceId, personaIdsByKey, fact.personaKey) : undefined,
       updatedAt: now,
     };
     if (existing) {
@@ -567,7 +592,7 @@ async function saveSourceEvidenceRecord(ctx: MutationCtx, owner: string, input: 
       factIds.push(String(factId));
     }
   }
-  return { sourceId, citationId, sourceCreated, citationCreated, linkIds, factIds, updatedAt: now };
+  return { sourceId, citationId, sourceCreated, citationCreated, linkIds, factIds, contentIds, personaIds, updatedAt: now };
 }
 
 async function saveResearchRecord(ctx: MutationCtx, owner: string, input: any, provenance: McpProvenance) {
@@ -723,6 +748,409 @@ async function saveStoryRecord(ctx: MutationCtx, owner: string, input: any) {
   return { id: row._id, created: false, updatedAt: now };
 }
 
+/* ------------------------------------------------------- original records */
+
+/**
+ * Places named by a createKey instead of an id. A whole source often brings
+ * its own places (the parish, the church inside it, the farm the family
+ * rented), so any `{ original, placeId }` reference may carry
+ * `placeCreateKey` naming a place saved earlier in the same call or under that
+ * key before. Resolved here, before the record functions see the input, so
+ * nothing downstream ever stores the key itself.
+ */
+async function resolvePlaceKeys(ctx: MutationCtx, owner: string, batchPlaces: Map<string, string>, value: any): Promise<any> {
+  if (Array.isArray(value)) {
+    const out = [];
+    for (const item of value) out.push(await resolvePlaceKeys(ctx, owner, batchPlaces, item));
+    return out;
+  }
+  if (!value || typeof value !== "object") return value;
+  const out: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (key === "placeCreateKey") continue;
+    out[key] = await resolvePlaceKeys(ctx, owner, batchPlaces, item);
+  }
+  if (typeof value.placeCreateKey === "string" && value.placeCreateKey.trim()) {
+    out.placeId = await resolveKeyedRecord(ctx, owner, batchPlaces, "place", value.placeCreateKey, "placeCreateKey");
+  }
+  return out;
+}
+
+async function resolveKeyedRecord(
+  ctx: MutationCtx,
+  owner: string,
+  batch: Map<string, string>,
+  recordType: RecordType,
+  key: string,
+  label: string,
+): Promise<string> {
+  const trimmedKey = key.trim();
+  const inBatch = batch.get(trimmedKey);
+  if (inBatch) return inBatch;
+  const mapping = await mappedRecord(ctx, owner, recordType, trimmedKey);
+  if (mapping) return mapping.recordId;
+  machineError(
+    "VALIDATION_ERROR",
+    `${label} names a ${recordType} createKey that was not saved in this call and does not already exist.`,
+    `Save the ${recordType} earlier in this same call, or use an id returned by search or context.`,
+  );
+}
+
+async function savePlaceRecord(
+  ctx: MutationCtx,
+  owner: string,
+  input: any,
+  provenance: McpProvenance,
+  batchPlaces: Map<string, string>,
+) {
+  const now = Date.now();
+  let parentId: Id<"places"> | undefined;
+  const parentRef = input.parentId ?? (input.parentCreateKey
+    ? await resolveKeyedRecord(ctx, owner, batchPlaces, "place", input.parentCreateKey, "parentCreateKey")
+    : undefined);
+  if (parentRef) parentId = (await owned(ctx, "places", parentRef, owner, "Parent place"))._id;
+  const parent = parentId ? await ctx.db.get(parentId) : null;
+  const description = cleanText(input.description, "place description", FAMILY_HISTORY_MCP_LIMITS.notes);
+  const notes = cleanText(input.notes, "place notes", FAMILY_HISTORY_MCP_LIMITS.notes);
+  if (input.mode === "create") {
+    const createKey = cleanKey(input.createKey, "createKey");
+    const mapping = await mappedRecord(ctx, owner, "place", createKey);
+    if (mapping) {
+      const row = await owned(ctx, "places", mapping.recordId, owner, "Place");
+      batchPlaces.set(createKey, String(row._id));
+      return { id: row._id, created: false, updatedAt: row.updatedAt, createKey };
+    }
+    const name = cleanText(input.name, "place name", FAMILY_HISTORY_MCP_LIMITS.shortText, true)!;
+    const fullName = cleanText(input.fullName, "place fullName", 1_000)
+      ?? (parent ? `${name}, ${parent.fullName}` : name);
+    const id = await ctx.db.insert("places", {
+      vaultOwnerId: owner,
+      name,
+      fullName,
+      type: input.type,
+      parentId,
+      latitude: input.latitude,
+      longitude: input.longitude,
+      temporalDescription: input.temporalDescription,
+      alternateNames: input.alternateNames,
+      description,
+      notes,
+      familySearchId: input.familySearchId,
+      importKey: `mcp:${createKey}`,
+      creationProvenance: provenance,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await rememberRecord(ctx, owner, "place", createKey, String(id));
+    batchPlaces.set(createKey, String(id));
+    return { id, created: true, updatedAt: now, createKey };
+  }
+  const row = await owned(ctx, "places", input.placeId, owner, "Place");
+  assertFresh(row, input.expectedUpdatedAt, "Place");
+  if (parentId && parentId === row._id) machineError("VALIDATION_ERROR", "A place cannot sit inside itself.", "Choose a different parent place.");
+  const patch = pickDefined(input, ["name", "fullName", "type", "latitude", "longitude", "temporalDescription", "alternateNames", "familySearchId"]);
+  if (input.description !== undefined) patch.description = description;
+  if (input.notes !== undefined) patch.notes = notes;
+  if (parentId) patch.parentId = parentId;
+  await ctx.db.patch(row._id, { ...patch, updatedAt: now });
+  return { id: row._id, created: false, updatedAt: now };
+}
+
+async function saveTopicRecord(
+  ctx: MutationCtx,
+  owner: string,
+  input: any,
+  provenance: McpProvenance,
+  batchPlaces: Map<string, string>,
+  batchTopics: Map<string, string>,
+) {
+  const now = Date.now();
+  const placeIds: Id<"places">[] = [];
+  for (const placeId of input.placeIds ?? []) placeIds.push((await owned(ctx, "places", placeId, owner, "Topic place"))._id);
+  for (const key of input.placeCreateKeys ?? []) {
+    const placeId = await resolveKeyedRecord(ctx, owner, batchPlaces, "place", key, "placeCreateKeys");
+    placeIds.push((await owned(ctx, "places", placeId, owner, "Topic place"))._id);
+  }
+  const description = cleanText(input.description, "topic description", FAMILY_HISTORY_MCP_LIMITS.notes);
+  if (input.mode === "create") {
+    const createKey = cleanKey(input.createKey, "createKey");
+    const mapping = await mappedRecord(ctx, owner, "topic", createKey);
+    if (mapping) {
+      const row = await owned(ctx, "topics", mapping.recordId, owner, "Topic");
+      batchTopics.set(createKey, String(row._id));
+      return { id: row._id, created: false, updatedAt: row.updatedAt, createKey };
+    }
+    const id = await ctx.db.insert("topics", {
+      vaultOwnerId: owner,
+      name: cleanText(input.name, "topic name", FAMILY_HISTORY_MCP_LIMITS.shortText, true)!,
+      kind: input.kind,
+      description,
+      alternateNames: input.alternateNames,
+      startYear: input.startYear,
+      endYear: input.endYear,
+      placeIds: placeIds.length ? [...new Set(placeIds)] : undefined,
+      sourceRefs: input.sourceRefs,
+      importKey: `mcp:${createKey}`,
+      creationProvenance: provenance,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await rememberRecord(ctx, owner, "topic", createKey, String(id));
+    batchTopics.set(createKey, String(id));
+    return { id, created: true, updatedAt: now, createKey };
+  }
+  const row = await owned(ctx, "topics", input.topicId, owner, "Topic");
+  assertFresh(row, input.expectedUpdatedAt, "Topic");
+  const patch = pickDefined(input, ["name", "kind", "alternateNames", "startYear", "endYear", "sourceRefs"]);
+  if (input.description !== undefined) patch.description = description;
+  if (placeIds.length) patch.placeIds = [...new Set(placeIds)];
+  await ctx.db.patch(row._id, { ...patch, updatedAt: now });
+  return { id: row._id, created: false, updatedAt: now };
+}
+
+/** Which table each Connection end lives in, and which createKey namespace names it. */
+const CONNECTION_TARGETS = {
+  person: { table: "persons", recordType: "person" },
+  relationship: { table: "relationships", recordType: "relationship" },
+  event: { table: "events", recordType: "event" },
+  place: { table: "places", recordType: "place" },
+  source: { table: "sources", recordType: "source" },
+  source_content: { table: "sourceContents", recordType: "source_content" },
+  persona: { table: "recordPersonas", recordType: null },
+  citation: { table: "citations", recordType: "citation" },
+  claim: { table: "sourceFacts", recordType: "source_fact" },
+  media: { table: "media", recordType: null },
+  topic: { table: "topics", recordType: "topic" },
+  story: { table: "stories", recordType: "story" },
+  research_finding: { table: "researchLog", recordType: "research_log" },
+} as const;
+
+type ConnectionKind = keyof typeof CONNECTION_TARGETS;
+
+async function resolveConnectionEnd(
+  ctx: MutationCtx,
+  owner: string,
+  batch: Map<string, Map<string, string>>,
+  end: any,
+  label: string,
+): Promise<{ kind: ConnectionKind; id: string }> {
+  const target = CONNECTION_TARGETS[end?.kind as ConnectionKind];
+  if (!target) machineError("VALIDATION_ERROR", `${label} has an unsupported kind.`, "Use a record kind listed in the tool schema.");
+  let recordId: string | undefined = typeof end.id === "string" && end.id.trim() ? end.id.trim() : undefined;
+  if (!recordId && typeof end.createKey === "string") {
+    if (!target.recordType) machineError("VALIDATION_ERROR", `${label} of kind ${end.kind} must use an id.`, "Use the id returned when the record was saved.");
+    recordId = await resolveKeyedRecord(ctx, owner, batch.get(end.kind) ?? new Map(), target.recordType, end.createKey, `${label}.createKey`);
+  }
+  if (!recordId) machineError("VALIDATION_ERROR", `${label} needs an id or a createKey.`, "Name the record by id or by the createKey used to save it.");
+  const row = await owned(ctx, target.table, recordId, owner, `Connection ${label}`);
+  return { kind: end.kind, id: String(row._id) };
+}
+
+async function saveConnectionRecord(
+  ctx: MutationCtx,
+  owner: string,
+  input: any,
+  provenance: McpProvenance,
+  batch: Map<string, Map<string, string>>,
+) {
+  const now = Date.now();
+  const createKey = cleanKey(input.createKey, "createKey");
+  const mapping = await mappedRecord(ctx, owner, "connection", createKey);
+  if (mapping) {
+    const row = await owned(ctx, "connections", mapping.recordId, owner, "Connection");
+    return { id: row._id, created: false, updatedAt: row.updatedAt, createKey };
+  }
+  const from = await resolveConnectionEnd(ctx, owner, batch, input.from, "from");
+  const to = await resolveConnectionEnd(ctx, owner, batch, input.to, "to");
+  if (from.kind === to.kind && from.id === to.id) machineError("VALIDATION_ERROR", "A record cannot be connected to itself.", "Choose two different records.");
+  const id = await ctx.db.insert("connections", {
+    vaultOwnerId: owner,
+    from,
+    to,
+    relation: input.relation,
+    reason: cleanText(input.reason, "connection reason", FAMILY_HISTORY_MCP_LIMITS.shortText * 2),
+    // An AI proposes; only the person accepts. There is no input that sets this.
+    state: "proposed",
+    importKey: `mcp:${createKey}`,
+    creationProvenance: provenance,
+    createdAt: now,
+    updatedAt: now,
+  });
+  await rememberRecord(ctx, owner, "connection", createKey, String(id));
+  return { id, created: true, updatedAt: now, createKey };
+}
+
+/**
+ * Append original content to a source. Never updates: a correction is a new
+ * row naming the one it supersedes, and both stay readable. Each content says
+ * who made it, so an indexer's fields, a transcription and an AI's reading are
+ * never mistaken for one another.
+ */
+async function appendSourceContents(
+  ctx: MutationCtx,
+  owner: string,
+  sourceId: Id<"sources">,
+  contents: any[],
+  provenance?: McpProvenance,
+) {
+  const ids: string[] = [];
+  for (const content of contents) {
+    const contentKey = cleanKey(content.contentKey, "contentKey");
+    const mapping = await mappedRecord(ctx, owner, "source_content", contentKey);
+    if (mapping) {
+      const row = await owned(ctx, "sourceContents", mapping.recordId, owner, "Source content");
+      if (row.sourceId !== sourceId) machineError("IDEMPOTENCY_CONFLICT", "contentKey was already used on another source.", "Choose a new contentKey for this source.");
+      ids.push(String(row._id));
+      continue;
+    }
+    const text = cleanText(content.text, "content text", FAMILY_HISTORY_MCP_LIMITS.sourceContentText);
+    const fields = Array.isArray(content.fields) && content.fields.length ? content.fields : undefined;
+    if (!text && !fields) machineError("VALIDATION_ERROR", "A source content needs text, fields, or both.", "Send the original wording as text or the indexed values as fields.");
+    if (content.kind === "ai_reading" && content.madeBy?.kind !== "chosen_ai") {
+      machineError("VALIDATION_ERROR", "An ai_reading must be marked as made by chosen_ai.", "Set madeBy.kind to chosen_ai, or use transcription or extract for the record's own words.");
+    }
+    let supersedesId: Id<"sourceContents"> | undefined;
+    if (content.supersedesId) {
+      const earlier = await owned(ctx, "sourceContents", content.supersedesId, owner, "Superseded content");
+      if (earlier.sourceId !== sourceId) machineError("VALIDATION_ERROR", "A content can only supersede content on the same source.", "Use a content id from this source.");
+      supersedesId = earlier._id;
+    }
+    let fromMediaId: Id<"media"> | undefined;
+    if (content.fromMediaId) fromMediaId = (await owned(ctx, "media", content.fromMediaId, owner, "Content media"))._id;
+    const id = await ctx.db.insert("sourceContents", {
+      vaultOwnerId: owner,
+      sourceId,
+      kind: content.kind,
+      title: cleanText(content.title, "content title", FAMILY_HISTORY_MCP_LIMITS.shortText),
+      text,
+      fields,
+      language: content.language,
+      location: cleanText(content.location, "content location", FAMILY_HISTORY_MCP_LIMITS.shortText),
+      madeBy: {
+        kind: content.madeBy.kind,
+        name: cleanText(content.madeBy.name, "madeBy.name (self-reported)", 160),
+      },
+      method: cleanText(content.method, "content method", FAMILY_HISTORY_MCP_LIMITS.shortText),
+      fromMediaId,
+      supersedesId,
+      importKey: `mcp:${contentKey}`,
+      creationProvenance: provenance,
+      createdAt: Date.now(),
+    });
+    await rememberRecord(ctx, owner, "source_content", contentKey, String(id));
+    ids.push(String(id));
+  }
+  return ids;
+}
+
+/**
+ * Save one person as a record names them. Keyed by (source, personaKey) so a
+ * repeated pass updates the same persona rather than duplicating it. A link to
+ * a researched Person is always saved as proposed.
+ */
+async function savePersonaRecord(
+  ctx: MutationCtx,
+  owner: string,
+  sourceId: Id<"sources">,
+  input: any,
+  provenance?: McpProvenance,
+) {
+  const now = Date.now();
+  const personaKey = cleanKey(input.personaKey, "personaKey");
+  let personId: Id<"persons"> | undefined;
+  if (input.personId) personId = (await owned(ctx, "persons", input.personId, owner, "Persona person"))._id;
+  const payload = {
+    nameAsWritten: cleanText(input.nameAsWritten, "nameAsWritten", FAMILY_HISTORY_MCP_LIMITS.shortText, true)!,
+    role: cleanText(input.role, "persona role", 160),
+    sexAsWritten: cleanText(input.sexAsWritten, "sexAsWritten", 80),
+    fields: (input.fields ?? []).map((field: any) => ({
+      label: cleanText(field.label, "persona field label", 300, true)!,
+      value: cleanText(field.value, "persona field value", 2_000, true)!,
+    })),
+    personId,
+    linkState: personId ? ("proposed" as const) : undefined,
+    linkReason: personId ? cleanText(input.linkReason, "linkReason", FAMILY_HISTORY_MCP_LIMITS.shortText * 2) : undefined,
+    updatedAt: now,
+  };
+  const existing = (await ctx.db
+    .query("recordPersonas")
+    .withIndex("by_source_key", (q) => q.eq("sourceId", sourceId).eq("personaKey", personaKey))
+    .collect())
+    .find((row) => row.vaultOwnerId === owner);
+  if (existing) {
+    // Never quietly undo the person's own decision about who this is.
+    const keepDecision = existing.linkState === "accepted" || existing.linkState === "rejected";
+    await ctx.db.patch(existing._id, keepDecision
+      ? { ...payload, personId: existing.personId, linkState: existing.linkState, linkReason: existing.linkReason }
+      : payload);
+    return { id: existing._id, personaKey, created: false };
+  }
+  const id = await ctx.db.insert("recordPersonas", {
+    vaultOwnerId: owner,
+    sourceId,
+    personaKey,
+    ...payload,
+    importKey: `mcp:${personaKey}`,
+    creationProvenance: provenance,
+    createdAt: now,
+  });
+  return { id, personaKey, created: true };
+}
+
+async function personaFor(
+  ctx: MutationCtx,
+  owner: string,
+  sourceId: Id<"sources">,
+  savedNow: Map<string, Id<"recordPersonas">>,
+  personaKey: string,
+): Promise<Id<"recordPersonas">> {
+  const inCall = savedNow.get(personaKey);
+  if (inCall) return inCall;
+  const row = (await ctx.db
+    .query("recordPersonas")
+    .withIndex("by_source_key", (q) => q.eq("sourceId", sourceId).eq("personaKey", personaKey))
+    .collect())
+    .find((candidate) => candidate.vaultOwnerId === owner);
+  if (!row) machineError("VALIDATION_ERROR", "A claim names a personaKey this source does not have.", "Add the persona to personas in the same call, or use a personaKey already saved on this source.");
+  return row._id;
+}
+
+/** Bounded view of a source's original content for an AI read. */
+function contentForRead(row: Doc<"sourceContents">, maxChars: number) {
+  const text = row.text ?? undefined;
+  const truncated = Boolean(text && text.length > maxChars);
+  return {
+    id: row._id,
+    kind: row.kind,
+    title: row.title,
+    text: truncated ? text!.slice(0, maxChars) : text,
+    textTruncated: truncated,
+    textLength: text?.length ?? 0,
+    fields: row.fields,
+    language: row.language,
+    location: row.location,
+    madeBy: row.madeBy,
+    method: row.method,
+    fromMediaId: row.fromMediaId,
+    supersedesId: row.supersedesId,
+    createdAt: row.createdAt,
+  };
+}
+
+async function connectionsFor(ctx: QueryCtx, owner: string, kind: string, id: string, max: number) {
+  const [outgoing, incoming] = await Promise.all([
+    ctx.db.query("connections").withIndex("by_from", (q) => q.eq("from.kind", kind as any).eq("from.id", id)).take(max + 1),
+    ctx.db.query("connections").withIndex("by_to", (q) => q.eq("to.kind", kind as any).eq("to.id", id)).take(max + 1),
+  ]);
+  const rows = [...outgoing, ...incoming].filter((row) => row.vaultOwnerId === owner && row.state !== "rejected");
+  return {
+    connections: rows.slice(0, max).map((row) => ({
+      id: row._id, from: row.from, to: row.to, relation: row.relation, reason: row.reason, state: row.state, updatedAt: row.updatedAt,
+    })),
+    truncated: outgoing.length > max || incoming.length > max,
+  };
+}
+
 export const getBrief = internalQuery({
   args: { principal: principalValidator },
   handler: async (ctx, { principal }) => {
@@ -772,7 +1200,7 @@ export const search = internalQuery({
     const needle = args.query.trim().toLowerCase();
     const limit = Math.max(1, Math.min(Math.floor(args.limit ?? 25), FAMILY_HISTORY_MCP_LIMITS.searchLimit));
     const scan = FAMILY_HISTORY_MCP_LIMITS.searchScanPerType;
-    const kinds = new Set(args.kinds?.length ? args.kinds : ["person", "source", "story", "research_task", "research_finding", "event"]);
+    const kinds = new Set(args.kinds?.length ? args.kinds : ["person", "source", "place", "topic", "story", "research_task", "research_finding", "event"]);
     const results: Array<Record<string, unknown>> = [];
     const add = (kind: string, rows: Array<Record<string, unknown>>) => {
       for (const row of rows) if (results.length < limit) results.push({ kind, ...row });
@@ -800,6 +1228,14 @@ export const search = internalQuery({
     if (kinds.has("event") && results.length < limit) {
       const rows = await ctx.db.query("events").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(scan + 1);
       add("event", rows.filter((row) => `${row.type} ${row.customType ?? ""} ${row.description ?? ""} ${row.place?.original ?? ""} ${row.date?.original ?? ""}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, type: row.type, customType: row.customType, date: row.date, place: row.place, description: row.description, updatedAt: row.updatedAt })));
+    }
+    if (kinds.has("place") && results.length < limit) {
+      const rows = await ctx.db.query("places").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(scan + 1);
+      add("place", rows.filter((row) => `${row.name} ${row.fullName} ${row.type} ${(row.alternateNames ?? []).map((name) => name.name).join(" ")}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, name: row.name, fullName: row.fullName, type: row.type, parentId: row.parentId, updatedAt: row.updatedAt })));
+    }
+    if (kinds.has("topic") && results.length < limit) {
+      const rows = await ctx.db.query("topics").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(scan + 1);
+      add("topic", rows.filter((row) => `${row.name} ${row.kind} ${(row.alternateNames ?? []).join(" ")} ${row.description ?? ""}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, name: row.name, kind: row.kind, updatedAt: row.updatedAt })));
     }
     return { query: args.query, results, limit, truncated: results.length === limit, nextRecommendedTool: "get_family_history_context" };
   },
@@ -870,7 +1306,59 @@ export const getRecordContext = internalQuery({
       const source = await owned(ctx, "sources", args.id, owner, "Source");
       const citations = (await ctx.db.query("citations").withIndex("by_source", (q) => q.eq("sourceId", source._id)).take(max + 1)).filter((row) => matchesVaultOwner(row.vaultOwnerId, owner));
       const links = (await Promise.all(citations.slice(0, max).map((citation) => ctx.db.query("citationLinks").withIndex("by_citation", (q) => q.eq("citationId", citation._id)).take(max)))).flat().filter((row) => matchesVaultOwner(row.vaultOwnerId, owner)).slice(0, max);
-      return { kind: "source", source, citations: citations.slice(0, max), links, truncated: citations.length > max || links.length === max };
+      const [contents, personas, facts, related] = await Promise.all([
+        ctx.db.query("sourceContents").withIndex("by_source", (q) => q.eq("sourceId", source._id)).take(max + 1),
+        ctx.db.query("recordPersonas").withIndex("by_source", (q) => q.eq("sourceId", source._id)).take(max + 1),
+        ctx.db.query("sourceFacts").withIndex("by_source", (q) => q.eq("sourceId", source._id)).take(max + 1),
+        connectionsFor(ctx, owner, "source", String(source._id), max),
+      ]);
+      const ownedContents = contents.filter((row) => row.vaultOwnerId === owner).slice(0, max);
+      return {
+        kind: "source",
+        source,
+        // Original content first and verbatim. Long texts are cut here; read one
+        // in full with kind "source_content".
+        contents: ownedContents.map((row) => contentForRead(row, FAMILY_HISTORY_MCP_LIMITS.contentPreviewChars)),
+        personas: personas.filter((row) => row.vaultOwnerId === owner).slice(0, max),
+        claims: facts.filter((row) => matchesVaultOwner(row.vaultOwnerId, owner)).slice(0, max),
+        citations: citations.slice(0, max),
+        links,
+        connections: related.connections,
+        truncated: citations.length > max || links.length === max || contents.length > max || personas.length > max || facts.length > max || related.truncated,
+      };
+    }
+    if (args.kind === "source_content") {
+      const content = await owned(ctx, "sourceContents", args.id, owner, "Source content");
+      return { kind: "source_content", content: contentForRead(content, FAMILY_HISTORY_MCP_LIMITS.sourceContentText) };
+    }
+    if (args.kind === "place") {
+      const place = await owned(ctx, "places", args.id, owner, "Place");
+      const [parent, children, events, related] = await Promise.all([
+        place.parentId ? ctx.db.get(place.parentId) : null,
+        ctx.db.query("places").withIndex("by_parent", (q) => q.eq("parentId", place._id)).take(max + 1),
+        ctx.db.query("events").withIndex("by_place", (q) => q.eq("place.placeId", place._id)).take(max + 1),
+        connectionsFor(ctx, owner, "place", String(place._id), max),
+      ]);
+      return {
+        kind: "place",
+        place,
+        parent: parent && matchesVaultOwner(parent.vaultOwnerId, owner) ? { id: parent._id, name: parent.name, fullName: parent.fullName, type: parent.type } : null,
+        children: children.filter((row) => matchesVaultOwner(row.vaultOwnerId, owner)).slice(0, max).map((row) => ({ id: row._id, name: row.name, type: row.type })),
+        events: events.filter((row) => matchesVaultOwner(row.vaultOwnerId, owner)).slice(0, max).map((row) => ({ id: row._id, type: row.type, customType: row.customType, date: row.date, description: row.description })),
+        connections: related.connections,
+        truncated: children.length > max || events.length > max || related.truncated,
+      };
+    }
+    if (args.kind === "topic") {
+      const topic = await owned(ctx, "topics", args.id, owner, "Topic");
+      const related = await connectionsFor(ctx, owner, "topic", String(topic._id), max);
+      return {
+        kind: "topic",
+        label: "Historical context. Not evidence about any particular person.",
+        topic,
+        connections: related.connections,
+        truncated: related.truncated,
+      };
     }
     if (args.kind === "event") {
       const event = await owned(ctx, "events", args.id, owner, "Event");
@@ -885,28 +1373,28 @@ export const getRecordContext = internalQuery({
     }
     if (args.kind === "research_task") return { kind: args.kind, task: await owned(ctx, "researchTasks", args.id, owner, "Research task") };
     if (args.kind === "research_finding") return { kind: args.kind, finding: await owned(ctx, "researchLog", args.id, owner, "Research finding") };
-    machineError("VALIDATION_ERROR", "Unsupported context kind.", "Use person, story, source, event, relationship, research_task, or research_finding.");
+    machineError("VALIDATION_ERROR", "Unsupported context kind.", "Use person, story, source, source_content, place, topic, event, relationship, research_task, or research_finding.");
   },
 });
 
 export const savePerson = internalMutation({
   args: { principal: principalValidator, grantId: v.optional(v.string()), operationId: v.string(), requestHash: v.string(), input: v.any() },
-  handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_person" }, async (owner, provenance) => ({ result: { person: await savePersonRecord(ctx, owner, args.input, provenance) }, detail: "Saved a person record through MCP." })),
+  handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_person" }, async (owner, provenance) => ({ result: { person: await savePersonRecord(ctx, owner, await resolvePlaceKeys(ctx, owner, new Map(), args.input), provenance) }, detail: "Saved a person record through MCP." })),
 });
 
 export const saveRelationship = internalMutation({
   args: { principal: principalValidator, grantId: v.optional(v.string()), operationId: v.string(), requestHash: v.string(), input: v.any() },
-  handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_relationship" }, async (owner, provenance) => ({ result: { relationship: await saveRelationshipRecord(ctx, owner, args.input, provenance) }, detail: "Saved a relationship record through MCP." })),
+  handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_relationship" }, async (owner, provenance) => ({ result: { relationship: await saveRelationshipRecord(ctx, owner, await resolvePlaceKeys(ctx, owner, new Map(), args.input), provenance) }, detail: "Saved a relationship record through MCP." })),
 });
 
 export const saveEvent = internalMutation({
   args: { principal: principalValidator, grantId: v.optional(v.string()), operationId: v.string(), requestHash: v.string(), input: v.any() },
-  handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_event" }, async (owner) => ({ result: { event: await saveEventRecord(ctx, owner, args.input) }, detail: "Saved an event and additive person roles through MCP." })),
+  handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_event" }, async (owner) => ({ result: { event: await saveEventRecord(ctx, owner, await resolvePlaceKeys(ctx, owner, new Map(), args.input)) }, detail: "Saved an event and additive person roles through MCP." })),
 });
 
 export const saveSourceEvidence = internalMutation({
   args: { principal: principalValidator, grantId: v.optional(v.string()), operationId: v.string(), requestHash: v.string(), input: v.any() },
-  handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_source_evidence" }, async (owner) => ({ result: { evidence: await saveSourceEvidenceRecord(ctx, owner, args.input) }, detail: "Saved source, citation, evidence links, and source facts through MCP." })),
+  handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_source_evidence" }, async (owner, provenance) => ({ result: { evidence: await saveSourceEvidenceRecord(ctx, owner, await resolvePlaceKeys(ctx, owner, new Map(), args.input), provenance) }, detail: "Saved source, citation, evidence links, and source facts through MCP." })),
 });
 
 export const saveResearchWork = internalMutation({
@@ -927,6 +1415,8 @@ export const saveCompleteResult = internalMutation({
       if (!Array.isArray(rows) || rows.length > cap) machineError("VALIDATION_ERROR", `Complete result ${kind} exceed the safe batch limit.`, `Use at most ${cap} ${kind} per complete result or split the work.`);
     }
     if (args.input.personId) await owned(ctx, "persons", args.input.personId, owner, "Complete-result person");
+    // Any placeCreateKey here must name a place saved by an earlier call.
+    args = { ...args, input: await resolvePlaceKeys(ctx, owner, new Map(), args.input) };
     const results: Record<string, unknown> = {};
     if (args.input.person) results.person = await savePersonRecord(ctx, owner, args.input.person, provenance);
     const relationships = [];
@@ -936,7 +1426,7 @@ export const saveCompleteResult = internalMutation({
     for (const item of args.input.events ?? []) events.push(await saveEventRecord(ctx, owner, item));
     results.events = events;
     const evidence = [];
-    for (const item of args.input.evidence ?? []) evidence.push(await saveSourceEvidenceRecord(ctx, owner, item));
+    for (const item of args.input.evidence ?? []) evidence.push(await saveSourceEvidenceRecord(ctx, owner, await resolvePlaceKeys(ctx, owner, new Map(), item), provenance));
     results.evidence = evidence;
     if (args.input.research) results.research = await saveResearchRecord(ctx, owner, args.input.research, provenance);
     const stories = [];
@@ -1042,6 +1532,9 @@ export const saveRecords = internalMutation({
       ["events", FAMILY_HISTORY_MCP_LIMITS.batchEvents],
       ["evidence", FAMILY_HISTORY_MCP_LIMITS.batchEvidence],
       ["stories", FAMILY_HISTORY_MCP_LIMITS.batchStories],
+      ["places", FAMILY_HISTORY_MCP_LIMITS.batchPlaces],
+      ["topics", FAMILY_HISTORY_MCP_LIMITS.batchTopics],
+      ["connections", FAMILY_HISTORY_MCP_LIMITS.batchConnections],
     ];
     for (const [key, cap] of caps) {
       const rows = input[key] ?? [];
@@ -1058,8 +1551,13 @@ export const saveRecords = internalMutation({
     }
 
     const batchPeople = new Map<string, string>();
+    const batchPlaces = new Map<string, string>();
+    const batchTopics = new Map<string, string>();
+    const batchEvents = new Map<string, string>();
+    const batchSources = new Map<string, string>();
+    const batchStories = new Map<string, string>();
     const results: Record<string, BatchItemResult[]> = {
-      people: [], relationships: [], events: [], evidence: [], stories: [],
+      places: [], topics: [], people: [], relationships: [], events: [], evidence: [], stories: [], connections: [],
     };
     const counts = { created: 0, updated: 0, skipped: 0, failed: 0 };
     const record = (kind: string, item: BatchItemResult) => {
@@ -1067,10 +1565,43 @@ export const saveRecords = internalMutation({
       counts[item.status] += 1;
     };
 
+    // Places first: a source, an event or a person's birth may name a place
+    // saved in this same call by its createKey. Parents before children is the
+    // caller's order to keep.
+    for (const [index, item] of (input.places ?? []).entries()) {
+      const createKey = typeof item?.createKey === "string" ? item.createKey : undefined;
+      try {
+        const saved = await savePlaceRecord(ctx, owner, item, provenance, batchPlaces);
+        record("places", {
+          index,
+          createKey,
+          id: String(saved.id),
+          status: saved.created ? "created" : item?.mode === "create" ? "skipped" : "updated",
+        });
+      } catch (error) {
+        record("places", failureOf(error, index, createKey));
+      }
+    }
+
+    for (const [index, item] of (input.topics ?? []).entries()) {
+      const createKey = typeof item?.createKey === "string" ? item.createKey : undefined;
+      try {
+        const saved = await saveTopicRecord(ctx, owner, item, provenance, batchPlaces, batchTopics);
+        record("topics", {
+          index,
+          createKey,
+          id: String(saved.id),
+          status: saved.created ? "created" : item?.mode === "create" ? "skipped" : "updated",
+        });
+      } catch (error) {
+        record("topics", failureOf(error, index, createKey));
+      }
+    }
+
     for (const [index, item] of (input.people ?? []).entries()) {
       const createKey = typeof item?.createKey === "string" ? item.createKey : undefined;
       try {
-        const saved = await savePersonRecord(ctx, owner, item, provenance);
+        const saved = await savePersonRecord(ctx, owner, await resolvePlaceKeys(ctx, owner, batchPlaces, item), provenance);
         if (createKey) batchPeople.set(createKey, String(saved.id));
         record("people", {
           index,
@@ -1096,7 +1627,7 @@ export const saveRecords = internalMutation({
         }
         delete resolved.person1CreateKey;
         delete resolved.person2CreateKey;
-        const saved = await saveRelationshipRecord(ctx, owner, resolved, provenance);
+        const saved = await saveRelationshipRecord(ctx, owner, await resolvePlaceKeys(ctx, owner, batchPlaces, resolved), provenance);
         record("relationships", {
           index,
           createKey,
@@ -1121,7 +1652,8 @@ export const saveRecords = internalMutation({
             });
           }
         }
-        const saved = await saveEventRecord(ctx, owner, resolved);
+        const saved = await saveEventRecord(ctx, owner, await resolvePlaceKeys(ctx, owner, batchPlaces, resolved));
+        if (createKey) batchEvents.set(createKey, String(saved.id));
         record("events", {
           index,
           createKey,
@@ -1161,7 +1693,19 @@ export const saveRecords = internalMutation({
             resolved.facts.push(copy);
           }
         }
-        const saved = await saveSourceEvidenceRecord(ctx, owner, resolved);
+        if (Array.isArray(item?.personas)) {
+          resolved.personas = [];
+          for (const persona of item.personas) {
+            const copy = { ...persona };
+            if (persona.personId || persona.personCreateKey) {
+              copy.personId = await resolveBatchPerson(ctx, owner, batchPeople, { id: persona.personId, createKey: persona.personCreateKey }, "personas.personId");
+            }
+            delete copy.personCreateKey;
+            resolved.personas.push(copy);
+          }
+        }
+        const saved = await saveSourceEvidenceRecord(ctx, owner, await resolvePlaceKeys(ctx, owner, batchPlaces, resolved), provenance);
+        if (createKey) batchSources.set(createKey, String(saved.sourceId));
         record("evidence", {
           index,
           createKey,
@@ -1182,6 +1726,7 @@ export const saveRecords = internalMutation({
         }
         delete resolved.personCreateKey;
         const saved = await saveStoryRecord(ctx, owner, resolved);
+        if (createKey) batchStories.set(createKey, String(saved.id));
         record("stories", {
           index,
           createKey,
@@ -1190,6 +1735,26 @@ export const saveRecords = internalMutation({
         });
       } catch (error) {
         record("stories", failureOf(error, index, createKey));
+      }
+    }
+
+    // Connections last, so either end may be anything saved above.
+    const connectionKeys = new Map<string, Map<string, string>>([
+      ["person", batchPeople], ["place", batchPlaces], ["topic", batchTopics],
+      ["event", batchEvents], ["source", batchSources], ["story", batchStories],
+    ]);
+    for (const [index, item] of (input.connections ?? []).entries()) {
+      const createKey = typeof item?.createKey === "string" ? item.createKey : undefined;
+      try {
+        const saved = await saveConnectionRecord(ctx, owner, item, provenance, connectionKeys);
+        record("connections", {
+          index,
+          createKey,
+          id: String(saved.id),
+          status: saved.created ? "created" : "skipped",
+        });
+      } catch (error) {
+        record("connections", failureOf(error, index, createKey));
       }
     }
 
@@ -1211,4 +1776,43 @@ export const saveRecords = internalMutation({
       detail: `Saved a batch through MCP: ${counts.created} created, ${counts.updated} updated, ${counts.skipped} already present, ${counts.failed} failed.`,
     };
   }),
+});
+
+/* ------------------------------------------------- appended source content */
+
+/**
+ * Add a transcription, translation, extract, full text or AI reading to a
+ * source that already exists. Append-only: nothing here edits earlier content.
+ */
+export const addSourceContent = internalMutation({
+  args: { principal: principalValidator, grantId: v.optional(v.string()), operationId: v.string(), requestHash: v.string(), input: v.any() },
+  handler: (ctx, args) => operation(ctx, { ...args, toolName: "family_history_add_source_content" }, async (owner, provenance) => {
+    const source = await owned(ctx, "sources", args.input?.sourceId, owner, "Source");
+    const contents = args.input?.contents;
+    if (!Array.isArray(contents) || contents.length === 0 || contents.length > FAMILY_HISTORY_MCP_LIMITS.contentsPerCall) {
+      machineError("VALIDATION_ERROR", "Send between one and the allowed number of contents.", `Send 1 to ${FAMILY_HISTORY_MCP_LIMITS.contentsPerCall} contents per call.`);
+    }
+    const contentIds = await appendSourceContents(ctx, owner, source._id, contents, provenance);
+    await ctx.db.patch(source._id, { updatedAt: Date.now() });
+    return { result: { sourceId: source._id, contentIds }, detail: `Added ${contentIds.length} original content item(s) to a source through MCP.` };
+  }),
+});
+
+/** The records-as-written and connections that sit beside a person's workspace. */
+export const getPersonOriginals = internalQuery({
+  args: { principal: principalValidator, personId: v.string() },
+  handler: async (ctx, args) => {
+    const owner = ownerFromPrincipal(args.principal);
+    const max = FAMILY_HISTORY_MCP_LIMITS.contextRows;
+    const person = await owned(ctx, "persons", args.personId, owner, "Person");
+    const [personas, related] = await Promise.all([
+      ctx.db.query("recordPersonas").withIndex("by_person", (q) => q.eq("personId", person._id)).take(max + 1),
+      connectionsFor(ctx, owner, "person", String(person._id), max),
+    ]);
+    return {
+      recordPersonas: personas.filter((row) => row.vaultOwnerId === owner && row.linkState !== "rejected").slice(0, max),
+      connections: related.connections,
+      truncated: personas.length > max || related.truncated,
+    };
+  },
 });
