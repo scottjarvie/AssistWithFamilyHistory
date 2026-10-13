@@ -1,10 +1,14 @@
 import {
+  AbortMultipartUploadCommand,
+  CompleteMultipartUploadCommand,
+  CreateMultipartUploadCommand,
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
   ListObjectVersionsCommand,
   PutObjectCommand,
   S3Client,
+  UploadPartCommand,
   type S3ClientConfig,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
@@ -124,6 +128,95 @@ export class EvidenceB2Store {
     }), { expiresIn });
     assertRelayCompatibleSignature(url);
     return url;
+  }
+
+  /** Open a multipart upload for an original too large for one relay request. */
+  async createMultipart(input: { objectKey: string; contentType: string }): Promise<string> {
+    const result = await this.client.send(new CreateMultipartUploadCommand({
+      Bucket: this.config.bucket,
+      Key: input.objectKey,
+      ContentType: input.contentType,
+      CacheControl: "private, no-store",
+    }));
+    if (!result.UploadId) throw new Error("B2 did not return a multipart upload id.");
+    return result.UploadId;
+  }
+
+  async signUploadPart(input: {
+    objectKey: string;
+    uploadId: string;
+    partNumber: number;
+    contentLength: number;
+    expiresAt?: number;
+  }): Promise<string> {
+    const expiresIn = input.expiresAt
+      ? remainingEvidenceUploadTtl(input.expiresAt)
+      : EVIDENCE_UPLOAD_TTL_SECONDS;
+    const url = await getSignedUrl(this.client, new UploadPartCommand({
+      Bucket: this.config.bucket,
+      Key: input.objectKey,
+      UploadId: input.uploadId,
+      PartNumber: input.partNumber,
+      ContentLength: input.contentLength,
+    }), { expiresIn });
+    assertRelayCompatibleSignature(url);
+    return url;
+  }
+
+  async completeMultipart(input: {
+    objectKey: string;
+    uploadId: string;
+    parts: Array<{ partNumber: number; etag: string }>;
+  }): Promise<void> {
+    await this.client.send(new CompleteMultipartUploadCommand({
+      Bucket: this.config.bucket,
+      Key: input.objectKey,
+      UploadId: input.uploadId,
+      MultipartUpload: {
+        Parts: [...input.parts]
+          .sort((a, b) => a.partNumber - b.partNumber)
+          .map((part) => ({ PartNumber: part.partNumber, ETag: part.etag })),
+      },
+    }));
+  }
+
+  async abortMultipart(objectKey: string, uploadId: string): Promise<void> {
+    await this.client.send(new AbortMultipartUploadCommand({
+      Bucket: this.config.bucket,
+      Key: objectKey,
+      UploadId: uploadId,
+    }));
+  }
+
+  /**
+   * Hash an exact version as it streams, keeping only its first bytes for type
+   * sniffing, so a whole scanned book never has to sit in memory.
+   */
+  async digest(objectKey: string, versionId: string, keepBytes = 64 * 1024): Promise<{
+    sha256: string;
+    sizeBytes: number;
+    head: Uint8Array;
+  }> {
+    const result = await this.client.send(new GetObjectCommand({
+      Bucket: this.config.bucket,
+      Key: objectKey,
+      VersionId: versionId,
+    }));
+    if (!result.Body) throw new Error("B2 returned no evidence bytes.");
+    const hash = createHash("sha256");
+    const head = new Uint8Array(keepBytes);
+    let kept = 0;
+    let sizeBytes = 0;
+    for await (const chunk of result.Body as AsyncIterable<Uint8Array>) {
+      hash.update(chunk);
+      if (kept < keepBytes) {
+        const take = Math.min(keepBytes - kept, chunk.byteLength);
+        head.set(chunk.subarray(0, take), kept);
+        kept += take;
+      }
+      sizeBytes += chunk.byteLength;
+    }
+    return { sha256: hash.digest("hex"), sizeBytes, head: head.subarray(0, kept) };
   }
 
   async head(objectKey: string, versionId?: string): Promise<EvidenceB2Head> {

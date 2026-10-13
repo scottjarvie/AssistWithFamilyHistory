@@ -1036,6 +1036,16 @@ export default defineSchema({
     expectedSha256: v.string(),
     objectKey: v.string(),
     relayTokenHash: v.string(),
+    /** Set when the original goes up in parts (over 20 MiB). */
+    multipartUploadId: v.optional(v.string()),
+    partSizeBytes: v.optional(v.number()),
+    /** Parts the relay stored, with the provider's receipt for each. */
+    parts: v.optional(v.array(v.object({
+      partNumber: v.number(),
+      etag: v.string(),
+      sizeBytes: v.number(),
+      sha256: v.string(),
+    }))),
     fileModifiedTime: v.optional(v.string()),
     scanTime: v.optional(v.string()),
     inferredHistoricalEventDate: v.optional(v.string()),

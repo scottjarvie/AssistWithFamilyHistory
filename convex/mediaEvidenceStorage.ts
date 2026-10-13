@@ -14,8 +14,12 @@ import {
 } from "../lib/media/evidenceB2";
 import { finalizeEvidenceFile, finalizeEvidenceImage } from "../lib/media/evidenceFinalize";
 import {
+  EVIDENCE_LARGE_UPLOAD_TTL_SECONDS,
+  EVIDENCE_PART_BYTES,
   EVIDENCE_UPLOAD_TTL_SECONDS,
   assertEvidenceUploadShape,
+  evidenceUploadParts,
+  isMultipartEvidenceUpload,
   isRenderedEvidenceImage,
   assertSha256,
   privateEvidenceObjectKey,
@@ -139,7 +143,9 @@ export const beginMcpEvidenceUpload = internalAction({
     const store = storage();
     const uploadRef = `family_evidence_${randomUUID()}`;
     const relayToken = randomBytes(32).toString("base64url");
-    const expiresAt = Date.now() + EVIDENCE_UPLOAD_TTL_SECONDS * 1000;
+    const multipart = isMultipartEvidenceUpload(args.input.sizeBytes);
+    const expiresAt = Date.now()
+      + (multipart ? EVIDENCE_LARGE_UPLOAD_TTL_SECONDS : EVIDENCE_UPLOAD_TTL_SECONDS) * 1000;
     const planned = await ctx.runMutation(internalApi.mediaEvidenceControl.planMcpEvidenceUpload, {
       ...args,
       uploadRef,
@@ -158,11 +164,53 @@ export const beginMcpEvidenceUpload = internalAction({
       };
     }
     const url = `${relayOrigin()}/evidence-upload/${encodeURIComponent(planned.uploadRef)}/${relayToken}`;
-    await ctx.scheduler.runAt(
-      planned.expiresAt + 5 * 60_000,
-      internalApi.mediaEvidenceStorage.cleanupMcpEvidenceUpload,
-      { uploadRef: planned.uploadRef },
-    );
+    if (!planned.replayed) {
+      await ctx.scheduler.runAt(
+        planned.expiresAt + 5 * 60_000,
+        internalApi.mediaEvidenceStorage.cleanupMcpEvidenceUpload,
+        { uploadRef: planned.uploadRef },
+      );
+    }
+    if (multipart) {
+      let uploadId = planned.multipartUploadId as string | undefined;
+      if (!uploadId) {
+        const created = await store.createMultipart({ objectKey: planned.objectKey, contentType: planned.contentType });
+        const attached = await ctx.runMutation(internalApi.mediaEvidenceControl.attachMultipartUpload, {
+          uploadRef: planned.uploadRef,
+          multipartUploadId: created,
+          partSizeBytes: EVIDENCE_PART_BYTES,
+        });
+        uploadId = attached.multipartUploadId;
+        if (uploadId !== created) {
+          // Another begin for this same operation won the race; drop ours.
+          try { await store.abortMultipart(planned.objectKey, created); } catch { /* cleanup retries */ }
+        }
+        if (!uploadId) throw new Error("Evidence upload session is no longer active.");
+      }
+      const parts = evidenceUploadParts(planned.sizeBytes, EVIDENCE_PART_BYTES);
+      return {
+        status: "pending_upload" as const,
+        uploadRef: planned.uploadRef,
+        upload: {
+          method: "PUT" as const,
+          mode: "parts" as const,
+          contentType: planned.contentType,
+          sizeBytes: planned.sizeBytes,
+          sha256: planned.sha256,
+          expiresAt: planned.expiresAt,
+          partSizeBytes: EVIDENCE_PART_BYTES,
+          parts: parts.map((part) => ({ ...part, url: `${url}/${part.partNumber}` })),
+          howTo: "PUT each part's bytes (offset to offset+sizeBytes of the file) to its url with the same Content-Type. Parts may go in any order and a failed part can be re-sent. Then call finish.",
+        },
+        next: {
+          tool: "family_history_finish_evidence_upload",
+          operationId: args.operationId,
+          uploadRef: planned.uploadRef,
+        },
+        replayed: planned.replayed,
+        privacy: "private_unreviewed" as const,
+      };
+    }
     return {
       status: "pending_upload" as const,
       uploadRef: planned.uploadRef,
@@ -187,7 +235,7 @@ export const beginMcpEvidenceUpload = internalAction({
 
 /** Called only by the first-party relay after it proves the opaque bearer token. */
 export const authorizeMcpEvidenceRelay = action({
-  args: { uploadRef: v.string(), relayToken: v.string() },
+  args: { uploadRef: v.string(), relayToken: v.string(), partNumber: v.optional(v.number()) },
   handler: async (ctx, args) => {
     const relay = await ctx.runQuery(internalApi.mediaEvidenceControl.relayAuthorization, {
       uploadRef: args.uploadRef,
@@ -195,6 +243,30 @@ export const authorizeMcpEvidenceRelay = action({
     });
     if (!relay) throw new Error("Upload authorization not found.");
     const store = storage();
+    // A multipart session accepts only numbered parts; a single upload only
+    // the whole file. Either mismatch is the same uniform refusal.
+    if (Boolean(relay.multipartUploadId) !== (args.partNumber !== undefined)) {
+      throw new Error("Upload authorization not found.");
+    }
+    if (relay.multipartUploadId) {
+      const part = evidenceUploadParts(relay.sizeBytes, relay.partSizeBytes)
+        .find((candidate) => candidate.partNumber === args.partNumber);
+      if (!part) throw new Error("Upload authorization not found.");
+      return {
+        method: "PUT" as const,
+        url: await store.signUploadPart({
+          objectKey: relay.objectKey,
+          uploadId: relay.multipartUploadId,
+          partNumber: part.partNumber,
+          contentLength: part.sizeBytes,
+          expiresAt: relay.expiresAt,
+        }),
+        contentType: relay.contentType,
+        sizeBytes: part.sizeBytes,
+        sha256: null,
+        partNumber: part.partNumber,
+      };
+    }
     return {
       method: "PUT" as const,
       url: await store.signPut({
@@ -339,6 +411,19 @@ export const finishMcpEvidenceUpload = internalAction({
     }
     const store = storage();
     try {
+      if (session.multipartUploadId) {
+        try {
+          await store.completeMultipart({
+            objectKey: session.objectKey,
+            uploadId: session.multipartUploadId,
+            parts: session.parts ?? [],
+          });
+        } catch (error) {
+          // A retry after an earlier finish already joined the parts finds no
+          // open upload; the exact-version checks below decide either way.
+          if ((error as { name?: string })?.name !== "NoSuchUpload") throw error;
+        }
+      }
       if (!isRenderedEvidenceImage(session.declaredContentType)) {
         const file = await finalizeEvidenceFile({
           store,
@@ -458,6 +543,11 @@ export const cleanupMcpEvidenceUpload = internalAction({
       return;
     }
     if (["authorized", "uploaded", "failed", "expired"].includes(state.session.state)) {
+      if (state.session.multipartUploadId) {
+        try {
+          await store.abortMultipart(state.session.objectKey, state.session.multipartUploadId);
+        } catch { /* already completed or aborted */ }
+      }
       await Promise.all([
         state.session.objectKey,
         privateEvidenceObjectKey(store.config.environment, state.session.ref, "tiny"),
