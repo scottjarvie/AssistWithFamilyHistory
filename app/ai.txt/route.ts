@@ -26,8 +26,10 @@ export function GET() {
     "2. Use family_history_search before creating records that may already exist.",
     "3. Use family_history_get_context to hydrate stable IDs and updatedAt before corrections.",
     "4. For a source that touches several people at once — a census page, a family group sheet — use family_history_save_records: one call, per-item results, and rows that fail come back named while the rest of the pass is still saved. Use family_history_save_complete_result when the pass must be all-or-nothing.",
-    "5. Preserve source/citation provenance, evidence-versus-conclusion status, conflicts, uncertainty, and blocked research honestly.",
-    "6. Queue context never grants domain-write authority. Use Queue tools only for work assigned to oauth-chosen-ai.",
+    "5. Store the original before any interpretation. Put the record's own words in source contents (indexed fields exactly as indexed, a transcription, an extract, the full text, a translation), each saying who made it, and save each person exactly as the record names them as a persona, with role and every field as written. Claims quote originalText. Your own reading of a record is a content of kind ai_reading or a research finding, never a replacement for the original, so another AI can later read the same original and reach its own conclusion.",
+    "6. Places go down to the building: country, county, parish, town, street, house, farm, church, temple, cemetery, school, ship. Nest them with parentCreateKey. Religions, ceremonies, customs, occupations and migrations are topics, always labelled as historical context. Link anything else with a connection; links you propose stay proposed until the person accepts them.",
+    "7. Preserve source/citation provenance, evidence-versus-conclusion status, conflicts, uncertainty, and blocked research honestly.",
+    "8. Queue context never grants domain-write authority. Use Queue tools only for work assigned to oauth-chosen-ai.",
     "",
     "## Permissions a person can approve",
     ...FAMILY_HISTORY_SCOPE_INFO.map(

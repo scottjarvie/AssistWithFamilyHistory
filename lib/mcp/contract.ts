@@ -28,6 +28,14 @@ export const FAMILY_HISTORY_MCP_LIMITS = {
   batchEvents: 50,
   batchEvidence: 20,
   batchStories: 10,
+  batchPlaces: 50,
+  batchTopics: 30,
+  batchConnections: 100,
+  /** Original text of one source content (a transcription, a translation). */
+  sourceContentText: 100_000,
+  /** How much of each content a source read shows before pointing at the full read. */
+  contentPreviewChars: 8_000,
+  contentsPerCall: 10,
   /** family_history_get_evidence — protected delivery budget. */
   evidenceItems: 10,
   evidencePerItemBytes: 2 * 1024 * 1024,

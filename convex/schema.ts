@@ -16,6 +16,40 @@ import { v } from "convex/values";
  * - AI-first extensions for storytelling and research
  */
 
+/**
+ * Server-derived "who first put this here". Same shape as the inline copies on
+ * persons, relationships and researchLog; the newer original-record tables use
+ * this shared constant.
+ */
+const creationProvenanceValidator = v.object({
+  actorKind: v.union(v.literal("user"), v.literal("chosen_ai"), v.literal("first_party_ai"), v.literal("system")),
+  actorId: v.string(),
+  method: v.union(v.literal("manual_first_start"), v.literal("import"), v.literal("mcp"), v.literal("legacy")),
+  evidenceStatus: v.union(v.literal("unsourced"), v.literal("source_linked")),
+  operationId: v.string(),
+  recordedAt: v.number(),
+});
+
+/** A reference to any record in the vault, used by Connections. */
+const recordRefValidator = v.object({
+  kind: v.union(
+    v.literal("person"),
+    v.literal("relationship"),
+    v.literal("event"),
+    v.literal("place"),
+    v.literal("source"),
+    v.literal("source_content"),
+    v.literal("persona"),
+    v.literal("citation"),
+    v.literal("claim"),
+    v.literal("media"),
+    v.literal("topic"),
+    v.literal("story"),
+    v.literal("research_finding"),
+  ),
+  id: v.string(),
+});
+
 export default defineSchema({
   /**
    * PERSONS
@@ -257,6 +291,17 @@ export default defineSchema({
       v.literal("naturalization"),
       v.literal("probate"),
       v.literal("land_record"),
+      v.literal("adoption"),
+      v.literal("engagement"),
+      v.literal("confirmation"),
+      v.literal("ordination"),
+      v.literal("religious_ordinance"),
+      v.literal("religious_membership"),
+      v.literal("education"),
+      v.literal("graduation"),
+      v.literal("retirement"),
+      v.literal("funeral"),
+      v.literal("cremation"),
       v.literal("custom")
     ),
     customType: v.optional(v.string()),
@@ -346,6 +391,22 @@ export default defineSchema({
       v.literal("village"),
       v.literal("parish"),
       v.literal("address"),
+      v.literal("region"),
+      v.literal("province"),
+      v.literal("district"),
+      v.literal("township"),
+      v.literal("neighborhood"),
+      v.literal("street"),
+      v.literal("building"),
+      v.literal("house"),
+      v.literal("farm"),
+      v.literal("church"),
+      v.literal("temple"),
+      v.literal("cemetery"),
+      v.literal("school"),
+      v.literal("hospital"),
+      v.literal("workplace"),
+      v.literal("ship"),
       v.literal("other")
     ),
     
@@ -365,6 +426,18 @@ export default defineSchema({
       })
     ),
     
+    // Names the place has gone by, each with when and in what language.
+    alternateNames: v.optional(v.array(v.object({
+      name: v.string(),
+      startYear: v.optional(v.number()),
+      endYear: v.optional(v.number()),
+      language: v.optional(v.string()),
+      note: v.optional(v.string()),
+    }))),
+    description: v.optional(v.string()),
+    importKey: v.optional(v.string()),
+    creationProvenance: v.optional(creationProvenanceValidator),
+
     // Additional info
     notes: v.optional(v.string()),
     
@@ -406,6 +479,18 @@ export default defineSchema({
       v.literal("website"),
       v.literal("repository"),
       v.literal("collection"),
+      v.literal("headstone"),
+      v.literal("journal"),
+      v.literal("family_bible"),
+      v.literal("family_memory"),
+      v.literal("oral_history"),
+      v.literal("probate"),
+      v.literal("land"),
+      v.literal("court"),
+      v.literal("directory"),
+      v.literal("school"),
+      v.literal("employment"),
+      v.literal("map"),
       v.literal("other")
     ),
     
@@ -430,6 +515,26 @@ export default defineSchema({
       })
     ),
     
+    // The original record, as the record itself states it. These are never a
+    // summary: the date and place exactly as written, the citation exactly as
+    // the repository gives it, and the identifiers that find the same record
+    // elsewhere. Text bodies (transcriptions, indexed fields, translations,
+    // AI readings) live in sourceContents, each attributed to who made it.
+    recordDate: v.optional(v.string()),
+    recordPlace: v.optional(v.object({
+      original: v.string(),
+      placeId: v.optional(v.id("places")),
+    })),
+    language: v.optional(v.string()),
+    citationText: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
+    externalIds: v.optional(v.array(v.object({
+      system: v.string(),
+      id: v.string(),
+      url: v.optional(v.string()),
+    }))),
+    creationProvenance: v.optional(creationProvenanceValidator),
+
     // Notes
     notes: v.optional(v.string()),
     
@@ -552,6 +657,17 @@ export default defineSchema({
       v.literal("rejected")
     ),
     conflictReason: v.optional(v.string()),
+    // Claim detail: the exact words in the source this claim rests on, whether
+    // the informant likely had first-hand knowledge, and which person in the
+    // record (persona) it was read from.
+    originalText: v.optional(v.string()),
+    informationKind: v.optional(v.union(
+      v.literal("primary"),
+      v.literal("secondary"),
+      v.literal("family_lore"),
+      v.literal("undetermined"),
+    )),
+    personaId: v.optional(v.id("recordPersonas")),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -561,6 +677,162 @@ export default defineSchema({
     .index("by_citation", ["citationId"])
     .index("by_import_key", ["importKey"])
     .index("by_status", ["status"]),
+
+  /**
+   * SOURCE CONTENTS
+   * The original data inside a source, kept verbatim and append-only.
+   *
+   * One source can hold many contents: the indexed fields as the indexer
+   * typed them, a full transcription, a translation, OCR text, and any number
+   * of AI readings. Each says what kind it is and who made it, so any later AI
+   * can go back to the original wording and make its own assessment instead of
+   * inheriting someone else's summary. A correction is a new row that points
+   * at the one it corrects; the earlier row stays.
+   */
+  sourceContents: defineTable({
+    vaultOwnerId: v.string(),
+    sourceId: v.id("sources"),
+    kind: v.union(
+      v.literal("indexed_fields"),
+      v.literal("transcription"),
+      v.literal("extract"),
+      v.literal("full_text"),
+      v.literal("translation"),
+      v.literal("abstract"),
+      v.literal("ai_reading"),
+    ),
+    title: v.optional(v.string()),
+    text: v.optional(v.string()),
+    fields: v.optional(v.array(v.object({
+      label: v.string(),
+      value: v.string(),
+      personaKey: v.optional(v.string()),
+    }))),
+    language: v.optional(v.string()),
+    location: v.optional(v.string()),
+    madeBy: v.object({
+      kind: v.union(
+        v.literal("record_creator"),
+        v.literal("indexer"),
+        v.literal("person"),
+        v.literal("chosen_ai"),
+        v.literal("other"),
+      ),
+      name: v.optional(v.string()),
+    }),
+    method: v.optional(v.string()),
+    fromMediaId: v.optional(v.id("media")),
+    supersedesId: v.optional(v.id("sourceContents")),
+    importKey: v.optional(v.string()),
+    creationProvenance: v.optional(creationProvenanceValidator),
+    createdAt: v.number(),
+  })
+    .index("by_owner", ["vaultOwnerId"])
+    .index("by_source", ["sourceId"]),
+
+  /**
+   * RECORD PERSONAS
+   * A person exactly as one record names them: "Jno. Smyth, Head, 42, b.
+   * Ireland". Kept separate from the researched Person so a record is never
+   * rewritten to fit a conclusion. The link to a Person is a proposal until the
+   * person accepts it.
+   */
+  recordPersonas: defineTable({
+    vaultOwnerId: v.string(),
+    sourceId: v.id("sources"),
+    personaKey: v.string(),
+    nameAsWritten: v.string(),
+    role: v.optional(v.string()),
+    sexAsWritten: v.optional(v.string()),
+    fields: v.array(v.object({ label: v.string(), value: v.string() })),
+    personId: v.optional(v.id("persons")),
+    linkState: v.optional(v.union(v.literal("proposed"), v.literal("accepted"), v.literal("rejected"))),
+    linkReason: v.optional(v.string()),
+    importKey: v.optional(v.string()),
+    creationProvenance: v.optional(creationProvenanceValidator),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner", ["vaultOwnerId"])
+    .index("by_source", ["sourceId"])
+    .index("by_source_key", ["sourceId", "personaKey"])
+    .index("by_person", ["personId"]),
+
+  /**
+   * TOPICS
+   * Subjects that connect many lives: a religion, a ceremony or custom, an
+   * occupation, a migration, a war, a community, a ship. Always historical
+   * context, never evidence about a particular person; Connections attach
+   * people, places and sources to them.
+   */
+  topics: defineTable({
+    vaultOwnerId: v.string(),
+    name: v.string(),
+    kind: v.union(
+      v.literal("religion"),
+      v.literal("ceremony"),
+      v.literal("custom"),
+      v.literal("occupation"),
+      v.literal("migration"),
+      v.literal("war"),
+      v.literal("event"),
+      v.literal("community"),
+      v.literal("institution"),
+      v.literal("ship"),
+      v.literal("law"),
+      v.literal("other"),
+    ),
+    description: v.optional(v.string()),
+    alternateNames: v.optional(v.array(v.string())),
+    startYear: v.optional(v.number()),
+    endYear: v.optional(v.number()),
+    placeIds: v.optional(v.array(v.id("places"))),
+    sourceRefs: v.optional(v.array(v.string())),
+    importKey: v.optional(v.string()),
+    creationProvenance: v.optional(creationProvenanceValidator),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner", ["vaultOwnerId"])
+    .index("by_owner_kind", ["vaultOwnerId", "kind"]),
+
+  /**
+   * CONNECTIONS
+   * Any typed link between two records that has no home of its own: a photo
+   * depicts a person, a building sits in a town, a person practised a
+   * religion, a source mentions a place. AI-made connections start proposed.
+   */
+  connections: defineTable({
+    vaultOwnerId: v.string(),
+    from: recordRefValidator,
+    to: recordRefValidator,
+    relation: v.union(
+      v.literal("about"),
+      v.literal("mentions"),
+      v.literal("depicts"),
+      v.literal("taken_at"),
+      v.literal("located_in"),
+      v.literal("member_of"),
+      v.literal("practiced"),
+      v.literal("participated_in"),
+      v.literal("worked_at"),
+      v.literal("lived_at"),
+      v.literal("buried_at"),
+      v.literal("supports"),
+      v.literal("contradicts"),
+      v.literal("possibly_same_as"),
+      v.literal("related"),
+    ),
+    reason: v.optional(v.string()),
+    state: v.union(v.literal("proposed"), v.literal("accepted"), v.literal("rejected")),
+    importKey: v.optional(v.string()),
+    creationProvenance: v.optional(creationProvenanceValidator),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner", ["vaultOwnerId"])
+    .index("by_from", ["from.kind", "from.id"])
+    .index("by_to", ["to.kind", "to.id"]),
 
   /**
    * MEDIA
@@ -1741,6 +2013,11 @@ export default defineSchema({
       v.literal("research_task"),
       v.literal("research_log"),
       v.literal("story"),
+      v.literal("place"),
+      v.literal("topic"),
+      v.literal("connection"),
+      v.literal("source_content"),
+      v.literal("persona"),
     ),
     recordKey: v.string(),
     recordId: v.string(),

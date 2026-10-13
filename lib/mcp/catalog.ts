@@ -200,7 +200,7 @@ export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
     writes: false,
     title: "Search Family History",
     description:
-      "Search bounded owner-scoped summaries across people, sources, stories, research tasks/findings, and events. Hydrate a returned stable ID before editing.",
+      "Search bounded owner-scoped summaries across people, sources, places, topics, stories, research tasks/findings, and events. Hydrate a returned stable ID before editing.",
     humanSummary: "Searches your research for matching people, sources, and notes.",
     implementedBy: "convex/mcpFamilyHistory.search",
     sunsetNote: ALIAS_SUNSET,
@@ -212,7 +212,7 @@ export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
     writes: false,
     title: "Get Family History context",
     description:
-      "Hydrate one person, story, source, event, relationship, research task, or research finding. Living-person notes stay withheld and only reviewed AI-allowed loose context and media metadata are included.",
+      "Hydrate one person, story, source, source_content, place, topic, event, relationship, research task, or research finding. A source comes back with its original content (each labelled with who made it), the people as the record names them, its claims and connections; a long text is cut and can be read whole as kind source_content. Living-person notes stay withheld and only reviewed AI-allowed loose context and media metadata are included.",
     humanSummary: "Opens the full detail of one record you allowed.",
     implementedBy: "convex/mcpFamilyHistory.getRecordContext",
     sunsetNote: ALIAS_SUNSET,
@@ -332,10 +332,20 @@ export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
     writes: true,
     title: "Save Family History records in one batch",
     description:
-      "BATCH, PREFERRED FOR REAL SOURCES. One call, one approval, one transaction, per-item results. Use this when a single source touches several people at once — a census page, a family group sheet, a ship manifest. Relationship and event items may name a person created in the SAME call by its createKey (person1CreateKey, person2CreateKey, personRoles[].personCreateKey). A row that fails comes back as status \"failed\" with a reason; the rest of the pass is still saved. Use family_history_save_complete_result instead when the pass must be all-or-nothing.",
+      "BATCH, PREFERRED FOR REAL SOURCES. One call, one approval, one transaction, per-item results. Store the ORIGINAL first: each evidence item can carry the record's own content (contents: indexed fields, transcription, extract, full text, translation; each says who made it) and the people exactly as the record names them (personas, with role and every field as written). Claims (facts) quote originalText and may name the personaKey they were read from. Save places (countries down to a church, cemetery, farm or house; nest them with parentCreateKey), topics (a religion, ceremony, custom, occupation, migration, war, community) and typed connections in the same call. Any place reference may use placeCreateKey; relationship, event, persona and connection items may name records created earlier in the SAME call by createKey. Your own interpretation goes in a content of kind ai_reading or in family_history_save_research_work, never in place of the original. Links you propose (persona to person, connections) stay proposed until the person accepts them. A row that fails comes back as status \"failed\" with a reason; the rest of the pass is still saved.",
     humanSummary:
       "Saves a whole source's worth of proposed records at once, telling you exactly which rows worked.",
     implementedBy: "convex/mcpFamilyHistory.saveRecords",
+  },
+  {
+    name: "family_history_add_source_content",
+    requiredScope: "family_history:research:write",
+    writes: true,
+    title: "Add original content to a source",
+    description:
+      "Append a transcription, translation, extract, full text, indexed fields, or your own ai_reading to a source that already exists. Append-only: earlier content is never changed. To correct one, add a new content with supersedesId; both stay readable so any later AI can compare.",
+    humanSummary: "Adds a transcription, translation, or AI reading beside a source's original, never over it.",
+    implementedBy: "convex/mcpFamilyHistory.addSourceContent",
   },
   {
     name: "family_history_save_complete_result",
