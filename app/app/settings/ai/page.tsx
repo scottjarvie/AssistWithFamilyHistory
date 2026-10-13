@@ -79,9 +79,9 @@ export default async function AiConnectionsPage() {
           AI Connections
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-7 text-stone-600">
-          Signing in proves whose workspace this is. It does not decide what an AI may do — you do,
-          here, one connection at a time. Nothing works until you approve it, everything is limited
-          to exactly what you tick, and turning a connection off stops it on its very next request.
+          Signing in approves an AI for ordinary research work in your workspace for 90 days. It can
+          never publish, delete, merge, share or export. Narrow any connection here, and turning one
+          off stops it on its very next request.
         </p>
         <p className="mt-3 max-w-2xl text-sm leading-7 text-stone-600">
           New here?{" "}

@@ -76,7 +76,7 @@ const ALIAS_COUNT = FAMILY_HISTORY_TOOLS.filter((tool) => tool.alias).length;
  */
 const currentInSource = [
   `${TOOL_COUNT} Family History tools share one stateless connection address, with ${ALIAS_COUNT} older names kept working as aliases.`,
-  "Signing in never grants authority on its own: every request resolves the permission the person approved, and fails closed without one.",
+  "Signing in approves the ordinary research permissions; publishing, deleting, merging, sharing and exporting are never available to a connection. Every request re-checks the permission, so narrowing it or turning it off works at once.",
   "Turning a connection off takes effect on its very next request, because the permission is re-checked every time rather than waiting for a sign-in to expire.",
   "A whole source's worth of records saves in one call, reporting each row's own outcome instead of discarding the pass.",
   "Reviewed, AI-allowed files are delivered through the connection itself; a storage link is never handed to a model.",
@@ -167,7 +167,7 @@ export default function AiSetupPage() {
                 {[
                   ["Choose a compatible client", "It must support remote Streamable HTTP MCP and OAuth. Exact menu names differ by client."],
                   ["Add the MCP address", "Use https://assistwithfamilyhistory.com/mcp as the server URL."],
-                  ["Sign in, then approve what it may do", "Signing in proves whose workspace it is; it does not decide what the AI may do. Its first call is refused and waits for you at /app/settings/ai, where you choose the permissions, the records, and how long it lasts."],
+                  ["Sign in", "Signing in approves the connection for ordinary research work in your workspace for 90 days. You can narrow it, or turn it off, at /app/settings/ai at any time."],
                   ["Ask for the Family History brief", "Your AI should call family_history_get_brief first, then search and hydrate before changing records."],
                 ].map(([title, copy], index) => (
                   <li key={title} className="grid grid-cols-[2.5rem_1fr] gap-4">

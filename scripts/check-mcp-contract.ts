@@ -259,8 +259,8 @@ assert.deepEqual(
 );
 assert.deepEqual(
   capabilityManifest.mcp?.authorityTiers?.defaultAfterOAuth,
-  [],
-  "OAuth sign-in must grant no Family History product permission by default",
+  [...FAMILY_HISTORY_SCOPES],
+  "OAuth sign-in grants the ordinary scope ceiling (owner decision 2026-10-13); the never-list stays outside it",
 );
 assert.deepEqual(
   capabilityManifest.mcp?.authorityTiers?.personApproved,

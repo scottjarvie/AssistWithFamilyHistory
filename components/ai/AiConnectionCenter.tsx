@@ -752,8 +752,8 @@ export function AiConnectionCenter({
         </h2>
         {pending.length === 0 ? (
           <p className="mt-2 text-sm leading-6 text-stone-600">
-            Nothing is waiting. When an AI signs in here for the first time it is refused and lands
-            in this list, so it can never start working before you have said what it may do.
+            Nothing is waiting. An AI you sign in is approved for ordinary research work straight
+            away and shows below; connections from before that change may still wait here.
           </p>
         ) : (
           <div className="mt-4 space-y-6">
