@@ -31,7 +31,15 @@
       "family_history_update_queue"
     ],
     "authorityTiers": {
-      "defaultAfterOAuth": [],
+      "defaultAfterOAuth": [
+        "family_history:context:read",
+        "family_history:evidence:read",
+        "family_history:evidence:write",
+        "family_history:research:write",
+        "family_history:story:draft",
+        "family_history:queue:read",
+        "family_history:queue:work"
+      ],
       "personApproved": [
         "family_history:context:read",
         "family_history:evidence:read",

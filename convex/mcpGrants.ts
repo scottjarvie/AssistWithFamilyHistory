@@ -22,6 +22,7 @@ import {
 import { authorizeTenantAction, authorizeTenantMutation, type TrustBoundaryShadowEntry } from "./access";
 import { internal } from "./_generated/api";
 import {
+  FAMILY_HISTORY_SCOPES,
   FAMILY_HISTORY_SCOPE_INFO,
   NEVER_EXPOSED,
   NEVER_PERMITTED,
@@ -35,9 +36,6 @@ import {
   type GrantResolution,
   type ResolvedGrant,
 } from "../lib/mcp/authorize";
-
-/** At most this many unanswered connection requests may pile up per person. */
-export const MAX_PENDING_GRANTS_PER_OWNER = 5;
 
 /** Skip the last-used write when the same tool ran again inside this window. */
 const USE_TOUCH_THROTTLE_MS = 15_000;
@@ -94,9 +92,12 @@ export function buildConsentSnapshot(input: {
   observedClientName?: string;
   clientId: string;
   clientProvenance: string;
+  /** "sign_in" when signing in was the approval rather than the settings page. */
+  approvedBy?: "settings" | "sign_in";
 }) {
   return JSON.stringify({
     shownAt: Date.now(),
+    approvedBy: input.approvedBy ?? "settings",
     connectionLabel: input.label,
     clientId: input.clientId,
     observedClientName: input.observedClientName ?? null,
@@ -160,42 +161,77 @@ export const resolveForRequest = internalMutation({
       .sort((a, b) => (b.consentedAt ?? b.updatedAt) - (a.consentedAt ?? a.updatedAt))[0];
 
     if (active) {
-      if (isGrantExpired(active, now)) {
-        await ctx.db.patch(active._id, { status: "expired", updatedAt: now });
-        return { state: "expired" };
-      }
-      return { state: "active", grant: toResolvedGrant(active) };
+      if (!isGrantExpired(active, now)) return { state: "active", grant: toResolvedGrant(active) };
+      // The term ran out; a signed-in request renews it below.
+      await ctx.db.patch(active._id, { status: "expired", updatedAt: now });
+      active.status = "expired";
+      active.updatedAt = now;
     }
 
-    if (rows.some((row) => row.status === "pending")) return { state: "pending" };
+    // A person's own "no" stands: a denied or turned-off connection is never
+    // reopened by signing in again. They reconnect from settings.
     if (rows.some((row) => row.status === "denied")) return { state: "denied" };
     if (rows.some((row) => row.status === "revoked")) return { state: "revoked" };
-    if (rows.some((row) => row.status === "expired")) return { state: "expired" };
 
-    // Nothing on record: raise exactly one bounded connection request so the
-    // person can approve it in the product, where real scope language exists.
-    const pending = await ctx.db
-      .query("mcpGrants")
-      .withIndex("by_owner_status", (q) => q.eq("vaultOwnerId", owner).eq("status", "pending"))
-      .take(MAX_PENDING_GRANTS_PER_OWNER + 1);
-    if (pending.length < MAX_PENDING_GRANTS_PER_OWNER) {
-      await ctx.db.insert("mcpGrants", {
-        vaultOwnerId: owner,
+    // Signing in is the approval (owner decision, 2026-10-13). The connection
+    // gets the ordinary permissions over the whole workspace for the default
+    // term. The never-list (publish, delete, merge, share, export) is outside
+    // the scope ceiling, so no grant here can reach it. The person can narrow
+    // or turn the connection off in settings at any time.
+    const expiresAt = now + DEFAULT_GRANT_DAYS * 24 * 60 * 60 * 1000;
+    const label = trimmed(args.observedClientName, 80) ?? "AI connection";
+    const latest = (status: Doc<"mcpGrants">["status"]) =>
+      rows
+        .filter((row) => row.status === status)
+        .sort((a, b) => b.updatedAt - a.updatedAt)[0];
+
+    // An expired connection is renewed with whatever narrowing the person set;
+    // a request left over from the approve-first era becomes the whole grant.
+    const previous = latest("expired") ?? latest("pending");
+    const scopes = previous && previous.status === "expired" && previous.scopes.length > 0
+      ? clampToScopeCeiling(previous.scopes)
+      : [...FAMILY_HISTORY_SCOPES];
+    const boundary: Doc<"mcpGrants">["boundary"] =
+      previous && previous.status === "expired" && previous.scopes.length > 0
+        ? previous.boundary
+        : { kind: "whole_workspace" };
+    const fields = {
+      scopes,
+      boundary,
+      status: "active" as const,
+      consentedAt: now,
+      issuedAt: now,
+      expiresAt,
+      updatedAt: now,
+      consentSnapshot: buildConsentSnapshot({
+        scopes,
+        boundary,
+        expiresAt,
+        label: previous?.label ?? label,
+        observedClientName: trimmed(args.observedClientName, 120) ?? previous?.observedClientName,
         clientId,
-        issuer: args.issuer,
-        label: trimmed(args.observedClientName, 80) ?? "New AI connection",
-        observedClientName: trimmed(args.observedClientName, 120),
-        clientProvenance: args.clientProvenance ?? "manual",
-        clientMetadataUrl: args.clientMetadataUrl,
-        scopes: [],
-        boundary: { kind: "queue_only" },
-        status: "pending",
-        requestedAt: now,
-        useCount: 0,
-        updatedAt: now,
-      });
+        clientProvenance: args.clientProvenance ?? previous?.clientProvenance ?? "manual",
+        approvedBy: "sign_in",
+      }),
+    };
+    if (previous) {
+      await ctx.db.patch(previous._id, fields);
+      const row = (await ctx.db.get(previous._id))!;
+      return { state: "active", grant: toResolvedGrant(row) };
     }
-    return { state: "absent" };
+    const id = await ctx.db.insert("mcpGrants", {
+      vaultOwnerId: owner,
+      clientId,
+      issuer: args.issuer,
+      label,
+      observedClientName: trimmed(args.observedClientName, 120),
+      clientProvenance: args.clientProvenance ?? "manual",
+      clientMetadataUrl: args.clientMetadataUrl,
+      requestedAt: now,
+      useCount: 0,
+      ...fields,
+    });
+    return { state: "active", grant: toResolvedGrant((await ctx.db.get(id))!) };
   },
 });
 

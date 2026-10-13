@@ -14,6 +14,7 @@ import schema from "./schema";
 import { internal } from "./_generated/api";
 import {
   FAMILY_HISTORY_ALL_TOOL_NAMES,
+  FAMILY_HISTORY_SCOPES,
   FAMILY_HISTORY_TOOLS,
   findTool,
   scopeForTool,
@@ -193,52 +194,70 @@ describe("scope to tool matrix", () => {
   });
 });
 
-describe("grant states deny both discovery and calls", () => {
-  test("an unapproved connection sees no tools and is told to ask the person", async () => {
+describe("grant states: sign-in approves, the person's no stands", () => {
+  test("signing in approves a new connection for the ordinary permissions, once", async () => {
     const t = convexTest(schema, modules);
-    expect(await toolNames(t, OWNER_A)).toEqual([]);
+    expect(await toolNames(t, OWNER_A)).toContain("family_history_get_brief");
 
     const call = await callTool(t, OWNER_A, "family_history_get_brief", {});
-    expect(call.isError).toBe(true);
-    expect(call.body.code).toBe("GRANT_REQUIRED");
-    expect(call.body.recovery).toContain("/settings/ai");
+    expect(call.isError).toBe(false);
 
-    // Exactly one pending request is raised, and a second call does not add
-    // another for the same client.
-    await callTool(t, OWNER_A, "family_history_get_brief", {});
-    const pending = await t.run(async (ctx) =>
+    // Exactly one grant exists for the client, over the whole workspace, and it
+    // records that sign-in was the approval.
+    const rows = await t.run(async (ctx) =>
       await ctx.db
         .query("mcpGrants")
-        .withIndex("by_owner_status", (q) => q.eq("vaultOwnerId", OWNER_A).eq("status", "pending"))
+        .withIndex("by_owner_client", (q) => q.eq("vaultOwnerId", OWNER_A).eq("clientId", CLIENT_ID))
         .collect(),
     );
-    expect(pending).toHaveLength(1);
-    expect(pending[0].scopes).toEqual([]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe("active");
+    expect(rows[0].boundary.kind).toBe("whole_workspace");
+    expect([...rows[0].scopes].sort()).toEqual([...FAMILY_HISTORY_SCOPES].sort());
+    expect(rows[0].expiresAt! - Date.now()).toBeGreaterThan(89 * 24 * 60 * 60 * 1000);
+    expect(JSON.parse(rows[0].consentSnapshot!).approvedBy).toBe("sign_in");
+    // The never-list is outside the scope ceiling, so sign-in cannot reach it.
+    expect(await toolNames(t, OWNER_A)).not.toContain("family_history_delete_person");
   });
 
-  test("pending, revoked, expired, and denied all fail closed", async () => {
-    for (const status of ["pending", "revoked", "expired", "denied"] as const) {
+  test("revoked and denied stay refused after signing in again", async () => {
+    for (const status of ["revoked", "denied"] as const) {
       const t = convexTest(schema, modules);
       await seedGrant(t, { vaultOwnerId: OWNER_A, clientId: CLIENT_ID, issuer: ISSUER, status });
       expect(await toolNames(t, OWNER_A)).toEqual([]);
       const call = await callTool(t, OWNER_A, "family_history_get_brief", {});
       expect(call.isError).toBe(true);
-      expect(["GRANT_REQUIRED", "GRANT_REVOKED", "GRANT_EXPIRED"]).toContain(call.body.code);
+      expect(call.body.code).toBe("GRANT_REVOKED");
     }
   });
 
-  test("expiry is decided in code at read time, not by the token's lifetime", async () => {
+  test("a waiting request from before sign-in approval becomes the whole grant", async () => {
+    const t = convexTest(schema, modules);
+    await seedGrant(t, { vaultOwnerId: OWNER_A, clientId: CLIENT_ID, issuer: ISSUER, status: "pending", scopes: [] });
+    const call = await callTool(t, OWNER_A, "family_history_get_brief", {});
+    expect(call.isError).toBe(false);
+    const rows = await t.run(async (ctx) => await ctx.db.query("mcpGrants").collect());
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe("active");
+  });
+
+  test("an expired term renews on the next signed-in request and keeps the person's narrowing", async () => {
     const t = convexTest(schema, modules);
     await seedGrant(t, {
       vaultOwnerId: OWNER_A,
       clientId: CLIENT_ID,
       issuer: ISSUER,
+      scopes: ["family_history:context:read"],
       expiresAt: Date.now() - 1_000,
     });
-    // The access token below is perfectly valid for another five minutes.
     const call = await callTool(t, OWNER_A, "family_history_get_brief", {});
-    expect(call.isError).toBe(true);
-    expect(call.body.code).toBe("GRANT_EXPIRED");
+    expect(call.isError).toBe(false);
+    const rows = await t.run(async (ctx) => await ctx.db.query("mcpGrants").collect());
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe("active");
+    expect(rows[0].scopes).toEqual(["family_history:context:read"]);
+    expect(rows[0].expiresAt!).toBeGreaterThan(Date.now());
+    expect(await toolNames(t, OWNER_A)).not.toContain("family_history_save_records");
   });
 
   test("revoking a grant denies the very next request with the same token", async () => {
@@ -385,10 +404,18 @@ describe("record boundaries", () => {
 describe("cross-owner isolation", () => {
   test("owner B's grant is invisible to owner A and vice versa", async () => {
     const t = convexTest(schema, modules);
-    await seedGrant(t, { vaultOwnerId: OWNER_B, clientId: CLIENT_ID, issuer: ISSUER });
-    // Same client, different verified subject: A has no grant of their own.
-    expect(await toolNames(t, OWNER_A)).toEqual([]);
-    expect(await toolNames(t, OWNER_B)).not.toEqual([]);
+    await seedGrant(t, {
+      vaultOwnerId: OWNER_B,
+      clientId: CLIENT_ID,
+      issuer: ISSUER,
+      scopes: ["family_history:context:read"],
+    });
+    // Same client, different verified subject: B's narrowed grant does not
+    // govern A, who gets a grant of their own from signing in.
+    expect(await toolNames(t, OWNER_A)).toContain("family_history_save_records");
+    expect(await toolNames(t, OWNER_B)).not.toContain("family_history_save_records");
+    const rows = await t.run(async (ctx) => await ctx.db.query("mcpGrants").collect());
+    expect(rows.map((row) => row.vaultOwnerId).sort()).toEqual([OWNER_A, OWNER_B].sort());
   });
 
   test("no grant refusal anywhere names a record, an owner, or a table", async () => {

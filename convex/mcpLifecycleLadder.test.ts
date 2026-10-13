@@ -160,27 +160,22 @@ describe("chosen-AI lifecycle ladder (locally provable rungs)", () => {
     expect(body.bearer_methods_supported).toContain("header");
   });
 
-  test("3 · discovery is empty without a grant and filtered by it afterwards", async () => {
+  test("3 · sign-in approves the connection, and a narrowed grant filters discovery", async () => {
     const t = convexTest(schema, modules);
     const token = await accessToken(OWNER);
 
-    const beforeApproval = await connect(t, token);
-    expect((await beforeApproval.listTools()).tools).toEqual([]);
-    await beforeApproval.close();
+    const firstContact = await connect(t, token);
+    expect((await firstContact.listTools()).tools.length).toBeGreaterThan(0);
+    await firstContact.close();
 
-    // The refused first call raised exactly one pending request for the person.
-    const pending = await t.run(async (ctx) => ctx.db.query("mcpGrants").collect());
-    expect(pending).toHaveLength(1);
-    expect(pending[0].status).toBe("pending");
-    expect(pending[0].observedClientName).toContain(RUN_KEY);
+    // Signing in raised exactly one active grant, named for the client.
+    const granted = await t.run(async (ctx) => ctx.db.query("mcpGrants").collect());
+    expect(granted).toHaveLength(1);
+    expect(granted[0].status).toBe("active");
+    expect(granted[0].observedClientName).toContain(RUN_KEY);
 
-    await t.run(async (ctx) => ctx.db.delete(pending[0]._id));
-    await seedGrant(t, {
-      vaultOwnerId: OWNER,
-      clientId: CLIENT_ID,
-      issuer: ISSUER,
-      scopes: ["family_history:context:read"],
-    });
+    // The person narrows it to reading only.
+    await t.run(async (ctx) => ctx.db.patch(granted[0]._id, { scopes: ["family_history:context:read"] }));
 
     const afterApproval = await connect(t, token);
     const names = (await afterApproval.listTools()).tools.map((tool) => tool.name);

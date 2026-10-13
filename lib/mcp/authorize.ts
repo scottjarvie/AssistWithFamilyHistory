@@ -103,7 +103,7 @@ export const GRANT_REFUSALS: Record<string, AccessRefusal> = {
     allowed: false,
     code: "GRANT_REVOKED",
     message: "The person turned this AI connection off.",
-    recovery: `Stop calling Family History tools. If the person wants to reconnect, they can approve a new connection at ${CONNECTION_SETTINGS_URL}.`,
+    recovery: `Stop calling Family History tools. If the person wants to reconnect, they can remove this connection from the list at ${CONNECTION_SETTINGS_URL} and sign in again.`,
   },
   GRANT_DENIED: {
     allowed: false,
