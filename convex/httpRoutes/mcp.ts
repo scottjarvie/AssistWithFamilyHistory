@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- Generated Convex references and SDK callbacks cross a runtime-validated MCP boundary. */
 import type { HttpRouter } from "convex/server";
+import { EVIDENCE_ORIGINAL_MAX_BYTES, EVIDENCE_UPLOAD_TYPES } from "../../lib/media/evidenceStandard";
 import { McpServer, createMcpHandler, type AuthInfo } from "@modelcontextprotocol/server";
 import { createRemoteJWKSet, errors as joseErrors, jwtVerify } from "jose";
 import { z } from "zod";
@@ -876,8 +877,8 @@ export function createFamilyHistoryServer(
       title: z.string().trim().min(1).max(200),
       description: z.string().trim().max(2_000).optional(),
       fileName: z.string().trim().min(1).max(240),
-      contentType: z.enum(["image/jpeg", "image/png", "image/webp"]),
-      sizeBytes: z.number().int().min(1).max(25 * 1024 * 1024),
+      contentType: z.enum(EVIDENCE_UPLOAD_TYPES),
+      sizeBytes: z.number().int().min(1).max(EVIDENCE_ORIGINAL_MAX_BYTES),
       sha256: z.string().regex(/^[a-fA-F0-9]{64}$/),
       fileModifiedTime: z.string().datetime().optional(),
       scanTime: z.string().datetime().optional(),

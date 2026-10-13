@@ -12,10 +12,11 @@ import {
   loadEvidenceB2Config,
   sha256Hex,
 } from "../lib/media/evidenceB2";
-import { finalizeEvidenceImage } from "../lib/media/evidenceFinalize";
+import { finalizeEvidenceFile, finalizeEvidenceImage } from "../lib/media/evidenceFinalize";
 import {
   EVIDENCE_UPLOAD_TTL_SECONDS,
   assertEvidenceUploadShape,
+  isRenderedEvidenceImage,
   assertSha256,
   privateEvidenceObjectKey,
 } from "../lib/media/evidenceStandard";
@@ -106,11 +107,18 @@ async function verifyCredentialCannotListBucket(
   throw new Error(`${source.config.bucketClass} B2 credential unexpectedly listed the other bucket.`);
 }
 
-function publicOrigin(): string {
-  const raw = process.env.MCP_PUBLIC_ORIGIN?.trim() || "https://assistwithfamilyhistory.com";
+/**
+ * Where an upload's bytes go: the Convex HTTP relay, which takes bodies up to
+ * 20 MiB. The product hostname's own relay runs as a Vercel function and is
+ * refused above about 4.5 MB, so it is no longer handed out.
+ */
+function relayOrigin(): string {
+  const raw = process.env.CONVEX_SITE_URL?.trim();
+  if (!raw) throw new Error("CONVEX_SITE_URL is not available to the upload relay.");
   const url = new URL(raw);
-  if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) {
-    throw new Error("MCP_PUBLIC_ORIGIN must be a plain HTTPS origin.");
+  const local = url.hostname === "127.0.0.1" || url.hostname === "localhost";
+  if ((url.protocol !== "https:" && !local) || url.username || url.password || url.search || url.hash) {
+    throw new Error("CONVEX_SITE_URL must be a plain HTTPS origin.");
   }
   return url.origin;
 }
@@ -149,7 +157,7 @@ export const beginMcpEvidenceUpload = internalAction({
         reviewAuthority: "person_only" as const,
       };
     }
-    const url = `${publicOrigin()}/api/mcp-media-upload/${encodeURIComponent(planned.uploadRef)}/${relayToken}`;
+    const url = `${relayOrigin()}/evidence-upload/${encodeURIComponent(planned.uploadRef)}/${relayToken}`;
     await ctx.scheduler.runAt(
       planned.expiresAt + 5 * 60_000,
       internalApi.mediaEvidenceStorage.cleanupMcpEvidenceUpload,
@@ -282,7 +290,9 @@ export const signMcpEvidenceRead = internalAction({
         mediaId: args.mediaId,
       }))?.uploadRef ?? "",
     });
-    const manifest = cleanupState?.manifests?.medium;
+    // Images are read as their metadata-clean medium copy; files without
+    // display copies are read as the exact original, size-capped upstream.
+    const manifest = cleanupState?.manifests?.medium ?? cleanupState?.manifests?.original;
     if (!manifest) throw new Error("Evidence is not available to this connection.");
     const store = storage();
     if (manifest.bucketClass !== "private" || manifest.bucketName !== store.config.bucket) {
@@ -329,6 +339,42 @@ export const finishMcpEvidenceUpload = internalAction({
     }
     const store = storage();
     try {
+      if (!isRenderedEvidenceImage(session.declaredContentType)) {
+        const file = await finalizeEvidenceFile({
+          store,
+          objectKey: session.objectKey,
+          declaredContentType: session.declaredContentType,
+          declaredSizeBytes: session.declaredSizeBytes,
+          expectedSha256: session.expectedSha256,
+          fileModifiedTime: session.fileModifiedTime,
+          scanTime: session.scanTime,
+          inferredHistoricalEventDate: session.inferredHistoricalEventDate,
+        });
+        const committed = await ctx.runMutation(internalApi.mediaEvidenceControl.commitMcpEvidenceUpload, {
+          principal: args.principal,
+          grantId: args.grantId,
+          uploadRef: session.ref,
+          original: file.original,
+          metadataProposal: file.metadataProposal,
+        });
+        await ctx.scheduler.runAt(
+          session.expiresAt + 5 * 60_000,
+          internalApi.mediaEvidenceStorage.cleanupMcpEvidenceUpload,
+          { uploadRef: session.ref },
+        );
+        return {
+          status: "pending_person_review" as const,
+          mediaId: String(committed.mediaId),
+          uploadRef: session.ref,
+          replayed: committed.replayed,
+          privacy: "private" as const,
+          reviewStatus: "unreviewed" as const,
+          rightsStatus: "unknown" as const,
+          aiUseAllowed: false,
+          original: { contentType: file.original.contentType, sizeBytes: file.original.sizeBytes, keptExact: true },
+          next: "The person reviews source, rights and people before this connection can read the file later.",
+        };
+      }
       const verified = await finalizeEvidenceImage({
         store,
         uploadRef: session.ref,
@@ -374,7 +420,7 @@ export const finishMcpEvidenceUpload = internalAction({
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      const terminal = /SHA-256|byte length changed|stored content type changed|bytes do not match|unsupported image|decode|retained embedded metadata/i.test(message);
+      const terminal = /SHA-256|byte length changed|stored content type changed|bytes do not match|unsupported image|decode|retained embedded metadata|declared file type/i.test(message);
       if (terminal) {
         await ctx.runMutation(internalApi.mediaEvidenceControl.markUploadFailed, {
           vaultOwnerId: session.vaultOwnerId,
@@ -407,7 +453,7 @@ export const cleanupMcpEvidenceUpload = internalAction({
     if (!state || state.session.expiresAt > Date.now()) return;
     const store = storage();
     if (state.session.state === "ready" && state.manifests) {
-      await Promise.all(Object.values(state.manifests).map((manifest: any) =>
+      await Promise.all(Object.values(state.manifests).filter(Boolean).map((manifest: any) =>
         store.deleteVersionsExcept(manifest.objectKey, manifest.versionId)));
       return;
     }

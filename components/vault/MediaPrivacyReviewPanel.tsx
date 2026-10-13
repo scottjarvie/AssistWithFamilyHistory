@@ -176,7 +176,7 @@ export function MediaPrivacyReviewPanel({
             // reference that only this browser can follow — worth saying out
             // loud, because it is exactly the difference between an AI being
             // able to read the record and only being able to cite its title.
-            const held = Boolean(item.storageId || item.b2Renditions?.medium);
+            const held = Boolean(item.storageId || item.b2Renditions?.medium || item.b2Original);
             const previewSrc = held
               ? `/api/media/${item._id}/file`
               : item.url;

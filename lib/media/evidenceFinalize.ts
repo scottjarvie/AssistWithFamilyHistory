@@ -6,6 +6,7 @@ import {
   EVIDENCE_RENDITION_MAX_BYTES,
   hasEmbeddedImageMetadata,
   privateEvidenceObjectKey,
+  sniffEvidenceFile,
   sniffEvidenceImage,
   type EvidenceMetadataProposal,
   type EvidenceRenditionSlot,
@@ -169,4 +170,68 @@ export async function finalizeEvidenceImage(input: {
     }));
     throw error;
   }
+}
+
+export type FinalizedEvidenceFile = {
+  original: ExactEvidenceObject;
+  metadataProposal: EvidenceMetadataProposal;
+};
+
+/**
+ * Verify a non-rendered original (PDF, TIFF, HEIC, audio, text) exactly as the
+ * image path does, then keep it untouched. No display copy is made, so nothing
+ * here can leak or strip the file's own metadata; the person reviews it before
+ * any AI may read it.
+ */
+export async function finalizeEvidenceFile(input: {
+  store: EvidenceVerificationStore;
+  objectKey: string;
+  declaredContentType: string;
+  declaredSizeBytes: number;
+  expectedSha256: string;
+  fileModifiedTime?: string;
+  scanTime?: string;
+  inferredHistoricalEventDate?: string;
+  now?: string;
+}): Promise<FinalizedEvidenceFile> {
+  const verifiedAt = input.now ?? new Date().toISOString();
+  const declared = input.declaredContentType.toLowerCase();
+  const head = await input.store.head(input.objectKey);
+  if (head.sizeBytes !== input.declaredSizeBytes) throw new Error("Evidence byte length changed.");
+  if (head.contentType.toLowerCase() !== declared) throw new Error("Evidence stored content type changed.");
+  const bytes = await input.store.read(input.objectKey, head.versionId);
+  if (bytes.byteLength !== head.sizeBytes) throw new Error("Evidence downloaded length changed.");
+  const sha256 = sha256Hex(bytes);
+  if (sha256 !== input.expectedSha256) throw new Error("Evidence SHA-256 did not match the declared original.");
+  const sniffed = sniffEvidenceFile(bytes);
+  // HEIC and HEIF share a container; either brand satisfies either label.
+  const heifFamily = new Set(["image/heic", "image/heif"]);
+  if (!sniffed || (sniffed !== declared && !(heifFamily.has(sniffed) && heifFamily.has(declared)))) {
+    throw new Error("Evidence bytes do not match the declared file type.");
+  }
+  return {
+    original: {
+      bucketClass: input.store.config.bucketClass,
+      bucketName: input.store.config.bucket,
+      objectKey: input.objectKey,
+      versionId: head.versionId,
+      sha256,
+      contentType: declared,
+      sizeBytes: bytes.byteLength,
+      metadataClean: false,
+      verifiedAt,
+    },
+    metadataProposal: {
+      temporal: {
+        uploadTime: verifiedAt,
+        ...(input.fileModifiedTime ? { fileModifiedTime: input.fileModifiedTime } : {}),
+        ...(input.scanTime ? { scanTime: input.scanTime } : {}),
+        ...(input.inferredHistoricalEventDate ? { inferredHistoricalEventDate: input.inferredHistoricalEventDate } : {}),
+      },
+      extractedFromOriginalSha256: sha256,
+      extractedAt: verifiedAt,
+      reversible: true,
+      decision: "pending",
+    },
+  };
 }

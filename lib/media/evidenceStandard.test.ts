@@ -13,9 +13,10 @@ describe("family evidence storage contract", () => {
       .toBe("private/v1/preview/family-evidence/family_evidence_a-b_123/original");
   });
 
-  it("accepts only admitted image types and bounded exact lengths", () => {
+  it("accepts only admitted types and bounded exact lengths", () => {
     expect(() => assertEvidenceUploadShape("image/jpeg", 1)).not.toThrow();
-    expect(() => assertEvidenceUploadShape("application/pdf", 1)).toThrow(/currently accepts/i);
+    expect(() => assertEvidenceUploadShape("application/pdf", 1)).not.toThrow();
+    expect(() => assertEvidenceUploadShape("application/x-msdownload", 1)).toThrow(/upload accepts/i);
     expect(() => assertEvidenceUploadShape("image/png", 0)).toThrow(/allowed range/i);
   });
 

@@ -16,6 +16,7 @@ import type * as documents from "../documents.js";
 import type * as events from "../events.js";
 import type * as helpers from "../helpers.js";
 import type * as http from "../http.js";
+import type * as httpRoutes_evidenceUpload from "../httpRoutes/evidenceUpload.js";
 import type * as httpRoutes_mcp from "../httpRoutes/mcp.js";
 import type * as importRuns from "../importRuns.js";
 import type * as mcpAcceptanceFixture from "../mcpAcceptanceFixture.js";
@@ -57,6 +58,7 @@ declare const fullApi: ApiFromModules<{
   events: typeof events;
   helpers: typeof helpers;
   http: typeof http;
+  "httpRoutes/evidenceUpload": typeof httpRoutes_evidenceUpload;
   "httpRoutes/mcp": typeof httpRoutes_mcp;
   importRuns: typeof importRuns;
   mcpAcceptanceFixture: typeof mcpAcceptanceFixture;
