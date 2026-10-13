@@ -273,9 +273,11 @@ export const commitMcpEvidenceUpload = internalMutation({
     grantId: v.optional(v.string()),
     uploadRef: v.string(),
     original: exactObjectValidator,
-    tiny: exactObjectValidator,
-    medium: exactObjectValidator,
-    large: exactObjectValidator,
+    // Display copies exist only for JPEG, PNG and WebP. PDFs, TIFF scans,
+    // HEIC photos, audio and text are kept as the exact original alone.
+    tiny: v.optional(exactObjectValidator),
+    medium: v.optional(exactObjectValidator),
+    large: v.optional(exactObjectValidator),
     metadataProposal: metadataProposalValidator,
   },
   handler: async (ctx, args) => {
@@ -302,9 +304,21 @@ export const commitMcpEvidenceUpload = internalMutation({
     await ownedPerson(ctx, owner, String(session.personIds[0]));
 
     const now = Date.now();
+    const rendered = Boolean(args.tiny && args.medium && args.large);
+    if (!rendered && (args.tiny || args.medium || args.large)) {
+      machineError("VALIDATION_ERROR", "An image needs all three display copies or none.", "Retry the finish call with the same operation ID.");
+    }
+    const contentType = args.original.contentType.toLowerCase();
+    const mediaType = contentType.startsWith("audio/")
+      ? "audio" as const
+      : contentType === "application/pdf" || contentType === "text/plain"
+        ? "document" as const
+        : contentType === "image/tiff"
+          ? "scan" as const
+          : "photo" as const;
     const mediaId = await ctx.db.insert("media", {
       vaultOwnerId: owner,
-      type: "photo",
+      type: mediaType,
       title: session.title,
       description: session.description,
       mimeType: args.original.contentType,
@@ -312,10 +326,10 @@ export const commitMcpEvidenceUpload = internalMutation({
       personIds: session.personIds,
       sourceId: session.sourceId,
       mediaState: "ready",
-      renditionState: "ready",
+      renditionState: rendered ? "ready" : undefined,
       uploadSessionRef: session.ref,
       b2Original: args.original,
-      b2Renditions: { tiny: args.tiny, medium: args.medium, large: args.large },
+      b2Renditions: rendered ? { tiny: args.tiny!, medium: args.medium!, large: args.large! } : undefined,
       metadataProposal: args.metadataProposal,
       recordedVia: { actorKind: "chosen_ai", clientName: session.clientId, grantId: session.grantId },
       privacyLevel: "private",
@@ -370,12 +384,12 @@ export const sessionForCleanup = internalQuery({
     const media = session.mediaId ? await ctx.db.get(session.mediaId) : null;
     return {
       session,
-      manifests: media?.b2Original && media.b2Renditions
+      manifests: media?.b2Original
         ? {
             original: media.b2Original,
-            tiny: media.b2Renditions.tiny,
-            medium: media.b2Renditions.medium,
-            large: media.b2Renditions.large,
+            tiny: media.b2Renditions?.tiny,
+            medium: media.b2Renditions?.medium,
+            large: media.b2Renditions?.large,
           }
         : null,
     };

@@ -8,11 +8,38 @@
  */
 
 export const EVIDENCE_UPLOAD_TTL_SECONDS = 30 * 60;
-export const EVIDENCE_ORIGINAL_MAX_BYTES = 25 * 1024 * 1024;
+/**
+ * Uploads travel through the Convex HTTP relay, whose request bodies stop at
+ * 20 MiB. The old 25 MB promise was never reachable through Vercel's ~4.5 MB
+ * function body cap; this number is the one that actually holds.
+ */
+export const EVIDENCE_ORIGINAL_MAX_BYTES = 20 * 1024 * 1024;
 export const EVIDENCE_RENDITION_MAX_BYTES = 3 * 1024 * 1024;
 
 export const EVIDENCE_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 export type EvidenceImageType = (typeof EVIDENCE_IMAGE_TYPES)[number];
+
+/**
+ * Originals kept byte-exact with no display copies yet: scans as PDF or TIFF,
+ * iPhone photos, recorded interviews, and plain-text transcriptions.
+ */
+export const EVIDENCE_FILE_TYPES = [
+  "application/pdf",
+  "image/heic",
+  "image/heif",
+  "image/tiff",
+  "audio/mpeg",
+  "audio/mp4",
+  "audio/wav",
+  "text/plain",
+] as const;
+export type EvidenceFileType = (typeof EVIDENCE_FILE_TYPES)[number];
+
+export const EVIDENCE_UPLOAD_TYPES = [...EVIDENCE_IMAGE_TYPES, ...EVIDENCE_FILE_TYPES] as const;
+
+export function isRenderedEvidenceImage(contentType: string): contentType is EvidenceImageType {
+  return (EVIDENCE_IMAGE_TYPES as readonly string[]).includes(contentType.toLowerCase());
+}
 
 export const EVIDENCE_MEDIA_STATES = [
   "authorized",
@@ -138,6 +165,36 @@ function sniffWebp(bytes: Uint8Array): SniffedEvidenceImage | null {
   return { contentType: "image/webp" };
 }
 
+function isoBrand(bytes: Uint8Array): string | null {
+  if (bytes.length < 12 || !ascii(bytes, 4, "ftyp")) return null;
+  return String.fromCharCode(...bytes.slice(8, 12));
+}
+
+/** Determine a non-rendered file's type from bytes, never from a header or name. */
+export function sniffEvidenceFile(bytes: Uint8Array): EvidenceFileType | null {
+  if (ascii(bytes, 0, "%PDF-")) return "application/pdf";
+  if ((ascii(bytes, 0, "II") && bytes[2] === 0x2a && bytes[3] === 0) || (ascii(bytes, 0, "MM") && bytes[2] === 0 && bytes[3] === 0x2a)) {
+    return "image/tiff";
+  }
+  const brand = isoBrand(bytes);
+  if (brand && ["heic", "heix", "heim", "heis"].includes(brand)) return "image/heic";
+  if (brand && ["mif1", "msf1", "heif"].includes(brand)) return "image/heif";
+  if (brand && ["M4A ", "M4B ", "mp42", "isom"].includes(brand)) return "audio/mp4";
+  if (ascii(bytes, 0, "RIFF") && ascii(bytes, 8, "WAVE")) return "audio/wav";
+  if (ascii(bytes, 0, "ID3") || (bytes.length > 1 && bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0)) return "audio/mpeg";
+  // Plain text: valid UTF-8 with no control bytes besides tab, newlines and
+  // form feed. Only a sample is checked; a multi-byte character cut at the
+  // sample's end is trimmed rather than counted against the file.
+  const sample = bytes.subarray(0, Math.min(bytes.length, 64 * 1024));
+  for (let trim = 0; trim <= (sample.length < bytes.length ? 3 : 0); trim += 1) {
+    try {
+      const text = new TextDecoder("utf-8", { fatal: true }).decode(sample.subarray(0, sample.length - trim));
+      return /[\u0000-\u0008\u000E-\u001F]/.test(text) ? null : "text/plain";
+    } catch { /* try a shorter sample */ }
+  }
+  return null;
+}
+
 /** Determine the admitted upload type from bytes, never from a header or name. */
 export function sniffEvidenceImage(bytes: Uint8Array): SniffedEvidenceImage | null {
   return sniffJpeg(bytes) ?? sniffPng(bytes) ?? sniffWebp(bytes);
@@ -188,11 +245,11 @@ export function hasEmbeddedImageMetadata(bytes: Uint8Array, contentType: string)
 }
 
 export function assertEvidenceUploadShape(contentType: string, sizeBytes: number): void {
-  if (!(EVIDENCE_IMAGE_TYPES as readonly string[]).includes(contentType.toLowerCase())) {
-    throw new Error("This evidence upload currently accepts JPEG, PNG, or WebP images.");
+  if (!(EVIDENCE_UPLOAD_TYPES as readonly string[]).includes(contentType.toLowerCase())) {
+    throw new Error(`This evidence upload accepts ${EVIDENCE_UPLOAD_TYPES.join(", ")}.`);
   }
   if (!Number.isSafeInteger(sizeBytes) || sizeBytes < 1 || sizeBytes > EVIDENCE_ORIGINAL_MAX_BYTES) {
-    throw new Error("Evidence image size is outside the allowed range.");
+    throw new Error("Evidence file size is outside the allowed range (up to 20 MiB).");
   }
 }
 

@@ -177,6 +177,22 @@ export const getEvidenceBatch = internalQuery({
           });
           continue;
         }
+        if (row.mediaState === "ready" && !row.b2Renditions && row.b2Original) {
+          // A PDF, TIFF, HEIC, audio or text original with no display copy:
+          // delivered exact, within the same per-item budget.
+          if (row.b2Original.sizeBytes > FAMILY_HISTORY_MCP_LIMITS.evidencePerItemBytes) {
+            skipped.push(skip(item.id, item.kind, "TOO_LARGE"));
+            continue;
+          }
+          b2Stored.push({
+            id: String(row._id),
+            kind: "media",
+            title: row.title,
+            mimeType: row.b2Original.contentType,
+            sizeBytes: row.b2Original.sizeBytes,
+          });
+          continue;
+        }
         if (row.storageId) {
           // A file the vault holds. Refuse it here rather than spending the
           // transport's budget on an object we already know is over the cap.

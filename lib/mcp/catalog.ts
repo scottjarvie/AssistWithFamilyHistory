@@ -233,7 +233,7 @@ export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
     writes: true,
     title: "Begin a private evidence upload",
     description:
-      "Authorize one replay-safe JPEG, PNG, or WebP upload for a person inside this connection's boundary. Returns a short-lived same-origin PUT capability, never a private storage URL. Supply the exact byte length and SHA-256, then call family_history_finish_evidence_upload with the same operationId and uploadRef.",
+      "Authorize one replay-safe upload of up to 20 MiB for a person inside this connection's boundary: a JPEG, PNG or WebP photo (display copies are made), or an original kept exact with no copies (PDF, TIFF scan, HEIC/HEIF photo, MP3/M4A/WAV recording, or plain-text transcription). Pass sourceId to file it inside the Source it belongs to. Returns a short-lived PUT capability on the Family History upload relay, never a private storage URL. Supply the exact byte length and SHA-256, then call family_history_finish_evidence_upload with the same operationId and uploadRef.",
     humanSummary: "Starts a private, checksum-bound evidence upload for your review.",
     implementedBy: "convex/mediaEvidenceStorage.beginMcpEvidenceUpload",
   },

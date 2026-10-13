@@ -1,11 +1,13 @@
 ---
 id: AWF-WO-018
 title: Make media work the way family photos, scans and recordings need
-execution: proposed
+execution: active
 audit: not-audited
 cards: AWF-0065, AWF-0066, AWF-0067, AWF-0068, AWF-0048
 created: 2026-10-06
-updated: 2026-10-06
+updated: 2026-10-13
+approved-by: Scott Jarvie
+approval-evidence: "2026-10-13 project thread: large originals like pictures and whole books go to Backblaze; it's up to you to make sure this is all ready to go."
 proposed-by: Claude (Opus 5.5) from Scott's site-guide and readiness request
 ---
 
@@ -64,7 +66,8 @@ executor work under existing access, but new paid storage tiers are Scott's.
 
 ## Execution evidence
 
-None yet. Proposed on 2026-10-06; Scott approves scope before it becomes Ready.
+2026-10-13: AI uploads go through the Convex relay (20 MiB) and accept PDF,
+TIFF, HEIC/HEIF, audio and text originals (AWF-0065).
 
 ## History
 
