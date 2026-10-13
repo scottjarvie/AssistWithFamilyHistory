@@ -46,6 +46,7 @@ const expectedProtected = [
   "/api/context-items",
   "/api/media/review",
   "/api/ai-connections",
+  "/api/local-session",
 ];
 
 const expectedPublic = [

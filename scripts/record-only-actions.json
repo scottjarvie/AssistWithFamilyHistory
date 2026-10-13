@@ -1,0 +1,40 @@
+{
+  "vaultReads.ts": [
+    "getPeopleExplorer",
+    "getPersonWorkspace",
+    "getStoriesIndex",
+    "getStoryReview",
+    "getPersonResearchChecks",
+    "getProvisionalRelatives",
+    "getOperationsQueue",
+    "getOperationsSummary",
+    "getVaultAudit",
+    "getContextCoverage",
+    "getStoryReadinessCandidates",
+    "getPlacesExplorer",
+    "getPlaceWorkspace",
+    "getDashboardSummary",
+    "getResearchOverview",
+    "getContextPack"
+  ],
+  "queue.ts": [
+    "listQueueItems",
+    "getQueueItem"
+  ],
+  "documents.ts": [
+    "getDocumentsByPerson",
+    "getDocument",
+    "list"
+  ],
+  "importRuns.ts": [
+    "listRecent",
+    "getByCaptureId"
+  ],
+  "places.ts": [
+    "getByFsId",
+    "list"
+  ],
+  "researchLog.ts": [
+    "listForEntity"
+  ]
+}

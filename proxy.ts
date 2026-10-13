@@ -1,5 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server";
+import { localPublicAuthEnabled, localLiveProxy } from "@/lib/localLiveAuth";
+import { NextRequest, type NextFetchEvent, NextResponse } from "next/server";
 import { isAnonymousVaultEnabled, isClerkEnabled } from "@/lib/clerk/config";
 import { canonicalizeProductionUrl } from "@/lib/site/canonicalProductionUrl";
 import { VAULT_PREVIEW_COOKIE } from "@/lib/vault/constants";
@@ -55,11 +56,15 @@ const authMiddleware = clerkMiddleware(
   }
 );
 
-export default hasClerkKeys
+const hostedProxy = hasClerkKeys
   ? authMiddleware
   : function proxy() {
       return NextResponse.next();
     };
+
+export default function proxy(request: NextRequest, event: NextFetchEvent) {
+ return localPublicAuthEnabled() ? localLiveProxy(request) : hostedProxy(request, event);
+}
 
 export const config = {
   matcher: [

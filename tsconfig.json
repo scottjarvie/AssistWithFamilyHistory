@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -19,7 +23,9 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": [
+        "./*"
+      ]
     }
   },
   "include": [
@@ -37,5 +43,11 @@
     "convex/**/*.ts",
     "convex/**/*.tsx"
   ],
-  "exclude": ["node_modules", "extension", "scripts", "convex/**/*.test.ts"]
+  "exclude": [
+    "node_modules",
+    "extension",
+    "scripts",
+    "convex/**/*.test.ts",
+    "sandbox-backend"
+  ]
 }

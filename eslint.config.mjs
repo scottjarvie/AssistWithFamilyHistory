@@ -14,6 +14,10 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     "convex/_generated/**",
     "scripts/**",
+    // Local-mode build output and ignored record-only Sandbox snapshots.
+    ".next-local-*/**",
+    "sandbox-backend*/**",
+    ".record-only-codegen-test-*/**",
   ]),
 ]);
 

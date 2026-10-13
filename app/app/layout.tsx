@@ -1,3 +1,4 @@
+import {localPublicAuthEnabled} from "@/lib/localLiveAuth";
 /**
  * App Layout
  * 
@@ -52,7 +53,7 @@ export default async function AppLayout({
           ClerkProvider), and guest->signed-in migration is meaningless without
           auth. Mounting it unconditionally crashed env-less prerenders (CI build)
           and would crash any Clerk-disabled deploy at runtime. */}
-      {isClerkEnabled() && <GuestVaultMigrationGate />}
+      {isClerkEnabled() && !localPublicAuthEnabled() && <GuestVaultMigrationGate />}
       <main className="min-h-screen pt-16 transition-all duration-300 md:ml-64 md:pt-0">
         <AppTopBar clerkEnabled={isClerkEnabled()} />
         {children}

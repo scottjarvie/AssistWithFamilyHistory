@@ -1,3 +1,4 @@
+import { localPublicAuthEnabled, verifyLocalSession } from "@/lib/localLiveAuth";
 import { auth } from "@clerk/nextjs/server";
 import { cookies } from "next/headers";
 import { isAnonymousVaultEnabled, isClerkEnabled } from "@/lib/clerk/config";
@@ -30,6 +31,11 @@ function isExpectedDynamicServerUsage(error: unknown) {
 }
 
 export async function getVaultAccessContext(): Promise<VaultAccessContext> {
+  if (localPublicAuthEnabled()) {
+    const session = await verifyLocalSession((await cookies()).get("__session")?.value);
+    if (!session) throw new Error("Authentication required for local vault access");
+    return {vaultOwnerId:session.userId,userId:session.userId,mode:"user"};
+  }
   if (!isClerkEnabled()) {
     return {
       vaultOwnerId: DEFAULT_LOCAL_VAULT_OWNER,
