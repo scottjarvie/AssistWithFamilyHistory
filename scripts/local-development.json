@@ -1,0 +1,21 @@
+{
+  "project": "FamilyHistory",
+  "hostname": "local.assistwithfamilyhistory.com",
+  "live": {
+    "port": 3444,
+    "deployment": "prod:gallant-mallard-74",
+    "backendURL": "https://gallant-mallard-74.convex.cloud",
+    "clerkHost": "clerk.assistwithfamilyhistory.com",
+    "ownerEnforcementVerified": false,
+    "blocker": "Local Live is withheld until its production backend binding and production owner enforcement are independently verified."
+  },
+  "sandbox": {
+    "port": 3443,
+    "deployment": "anonymous:anonymous-family-history-completion-20261007",
+    "backendURL": "http://127.0.0.1:4323",
+    "siteURL": "http://127.0.0.1:4324",
+    "hostname": "family-history.localhost",
+    "clerkHost": "improved-ram-86.clerk.accounts.dev",
+    "recordOnly": true
+  }
+}

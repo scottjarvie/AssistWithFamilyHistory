@@ -60,3 +60,11 @@ next-env.d.ts
 
 # deploy worktrees (pinned exact-SHA deploy sources, never committed)
 /.claude/worktrees/
+
+.env.local-*
+.next-local-*
+sandbox-backend/
+sandbox-backend-before-source-owned-guard-20261007/
+.record-only-codegen-test-*/
+dependency-donor-receipt.json
+.local-sandbox/

@@ -1,3 +1,6 @@
+import {LocalDevelopmentBanner} from "@/components/LocalDevelopmentBanner";
+import {LocalSessionBridge} from "@/components/LocalSessionBridge";
+import {localPublicAuthEnabled} from "@/lib/localLiveAuth";
 /**
  * Root Layout - Assist With Family History
  * 
@@ -64,8 +67,9 @@ export default function RootLayout({
       <body
         className={`${instrumentSans.variable} ${cormorantGaramond.variable} ${ibmPlexMono.variable} antialiased`}
       >
+        <LocalDevelopmentBanner />
         {clerkPublishableKey ? (
-          <ClerkProvider publishableKey={clerkPublishableKey}>{children}</ClerkProvider>
+          <ClerkProvider publishableKey={clerkPublishableKey}>{localPublicAuthEnabled()?<LocalSessionBridge />:null}{children}</ClerkProvider>
         ) : (
           children
         )}

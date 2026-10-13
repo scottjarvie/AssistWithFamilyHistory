@@ -9,13 +9,14 @@ export function isClerkEnabled() {
     process.env.NEXT_PUBLIC_ENABLE_CLERK_DEV !== "true" &&
     process.env.ENABLE_CLERK_DEV !== "true";
 
+  const localPublic = process.env.NODE_ENV === "development" && !process.env.VERCEL && !process.env.CI && ["live", "sandbox"].includes(process.env.NEXT_PUBLIC_LOCAL_DEVELOPMENT_MODE ?? "");
   return Boolean(
     !disabled &&
-      !localDevDisabled &&
+      (!localDevDisabled || localPublic) &&
       publishableKey &&
-      secretKey &&
+      (secretKey || localPublic) &&
       publishableKey.startsWith("pk_") &&
-      secretKey.startsWith("sk_")
+      (secretKey?.startsWith("sk_") || localPublic)
   );
 }
 

@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  ...(process.env.NODE_ENV === "development" && ["live","sandbox"].includes(process.env.LOCAL_DEVELOPMENT_MODE ?? "") ? {distDir:`.next-local-${process.env.LOCAL_DEVELOPMENT_MODE}`,allowedDevOrigins:[process.env.LOCAL_DEVELOPMENT_MODE==="live"?"local.assistwithfamilyhistory.com":"family-history.localhost"]}:{}),
   poweredByHeader: false,
   async headers() {
     return [

@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+import { localPublicAuthEnabled, verifyLocalSession, verifyLocalConvexToken, LOCAL_CONVEX_COOKIE } from "@/lib/localLiveAuth";
 import { ConvexHttpClient } from "convex/browser";
 import { auth } from "@clerk/nextjs/server";
 import { isClerkEnabled } from "@/lib/clerk/config";
@@ -39,6 +41,14 @@ export async function getAuthedConvexClient(options?: {
   requireAuthentication?: boolean;
 }): Promise<ConvexHttpClient> {
   const client = getConvexClient();
+  if (localPublicAuthEnabled()) {
+    const cookieStore=await cookies();
+    const session=await verifyLocalSession(cookieStore.get("__session")?.value);
+    const verified=await verifyLocalConvexToken(cookieStore.get(LOCAL_CONVEX_COOKIE)?.value,session);
+    if(!verified) throw new Error("Local audience-specific Convex token unavailable; complete local session handshake");
+    client.setAuth(verified.token);
+    return client;
+  }
   const enforcing = process.env.TRUST_BOUNDARY_MODE === "enforce";
   const requireAuthentication = options?.requireAuthentication === true || enforcing;
 

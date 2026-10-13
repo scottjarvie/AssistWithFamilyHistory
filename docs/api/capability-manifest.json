@@ -279,6 +279,19 @@
       "notes": "Internal human first-start route. It derives the owner server-side, writes only to a genuinely empty workspace, uses an idempotent operation ID, records unsourced provenance, and does not create an AI handoff."
     },
     {
+      "route": "/api/local-session",
+      "methods": [
+        "POST"
+      ],
+      "capability": "local_development_session_bridge",
+      "environment": "browser",
+      "agentSupport": "not-supported",
+      "reviewLevel": "owner-scoped-reviewed-write",
+      "risk": "low",
+      "scopes": [],
+      "notes": "Local Live/Sandbox development only; returns 404 outside local mode. Verifies the signed local session and a same-subject audience convex token against the mode's own issuer and exact local origin, then stores the token in a short-lived HttpOnly cookie."
+    },
+    {
       "route": "/api/import",
       "methods": [
         "POST"
