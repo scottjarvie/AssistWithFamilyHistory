@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { sha256Hex } from "./evidenceB2";
 import { finalizeEvidenceFile, type EvidenceVerificationStore } from "./evidenceFinalize";
-import { assertEvidenceUploadShape, sniffEvidenceFile } from "./evidenceStandard";
+import {
+  assertEvidenceUploadShape,
+  evidenceUploadParts,
+  isMultipartEvidenceUpload,
+  sniffEvidenceFile,
+} from "./evidenceStandard";
 
 const text = (value: string) => new TextEncoder().encode(value);
 const pdf = text("%PDF-1.7\n1 0 obj\n<<>>\nendobj\ntrailer\n%%EOF\n");
@@ -32,10 +37,40 @@ describe("non-image evidence originals", () => {
     expect(sniffEvidenceFile(new Uint8Array([0x00, 0x01, 0x02, 0x03]))).toBeNull();
   });
 
-  it("admits files up to 20 MiB and refuses larger or unlisted ones", () => {
-    expect(() => assertEvidenceUploadShape("application/pdf", 20 * 1024 * 1024)).not.toThrow();
-    expect(() => assertEvidenceUploadShape("application/pdf", 20 * 1024 * 1024 + 1)).toThrow();
+  it("admits exact-kept files up to 512 MiB, photos up to 20 MiB, and refuses unlisted ones", () => {
+    expect(() => assertEvidenceUploadShape("application/pdf", 512 * 1024 * 1024)).not.toThrow();
+    expect(() => assertEvidenceUploadShape("application/pdf", 512 * 1024 * 1024 + 1)).toThrow();
+    expect(() => assertEvidenceUploadShape("image/jpeg", 20 * 1024 * 1024)).not.toThrow();
+    expect(() => assertEvidenceUploadShape("image/jpeg", 20 * 1024 * 1024 + 1)).toThrow(/20 MiB/);
     expect(() => assertEvidenceUploadShape("application/zip", 10)).toThrow();
+  });
+
+  it("splits a large original into 16 MiB parts with a shorter last part", () => {
+    const mib = 1024 * 1024;
+    expect(isMultipartEvidenceUpload(20 * mib)).toBe(false);
+    expect(isMultipartEvidenceUpload(20 * mib + 1)).toBe(true);
+    const parts = evidenceUploadParts(40 * mib);
+    expect(parts).toEqual([
+      { partNumber: 1, offset: 0, sizeBytes: 16 * mib },
+      { partNumber: 2, offset: 16 * mib, sizeBytes: 16 * mib },
+      { partNumber: 3, offset: 32 * mib, sizeBytes: 8 * mib },
+    ]);
+    expect(evidenceUploadParts(512 * mib)).toHaveLength(32);
+  });
+
+  it("verifies a streamed digest without holding the whole file", async () => {
+    const store = storeFor(pdf, "application/pdf");
+    store.read = vi.fn(async () => { throw new Error("a streamed original is never read whole"); });
+    store.digest = vi.fn(async () => ({ sha256: sha256Hex(pdf), sizeBytes: pdf.byteLength, head: pdf.subarray(0, 8) }));
+    const result = await finalizeEvidenceFile({
+      store,
+      objectKey: "private/v1/development/family-evidence/ref/original",
+      declaredContentType: "application/pdf",
+      declaredSizeBytes: pdf.byteLength,
+      expectedSha256: sha256Hex(pdf),
+    });
+    expect(result.original.sizeBytes).toBe(pdf.byteLength);
+    expect(store.read).not.toHaveBeenCalled();
   });
 
   it("keeps a PDF byte-exact with no display copies", async () => {

@@ -33,4 +33,16 @@ describe("evidence upload relay", () => {
     expect(unknown.status).toBe(404);
     expect(unknown.headers.get("cache-control")).toBe("private, no-store");
   });
+
+  test("refuses a malformed part number and an unknown part capability alike", async () => {
+    const t = convexTest(schema, modules);
+    for (const path of ["family_evidence_x/token/0", "family_evidence_x/token/abc", "family_evidence_x/token/1/2", "family_evidence_x/token/1"]) {
+      const response = await t.fetch(`/evidence-upload/${path}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/pdf", "Content-Length": "5" },
+        body: new TextEncoder().encode("%PDF-"),
+      });
+      expect(response.status, path).toBe(404);
+    }
+  });
 });

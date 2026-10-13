@@ -21,6 +21,8 @@ export type EvidenceVerificationStore = {
   };
   head(objectKey: string, versionId?: string): Promise<EvidenceB2Head>;
   read(objectKey: string, versionId: string): Promise<Uint8Array>;
+  /** Streaming hash for originals too large to hold in memory. */
+  digest?(objectKey: string, versionId: string): Promise<{ sha256: string; sizeBytes: number; head: Uint8Array }>;
   put(input: { objectKey: string; bytes: Uint8Array; contentType: string }): Promise<{
     versionId: string;
     sha256: string;
@@ -199,11 +201,19 @@ export async function finalizeEvidenceFile(input: {
   const head = await input.store.head(input.objectKey);
   if (head.sizeBytes !== input.declaredSizeBytes) throw new Error("Evidence byte length changed.");
   if (head.contentType.toLowerCase() !== declared) throw new Error("Evidence stored content type changed.");
-  const bytes = await input.store.read(input.objectKey, head.versionId);
-  if (bytes.byteLength !== head.sizeBytes) throw new Error("Evidence downloaded length changed.");
-  const sha256 = sha256Hex(bytes);
+  const read = input.store.digest
+    ? await input.store.digest(input.objectKey, head.versionId)
+    : await input.store.read(input.objectKey, head.versionId).then((bytes) => ({
+      sha256: sha256Hex(bytes),
+      sizeBytes: bytes.byteLength,
+      head: bytes,
+    }));
+  if (read.sizeBytes !== head.sizeBytes) throw new Error("Evidence downloaded length changed.");
+  const sha256 = read.sha256;
   if (sha256 !== input.expectedSha256) throw new Error("Evidence SHA-256 did not match the declared original.");
-  const sniffed = sniffEvidenceFile(bytes);
+  // A sample shorter than the whole file is judged as a sample (a multi-byte
+  // character cut at its end is not held against the file).
+  const sniffed = sniffEvidenceFile(read.head, read.head.byteLength < read.sizeBytes);
   // HEIC and HEIF share a container; either brand satisfies either label.
   const heifFamily = new Set(["image/heic", "image/heif"]);
   if (!sniffed || (sniffed !== declared && !(heifFamily.has(sniffed) && heifFamily.has(declared)))) {
@@ -217,7 +227,7 @@ export async function finalizeEvidenceFile(input: {
       versionId: head.versionId,
       sha256,
       contentType: declared,
-      sizeBytes: bytes.byteLength,
+      sizeBytes: read.sizeBytes,
       metadataClean: false,
       verifiedAt,
     },

@@ -2,6 +2,7 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, internalQuery } from "./_generated/server";
+import { evidenceUploadParts } from "../lib/media/evidenceStandard";
 import { assertGrantPermits } from "./mcpGrants";
 import { matchesVaultOwner } from "./vaultCore";
 
@@ -137,6 +138,7 @@ export const planMcpEvidenceUpload = internalMutation({
         contentType: prior.declaredContentType,
         sizeBytes: prior.declaredSizeBytes,
         sha256: prior.expectedSha256,
+        multipartUploadId: prior.multipartUploadId,
       };
     }
 
@@ -174,7 +176,67 @@ export const planMcpEvidenceUpload = internalMutation({
       contentType: args.input.contentType,
       sizeBytes: args.input.sizeBytes,
       sha256: args.input.sha256,
+      multipartUploadId: undefined as string | undefined,
     };
+  },
+});
+
+/** Record the provider's multipart upload id on a freshly planned session. */
+export const attachMultipartUpload = internalMutation({
+  args: { uploadRef: v.string(), multipartUploadId: v.string(), partSizeBytes: v.number() },
+  handler: async (ctx, args) => {
+    const session = await ctx.db
+      .query("mediaUploadSessions")
+      .withIndex("by_ref", (q) => q.eq("ref", args.uploadRef))
+      .first();
+    if (!session || session.state !== "authorized") return { attached: false as const };
+    if (session.multipartUploadId) return { attached: false as const, multipartUploadId: session.multipartUploadId };
+    await ctx.db.patch(session._id, {
+      multipartUploadId: args.multipartUploadId,
+      partSizeBytes: args.partSizeBytes,
+      parts: [],
+    });
+    return { attached: true as const, multipartUploadId: args.multipartUploadId };
+  },
+});
+
+/**
+ * Called only by the Convex-site relay after it stored one part: proves the same bearer
+ * capability, then keeps the provider's receipt. A re-sent part replaces its
+ * earlier receipt, so a dropped connection can simply be retried.
+ */
+export const recordMcpEvidencePart = internalMutation({
+  args: {
+    uploadRef: v.string(),
+    relayTokenHash: v.string(),
+    partNumber: v.number(),
+    etag: v.string(),
+    sizeBytes: v.number(),
+    sha256: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db
+      .query("mediaUploadSessions")
+      .withIndex("by_ref", (q) => q.eq("ref", args.uploadRef))
+      .first();
+    if (
+      !session
+      || session.sourceKind !== "chosen_ai"
+      || session.state !== "authorized"
+      || session.relayTokenHash !== args.relayTokenHash
+      || session.expiresAt <= Date.now()
+      || !session.multipartUploadId
+    ) throw new Error("Upload authorization not found.");
+    const expected = evidenceUploadParts(session.declaredSizeBytes, session.partSizeBytes)
+      .find((part) => part.partNumber === args.partNumber);
+    if (!expected || expected.sizeBytes !== args.sizeBytes || !/^[a-f0-9]{64}$/.test(args.sha256)) {
+      throw new Error("Upload authorization not found.");
+    }
+    const parts = (session.parts ?? []).filter((part) => part.partNumber !== args.partNumber);
+    parts.push({ partNumber: args.partNumber, etag: args.etag.slice(0, 200), sizeBytes: args.sizeBytes, sha256: args.sha256 });
+    parts.sort((a, b) => a.partNumber - b.partNumber);
+    await ctx.db.patch(session._id, { parts });
+    return { stored: parts.length };
   },
 });
 
@@ -200,6 +262,8 @@ export const relayAuthorization = internalQuery({
       sizeBytes: session.declaredSizeBytes,
       sha256: session.expectedSha256,
       expiresAt: session.expiresAt,
+      multipartUploadId: session.multipartUploadId,
+      partSizeBytes: session.partSizeBytes,
     };
   },
 });
@@ -261,6 +325,19 @@ export const claimSessionForFinish = internalMutation({
     }
     if (session.state !== "authorized" || session.expiresAt <= Date.now()) {
       machineError("UPLOAD_EXPIRED", "That evidence upload is no longer active.", "Begin again with a new operation ID.");
+    }
+    if (session.multipartUploadId) {
+      const stored = new Set((session.parts ?? []).map((part) => part.partNumber));
+      const missing = evidenceUploadParts(session.declaredSizeBytes, session.partSizeBytes)
+        .filter((part) => !stored.has(part.partNumber))
+        .map((part) => part.partNumber);
+      if (missing.length > 0) {
+        machineError(
+          "UPLOAD_INCOMPLETE",
+          `Parts ${missing.slice(0, 20).join(", ")}${missing.length > 20 ? " and more" : ""} have not arrived yet.`,
+          "PUT each missing part to its URL from the begin response, then call finish again with the same operation ID.",
+        );
+      }
     }
     await ctx.db.patch(session._id, { state: "uploaded" });
     return { ...session, state: "uploaded" as const, replayed: false as const };

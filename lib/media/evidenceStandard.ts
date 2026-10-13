@@ -14,6 +14,15 @@ export const EVIDENCE_UPLOAD_TTL_SECONDS = 30 * 60;
  * function body cap; this number is the one that actually holds.
  */
 export const EVIDENCE_ORIGINAL_MAX_BYTES = 20 * 1024 * 1024;
+/**
+ * Bigger originals (a scanned book, a long recording) go up in parts through
+ * the same relay, each part one request under the relay's 20 MiB body limit.
+ * Only exact-kept file types may do this; photos still need display copies,
+ * which are made from bytes held in memory.
+ */
+export const EVIDENCE_LARGE_ORIGINAL_MAX_BYTES = 512 * 1024 * 1024;
+export const EVIDENCE_PART_BYTES = 16 * 1024 * 1024;
+export const EVIDENCE_LARGE_UPLOAD_TTL_SECONDS = 2 * 60 * 60;
 export const EVIDENCE_RENDITION_MAX_BYTES = 3 * 1024 * 1024;
 
 export const EVIDENCE_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
@@ -171,7 +180,7 @@ function isoBrand(bytes: Uint8Array): string | null {
 }
 
 /** Determine a non-rendered file's type from bytes, never from a header or name. */
-export function sniffEvidenceFile(bytes: Uint8Array): EvidenceFileType | null {
+export function sniffEvidenceFile(bytes: Uint8Array, truncated = false): EvidenceFileType | null {
   if (ascii(bytes, 0, "%PDF-")) return "application/pdf";
   if ((ascii(bytes, 0, "II") && bytes[2] === 0x2a && bytes[3] === 0) || (ascii(bytes, 0, "MM") && bytes[2] === 0 && bytes[3] === 0x2a)) {
     return "image/tiff";
@@ -186,7 +195,7 @@ export function sniffEvidenceFile(bytes: Uint8Array): EvidenceFileType | null {
   // form feed. Only a sample is checked; a multi-byte character cut at the
   // sample's end is trimmed rather than counted against the file.
   const sample = bytes.subarray(0, Math.min(bytes.length, 64 * 1024));
-  for (let trim = 0; trim <= (sample.length < bytes.length ? 3 : 0); trim += 1) {
+  for (let trim = 0; trim <= (truncated || sample.length < bytes.length ? 3 : 0); trim += 1) {
     try {
       const text = new TextDecoder("utf-8", { fatal: true }).decode(sample.subarray(0, sample.length - trim));
       return /[\u0000-\u0008\u000E-\u001F]/.test(text) ? null : "text/plain";
@@ -248,9 +257,30 @@ export function assertEvidenceUploadShape(contentType: string, sizeBytes: number
   if (!(EVIDENCE_UPLOAD_TYPES as readonly string[]).includes(contentType.toLowerCase())) {
     throw new Error(`This evidence upload accepts ${EVIDENCE_UPLOAD_TYPES.join(", ")}.`);
   }
-  if (!Number.isSafeInteger(sizeBytes) || sizeBytes < 1 || sizeBytes > EVIDENCE_ORIGINAL_MAX_BYTES) {
-    throw new Error("Evidence file size is outside the allowed range (up to 20 MiB).");
+  const max = isRenderedEvidenceImage(contentType) ? EVIDENCE_ORIGINAL_MAX_BYTES : EVIDENCE_LARGE_ORIGINAL_MAX_BYTES;
+  if (!Number.isSafeInteger(sizeBytes) || sizeBytes < 1 || sizeBytes > max) {
+    throw new Error(
+      isRenderedEvidenceImage(contentType)
+        ? "Evidence photo size is outside the allowed range (up to 20 MiB)."
+        : "Evidence file size is outside the allowed range (up to 512 MiB).",
+    );
   }
+}
+
+/** Whether this upload goes up in parts rather than one request. */
+export function isMultipartEvidenceUpload(sizeBytes: number): boolean {
+  return sizeBytes > EVIDENCE_ORIGINAL_MAX_BYTES;
+}
+
+export type EvidenceUploadPart = { partNumber: number; offset: number; sizeBytes: number };
+
+/** The fixed split of a multipart upload: 16 MiB parts, the last one shorter. */
+export function evidenceUploadParts(sizeBytes: number, partBytes = EVIDENCE_PART_BYTES): EvidenceUploadPart[] {
+  const parts: EvidenceUploadPart[] = [];
+  for (let offset = 0, partNumber = 1; offset < sizeBytes; offset += partBytes, partNumber += 1) {
+    parts.push({ partNumber, offset, sizeBytes: Math.min(partBytes, sizeBytes - offset) });
+  }
+  return parts;
 }
 
 export function assertSha256(value: string): string {

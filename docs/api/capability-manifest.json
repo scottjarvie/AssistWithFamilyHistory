@@ -344,7 +344,7 @@
       "scopes": [
         "family_history:evidence:write"
       ],
-      "notes": "Legacy product-hostname relay for small images; no longer handed out, because Vercel refuses bodies over about 4.5 MB. New capabilities point at the Convex-site relay PUT /evidence-upload/{uploadRef}/{token} (convex/httpRoutes/evidenceUpload.ts), which takes up to 20 MiB of JPEG, PNG, WebP, PDF, TIFF, HEIC/HEIF, MP3/M4A/WAV or plain text under the same contract. Relays one exact JPEG, PNG, or WebP upload. The caller supplies only an opaque short-lived bearer capability and bytes; Convex resolves owner, grant-bound session, key, type, length, and SHA-256. The provider URL is consumed server-to-server and never returned. Invalid, expired, revoked, reused, and cross-owner capabilities share one 404 shape."
+      "notes": "Legacy product-hostname relay for small images; no longer handed out, because Vercel refuses bodies over about 4.5 MB. New capabilities point at the Convex-site relay PUT /evidence-upload/{uploadRef}/{token} (convex/httpRoutes/evidenceUpload.ts), which takes up to 20 MiB of JPEG, PNG, WebP, PDF, TIFF, HEIC/HEIF, MP3/M4A/WAV or plain text under the same contract, and exact-kept originals up to 512 MiB as 16 MiB parts at PUT /evidence-upload/{uploadRef}/{token}/{partNumber}. Relays one exact JPEG, PNG, or WebP upload. The caller supplies only an opaque short-lived bearer capability and bytes; Convex resolves owner, grant-bound session, key, type, length, and SHA-256. The provider URL is consumed server-to-server and never returned. Invalid, expired, revoked, reused, and cross-owner capabilities share one 404 shape."
     },
     {
       "route": "/api/media/upload",
