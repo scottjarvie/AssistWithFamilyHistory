@@ -1,0 +1,414 @@
+- generic [active] [ref=e1]:
+  - link "Skip to tracker" [ref=e2] [cursor=pointer]:
+    - /url: "#workspace"
+  - banner [ref=e3]:
+    - heading "Assist With Family History — tracker" [level=1] [ref=e4]
+    - generic [ref=e5]: What's moving now, what's queued, and the few things waiting on you · 43 cards · 2026-08-16
+    - navigation "Tracker links" [ref=e6]:
+      - link "Project" [ref=e7] [cursor=pointer]:
+        - /url: https://assistwithfamilyhistory.com
+      - link "Project Philosophy" [ref=e8] [cursor=pointer]:
+        - /url: ../planning/assist-with-family-history-project-philosophy.md
+      - link "Family Core" [ref=e9] [cursor=pointer]:
+        - /url: https://github.com/scottjarvie/assistwithlife/blob/main/planning/assist-with-sites-core-philosophy.md
+      - link "Guide" [ref=e10] [cursor=pointer]:
+        - /url: guide.html
+    - button "Night archive" [ref=e11] [cursor=pointer]
+  - main [ref=e12]:
+    - tablist "Tracker view" [ref=e13]:
+      - tab "Kanban" [selected] [ref=e14] [cursor=pointer]
+      - tab "Work Orders" [ref=e15] [cursor=pointer]
+      - button "Needs You · 1" [ref=e16] [cursor=pointer]
+    - tabpanel "Kanban" [ref=e17]:
+      - generic [ref=e18]:
+        - generic [ref=e19]: area
+        - button "Chosen AI & Durable Work" [ref=e20] [cursor=pointer]
+        - button "Context Intelligence" [ref=e21] [cursor=pointer]
+        - button "Experimental Tools Lab" [ref=e22] [cursor=pointer]
+        - button "First Journey & Chosen AI" [ref=e23] [cursor=pointer]
+        - button "First Journey & Private Workspace" [ref=e24] [cursor=pointer]
+        - button "Privacy, Trust & Quality" [ref=e25] [cursor=pointer]
+        - button "Product Experience" [ref=e26] [cursor=pointer]
+        - button "Product Identity & Trust" [ref=e27] [cursor=pointer]
+        - button "Product OS & Agent Workflow" [ref=e28] [cursor=pointer]
+        - button "Research Operations & Agent Handoff" [ref=e29] [cursor=pointer]
+        - button "Research Vault" [ref=e30] [cursor=pointer]
+        - button "Story Studio & Publishing" [ref=e31] [cursor=pointer]
+        - button "assurance" [ref=e32] [cursor=pointer]
+        - button "delivery" [ref=e33] [cursor=pointer]
+        - button "operations" [ref=e34] [cursor=pointer]
+        - button "philosophy" [ref=e35] [cursor=pointer]
+        - generic [ref=e36]: type
+        - button "audit" [ref=e37] [cursor=pointer]
+        - button "documentation" [ref=e38] [cursor=pointer]
+        - button "documentation-operating" [ref=e39] [cursor=pointer]
+        - button "migration" [ref=e40] [cursor=pointer]
+        - button "operations" [ref=e41] [cursor=pointer]
+        - button "product" [ref=e42] [cursor=pointer]
+        - button "product-change" [ref=e43] [cursor=pointer]
+        - button "release" [ref=e44] [cursor=pointer]
+        - button "verification" [ref=e45] [cursor=pointer]
+        - button "verification-gap" [ref=e46] [cursor=pointer]
+        - generic [ref=e47]: verdict
+        - button "missing" [ref=e48] [cursor=pointer]
+        - button "adapt" [ref=e49] [cursor=pointer]
+      - generic [ref=e50]:
+        - strong [ref=e51]: Personal order · browser only
+        - generic [ref=e52]: Canonical order
+        - paragraph [ref=e53]: "Drag Cards · touch: hold, then drag · keyboard: Alt + ↑/↓/Home/End. Canonical fields never change."
+        - button "Reset to canonical order" [disabled] [ref=e54]
+      - generic [ref=e55]:
+        - generic [ref=e56]:
+          - heading "Backlog 28" [level=2] [ref=e57]
+          - 'button "Open AWF-0039: Enforce person-approved MCP grants and narrow Family History scopes. Drag to reorder within Backlog; or use Alt plus Arrow keys, Home, or End." [ref=e59]':
+            - text: AWF-0039
+            - generic [ref=e60]: P0
+            - generic [ref=e61]: owner identity is derived securely, but MCP scopes are parsed rather than enforced and no durable product grant exists
+            - generic [ref=e62]: Enforce person-approved MCP grants and narrow Family History scopes
+            - generic [ref=e63]: product-change
+            - generic [ref=e64]: Privacy, Trust & Quality
+            - generic [ref=e65]: person-visible grants, server-enforced scope ceilings, expiry, activity, and immediate revocation
+          - 'button "Open AWF-0040: Give a chosen AI provenance-aware evidence and a review-first result path. Drag to reorder within Backlog; or use Alt plus Arrow keys, Home, or End." [ref=e67]':
+            - text: AWF-0040
+            - generic [ref=e68]: P0
+            - generic [ref=e69]: bounded context and canonical saves exist; protected evidence batches and a review-first result contract do not
+            - generic [ref=e70]: Give a chosen AI provenance-aware evidence and a review-first result path
+            - generic [ref=e71]: product-change
+            - generic [ref=e72]: Chosen AI & Durable Work
+            - generic [ref=e73]: Queue brief -> protected evidence -> sourced proposed result -> person review -> correction
+          - 'button "Open AWF-0041: Let a person understand, narrow, and revoke each chosen-AI connection. Drag to reorder within Backlog; or use Alt plus Arrow keys, Home, or End." [ref=e75]':
+            - text: AWF-0041
+            - generic [ref=e76]: P0
+            - generic [ref=e77]: public setup guidance exists; owner-visible connection, scope, activity, expiry, and revoke controls do not
+            - generic [ref=e78]: Let a person understand, narrow, and revoke each chosen-AI connection
+            - generic [ref=e79]: product-change
+            - generic [ref=e80]: Product Experience
+            - generic [ref=e81]: /ai education + authenticated connection center + generated AI guide + manual Queue fallback
+          - 'button "Open AWF-0042: Prove one complete chosen-AI research lifecycle and promote only exact client truth. Drag to reorder within Backlog; or use Alt plus Arrow keys, Home, or End." [ref=e83]':
+            - text: AWF-0042
+            - generic [ref=e84]: P0
+            - generic [ref=e85]: isolated MCP and Queue layers are strong; metadata-first consent, scoped grant, evidence, review, revoke, reconnect, and exact-client proof are not joined
+            - generic [ref=e86]: Prove one complete chosen-AI research lifecycle and promote only exact client truth
+            - generic [ref=e87]: verification
+            - generic [ref=e88]: Chosen AI & Durable Work
+            - generic [ref=e89]: discover -> consent -> assigned Queue brief -> evidence -> reviewed save -> correction -> revoke -> reconnect -> cleanup
+          - 'button "Open AWF-0038: Connect conforming AI clients through metadata-first OAuth. Drag to reorder within Backlog; or use Alt plus Arrow keys, Home, or End." [ref=e91]':
+            - text: AWF-0038
+            - generic [ref=e92]: P1
+            - generic [ref=e93]: stateless transport and one disposable PKCE client are proven; live discovery advertises neither Client ID Metadata Documents nor DCR
+            - generic [ref=e94]: Connect conforming AI clients through metadata-first OAuth
+            - generic [ref=e95]: product-change
+            - generic [ref=e96]: Chosen AI & Durable Work
+            - generic [ref=e97]: Client ID Metadata Documents first, bounded DCR fallback, PKCE, truthful exact-client proof
+          - 'button "Open AWF-0007: Prove the deployed capture-to-story journey and privacy gates. Drag to reorder within Backlog; or use Alt plus Arrow keys, Home, or End." [ref=e99]':
+            - text: AWF-0007
+            - generic [ref=e100]: P2
+            - generic [ref=e101]: missing
+            - generic [ref=e102]: Prove the deployed capture-to-story journey and privacy gates
+            - generic [ref=e103]: verification-gap
+            - generic [ref=e104]: Story Studio & Publishing
+            - generic [ref=e105]: Core §§7, 8, 10, 16.3, 17 · deployed user-path proof
+          - 'button "Open AWF-0010: Complete vault export, retention, and account deletion controls. Drag to reorder within Backlog; or use Alt plus Arrow keys, Home, or End." [ref=e107]':
+            - text: AWF-0010
+            - generic [ref=e108]: P2
+            - generic [ref=e109]: missing
+            - generic [ref=e110]: Complete vault export, retention, and account deletion controls
+            - generic [ref=e111]: product-change
+            - generic [ref=e112]: Privacy, Trust & Quality
+            - generic [ref=e113]: Core §§7, 11 · user-owned data lifecycle
+          - 'button "Open AWF-0011: Keep private workspace routes out of public crawl surfaces. Drag to reorder within Backlog; or use Alt plus Arrow keys, Home, or End." [ref=e115]':
+            - text: AWF-0011
+            - generic [ref=e116]: P2
+            - generic [ref=e117]: missing
+            - generic [ref=e118]: Keep private workspace routes out of public crawl surfaces
+            - generic [ref=e119]: product-change
+            - generic [ref=e120]: Privacy, Trust & Quality
+            - generic [ref=e121]: Core §§9–10, 13 · route and public-truth boundaries
+          - 'button "Open AWF-0012: Prove deployed identity, tenant isolation, and account recovery. Drag to reorder within Backlog; or use Alt plus Arrow keys, Home, or End." [ref=e123]':
+            - text: AWF-0012
+            - generic [ref=e124]: P2
+            - generic [ref=e125]: missing
+            - generic [ref=e126]: Prove deployed identity, tenant isolation, and account recovery
+            - generic [ref=e127]: verification-gap
+            - generic [ref=e128]: Privacy, Trust & Quality
+            - generic [ref=e129]: Core §§7, 11, 16.3 · identity and owner boundary
+          - 'button "Open AWF-0013: Make meaningful user and AI changes inspectable in activity history. Drag to reorder within Backlog; or use Alt plus Arrow keys, Home, or End." [ref=e131]':
+            - text: AWF-0013
+            - generic [ref=e132]: P2
+            - generic [ref=e133]: missing
+            - generic [ref=e134]: Make meaningful user and AI changes inspectable in activity history
+            - generic [ref=e135]: product-change
+            - generic [ref=e136]: Research Operations & Agent Handoff
+            - generic [ref=e137]: Core §7 · record-visible activity and provenance
+          - 'button "Open AWF-0020: Make the signed-in shell accessible and phone-native. Drag to reorder within Backlog; or use Alt plus Arrow keys, Home, or End." [ref=e139]':
+            - text: AWF-0020
+            - generic [ref=e140]: P2
+            - generic [ref=e141]: missing
+            - generic [ref=e142]: Make the signed-in shell accessible and phone-native
+            - generic [ref=e143]: product-change
+            - generic [ref=e144]: Privacy, Trust & Quality
+            - generic [ref=e145]: Core §13 · accessibility, themes, and mobile navigation
+          - 'button "Open AWF-0022: Reconcile API and chosen-AI capability documentation. Drag to reorder within Backlog; or use Alt plus Arrow keys, Home, or End." [ref=e147]':
+            - text: AWF-0022
+            - generic [ref=e148]: P2
+            - generic [ref=e149]: missing
+            - generic [ref=e150]: Reconcile API and chosen-AI capability documentation
+            - generic [ref=e151]: documentation-operating
+            - generic [ref=e152]: Product OS & Agent Workflow
+            - generic [ref=e153]: Core §§5–7, 10 · machine and human capability truth
+          - 'button "Open AWF-0027: Add first-class source-fact and claim adjudication. Drag to reorder within Backlog; or use Alt plus Arrow keys, Home, or End." [ref=e155]':
+            - text: AWF-0027
+            - generic [ref=e156]: P2
+            - generic [ref=e157]: missing
+            - generic [ref=e158]: Add first-class source-fact and claim adjudication
+            - generic [ref=e159]: product-change
+            - generic [ref=e160]: Research Vault
+            - generic [ref=e161]: Project Philosophy · evidence, claims, conflict, and changing understanding
+          - 'button "Open AWF-0043: Make tracker reader browser proof content-independent. Drag to reorder within Backlog; or use Alt plus Arrow keys, Home, or End." [ref=e163]':
+            - text: AWF-0043
+            - generic [ref=e164]: P2
+            - generic [ref=e165]: tracker source/parity and full repo verify pass; optional reader suite has two stale or brittle assertions
+            - generic [ref=e166]: Make tracker reader browser proof content-independent
+            - generic [ref=e167]: verification-gap
+            - generic [ref=e168]: Product OS & Agent Workflow
+            - generic [ref=e169]: browser proof must derive current tracker content and reliably exercise pointer reorder
+          - 'button "Open AWF-0004: Independently audit the completed fast-lane rollout. Drag to reorder within Backlog; or use Alt plus Arrow keys, Home, or End." [ref=e171]':
+            - text: AWF-0004
+            - generic [ref=e172]: P3
+            - generic [ref=e173]: operationally-proven; independent audit deferred
+            - generic [ref=e174]: Independently audit the completed fast-lane rollout
+            - generic [ref=e175]: audit
+            - generic [ref=e176]: assurance
+          - 'button "Open AWF-0014: Add revocable read-only Unlisted family views. Drag to reorder within Backlog; or use Alt plus Arrow keys, Home, or End." [ref=e178]':
+            - text: AWF-0014
+            - generic [ref=e179]: P3
+            - generic [ref=e180]: missing
+            - generic [ref=e181]: Add revocable read-only Unlisted family views
+            - generic [ref=e182]: product-change
+            - generic [ref=e183]: Story Studio & Publishing
+            - generic [ref=e184]: Core §8 · Unlisted access
+          - 'button "Open AWF-0015: Add scoped Trusted collaboration for family research. Drag to reorder within Backlog; or use Alt plus Arrow keys, Home, or End." [ref=e186]':
+            - text: AWF-0015
+            - generic [ref=e187]: P3
+            - generic [ref=e188]: missing
+            - generic [ref=e189]: Add scoped Trusted collaboration for family research
+            - generic [ref=e190]: product-change
+            - generic [ref=e191]: Research Vault
+            - generic [ref=e192]: Core §8 · Trusted collaboration
+          - 'button "Open AWF-0016: Add a useful Family History account view at /me. Drag to reorder within Backlog; or use Alt plus Arrow keys, Home, or End." [ref=e194]':
+            - text: AWF-0016
+            - generic [ref=e195]: P3
+            - generic [ref=e196]: missing
+            - generic [ref=e197]: Add a useful Family History account view at /me
+            - generic [ref=e198]: product-change
+            - generic [ref=e199]: Product OS & Agent Workflow
+            - generic [ref=e200]: Core §11 · ordinary account surface
+          - 'button "Open AWF-0017: Add a privacy-safe owner operations view at /admin. Drag to reorder within Backlog; or use Alt plus Arrow keys, Home, or End." [ref=e202]':
+            - text: AWF-0017
+            - generic [ref=e203]: P3
+            - generic [ref=e204]: missing
+            - generic [ref=e205]: Add a privacy-safe owner operations view at /admin
+            - generic [ref=e206]: product-change
+            - generic [ref=e207]: Product OS & Agent Workflow
+            - generic [ref=e208]: Core §11 · owner-only aggregate administration
+          - 'button "Open AWF-0018: Connect Family History to the shared Support Desk. Drag to reorder within Backlog; or use Alt plus Arrow keys, Home, or End." [ref=e210]':
+            - text: AWF-0018
+            - generic [ref=e211]: P3
+            - generic [ref=e212]: missing
+            - generic [ref=e213]: Connect Family History to the shared Support Desk
+            - generic [ref=e214]: documentation-operating
+            - generic [ref=e215]: Product OS & Agent Workflow
+            - generic [ref=e216]: Core §12 · Support Desk
+          - 'button "Open AWF-0019: Add product-native Assist family wayfinding. Drag to reorder within Backlog; or use Alt plus Arrow keys, Home, or End." [ref=e218]':
+            - text: AWF-0019
+            - generic [ref=e219]: P3
+            - generic [ref=e220]: missing
+            - generic [ref=e221]: Add product-native Assist family wayfinding
+            - generic [ref=e222]: product-change
+            - generic [ref=e223]: Product OS & Agent Workflow
+            - generic [ref=e224]: Core §15 · family row and cross-site boundaries
+          - 'button "Open AWF-0021: Make dense evidence views scalable and personalizable. Drag to reorder within Backlog; or use Alt plus Arrow keys, Home, or End." [ref=e226]':
+            - text: AWF-0021
+            - generic [ref=e227]: P3
+            - generic [ref=e228]: missing
+            - generic [ref=e229]: Make dense evidence views scalable and personalizable
+            - generic [ref=e230]: product-change
+            - generic [ref=e231]: Research Vault
+            - generic [ref=e232]: Core §14 · bounded dense information
+          - 'button "Open AWF-0023: Add provenance-aware search across the research vault. Drag to reorder within Backlog; or use Alt plus Arrow keys, Home, or End." [ref=e234]':
+            - text: AWF-0023
+            - generic [ref=e235]: P3
+            - generic [ref=e236]: missing
+            - generic [ref=e237]: Add provenance-aware search across the research vault
+            - generic [ref=e238]: product-change
+            - generic [ref=e239]: Research Vault
+            - generic [ref=e240]: Project Philosophy · durable retrieval and evidence
+          - 'button "Open AWF-0024: Deliver evidence-centered timeline, relationship, and place views. Drag to reorder within Backlog; or use Alt plus Arrow keys, Home, or End." [ref=e242]':
+            - text: AWF-0024
+            - generic [ref=e243]: P3
+            - generic [ref=e244]: missing
+            - generic [ref=e245]: Deliver evidence-centered timeline, relationship, and place views
+            - generic [ref=e246]: product-change
+            - generic [ref=e247]: Context Intelligence
+            - generic [ref=e248]: Core §2.4 and Project Philosophy · product-specific visualization
+          - 'button "Open AWF-0025: Complete production web security headers and client-config review. Drag to reorder within Backlog; or use Alt plus Arrow keys, Home, or End." [ref=e250]':
+            - text: AWF-0025
+            - generic [ref=e251]: P3
+            - generic [ref=e252]: missing
+            - generic [ref=e253]: Complete production web security headers and client-config review
+            - generic [ref=e254]: verification-gap
+            - generic [ref=e255]: Privacy, Trust & Quality
+            - generic [ref=e256]: Core §§7, 13, 16.3 · deployed privacy and safety proof
+          - 'button "Open AWF-0026: Remove stale Linear coordination from current product and validators. Drag to reorder within Backlog; or use Alt plus Arrow keys, Home, or End." [ref=e258]':
+            - text: AWF-0026
+            - generic [ref=e259]: P3
+            - generic [ref=e260]: missing
+            - generic [ref=e261]: Remove stale Linear coordination from current product and validators
+            - generic [ref=e262]: documentation-operating
+            - generic [ref=e263]: Product OS & Agent Workflow
+            - generic [ref=e264]: Core §§16–17 · repository-owned current-work truth
+          - 'button "Open AWF-0028: Add privacy-safe production observability and incident handoff. Drag to reorder within Backlog; or use Alt plus Arrow keys, Home, or End." [ref=e266]':
+            - text: AWF-0028
+            - generic [ref=e267]: P3
+            - generic [ref=e268]: missing
+            - generic [ref=e269]: Add privacy-safe production observability and incident handoff
+            - generic [ref=e270]: verification-gap
+            - generic [ref=e271]: Privacy, Trust & Quality
+            - generic [ref=e272]: Core §§7, 16.3–16.5 · truthful operations and release proof
+          - 'button "Open AWF-0031: Curate an optional prompt and research-loop library. Drag to reorder within Backlog; or use Alt plus Arrow keys, Home, or End." [ref=e274]':
+            - text: AWF-0031
+            - generic [ref=e275]: P3
+            - generic [ref=e276]: missing
+            - generic [ref=e277]: Curate an optional prompt and research-loop library
+            - generic [ref=e278]: product-change
+            - generic [ref=e279]: Experimental Tools Lab
+            - generic [ref=e280]: Project Philosophy · optional prompts and reusable research loops
+        - generic [ref=e281]:
+          - heading "Next 2" [level=2] [ref=e282]
+          - 'button "Open AWF-0006: Let someone begin with one person and one known relationship. Drag to reorder within Next; or use Alt plus Arrow keys, Home, or End." [ref=e284]':
+            - text: AWF-0006
+            - generic [ref=e285]: P0
+            - generic [ref=e286]: private person-and-relationship start is live; retained-identity browser acceptance remains
+            - generic [ref=e287]: Let someone begin with one person and one known relationship
+            - generic [ref=e288]: product-change
+            - generic [ref=e289]: First Journey & Private Workspace
+            - generic [ref=e290]: Core §§4, 7, 11, 13, 17 · first useful journey
+          - 'button "Open AWF-0037: Join a newcomer Queue handoff to a sourced chosen-AI result. Drag to reorder within Next; or use Alt plus Arrow keys, Home, or End." [ref=e292]':
+            - text: AWF-0037
+            - generic [ref=e293]: P0
+            - generic [ref=e294]: bridge is live; authenticated joined acceptance is environment-blocked
+            - generic [ref=e295]: Join a newcomer Queue handoff to a sourced chosen-AI result
+            - generic [ref=e296]: product
+            - generic [ref=e297]: First Journey & Chosen AI
+            - generic [ref=e298]: private newcomer directive, owner-scoped chosen AI, sourced durable result, and visible Queue handback
+        - heading "Doing 0" [level=2] [ref=e300]
+        - generic [ref=e301]:
+          - heading "Needs You 1" [level=2] [ref=e302]
+          - 'button "Open AWF-0034: Make chosen-AI access revocable immediately. Drag to reorder within Needs You; or use Alt plus Arrow keys, Home, or End." [ref=e304]':
+            - text: AWF-0034
+            - generic [ref=e305]: P1
+            - generic [ref=e306]: production OAuth works; issued Clerk JWT access tokens remain valid until expiry
+            - generic [ref=e307]: edu
+            - generic [ref=e308]: Make chosen-AI access revocable immediately
+            - generic [ref=e309]: product-change
+            - generic [ref=e310]: Privacy, Trust & Quality
+            - generic [ref=e311]: Project Philosophy · revocable chosen-AI authority and private family tenancy
+        - generic [ref=e312]:
+          - heading "Done 12" [level=2] [ref=e313]
+          - 'button "Open AWF-0032: Make Queue tenancy and expiry fail closed. Drag to reorder within Done; or use Alt plus Arrow keys, Home, or End." [ref=e315]':
+            - text: AWF-0032
+            - generic [ref=e316]: P0
+            - generic [ref=e317]: implemented
+            - generic [ref=e318]: Make Queue tenancy and expiry fail closed
+            - generic [ref=e319]: product-change
+            - generic [ref=e320]: Privacy, Trust & Quality
+            - generic [ref=e321]: Core §§4–7 · Queue tenancy, authority expiry, and recovery
+          - 'button "Open AWF-0033: Give a chosen AI a durable Family History workspace. Drag to reorder within Done; or use Alt plus Arrow keys, Home, or End." [ref=e323]':
+            - text: AWF-0033
+            - generic [ref=e324]: P0
+            - generic [ref=e325]: production MCP and disposable named-client workflow proven; immediate JWT revocation remains separate
+            - generic [ref=e326]: Give a chosen AI a durable Family History workspace
+            - generic [ref=e327]: product-change
+            - generic [ref=e328]: Chosen AI & Durable Work
+            - generic [ref=e329]: Project Philosophy · private research-to-story workspace and chosen-AI boundary
+          - 'button "Open AWF-0035: Make Assist With Family History the canonical live product and sign-in home. Drag to reorder within Done; or use Alt plus Arrow keys, Home, or End." [ref=e331]':
+            - text: AWF-0035
+            - generic [ref=e332]: P0
+            - generic [ref=e333]: shipped and live; independent audit pending
+            - generic [ref=e334]: Make Assist With Family History the canonical live product and sign-in home
+            - generic [ref=e335]: release
+            - generic [ref=e336]: Product Identity & Trust
+            - generic [ref=e337]: Assist With Family History identity, canonical domain, secure sign-in, and truthful AI surfaces
+          - 'button "Open AWF-0001: Make the repository tracker the day-to-day operating source. Drag to reorder within Done; or use Alt plus Arrow keys, Home, or End." [ref=e339]':
+            - text: AWF-0001
+            - generic [ref=e340]: P1
+            - generic [ref=e341]: proven
+            - generic [ref=e342]: Make the repository tracker the day-to-day operating source
+            - generic [ref=e343]: migration
+            - generic [ref=e344]: operations
+            - generic [ref=e345]: Core §16 · Cards / Work Orders / Guide
+          - 'button "Open AWF-0002: Establish the fail-closed GitHub and Vercel state fast lane. Drag to reorder within Done; or use Alt plus Arrow keys, Home, or End." [ref=e347]':
+            - text: AWF-0002
+            - generic [ref=e348]: P1
+            - generic [ref=e349]: proven
+            - generic [ref=e350]: Establish the fail-closed GitHub and Vercel state fast lane
+            - generic [ref=e351]: operations
+            - generic [ref=e352]: delivery
+            - generic [ref=e353]: Core §16 · state publication
+          - 'button "Open AWF-0003: Align the Project Philosophy with Family Core v1.6.2. Drag to reorder within Done; or use Alt plus Arrow keys, Home, or End." [ref=e355]':
+            - text: AWF-0003
+            - generic [ref=e356]: P1
+            - generic [ref=e357]: adapt
+            - generic [ref=e358]: Align the Project Philosophy with Family Core v1.6.2
+            - generic [ref=e359]: documentation
+            - generic [ref=e360]: philosophy
+            - generic [ref=e361]: Core §§2, 16, 17
+          - 'button "Open AWF-0005: Make the public beta promise and storage story truthful. Drag to reorder within Done; or use Alt plus Arrow keys, Home, or End." [ref=e363]':
+            - text: AWF-0005
+            - generic [ref=e364]: P1
+            - generic [ref=e365]: superseded by the 2.0.0 identity and public-truth release
+            - generic [ref=e366]: Make the public beta promise and storage story truthful
+            - generic [ref=e367]: product-change
+            - generic [ref=e368]: Privacy, Trust & Quality
+            - generic [ref=e369]: Core §§6, 10, 13, 16.3 · public truth and soft launch
+          - 'button "Open AWF-0008: Deliver the Family History Queue backend foundation. Drag to reorder within Done; or use Alt plus Arrow keys, Home, or End." [ref=e371]':
+            - text: AWF-0008
+            - generic [ref=e372]: P1
+            - generic [ref=e373]: adopted
+            - generic [ref=e374]: Deliver the Family History Queue backend foundation
+            - generic [ref=e375]: product-change
+            - generic [ref=e376]: Research Operations & Agent Handoff
+            - generic [ref=e377]: Core §4 · directive-first Queue
+          - 'button "Open AWF-0029: Design and ship the Family History Queue experience. Drag to reorder within Done; or use Alt plus Arrow keys, Home, or End." [ref=e379]':
+            - text: AWF-0029
+            - generic [ref=e380]: P1
+            - generic [ref=e381]: product Queue shipped; joined chosen-AI browser acceptance remains in AWF-0037
+            - generic [ref=e382]: Design and ship the Family History Queue experience
+            - generic [ref=e383]: product-change
+            - generic [ref=e384]: Research Operations & Agent Handoff
+            - generic [ref=e385]: Core §4 · final product Queue experience
+          - 'button "Open AWF-0030: Prove deployed Queue persistence and chosen-AI boundary. Drag to reorder within Done; or use Alt plus Arrow keys, Home, or End." [ref=e387]':
+            - text: AWF-0030
+            - generic [ref=e388]: P1
+            - generic [ref=e389]: superseded by canonical production Queue and OAuth MCP proof
+            - generic [ref=e390]: Prove deployed Queue persistence and chosen-AI boundary
+            - generic [ref=e391]: verification-gap
+            - generic [ref=e392]: Research Operations & Agent Handoff
+            - generic [ref=e393]: Core §§4, 5, 7, 16.3 · authenticated Queue deployment proof
+          - 'button "Open AWF-0036: Give an empty family workspace one truthful first step. Drag to reorder within Done; or use Alt plus Arrow keys, Home, or End." [ref=e395]':
+            - text: AWF-0036
+            - generic [ref=e396]: P1
+            - generic [ref=e397]: version 2.0.1 shipped and live; independent audit pending
+            - generic [ref=e398]: Give an empty family workspace one truthful first step
+            - generic [ref=e399]: product
+            - generic [ref=e400]: First Journey & Chosen AI
+            - generic [ref=e401]: ordinary sign-in, empty workspace, Queue, and current OAuth MCP setup
+          - 'button "Open AWF-0009: Connect a chosen AI through scoped MCP and current AI guides. Drag to reorder within Done; or use Alt plus Arrow keys, Home, or End." [ref=e403]':
+            - text: AWF-0009
+            - generic [ref=e404]: P2
+            - generic [ref=e405]: shipped through AWF-0033 and AWF-WO-006
+            - generic [ref=e406]: Connect a chosen AI through scoped MCP and current AI guides
+            - generic [ref=e407]: product-change
+            - generic [ref=e408]: Product OS & Agent Workflow
+            - generic [ref=e409]: Core §§5–6 · MCP, AI setup, and current briefing
+  - status [ref=e410]

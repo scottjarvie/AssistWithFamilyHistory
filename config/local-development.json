@@ -1,0 +1,10 @@
+{
+  "livePort": 3444,
+  "sandboxPort": 3443,
+  "production": null,
+  "sandbox": "impressive-labrador-64",
+  "domain": "assistwithfamilyhistory.com",
+  "sandboxBlocker": "Current hosted Convex binding not yet confirmed; cannot prove this deployment is separate from production.",
+  "project": "AssistWithFamilyHistory",
+  "liveBlocker": "Existing Clerk server middleware requires a production server key absent from local mode; production local origin not verified."
+}

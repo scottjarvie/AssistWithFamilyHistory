@@ -64,6 +64,12 @@ export default function RootLayout({
       <body
         className={`${instrumentSans.variable} ${cormorantGaramond.variable} ${ibmPlexMono.variable} antialiased`}
       >
+        {process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_LOCAL_DATA_MODE ? (
+          <aside data-local-data-mode={process.env.NEXT_PUBLIC_LOCAL_DATA_MODE} style={{ position: "sticky", top: 0, zIndex: 9999, padding: "8px 12px", background: "#18372a", color: "#ffffff", fontSize: 13, textAlign: "center" }}>
+            {process.env.NEXT_PUBLIC_LOCAL_DATA_MODE === "live" ? "Local site · Live data · Changes affect your real account." : "Development data · Changes stay here."}
+          </aside>
+        ) : null}
+
         {clerkPublishableKey ? (
           <ClerkProvider publishableKey={clerkPublishableKey}>{children}</ClerkProvider>
         ) : (

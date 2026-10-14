@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  ...(process.env.NODE_ENV === "development" && process.env.ASSIST_LOCAL_DIST ? { distDir: process.env.ASSIST_LOCAL_DIST } : {}),
   poweredByHeader: false,
   async headers() {
     return [
