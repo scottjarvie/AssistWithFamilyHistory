@@ -3,7 +3,8 @@ name: CI
 # Conservative by design (soft launch, one tester). See
 # docs/operations/ci-review-and-preview-policy.md for who covers what:
 #   - Code review covers logic, privacy, and product intent.
-#   - Vercel's own preview build proves `next build` on every PR and deploys
+#   - Local `pnpm verify` proves the build before a push; Vercel builds only
+#     main and preview/* branches (Core Philosophy §16.6) and deploys
 #     production on merge, so this workflow does not build or start the app.
 #   - This workflow runs the fast contract checks once, when a PR is ready.
 # It does not run on pushes to main: the same commit already passed on its PR.

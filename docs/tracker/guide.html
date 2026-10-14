@@ -152,7 +152,8 @@ research-to-story identity while following the shared tracker contract.</p>
 </ul>
 <p>Work Order execution is exactly <code>proposed</code>, <code>ready</code>, <code>active</code>, <code>complete</code>, or <code>superseded</code>. Audit is independently <code>not-audited</code>, <code>passed</code>, or <code>follow-up-needed</code>. Complete never silently means audited.</p>
 <h2>Authority and handoff</h2>
-<p>The bounded loop is <strong>your AI proposes; Scott approves scope; your AI executes; a separate AI audits</strong>. There is no automatic dispatcher. A Work Order states its goal, included Cards, sequence, dependencies, exclusions, stop rules, verification, and genuine human gates.</p>
+<p>The bounded loop is <strong>your AI proposes; Scott approves scope; your AI executes; a separate AI audits</strong>. There is no automatic dispatcher. A Work Order states its goal, included Cards, sequence, dependencies, exclusions, stop rules, verification, and genuine human gates. A direct request from Scott in chat authorizes ordinary work on its own; a Work Order is optional context for larger runs, not a gate. Never record approval Scott did not give.</p>
+<p>Routine work is merged and deployed by the AI under the family delivery rule, <a href="https://github.com/scottjarvie/assistwithlife/blob/main/planning/assist-with-sites-core-philosophy.md#166-delivering-changes-localhost-first-then-merge">Core Philosophy §16.6</a>. Stop only for money/billing, deleting real data, domains/DNS, secrets, or a change to who can access production data.</p>
 <p>Copy prompt carries the Project, Project Philosophy, Family Core, full Card, linked Work Order, current evidence, and update rules. Copy Work Order carries the approved tranche and all included Cards.</p>
 <h2>Durable authoring rules</h2>
 <ul>

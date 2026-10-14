@@ -1,7 +1,8 @@
 # CI, review, and preview policy
 
-Last updated: 2026-10-06. Applies while the site is in soft launch (one owner
-testing, no outside users). Revisit when real users arrive.
+Last updated: 2026-10-14 (Vercel builds only `main` and `preview/*`, per
+[Core Philosophy §16.6](https://github.com/scottjarvie/assistwithlife/blob/main/planning/assist-with-sites-core-philosophy.md#166-delivering-changes-localhost-first-then-merge)). Applies while the site is in soft launch (one
+owner testing, no outside users). Revisit when real users arrive.
 
 ## Why
 
@@ -16,9 +17,9 @@ paid checks for the moment a change is about to ship.
 | Layer | Covers | When it runs | Cost |
 | --- | --- | --- | --- |
 | Local preview (`pnpm preview:local`) | How it looks and feels; owner feedback | Every save | Free |
-| Local `pnpm verify` | Typecheck, lint, tests, every contract check, build | Before an agent pushes | Free |
+| Local `pnpm verify` | Typecheck, lint, tests, every contract check, build (the build check for PR branches) | Before an agent pushes | Free |
 | Code review | Logic, privacy and trust boundaries, product intent, whether the right test exists | Every PR before merge | Free |
-| Vercel preview build | `next build` succeeds (and the Convex preview deploy, when a preview key is set) | Every push to a PR branch, except docs-only | Vercel build minutes |
+| Vercel preview build | `next build` succeeds (and the Convex preview deploy, when a preview key is set) | Pushes to `preview/*` branches only, except docs-only | Vercel build minutes |
 | GitHub CI (`.github/workflows/ci.yml`) | `pnpm verify` without the build | Ready (non-draft) PR pushes, or by hand | GitHub minutes, about 1 minute a run |
 | Vercel production build | Convex deploy then build, on merge | Every merge to `main`, except docs-only | Vercel build minutes |
 
@@ -28,13 +29,16 @@ paid checks for the moment a change is about to ship.
    PR ready, pushing to a ready PR, or running the workflow by hand triggers it.
    A newer push cancels the older run.
 2. **No CI on `main`.** The merged commit already passed on its PR.
-3. **CI does not build or start the app.** Vercel's preview build is the build
-   check, and it shows on the PR as the `Vercel` status. The route smoke test
-   moved to the local preview.
-4. **Docs-only changes do not build on Vercel.** If every changed path since
-   the last successful deployment is under `docs/`, `.claude/`, or a top-level
-   Markdown file, `scripts/vercel-ignore-build.mjs` skips the build after the
-   tracker and philosophy validators pass. Anything else builds.
+3. **CI does not build or start the app.** Local `pnpm verify` is the build
+   check for ordinary PR branches; Vercel builds only `main` and `preview/*`
+   (push to `preview/<name>` when someone wants a hosted link). The route
+   smoke test moved to the local preview.
+4. **Other branches and docs-only changes do not build on Vercel.**
+   `scripts/vercel-ignore-build.mjs` skips any non-production ref not named
+   `preview/*`. For `main` and `preview/*`, if every changed path since the
+   last successful deployment is under `docs/`, `.claude/`, or a top-level
+   Markdown file, it also skips the build after the tracker and philosophy
+   validators pass. Anything else builds.
 5. **Agents iterate locally and push in batches.** Run `pnpm verify` before
    pushing, keep the PR a draft while iterating, and mark it ready once.
 

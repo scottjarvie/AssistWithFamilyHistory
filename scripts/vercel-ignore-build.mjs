@@ -17,6 +17,16 @@ const DOCS_ONLY_PATHS = [
   /^\.claude\//,
 ];
 
+// Branch rule (Core Philosophy §16.6, 2026-10-14): Vercel builds production
+// (main) and branches named `preview/*` only. Any other non-production ref is
+// ignored before the docs check. Production, or a missing VERCEL_ENV, always
+// falls through to the fail-closed docs check below.
+export function decideVercelRef({ env, ref } = {}) {
+  if (!env || env === "production") return null;
+  if ((ref ?? "").startsWith("preview/")) return null;
+  return { ignore: true, reason: `${env} build of "${ref || "unknown ref"}" (only main and preview/* build)`, changes: [] };
+}
+
 export function nonDocsPaths(paths) {
   return paths.filter((file) => !DOCS_ONLY_PATHS.some((pattern) => pattern.test(file)));
 }
@@ -69,7 +79,10 @@ export function runCli(argv = process.argv.slice(2)) {
     process.stderr.write(`Vercel build required: ${error.message}\n`);
     return 1;
   }
-  const result = decideVercelBuild({
+  const result = decideVercelRef({
+    env: process.env.VERCEL_ENV?.trim(),
+    ref: process.env.VERCEL_GIT_COMMIT_REF?.trim(),
+  }) ?? decideVercelBuild({
     base: options.base || process.env.VERCEL_GIT_PREVIOUS_SHA?.trim(),
     head: options.head || process.env.VERCEL_GIT_COMMIT_SHA?.trim(),
     runValidators: () => {
