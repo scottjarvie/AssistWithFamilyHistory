@@ -60,7 +60,13 @@ Work Order execution is exactly `proposed`, `ready`, `active`, `complete`, or
 The bounded loop is **your AI proposes; Scott approves scope; your AI
 executes; a separate AI audits**. There is no automatic dispatcher. A Work
 Order states its goal, included Cards, sequence, dependencies, exclusions,
-stop rules, verification, and genuine human gates.
+stop rules, verification, and genuine human gates. A direct request from Scott
+in chat authorizes ordinary work on its own; a Work Order is optional context
+for larger runs, not a gate. Never record approval Scott did not give.
+
+Routine work is merged and deployed by the AI under the family delivery rule,
+[Core Philosophy §16.6](https://github.com/scottjarvie/assistwithlife/blob/main/planning/assist-with-sites-core-philosophy.md#166-delivering-changes-localhost-first-then-merge). Stop only for money/billing, deleting real data,
+domains/DNS, secrets, or a change to who can access production data.
 
 Copy prompt carries the Project, Project Philosophy, Family Core, full Card,
 linked Work Order, current evidence, and update rules. Copy Work Order carries

@@ -25,9 +25,10 @@ dependency and must not block work.
 
 ## Autonomous Mode
 
-When asked to work autonomously, follow a Ready or Active Work Order. If no
-approved order covers the request, record verified intake as Cards and propose a
-bounded Work Order for Scott's scope approval. Group work by product surface,
+A direct request from Scott in chat authorizes ordinary work; a Work Order is
+optional context, not a gate for it. When asked to work autonomously without a
+specific request, follow a Ready or Active Work Order, or record verified intake
+as Cards and propose a bounded Work Order for Scott's scope approval. Group work by product surface,
 dependency, workflow, refactor path, verification need, or release goal. Do not
 stop after one tiny task unless there is a real blocker or stopping point.
 
@@ -45,8 +46,10 @@ As you work:
 
 Answer technical questions from the repo, tracker, docs, tests, and provider
 evidence first. Ask the PM only when the answer materially changes product
-direction, UX taste, risk tolerance, production access, main-dev/backend
-ownership, or another decision that cannot be safely inferred.
+direction, UX taste, risk tolerance, or another decision that cannot be safely
+inferred. Stop and ask before money/billing, deleting real data, domains/DNS,
+secrets, or a change to who can access production data. Merging and deploying
+routine work is not a stop (see Delivering Changes).
 
 When you do ask, explain the technical question in plain language and state the tradeoff.
 
@@ -72,16 +75,26 @@ For targeted work pick from:
 - targeted contracts such as `pnpm check:familysearch-capture`, `pnpm check:capture-validation`, `pnpm check:operations-handoff`, `pnpm check:agent-quality-gates`, `pnpm check:context-pack-contract`, or `pnpm check:place-era-packs`
 - `BASE_URL=http://127.0.0.1:3443 pnpm smoke:routes` after starting the local app
 
-### CI, Vercel, and the local preview
+## Delivering Changes
 
-CI is deliberately conservative; read
-[`docs/operations/ci-review-and-preview-policy.md`](docs/operations/ci-review-and-preview-policy.md)
-before touching `.github/workflows/` or `vercel.json`. In short: iterate on
-`pnpm preview:local` ([how-to](docs/operations/local-preview.md)) and run
-`pnpm verify` locally; push in batches, keep the PR as a draft while you are
-still iterating (drafts run no GitHub CI), and mark it ready once, when it is
-done. Vercel's preview build is the build check; GitHub CI runs the contract
-checks once per ready push.
+Follow the family rule, [Core Philosophy §16.6](https://github.com/scottjarvie/assistwithlife/blob/main/planning/assist-with-sites-core-philosophy.md#166-delivering-changes-localhost-first-then-merge):
+preview on localhost, ship in batches, and the AI merges and deploys routine
+work. Scott does not need to press merge.
+
+- Preview locally: `pnpm dev:sandbox` (record-only local backend, synthetic
+  records) or `pnpm preview:local`; see
+  [local development](docs/operations/local-development.md) and
+  [local preview](docs/operations/local-preview.md). `pnpm dev:live` is
+  withheld by the launcher until its production binding is verified.
+- Run `pnpm verify` (it includes the build) before pushing. Work in progress
+  stays a draft PR (drafts run no GitHub CI); mark it ready once.
+- Vercel builds `main` and `preview/*` branches only. A production build also
+  deploys Convex ([how production deploys](docs/operations/how-production-deploys.md)).
+- Close out with where the latest change lives: local only, pushed but not
+  live, or live.
+
+Read [`docs/operations/ci-review-and-preview-policy.md`](docs/operations/ci-review-and-preview-policy.md)
+before touching `.github/workflows/` or `vercel.json`.
 
 For UI work, run browser checks on desktop and mobile breakpoints where relevant, inspect console errors, and note what changed visually.
 
@@ -107,4 +120,5 @@ At a meaningful stopping point, report:
 - UI routes or preview links to inspect, including desktop/mobile notes when relevant.
 - New or updated Cards and Work Orders, including separate audit state.
 - Residual risks or blockers.
+- Where the latest change lives: local only, pushed but not live, or live.
 - The next long route to take if continuing.

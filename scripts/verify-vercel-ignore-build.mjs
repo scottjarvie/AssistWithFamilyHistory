@@ -5,7 +5,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { decideVercelBuild, nonDocsPaths } from "./vercel-ignore-build.mjs";
+import { decideVercelBuild, decideVercelRef, nonDocsPaths } from "./vercel-ignore-build.mjs";
 
 const vercelConfig = JSON.parse(fs.readFileSync("vercel.json", "utf8"));
 assert.equal(vercelConfig.ignoreCommand, "node scripts/vercel-ignore-build.mjs");
@@ -32,6 +32,14 @@ for (const file of [
   "convex/README.md",
   ".github/workflows/ci.yml",
 ]) assert.deepEqual(nonDocsPaths([file]), [file], file);
+
+// Only production and preview/* branches build; other preview refs are ignored.
+assert.equal(decideVercelRef({ env: "production", ref: "main" }), null);
+assert.equal(decideVercelRef({ env: undefined, ref: "claude/anything" }), null);
+assert.equal(decideVercelRef({ env: "preview", ref: "preview/story-pages" }), null);
+assert.equal(decideVercelRef({ env: "preview", ref: "claude/story-pages" }).ignore, true);
+assert.equal(decideVercelRef({ env: "preview", ref: "" }).ignore, true);
+assert.equal(decideVercelRef({ env: "development", ref: "feature/x" }).ignore, true);
 
 function git(cwd, args) { return execFileSync("git", args, { cwd, encoding: "utf8" }).trim(); }
 function commit(cwd, message) {
@@ -78,4 +86,4 @@ try {
   fs.rmSync(fixture, { recursive: true, force: true });
 }
 
-console.log("Vercel ignore-build contract verified: docs-only ranges skip after validators pass; site, config, mixed, moved-out, malformed, missing-history, and invalid-state ranges build normally.");
+console.log("Vercel ignore-build contract verified: non-production refs other than preview/* skip; docs-only ranges skip after validators pass; site, config, mixed, moved-out, malformed, missing-history, and invalid-state ranges build normally.");
