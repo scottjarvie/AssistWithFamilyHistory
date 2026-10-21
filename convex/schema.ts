@@ -987,6 +987,7 @@ export default defineSchema({
     importKey: v.optional(v.string()),
     externalIds: v.optional(v.array(externalIdValidator)),
     importJobId: v.optional(v.id("treeImports")),
+    creationProvenance: v.optional(creationProvenanceValidator),
 
     // FamilySearch integration
     familySearchUrl: v.optional(v.string()),
