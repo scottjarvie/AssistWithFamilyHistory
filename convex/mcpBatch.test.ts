@@ -209,6 +209,96 @@ describe("family_history_save_records", () => {
     expect(stillThree).toHaveLength(3);
   });
 
+  test("a row that fails part-way leaves nothing of itself behind", async () => {
+    const t = convexTest(schema, modules);
+    const grantId = await seedGrant(t, { vaultOwnerId: OWNER });
+
+    const saved = await t.mutation(internal.mcpFamilyHistory.saveRecords, {
+      principal: principal(),
+      grantId,
+      operationId: "batch-atomic-rows",
+      requestHash: "hash-atomic-rows",
+      input: {
+        summary: "One good source, one whose content is empty and fails after its source and citation are written.",
+        evidence: [
+          {
+            source: { mode: "create", createKey: "source:atomic:good", title: "Atomic good source", type: "census" },
+            citation: { mode: "create", createKey: "citation:atomic:good", confidence: "high" },
+          },
+          {
+            source: { mode: "create", createKey: "source:atomic:bad", title: "Atomic half-saved source", type: "census" },
+            citation: { mode: "create", createKey: "citation:atomic:bad", confidence: "high" },
+            contents: [{ contentKey: "content:atomic:empty", kind: "transcription", madeBy: { kind: "person" } }],
+          },
+        ],
+      },
+    });
+
+    expect(saved.results.evidence.map((row: { status: string }) => row.status)).toEqual(["created", "failed"]);
+    expect(saved.results.evidence[1].reason).toMatch(/VALIDATION_ERROR/);
+    const sources = await t.run(async (ctx) =>
+      ctx.db.query("sources").withIndex("by_owner", (q) => q.eq("vaultOwnerId", OWNER)).collect(),
+    );
+    expect(sources.map((row) => row.title)).toEqual(["Atomic good source"]);
+    const citations = await t.run(async (ctx) => ctx.db.query("citations").collect());
+    expect(citations).toHaveLength(1);
+
+    // The failed row's keys were never claimed, so the corrected row saves cleanly.
+    const retry = await t.mutation(internal.mcpFamilyHistory.saveRecords, {
+      principal: principal(),
+      grantId,
+      operationId: "batch-atomic-rows-retry",
+      requestHash: "hash-atomic-rows-retry",
+      input: {
+        summary: "The corrected row.",
+        evidence: [{
+          source: { mode: "create", createKey: "source:atomic:bad", title: "Atomic half-saved source", type: "census" },
+          citation: { mode: "create", createKey: "citation:atomic:bad", confidence: "high" },
+          contents: [{ contentKey: "content:atomic:empty", kind: "transcription", madeBy: { kind: "person" }, text: "Line 4" }],
+        }],
+      },
+    });
+    expect(retry.results.evidence[0].status).toBe("created");
+  });
+
+  test("a failed update leaves the record at its original version", async () => {
+    const t = convexTest(schema, modules);
+    const grantId = await seedGrant(t, { vaultOwnerId: OWNER });
+    const first = await t.mutation(internal.mcpFamilyHistory.saveRecords, {
+      principal: principal(),
+      grantId,
+      operationId: "batch-update-seed",
+      requestHash: "hash-update-seed",
+      input: {
+        summary: "Seed one source and citation.",
+        evidence: [{
+          source: { mode: "create", createKey: "source:update:one", title: "Original title", type: "census" },
+          citation: { mode: "create", createKey: "citation:update:one", confidence: "high" },
+        }],
+      },
+    });
+    const citationId = first.results.evidence[0].id;
+    const source = await t.run(async (ctx) => (await ctx.db.query("sources").collect())[0]);
+
+    const stale = await t.mutation(internal.mcpFamilyHistory.saveRecords, {
+      principal: principal(),
+      grantId,
+      operationId: "batch-update-stale",
+      requestHash: "hash-update-stale",
+      input: {
+        summary: "Fresh source update, stale citation update.",
+        evidence: [{
+          source: { mode: "update", sourceId: String(source._id), expectedUpdatedAt: source.updatedAt, title: "Changed title" },
+          citation: { mode: "update", citationId, expectedUpdatedAt: 1, page: "p. 9" },
+        }],
+      },
+    });
+    expect(stale.results.evidence[0].status).toBe("failed");
+    const after = await t.run(async (ctx) => ctx.db.get(source._id));
+    expect(after?.title).toBe("Original title");
+    expect(after?.updatedAt).toBe(source.updatedAt);
+  });
+
   test("a batch over its cap is refused before anything is written", async () => {
     const t = convexTest(schema, modules);
     const grantId = await seedGrant(t, { vaultOwnerId: OWNER });
