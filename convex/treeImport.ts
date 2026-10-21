@@ -85,7 +85,7 @@ function liveWriter(ctx: MutationCtx): Writer {
   return {
     dryRun: false,
     insert: async (table, doc) => String(await ctx.db.insert(table, doc)),
-    patch: async (id, doc) => (ctx.db.patch as (id: string, doc: Record<string, unknown>) => Promise<void>)(id, doc),
+    patch: async (id, doc) => (ctx.db.patch as unknown as (id: string, doc: Record<string, unknown>) => Promise<void>)(id, doc),
   };
 }
 
