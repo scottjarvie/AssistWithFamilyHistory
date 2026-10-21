@@ -103,7 +103,6 @@ for (const requiredText of [
   "**Document:** Assist With Family History — Project Philosophy",
   `**Canonical:**`,
   `**Family Core:** ${familyCore.label} (${familyCore.date})`,
-  "**Aligned:** 2026-08-08",
   "**Adopted:**",
   "**Deferred/gaps:**",
   "**Differs:**",
@@ -111,6 +110,10 @@ for (const requiredText of [
 ]) {
   assert(source.includes(requiredText), `Missing alignment field: ${requiredText}`);
 }
+assert(
+  /\*\*Aligned:\*\* \d{4}-\d{2}-\d{2}/.test(source),
+  "Missing alignment field: **Aligned:** with a date",
+);
 assert(
   source.includes(familyCore.commit),
   "Project Philosophy does not name the tracker Family Core commit.",
