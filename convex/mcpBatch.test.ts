@@ -299,6 +299,68 @@ describe("family_history_save_records", () => {
     expect(after?.updatedAt).toBe(source.updatedAt);
   });
 
+  test("a citation createKey reused on another source is refused, not attached to the first source", async () => {
+    const t = convexTest(schema, modules);
+    const grantId = await seedGrant(t, { vaultOwnerId: OWNER });
+    const person = await t.mutation(internal.mcpFamilyHistory.saveRecords, {
+      principal: principal(), grantId, operationId: "batch-citation-person", requestHash: "hash-citation-person",
+      input: { summary: "One person.", people: [personRow("person:citation:one", "Ada")] },
+    });
+    const personId = person.results.people[0].id;
+    await t.mutation(internal.mcpFamilyHistory.saveRecords, {
+      principal: principal(), grantId, operationId: "batch-citation-a", requestHash: "hash-citation-a",
+      input: {
+        summary: "Source A.",
+        evidence: [{
+          source: { mode: "create", createKey: "source:citation:a", title: "Source A", type: "census" },
+          citation: { mode: "create", createKey: "citation:shared", confidence: "high" },
+        }],
+      },
+    });
+
+    const reused = await t.mutation(internal.mcpFamilyHistory.saveRecords, {
+      principal: principal(), grantId, operationId: "batch-citation-b", requestHash: "hash-citation-b",
+      input: {
+        summary: "Source B reusing source A's citation key.",
+        evidence: [{
+          source: { mode: "create", createKey: "source:citation:b", title: "Source B", type: "census" },
+          citation: { mode: "create", createKey: "citation:shared", confidence: "high" },
+          links: [{ targetType: "person", targetId: personId }],
+        }],
+      },
+    });
+    expect(reused.results.evidence[0].status).toBe("failed");
+    expect(reused.results.evidence[0].reason).toMatch(/IDEMPOTENCY_CONFLICT/);
+    const links = await t.run(async (ctx) => ctx.db.query("citationLinks").collect());
+    expect(links).toHaveLength(0);
+    const titles = await t.run(async (ctx) => (await ctx.db.query("sources").collect()).map((row) => row.title));
+    expect(titles).toEqual(["Source A"]);
+
+    // The single-source tool refuses it too, and writes nothing.
+    await expect(t.mutation(internal.mcpFamilyHistory.saveSourceEvidence, {
+      principal: principal(), grantId, operationId: "single-citation-b", requestHash: "hash-single-citation-b",
+      input: {
+        source: { mode: "create", createKey: "source:citation:b2", title: "Source B2", type: "census" },
+        citation: { mode: "create", createKey: "citation:shared", confidence: "high" },
+        links: [{ targetType: "person", targetId: personId }],
+      },
+    })).rejects.toThrow(/IDEMPOTENCY_CONFLICT/);
+    expect(await t.run(async (ctx) => (await ctx.db.query("citationLinks").collect()).length)).toBe(0);
+
+    // Reusing the key on its own source is still an idempotent retry.
+    const same = await t.mutation(internal.mcpFamilyHistory.saveRecords, {
+      principal: principal(), grantId, operationId: "batch-citation-a-again", requestHash: "hash-citation-a-again",
+      input: {
+        summary: "Source A again.",
+        evidence: [{
+          source: { mode: "create", createKey: "source:citation:a", title: "Source A", type: "census" },
+          citation: { mode: "create", createKey: "citation:shared", confidence: "high" },
+        }],
+      },
+    });
+    expect(same.results.evidence[0].status).toBe("updated");
+  });
+
   test("a batch over its cap is refused before anything is written", async () => {
     const t = convexTest(schema, modules);
     const grantId = await seedGrant(t, { vaultOwnerId: OWNER });

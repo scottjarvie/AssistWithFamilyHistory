@@ -488,8 +488,19 @@ async function saveSourceEvidenceRecord(ctx: MutationCtx, owner: string, input: 
   if (citationInput.mode === "create") {
     const key = cleanKey(citationInput.createKey, "citation.createKey");
     const mapping = await mappedRecord(ctx, owner, "citation", key);
-    if (mapping) citationId = (await owned(ctx, "citations", mapping.recordId, owner, "Citation"))._id;
-    else {
+    if (mapping) {
+      const row = await owned(ctx, "citations", mapping.recordId, owner, "Citation");
+      // A createKey names one citation of one source. Reusing it for another
+      // source would hang this evidence on the wrong source's citation.
+      if (row.sourceId !== sourceId) {
+        machineError(
+          "IDEMPOTENCY_CONFLICT",
+          "This citation createKey already names a citation on a different source.",
+          "Use a new citation createKey for this source, or save this evidence against the citation's original source.",
+        );
+      }
+      citationId = row._id;
+    } else {
       citationId = await ctx.db.insert("citations", {
         vaultOwnerId: owner,
         sourceId,
