@@ -7,14 +7,14 @@ import { FAMILY_HISTORY_MCP_LIMITS } from "../lib/mcp/contract";
 import { matchesVaultOwner } from "./vaultCore";
 import { assertGrantPermits } from "./mcpGrants";
 
-const principalValidator = v.object({
+export const principalValidator = v.object({
   issuer: v.string(),
   subject: v.string(),
   clientId: v.string(),
   scopes: v.array(v.string()),
 });
 
-type McpPrincipal = {
+export type McpPrincipal = {
   issuer: string;
   subject: string;
   clientId: string;
@@ -23,7 +23,7 @@ type McpPrincipal = {
 
 type RecordType = Doc<"mcpRecordKeys">["recordType"];
 
-function ownerFromPrincipal(principal: McpPrincipal): string {
+export function ownerFromPrincipal(principal: McpPrincipal): string {
   const owner = principal.subject.trim();
   if (!owner || !principal.issuer.trim() || !principal.clientId.trim()) {
     throw new Error("MCP_FAMILY_HISTORY_ERROR:" + JSON.stringify({
@@ -35,11 +35,11 @@ function ownerFromPrincipal(principal: McpPrincipal): string {
   return owner;
 }
 
-function machineError(code: string, message: string, recovery: string): never {
+export function machineError(code: string, message: string, recovery: string): never {
   throw new Error(`MCP_FAMILY_HISTORY_ERROR:${JSON.stringify({ code, message, recovery })}`);
 }
 
-function cleanText(value: unknown, label: string, max: number, required = false): string | undefined {
+export function cleanText(value: unknown, label: string, max: number, required = false): string | undefined {
   if (value === undefined || value === null) {
     if (required) machineError("VALIDATION_ERROR", `${label} is required.`, `Provide ${label}.`);
     return undefined;
@@ -261,7 +261,7 @@ function mcpProvenance(principal: McpPrincipal, operationId: string): McpProvena
   };
 }
 
-async function operation(
+export async function operation(
   ctx: MutationCtx,
   args: {
     principal: McpPrincipal;
@@ -1271,8 +1271,18 @@ export const getRecordContext = internalQuery({
         .filter((row): row is Doc<"citations"> => Boolean(row && matchesVaultOwner(row.vaultOwnerId, owner)));
       const sources = (await Promise.all(citations.map((citation) => ctx.db.get(citation.sourceId))))
         .filter((row): row is Doc<"sources"> => Boolean(row && matchesVaultOwner(row.vaultOwnerId, owner)));
+      // Notes about this person (imported or otherwise). A living person's notes
+      // stay out of AI context, the same promise the context:read scope makes.
+      const noteRows = person.living
+        ? []
+        : (await ctx.db
+          .query("notes")
+          .withIndex("by_subject", (q) => q.eq("subject.kind", "person").eq("subject.id", String(person._id)))
+          .take(max + 1))
+          .filter((row) => row.vaultOwnerId === owner);
       return {
         kind: "person",
+        notes: noteRows.slice(0, max).map((row) => ({ id: row._id, noteType: row.noteType, title: row.title ?? null, text: row.text })),
         person,
         relationships,
         events,
@@ -1281,7 +1291,7 @@ export const getRecordContext = internalQuery({
         stories: stories.filter((row) => matchesVaultOwner(row.vaultOwnerId, owner)).slice(0, max),
         researchTasks: tasks.filter((row) => matchesVaultOwner(row.vaultOwnerId, owner)).slice(0, max),
         researchFindings: findings.filter((row) => matchesVaultOwner(row.vaultOwnerId, owner)).slice(0, max),
-        truncated: [asPerson1, asPerson2, personEventLinks, stories, tasks, findings, citationLinks].some((rows) => rows.length > max),
+        truncated: [asPerson1, asPerson2, personEventLinks, stories, tasks, findings, citationLinks, noteRows].some((rows) => rows.length > max),
       };
     }
     if (args.kind === "story") {
