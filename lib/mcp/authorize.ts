@@ -234,6 +234,9 @@ export function namedRecordsInInput(toolName: string, input: unknown): NamedReco
       break;
     }
     case "family_history_save_source_evidence": {
+      for (const persona of Array.isArray(args.personas) ? args.personas : []) {
+        pushId(found.personIds, persona?.personId);
+      }
       for (const link of Array.isArray(args.links) ? args.links : []) {
         if (link?.targetType === "person") pushId(found.personIds, link?.targetId);
         else found.unattributable = true;
