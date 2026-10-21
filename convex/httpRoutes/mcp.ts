@@ -699,7 +699,7 @@ export function createFamilyHistoryServer(
   registerTool("family_history_get_brief", {
     inputSchema: z.object({}).strict(),
     annotations: readOnly,
-  }, () => read("family_history_get_brief", () => actionCtx.runQuery(mcp.getBrief, { principal })));
+  }, () => read("family_history_get_brief", () => actionCtx.runQuery(mcp.getBrief, { principal, grantId })));
 
   registerTool("family_history_search", {
     inputSchema: z.object({
@@ -708,7 +708,7 @@ export function createFamilyHistoryServer(
       limit: z.number().int().min(1).max(FAMILY_HISTORY_MCP_LIMITS.searchLimit).default(25),
     }).strict(),
     annotations: readOnly,
-  }, (input: any) => read("family_history_search", () => actionCtx.runQuery(mcp.search, { principal, ...input })));
+  }, (input: any) => read("family_history_search", () => actionCtx.runQuery(mcp.search, { principal, grantId, ...input })));
 
   registerTool("family_history_get_context", {
     inputSchema: z.object({

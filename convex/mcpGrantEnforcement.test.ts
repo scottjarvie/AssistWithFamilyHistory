@@ -386,6 +386,60 @@ describe("record boundaries", () => {
     expect(real.body).toEqual(invented.body);
   });
 
+  test("a selected-people grant's brief and search discover only its own people", async () => {
+    const t = convexTest(schema, modules);
+    const inside = await seedPerson(t, OWNER_A, "Inside");
+    const outside = await seedPerson(t, OWNER_A, "Outside");
+    await t.run(async (ctx) => {
+      const now = Date.now();
+      for (const [personId, label] of [[inside, "Inside"], [outside, "Outside"]] as const) {
+        await ctx.db.insert("stories", {
+          vaultOwnerId: OWNER_A, personId, type: "biography", title: `${label} Boundary story`,
+          content: "synthetic", citationIds: [], status: "draft", generatedBy: "human", createdAt: now, updatedAt: now,
+        });
+        await ctx.db.insert("researchTasks", {
+          vaultOwnerId: OWNER_A, personId, type: "record_search", title: `${label} Boundary task`,
+          status: "todo", priority: "medium", aiSuggested: false, createdAt: now, updatedAt: now,
+        });
+        await ctx.db.insert("researchLog", {
+          vaultOwnerId: OWNER_A, entityType: "person", entityId: personId, activityType: "other",
+          summary: `${label} Boundary finding`, status: "done", createdAt: now, updatedAt: now,
+        });
+      }
+      await ctx.db.insert("sources", { vaultOwnerId: OWNER_A, title: "Outside Boundary source", type: "other", createdAt: now, updatedAt: now });
+    });
+    await seedGrant(t, {
+      vaultOwnerId: OWNER_A,
+      clientId: CLIENT_ID,
+      issuer: ISSUER,
+      boundary: { kind: "selected_people", personIds: [String(inside)] },
+    });
+
+    const brief = await callTool(t, OWNER_A, "family_history_get_brief", {});
+    expect(brief.isError).toBe(false);
+    const briefText = JSON.stringify(brief.body);
+    expect(briefText).toContain("Inside Boundary");
+    expect(briefText).not.toContain("Outside");
+    expect(briefText).not.toContain(String(outside));
+
+    const search = await callTool(t, OWNER_A, "family_history_search", { query: "Boundary" });
+    expect(search.isError).toBe(false);
+    const searchText = JSON.stringify(search.body);
+    expect(searchText).toContain("Inside Boundary");
+    expect(searchText).not.toContain("Outside");
+    expect(searchText).not.toContain(String(outside));
+  });
+
+  test("a whole-workspace grant still discovers the whole vault", async () => {
+    const t = convexTest(schema, modules);
+    await seedPerson(t, OWNER_A, "Inside");
+    await seedPerson(t, OWNER_A, "Outside");
+    await seedGrant(t, { vaultOwnerId: OWNER_A, clientId: CLIENT_ID, issuer: ISSUER });
+    const search = await callTool(t, OWNER_A, "family_history_search", { query: "Boundary", kinds: ["person"] });
+    expect(search.isError).toBe(false);
+    expect((search.body as { results: unknown[] }).results).toHaveLength(2);
+  });
+
   test("a queue-only grant reaches no record tools at all", async () => {
     const t = convexTest(schema, modules);
     await seedGrant(t, {

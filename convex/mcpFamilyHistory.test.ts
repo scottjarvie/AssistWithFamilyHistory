@@ -65,16 +65,16 @@ describe("stateless Family History MCP durable operations", () => {
       input: personInput("person:owner-a:other", "Other"),
     })).rejects.toThrow(/IDEMPOTENCY_CONFLICT/);
 
-    const ownerABrief = await t.query(internal.mcpFamilyHistory.getBrief, { principal: principal() });
+    const ownerABrief = await t.query(internal.mcpFamilyHistory.getBrief, { principal: principal(), grantId });
     expect(ownerABrief.recentPeople).toHaveLength(1);
     expect(ownerABrief.recentPeople[0]).toMatchObject({ name: "Ada Evidence", living: true });
     expect(JSON.stringify(ownerABrief)).not.toContain("private living-person note");
 
-    const ownerBBrief = await t.query(internal.mcpFamilyHistory.getBrief, { principal: principal(OWNER_B) });
+    const ownerBBrief = await t.query(internal.mcpFamilyHistory.getBrief, { principal: principal(OWNER_B), grantId: await seedGrant(t, { vaultOwnerId: OWNER_B }) });
     expect(ownerBBrief.recentPeople).toEqual([]);
 
     const search = await t.query(internal.mcpFamilyHistory.search, {
-      principal: principal(),
+      principal: principal(), grantId,
       query: "Ada",
       kinds: ["person"],
     });
