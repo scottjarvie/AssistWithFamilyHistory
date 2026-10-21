@@ -445,8 +445,46 @@ function compactPersonWorkspace(workspace: any) {
   };
 }
 
-function withOperation<T extends z.ZodType>(schema: T) {
-  return z.intersection(z.object({ operationId }).strict(), schema);
+/**
+ * One object-shaped envelope: `operationId` beside the payload's own fields.
+ *
+ * Clients read the published JSON Schema, not the Zod. An intersection
+ * publishes `allOf: [{operationId}, oneOf[...]]`, which is not object-shaped:
+ * Claude flattened it to `{operationId}` alone and showed the AI none of the
+ * payload fields, and a JSON Schema validator rejects every call because each
+ * `allOf` half forbids the other's keys. So the published shape is one strict
+ * object holding every key any mode accepts (and `mode` as an enum), and the
+ * exact per-mode rules are still enforced here, server-side, against the
+ * original schema.
+ */
+function withOperation(schema: z.ZodType) {
+  const shape: Record<string, z.ZodType> = {};
+  const optional = (field: z.ZodType) => (field instanceof z.ZodOptional ? field : field.optional());
+  if (schema instanceof z.ZodDiscriminatedUnion) {
+    const modes: string[] = [];
+    for (const option of schema.options as z.ZodObject[]) {
+      for (const [key, field] of Object.entries(option.shape)) {
+        if (key === "mode") {
+          modes.push(...[...(field as z.ZodLiteral<string>).values].map(String));
+          continue;
+        }
+        shape[key] ??= optional(field as z.ZodType);
+      }
+    }
+    shape.mode = z.enum(modes as [string, ...string[]]);
+  } else if (schema instanceof z.ZodObject) {
+    Object.assign(shape, schema.shape);
+  } else {
+    throw new Error("withOperation needs an object or a discriminated union of objects.");
+  }
+  return z.object({ operationId, ...shape }).strict().superRefine((value, ctx) => {
+    const { operationId: _operationId, ...payload } = value as Record<string, unknown>;
+    const exact = schema.safeParse(payload);
+    if (exact.success) return;
+    for (const issue of exact.error.issues) {
+      ctx.addIssue({ code: "custom", message: issue.message, path: issue.path as PropertyKey[] });
+    }
+  });
 }
 
 /* ------------------------------------------------------------ batch schemas */

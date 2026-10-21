@@ -254,6 +254,57 @@ describe("stateless Family History MCP transport", () => {
     }
   });
 
+  test("single-record write tools publish one object with every field, not an allOf a client flattens away", async () => {
+    // Claude rendered the old `allOf: [{operationId}, oneOf[...]]` shape as
+    // `{operationId}` alone, so the AI never saw `mode`, `name` or `personId`.
+    const t = convexTest(schema, modules);
+    await approvedConnection(t);
+    const response = await t.fetch("/mcp", modernRequest("tools/list", await accessToken()));
+    const tools = (await response.json()).result.tools as Array<{ name: string; inputSchema: any }>;
+    const byName = new Map(tools.map((tool) => [tool.name, tool.inputSchema]));
+    const expected: Record<string, string[]> = {
+      family_history_save_person: ["operationId", "mode", "createKey", "personId", "expectedUpdatedAt", "name", "sex", "living"],
+      family_history_save_relationship: ["operationId", "mode", "createKey", "relationshipId", "type", "person1", "person2"],
+      family_history_save_event: ["operationId", "mode", "createKey", "eventId", "type", "personRoles"],
+      family_history_save_source_evidence: ["operationId", "source", "citation", "facts"],
+      family_history_save_research_work: ["operationId", "task", "finding"],
+      family_history_save_story_work: ["operationId", "mode", "createKey", "storyId", "title", "content"],
+    };
+    for (const [name, keys] of Object.entries(expected)) {
+      for (const toolName of [name, name.replace(/^family_history_/, "")]) {
+        const inputSchema = byName.get(toolName);
+        expect(inputSchema, toolName).toBeDefined();
+        expect(inputSchema.type, toolName).toBe("object");
+        expect(inputSchema.allOf, toolName).toBeUndefined();
+        expect(inputSchema.additionalProperties, toolName).toBe(false);
+        expect(inputSchema.required, toolName).toContain("operationId");
+        for (const key of keys) expect(Object.keys(inputSchema.properties), `${toolName}.${key}`).toContain(key);
+      }
+    }
+    expect(byName.get("family_history_save_person").properties.mode.enum).toEqual(["create", "update"]);
+  });
+
+  test("the object envelope still enforces each mode's own rules on the server", async () => {
+    const t = convexTest(schema, modules);
+    await approvedConnection(t);
+    const call = async (args: Record<string, unknown>) => {
+      const response = await t.fetch("/mcp", modernRequest("tools/call", await accessToken(), {
+        name: "family_history_save_person",
+        arguments: args,
+      }, "family_history_save_person"));
+      return (await response.json());
+    };
+    const refusedOutcome = (payload: any) => payload.error !== undefined || payload.result?.isError === true;
+    // A create without the create-only required name and sex.
+    expect(refusedOutcome(await call({ operationId: "envelope-missing", mode: "create", createKey: "person:envelope:missing", living: false }))).toBe(true);
+    // An update field on a create.
+    expect(refusedOutcome(await call({ operationId: "envelope-mixed", mode: "create", createKey: "person:envelope:mixed", name: { given: "A", surname: "B" }, sex: "unknown", living: false, personId: "abc", expectedUpdatedAt: 1 }))).toBe(true);
+    // An unknown key.
+    expect(refusedOutcome(await call({ operationId: "envelope-unknown", mode: "create", createKey: "person:envelope:unknown", name: { given: "A", surname: "B" }, sex: "unknown", living: false, species: "x" }))).toBe(true);
+    const ok = await call({ operationId: "envelope-valid", mode: "create", createKey: "person:envelope:valid", name: { given: "Envelope", surname: "Valid" }, sex: "unknown", living: false });
+    expect(refusedOutcome(ok)).toBe(false);
+  });
+
   test("the official v2 MCP client negotiates, lists tools, and saves through the stateless handler", async () => {
     const t = convexTest(schema, modules);
     await approvedConnection(t);
