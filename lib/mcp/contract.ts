@@ -16,7 +16,8 @@ export const FAMILY_HISTORY_MCP_TOOL_NAMES = [
 export type FamilyHistoryMcpToolName = (typeof FAMILY_HISTORY_MCP_TOOL_NAMES)[number];
 
 export const FAMILY_HISTORY_MCP_LIMITS = {
-  requestBytes: 256 * 1024,
+  /** Big enough for a 500-record whole-tree import batch. */
+  requestBytes: 1024 * 1024,
   searchLimit: 50,
   searchScanPerType: 250,
   briefRows: 12,

@@ -348,6 +348,36 @@ export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
     implementedBy: "convex/mcpFamilyHistory.addSourceContent",
   },
   {
+    name: "family_history_begin_tree_import",
+    requiredScope: "family_history:research:write",
+    writes: true,
+    title: "Begin or resume a whole-tree import",
+    description:
+      "WHOLE-TREE IMPORT, STEP 1. Start one resumable import session for a tree the person keeps on another site (system: \"familysearch\", \"ancestry\", \"gedcom\", ...), or resume the session with the same importKey. Returns importJobId, nextBatchIndex and the resume cursor you saved last time. Family History never signs into the other site; you read the tree the person can see and send it here. Needs a whole-workspace connection.",
+    humanSummary: "Starts (or picks up) bringing a whole family tree in from another site.",
+    implementedBy: "convex/treeImport.beginTreeImport",
+  },
+  {
+    name: "family_history_import_tree_batch",
+    requiredScope: "family_history:research:write",
+    writes: true,
+    title: "Import one batch of a family tree",
+    description:
+      "WHOLE-TREE IMPORT, STEP 2. Send up to 500 records per call: sources, persons (every name with its type, sex, living, and every fact with date and place), relationships (Couple, or one ParentChild row per parent with lineage), media references, citations (page, GEDCOM quality 0-3, and the person, fact or relationship each supports) and notes on any record. Every record is keyed by its id on the other site (a FamilySearch PID, source id, fact id), so resending updates the same record and never duplicates it. Records the person entered themselves are never overwritten; differences come back as kept. Set dryRun to see what would happen without saving. Send batchIndex = nextBatchIndex, plus your own cursor (where you are in the walk) so an interrupted import can resume. Possible duplicates become suggestions for the person; nothing is merged. Each row reports created, updated, unchanged, linked or failed with what to do. Set final on the last batch.",
+    humanSummary: "Brings in one batch of people, relationships, sources, citations and notes from another family tree site.",
+    implementedBy: "convex/treeImport.importTreeBatch",
+  },
+  {
+    name: "family_history_get_tree_import",
+    requiredScope: "family_history:context:read",
+    writes: false,
+    title: "Get whole-tree import progress",
+    description:
+      "WHOLE-TREE IMPORT, RESUME. Without importJobId: the ten most recent imports. With it: progress per record kind, nextBatchIndex, your saved cursor, the last 20 batches with their failed rows, and a page of possible-duplicate suggestions (follow possibleDuplicatesCursor). Call this first when resuming an interrupted import.",
+    humanSummary: "Shows how far a family tree import has got and which people might be duplicates.",
+    implementedBy: "convex/treeImport.getTreeImport",
+  },
+  {
     name: "family_history_save_complete_result",
     alias: "save_complete_result",
     requiredScope: "family_history:research:write",
