@@ -621,6 +621,21 @@
       "notes": "GEN-83. One-shot trigger: when an authenticated user still has the anonymous-vault preview cookie set, re-tags every owner-scoped row from the guest UUID to their Clerk user id and deletes the cookie. No-ops when not signed in, no cookie, or Clerk/Convex not configured. Convex mutation enforces a guest_* source prefix and user_* destination prefix as defense in depth. Never exposed to external agents."
     },
     {
+      "route": "/api/vault/export",
+      "methods": [
+        "GET"
+      ],
+      "capability": "owner_data_export",
+      "environment": "browser",
+      "agentSupport": "not-supported",
+      "reviewLevel": "internal-only",
+      "risk": "medium",
+      "scopes": [
+        "owner_only"
+      ],
+      "notes": "Your data export from /app/settings/data. Streams every owner table in lib/vault/exportTables.ts as one JSON file, 200 rows per owner-checked Convex read. Hashed API keys, replay receipts, internal key maps and upload sessions are left out. Never cached. Not an MCP tool: whole-vault export stays on the MCP never-list."
+    },
+    {
       "route": "/api/ai-connections",
       "methods": [
         "POST"
