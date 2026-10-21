@@ -58,6 +58,15 @@ export function Footer() {
             <SafeLink href="/contact" className="inline-flex min-h-11 items-center transition-colors hover:text-[#fff6e5] md:pointer-fine:min-h-0">
               Contact
             </SafeLink>
+            <SafeLink href="/ideas-and-usage" className="transition-colors hover:text-[#fff6e5]">
+              Ideas
+            </SafeLink>
+            <SafeLink href="/support" className="transition-colors hover:text-[#fff6e5]">
+              Support
+            </SafeLink>
+            <SafeLink href="/delete-account" className="transition-colors hover:text-[#fff6e5]">
+              Deleting your account
+            </SafeLink>
           </nav>
 
           <p className="max-w-xs text-sm leading-6 text-[#b8a987]">
