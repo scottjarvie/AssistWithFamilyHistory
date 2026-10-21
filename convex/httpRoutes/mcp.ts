@@ -1037,6 +1037,8 @@ export function createFamilyHistoryServer(
           principal: queuePrincipal,
           state: input.state,
           priority: input.priority,
+          // A connection narrowed to named Queue items lists only those.
+          queueItemIds: grant?.boundary?.queueItemIds?.length ? grant.boundary.queueItemIds : undefined,
           paginationOpts: { numItems: input.limit, cursor: input.cursor ?? null },
         });
       }

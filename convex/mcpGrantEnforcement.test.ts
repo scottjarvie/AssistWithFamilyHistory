@@ -11,7 +11,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from "vit
 import { convexTest } from "convex-test";
 import { exportJWK, generateKeyPair, SignJWT, type KeyLike } from "jose";
 import schema from "./schema";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import {
   FAMILY_HISTORY_ALL_TOOL_NAMES,
   FAMILY_HISTORY_SCOPES,
@@ -398,6 +398,50 @@ describe("record boundaries", () => {
     expect(names).toContain("family_history_get_queue");
     expect(names).not.toContain("family_history_get_brief");
     expect(names).not.toContain("family_history_save_person");
+  });
+
+  test("a grant narrowed to named Queue items lists only those items", async () => {
+    vi.stubEnv("TRUST_BOUNDARY_MODE", "enforce");
+    const t = convexTest(schema, modules);
+    const create = (key: string) => t.withIdentity({ subject: OWNER_A }).mutation(api.queue.createQueueItem, {
+      vaultOwnerId: OWNER_A,
+      directive: `Synthetic Queue directive ${key}.`,
+      idempotencyKey: `grant-queue:${key}`,
+    });
+    const allowed = (await create("allowed")).item;
+    const excluded = (await create("excluded")).item;
+    await seedGrant(t, {
+      vaultOwnerId: OWNER_A,
+      clientId: CLIENT_ID,
+      issuer: ISSUER,
+      boundary: { kind: "queue_only", queueItemIds: [String(allowed._id)] },
+    });
+    const listed = await callTool(t, OWNER_A, "family_history_get_queue", { action: "list" });
+    expect(listed.isError).toBe(false);
+    const ids = (listed.body as { page: Array<{ _id: string }> }).page.map((item) => item._id);
+    expect(ids).toEqual([String(allowed._id)]);
+    expect(ids).not.toContain(String(excluded._id));
+    // Filters still apply inside the boundary.
+    const none = await callTool(t, OWNER_A, "family_history_get_queue", { action: "list", state: "done" });
+    expect((none.body as { page: unknown[] }).page).toEqual([]);
+    // The excluded item stays out of reach by id too.
+    const detail = await callTool(t, OWNER_A, "family_history_get_queue", { action: "detail", queueItemId: String(excluded._id) });
+    expect(detail.isError).toBe(true);
+  });
+
+  test("a whole-workspace grant without a Queue boundary still lists every Queue item", async () => {
+    vi.stubEnv("TRUST_BOUNDARY_MODE", "enforce");
+    const t = convexTest(schema, modules);
+    for (const key of ["one", "two"]) {
+      await t.withIdentity({ subject: OWNER_A }).mutation(api.queue.createQueueItem, {
+        vaultOwnerId: OWNER_A,
+        directive: `Synthetic Queue directive ${key}.`,
+        idempotencyKey: `grant-queue-all:${key}`,
+      });
+    }
+    await seedGrant(t, { vaultOwnerId: OWNER_A, clientId: CLIENT_ID, issuer: ISSUER });
+    const listed = await callTool(t, OWNER_A, "family_history_get_queue", { action: "list" });
+    expect((listed.body as { page: unknown[] }).page).toHaveLength(2);
   });
 });
 

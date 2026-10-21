@@ -546,6 +546,31 @@ export const listQueueItemsInternal = internalQuery({
   },
 });
 
+/**
+ * A connection narrowed to named Queue items lists exactly those items, never
+ * the owner's whole Queue. Read by id (the list is small and person-chosen),
+ * newest first, paged by offset.
+ */
+export const listAllowedQueueItemsInternal = internalQuery({
+  args: { ...listQueueArgs, queueItemIds: v.array(v.string()) },
+  handler: async (ctx, args): Promise<PaginationResult<QueueItem>> => {
+    const rows: QueueItem[] = [];
+    for (const raw of new Set(args.queueItemIds)) {
+      const id = ctx.db.normalizeId("queueItems", raw);
+      const item = id ? await ctx.db.get(id) : null;
+      if (!item || !matchesVaultOwner(item.vaultOwnerId, args.vaultOwnerId)) continue;
+      if (args.state && item.state !== args.state) continue;
+      if (args.priority && item.priority !== args.priority) continue;
+      rows.push(item);
+    }
+    rows.sort((a, b) => b.updatedAt - a.updatedAt);
+    const parsed = Number.parseInt(args.paginationOpts.cursor ?? "0", 10);
+    const start = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+    const end = start + Math.min(args.paginationOpts.numItems, QUEUE_LIMITS.itemPage);
+    return { page: rows.slice(start, end), isDone: end >= rows.length, continueCursor: String(Math.min(end, rows.length)) };
+  },
+});
+
 export const listQueueItems = action({
   args: listQueueArgs,
   handler: async (ctx, args): Promise<PaginationResult<QueueItem>> => {
@@ -623,15 +648,21 @@ export const agentListQueueItems = internalAction({
     state: v.optional(queueStateValidator),
     priority: v.optional(queuePriorityValidator),
     paginationOpts: paginationOptsValidator,
+    // The grant's named Queue items, when the person narrowed the connection
+    // to them. Absent or empty means the grant names no Queue boundary.
+    queueItemIds: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args): Promise<PaginationResult<QueueItem>> => {
     const actor = verifyPrincipal(args.principal, "list_queue_items");
-    const result = await ctx.runQuery(internal.queue.listQueueItemsInternal, {
+    const listArgs = {
       vaultOwnerId: actor.ownerId,
       state: args.state,
       priority: args.priority,
       paginationOpts: args.paginationOpts,
-    });
+    };
+    const result = args.queueItemIds && args.queueItemIds.length > 0
+      ? await ctx.runQuery(internal.queue.listAllowedQueueItemsInternal, { ...listArgs, queueItemIds: args.queueItemIds })
+      : await ctx.runQuery(internal.queue.listQueueItemsInternal, listArgs);
     const page: QueueItem[] = [];
     for (const item of result.page) {
       const transition = queueExpiryTransition(item, Date.now());
