@@ -33,11 +33,12 @@ TRUST_BOUNDARY_MODE accepts two values:
 
 | Mode | Tenant or policy denial | Shadow table |
 | --- | --- | --- |
-| unset or shadow | Log the would-be denial and preserve the legacy call | Insert one record containing function, caller, reason, and timestamp |
-| enforce | Throw before protected data is read or changed | No insert |
+| shadow | Log the would-be denial and preserve the legacy call | Insert one record containing function, caller, reason, and timestamp |
+| enforce, unset, or anything else | Throw before protected data is read or changed | No insert |
 
-Only the exact value enforce enables enforcement. Every other value defaults
-to shadow, which is the safe rollout default.
+Tenant checks fail closed (2026-10-21). Only the exact value shadow opts out,
+and only the throwaway `pnpm preview:local` backend sets it. Unset, empty, or
+misspelled values enforce.
 
 The Next server mirrors this value. In enforce mode,
 getAuthedConvexClient() fails closed when Clerk, the issuer, the session, or

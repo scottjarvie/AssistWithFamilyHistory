@@ -83,11 +83,14 @@ test("decideTenantAccess: anonymous callers are denied and classified for loggin
   });
 });
 
-test("TRUST_BOUNDARY_MODE is fail-safe: only exact enforce enables enforcement", () => {
+test("TRUST_BOUNDARY_MODE fails closed: only exact shadow opts out of enforcement", () => {
   assert.equal(getTrustBoundaryMode("enforce"), "enforce");
   assert.equal(getTrustBoundaryMode("shadow"), "shadow");
-  assert.equal(getTrustBoundaryMode("ENFORCE"), "shadow");
-  assert.equal(getTrustBoundaryMode(undefined), "shadow");
+  assert.equal(getTrustBoundaryMode("ENFORCE"), "enforce");
+  assert.equal(getTrustBoundaryMode("SHADOW"), "enforce");
+  assert.equal(getTrustBoundaryMode("enfroce"), "enforce");
+  assert.equal(getTrustBoundaryMode(""), "enforce");
+  assert.equal(getTrustBoundaryMode(undefined), "enforce");
 });
 
 test("buildOperationSummary aggregates required/recommended/critical and next actions", () => {

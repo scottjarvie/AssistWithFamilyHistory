@@ -49,7 +49,8 @@ export async function getAuthedConvexClient(options?: {
     client.setAuth(verified.token);
     return client;
   }
-  const enforcing = process.env.TRUST_BOUNDARY_MODE === "enforce";
+  // Mirrors convex/access.ts: only the explicit `shadow` opt-out relaxes this.
+  const enforcing = process.env.TRUST_BOUNDARY_MODE !== "shadow";
   const requireAuthentication = options?.requireAuthentication === true || enforcing;
 
   // Only mint a "convex" template token in an environment actually configured
