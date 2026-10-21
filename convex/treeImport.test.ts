@@ -60,12 +60,15 @@ async function countRows(t: T, table: string) {
   return await t.run(async (ctx) => (await (ctx.db as any).query(table).collect()).length); // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
-describe("whole-tree import", () => {
-  test("imports a 5,000-person tree in 500-record batches with nothing lost", { timeout: 1_800_000 }, async () => {
-    const t = convexTest(schema, modules);
+/** Set by vitest.treeimport.config.ts (pnpm test:tree-import-5k). */
+const FULL = (typeof process !== "undefined" && process.env?.TREE_IMPORT_FULL === "1");
+
+async function importsWholeTree(people: number) {
+    // transactionLimits: every chunk must fit Convex's real per-transaction ceilings.
+    const t = convexTest({ schema, modules, transactionLimits: true });
     const grantId = await seedGrant(t, { vaultOwnerId: OWNER });
-    const tree = generateSyntheticTree({ people: 5_000 });
-    expect(tree.persons).toHaveLength(5_000);
+    const tree = generateSyntheticTree({ people });
+    expect(tree.persons).toHaveLength(people);
     const batches = packBatches(tree, 500);
     const job = await begin(t, grantId);
 
@@ -79,17 +82,17 @@ describe("whole-tree import", () => {
 
     const progress = (await t.query(internal.treeImport.getTreeImport, { principal: principal(), importJobId: job.importJobId })) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
     expect(progress.import.status).toBe("completed");
-    expect(progress.import.peopleSaved).toBe(5_000);
+    expect(progress.import.peopleSaved).toBe(people);
     expect(progress.import.nextBatchIndex).toBe(batches.length);
     expect(progress.import.cursor).toBe(`after-batch-${batches.length - 1}`);
-    expect(progress.import.counts.persons.created).toBe(5_000);
+    expect(progress.import.counts.persons.created).toBe(people);
     expect(progress.import.counts.relationships.created).toBe(tree.relationships.length);
     expect(progress.import.counts.sources.created).toBe(tree.sources.length);
     expect(progress.import.counts.citations.created).toBe(tree.citations.length);
     expect(progress.import.counts.notes.created).toBe(tree.notes.length);
     expect(progress.import.counts.media.created).toBe(tree.media.length);
 
-    expect(await countRows(t, "persons")).toBe(5_000);
+    expect(await countRows(t, "persons")).toBe(people);
     expect(await countRows(t, "relationships")).toBe(tree.relationships.length);
     const facts = tree.persons.reduce((sum, person) => sum + (person.facts?.length ?? 0), 0);
     expect(await countRows(t, "events")).toBe(facts);
@@ -119,7 +122,16 @@ describe("whole-tree import", () => {
     const parentLinks = await t.run(async (ctx) => ctx.db.query("relationships").withIndex("by_type", (q) => q.eq("type", "ParentChild")).collect());
     expect(parentLinks.some((row) => row.childRelationType === "Adopted")).toBe(true);
     expect(parentLinks.every((row) => row.childRelationType !== undefined)).toBe(true);
-  });
+}
+
+
+describe("whole-tree import", () => {
+  test("imports a 300-person tree in 500-record batches inside Convex transaction limits", { timeout: 900_000 }, () => importsWholeTree(300));
+
+  // convex-test walks every document on every query, so 5,000 people (about
+  // 100,000 rows) only runs under vitest.treeimport.config.ts, which gives the
+  // in-memory store a per-table index. Real Convex is not affected.
+  test.runIf(FULL)("imports a 5,000-person tree in 500-record batches with nothing lost", { timeout: 7_200_000 }, () => importsWholeTree(5_000));
 
   describe("on a smaller tree", () => {
     const tree = generateSyntheticTree({ people: 120, generations: 4 });
