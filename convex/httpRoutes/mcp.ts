@@ -351,6 +351,8 @@ const citationSave = z.discriminatedUnion("mode", [
   z.object({ mode: z.literal("create"), createKey, ...citationFields, confidence: z.enum(["very_high", "high", "medium", "low", "very_low"]) }).strict(),
   z.object({ mode: z.literal("update"), citationId: id, expectedUpdatedAt: z.number(), ...citationFields }).strict(),
 ]);
+// A connected AI proposes facts; only the person accepts one.
+const factProposalStatus = z.enum(["candidate", "conflict", "rejected"]).describe("candidate (default), conflict or rejected. Only the person can accept a fact.");
 const recordField = z.object({ label: z.string().trim().min(1).max(300), value: z.string().trim().min(1).max(2_000) }).strict();
 const sourceContent = z.object({
   contentKey: createKey,
@@ -385,7 +387,7 @@ const evidenceSave = z.object({
   contents: z.array(sourceContent).max(FAMILY_HISTORY_MCP_LIMITS.contentsPerCall).optional(),
   personas: z.array(persona).max(60).optional(),
   links: z.array(z.object({ targetType: z.enum(["person", "relationship", "event", "place"]), targetId: id, field: z.string().max(160).optional() }).strict()).max(30).optional(),
-  facts: z.array(z.object({ factKey: createKey, personId: id, factType: z.enum(["name", "sex", "birth", "death", "marriage", "census_residence", "residence", "occupation", "other"]), label: z.string().min(1).max(300), value: z.string().min(1).max(2_000), date: z.string().max(160).optional(), place: z.string().max(500).optional(), confidence: z.enum(["high", "medium", "low"]), status: z.enum(["candidate", "accepted", "conflict", "rejected"]).optional(), conflictReason: z.string().max(1_000).optional(), ...claimExtras }).strict()).max(30).optional(),
+  facts: z.array(z.object({ factKey: createKey, personId: id, factType: z.enum(["name", "sex", "birth", "death", "marriage", "census_residence", "residence", "occupation", "other"]), label: z.string().min(1).max(300), value: z.string().min(1).max(2_000), date: z.string().max(160).optional(), place: z.string().max(500).optional(), confidence: z.enum(["high", "medium", "low"]), status: factProposalStatus.optional(), conflictReason: z.string().max(1_000).optional(), ...claimExtras }).strict()).max(30).optional(),
 }).strict();
 
 const researchTaskFields = {
@@ -538,7 +540,7 @@ const batchEvidenceSave = z.object({
     date: z.string().max(160).optional(),
     place: z.string().max(500).optional(),
     confidence: z.enum(["high", "medium", "low"]),
-    status: z.enum(["candidate", "accepted", "conflict", "rejected"]).optional(),
+    status: factProposalStatus.optional(),
     conflictReason: z.string().max(1_000).optional(),
     ...claimExtras,
   }).strict()).max(30).optional(),
