@@ -480,7 +480,8 @@ function withOperation(schema: z.ZodType) {
     throw new Error("withOperation needs an object or a discriminated union of objects.");
   }
   return z.object({ operationId, ...shape }).strict().superRefine((value, ctx) => {
-    const { operationId: _operationId, ...payload } = value as Record<string, unknown>;
+    const payload: Record<string, unknown> = { ...value };
+    delete payload.operationId;
     const exact = schema.safeParse(payload);
     if (exact.success) return;
     for (const issue of exact.error.issues) {

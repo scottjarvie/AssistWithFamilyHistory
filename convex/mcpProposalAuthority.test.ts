@@ -8,6 +8,7 @@ import { describe, expect, test } from "vitest";
 import { convexTest } from "convex-test";
 import schema from "./schema";
 import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import { seedGrant } from "../lib/mcp/testSupport";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -82,14 +83,14 @@ describe("proposals-only research authority", () => {
       principal, grantId, operationId: "proposal-first", requestHash: "hash-first",
       input: evidence(personId, "candidate"),
     });
-    const factId = saved.evidence.factIds[0];
+    const factId = saved.evidence.factIds[0] as Id<"sourceFacts">;
     // The person accepts it in Family History.
-    await t.run(async (ctx) => ctx.db.patch(factId as any, { status: "accepted" }));
+    await t.run(async (ctx) => ctx.db.patch(factId, { status: "accepted" }));
     await expect(t.mutation(internal.mcpFamilyHistory.saveSourceEvidence, {
       principal, grantId, operationId: "proposal-overwrite", requestHash: "hash-overwrite",
       input: { ...evidence(personId, "rejected"), facts: [{ ...evidence(personId, "rejected").facts[0], value: "1890" }] },
     })).rejects.toThrow(/FORBIDDEN/);
-    const fact = await t.run(async (ctx) => ctx.db.get(factId as any));
+    const fact = await t.run(async (ctx) => ctx.db.get(factId));
     expect(fact).toMatchObject({ status: "accepted", value: "1881" });
   });
 
@@ -132,6 +133,6 @@ describe("proposals-only research authority", () => {
       input: { mode: "update", personId: String(created.person.id), expectedUpdatedAt: created.person.updatedAt, name: { given: "Aileen", surname: "Made" } },
     });
     expect(corrected.person).toMatchObject({ created: false });
-    expect(await t.run(async (ctx) => ctx.db.get(created.person.id as any))).toMatchObject({ name: { given: "Aileen" } });
+    expect(await t.run(async (ctx) => ctx.db.get(created.person.id as Id<"persons">))).toMatchObject({ name: { given: "Aileen" } });
   });
 });

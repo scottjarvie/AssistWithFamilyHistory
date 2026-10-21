@@ -260,7 +260,14 @@ describe("stateless Family History MCP transport", () => {
     const t = convexTest(schema, modules);
     await approvedConnection(t);
     const response = await t.fetch("/mcp", modernRequest("tools/list", await accessToken()));
-    const tools = (await response.json()).result.tools as Array<{ name: string; inputSchema: any }>;
+    type PublishedSchema = {
+      type?: string;
+      allOf?: unknown;
+      additionalProperties?: unknown;
+      required?: string[];
+      properties: Record<string, { enum?: string[] }>;
+    };
+    const tools = (await response.json()).result.tools as Array<{ name: string; inputSchema: PublishedSchema }>;
     const byName = new Map(tools.map((tool) => [tool.name, tool.inputSchema]));
     const expected: Record<string, string[]> = {
       family_history_save_person: ["operationId", "mode", "createKey", "personId", "expectedUpdatedAt", "name", "sex", "living"],
@@ -272,7 +279,7 @@ describe("stateless Family History MCP transport", () => {
     };
     for (const [name, keys] of Object.entries(expected)) {
       for (const toolName of [name, name.replace(/^family_history_/, "")]) {
-        const inputSchema = byName.get(toolName);
+        const inputSchema = byName.get(toolName)!;
         expect(inputSchema, toolName).toBeDefined();
         expect(inputSchema.type, toolName).toBe("object");
         expect(inputSchema.allOf, toolName).toBeUndefined();
@@ -281,7 +288,7 @@ describe("stateless Family History MCP transport", () => {
         for (const key of keys) expect(Object.keys(inputSchema.properties), `${toolName}.${key}`).toContain(key);
       }
     }
-    expect(byName.get("family_history_save_person").properties.mode.enum).toEqual(["create", "update"]);
+    expect(byName.get("family_history_save_person")!.properties.mode.enum).toEqual(["create", "update"]);
   });
 
   test("the object envelope still enforces each mode's own rules on the server", async () => {
@@ -294,7 +301,7 @@ describe("stateless Family History MCP transport", () => {
       }, "family_history_save_person"));
       return (await response.json());
     };
-    const refusedOutcome = (payload: any) => payload.error !== undefined || payload.result?.isError === true;
+    const refusedOutcome = (payload: { error?: unknown; result?: { isError?: boolean } }) => payload.error !== undefined || payload.result?.isError === true;
     // A create without the create-only required name and sex.
     expect(refusedOutcome(await call({ operationId: "envelope-missing", mode: "create", createKey: "person:envelope:missing", living: false }))).toBe(true);
     // An update field on a create.
