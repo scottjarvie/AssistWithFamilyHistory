@@ -13,7 +13,7 @@ import {
   getTrustBoundaryMode,
   handlePolicyViolationMutation,
 } from "./access";
-import { buildStoryBundle, loadStoryScopedSnapshot } from "./vault";
+import { buildStoryBundle, isFirstStartEligible, loadStoryScopedSnapshot } from "./vault";
 import {
   buildProvisionalDedupeKey,
   filterByVaultOwner,
@@ -458,30 +458,7 @@ export const startPrivateWorkspace = mutation({
       };
     }
 
-    const workspaceChecks = await Promise.all([
-      ctx.db.query("persons").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("relationships").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("events").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("personEvents").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("places").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("sources").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("citations").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("citationLinks").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("sourceFacts").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("media").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("contextItems").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("stories").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("importRuns").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("documents").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("researchTasks").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("researchLog").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("storyReviewEvents").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("provisionalRelatives").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("researchChecks").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("historicalContext").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("queueItems").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-    ]);
-    if (workspaceChecks.some(Boolean)) {
+    if (!(await isFirstStartEligible(ctx, vaultOwnerId))) {
       throw new Error("First start is only available in an empty private workspace");
     }
 
