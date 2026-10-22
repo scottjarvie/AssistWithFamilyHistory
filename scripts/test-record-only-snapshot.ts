@@ -1,15 +1,26 @@
-import test from 'node:test';
+import test,{before,after} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync,mkdirSync,cpSync,rmSync,mkdtempSync} from 'node:fs';
-import {resolve} from 'node:path';
+import {execFileSync} from 'node:child_process';
+import {tmpdir} from 'node:os';
+import {join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
+// Prepare a fresh snapshot of the committed source in a throwaway folder, so
+// this runs in verification without a hand-made local Sandbox checkout.
+let preparedRoot='';let snapshotRoot='';
+before(()=>{
+ preparedRoot=mkdtempSync(join(tmpdir(),'awf-record-only-'));snapshotRoot=join(preparedRoot,'sandbox-backend');
+ execFileSync(process.execPath,['scripts/prepare-record-only-sandbox.mjs'],{env:{...process.env,RECORD_ONLY_SANDBOX_TARGET:snapshotRoot},stdio:'pipe'});
+});
+after(()=>{if(preparedRoot)rmSync(preparedRoot,{recursive:true,force:true});});
+const inSnapshot=(path:string)=>join(snapshotRoot,path);
 test('source-owned guard survives fresh generated builders and refuses every unapproved action registration',async()=>{
  const folder=mkdtempSync(resolve('.record-only-codegen-test-'));
  try{
  mkdirSync(resolve(folder,'_local'));mkdirSync(resolve(folder,'_generated'));
  // Simulate codegen replacing generated builders with the unmodified current source.
  cpSync('convex/_generated/server.js',resolve(folder,'_generated/server.js'));
- cpSync('sandbox-backend/convex/_local/recordOnlyServer.ts',resolve(folder,'_local/recordOnlyServer.ts'));
+ cpSync(inSnapshot('convex/_local/recordOnlyServer.ts'),resolve(folder,'_local/recordOnlyServer.ts'));
  const module=await import(pathToFileURL(resolve(folder,'_local/recordOnlyServer.ts')).href);
  let executed=false;
  for(const builder of [module.action,module.internalAction,module.httpAction]){
@@ -19,27 +30,27 @@ test('source-owned guard survives fresh generated builders and refuses every una
   }
  }
  assert.equal(executed,false);
- assert.equal(readFileSync('convex/_generated/server.js','utf8'),readFileSync('sandbox-backend/convex/_generated/server.js','utf8'));
+ assert.equal(readFileSync('convex/_generated/server.js','utf8'),readFileSync(inSnapshot('convex/_generated/server.js'),'utf8'));
  }finally{rmSync(folder,{recursive:true,force:true});}
 });
 test('each vetted statement calls raw builder only through its explicit approved alias',()=>{
  const whitelist=JSON.parse(readFileSync('scripts/record-only-actions.json','utf8')) as Record<string,string[]>;
  let count=0;
  for(const [file,names] of Object.entries(whitelist)){
-  const source=readFileSync('sandbox-backend/convex/'+file,'utf8');
+  const source=readFileSync(inSnapshot('convex/'+file),'utf8');
   assert.match(source,/import \{action as recordOnlyAction\} from "\.\/_generated\/server"/);
   assert.match(source,/_local\/recordOnlyServer/);
   const uses=[...source.matchAll(/export const (\w+) = recordOnlyAction\(/g)].map(match=>match[1]);
   assert.deepEqual(uses,names);count+=uses.length;
  }
  assert.equal(count,26);
- assert.match(readFileSync('sandbox-backend/convex/vaultReads.ts','utf8'),/export const getOwnedMediaFile = action\(/);
- assert.match(readFileSync('sandbox-backend/convex/access.ts','utf8'),/return "enforce"/);
+ assert.match(readFileSync(inSnapshot('convex/vaultReads.ts'),'utf8'),/export const getOwnedMediaFile = action\(/);
+ assert.match(readFileSync(inSnapshot('convex/access.ts'),'utf8'),/return "enforce"/);
 });
 
 test('approved Node actions preserve the use-node directive before every import',()=>{
- const original=readFileSync('convex/vaultReads.ts','utf8');const snapshot=readFileSync('sandbox-backend/convex/vaultReads.ts','utf8');
+ const original=readFileSync('convex/vaultReads.ts','utf8');const snapshot=readFileSync(inSnapshot('convex/vaultReads.ts'),'utf8');
  assert.match(original,/^"use node";/);assert.match(snapshot,/^"use node";/);
  assert.ok(snapshot.indexOf('"use node";')<snapshot.indexOf('import {action as recordOnlyAction}'));
- const media=readFileSync('sandbox-backend/convex/mediaEvidenceStorage.ts','utf8');assert.match(media,/^"use node";/);assert.match(media,/_local\/recordOnlyServer/);
+ const media=readFileSync(inSnapshot('convex/mediaEvidenceStorage.ts'),'utf8');assert.match(media,/^"use node";/);assert.match(media,/_local\/recordOnlyServer/);
 });
