@@ -24,7 +24,10 @@ import { EVIDENCE_SKIP_GUIDANCE } from "../mcpEvidence";
 const SERVER_NAME = "assist-with-family-history";
 const SERVER_VERSION = "0.3.0";
 // Preserve the current rich record batches while bounding pre-schema work.
-const MAX_MCP_TOOL_INPUT_ELEMENTS = 32_768;
+// A near-byte-limit mixed records batch can exceed 32K entries. Keep 64K
+// headroom for that supported shape while rejecting compact array bombs before
+// schema validation; the independent 256 KiB transport limit still applies.
+const MAX_MCP_TOOL_INPUT_ELEMENTS = 65_536;
 const DEFAULT_RESOURCE = "https://assistwithfamilyhistory.com/mcp";
 const LEGACY_RESOURCE_HOST = "discovertheirstories.com";
 const LEGACY_ISSUER_HOST = "clerk.discovertheirstories.com";
