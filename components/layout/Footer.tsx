@@ -33,29 +33,29 @@ export function Footer() {
             </div>
           </div>
 
-          <nav className="flex flex-wrap items-center justify-center gap-6 md:gap-8">
-            <SafeLink href="/features" className="transition-colors hover:text-[#fff6e5]">
+          <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1 md:gap-8">
+            <SafeLink href="/features" className="inline-flex min-h-11 items-center transition-colors hover:text-[#fff6e5] md:min-h-0">
               Features
             </SafeLink>
-            <SafeLink href="/extension" className="transition-colors hover:text-[#fff6e5]">
+            <SafeLink href="/extension" className="inline-flex min-h-11 items-center transition-colors hover:text-[#fff6e5] md:min-h-0">
               Extension
             </SafeLink>
-            <SafeLink href="/about" className="transition-colors hover:text-[#fff6e5]">
+            <SafeLink href="/about" className="inline-flex min-h-11 items-center transition-colors hover:text-[#fff6e5] md:min-h-0">
               About
             </SafeLink>
-            <SafeLink href="/roadmap" className="transition-colors hover:text-[#fff6e5]">
+            <SafeLink href="/roadmap" className="inline-flex min-h-11 items-center transition-colors hover:text-[#fff6e5] md:min-h-0">
               Roadmap
             </SafeLink>
-            <SafeLink href="/updates" className="transition-colors hover:text-[#fff6e5]">
+            <SafeLink href="/updates" className="inline-flex min-h-11 items-center transition-colors hover:text-[#fff6e5] md:min-h-0">
               Updates
             </SafeLink>
-            <SafeLink href="/ai" className="transition-colors hover:text-[#fff6e5]">
+            <SafeLink href="/ai" className="inline-flex min-h-11 items-center transition-colors hover:text-[#fff6e5] md:min-h-0">
               Connect AI
             </SafeLink>
-            <SafeLink href="/privacy" className="transition-colors hover:text-[#fff6e5]">
+            <SafeLink href="/privacy" className="inline-flex min-h-11 items-center transition-colors hover:text-[#fff6e5] md:min-h-0">
               Privacy
             </SafeLink>
-            <SafeLink href="/contact" className="transition-colors hover:text-[#fff6e5]">
+            <SafeLink href="/contact" className="inline-flex min-h-11 items-center transition-colors hover:text-[#fff6e5] md:min-h-0">
               Contact
             </SafeLink>
           </nav>
