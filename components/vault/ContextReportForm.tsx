@@ -207,7 +207,7 @@ export function ContextReportForm({
             id="context-topic"
             value={topic}
             onChange={(event) => setTopic(event.target.value)}
-            className="h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-sm text-stone-700"
+            className="h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-base md:text-sm text-stone-700"
           >
             {CONTEXT_TOPICS.map((option) => (
               <option key={option} value={option}>
@@ -236,7 +236,7 @@ export function ContextReportForm({
             id="context-privacy"
             value={privacyLevel}
             onChange={(event) => setPrivacyLevel(event.target.value)}
-            className="h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-sm text-stone-700"
+            className="h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-base md:text-sm text-stone-700"
           >
             <option value="private">private</option>
             <option value="family_review">family review</option>
@@ -250,7 +250,7 @@ export function ContextReportForm({
             id="context-review"
             value={reviewStatus}
             onChange={(event) => setReviewStatus(event.target.value)}
-            className="h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-sm text-stone-700"
+            className="h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-base md:text-sm text-stone-700"
           >
             <option value="unreviewed">unreviewed</option>
             <option value="reviewed">reviewed</option>
@@ -362,7 +362,7 @@ export function ContextReportForm({
                                     confidence: event.target.value as "high" | "medium" | "low",
                                   })
                                 }
-                                className="h-9 rounded-md border border-stone-200 bg-white px-2 text-xs text-stone-700"
+                                className="h-9 rounded-md border border-stone-200 bg-white px-2 text-base md:text-xs text-stone-700"
                                 aria-label="Confidence"
                               >
                                 <option value="high">high</option>
