@@ -59,9 +59,12 @@ export async function getVaultAccessContext(): Promise<VaultAccessContext> {
       };
     }
   } catch (error) {
-    if (!isExpectedDynamicServerUsage(error)) {
-      console.warn("Unable to resolve Clerk auth for vault access:", error);
+    if (isExpectedDynamicServerUsage(error)) {
+      // Let Next.js bail out of static prerendering instead of treating the
+      // request as unauthenticated (which would fail the production build).
+      throw error;
     }
+    console.warn("Unable to resolve Clerk auth for vault access:", error);
   }
 
   if (process.env.REQUIRE_AUTH === "true" || !isAnonymousVaultEnabled()) {
