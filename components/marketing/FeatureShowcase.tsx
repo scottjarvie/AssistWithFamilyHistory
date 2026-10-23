@@ -60,18 +60,6 @@ const journeyStages: JourneyStage[] = [
   },
 ];
 
-const statusLabel: Record<StageStatus, string> = {
-  working: "Works",
-  "in-progress": "Coming soon",
-  exploring: "Later",
-};
-
-const statusClass: Record<StageStatus, string> = {
-  working: "border-[#476553] bg-[#476553] text-[#eef5f0]",
-  "in-progress": "border-[#9f5a2d] bg-[#9f5a2d] text-[#fff5e8]",
-  exploring: "border-[#234d5e] bg-[#234d5e] text-[#edf5f7]",
-};
-
 export function FeatureShowcase() {
   return (
     <section className="relative overflow-hidden bg-[#fffaf2] py-20 sm:py-24">
@@ -118,11 +106,6 @@ export function FeatureShowcase() {
                       ) : (
                         <span className="text-sm font-medium text-[#24323e]">{feature.name}</span>
                       )}
-                      <span
-                        className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] ${statusClass[feature.status]}`}
-                      >
-                        {statusLabel[feature.status]}
-                      </span>
                     </div>
                   </li>
                 ))}
