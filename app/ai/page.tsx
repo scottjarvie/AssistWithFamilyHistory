@@ -4,6 +4,7 @@ import {
   Bot,
   Braces,
   CheckCircle2,
+  ChevronDown,
   Eye,
   FileSearch,
   Fingerprint,
@@ -148,10 +149,16 @@ export default function AiSetupPage() {
                   <span className="absolute right-5 top-4 font-mono text-[10px] text-[#98702b]">0{index + 1}</span>
                   <Icon className="h-7 w-7 text-[#245a43]" aria-hidden="true" />
                   <h3 className="mt-5 text-2xl font-semibold">{label}</h3>
-                  <p className="mt-2 font-mono text-[10px] leading-5 text-[#98702b]">
-                    {toolsForScopes(scopes).map((tool) => tool.name).join(" · ")}
-                  </p>
-                  <p className="mt-4 text-sm leading-7 text-[#5f665f]">{copy}</p>
+                  <p className="mt-2 text-sm leading-7 text-[#5f665f]">{copy}</p>
+                  <details className="group mt-3">
+                    <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-[#98702b] [&::-webkit-details-marker]:hidden">
+                      {toolsForScopes(scopes).length} tools
+                      <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" aria-hidden="true" />
+                    </summary>
+                    <p className="font-mono text-[10px] leading-5 text-[#98702b]">
+                      {toolsForScopes(scopes).map((tool) => tool.name).join(" · ")}
+                    </p>
+                  </details>
                 </article>
               ))}
             </div>
