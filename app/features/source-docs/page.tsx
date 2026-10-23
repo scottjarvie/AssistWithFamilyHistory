@@ -104,27 +104,33 @@ export default function SourceDocsFeaturePage() {
           {/* Key Benefits */}
           <section className="mb-16">
             <h2 className="sr-only">Key Benefits</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="text-center p-6">
-                <CheckCircle className="w-8 h-8 text-green-600 mx-auto mb-3" />
-                <h3 className="font-semibold text-stone-900 mb-2">Capture Everything</h3>
-                <p className="text-stone-500 text-sm">
-                  All indexed information, citations, tags, and attachments in one place.
-                </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-6">
+              <div className="flex items-start gap-3 md:block md:p-6 md:text-center">
+                <CheckCircle className="h-6 w-6 shrink-0 text-green-600 md:mx-auto md:mb-3 md:h-8 md:w-8" />
+                <div>
+                  <h3 className="font-semibold text-stone-900 mb-1 md:mb-2">Capture Everything</h3>
+                  <p className="text-stone-500 text-sm">
+                    All indexed information, citations, tags, and attachments in one place.
+                  </p>
+                </div>
               </div>
-              <div className="text-center p-6">
-                <CheckCircle className="w-8 h-8 text-green-600 mx-auto mb-3" />
-                <h3 className="font-semibold text-stone-900 mb-2">Find Patterns</h3>
-                <p className="text-stone-500 text-sm">
-                  AI identifies duplicates, conflicts, and connections across sources.
-                </p>
+              <div className="flex items-start gap-3 md:block md:p-6 md:text-center">
+                <CheckCircle className="h-6 w-6 shrink-0 text-green-600 md:mx-auto md:mb-3 md:h-8 md:w-8" />
+                <div>
+                  <h3 className="font-semibold text-stone-900 mb-1 md:mb-2">Find Patterns</h3>
+                  <p className="text-stone-500 text-sm">
+                    AI identifies duplicates, conflicts, and connections across sources.
+                  </p>
+                </div>
               </div>
-              <div className="text-center p-6">
-                <CheckCircle className="w-8 h-8 text-green-600 mx-auto mb-3" />
-                <h3 className="font-semibold text-stone-900 mb-2">Export Everything</h3>
-                <p className="text-stone-500 text-sm">
-                  All outputs in Markdown. Use them anywhere, share with anyone.
-                </p>
+              <div className="flex items-start gap-3 md:block md:p-6 md:text-center">
+                <CheckCircle className="h-6 w-6 shrink-0 text-green-600 md:mx-auto md:mb-3 md:h-8 md:w-8" />
+                <div>
+                  <h3 className="font-semibold text-stone-900 mb-1 md:mb-2">Export Everything</h3>
+                  <p className="text-stone-500 text-sm">
+                    All outputs in Markdown. Use them anywhere, share with anyone.
+                  </p>
+                </div>
               </div>
             </div>
           </section>
