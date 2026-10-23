@@ -82,6 +82,11 @@ const aiPage = readFileSync(path.join(root, "app/ai/page.tsx"), "utf8");
 const aiPageMarkup = renderToStaticMarkup(React.createElement(AiSetupPage));
 assert.ok(aiPageMarkup.includes("current permission categories — full access includes future tools"));
 assert.ok(!aiPageMarkup.includes("this is the whole list"));
+assert.ok(
+  aiPageMarkup.includes("Signing in approves full access to current and future tools with no end date by default. You can deliberately limit the scope or set an end date in Settings;"),
+  "/ai must describe full current and future tool access with no end date by default and deliberate scope/date limits in Settings",
+);
+assert.ok(!aiPageMarkup.includes("ordinary research permissions"));
 const aiPageText = aiPageMarkup
   .replaceAll("&#x27;", "'")
   .replaceAll("&quot;", '"')

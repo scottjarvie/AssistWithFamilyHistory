@@ -76,7 +76,7 @@ const ALIAS_COUNT = FAMILY_HISTORY_TOOLS.filter((tool) => tool.alias).length;
  */
 const currentInSource = [
   `${TOOL_COUNT} Family History tools share one stateless connection address, with ${ALIAS_COUNT} older names kept working as aliases.`,
-  "Signing in approves the ordinary research permissions; publishing, deleting, merging, sharing and exporting are never available to a connection. Every request re-checks the permission, so narrowing it or turning it off works at once.",
+  "Signing in approves full access to current and future tools with no end date by default. You can deliberately limit the scope or set an end date in Settings; publishing, deleting, merging, sharing and exporting are never available to a connection. Every request re-checks the permission, so narrowing it or turning it off works at once.",
   "Turning a connection off takes effect on its very next request, because the permission is re-checked every time rather than waiting for a sign-in to expire.",
   "A whole source's worth of records saves in one call, reporting each row's own outcome instead of discarding the pass.",
   "Reviewed, AI-allowed files are delivered through the connection itself; a storage link is never handed to a model.",
