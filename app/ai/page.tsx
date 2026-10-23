@@ -122,7 +122,7 @@ export default function AiSetupPage() {
               <code className="mt-4 block break-all border-y border-[#d8cfbd] py-5 font-mono text-xs font-semibold sm:text-sm text-[#245a43]">
                 https://assistwithfamilyhistory.com/mcp
               </code>
-              <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+              <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-1 xl:grid-cols-2">
                 <div><p className="text-3xl font-semibold">{TOOL_COUNT}</p><p className="mt-1 text-xs leading-5 text-[#687169]">workflow tools from first brief to complete-result save</p></div>
                 <div><p className="text-3xl font-semibold">{FAMILY_HISTORY_SCOPE_INFO.length}</p><p className="mt-1 text-xs leading-5 text-[#687169]">permissions you choose from — this is the whole list</p></div>
                 <div><p className="text-3xl font-semibold">0</p><p className="mt-1 text-xs leading-5 text-[#687169]">owner or workspace IDs accepted from an AI</p></div>
