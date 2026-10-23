@@ -59,7 +59,7 @@ Capture FamilySearch data, merge it into a canonical vault, and move from eviden
 
 ### Prerequisites
 
-- Node.js 20 (see `.nvmrc`)
+- Node.js 22.23.4 or newer patched 22.x (see `.nvmrc`; Vercel selects `22.x` via `engines.node`)
 - pnpm (recommended) or npm
 
 ### Installation
