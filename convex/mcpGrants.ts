@@ -355,6 +355,35 @@ export async function assertGrantPermits(
  * keeps the declared type honest: it is literally what the query returns, so
  * the two cannot drift apart.
  */
+function connectionRow(row: Doc<"mcpGrants">, now: number) {
+  return {
+    id: row._id,
+    label: row.label,
+    observedClientName: row.observedClientName ?? null,
+    clientId: row.clientId,
+    issuer: row.issuer,
+    clientProvenance: row.clientProvenance,
+    clientMetadataUrl: row.clientMetadataUrl ?? null,
+    scopes: effectiveScopes(row),
+    scopeChoice: effectiveScopeChoice(row),
+    boundary: row.boundary,
+    // Expiry is decided in code at read time, so a row that has aged out
+    // reads as expired even before anything rewrites its status.
+    status: (row.status === "active" || (row.status === "expired" && (hasAutomaticLegacyExpiry(row) || row.expiryChoice === "none")))
+      ? (isGrantExpired(row, now) ? "expired" : "active") : row.status,
+    requestedAt: row.requestedAt,
+    consentedAt: row.consentedAt ?? null,
+    issuedAt: row.issuedAt ?? null,
+    expiresAt: effectiveExpiry(row) ?? null,
+    lastUsedAt: row.lastUsedAt ?? null,
+    lastToolName: row.lastToolName ?? null,
+    revokedAt: row.revokedAt ?? null,
+    revokedReason: row.revokedReason ?? null,
+    useCount: row.useCount,
+    consentSnapshot: row.consentSnapshot ?? null,
+  };
+}
+
 async function readConnections(ctx: QueryCtx, vaultOwnerId: string) {
   const rows = await ctx.db
     .query("mcpGrants")
@@ -367,32 +396,7 @@ async function readConnections(ctx: QueryCtx, vaultOwnerId: string) {
     scopeInfo: FAMILY_HISTORY_SCOPE_INFO,
     neverExposed: NEVER_EXPOSED,
     neverPermitted: NEVER_PERMITTED,
-    connections: rows.map((row) => ({
-      id: row._id,
-      label: row.label,
-      observedClientName: row.observedClientName ?? null,
-      clientId: row.clientId,
-      issuer: row.issuer,
-      clientProvenance: row.clientProvenance,
-      clientMetadataUrl: row.clientMetadataUrl ?? null,
-      scopes: effectiveScopes(row),
-      scopeChoice: effectiveScopeChoice(row),
-      boundary: row.boundary,
-      // Expiry is decided in code at read time, so a row that has aged out
-      // reads as expired even before anything rewrites its status.
-      status: (row.status === "active" || (row.status === "expired" && (hasAutomaticLegacyExpiry(row) || row.expiryChoice === "none")))
-        ? (isGrantExpired(row, now) ? "expired" : "active") : row.status,
-      requestedAt: row.requestedAt,
-      consentedAt: row.consentedAt ?? null,
-      issuedAt: row.issuedAt ?? null,
-      expiresAt: effectiveExpiry(row) ?? null,
-      lastUsedAt: row.lastUsedAt ?? null,
-      lastToolName: row.lastToolName ?? null,
-      revokedAt: row.revokedAt ?? null,
-      revokedReason: row.revokedReason ?? null,
-      useCount: row.useCount,
-      consentSnapshot: row.consentSnapshot ?? null,
-    })),
+    connections: rows.map((row) => connectionRow(row, now)),
   };
 }
 
@@ -576,7 +580,7 @@ export const approveGrant = mutation({
     } else {
       await ctx.db.patch(row._id, { ...fields, hiddenAt: undefined });
     }
-    return { id, status: "active" as const, scopes, boundary, expiresAt: expiresAt ?? null, scopeChoice };
+    return { id, status: "active" as const, scopes, boundary, expiresAt: expiresAt ?? null, scopeChoice, connection: connectionRow((await ctx.db.get(id))!, now) };
   },
 });
 
@@ -642,6 +646,15 @@ export const revokeGrant = mutation({
     const decision = await authorizeTenantMutation(ctx, "mcpGrants.revokeGrant", args.vaultOwnerId);
     if (!decision.allowed) throw new Error("Connection not found");
     const row = await ownedGrant(ctx, decision.owner, args.grantId);
+    if (row.status !== "active" || row.hiddenAt !== undefined || isGrantExpired(row, Date.now())) {
+      throw new Error("Only an active connection can be turned off. Reload to see its current approval.");
+    }
+    const governing = (await grantsForClient(ctx, decision.owner, row.clientId))
+      .filter((grant) => grant.issuer === row.issuer && grant.status === "active")
+      .sort((a, b) => (b.consentedAt ?? b.updatedAt) - (a.consentedAt ?? a.updatedAt))[0];
+    if (governing?._id !== row._id) {
+      throw new Error("This approval has been superseded. Reload to turn off the current connection.");
+    }
     const now = Date.now();
     // Revocation takes effect on the very next request because the transport
     // re-resolves the grant every time; no token has to expire first.

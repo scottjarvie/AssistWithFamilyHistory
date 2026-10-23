@@ -21,7 +21,7 @@
  * No OAuth vocabulary appears in the copy. A person should be able to decide
  * what their AI may touch without knowing what a bearer token is.
  */
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   AlertTriangle,
@@ -680,6 +680,7 @@ export function AiConnectionCenter({
   const [connections, setConnections] = useState(initialConnections);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const inFlight = useRef(new Set<string>());
 
   const pending = connections.filter((row) => row.status === "pending");
   const active = connections.filter((row) => row.status === "active");
@@ -688,6 +689,8 @@ export function AiConnectionCenter({
   );
 
   async function send(grantId: string, body: Record<string, unknown>, success: string) {
+    if (inFlight.current.has(grantId)) return;
+    inFlight.current.add(grantId);
     setBusyId(grantId);
     try {
       const response = await fetch("/api/ai-connections", {
@@ -696,6 +699,8 @@ export function AiConnectionCenter({
         body: JSON.stringify({ ...body, grantId }),
       });
       const payload = (await response.json().catch(() => ({}))) as {
+        id?: string;
+        connection?: ConnectionRow;
         error?: string;
         status?: ConnectionRow["status"];
         scopes?: FamilyHistoryScope[];
@@ -708,13 +713,24 @@ export function AiConnectionCenter({
         toast.error(payload.error ?? "That connection change could not be applied.");
         return;
       }
+      // An approval can create a replacement grant. Never activate the old ID,
+      // including when talking to a backend predating the complete-row response.
+      if (body.action === "approve" && !payload.id) {
+        toast.error("Approval could not be refreshed. Reload to see the current connection.");
+        return;
+      }
       toast.success(success);
       setConnections((current) => {
         if (payload.removed) return current.filter((row) => row.id !== grantId);
         return current.map((row) =>
           row.id === grantId
-            ? {
+            ? payload.connection ?? {
                 ...row,
+                id: payload.id ?? row.id,
+                ...(payload.id && payload.id !== row.id ? {
+                  revokedAt: null, revokedReason: null, consentSnapshot: null,
+                  lastUsedAt: null, lastToolName: null, useCount: 0,
+                } : {}),
                 status: payload.status ?? row.status,
                 scopes: payload.scopes ?? row.scopes,
                 expiresAt: payload.expiresAt === undefined ? row.expiresAt : payload.expiresAt,
@@ -727,7 +743,8 @@ export function AiConnectionCenter({
     } catch {
       toast.error("That connection change could not be sent. Check your network and try again.");
     } finally {
-      setBusyId(null);
+      inFlight.current.delete(grantId);
+      setBusyId((current) => current === grantId ? null : current);
     }
   }
 

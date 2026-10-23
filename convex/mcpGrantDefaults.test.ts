@@ -190,12 +190,59 @@ describe("durable revocation and owner removal", () => {
     expect(active.state).toBe("active");
     if (active.state === "active") expect(active.grant).toMatchObject({ scopes: ["family_history:context:read"], scopeChoice: "chosen", boundary: revoked!.boundary, expiresAt: approved.expiresAt });
     expect(decideToolAccess({ resolution: active, toolName: "family_history_save_records", now: Date.now() }).allowed).toBe(false);
+    // Stale tabs cannot report success against the old refusal or alter it.
+    const oldHistory = await t.run((ctx) => ctx.db.get(grantId));
+    await expect(own.mutation(api.mcpGrants.revokeGrant, args)).rejects.toThrow("Only an active connection");
+    await expect(foreign.mutation(api.mcpGrants.revokeGrant, { vaultOwnerId: owner, grantId: approved.id })).rejects.toThrow();
+    await expect(foreign.mutation(api.mcpGrants.revokeGrant, { vaultOwnerId: "user_foreign_synthetic", grantId: approved.id })).rejects.toThrow("Connection not found");
+    expect(await t.run((ctx) => ctx.db.get(grantId))).toEqual(oldHistory);
+    expect((await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs)).state).toBe("active");
+    expect(approved.connection).toMatchObject({ id: approved.id, status: "active", revokedAt: null, revokedReason: null, useCount: 0 });
     // Reapproving did not erase the old refusal; revoking/removing the new
     // connection still cannot fall through to an automatic full grant.
     await own.mutation(api.mcpGrants.revokeGrant, { vaultOwnerId: owner, grantId: approved.id });
     await own.mutation(api.mcpGrants.removeGrant, { vaultOwnerId: owner, grantId: approved.id });
     expect((await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs)).state).toBe("revoked");
     expect(await t.run((ctx) => ctx.db.query("mcpGrants").collect())).toHaveLength(3);
+  });
+
+  test.each(["pending", "denied", "revoked", "expired"] as const)("stale revoke of %s is refused without rewriting history", async (status) => {
+    const { t, grantId } = await fixture();
+    await t.run((ctx) => ctx.db.patch(grantId, { status }));
+    const before = await t.run((ctx) => ctx.db.get(grantId));
+    await expect(t.withIdentity(identity).mutation(api.mcpGrants.revokeGrant, { vaultOwnerId: owner, grantId })).rejects.toThrow("Only an active connection");
+    expect(await t.run((ctx) => ctx.db.get(grantId))).toEqual(before);
+  });
+
+  test("superseded active and hidden active IDs cannot report a successful revoke", async () => {
+    const { t, grantId } = await fixture();
+    const original = (await t.run((ctx) => ctx.db.get(grantId)))!;
+    const { _id, _creationTime, ...fields } = original;
+    void _id; void _creationTime;
+    const nextId = await t.run((ctx) => ctx.db.insert("mcpGrants", { ...fields, consentedAt: Date.now() + 1000 }));
+    const own = t.withIdentity(identity);
+    await expect(own.mutation(api.mcpGrants.revokeGrant, { vaultOwnerId: owner, grantId })).rejects.toThrow("superseded");
+    await t.run((ctx) => ctx.db.patch(grantId, { hiddenAt: Date.now() }));
+    await expect(own.mutation(api.mcpGrants.revokeGrant, { vaultOwnerId: owner, grantId })).rejects.toThrow("Only an active connection");
+    expect((await t.run((ctx) => ctx.db.get(nextId)))!.status).toBe("active");
+  });
+
+  test("concurrent revocations have exactly one success; a late second approval is refused", async () => {
+    const { t, grantId } = await fixture();
+    const own = t.withIdentity(identity);
+    const args = { vaultOwnerId: owner, grantId };
+    const results = await Promise.allSettled([
+      own.mutation(api.mcpGrants.revokeGrant, { ...args, reason: "first" }),
+      own.mutation(api.mcpGrants.revokeGrant, { ...args, reason: "second" }),
+    ]);
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    expect(results.filter((r) => r.status === "rejected")).toHaveLength(1);
+    const approval = { ...args, label: "New", scopes: [...FAMILY_HISTORY_SCOPES], boundary: { kind: "whole_workspace" as const } };
+    const approved = await own.mutation(api.mcpGrants.approveGrant, approval);
+    await expect(own.mutation(api.mcpGrants.approveGrant, approval)).rejects.toThrow("already approved");
+    await expect(own.mutation(api.mcpGrants.revokeGrant, args)).rejects.toThrow("Only an active connection");
+    await own.mutation(api.mcpGrants.revokeGrant, { ...args, grantId: approved.id });
+    expect((await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs)).state).toBe("revoked");
   });
 
   test.each(["denied", "pending", "expired"] as const)("removing %s records hides the row without enabling sign-in", async (status) => {

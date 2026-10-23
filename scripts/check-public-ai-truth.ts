@@ -80,6 +80,8 @@ assert.ok(
 
 const aiPage = readFileSync(path.join(root, "app/ai/page.tsx"), "utf8");
 const aiPageMarkup = renderToStaticMarkup(React.createElement(AiSetupPage));
+assert.ok(aiPageMarkup.includes("current permission categories — full access includes future tools"));
+assert.ok(!aiPageMarkup.includes("this is the whole list"));
 const aiPageText = aiPageMarkup
   .replaceAll("&#x27;", "'")
   .replaceAll("&quot;", '"')
