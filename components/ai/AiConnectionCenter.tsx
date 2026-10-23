@@ -354,14 +354,14 @@ function ApprovalForm({
     boundary: ConnectionBoundary;
     expiresInDays?: number;
   }) => void;
-  onDeny: (reason: string) => void;
+  onDeny?: (reason: string) => void;
 }) {
   const [label, setLabel] = useState(connection.label);
-  const [scopes, setScopes] = useState<FamilyHistoryScope[]>([...FAMILY_HISTORY_SCOPES]);
-  const [boundaryKind, setBoundaryKind] = useState<ConnectionBoundary["kind"]>("whole_workspace");
-  const [personIdText, setPersonIdText] = useState("");
-  const [queueItemText, setQueueItemText] = useState("");
-  const [expiresInDays, setExpiresInDays] = useState(0);
+  const [scopes, setScopes] = useState<FamilyHistoryScope[]>(connection.status === "pending" && connection.scopes.length === 0 ? [...FAMILY_HISTORY_SCOPES] : [...connection.scopes]);
+  const [boundaryKind, setBoundaryKind] = useState<ConnectionBoundary["kind"]>(connection.boundary.kind);
+  const [personIdText, setPersonIdText] = useState((connection.boundary.personIds ?? []).join("\n"));
+  const [queueItemText, setQueueItemText] = useState((connection.boundary.queueItemIds ?? []).join("\n"));
+  const [expiresInDays, setExpiresInDays] = useState(connection.expiresAt == null ? 0 : 7);
   const [denyReason, setDenyReason] = useState("");
 
   const personIds = useMemo(() => parseIdList(personIdText), [personIdText]);
@@ -381,7 +381,7 @@ function ApprovalForm({
           1 · What may it do?
         </h4>
         <p className="mt-1 text-sm leading-6 text-stone-600">
-          Every permission is included by default, including tools added later. Untick a permission to choose a limited connection.
+          Your saved permissions and record boundary are selected below. Review each choice before approving. Selecting every permission includes tools added later.
         </p>
         <ul className="mt-3 space-y-3">
           {FAMILY_HISTORY_SCOPE_INFO.map((scope) => (
@@ -529,7 +529,7 @@ function ApprovalForm({
         </span>
       </div>
 
-      <details className="rounded-lg border border-stone-200 bg-stone-50 p-4">
+      {onDeny && <details className="rounded-lg border border-stone-200 bg-stone-50 p-4">
         <summary className="cursor-pointer text-sm font-medium text-stone-700">
           I do not recognise this — decline it
         </summary>
@@ -553,7 +553,7 @@ function ApprovalForm({
             Decline
           </Button>
         </div>
-      </details>
+      </details>}
     </div>
   );
 }
@@ -952,6 +952,17 @@ export function AiConnectionCenter({
                     {connection.revokedReason ? ` You noted: “${connection.revokedReason}”` : ""}
                   </p>
                 </div>
+                {(connection.status === "revoked" || connection.status === "denied") && (
+                  <details className="w-full">
+                    <summary className="cursor-pointer text-sm font-medium text-emerald-800">Review and approve again</summary>
+                    <p className="mt-2 text-sm text-stone-600">This connection stays off until you approve the choices below. Choose a new end date for this new approval.</p>
+                    <ApprovalForm
+                      connection={connection}
+                      busy={busyId === connection.id}
+                      onApprove={(input) => send(connection.id, { action: "approve", ...input, expiresInDays: input.expiresInDays || undefined }, "Approved with the choices you reviewed.")}
+                    />
+                  </details>
+                )}
                 {connection.status === "expired" && <ExpiryControls busy={busyId === connection.id} onSave={(expiresInDays) => send(connection.id, { action: "expiry", expiresInDays }, "End date updated. Your scopes and record boundary are unchanged.")} />}
                 <Button
                   type="button"
@@ -1066,7 +1077,7 @@ export function AiConnectionCenter({
         <p className="mt-3 flex gap-2 text-sm leading-6 text-stone-600">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
           If it still refuses everything, look at the status above. A connection that ran out or was
-          turned off is refused on purpose, and reconnecting will not change that — approve a fresh
+          turned off is refused on purpose. Signing in again reveals it here so you can review and approve a new
           request instead.
         </p>
       </section>

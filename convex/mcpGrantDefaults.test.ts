@@ -138,3 +138,85 @@ describe("explicit and legacy expiry", () => {
     }
   });
 });
+
+describe("durable revocation and owner removal", () => {
+  test("real sign-in → narrow → chosen date → revoke → remove → sign-in stays refused, isolated by owner", async () => {
+    const t = convexTest(schema, modules);
+    const first = await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs);
+    expect(first.state).toBe("active");
+    const [initial] = await t.run((ctx) => ctx.db.query("mcpGrants").collect());
+    const grantId = initial._id;
+    const own = t.withIdentity(identity);
+    const args = { vaultOwnerId: owner, grantId };
+    await own.mutation(api.mcpGrants.reduceGrantScopes, { ...args, scopes: ["family_history:context:read"] });
+    await own.mutation(api.mcpGrants.updateGrantExpiry, { ...args, expiresInDays: 7 });
+    await t.run((ctx) => ctx.db.patch(grantId, { boundary: { kind: "selected_people", personIds: ["synthetic-person"] } }));
+    await own.mutation(api.mcpGrants.revokeGrant, { ...args, reason: "Synthetic owner refusal" });
+    const revoked = await t.run((ctx) => ctx.db.get(grantId));
+    const foreign = t.withIdentity({ subject: "user_foreign_synthetic" });
+    await expect(t.mutation(api.mcpGrants.removeGrant, args)).rejects.toThrow();
+    await expect(foreign.action(api.mcpGrants.listConnections, { vaultOwnerId: owner })).rejects.toThrow();
+    await expect(foreign.action(api.mcpGrants.recentConnectionActivity, { vaultOwnerId: owner })).rejects.toThrow();
+    await expect(foreign.mutation(api.mcpGrants.removeGrant, args)).rejects.toThrow();
+    await expect(foreign.mutation(api.mcpGrants.removeGrant, { ...args, vaultOwnerId: "user_foreign_synthetic" })).rejects.toThrow("Connection not found");
+    await own.mutation(api.mcpGrants.removeGrant, args);
+    const hidden = await t.run((ctx) => ctx.db.get(grantId));
+    expect(hidden).toMatchObject({ ...revoked!, hiddenAt: expect.any(Number) });
+    expect((await t.query(internal.mcpGrants.listConnectionsInternal, { vaultOwnerId: owner })).connections).toEqual([]);
+    await t.run(async (ctx) => {
+      await expect(assertGrantPermits(ctx, { owner, grantId, toolName: "family_history_get_context", input: { kind: "person", id: "synthetic-person" } })).rejects.toThrow();
+    });
+    const other = await t.mutation(internal.mcpGrants.resolveForRequest, { ...resolveArgs, subject: "user_foreign_synthetic" });
+    expect(other.state).toBe("active");
+    expect(await t.run((ctx) => ctx.db.get(grantId))).toEqual(hidden);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const denied = await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs);
+      expect(denied.state).toBe("revoked");
+      expect(permittedTools(denied, Date.now())).toEqual([]);
+    }
+    expect(await t.run((ctx) => ctx.db.get(grantId))).toEqual(revoked);
+    const listing = await t.query(internal.mcpGrants.listConnectionsInternal, { vaultOwnerId: owner });
+    expect(listing.connections).toHaveLength(1);
+    expect(listing.connections[0]).toMatchObject({ status: "revoked", scopeChoice: "chosen", scopes: ["family_history:context:read"], expiresAt: revoked!.expiresAt, boundary: revoked!.boundary });
+    const approval = { ...args, label: "Explicit new approval", scopes: ["family_history:context:read"], boundary: revoked!.boundary, expiresInDays: 7 };
+    await expect(foreign.mutation(api.mcpGrants.approveGrant, approval)).rejects.toThrow();
+    await expect(foreign.mutation(api.mcpGrants.approveGrant, { ...approval, vaultOwnerId: "user_foreign_synthetic" })).rejects.toThrow("Connection not found");
+    expect((await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs)).state).toBe("revoked");
+    const approved = await own.mutation(api.mcpGrants.approveGrant, approval);
+    await expect(own.mutation(api.mcpGrants.approveGrant, approval)).rejects.toThrow("already approved");
+    expect(approved.id).not.toBe(grantId);
+    expect(await t.run((ctx) => ctx.db.get(grantId))).toMatchObject({ ...revoked!, hiddenAt: expect.any(Number) });
+    const active = await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs);
+    expect(active.state).toBe("active");
+    if (active.state === "active") expect(active.grant).toMatchObject({ scopes: ["family_history:context:read"], scopeChoice: "chosen", boundary: revoked!.boundary, expiresAt: approved.expiresAt });
+    expect(decideToolAccess({ resolution: active, toolName: "family_history_save_records", now: Date.now() }).allowed).toBe(false);
+    // Reapproving did not erase the old refusal; revoking/removing the new
+    // connection still cannot fall through to an automatic full grant.
+    await own.mutation(api.mcpGrants.revokeGrant, { vaultOwnerId: owner, grantId: approved.id });
+    await own.mutation(api.mcpGrants.removeGrant, { vaultOwnerId: owner, grantId: approved.id });
+    expect((await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs)).state).toBe("revoked");
+    expect(await t.run((ctx) => ctx.db.query("mcpGrants").collect())).toHaveLength(3);
+  });
+
+  test.each(["denied", "pending", "expired"] as const)("removing %s records hides the row without enabling sign-in", async (status) => {
+    const { t, grantId } = await fixture();
+    await t.run((ctx) => ctx.db.patch(grantId, { status, scopes: ["family_history:context:read"], scopeChoice: "chosen", expiryChoice: "chosen", expiresAt: Date.now() - 1 }));
+    await t.withIdentity(identity).mutation(api.mcpGrants.removeGrant, { vaultOwnerId: owner, grantId });
+    const hidden = await t.run((ctx) => ctx.db.get(grantId));
+    expect(hidden).toMatchObject({ hiddenAt: expect.any(Number), scopeChoice: "chosen", expiryChoice: "chosen", scopes: ["family_history:context:read"] });
+    expect((await t.query(internal.mcpGrants.listConnectionsInternal, { vaultOwnerId: owner })).connections).toEqual([]);
+    expect((await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs)).state).toBe(status === "denied" ? "denied" : "revoked");
+    expect(await t.run((ctx) => ctx.db.query("mcpGrants").collect())).toHaveLength(1);
+  });
+
+  test("active removal is refused and hidden refusals do not crowd visible connections out of the 100-row window", async () => {
+    const { t, grantId } = await fixture();
+    await expect(t.withIdentity(identity).mutation(api.mcpGrants.removeGrant, { vaultOwnerId: owner, grantId })).rejects.toThrow("Revoke");
+    await t.run(async (ctx) => {
+      const row = (await ctx.db.get(grantId))!;
+      for (let i = 0; i < 101; i++) await ctx.db.insert("mcpGrants", { vaultOwnerId: owner, issuer: row.issuer, label: row.label, clientProvenance: row.clientProvenance, scopes: row.scopes, boundary: row.boundary, requestedAt: row.requestedAt, updatedAt: row.updatedAt, useCount: 0, clientId: `synthetic-hidden-${i}`, status: "revoked", hiddenAt: Date.now() });
+    });
+    const listing = await t.query(internal.mcpGrants.listConnectionsInternal, { vaultOwnerId: owner });
+    expect(listing.connections.map((row) => row.id)).toEqual([grantId]);
+  });
+});

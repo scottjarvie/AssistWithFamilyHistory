@@ -290,3 +290,26 @@ console.log(
   `Connection-centre honesty contract passed (${FAMILY_HISTORY_SCOPE_INFO.length} scopes, ` +
     `${NEVER_EXPOSED.length} never-exposed, ${NEVER_PERMITTED.length} never-permitted entries rendered)`,
 );
+
+// Closed connections expose the existing approval form only through an explicit
+// settings disclosure, preserving saved narrowing rather than preselecting full.
+const closed: ConnectionRow = {
+  ...active,
+  id: "grant_revoked_fixture",
+  status: "revoked",
+  boundary: { kind: "selected_people", personIds: ["synthetic-person"] },
+};
+const closedMarkup = decode(renderToStaticMarkup(React.createElement(AiConnectionCenter, {
+  initialConnections: [closed], initialActivity: [],
+})));
+assert.match(closedMarkup, /Review and approve again/);
+assert.match(closedMarkup, /stays off until you approve/);
+assert.match(closedMarkup, /Approve exactly this/);
+assert.match(closedMarkup, /Remove from this list/);
+assert.match(closedMarkup, /synthetic-person/);
+for (const scope of FAMILY_HISTORY_SCOPES) {
+  const checked = new RegExp(`id="approve-${closed.id}-${scope}"[^>]*checked`).test(closedMarkup);
+  assert.equal(checked, closed.scopes.includes(scope), "Reapproval must retain chosen scopes in the initial form");
+}
+assert.match(closedMarkup, new RegExp(`id="boundary-${closed.id}-selected_people"[^>]*checked`));
+assert.ok(!closedMarkup.includes("I do not recognise this"), "Closed connections cannot submit the pending-only decline action");

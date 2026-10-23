@@ -1953,6 +1953,8 @@ export default defineSchema({
     lastUsedAt: v.optional(v.number()),
     revokedAt: v.optional(v.number()),
     revokedReason: v.optional(v.string()),
+    /** Owner list visibility only; never removes the durable refusal or limits. */
+    hiddenAt: v.optional(v.number()),
     useCount: v.number(),
     lastToolName: v.optional(v.string()),
     /**

@@ -170,8 +170,14 @@ export const resolveForRequest = internalMutation({
 
     // A person's own "no" stands: a denied or turned-off connection is never
     // reopened by signing in again. They reconnect from settings.
-    if (rows.some((row) => row.status === "denied")) return { state: "denied" };
-    if (rows.some((row) => row.status === "revoked")) return { state: "revoked" };
+    const closed = rows.filter((row) => row.status === "denied" || row.status === "revoked")
+      .sort((a, b) => b.updatedAt - a.updatedAt)[0];
+    if (closed) {
+      // A new attempt reveals the refusal in settings for explicit reapproval.
+      // It never changes status, scopes, boundary, expiry, or the consent receipt.
+      if (closed.hiddenAt !== undefined) await ctx.db.patch(closed._id, { hiddenAt: undefined });
+      return { state: closed.status as "denied" | "revoked" };
+    }
 
     // Signing in grants every current and future tool, with no end date.
     // Existing explicit/ambiguous expiries are never renewed by signing in.
@@ -354,6 +360,7 @@ async function readConnections(ctx: QueryCtx, vaultOwnerId: string) {
     .query("mcpGrants")
     .withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId))
     .order("desc")
+    .filter((q) => q.eq(q.field("hiddenAt"), undefined))
     .take(100);
   const now = Date.now();
   return {
@@ -447,6 +454,7 @@ export const listConnections = action({
       (entry: TrustBoundaryShadowEntry) =>
         ctx.runMutation(internal.trustBoundary.recordShadowDenial, entry),
     );
+    if (!decision.allowed) throw new Error("Connection not found");
     return await ctx.runQuery(internal.mcpGrants.listConnectionsInternal, {
       vaultOwnerId: decision.owner,
     });
@@ -467,6 +475,7 @@ export const recentConnectionActivity = action({
       (entry: TrustBoundaryShadowEntry) =>
         ctx.runMutation(internal.trustBoundary.recordShadowDenial, entry),
     );
+    if (!decision.allowed) throw new Error("Connection not found");
     return await ctx.runQuery(internal.mcpGrants.recentActivityInternal, {
       vaultOwnerId: decision.owner,
       grantId: args.grantId,
@@ -513,11 +522,12 @@ export const approveGrant = mutation({
   },
   handler: async (ctx, args) => {
     const decision = await authorizeTenantMutation(ctx, "mcpGrants.approveGrant", args.vaultOwnerId);
+    if (!decision.allowed) throw new Error("Connection not found");
     const row = await ownedGrant(ctx, decision.owner, args.grantId);
     if (row.status === "active") throw new Error("This connection is already approved");
-    if (row.status === "revoked" || row.status === "denied") {
-      throw new Error("Approve a fresh connection request instead of reviving a closed one");
-    }
+    if ((await grantsForClient(ctx, decision.owner, row.clientId)).some(
+      (existing) => existing.issuer === row.issuer && existing.status === "active",
+    )) throw new Error("This connection is already approved");
     // Anything above the ceiling is dropped here, not merely unused.
     const scopes = clampToScopeCeiling(args.scopes);
     if (scopes.length === 0) throw new Error("Choose at least one permission for this connection");
@@ -526,13 +536,13 @@ export const approveGrant = mutation({
     const now = Date.now();
     const expiresAt = chosenExpiry(args.expiresInDays, now);
     const scopeChoice = FAMILY_HISTORY_SCOPES.every((scope) => scopes.includes(scope)) ? "full" as const : "chosen" as const;
-    await ctx.db.patch(row._id, {
+    const fields = {
       label,
       scopes,
       scopeChoice,
-      expiryChoice: expiresAt === undefined ? "none" : "chosen",
+      expiryChoice: expiresAt === undefined ? "none" as const : "chosen" as const,
       boundary,
-      status: "active",
+      status: "active" as const,
       consentedAt: now,
       issuedAt: now,
       expiresAt,
@@ -546,8 +556,27 @@ export const approveGrant = mutation({
         clientId: row.clientId,
         clientProvenance: row.clientProvenance,
       }),
-    });
-    return { id: row._id, status: "active" as const, scopes, boundary, expiresAt: expiresAt ?? null, scopeChoice };
+    };
+    // Reapproval is an authenticated, explicit settings act. Keep the closed
+    // row as the durable revocation/consent history rather than overwrite it.
+    let id = row._id;
+    if (row.status === "revoked" || row.status === "denied") {
+      id = await ctx.db.insert("mcpGrants", {
+        vaultOwnerId: decision.owner,
+        clientId: row.clientId,
+        issuer: row.issuer,
+        observedClientName: row.observedClientName,
+        clientProvenance: row.clientProvenance,
+        clientMetadataUrl: row.clientMetadataUrl,
+        requestedAt: now,
+        useCount: 0,
+        ...fields,
+      });
+      await ctx.db.patch(row._id, { hiddenAt: now });
+    } else {
+      await ctx.db.patch(row._id, { ...fields, hiddenAt: undefined });
+    }
+    return { id, status: "active" as const, scopes, boundary, expiresAt: expiresAt ?? null, scopeChoice };
   },
 });
 
@@ -570,6 +599,7 @@ export const denyGrant = mutation({
   args: { vaultOwnerId: v.string(), grantId: v.id("mcpGrants"), reason: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const decision = await authorizeTenantMutation(ctx, "mcpGrants.denyGrant", args.vaultOwnerId);
+    if (!decision.allowed) throw new Error("Connection not found");
     const row = await ownedGrant(ctx, decision.owner, args.grantId);
     if (row.status !== "pending") throw new Error("Only a pending connection request can be declined");
     const now = Date.now();
@@ -587,6 +617,7 @@ export const reduceGrantScopes = mutation({
   args: { vaultOwnerId: v.string(), grantId: v.id("mcpGrants"), scopes: v.array(v.string()) },
   handler: async (ctx, args) => {
     const decision = await authorizeTenantMutation(ctx, "mcpGrants.reduceGrantScopes", args.vaultOwnerId);
+    if (!decision.allowed) throw new Error("Connection not found");
     const row = await ownedGrant(ctx, decision.owner, args.grantId);
     if (row.status !== "active") throw new Error("Only an active connection can be narrowed");
     const current = new Set(effectiveScopes(row));
@@ -609,6 +640,7 @@ export const revokeGrant = mutation({
   args: { vaultOwnerId: v.string(), grantId: v.id("mcpGrants"), reason: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const decision = await authorizeTenantMutation(ctx, "mcpGrants.revokeGrant", args.vaultOwnerId);
+    if (!decision.allowed) throw new Error("Connection not found");
     const row = await ownedGrant(ctx, decision.owner, args.grantId);
     const now = Date.now();
     // Revocation takes effect on the very next request because the transport
@@ -627,9 +659,18 @@ export const removeGrant = mutation({
   args: { vaultOwnerId: v.string(), grantId: v.id("mcpGrants") },
   handler: async (ctx, args) => {
     const decision = await authorizeTenantMutation(ctx, "mcpGrants.removeGrant", args.vaultOwnerId);
+    if (!decision.allowed) throw new Error("Connection not found");
     const row = await ownedGrant(ctx, decision.owner, args.grantId);
     if (row.status === "active") throw new Error("Revoke the connection before removing it");
-    await ctx.db.delete(row._id);
+    const now = Date.now();
+    // Removing a closed/expired request is also a durable refusal to reconnect.
+    // Pending and expired rows must not become eligible for automatic sign-in.
+    await ctx.db.patch(row._id, {
+      hiddenAt: now,
+      ...(row.status === "revoked" || row.status === "denied" ? {} : {
+        status: "revoked" as const, revokedAt: now, updatedAt: now,
+      }),
+    });
     return { id: row._id, removed: true as const };
   },
 });
