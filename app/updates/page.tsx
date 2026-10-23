@@ -18,7 +18,7 @@ export default function UpdatesPage() {
   return (
     <div className="min-h-screen bg-[#f8f4ec]">
       <MarketingNav />
-      <main className="pt-24">
+      <main className="pt-[4.5rem]">
         <section className="border-b border-[#d8c7a7] bg-[#1f2f35] px-4 py-12 text-white sm:px-6 lg:px-8">
           <div className="mx-auto max-w-5xl">
             <Badge className="mb-5 bg-white/10 text-white hover:bg-white/10">Product updates</Badge>

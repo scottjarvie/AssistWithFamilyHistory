@@ -53,7 +53,7 @@ export default function FeaturesPage() {
   return (
     <div className="min-h-screen bg-[#f8f4ec]">
       <MarketingNav />
-      <main className="pt-24">
+      <main className="pt-[4.5rem]">
         <section className="border-b border-[#d8c7a7] bg-[#efe4cd] px-4 py-12 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-6xl">
             <Badge className="mb-5 border-[#9f5a2d33] bg-white/60 text-[#7c4425] hover:bg-white/60">
