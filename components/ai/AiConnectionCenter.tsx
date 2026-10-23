@@ -44,6 +44,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   FAMILY_HISTORY_SCOPE_INFO,
+  FAMILY_HISTORY_SCOPES,
   NEVER_EXPOSED,
   NEVER_PERMITTED,
   type FamilyHistoryScope,
@@ -83,6 +84,7 @@ const BOUNDARY_CHOICES: ReadonlyArray<{
 ];
 
 const EXPIRY_CHOICES: ReadonlyArray<{ days: number; label: string }> = [
+  { days: 0, label: "No end date" },
   { days: 7, label: "1 week" },
   { days: 30, label: "1 month" },
   { days: 90, label: "3 months" },
@@ -350,16 +352,16 @@ function ApprovalForm({
     label: string;
     scopes: FamilyHistoryScope[];
     boundary: ConnectionBoundary;
-    expiresInDays: number;
+    expiresInDays?: number;
   }) => void;
   onDeny: (reason: string) => void;
 }) {
   const [label, setLabel] = useState(connection.label);
-  const [scopes, setScopes] = useState<FamilyHistoryScope[]>([]);
-  const [boundaryKind, setBoundaryKind] = useState<ConnectionBoundary["kind"]>("queue_only");
+  const [scopes, setScopes] = useState<FamilyHistoryScope[]>([...FAMILY_HISTORY_SCOPES]);
+  const [boundaryKind, setBoundaryKind] = useState<ConnectionBoundary["kind"]>("whole_workspace");
   const [personIdText, setPersonIdText] = useState("");
   const [queueItemText, setQueueItemText] = useState("");
-  const [expiresInDays, setExpiresInDays] = useState(90);
+  const [expiresInDays, setExpiresInDays] = useState(0);
   const [denyReason, setDenyReason] = useState("");
 
   const personIds = useMemo(() => parseIdList(personIdText), [personIdText]);
@@ -379,7 +381,7 @@ function ApprovalForm({
           1 · What may it do?
         </h4>
         <p className="mt-1 text-sm leading-6 text-stone-600">
-          Tick only what this AI genuinely needs. Nothing is ticked for you.
+          Every permission is included by default, including tools added later. Untick a permission to choose a limited connection.
         </p>
         <ul className="mt-3 space-y-3">
           {FAMILY_HISTORY_SCOPE_INFO.map((scope) => (
@@ -452,8 +454,8 @@ function ApprovalForm({
           3 · For how long?
         </h4>
         <p className="mt-1 text-sm leading-6 text-stone-600">
-          When this runs out the connection stops working until you approve it again. You can turn
-          it off sooner at any time.
+          Connections have no end date by default. An end date you pick is your choice and stays
+          in place until you change or remove it. You can turn the connection off at any time.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           {EXPIRY_CHOICES.map((choice) => (
@@ -552,6 +554,24 @@ function ApprovalForm({
           </Button>
         </div>
       </details>
+    </div>
+  );
+}
+
+function ExpiryControls({ busy, onSave }: { busy: boolean; onSave: (days?: number) => void }) {
+  const [days, setDays] = useState(0);
+  return (
+    <div className="mt-4 space-y-2">
+      <Label>End date (optional)</Label>
+      <p className="text-sm text-stone-600">No end date by default. A date you choose stays until you change or remove it.</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <select aria-label="Connection end date" value={days} disabled={busy} onChange={(event) => setDays(Number(event.target.value))} className="min-h-11 rounded border border-stone-300 bg-white px-3 text-sm">
+          {EXPIRY_CHOICES.map((choice) => <option key={choice.days} value={choice.days}>{choice.label}</option>)}
+        </select>
+        <Button type="button" variant="outline" disabled={busy} onClick={() => onSave(days || undefined)} className="min-h-11">
+          {days ? "Set end date" : "Remove end date"}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -680,6 +700,9 @@ export function AiConnectionCenter({
         status?: ConnectionRow["status"];
         scopes?: FamilyHistoryScope[];
         removed?: boolean;
+        expiresAt?: number | null;
+        boundary?: ConnectionBoundary;
+        scopeChoice?: "full" | "chosen";
       };
       if (!response.ok) {
         toast.error(payload.error ?? "That connection change could not be applied.");
@@ -694,6 +717,9 @@ export function AiConnectionCenter({
                 ...row,
                 status: payload.status ?? row.status,
                 scopes: payload.scopes ?? row.scopes,
+                expiresAt: payload.expiresAt === undefined ? row.expiresAt : payload.expiresAt,
+                boundary: payload.boundary ?? row.boundary,
+                scopeChoice: payload.scopeChoice ?? row.scopeChoice,
               }
             : row,
         );
@@ -727,10 +753,8 @@ export function AiConnectionCenter({
           Everything an AI can ever be given here
         </h2>
         <p className="mt-2 text-sm leading-6 text-stone-600">
-          These six permissions are the whole list. There is no seventh, no hidden one, and no
-          setting that grants more — anything not named here has no way in at all. Every consent
-          screen below is built from this same list, so what you are shown and what the server
-          allows cannot drift apart.
+          Full access includes every current permission below and future tools. You can choose fewer
+          permissions or an end date. Review, privacy, and publishing safeguards still apply.
         </p>
         <ul className="mt-4 space-y-3">
           {FAMILY_HISTORY_SCOPE_INFO.map((scope) => (
@@ -786,7 +810,7 @@ export function AiConnectionCenter({
                         label: input.label,
                         scopes: input.scopes,
                         boundary: input.boundary,
-                        expiresInDays: input.expiresInDays,
+                        expiresInDays: input.expiresInDays || undefined,
                       },
                       "Approved. This connection now works inside exactly what you chose.",
                     )
@@ -846,7 +870,7 @@ export function AiConnectionCenter({
                       <dt className="text-xs font-semibold uppercase tracking-wider text-stone-500">
                         Runs out
                       </dt>
-                      <dd className="mt-1 text-stone-800">{formatDate(connection.expiresAt)}</dd>
+                      <dd className="mt-1 text-stone-800">{connection.expiresAt == null ? "No end date" : formatDate(connection.expiresAt)}</dd>
                     </div>
                     <div>
                       <dt className="text-xs font-semibold uppercase tracking-wider text-stone-500">
@@ -875,6 +899,7 @@ export function AiConnectionCenter({
                       this page can never rewrite what you agreed to.
                     </p>
                   ) : null}
+                  <ExpiryControls busy={busyId === connection.id} onSave={(expiresInDays) => send(connection.id, { action: "expiry", expiresInDays }, expiresInDays ? "End date saved as your choice." : "End date removed.")} />
                   <ActiveConnectionControls
                     connection={connection}
                     busy={busyId === connection.id}
@@ -927,6 +952,7 @@ export function AiConnectionCenter({
                     {connection.revokedReason ? ` You noted: “${connection.revokedReason}”` : ""}
                   </p>
                 </div>
+                {connection.status === "expired" && <ExpiryControls busy={busyId === connection.id} onSave={(expiresInDays) => send(connection.id, { action: "expiry", expiresInDays }, "End date updated. Your scopes and record boundary are unchanged.")} />}
                 <Button
                   type="button"
                   variant="outline"

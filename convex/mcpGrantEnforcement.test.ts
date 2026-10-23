@@ -214,7 +214,9 @@ describe("grant states: sign-in approves, the person's no stands", () => {
     expect(rows[0].status).toBe("active");
     expect(rows[0].boundary.kind).toBe("whole_workspace");
     expect([...rows[0].scopes].sort()).toEqual([...FAMILY_HISTORY_SCOPES].sort());
-    expect(rows[0].expiresAt! - Date.now()).toBeGreaterThan(89 * 24 * 60 * 60 * 1000);
+    expect(rows[0].expiresAt).toBeUndefined();
+    expect(rows[0].scopeChoice).toBe("full");
+    expect(rows[0].expiryChoice).toBe("none");
     expect(JSON.parse(rows[0].consentSnapshot!).approvedBy).toBe("sign_in");
     // The never-list is outside the scope ceiling, so sign-in cannot reach it.
     expect(await toolNames(t, OWNER_A)).not.toContain("family_history_delete_person");
@@ -241,7 +243,7 @@ describe("grant states: sign-in approves, the person's no stands", () => {
     expect(rows[0].status).toBe("active");
   });
 
-  test("an expired term renews on the next signed-in request and keeps the person's narrowing", async () => {
+  test("an ambiguous expired term stays expired on sign-in and keeps the person's narrowing", async () => {
     const t = convexTest(schema, modules);
     await seedGrant(t, {
       vaultOwnerId: OWNER_A,
@@ -251,13 +253,13 @@ describe("grant states: sign-in approves, the person's no stands", () => {
       expiresAt: Date.now() - 1_000,
     });
     const call = await callTool(t, OWNER_A, "family_history_get_brief", {});
-    expect(call.isError).toBe(false);
+    expect(call.isError).toBe(true);
+    expect(call.body.code).toBe("GRANT_EXPIRED");
     const rows = await t.run(async (ctx) => await ctx.db.query("mcpGrants").collect());
     expect(rows).toHaveLength(1);
-    expect(rows[0].status).toBe("active");
     expect(rows[0].scopes).toEqual(["family_history:context:read"]);
-    expect(rows[0].expiresAt!).toBeGreaterThan(Date.now());
-    expect(await toolNames(t, OWNER_A)).not.toContain("family_history_save_records");
+    expect(rows[0].expiresAt!).toBeLessThan(Date.now());
+    expect(await toolNames(t, OWNER_A)).toEqual([]);
   });
 
   test("revoking a grant denies the very next request with the same token", async () => {

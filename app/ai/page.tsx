@@ -167,7 +167,7 @@ export default function AiSetupPage() {
                 {[
                   ["Choose a compatible client", "It must support remote Streamable HTTP MCP and OAuth. Exact menu names differ by client."],
                   ["Add the MCP address", "Use https://assistwithfamilyhistory.com/mcp as the server URL."],
-                  ["Sign in", "Signing in approves the connection for ordinary research work in your workspace for 90 days. You can narrow it, or turn it off, at /app/settings/ai at any time."],
+                  ["Sign in", "Signing in gives the connection every current and future tool in your workspace with no end date by default. You can choose fewer permissions, set an end date, or turn it off at /app/settings/ai."],
                   ["Ask for the Family History brief", "Your AI should call family_history_get_brief first, then search and hydrate before changing records."],
                 ].map(([title, copy], index) => (
                   <li key={title} className="grid grid-cols-[2.5rem_1fr] gap-4">

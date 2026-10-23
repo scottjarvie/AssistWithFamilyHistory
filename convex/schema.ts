@@ -1928,6 +1928,8 @@ export default defineSchema({
     clientMetadataUrl: v.optional(v.string()),
     /** Always a subset of the scope ceiling in lib/mcp/catalog.ts. */
     scopes: v.array(v.string()),
+    scopeChoice: v.optional(v.union(v.literal("full"), v.literal("chosen"))),
+    expiryChoice: v.optional(v.union(v.literal("none"), v.literal("chosen"))),
     boundary: v.object({
       kind: v.union(
         v.literal("whole_workspace"),

@@ -37,11 +37,10 @@ import {
   type ResolvedGrant,
 } from "../lib/mcp/authorize";
 
+import { effectiveScopes, effectiveScopeChoice, effectiveExpiry, hasAutomaticLegacyExpiry, chosenExpiry } from "../lib/mcp/grantDefaults";
+
 /** Skip the last-used write when the same tool ran again inside this window. */
 const USE_TOUCH_THROTTLE_MS = 15_000;
-
-const DEFAULT_GRANT_DAYS = 90;
-const MAX_GRANT_DAYS = 365;
 
 const boundaryValidator = v.object({
   kind: v.union(
@@ -68,13 +67,14 @@ function toResolvedGrant(row: Doc<"mcpGrants">): ResolvedGrant {
     grantId: String(row._id),
     clientId: row.clientId,
     issuer: row.issuer,
-    scopes: clampToScopeCeiling(row.scopes),
+    scopes: effectiveScopes(row),
+    scopeChoice: effectiveScopeChoice(row),
     boundary: {
       kind: row.boundary.kind,
       personIds: row.boundary.personIds,
       queueItemIds: row.boundary.queueItemIds,
     },
-    expiresAt: row.expiresAt,
+    expiresAt: effectiveExpiry(row),
   };
 }
 
@@ -113,6 +113,9 @@ export function buildConsentSnapshot(input: {
       personCount: input.boundary.personIds?.length ?? null,
       queueItemCount: input.boundary.queueItemIds?.length ?? null,
     },
+    scopeChoice: FAMILY_HISTORY_SCOPES.every((scope) => input.scopes.includes(scope)) ? "full" : "chosen",
+    fullAccessIncludesFutureTools: FAMILY_HISTORY_SCOPES.every((scope) => input.scopes.includes(scope)),
+    expiryChoice: input.expiresAt === undefined ? "none" : "chosen",
     expiresAt: input.expiresAt ?? null,
     neverExposed: NEVER_EXPOSED,
     neverPermitted: NEVER_PERMITTED,
@@ -162,10 +165,7 @@ export const resolveForRequest = internalMutation({
 
     if (active) {
       if (!isGrantExpired(active, now)) return { state: "active", grant: toResolvedGrant(active) };
-      // The term ran out; a signed-in request renews it below.
-      await ctx.db.patch(active._id, { status: "expired", updatedAt: now });
-      active.status = "expired";
-      active.updatedAt = now;
+      return { state: "expired" };
     }
 
     // A person's own "no" stands: a denied or turned-off connection is never
@@ -173,40 +173,36 @@ export const resolveForRequest = internalMutation({
     if (rows.some((row) => row.status === "denied")) return { state: "denied" };
     if (rows.some((row) => row.status === "revoked")) return { state: "revoked" };
 
-    // Signing in is the approval (owner decision, 2026-10-13). The connection
-    // gets the ordinary permissions over the whole workspace for the default
-    // term. The never-list (publish, delete, merge, share, export) is outside
-    // the scope ceiling, so no grant here can reach it. The person can narrow
-    // or turn the connection off in settings at any time.
-    const expiresAt = now + DEFAULT_GRANT_DAYS * 24 * 60 * 60 * 1000;
+    // Signing in grants every current and future tool, with no end date.
+    // Existing explicit/ambiguous expiries are never renewed by signing in.
     const label = trimmed(args.observedClientName, 80) ?? "AI connection";
     const latest = (status: Doc<"mcpGrants">["status"]) =>
       rows
         .filter((row) => row.status === status)
         .sort((a, b) => b.updatedAt - a.updatedAt)[0];
 
-    // An expired connection is renewed with whatever narrowing the person set;
-    // a request left over from the approve-first era becomes the whole grant.
-    const previous = latest("expired") ?? latest("pending");
-    const scopes = previous && previous.status === "expired" && previous.scopes.length > 0
-      ? clampToScopeCeiling(previous.scopes)
-      : [...FAMILY_HISTORY_SCOPES];
-    const boundary: Doc<"mcpGrants">["boundary"] =
-      previous && previous.status === "expired" && previous.scopes.length > 0
-        ? previous.boundary
-        : { kind: "whole_workspace" };
+    const expired = latest("expired");
+    if (expired) {
+      if (!hasAutomaticLegacyExpiry(expired) && expired.expiryChoice !== "none") return { state: "expired" };
+      return { state: "active", grant: toResolvedGrant(expired) };
+    }
+    const previous = latest("pending");
+    if (previous && (previous.scopeChoice === "chosen" || previous.expiryChoice === "chosen" || previous.scopes.length > 0)) return { state: "pending" };
+    const scopes = [...FAMILY_HISTORY_SCOPES];
+    const boundary: Doc<"mcpGrants">["boundary"] = { kind: "whole_workspace" };
     const fields = {
       scopes,
       boundary,
       status: "active" as const,
       consentedAt: now,
       issuedAt: now,
-      expiresAt,
+      expiresAt: undefined,
+      scopeChoice: "full" as const,
+      expiryChoice: "none" as const,
       updatedAt: now,
       consentSnapshot: buildConsentSnapshot({
         scopes,
         boundary,
-        expiresAt,
         label: previous?.label ?? label,
         observedClientName: trimmed(args.observedClientName, 120) ?? previous?.observedClientName,
         clientId,
@@ -327,7 +323,7 @@ export async function assertGrantPermits(
     );
   }
   const resolution: GrantResolution =
-    row.status === "active"
+    (row.status === "active" || (row.status === "expired" && (hasAutomaticLegacyExpiry(row) || row.expiryChoice === "none")))
       ? { state: "active", grant: toResolvedGrant(row) }
       : { state: row.status };
   const decision = decideToolAccess({
@@ -372,15 +368,17 @@ async function readConnections(ctx: QueryCtx, vaultOwnerId: string) {
       issuer: row.issuer,
       clientProvenance: row.clientProvenance,
       clientMetadataUrl: row.clientMetadataUrl ?? null,
-      scopes: clampToScopeCeiling(row.scopes),
+      scopes: effectiveScopes(row),
+      scopeChoice: effectiveScopeChoice(row),
       boundary: row.boundary,
       // Expiry is decided in code at read time, so a row that has aged out
       // reads as expired even before anything rewrites its status.
-      status: row.status === "active" && isGrantExpired(row, now) ? "expired" : row.status,
+      status: (row.status === "active" || (row.status === "expired" && (hasAutomaticLegacyExpiry(row) || row.expiryChoice === "none")))
+        ? (isGrantExpired(row, now) ? "expired" : "active") : row.status,
       requestedAt: row.requestedAt,
       consentedAt: row.consentedAt ?? null,
       issuedAt: row.issuedAt ?? null,
-      expiresAt: row.expiresAt ?? null,
+      expiresAt: effectiveExpiry(row) ?? null,
       lastUsedAt: row.lastUsedAt ?? null,
       lastToolName: row.lastToolName ?? null,
       revokedAt: row.revokedAt ?? null,
@@ -525,12 +523,14 @@ export const approveGrant = mutation({
     if (scopes.length === 0) throw new Error("Choose at least one permission for this connection");
     const label = trimmed(args.label, 80) ?? row.label;
     const boundary = normalizeBoundary(args.boundary);
-    const days = Math.max(1, Math.min(Math.floor(args.expiresInDays ?? DEFAULT_GRANT_DAYS), MAX_GRANT_DAYS));
     const now = Date.now();
-    const expiresAt = now + days * 24 * 60 * 60 * 1000;
+    const expiresAt = chosenExpiry(args.expiresInDays, now);
+    const scopeChoice = FAMILY_HISTORY_SCOPES.every((scope) => scopes.includes(scope)) ? "full" as const : "chosen" as const;
     await ctx.db.patch(row._id, {
       label,
       scopes,
+      scopeChoice,
+      expiryChoice: expiresAt === undefined ? "none" : "chosen",
       boundary,
       status: "active",
       consentedAt: now,
@@ -547,7 +547,22 @@ export const approveGrant = mutation({
         clientProvenance: row.clientProvenance,
       }),
     });
-    return { id: row._id, status: "active" as const, scopes, boundary, expiresAt };
+    return { id: row._id, status: "active" as const, scopes, boundary, expiresAt: expiresAt ?? null, scopeChoice };
+  },
+});
+
+/** Explicit settings choice; independent of scopes and record boundary. */
+export const updateGrantExpiry = mutation({
+  args: { vaultOwnerId: v.string(), grantId: v.id("mcpGrants"), expiresInDays: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const decision = await authorizeTenantMutation(ctx, "mcpGrants.updateGrantExpiry", args.vaultOwnerId);
+    if (!decision.allowed) throw new Error("Connection not found");
+    const row = await ownedGrant(ctx, decision.owner, args.grantId);
+    if (row.status !== "active" && row.status !== "expired") throw new Error("Only an approved connection can have an end date changed");
+    const now = Date.now();
+    const expiresAt = chosenExpiry(args.expiresInDays, now);
+    await ctx.db.patch(row._id, { expiresAt, expiryChoice: expiresAt === undefined ? "none" : "chosen", status: "active", updatedAt: now });
+    return { id: row._id, status: "active" as const, expiresAt: expiresAt ?? null };
   },
 });
 
@@ -574,7 +589,7 @@ export const reduceGrantScopes = mutation({
     const decision = await authorizeTenantMutation(ctx, "mcpGrants.reduceGrantScopes", args.vaultOwnerId);
     const row = await ownedGrant(ctx, decision.owner, args.grantId);
     if (row.status !== "active") throw new Error("Only an active connection can be narrowed");
-    const current = new Set(clampToScopeCeiling(row.scopes));
+    const current = new Set(effectiveScopes(row));
     const requested = clampToScopeCeiling(args.scopes);
     const next = requested.filter((scope) => current.has(scope));
     // This path only ever narrows. Widening requires a fresh approval so the
@@ -584,8 +599,9 @@ export const reduceGrantScopes = mutation({
     }
     if (next.length === 0) throw new Error("Revoke the connection instead of removing every permission");
     const now = Date.now();
-    await ctx.db.patch(row._id, { scopes: next, updatedAt: now });
-    return { id: row._id, scopes: next };
+    const scopeChoice = FAMILY_HISTORY_SCOPES.every((scope) => next.includes(scope)) ? "full" as const : "chosen" as const;
+    await ctx.db.patch(row._id, { scopes: next, scopeChoice, updatedAt: now });
+    return { id: row._id, scopes: next, scopeChoice };
   },
 });
 
