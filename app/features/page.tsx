@@ -19,7 +19,7 @@ const statusGroups = [
     ],
   },
   {
-    title: "Coming Soon",
+    title: "Coming soon",
     icon: Clock3,
     tone: "text-[#9f5a2d]",
     items: [

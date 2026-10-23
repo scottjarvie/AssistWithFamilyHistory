@@ -18,7 +18,7 @@ const roadmap = [
     ],
   },
   {
-    phase: "Coming Soon",
+    phase: "Coming soon",
     icon: Clock3,
     copy: "The next layer is making the app feel like a story workshop instead of just a data store.",
     items: [

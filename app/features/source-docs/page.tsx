@@ -28,27 +28,27 @@ import { createPageMetadata } from "@/lib/seo";
 const steps = [
   {
     step: 1,
-    title: "Install the Extension",
+    title: "Install the extension",
     description: "Add our Chrome extension to your browser. It activates when you visit FamilySearch person pages.",
   },
   {
     step: 2,
-    title: "Capture FamilySearch Data",
+    title: "Capture FamilySearch data",
     description: "Use the extension to capture sources or memories for a person, including indexed information, citations, relationships, and place mentions.",
   },
   {
     step: 3,
-    title: "Import to App",
+    title: "Import to the app",
     description: "Import the capture package into the Research Vault so people, places, documents, and research history update together.",
   },
   {
     step: 4,
-    title: "Generate Raw Document",
+    title: "Generate the raw document",
     description: "The app creates a clean, deterministic evidence document with all source information organized and anchored.",
   },
   {
     step: 5,
-    title: "AI Contextualization",
+    title: "AI contextualization",
     description: "Use AI to analyze sources, find patterns, identify conflicts, group duplicates, and create a research-ready dossier.",
   },
 ];
@@ -56,12 +56,12 @@ const steps = [
 const outputs = [
   {
     icon: FileText,
-    title: "Raw Evidence Document",
+    title: "Raw evidence document",
     description: "A complete, lossless capture of all source data. Deterministic (no AI), organized with source anchors (S1, S2, etc.), and perfect for archival purposes.",
   },
   {
     icon: Brain,
-    title: "Contextualized Dossier",
+    title: "Contextualized dossier",
     description: "AI-generated analysis that synthesizes sources, identifies verified facts with confidence levels, finds conflicts, builds timelines, and suggests research directions.",
   },
 ];
@@ -85,7 +85,7 @@ export default function SourceDocsFeaturePage() {
               <FileText className="w-8 h-8 text-amber-700" />
             </div>
             <h1 className="text-4xl sm:text-5xl font-bold text-stone-900 mb-6">
-              Source Documentation In The Research Vault
+              Source documentation in the Research Vault
             </h1>
             <p className="text-xl text-stone-500 max-w-2xl mx-auto">
               Capture FamilySearch evidence, merge it into a canonical research graph, and generate raw documents, dossiers, and context packs from one person workspace.
@@ -108,7 +108,7 @@ export default function SourceDocsFeaturePage() {
               <div className="flex items-start gap-3 md:block md:p-6 md:text-center">
                 <CheckCircle className="h-6 w-6 shrink-0 text-green-600 md:mx-auto md:mb-3 md:h-8 md:w-8" />
                 <div>
-                  <h3 className="font-semibold text-stone-900 mb-1 md:mb-2">Capture Everything</h3>
+                  <h3 className="font-semibold text-stone-900 mb-1 md:mb-2">Capture everything</h3>
                   <p className="text-stone-500 text-sm">
                     All indexed information, citations, tags, and attachments in one place.
                   </p>
@@ -117,7 +117,7 @@ export default function SourceDocsFeaturePage() {
               <div className="flex items-start gap-3 md:block md:p-6 md:text-center">
                 <CheckCircle className="h-6 w-6 shrink-0 text-green-600 md:mx-auto md:mb-3 md:h-8 md:w-8" />
                 <div>
-                  <h3 className="font-semibold text-stone-900 mb-1 md:mb-2">Find Patterns</h3>
+                  <h3 className="font-semibold text-stone-900 mb-1 md:mb-2">Find patterns</h3>
                   <p className="text-stone-500 text-sm">
                     AI identifies duplicates, conflicts, and connections across sources.
                   </p>
@@ -126,7 +126,7 @@ export default function SourceDocsFeaturePage() {
               <div className="flex items-start gap-3 md:block md:p-6 md:text-center">
                 <CheckCircle className="h-6 w-6 shrink-0 text-green-600 md:mx-auto md:mb-3 md:h-8 md:w-8" />
                 <div>
-                  <h3 className="font-semibold text-stone-900 mb-1 md:mb-2">Export Everything</h3>
+                  <h3 className="font-semibold text-stone-900 mb-1 md:mb-2">Export everything</h3>
                   <p className="text-stone-500 text-sm">
                     All outputs in Markdown. Use them anywhere, share with anyone.
                   </p>
@@ -138,7 +138,7 @@ export default function SourceDocsFeaturePage() {
           {/* How It Works */}
           <section className="mb-16">
             <h2 className="text-2xl font-bold text-stone-900 mb-8 text-center">
-              How It Works
+              How it works
             </h2>
             <div className="space-y-6">
               {steps.map((step) => (
@@ -158,7 +158,7 @@ export default function SourceDocsFeaturePage() {
           {/* Outputs */}
           <section className="mb-16">
             <h2 className="text-2xl font-bold text-stone-900 mb-8 text-center">
-              What You Get
+              What you get
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {outputs.map((output) => (
@@ -178,14 +178,14 @@ export default function SourceDocsFeaturePage() {
           {/* AI Options */}
           <section className="mb-16">
             <h2 className="text-2xl font-bold text-stone-900 mb-6 text-center">
-              Flexible AI Processing
+              Flexible AI processing
             </h2>
             <div className="bg-amber-50 rounded-2xl p-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>
                   <h3 className="font-semibold text-stone-900 mb-2 flex items-center gap-2">
                     <Download className="w-5 h-5 text-amber-700" />
-                    In-App Processing
+                    In-app processing
                   </h3>
                   <p className="text-stone-600 text-sm">
                     Connect your OpenRouter API key and process directly in the app,
@@ -195,7 +195,7 @@ export default function SourceDocsFeaturePage() {
                 <div>
                   <h3 className="font-semibold text-stone-900 mb-2 flex items-center gap-2">
                     <Download className="w-5 h-5 text-amber-700" />
-                    Export/Import Workflow
+                    Export and import workflow
                   </h3>
                   <p className="text-stone-600 text-sm">
                     Export prompts and data, use any AI tool you prefer, then import 
@@ -214,7 +214,7 @@ export default function SourceDocsFeaturePage() {
                 className="h-12 w-full rounded-full bg-[#234d5e] px-7 text-[#f7f3e8] hover:bg-[#1f4554] sm:w-auto"
               >
                 <Link href="/app/imports" className="flex items-center gap-2">
-                  Open Imports Workspace
+                  Open the imports workspace
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
@@ -223,7 +223,7 @@ export default function SourceDocsFeaturePage() {
                 variant="outline"
                 className="h-12 w-full rounded-full border-[#9f5a2d66] bg-[#fffaf2aa] px-7 text-[#7a4525] hover:bg-[#fffaf2] sm:w-auto"
               >
-                <Link href="/extension">Install Extension</Link>
+                <Link href="/extension">Install the extension</Link>
               </Button>
             </div>
           </div>

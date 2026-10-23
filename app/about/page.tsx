@@ -69,7 +69,7 @@ export default function AboutPage() {
 
           {/* Mission */}
           <section className="mb-16">
-            <h2 className="text-2xl font-bold text-stone-900 mb-4">Our Mission</h2>
+            <h2 className="text-2xl font-bold text-stone-900 mb-4">Our mission</h2>
             <div className="prose prose-stone prose-lg max-w-none space-y-4">
               <p className="text-stone-600 leading-relaxed">
                 Traditional genealogy software focuses on building trees—collecting names, 
@@ -91,7 +91,7 @@ export default function AboutPage() {
 
           {/* Principles */}
           <section className="mb-16">
-            <h2 className="text-2xl font-bold text-stone-900 mb-8">Our Principles</h2>
+            <h2 className="text-2xl font-bold text-stone-900 mb-8">Our principles</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {principles.map((principle) => (
                 <div key={principle.title} className="flex gap-4">
@@ -115,7 +115,7 @@ export default function AboutPage() {
 
           {/* How It Works */}
           <section className="mb-16">
-            <h2 className="text-2xl font-bold text-stone-900 mb-4">How It Works</h2>
+            <h2 className="text-2xl font-bold text-stone-900 mb-4">How it works</h2>
             <div className="bg-stone-50 rounded-2xl p-5 sm:p-8">
               <ol className="space-y-6">
                 <li className="flex gap-4">
