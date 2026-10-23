@@ -140,12 +140,68 @@ async function grantsForClient(ctx: QueryCtx | MutationCtx, owner: string, clien
   return rows;
 }
 
+/*
+ * Grant history is ordered by events, latest event wins:
+ *  - an approval happens at its consent time (never `updatedAt`, which use
+ *    tracking bumps — old usage must never make an old approval look new);
+ *  - a refusal (revoked or denied) happens at its decision time.
+ * A refusal is final for every approval at or before it. Only an explicit
+ * approval strictly after it can govern again; ties go to the refusal.
+ */
+function approvalTime(row: Doc<"mcpGrants">): number {
+  return row.consentedAt ?? row.issuedAt ?? row._creationTime;
+}
+
+function isRefusal(row: Doc<"mcpGrants">): boolean {
+  return row.status === "revoked" || row.status === "denied";
+}
+
+function refusalTime(row: Doc<"mcpGrants">): number {
+  return Math.max(row.revokedAt ?? row.updatedAt, approvalTime(row));
+}
+
+/** An expired-status row that still authorizes (legacy automatic or no end date). */
+function isUsableExpired(row: Doc<"mcpGrants">): boolean {
+  return row.status === "expired" && (hasAutomaticLegacyExpiry(row) || row.expiryChoice === "none");
+}
+
 // Consent order, then insertion order, then ID: resolution and revocation must
 // choose exactly the same row, including legacy approvals with tied timestamps.
 function newestApprovalFirst(a: Doc<"mcpGrants">, b: Doc<"mcpGrants">): number {
-  return (b.consentedAt ?? b.updatedAt) - (a.consentedAt ?? a.updatedAt)
+  return approvalTime(b) - approvalTime(a)
     || b._creationTime - a._creationTime
     || (a._id < b._id ? 1 : a._id > b._id ? -1 : 0);
+}
+
+function latestRefusalFirst(a: Doc<"mcpGrants">, b: Doc<"mcpGrants">): number {
+  return refusalTime(b) - refusalTime(a)
+    || b._creationTime - a._creationTime
+    || (a._id < b._id ? 1 : a._id > b._id ? -1 : 0);
+}
+
+/** The most recent refusal in this owner/client/issuer history, if any. */
+function latestRefusal(rows: Doc<"mcpGrants">[]): Doc<"mcpGrants"> | undefined {
+  return rows.filter(isRefusal).sort(latestRefusalFirst)[0];
+}
+
+/** True when a refusal at or after this approval closes it, whatever its own status says. */
+function refusedByHistory(rows: Doc<"mcpGrants">[], row: Doc<"mcpGrants">): Doc<"mcpGrants"> | undefined {
+  if (isRefusal(row)) return row;
+  const refusal = latestRefusal(rows.filter((other) => other._id !== row._id));
+  return refusal && refusalTime(refusal) >= approvalTime(row) ? refusal : undefined;
+}
+
+/** Approvals still in force by history: active or usable-expired, not closed by a later refusal. */
+function liveApprovals(rows: Doc<"mcpGrants">[]): Doc<"mcpGrants">[] {
+  const refusal = latestRefusal(rows);
+  const cutoff = refusal ? refusalTime(refusal) : -Infinity;
+  return rows.filter((row) => (row.status === "active" || isUsableExpired(row)) && approvalTime(row) > cutoff);
+}
+
+/** A new explicit approval must land strictly after every refusal it supersedes. */
+function explicitApprovalTime(rows: Doc<"mcpGrants">[], now: number): number {
+  const refusal = latestRefusal(rows);
+  return refusal ? Math.max(now, refusalTime(refusal) + 1) : now;
 }
 
 /**
@@ -171,11 +227,17 @@ export const resolveForRequest = internalMutation({
 
     const rows = await grantsForClient(ctx, owner, clientId, args.issuer);
 
+    // Latest event wins. A person's own "no" stands over every approval at or
+    // before it — including older active duplicates left by legacy one-row
+    // revocations. Only an explicit approval strictly after it governs again.
+    const closed = latestRefusal(rows);
+    const cutoff = closed ? refusalTime(closed) : -Infinity;
+
     // One active grant governs the request. If several exist (a person
     // re-approved without revoking), the most recently consented one wins and
     // the others are left untouched — scopes are never combined.
     const active = rows
-      .filter((row) => row.status === "active")
+      .filter((row) => row.status === "active" && approvalTime(row) > cutoff)
       .sort(newestApprovalFirst)[0];
 
     if (active) {
@@ -183,10 +245,8 @@ export const resolveForRequest = internalMutation({
       return { state: "expired" };
     }
 
-    // A person's own "no" stands: a denied or turned-off connection is never
-    // reopened by signing in again. They reconnect from settings.
-    const closed = rows.filter((row) => row.status === "denied" || row.status === "revoked")
-      .sort((a, b) => b.updatedAt - a.updatedAt)[0];
+    // A denied or turned-off connection is never reopened by signing in
+    // again. They reconnect from settings.
     if (closed) {
       // A new attempt reveals the refusal in settings for explicit reapproval.
       // It never changes status, scopes, boundary, expiry, or the consent receipt.
@@ -197,10 +257,11 @@ export const resolveForRequest = internalMutation({
     // Signing in grants every current and future tool, with no end date.
     // Existing explicit/ambiguous expiries are never renewed by signing in.
     const label = trimmed(args.observedClientName, 80) ?? "AI connection";
+    // No refusal exists past this point, so nothing below can reopen one.
     const latest = (status: Doc<"mcpGrants">["status"]) =>
       rows
         .filter((row) => row.status === status)
-        .sort((a, b) => b.updatedAt - a.updatedAt)[0];
+        .sort(newestApprovalFirst)[0];
 
     const expired = latest("expired");
     if (expired) {
@@ -343,8 +404,13 @@ export async function assertGrantPermits(
       "Ask the person to approve the connection at https://assistwithfamilyhistory.com/app/settings/ai, then retry.",
     );
   }
-  const resolution: GrantResolution =
-    (row.status === "active" || (row.status === "expired" && (hasAutomaticLegacyExpiry(row) || row.expiryChoice === "none")))
+  // A later refusal in the same history closes this approval even if its own
+  // row still says active (legacy one-row revocation or expired-row removal).
+  const refused = (row.status === "active" || isUsableExpired(row))
+    && refusedByHistory(await grantsForClient(ctx, row.vaultOwnerId, row.clientId, row.issuer), row);
+  const resolution: GrantResolution = refused
+    ? { state: refused.status as "denied" | "revoked" }
+    : (row.status === "active" || isUsableExpired(row))
       ? { state: "active", grant: toResolvedGrant(row) }
       : { state: row.status };
   const decision = decideToolAccess({
@@ -370,7 +436,22 @@ export async function assertGrantPermits(
  * keeps the declared type honest: it is literally what the query returns, so
  * the two cannot drift apart.
  */
-function connectionRow(row: Doc<"mcpGrants">, now: number) {
+type HistoryRefusal = { status: "revoked" | "denied"; at: number; reason: string | null };
+
+function historyRefusal(row: Doc<"mcpGrants">): HistoryRefusal {
+  return { status: row.status as "revoked" | "denied", at: refusalTime(row), reason: row.revokedReason ?? null };
+}
+
+function connectionRow(row: Doc<"mcpGrants">, now: number, refusedBy?: HistoryRefusal) {
+  const base = storedConnectionRow(row, now);
+  // An approval closed by a later refusal is shown as that refusal, so Settings
+  // offers explicit reapproval instead of a switch that no longer governs.
+  return refusedBy
+    ? { ...base, status: refusedBy.status as typeof base.status, revokedAt: refusedBy.at as number | null, revokedReason: refusedBy.reason }
+    : base;
+}
+
+function storedConnectionRow(row: Doc<"mcpGrants">, now: number) {
   return {
     id: row._id,
     label: row.label,
@@ -384,7 +465,7 @@ function connectionRow(row: Doc<"mcpGrants">, now: number) {
     boundary: row.boundary,
     // Expiry is decided in code at read time, so a row that has aged out
     // reads as expired even before anything rewrites its status.
-    status: (row.status === "active" || (row.status === "expired" && (hasAutomaticLegacyExpiry(row) || row.expiryChoice === "none")))
+    status: (row.status === "active" || isUsableExpired(row))
       ? (isGrantExpired(row, now) ? "expired" : "active") : row.status,
     requestedAt: row.requestedAt,
     consentedAt: row.consentedAt ?? null,
@@ -407,11 +488,34 @@ async function readConnections(ctx: QueryCtx, vaultOwnerId: string) {
     .filter((q) => q.eq(q.field("hiddenAt"), undefined))
     .take(100);
   const now = Date.now();
+  // Approvals are checked against their own bounded owner/client/issuer
+  // history, read once per pair, so the list never shows a closed approval as on.
+  const histories = new Map<string, Doc<"mcpGrants">[] | null>();
+  const refusedBy = new Map<Id<"mcpGrants">, HistoryRefusal>();
+  for (const row of rows) {
+    if (row.status !== "active" && !isUsableExpired(row)) continue;
+    const key = JSON.stringify([row.clientId, row.issuer]);
+    if (!histories.has(key)) {
+      const history = await ctx.db
+        .query("mcpGrants")
+        .withIndex("by_owner_client_issuer", (q) => q.eq("vaultOwnerId", vaultOwnerId).eq("clientId", row.clientId).eq("issuer", row.issuer))
+        .take(MAX_CLIENT_GRANTS + 1);
+      histories.set(key, history.length > MAX_CLIENT_GRANTS ? null : history);
+    }
+    const history = histories.get(key);
+    // Overflowing history refuses every request, so it never reads as on.
+    if (history === null) {
+      refusedBy.set(row._id, { status: "revoked", at: now, reason: "Too much approval history to safely authorize." });
+      continue;
+    }
+    const refusal = refusedByHistory(history!, row);
+    if (refusal) refusedBy.set(row._id, historyRefusal(refusal));
+  }
   return {
     scopeInfo: FAMILY_HISTORY_SCOPE_INFO,
     neverExposed: NEVER_EXPOSED,
     neverPermitted: NEVER_PERMITTED,
-    connections: rows.map((row) => connectionRow(row, now)),
+    connections: rows.map((row) => connectionRow(row, now, refusedBy.get(row._id))),
   };
 }
 
@@ -543,10 +647,14 @@ export const approveGrant = mutation({
     const decision = await authorizeTenantMutation(ctx, "mcpGrants.approveGrant", args.vaultOwnerId);
     if (!decision.allowed) throw new Error("Connection not found");
     const row = await ownedGrant(ctx, decision.owner, args.grantId);
-    if (row.status === "active") throw new Error("This connection is already approved");
-    if ((await grantsForClient(ctx, decision.owner, row.clientId, row.issuer)).some(
-      (existing) => existing.issuer === row.issuer && existing.status === "active",
-    )) throw new Error("This connection is already approved");
+    const history = await grantsForClient(ctx, decision.owner, row.clientId, row.issuer);
+    // An active row closed by a later refusal is shown as turned off and is
+    // reapproved like one; any approval still in force means already approved.
+    const closedByHistory = row.status === "active" && refusedByHistory(history, row) !== undefined;
+    if (row.status === "active" && !closedByHistory) throw new Error("This connection is already approved");
+    if (liveApprovals(history).some((existing) => existing.status === "active")) {
+      throw new Error("This connection is already approved");
+    }
     // Anything above the ceiling is dropped here, not merely unused.
     const scopes = clampToScopeCeiling(args.scopes);
     if (scopes.length === 0) throw new Error("Choose at least one permission for this connection");
@@ -554,6 +662,8 @@ export const approveGrant = mutation({
     const boundary = normalizeBoundary(args.boundary);
     const now = Date.now();
     const expiresAt = chosenExpiry(args.expiresInDays, now);
+    // The explicit approval is an event strictly after every earlier refusal.
+    const approvedAt = explicitApprovalTime(history, now);
     const scopeChoice = FAMILY_HISTORY_SCOPES.every((scope) => scopes.includes(scope)) ? "full" as const : "chosen" as const;
     const fields = {
       label,
@@ -562,8 +672,8 @@ export const approveGrant = mutation({
       expiryChoice: expiresAt === undefined ? "none" as const : "chosen" as const,
       boundary,
       status: "active" as const,
-      consentedAt: now,
-      issuedAt: now,
+      consentedAt: approvedAt,
+      issuedAt: approvedAt,
       expiresAt,
       updatedAt: now,
       consentSnapshot: buildConsentSnapshot({
@@ -579,7 +689,7 @@ export const approveGrant = mutation({
     // Reapproval is an authenticated, explicit settings act. Keep the closed
     // row as the durable revocation/consent history rather than overwrite it.
     let id = row._id;
-    if (row.status === "revoked" || row.status === "denied") {
+    if (row.status === "revoked" || row.status === "denied" || closedByHistory) {
       id = await ctx.db.insert("mcpGrants", {
         vaultOwnerId: decision.owner,
         clientId: row.clientId,
@@ -607,6 +717,9 @@ export const updateGrantExpiry = mutation({
     if (!decision.allowed) throw new Error("Connection not found");
     const row = await ownedGrant(ctx, decision.owner, args.grantId);
     if (row.status !== "active" && row.status !== "expired") throw new Error("Only an approved connection can have an end date changed");
+    if (refusedByHistory(await grantsForClient(ctx, decision.owner, row.clientId, row.issuer), row)) {
+      throw new Error("Only an approved connection can have an end date changed");
+    }
     const now = Date.now();
     const expiresAt = chosenExpiry(args.expiresInDays, now);
     await ctx.db.patch(row._id, { expiresAt, expiryChoice: expiresAt === undefined ? "none" : "chosen", status: "active", updatedAt: now });
@@ -664,10 +777,12 @@ export const revokeGrant = mutation({
     if (row.status !== "active" || row.hiddenAt !== undefined || isGrantExpired(row, Date.now())) {
       throw new Error("Only an active connection can be turned off. Reload to see its current approval.");
     }
-    const duplicates = (await grantsForClient(ctx, decision.owner, row.clientId, row.issuer))
-      .filter((grant) => grant.status === "active"
-        || (grant.status === "expired" && (hasAutomaticLegacyExpiry(grant) || grant.expiryChoice === "none")));
-    const governing = duplicates.filter((grant) => grant.status === "active").sort(newestApprovalFirst)[0];
+    const history = await grantsForClient(ctx, decision.owner, row.clientId, row.issuer);
+    if (refusedByHistory(history, row)) {
+      throw new Error("Only an active connection can be turned off. Reload to see its current approval.");
+    }
+    const duplicates = history.filter((grant) => grant.status === "active" || isUsableExpired(grant));
+    const governing = liveApprovals(history).filter((grant) => grant.status === "active").sort(newestApprovalFirst)[0];
     if (governing?._id !== row._id) {
       throw new Error("This approval has been superseded. Reload to turn off the current connection.");
     }
@@ -695,16 +810,23 @@ export const removeGrant = mutation({
     if (!decision.allowed) throw new Error("Connection not found");
     const row = await ownedGrant(ctx, decision.owner, args.grantId);
     const now = Date.now();
+    const history = await grantsForClient(ctx, decision.owner, row.clientId, row.issuer);
     // Settings projects elapsed active rows as expired without rewriting them.
     // Use the same effective expiry, including explicit and legacy choices.
-    if (row.status === "active" && !isGrantExpired(row, now)) {
+    // An active row already closed by a later refusal is shown as turned off.
+    if (row.status === "active" && !isGrantExpired(row, now) && !refusedByHistory(history, row)) {
       throw new Error("Revoke the connection before removing it");
     }
-    // Removing a closed/expired request is also a durable refusal to reconnect.
-    // Pending and expired rows must not become eligible for automatic sign-in.
+    // Removing the governing (expired) approval, or a request while nothing is
+    // approved, is a durable refusal at removal time: older active duplicates
+    // must not resurface and pending/expired rows never become eligible for
+    // automatic sign-in. Tidying any other row while a different approval
+    // governs only hides it, so housekeeping never turns that approval off.
+    const governing = [...liveApprovals(history)].sort(newestApprovalFirst)[0];
+    const hideOnly = governing !== undefined && governing._id !== row._id;
     await ctx.db.patch(row._id, {
       hiddenAt: now,
-      ...(row.status === "revoked" || row.status === "denied" ? {} : {
+      ...(row.status === "revoked" || row.status === "denied" || hideOnly ? {} : {
         status: "revoked" as const, revokedAt: now, updatedAt: now,
       }),
     });

@@ -20,6 +20,26 @@ access. The owner reviews a new duration (including no end date) and presses
 consent receipt, preserving the old revocation row as hidden history. Another
 active grant for that owner/issuer/client prevents duplicate reapproval.
 
+## History order: the latest event wins
+
+Each owner/issuer/client pair is resolved as one ordered history, never by
+picking the newest active row. An approval's time is its consent (or issue)
+time; usage bookkeeping (`updatedAt`, `lastUsedAt`) never reorders it. A
+refusal (revoked or denied) takes effect at its revocation time, or at its own
+approval time if that is later. A refusal closes every approval at or before
+it, including rows an earlier one-row revoke left marked active; ties go to
+the refusal. Only an approval strictly after the latest refusal can govern,
+and an explicit reapproval is stamped at least one millisecond after it.
+
+The same rule is applied to per-request resolution, the data-layer
+`assertGrantPermits` check by grant ID, and Settings: an approval closed by
+history is shown as revoked/denied, cannot be edited or turned off, and offers
+“Review and approve again”. Turning a connection off revokes every remaining
+active or usable duplicate. Removing the governing expired approval records a
+revocation, so an older active duplicate cannot resurface; removing any other
+row while a different approval governs only hides it, so tidying the list
+never turns off the newer approval. A denial is a refusal event too.
+
 The shared `effectiveScopes`/expiry helpers remain authoritative. Full grants
 include current and future ordinary tools; chosen grants never acquire future
 permissions automatically. The seven-scope frozen legacy inference baseline
@@ -40,7 +60,11 @@ reviewed reliable evidence and explicit scope.
 
 `convex/mcpGrantDefaults.test.ts` runs real handlers in an isolated in-memory
 Convex test backend: sign-in, narrowing, chosen date, revoke, remove, refusal,
-owner isolation, explicit reapproval and refusal after revoking again. Hidden
+owner isolation, explicit reapproval and refusal after revoking again.
+`convex/mcpGrantHistory.test.ts` covers history order: revoke after grant
+(persisted partial revocations, ties, usage touches, denial), expired-grant
+removal and hide-only tidying, and re-grant after revoke (same-millisecond
+reapproval, old IDs stay refused, revoke and reapprove again). Hidden
 rows are filtered before the visible 100-row limit. The settings render contract
 checks the reapproval controls and saved selections; it is not browser proof.
 
