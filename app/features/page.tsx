@@ -97,9 +97,9 @@ export default function FeaturesPage() {
                 </p>
               </div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-4">
+            <div className="grid grid-cols-4 gap-2 sm:gap-3">
               {["Intake", "Vault", "Research", "Stories"].map((step) => (
-                <div key={step} className="border border-[#e6dcc8] px-4 py-4 text-center text-sm font-medium text-[#2d2b26]">
+                <div key={step} className="border border-[#e6dcc8] px-1 py-3 text-center text-sm font-medium text-[#2d2b26] sm:px-4 sm:py-4">
                   {step}
                 </div>
               ))}
