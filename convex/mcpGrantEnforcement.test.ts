@@ -11,7 +11,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from "vit
 import { convexTest } from "convex-test";
 import { exportJWK, generateKeyPair, SignJWT, type KeyLike } from "jose";
 import schema from "./schema";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import {
   FAMILY_HISTORY_ALL_TOOL_NAMES,
   FAMILY_HISTORY_SCOPES,
@@ -278,6 +278,36 @@ describe("grant states: sign-in approves, the person's no stands", () => {
     expect(after.isError).toBe(true);
     expect(after.body.code).toBe("GRANT_REVOKED");
     expect(await toolNames(t, OWNER_A)).toEqual([]);
+  });
+
+  test("revoking newest of multiple legacy approvals refuses the next MCP call with the same token", async () => {
+    const t = convexTest(schema, modules);
+    const olderId = await seedGrant(t, { vaultOwnerId: OWNER_A, clientId: CLIENT_ID, issuer: ISSUER });
+    const newestId = await seedGrant(t, { vaultOwnerId: OWNER_A, clientId: CLIENT_ID, issuer: ISSUER });
+    await t.run((ctx) => ctx.db.patch(olderId as never, { consentedAt: Date.now() - 1000 }));
+    const token = await tokenFor(OWNER_A);
+    const call = async () => {
+      const response = await t.fetch("/mcp", rpc("tools/call", token, { name: "family_history_get_brief", arguments: {} }));
+      const payload = await response.json();
+      expect(payload.error).toBeUndefined();
+      return payload.result;
+    };
+    expect((await call()).isError).not.toBe(true);
+    const own = t.withIdentity({ subject: OWNER_A });
+    await own.mutation(api.mcpGrants.revokeGrant, { vaultOwnerId: OWNER_A, grantId: newestId as never });
+    const refused = await call();
+    expect(refused.isError).toBe(true);
+    expect(JSON.parse(refused.content.find((block: { type: string }) => block.type === "text").text).code).toBe("GRANT_REVOKED");
+    expect(await toolNames(t, OWNER_A)).toEqual([]);
+    const approved = await own.mutation(api.mcpGrants.approveGrant, {
+      vaultOwnerId: OWNER_A, grantId: newestId as never, label: "Explicit reapproval",
+      scopes: ["family_history:context:read"], boundary: { kind: "whole_workspace" }, expiresInDays: 7,
+    });
+    expect([olderId, newestId]).not.toContain(String(approved.id));
+    expect((await call()).isError).not.toBe(true);
+    for (const id of [olderId, newestId]) {
+      expect(await t.run((ctx) => ctx.db.get(id as never))).toMatchObject({ status: "revoked" });
+    }
   });
 });
 

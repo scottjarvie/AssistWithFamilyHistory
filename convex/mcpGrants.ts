@@ -124,11 +124,28 @@ export function buildConsentSnapshot(input: {
 
 /* ---------------------------------------------------- per-request resolution */
 
-async function grantsForClient(ctx: QueryCtx | MutationCtx, owner: string, clientId: string) {
-  return await ctx.db
+// Read the entire bounded owner/client/issuer history or refuse; a truncated
+// history must never let an older approval escape revocation.
+const MAX_CLIENT_GRANTS = 256;
+
+async function grantsForClient(ctx: QueryCtx | MutationCtx, owner: string, clientId: string, issuer: string) {
+  const rows = await ctx.db
     .query("mcpGrants")
-    .withIndex("by_owner_client", (q) => q.eq("vaultOwnerId", owner).eq("clientId", clientId))
-    .collect();
+    .withIndex("by_owner_client_issuer", (q) => q.eq("vaultOwnerId", owner).eq("clientId", clientId).eq("issuer", issuer))
+    .take(MAX_CLIENT_GRANTS + 1);
+  if (rows.length > MAX_CLIENT_GRANTS) {
+    machineError("GRANT_REQUIRED", "This connection has too much approval history to safely authorize.",
+      "Stop calling Family History tools. Ask the person to review this connection in Settings and contact support.");
+  }
+  return rows;
+}
+
+// Consent order, then insertion order, then ID: resolution and revocation must
+// choose exactly the same row, including legacy approvals with tied timestamps.
+function newestApprovalFirst(a: Doc<"mcpGrants">, b: Doc<"mcpGrants">): number {
+  return (b.consentedAt ?? b.updatedAt) - (a.consentedAt ?? a.updatedAt)
+    || b._creationTime - a._creationTime
+    || (a._id < b._id ? 1 : a._id > b._id ? -1 : 0);
 }
 
 /**
@@ -152,16 +169,14 @@ export const resolveForRequest = internalMutation({
     if (!owner || !clientId || !args.issuer.trim()) return { state: "absent" };
     const now = Date.now();
 
-    const rows = (await grantsForClient(ctx, owner, clientId)).filter(
-      (row) => row.issuer === args.issuer,
-    );
+    const rows = await grantsForClient(ctx, owner, clientId, args.issuer);
 
     // One active grant governs the request. If several exist (a person
     // re-approved without revoking), the most recently consented one wins and
     // the others are left untouched — scopes are never combined.
     const active = rows
       .filter((row) => row.status === "active")
-      .sort((a, b) => (b.consentedAt ?? b.updatedAt) - (a.consentedAt ?? a.updatedAt))[0];
+      .sort(newestApprovalFirst)[0];
 
     if (active) {
       if (!isGrantExpired(active, now)) return { state: "active", grant: toResolvedGrant(active) };
@@ -529,7 +544,7 @@ export const approveGrant = mutation({
     if (!decision.allowed) throw new Error("Connection not found");
     const row = await ownedGrant(ctx, decision.owner, args.grantId);
     if (row.status === "active") throw new Error("This connection is already approved");
-    if ((await grantsForClient(ctx, decision.owner, row.clientId)).some(
+    if ((await grantsForClient(ctx, decision.owner, row.clientId, row.issuer)).some(
       (existing) => existing.issuer === row.issuer && existing.status === "active",
     )) throw new Error("This connection is already approved");
     // Anything above the ceiling is dropped here, not merely unused.
@@ -649,21 +664,26 @@ export const revokeGrant = mutation({
     if (row.status !== "active" || row.hiddenAt !== undefined || isGrantExpired(row, Date.now())) {
       throw new Error("Only an active connection can be turned off. Reload to see its current approval.");
     }
-    const governing = (await grantsForClient(ctx, decision.owner, row.clientId))
-      .filter((grant) => grant.issuer === row.issuer && grant.status === "active")
-      .sort((a, b) => (b.consentedAt ?? b.updatedAt) - (a.consentedAt ?? a.updatedAt))[0];
+    const duplicates = (await grantsForClient(ctx, decision.owner, row.clientId, row.issuer))
+      .filter((grant) => grant.status === "active"
+        || (grant.status === "expired" && (hasAutomaticLegacyExpiry(grant) || grant.expiryChoice === "none")));
+    const governing = duplicates.filter((grant) => grant.status === "active").sort(newestApprovalFirst)[0];
     if (governing?._id !== row._id) {
       throw new Error("This approval has been superseded. Reload to turn off the current connection.");
     }
     const now = Date.now();
-    // Revocation takes effect on the very next request because the transport
-    // re-resolves the grant every time; no token has to expire first.
-    await ctx.db.patch(row._id, {
-      status: "revoked",
-      revokedAt: now,
-      revokedReason: trimmed(args.reason, 300),
-      updatedAt: now,
-    });
+    // Close every legacy approval atomically, including expired rows that are
+    // effectively unlimited. Neither the next request nor an old grant ID may
+    // fall back to one of them, even after explicit reapproval creates a new ID.
+    // Preserve consent, chosen limits and hiddenAt on every historical row.
+    for (const duplicate of duplicates) {
+      await ctx.db.patch(duplicate._id, {
+        status: "revoked",
+        revokedAt: now,
+        revokedReason: trimmed(args.reason, 300),
+        updatedAt: now,
+      });
+    }
     return { id: row._id, status: "revoked" as const };
   },
 });

@@ -1967,7 +1967,8 @@ export default defineSchema({
   })
     .index("by_owner", ["vaultOwnerId"])
     .index("by_owner_status", ["vaultOwnerId", "status"])
-    .index("by_owner_client", ["vaultOwnerId", "clientId"]),
+    .index("by_owner_client", ["vaultOwnerId", "clientId"])
+    .index("by_owner_client_issuer", ["vaultOwnerId", "clientId", "issuer"]),
 
   /**
    * VALIDATED MCP CLIENT REGISTRATIONS
