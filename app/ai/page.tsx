@@ -95,7 +95,7 @@ export default function AiSetupPage() {
             <div className="absolute left-10 top-36 h-52 w-52 rounded-full border border-[#d8b16d]/20" />
             <div className="absolute right-[-5rem] top-[-3rem] h-[30rem] w-[30rem] rounded-full bg-[#245a43] blur-3xl" />
           </div>
-          <div className="mx-auto grid max-w-7xl gap-14 px-5 py-20 sm:px-8 lg:grid-cols-[1.15fr_0.85fr] lg:px-10 lg:py-28">
+          <div className="mx-auto grid max-w-7xl gap-14 px-5 py-20 sm:px-8 lg:grid-cols-[1.15fr_0.85fr] lg:px-10 lg:py-28 [&>*]:min-w-0">
             <div className="animate-rise-in">
               <p className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.24em] text-[#d8b16d]">
                 <Sparkles className="h-4 w-4" aria-hidden="true" /> Chosen-AI connection
@@ -119,7 +119,7 @@ export default function AiSetupPage() {
             <aside className="relative self-end rounded-[2rem] border border-[#d8b16d]/35 bg-[#fffaf2] p-6 text-[#24312c] shadow-[0_30px_90px_-50px_#000] sm:p-8" aria-label="MCP endpoint">
               <div className="absolute -left-7 top-12 hidden h-px w-14 bg-[#d8b16d] lg:block" aria-hidden="true" />
               <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#98702b]">Canonical connection address</p>
-              <code className="mt-4 block overflow-x-auto border-y border-[#d8cfbd] py-5 font-mono text-sm font-semibold text-[#245a43]">
+              <code className="mt-4 block break-all border-y border-[#d8cfbd] py-5 font-mono text-xs font-semibold sm:text-sm text-[#245a43]">
                 https://assistwithfamilyhistory.com/mcp
               </code>
               <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
