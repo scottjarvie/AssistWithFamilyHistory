@@ -69,7 +69,7 @@ export default function RoadmapPage() {
 
         <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
           <div className="space-y-5">
-            {roadmap.map((phase, index) => (
+            {roadmap.map((phase) => (
               <section key={phase.phase} className="grid gap-5 border border-[#d8c7a7] bg-white px-5 py-6 shadow-sm md:grid-cols-[240px_1fr]">
                 <div>
                   <phase.icon className="h-6 w-6 text-[#9f5a2d]" />
@@ -78,10 +78,9 @@ export default function RoadmapPage() {
                 </div>
                 <div className="space-y-3">
                   {phase.items.map((item) => (
-                    <div key={item} className="flex gap-3 border border-[#e6dcc8] px-4 py-3">
-                      <span className="mt-1 text-xs font-semibold text-[#9f5a2d]">{index + 1}</span>
-                      <p className="text-sm leading-6 text-[#3f392d]">{item}</p>
-                    </div>
+                    <p key={item} className="border-l-2 border-[#c58a5a] pl-4 text-sm leading-6 text-[#3f392d]">
+                      {item}
+                    </p>
                   ))}
                 </div>
               </section>
