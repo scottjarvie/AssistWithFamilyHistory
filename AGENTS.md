@@ -122,3 +122,12 @@ At a meaningful stopping point, report:
 - Residual risks or blockers.
 - Where the latest change lives: local only, pushed but not live, or live.
 - The next long route to take if continuing.
+
+## AI connection defaults
+
+New MCP grants use `scopeChoice: "full"` and `expiryChoice: "none"`. Use
+`lib/mcp/grantDefaults.ts` for effective scopes and expiry in every authorization,
+discovery and settings read. Never extend its frozen legacy scope baseline.
+Explicit and ambiguous legacy end dates remain enforced; only matching automatic
+sign-in consent receipts may have their old 90-day term ignored at read time.
+No grant cleanup is required or authorized by this implementation.
