@@ -70,7 +70,7 @@ export default function AboutPage() {
           {/* Mission */}
           <section className="mb-16">
             <h2 className="text-2xl font-bold text-stone-900 mb-4">Our Mission</h2>
-            <div className="prose prose-stone prose-lg max-w-none">
+            <div className="prose prose-stone prose-lg max-w-none space-y-4">
               <p className="text-stone-600 leading-relaxed">
                 Traditional genealogy software focuses on building trees—collecting names, 
                 dates, and connecting relationships. That&apos;s important work, but it&apos;s only 
