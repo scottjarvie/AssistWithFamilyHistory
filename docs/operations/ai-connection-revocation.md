@@ -30,11 +30,16 @@ approval time if that is later. A refusal closes every approval at or before
 it, including rows an earlier one-row revoke left marked active; ties go to
 the refusal. Only an approval strictly after the latest refusal can govern,
 and an explicit reapproval is stamped at least one millisecond after it.
+Among those, the newest approval governs whatever its status: a newer legacy
+usable-expired approval is in force, and a newer ended approval means expired
+rather than a fall back to an older approval. A grant ID is authority only if
+it is that governing approval.
 
 The same rule is applied to per-request resolution, the data-layer
 `assertGrantPermits` check by grant ID, and Settings: an approval closed by
 history is shown as revoked/denied, cannot be edited or turned off, and offers
-“Review and approve again”. Turning a connection off revokes every remaining
+“Review and approve again”; one superseded by a newer ended approval is shown as
+expired and only the governing approval can be extended. Turning a connection off revokes every remaining
 active or usable duplicate. Removing the governing expired approval records a
 revocation, so an older active duplicate cannot resurface; removing any other
 row while a different approval governs only hides it, so tidying the list

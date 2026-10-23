@@ -218,3 +218,68 @@ describe("re-grant after revoke", () => {
     await refuses(t, activeId);
   });
 });
+
+describe("newest approval governs, whatever its status", () => {
+  test("a newer legacy usable-expired approval governs over an older active one", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const olderId = await insert(t, grant({ consentedAt: now - 5000, scopes: ["family_history:context:read"], scopeChoice: "chosen" }));
+    const newerId = await insert(t, grant({ consentedAt: now - 1000, status: "expired", expiryChoice: "none" }));
+    expect(await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs)).toMatchObject({ state: "active", grant: { grantId: String(newerId) } });
+    await expect(permits(t, newerId)).resolves.not.toBeNull();
+    // A stale older ID is not authority while a newer approval governs.
+    await refuses(t, olderId, "GRANT_REQUIRED");
+    const own = t.withIdentity(identity);
+    await expect(own.mutation(api.mcpGrants.revokeGrant, { vaultOwnerId: owner, grantId: olderId })).rejects.toThrow("superseded");
+    await own.mutation(api.mcpGrants.revokeGrant, { vaultOwnerId: owner, grantId: newerId });
+    for (const id of [olderId, newerId]) expect((await t.run((ctx) => ctx.db.get(id)))!.status).toBe("revoked");
+    expect((await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs)).state).toBe("revoked");
+  });
+
+  test("a newer ended approval means expired, never a fall back to an older active approval", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const olderId = await insert(t, grant({ consentedAt: now - 5000 }));
+    const endedId = await insert(t, grant({ consentedAt: now - 3000, status: "expired", expiryChoice: "chosen", expiresAt: now - 10 }));
+    expect((await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs)).state).toBe("expired");
+    await refuses(t, olderId, "GRANT_EXPIRED");
+    await refuses(t, endedId, "GRANT_EXPIRED");
+    const listing = await t.query(internal.mcpGrants.listConnectionsInternal, { vaultOwnerId: owner });
+    expect(listing.connections.find((row) => row.id === olderId)).toMatchObject({ status: "expired" });
+
+    const own = t.withIdentity(identity);
+    // The superseded older row cannot be extended or used to dodge the end date.
+    await expect(own.mutation(api.mcpGrants.updateGrantExpiry, { vaultOwnerId: owner, grantId: olderId, expiresInDays: 7 })).rejects.toThrow("Only an approved connection");
+    // Tidying it only hides it; the result stays expired.
+    await own.mutation(api.mcpGrants.removeGrant, { vaultOwnerId: owner, grantId: olderId });
+    expect(await t.run((ctx) => ctx.db.get(olderId))).toMatchObject({ status: "active", hiddenAt: expect.any(Number) });
+    expect((await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs)).state).toBe("expired");
+    // Explicitly choosing a new date on the governing approval restores it.
+    await own.mutation(api.mcpGrants.updateGrantExpiry, { vaultOwnerId: owner, grantId: endedId, expiresInDays: 7 });
+    expect(await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs)).toMatchObject({ state: "active", grant: { grantId: String(endedId) } });
+    await refuses(t, olderId, "GRANT_REQUIRED");
+  });
+
+  test("an ended governing approval can be approved again explicitly", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const olderId = await insert(t, grant({ consentedAt: now - 5000 }));
+    const endedId = await insert(t, grant({ consentedAt: now - 3000, status: "expired", expiryChoice: "chosen", expiresAt: now - 10 }));
+    expect((await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs)).state).toBe("expired");
+    const approved = await t.withIdentity(identity).mutation(api.mcpGrants.approveGrant, {
+      vaultOwnerId: owner, grantId: endedId, label: "Renewed", scopes: [...FAMILY_HISTORY_SCOPES], boundary: { kind: "whole_workspace" },
+    });
+    expect(await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs)).toMatchObject({ state: "active", grant: { grantId: String(approved.id) } });
+    await refuses(t, olderId, "GRANT_REQUIRED");
+  });
+
+  test("with legacy active duplicates and no refusal, only the governing ID is authority", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const olderId = await insert(t, grant({ consentedAt: now - 5000, updatedAt: now, lastUsedAt: now }));
+    const newerId = await insert(t, grant({ consentedAt: now - 1000 }));
+    expect(await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs)).toMatchObject({ state: "active", grant: { grantId: String(newerId) } });
+    await expect(permits(t, newerId)).resolves.not.toBeNull();
+    await refuses(t, olderId, "GRANT_REQUIRED");
+  });
+});
