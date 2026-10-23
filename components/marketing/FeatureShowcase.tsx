@@ -80,7 +80,7 @@ export function FeatureShowcase() {
           {journeyStages.map((stage) => (
             <div
               key={stage.label}
-              className={`border-t-4 bg-[#f7f1e2] p-5 shadow-[0_26px_35px_-34px_#111] ${stage.borderClass}`}
+              className={`border-t-4 bg-[#f7f1e2] p-5 shadow-[0_1px_2px_#1d212a14] ${stage.borderClass}`}
             >
               <stage.icon className={`h-6 w-6 ${stage.headingClass}`} />
               <h3 className={`mt-4 text-3xl leading-tight ${stage.headingClass}`} data-display="true">
