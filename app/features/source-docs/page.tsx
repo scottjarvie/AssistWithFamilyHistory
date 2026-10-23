@@ -211,15 +211,18 @@ export default function SourceDocsFeaturePage() {
             <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Button
                 asChild
-                size="lg"
-                className="bg-amber-700 hover:bg-amber-800 text-lg px-8 py-6"
+                className="h-12 w-full rounded-full bg-[#234d5e] px-7 text-[#f7f3e8] hover:bg-[#1f4554] sm:w-auto"
               >
                 <Link href="/app/imports" className="flex items-center gap-2">
                   Open Imports Workspace
-                  <ArrowRight className="w-5 h-5" />
+                  <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
-              <Button asChild size="lg" variant="outline" className="text-lg px-8 py-6">
+              <Button
+                asChild
+                variant="outline"
+                className="h-12 w-full rounded-full border-[#9f5a2d66] bg-[#fffaf2aa] px-7 text-[#7a4525] hover:bg-[#fffaf2] sm:w-auto"
+              >
                 <Link href="/extension">Install Extension</Link>
               </Button>
             </div>
