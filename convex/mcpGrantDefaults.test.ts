@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { convexTest } from "convex-test";
 import schema from "./schema";
 import { assertGrantPermits } from "./mcpGrants";
@@ -74,6 +74,7 @@ describe("explicit and legacy expiry", () => {
     const automatic = autoExpiry(Date.now() - 100 * 86_400_000);
     expect(effectiveExpiry(automatic)).toBeUndefined();
     expect(effectiveExpiry({ ...automatic, requestedAt: automatic.issuedAt - 1 })).toBe(automatic.expiresAt);
+    expect(effectiveExpiry({ ...automatic, consentSnapshot: JSON.stringify({ approvedBy: "sign_in", shownAt: automatic.issuedAt + 1, expiresAt: automatic.expiresAt }) })).toBe(automatic.expiresAt);
     expect(effectiveExpiry({ ...automatic, expiryChoice: "chosen" })).toBe(automatic.expiresAt);
     expect(effectiveExpiry({ ...automatic, consentSnapshot: undefined })).toBe(automatic.expiresAt);
     expect(effectiveExpiry({ ...automatic, expiresAt: automatic.expiresAt + 1 })).toBe(automatic.expiresAt + 1);
@@ -140,6 +141,66 @@ describe("explicit and legacy expiry", () => {
 });
 
 describe("durable revocation and owner removal", () => {
+  test.each([-1, 0, 1])("projected expiry removal at end date %+i ms retains history and refusal", async (offset) => {
+    const { t, grantId } = await fixture();
+    const expiresAt = Date.now() + 60_000;
+    await t.run((ctx) => ctx.db.patch(grantId, {
+      expiryChoice: "chosen", expiresAt,
+      scopeChoice: "chosen", scopes: ["family_history:context:read"],
+      boundary: { kind: "selected_people", personIds: ["synthetic-person"] },
+      consentSnapshot: "Synthetic original consent receipt", useCount: 4,
+      lastUsedAt: expiresAt - 1000, lastToolName: "family_history_get_context",
+    }));
+    const before = (await t.run((ctx) => ctx.db.get(grantId)))!;
+    const clock = vi.spyOn(Date, "now").mockReturnValue(expiresAt + offset);
+    try {
+      const args = { vaultOwnerId: owner, grantId };
+      const own = t.withIdentity(identity);
+      expect((await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs)).state).toBe(offset < 0 ? "active" : "expired");
+      expect((await t.query(internal.mcpGrants.listConnectionsInternal, { vaultOwnerId: owner })).connections[0].status).toBe(offset < 0 ? "active" : "expired");
+      expect(await t.run((ctx) => ctx.db.get(grantId))).toEqual(before);
+      if (offset < 0) {
+        await expect(own.mutation(api.mcpGrants.removeGrant, args)).rejects.toThrow("Revoke the connection before removing it");
+        expect(await t.run((ctx) => ctx.db.get(grantId))).toEqual(before);
+        return;
+      }
+      await expect(own.mutation(api.mcpGrants.removeGrant, args)).resolves.toEqual({ id: grantId, removed: true });
+      const hidden = { ...before, status: "revoked", revokedAt: expiresAt + offset, hiddenAt: expiresAt + offset, updatedAt: expiresAt + offset };
+      expect(await t.run((ctx) => ctx.db.get(grantId))).toEqual(hidden);
+      expect((await t.query(internal.mcpGrants.listConnectionsInternal, { vaultOwnerId: owner })).connections).toEqual([]);
+      await expect(own.mutation(api.mcpGrants.updateGrantExpiry, args)).rejects.toThrow("Only an approved connection");
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const refused = await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs);
+        expect(refused.state).toBe("revoked");
+        expect(permittedTools(refused, Date.now())).toEqual([]);
+      }
+      await expect(t.run((ctx) => assertGrantPermits(ctx, { owner, grantId, toolName: "family_history_get_context", input: { kind: "person", id: "synthetic-person" } }))).rejects.toThrow();
+      const revealed = { ...hidden, hiddenAt: undefined };
+      expect(await t.run((ctx) => ctx.db.get(grantId))).toEqual(revealed);
+      expect(await t.run((ctx) => ctx.db.query("mcpGrants").collect())).toHaveLength(1);
+      // Only explicit owner reapproval creates a new grant; the old receipt,
+      // person boundary, chosen end date and usage history survive intact.
+      const approved = await own.mutation(api.mcpGrants.approveGrant, {
+        ...args, label: before.label, scopes: before.scopes,
+        boundary: before.boundary, expiresInDays: 7,
+      });
+      expect(approved.id).not.toBe(grantId);
+      expect(await t.run((ctx) => ctx.db.get(grantId))).toEqual(hidden);
+      expect(await t.run((ctx) => ctx.db.query("mcpGrants").collect())).toHaveLength(2);
+    } finally { clock.mockRestore(); }
+  });
+
+  test.each(["none", "automatic"] as const)("elapsed raw date with %s effective expiry still requires revocation", async (choice) => {
+    const { t, grantId } = await fixture();
+    await t.run((ctx) => ctx.db.patch(grantId, {
+      ...autoExpiry(Date.now() - 100 * 86_400_000),
+      ...(choice === "none" ? { expiryChoice: "none" as const } : {}),
+    }));
+    const before = await t.run((ctx) => ctx.db.get(grantId));
+    await expect(t.withIdentity(identity).mutation(api.mcpGrants.removeGrant, { vaultOwnerId: owner, grantId })).rejects.toThrow("Revoke");
+    expect(await t.run((ctx) => ctx.db.get(grantId))).toEqual(before);
+  });
+
   test("real sign-in → narrow → chosen date → revoke → remove → sign-in stays refused, isolated by owner", async () => {
     const t = convexTest(schema, modules);
     const first = await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs);

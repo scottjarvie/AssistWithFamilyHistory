@@ -674,8 +674,12 @@ export const removeGrant = mutation({
     const decision = await authorizeTenantMutation(ctx, "mcpGrants.removeGrant", args.vaultOwnerId);
     if (!decision.allowed) throw new Error("Connection not found");
     const row = await ownedGrant(ctx, decision.owner, args.grantId);
-    if (row.status === "active") throw new Error("Revoke the connection before removing it");
     const now = Date.now();
+    // Settings projects elapsed active rows as expired without rewriting them.
+    // Use the same effective expiry, including explicit and legacy choices.
+    if (row.status === "active" && !isGrantExpired(row, now)) {
+      throw new Error("Revoke the connection before removing it");
+    }
     // Removing a closed/expired request is also a durable refusal to reconnect.
     // Pending and expired rows must not become eligible for automatic sign-in.
     await ctx.db.patch(row._id, {

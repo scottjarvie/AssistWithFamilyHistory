@@ -38,6 +38,9 @@ export function effectiveScopes(grant: Pick<GrantChoices, "scopes" | "scopeChoic
  * First issuance must match creation: old renewals could overwrite earlier
  * settings consent, so renewal receipts alone are ambiguous and stay enforced.
  * updatedAt/lastUsedAt are intentionally irrelevant: activity can change them.
+ * The receipt builder sampled shownAt separately from issuedAt. A millisecond
+ * mismatch is ambiguous, so keep its term enforced rather than infer consent
+ * from nearby timestamps (including possible prior renewals).
  */
 export function hasAutomaticLegacyExpiry(grant: Omit<GrantChoices, "scopes">): boolean {
   if (grant.expiryChoice || grant.expiresAt === undefined || grant.issuedAt === undefined || !grant.consentSnapshot) return false;
