@@ -26,6 +26,9 @@
       "family_history_save_story_work",
       "family_history_save_records",
       "family_history_add_source_content",
+      "family_history_begin_tree_import",
+      "family_history_import_tree_batch",
+      "family_history_get_tree_import",
       "family_history_save_complete_result",
       "family_history_get_queue",
       "family_history_update_queue"
