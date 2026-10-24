@@ -19,7 +19,7 @@ const statusGroups = [
     ],
   },
   {
-    title: "Coming Soon",
+    title: "Coming soon",
     icon: Clock3,
     tone: "text-[#9f5a2d]",
     items: [
@@ -53,7 +53,7 @@ export default function FeaturesPage() {
   return (
     <div className="min-h-screen bg-[#f8f4ec]">
       <MarketingNav />
-      <main className="pt-24">
+      <main className="pt-[4.5rem]">
         <section className="border-b border-[#d8c7a7] bg-[#efe4cd] px-4 py-12 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-6xl">
             <Badge className="mb-5 border-[#9f5a2d33] bg-white/60 text-[#7c4425] hover:bg-white/60">
@@ -97,9 +97,9 @@ export default function FeaturesPage() {
                 </p>
               </div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-4">
+            <div className="grid grid-cols-4 gap-2 sm:gap-3">
               {["Intake", "Vault", "Research", "Stories"].map((step) => (
-                <div key={step} className="border border-[#e6dcc8] px-4 py-4 text-center text-sm font-medium text-[#2d2b26]">
+                <div key={step} className="border border-[#e6dcc8] px-1 py-3 text-center text-sm font-medium text-[#2d2b26] sm:px-4 sm:py-4">
                   {step}
                 </div>
               ))}
