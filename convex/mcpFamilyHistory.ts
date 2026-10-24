@@ -1151,21 +1151,73 @@ async function connectionsFor(ctx: QueryCtx, owner: string, kind: string, id: st
   };
 }
 
+/**
+ * What one grant may discover. Brief and search are broad reads, so they honour
+ * the grant's record boundary, not just the owner: a selected-people connection
+ * sees its own people and records attributable to them, and nothing it cannot
+ * attribute (sources, places, topics, events). Queue summaries follow the
+ * grant's Queue scopes and Queue item boundary separately.
+ */
+type DiscoveryScope = {
+  wholeWorkspace: boolean;
+  personIds: Set<string>;
+  queue: boolean;
+  queueItemIds: Set<string> | null;
+};
+
+function discoveryScope(grant: Doc<"mcpGrants">): DiscoveryScope {
+  const { boundary } = grant;
+  return {
+    wholeWorkspace: boundary.kind === "whole_workspace",
+    personIds: new Set(boundary.kind === "selected_people" ? boundary.personIds ?? [] : []),
+    queue: grant.scopes.includes("family_history:queue:read") || grant.scopes.includes("family_history:queue:work"),
+    queueItemIds: boundary.queueItemIds?.length ? new Set(boundary.queueItemIds) : null,
+  };
+}
+
+function personInScope(scope: DiscoveryScope, personId: unknown): boolean {
+  return scope.wholeWorkspace || (personId !== undefined && personId !== null && scope.personIds.has(String(personId)));
+}
+
+/** Newest-first people this grant may see: the owner index, or the selected people themselves. */
+async function discoverablePeople(ctx: QueryCtx, owner: string, scope: DiscoveryScope, take: number): Promise<Doc<"persons">[]> {
+  if (scope.wholeWorkspace) {
+    return await ctx.db.query("persons").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(take);
+  }
+  const rows = await Promise.all([...scope.personIds].map((id) => {
+    const personId = ctx.db.normalizeId("persons", id);
+    return personId ? ctx.db.get(personId) : null;
+  }));
+  return rows
+    .filter((row): row is Doc<"persons"> => Boolean(row && matchesVaultOwner(row.vaultOwnerId, owner)))
+    .sort((a, b) => b._creationTime - a._creationTime)
+    .slice(0, take);
+}
+
 export const getBrief = internalQuery({
-  args: { principal: principalValidator },
-  handler: async (ctx, { principal }) => {
+  args: { principal: principalValidator, grantId: v.optional(v.string()) },
+  handler: async (ctx, { principal, grantId }) => {
     const owner = ownerFromPrincipal(principal);
+    const grant = await assertGrantPermits(ctx, { owner, grantId, toolName: "family_history_get_brief", input: {} });
+    const scope = discoveryScope(grant!);
     const limit = FAMILY_HISTORY_MCP_LIMITS.briefRows;
     const researchScan = FAMILY_HISTORY_MCP_LIMITS.searchScanPerType;
-    const [people, stories, tasks, findings, queueGroups] = await Promise.all([
-      ctx.db.query("persons").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(limit + 1),
-      ctx.db.query("stories").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(limit + 1),
+    const recordScan = scope.wholeWorkspace ? limit + 1 : researchScan + 1;
+    const [people, allStories, allTasks, allFindings, queueGroups] = await Promise.all([
+      discoverablePeople(ctx, owner, scope, limit + 1),
+      ctx.db.query("stories").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(recordScan),
       ctx.db.query("researchTasks").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(researchScan + 1),
-      ctx.db.query("researchLog").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(limit + 1),
-      Promise.all(["needs_you", "working", "waiting_for_your_ai", "done"].map((state) =>
-        ctx.db.query("queueItems").withIndex("by_owner_state_updated", (q) => q.eq("vaultOwnerId", owner).eq("state", state as any)).order("desc").take(4),
-      )),
+      ctx.db.query("researchLog").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(recordScan),
+      scope.queue
+        ? Promise.all(["needs_you", "working", "waiting_for_your_ai", "done"].map((state) =>
+          ctx.db.query("queueItems").withIndex("by_owner_state_updated", (q) => q.eq("vaultOwnerId", owner).eq("state", state as any)).order("desc").take(4),
+        ))
+        : Promise.resolve([]),
     ]);
+    const stories = allStories.filter((story) => personInScope(scope, story.personId));
+    const tasks = allTasks.filter((task) => personInScope(scope, task.personId));
+    const findings = allFindings.filter((finding) => scope.wholeWorkspace || (finding.entityType === "person" && personInScope(scope, finding.entityId)));
+    const queueItems = queueGroups.flat().filter((item) => !scope.queueItemIds || scope.queueItemIds.has(String(item._id)));
     const personSummary = (person: Doc<"persons">) => ({
       id: person._id,
       name: [person.name.given, person.name.surname].filter(Boolean).join(" "),
@@ -1181,7 +1233,7 @@ export const getBrief = internalQuery({
       recentStories: stories.slice(0, limit).map((story) => ({ id: story._id, title: story.title, type: story.type, status: story.status, personId: story.personId, updatedAt: story.updatedAt })),
       openResearchTasks: tasks.filter((task) => task.status !== "done").slice(0, limit).map((task) => ({ id: task._id, title: task.title, type: task.type, status: task.status, priority: task.priority, personId: task.personId, updatedAt: task.updatedAt })),
       recentFindings: findings.slice(0, limit).map((finding) => ({ id: finding._id, entityType: finding.entityType, entityId: finding.entityId, status: finding.status, summary: finding.summary, updatedAt: finding.updatedAt })),
-      queue: queueGroups.flat().sort((a, b) => b.updatedAt - a.updatedAt).slice(0, limit).map((item) => ({ id: item._id, state: item.state, condition: item.condition, priority: item.priority, summary: item.summary, version: item.version, updatedAt: item.updatedAt })),
+      queue: queueItems.sort((a, b) => b.updatedAt - a.updatedAt).slice(0, limit).map((item) => ({ id: item._id, state: item.state, condition: item.condition, priority: item.priority, summary: item.summary, version: item.version, updatedAt: item.updatedAt })),
       truncated: people.length > limit || stories.length > limit || tasks.filter((task) => task.status !== "done").length > limit || tasks.length > researchScan || findings.length > limit,
       nextRecommendedTool: "search_family_history",
     };
@@ -1191,22 +1243,29 @@ export const getBrief = internalQuery({
 export const search = internalQuery({
   args: {
     principal: principalValidator,
+    grantId: v.optional(v.string()),
     query: v.string(),
     kinds: v.optional(v.array(v.string())),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const owner = ownerFromPrincipal(args.principal);
+    const grant = await assertGrantPermits(ctx, { owner, grantId: args.grantId, toolName: "family_history_search", input: {} });
+    const scope = discoveryScope(grant!);
     const needle = args.query.trim().toLowerCase();
     const limit = Math.max(1, Math.min(Math.floor(args.limit ?? 25), FAMILY_HISTORY_MCP_LIMITS.searchLimit));
     const scan = FAMILY_HISTORY_MCP_LIMITS.searchScanPerType;
     const kinds = new Set(args.kinds?.length ? args.kinds : ["person", "source", "place", "topic", "story", "research_task", "research_finding", "event"]);
+    if (!scope.wholeWorkspace) {
+      // Workspace records nothing here can attribute to an approved person.
+      for (const kind of ["source", "place", "topic", "event"]) kinds.delete(kind);
+    }
     const results: Array<Record<string, unknown>> = [];
     const add = (kind: string, rows: Array<Record<string, unknown>>) => {
       for (const row of rows) if (results.length < limit) results.push({ kind, ...row });
     };
     if (kinds.has("person")) {
-      const rows = await ctx.db.query("persons").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(scan + 1);
+      const rows = await discoverablePeople(ctx, owner, scope, scan + 1);
       add("person", rows.filter((row) => `${row.name.given} ${row.name.surname} ${(row.alternateNames ?? []).map((name) => `${name.given} ${name.surname}`).join(" ")} ${(row.tags ?? []).join(" ")}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, name: `${row.name.given} ${row.name.surname}`.trim(), living: row.living, researchStatus: row.researchStatus, updatedAt: row.updatedAt })));
     }
     if (kinds.has("source") && results.length < limit) {
@@ -1215,15 +1274,15 @@ export const search = internalQuery({
     }
     if (kinds.has("story") && results.length < limit) {
       const rows = await ctx.db.query("stories").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(scan + 1);
-      add("story", rows.filter((row) => `${row.title} ${(row.tags ?? []).join(" ")} ${row.type}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, title: row.title, type: row.type, status: row.status, personId: row.personId, updatedAt: row.updatedAt })));
+      add("story", rows.filter((row) => personInScope(scope, row.personId) && `${row.title} ${(row.tags ?? []).join(" ")} ${row.type}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, title: row.title, type: row.type, status: row.status, personId: row.personId, updatedAt: row.updatedAt })));
     }
     if (kinds.has("research_task") && results.length < limit) {
       const rows = await ctx.db.query("researchTasks").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(scan + 1);
-      add("research_task", rows.filter((row) => `${row.title} ${row.description ?? ""} ${row.notes ?? ""}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, title: row.title, status: row.status, priority: row.priority, personId: row.personId, updatedAt: row.updatedAt })));
+      add("research_task", rows.filter((row) => personInScope(scope, row.personId) && `${row.title} ${row.description ?? ""} ${row.notes ?? ""}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, title: row.title, status: row.status, priority: row.priority, personId: row.personId, updatedAt: row.updatedAt })));
     }
     if (kinds.has("research_finding") && results.length < limit) {
       const rows = await ctx.db.query("researchLog").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(scan + 1);
-      add("research_finding", rows.filter((row) => `${row.summary} ${row.details ?? ""}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, summary: row.summary, entityType: row.entityType, entityId: row.entityId, status: row.status, updatedAt: row.updatedAt })));
+      add("research_finding", rows.filter((row) => (scope.wholeWorkspace || (row.entityType === "person" && personInScope(scope, row.entityId))) && `${row.summary} ${row.details ?? ""}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, summary: row.summary, entityType: row.entityType, entityId: row.entityId, status: row.status, updatedAt: row.updatedAt })));
     }
     if (kinds.has("event") && results.length < limit) {
       const rows = await ctx.db.query("events").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(scan + 1);

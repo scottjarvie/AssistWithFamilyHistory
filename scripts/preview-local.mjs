@@ -13,6 +13,8 @@
  *     into.
  *   - Code generation is off, so `convex/_generated` stays exactly as checked in.
  *   - Clerk is forced off, so the app uses its signed-out "local" vault owner.
+ *     Tenant checks fail closed by default, so this throwaway backend (and only
+ *     it) is explicitly opted out with TRUST_BOUNDARY_MODE=shadow.
  *   - Convex URLs are forced to the local backend, overriding `.env.local`.
  *
  * Convex watches `convex/` and re-pushes functions on save; Next.js hot-reloads
@@ -22,7 +24,7 @@
  */
 
 import fs from "node:fs";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 
 const ENV_FILE = ".env.preview.local";
 const LOCAL_DEPLOYMENT = "anonymous:anonymous-assistwithfamilyhistory";
@@ -47,8 +49,26 @@ function run(command, args, env) {
   child.on("exit", (code) => process.exit(code ?? 0));
 }
 
+// The signed-out local owner has no verified identity, which enforce mode (the
+// default everywhere) denies. Opt only the anonymous local backend out.
+function optLocalBackendIntoShadow(file) {
+  if (!file.CONVEX_DEPLOYMENT?.startsWith("anonymous:")) {
+    console.error("[preview:local] refusing to relax tenant checks on a non-local deployment");
+    return;
+  }
+  const env = { ...process.env, CONVEX_AGENT_MODE: "anonymous", CONVEX_DEPLOYMENT: file.CONVEX_DEPLOYMENT };
+  delete env.CONVEX_DEPLOY_KEY;
+  const result = spawnSync("pnpm", ["exec", "convex", "env", "set", "TRUST_BOUNDARY_MODE", "shadow"], {
+    stdio: "inherit",
+    shell: isWindows,
+    env,
+  });
+  if (result.status !== 0) console.error("[preview:local] could not set TRUST_BOUNDARY_MODE=shadow; vault reads will be denied");
+}
+
 function startNext() {
   const file = readEnvFile();
+  optLocalBackendIntoShadow(file);
   const convexUrl = (file.NEXT_PUBLIC_CONVEX_URL || file.CONVEX_URL || "http://127.0.0.1:3210")
     .replace("127.0.0.1", "localhost");
   const parsed = new URL(convexUrl);
@@ -66,6 +86,7 @@ function startNext() {
     NEXT_PUBLIC_DISABLE_CLERK: "true",
     ENABLE_CLERK_DEV: "false",
     NEXT_PUBLIC_ENABLE_CLERK_DEV: "false",
+    TRUST_BOUNDARY_MODE: "shadow",
   });
 }
 
