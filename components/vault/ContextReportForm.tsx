@@ -259,7 +259,7 @@ export function ContextReportForm({
             <option value="rejected">rejected</option>
           </select>
         </div>
-        <label className="flex h-9 items-center gap-2 self-end rounded-md border border-stone-200 px-3 text-sm text-stone-700">
+        <label className="flex h-11 md:pointer-fine:h-9 items-center gap-2 self-end rounded-md border border-stone-200 px-3 text-sm text-stone-700">
           <input
             type="checkbox"
             checked={aiUseAllowed}
@@ -394,7 +394,7 @@ export function ContextReportForm({
                                     type="button"
                                     onClick={() => toggleSourceRef(entry.category, index, source)}
                                     className={
-                                      "rounded-full border px-2 py-0.5 text-[11px] " +
+                                      "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] pointer-coarse:min-h-11 " +
                                       (selected
                                         ? "border-amber-300 bg-amber-50 text-amber-800"
                                         : "border-stone-200 bg-white text-stone-500 hover:bg-stone-50")
@@ -411,7 +411,7 @@ export function ContextReportForm({
                                     key={`orphan-${orphan}`}
                                     type="button"
                                     onClick={() => toggleSourceRef(entry.category, index, orphan)}
-                                    className="rounded-full border border-stone-200 bg-stone-100 px-2 py-0.5 text-[11px] text-stone-500 line-through"
+                                    className="inline-flex items-center rounded-full border border-stone-200 bg-stone-100 px-2 py-0.5 text-[11px] text-stone-500 line-through pointer-coarse:min-h-11"
                                     title="This source was removed from the form-level list. Click to drop it from this claim."
                                   >
                                     {orphan.length > 36 ? orphan.slice(0, 33) + "…" : orphan}

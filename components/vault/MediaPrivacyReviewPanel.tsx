@@ -217,7 +217,7 @@ export function MediaPrivacyReviewPanel({
                         the file to let one see the record.
                       </p>
                     )}
-                    <label className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100">
+                    <label className="mt-3 inline-flex min-h-11 cursor-pointer items-center gap-2 md:pointer-fine:min-h-0 rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100">
                       <Upload className="h-4 w-4" />
                       {uploadingId === item._id
                         ? "Uploading…"
@@ -289,7 +289,7 @@ export function MediaPrivacyReviewPanel({
                       options={["unknown", "owned", "permitted", "public_domain", "restricted"]}
                       onChange={(value) => updateDraft(item._id, { rightsStatus: value as typeof draft.rightsStatus })}
                     />
-                    <label className="flex items-center gap-2 rounded-md border border-stone-200 px-3 py-2 text-sm text-stone-700">
+                    <label className="flex min-h-11 items-center gap-2 rounded-md border border-stone-200 px-3 py-2 text-sm text-stone-700 md:pointer-fine:min-h-0">
                       <input
                         type="checkbox"
                         checked={draft.aiUseAllowed}

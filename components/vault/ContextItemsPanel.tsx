@@ -104,7 +104,7 @@ export function ContextItemsPanel({
             <SelectField label="Role" value={evidenceRole} options={["raw_material", "researcher_conclusion", "generated_summary", "lead_or_hint", "background_context"]} onChange={setEvidenceRole} />
             <SelectField label="Privacy" value={privacyLevel} options={["private", "family_review", "publish_candidate", "public_source"]} onChange={setPrivacyLevel} />
             <SelectField label="Review" value={reviewStatus} options={["unreviewed", "reviewed", "disputed", "redacted", "rejected"]} onChange={setReviewStatus} />
-            <label className="flex items-center gap-2 rounded-md border border-stone-200 px-3 py-2 text-sm text-stone-700">
+            <label className="flex min-h-11 items-center gap-2 rounded-md border border-stone-200 px-3 py-2 text-sm text-stone-700 md:pointer-fine:min-h-0">
               <input checked={aiUseAllowed} onChange={(event) => setAiUseAllowed(event.target.checked)} type="checkbox" />
               AI use
             </label>
