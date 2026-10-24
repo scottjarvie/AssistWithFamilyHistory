@@ -1928,6 +1928,8 @@ export default defineSchema({
     clientMetadataUrl: v.optional(v.string()),
     /** Always a subset of the scope ceiling in lib/mcp/catalog.ts. */
     scopes: v.array(v.string()),
+    scopeChoice: v.optional(v.union(v.literal("full"), v.literal("chosen"))),
+    expiryChoice: v.optional(v.union(v.literal("none"), v.literal("chosen"))),
     boundary: v.object({
       kind: v.union(
         v.literal("whole_workspace"),
@@ -1951,6 +1953,8 @@ export default defineSchema({
     lastUsedAt: v.optional(v.number()),
     revokedAt: v.optional(v.number()),
     revokedReason: v.optional(v.string()),
+    /** Owner list visibility only; never removes the durable refusal or limits. */
+    hiddenAt: v.optional(v.number()),
     useCount: v.number(),
     lastToolName: v.optional(v.string()),
     /**
@@ -1963,7 +1967,8 @@ export default defineSchema({
   })
     .index("by_owner", ["vaultOwnerId"])
     .index("by_owner_status", ["vaultOwnerId", "status"])
-    .index("by_owner_client", ["vaultOwnerId", "clientId"]),
+    .index("by_owner_client", ["vaultOwnerId", "clientId"])
+    .index("by_owner_client_issuer", ["vaultOwnerId", "clientId", "issuer"]),
 
   /**
    * VALIDATED MCP CLIENT REGISTRATIONS

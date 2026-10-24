@@ -79,8 +79,8 @@ export default async function AiConnectionsPage() {
           AI Connections
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-7 text-stone-600">
-          Signing in approves an AI for ordinary research work in your workspace for 90 days. It can
-          never publish, delete, merge, share or export. Narrow any connection here, and turning one
+          Signing in gives an AI every current and future tool in your workspace with no end date by default. It can
+          never publish, delete, merge, share or export. Choose fewer permissions or an end date here. Turning one
           off stops it on its very next request.
         </p>
         <p className="mt-3 max-w-2xl text-sm leading-7 text-stone-600">

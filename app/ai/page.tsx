@@ -77,7 +77,7 @@ const ALIAS_COUNT = FAMILY_HISTORY_TOOLS.filter((tool) => tool.alias).length;
  */
 const currentInSource = [
   `${TOOL_COUNT} Family History tools share one stateless connection address, with ${ALIAS_COUNT} older names kept working as aliases.`,
-  "Signing in approves the ordinary research permissions; publishing, deleting, merging, sharing and exporting are never available to a connection. Every request re-checks the permission, so narrowing it or turning it off works at once.",
+  "Signing in approves full access to current and future tools with no end date by default. You can deliberately limit the scope or set an end date in Settings; publishing, deleting, merging, sharing and exporting are never available to a connection. Every request re-checks the permission, so narrowing it or turning it off works at once.",
   "Turning a connection off takes effect on its very next request, because the permission is re-checked every time rather than waiting for a sign-in to expire.",
   "A whole source's worth of records saves in one call, reporting each row's own outcome instead of discarding the pass.",
   "Reviewed, AI-allowed files are delivered through the connection itself; a storage link is never handed to a model.",
@@ -125,7 +125,7 @@ export default function AiSetupPage() {
               </code>
               <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-1 xl:grid-cols-2">
                 <div><p className="text-3xl font-semibold">{TOOL_COUNT}</p><p className="mt-1 text-xs leading-5 text-[#687169]">workflow tools from first brief to complete-result save</p></div>
-                <div><p className="text-3xl font-semibold">{FAMILY_HISTORY_SCOPE_INFO.length}</p><p className="mt-1 text-xs leading-5 text-[#687169]">permissions you choose from — this is the whole list</p></div>
+                <div><p className="text-3xl font-semibold">{FAMILY_HISTORY_SCOPE_INFO.length}</p><p className="mt-1 text-xs leading-5 text-[#687169]">current permission categories — full access includes future tools</p></div>
                 <div><p className="text-3xl font-semibold">0</p><p className="mt-1 text-xs leading-5 text-[#687169]">owner or workspace IDs accepted from an AI</p></div>
                 <div><p className="text-3xl font-semibold">0</p><p className="mt-1 text-xs leading-5 text-[#687169]">assistants named as working, until one proves it</p></div>
               </div>
@@ -174,7 +174,7 @@ export default function AiSetupPage() {
                 {[
                   ["Choose a compatible client", "It must support remote Streamable HTTP MCP and OAuth. Exact menu names differ by client."],
                   ["Add the MCP address", "Use https://assistwithfamilyhistory.com/mcp as the server URL."],
-                  ["Sign in", "Signing in approves the connection for ordinary research work in your workspace for 90 days. You can narrow it, or turn it off, at /app/settings/ai at any time."],
+                  ["Sign in", "Signing in gives the connection every current and future tool in your workspace with no end date by default. You can choose fewer permissions, set an end date, or turn it off at /app/settings/ai."],
                   ["Ask for the Family History brief", "Your AI should call family_history_get_brief first, then search and hydrate before changing records."],
                 ].map(([title, copy], index) => (
                   <li key={title} className="grid grid-cols-[2.5rem_1fr] gap-4">
