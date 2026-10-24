@@ -254,7 +254,7 @@ export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
     writes: true,
     title: "Save person",
     description:
-      "Replay-safely create one person or optimistically correct an existing one. For more than a couple of people, prefer family_history_save_records.",
+      "Replay-safely create one person or optimistically correct an existing one. Name, sex, living and dates can be corrected only on a person an AI created; for a person the owner entered or imported, propose the change as a candidate source fact. For more than a couple of people, prefer family_history_save_records.",
     humanSummary: "Adds or corrects one person.",
     implementedBy: "convex/mcpFamilyHistory.savePerson",
     sunsetNote: ALIAS_SUNSET,
@@ -290,7 +290,7 @@ export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
     writes: true,
     title: "Save source evidence",
     description:
-      "Save a source plus one citation, target links, and candidate/accepted/conflicting source facts in one replay-safe call. Evidence never silently overwrites a person's canonical conclusions.",
+      "Save a source plus one citation, target links, and candidate or conflicting source facts in one replay-safe call. Only the person accepts a fact, and evidence never overwrites a person's canonical conclusions.",
     humanSummary: "Records a source, a citation, and the facts it supports.",
     implementedBy: "convex/mcpFamilyHistory.saveSourceEvidence",
     sunsetNote: ALIAS_SUNSET,
