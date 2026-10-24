@@ -4,10 +4,10 @@ import { SafeLink } from "@/components/layout/SafeLink";
 
 export function Hero() {
   return (
-    <section className="relative overflow-hidden border-b border-[#b79f7a55] bg-[#f6efe1] pt-28 sm:pt-32">
+    <section className="relative overflow-hidden border-b border-[#b79f7a55] bg-[#f6efe1] pt-24 sm:pt-32">
       <div className="absolute inset-0 bg-[linear-gradient(90deg,#d7cfbf66_1px,transparent_1px),linear-gradient(#d7cfbf55_1px,transparent_1px)] bg-[size:42px_42px]" />
       <div className="absolute inset-0 bg-[linear-gradient(135deg,#f8f4ec_0%,#f3ead7_46%,#e6dac2_100%)] opacity-90" />
-      <div className="absolute left-0 right-0 top-28 h-px bg-[#9f5a2d66]" />
+      <div className="absolute left-0 right-0 top-28 hidden h-px bg-[#9f5a2d66] sm:block" />
 
       <div className="relative mx-auto grid min-h-[calc(100vh-4.5rem)] max-w-7xl content-center gap-10 px-4 pb-16 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:px-8">
         <div className="animate-rise-in">
