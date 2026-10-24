@@ -19,6 +19,7 @@ import {
   type AccessRefusal,
   type GrantResolution,
 } from "../../lib/mcp/authorize";
+import { effectiveScopes } from "../../lib/mcp/grantDefaults";
 import { EVIDENCE_SKIP_GUIDANCE } from "../mcpEvidence";
 
 const SERVER_NAME = "assist-with-family-history";
@@ -609,7 +610,7 @@ export function createFamilyHistoryServer(
   const grantId = grant?.grantId;
 
   const instructions = grant
-    ? `Call family_history_get_brief first. Search, then hydrate a stable ID before editing. For a source that touches several people at once — a census page, a family group sheet — use family_history_save_records: one call, per-item results. Use family_history_save_complete_result when the pass must be all-or-nothing. Never publish, delete, merge identities, or invent owner/workspace IDs. This connection is approved for: ${grant.scopes.join(", ")}. Tools available to it: ${permitted.map((tool) => tool.name).join(", ")}.`
+    ? `Call family_history_get_brief first. Search, then hydrate a stable ID before editing. For a source that touches several people at once — a census page, a family group sheet — use family_history_save_records: one call, per-item results. Use family_history_save_complete_result when the pass must be all-or-nothing. Never publish, delete, merge identities, or invent owner/workspace IDs. This connection is approved for: ${effectiveScopes(grant).join(", ")}. Tools available to it: ${permitted.map((tool) => tool.name).join(", ")}.`
     : `This AI connection has not been approved for Assist With Family History yet. Signing in proved who the person is; it did not decide what this connection may do. Ask the person to open ${CONNECTION_SETTINGS_URL}, choose which parts of their research this connection may use, and approve it. No Family History tools are available until they do.`;
 
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, {
@@ -988,7 +989,7 @@ export function createFamilyHistoryServer(
     ownerId: principal.subject,
     actorId: "oauth-chosen-ai",
     actorKind: "chosen_ai" as const,
-    scopes: queueScopesForGrant(grant?.scopes ?? []),
+    scopes: queueScopesForGrant(grant ? effectiveScopes(grant) : []),
     credentialId: `${principal.issuer}#${principal.clientId}`,
   };
 
