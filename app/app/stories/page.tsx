@@ -129,7 +129,7 @@ export default async function StoriesIndexPage({
           ["Review", "review"],
           ["Published", "published"],
         ].map(([label, status]) => (
-          <Button key={label} asChild variant={selectedStatus === status ? "default" : "outline"} size="sm" className="min-h-11 sm:min-h-0">
+          <Button key={label} asChild variant={selectedStatus === status ? "default" : "outline"} size="sm" className="min-h-11 sm:pointer-fine:min-h-0">
             <Link href={status ? `/app/stories?status=${status}` : "/app/stories"}>{label}</Link>
           </Button>
         ))}
@@ -143,7 +143,7 @@ export default async function StoriesIndexPage({
           ["Ready to review", "ready_to_review"],
           ["Published", "published"],
         ].map(([label, workflow]) => (
-          <Button key={workflow} asChild variant={selectedWorkflow === workflow ? "default" : "outline"} size="sm" className="min-h-11 sm:min-h-0">
+          <Button key={workflow} asChild variant={selectedWorkflow === workflow ? "default" : "outline"} size="sm" className="min-h-11 sm:pointer-fine:min-h-0">
             <Link href={`/app/stories?workflow=${workflow}`}>{label}</Link>
           </Button>
         ))}

@@ -149,7 +149,7 @@ export function ResearchChecksPanel({
                       status: event.target.value as CheckRecord["status"],
                     })
                   }
-                  className="h-11 md:h-10 rounded-md border border-stone-200 bg-white px-3 text-base md:text-sm text-stone-700"
+                  className="h-11 md:pointer-fine:h-10 rounded-md border border-stone-200 bg-white px-3 text-base md:pointer-fine:text-sm text-stone-700"
                 >
                   <option value="missing">Missing</option>
                   <option value="in_progress">In progress</option>

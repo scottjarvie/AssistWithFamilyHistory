@@ -122,7 +122,7 @@ export default async function PeoplePage({
           <select
             name="status"
             defaultValue={params.status || ""}
-            className="h-11 md:h-10 rounded-md border border-stone-200 bg-white px-3 text-base md:text-sm text-stone-700"
+            className="h-11 md:pointer-fine:h-10 rounded-md border border-stone-200 bg-white px-3 text-base md:pointer-fine:text-sm text-stone-700"
           >
             <option value="">All research states</option>
             <option value="not_started">Not started</option>
