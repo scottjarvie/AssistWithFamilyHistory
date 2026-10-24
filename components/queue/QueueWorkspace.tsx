@@ -232,7 +232,7 @@ function NewDirectiveForm({ onCreated, onClose }: { onCreated: (item: QueueItemR
               id="queue-priority"
               value={priority}
               onChange={(event) => setPriority(event.target.value as QueuePriority)}
-              className="mt-2 h-10 w-full rounded-md border border-[#cfc3af] bg-[#fffdf7] px-3 text-base md:text-sm"
+              className="mt-2 h-11 w-full rounded-md border border-[#cfc3af] bg-[#fffdf7] px-3 text-base md:h-10 md:text-sm"
             >
               <option value="normal">Normal</option>
               <option value="high">High</option>

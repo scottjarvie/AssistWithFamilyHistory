@@ -84,7 +84,7 @@ export function StoryEditorForm({
             id="story-type"
             value={type}
             onChange={(event) => setType(event.target.value)}
-            className="h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-base md:text-sm text-stone-700"
+            className="h-11 md:h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-base md:text-sm text-stone-700"
           >
             {STORY_TYPES.map((option) => (
               <option key={option} value={option}>
