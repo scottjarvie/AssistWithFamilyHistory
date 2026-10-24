@@ -21,7 +21,7 @@
  * No OAuth vocabulary appears in the copy. A person should be able to decide
  * what their AI may touch without knowing what a bearer token is.
  */
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   AlertTriangle,
@@ -44,6 +44,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   FAMILY_HISTORY_SCOPE_INFO,
+  FAMILY_HISTORY_SCOPES,
   NEVER_EXPOSED,
   NEVER_PERMITTED,
   type FamilyHistoryScope,
@@ -83,6 +84,7 @@ const BOUNDARY_CHOICES: ReadonlyArray<{
 ];
 
 const EXPIRY_CHOICES: ReadonlyArray<{ days: number; label: string }> = [
+  { days: 0, label: "No end date" },
   { days: 7, label: "1 week" },
   { days: 30, label: "1 month" },
   { days: 90, label: "3 months" },
@@ -350,16 +352,16 @@ function ApprovalForm({
     label: string;
     scopes: FamilyHistoryScope[];
     boundary: ConnectionBoundary;
-    expiresInDays: number;
+    expiresInDays?: number;
   }) => void;
-  onDeny: (reason: string) => void;
+  onDeny?: (reason: string) => void;
 }) {
   const [label, setLabel] = useState(connection.label);
-  const [scopes, setScopes] = useState<FamilyHistoryScope[]>([]);
-  const [boundaryKind, setBoundaryKind] = useState<ConnectionBoundary["kind"]>("queue_only");
-  const [personIdText, setPersonIdText] = useState("");
-  const [queueItemText, setQueueItemText] = useState("");
-  const [expiresInDays, setExpiresInDays] = useState(90);
+  const [scopes, setScopes] = useState<FamilyHistoryScope[]>(connection.status === "pending" && connection.scopes.length === 0 ? [...FAMILY_HISTORY_SCOPES] : [...connection.scopes]);
+  const [boundaryKind, setBoundaryKind] = useState<ConnectionBoundary["kind"]>(connection.boundary.kind);
+  const [personIdText, setPersonIdText] = useState((connection.boundary.personIds ?? []).join("\n"));
+  const [queueItemText, setQueueItemText] = useState((connection.boundary.queueItemIds ?? []).join("\n"));
+  const [expiresInDays, setExpiresInDays] = useState(connection.expiresAt == null ? 0 : 7);
   const [denyReason, setDenyReason] = useState("");
 
   const personIds = useMemo(() => parseIdList(personIdText), [personIdText]);
@@ -379,7 +381,7 @@ function ApprovalForm({
           1 · What may it do?
         </h4>
         <p className="mt-1 text-sm leading-6 text-stone-600">
-          Tick only what this AI genuinely needs. Nothing is ticked for you.
+          Your saved permissions and record boundary are selected below. Review each choice before approving. Selecting every permission includes tools added later.
         </p>
         <ul className="mt-3 space-y-3">
           {FAMILY_HISTORY_SCOPE_INFO.map((scope) => (
@@ -452,8 +454,8 @@ function ApprovalForm({
           3 · For how long?
         </h4>
         <p className="mt-1 text-sm leading-6 text-stone-600">
-          When this runs out the connection stops working until you approve it again. You can turn
-          it off sooner at any time.
+          Connections have no end date by default. An end date you pick is your choice and stays
+          in place until you change or remove it. You can turn the connection off at any time.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           {EXPIRY_CHOICES.map((choice) => (
@@ -527,7 +529,7 @@ function ApprovalForm({
         </span>
       </div>
 
-      <details className="rounded-lg border border-stone-200 bg-stone-50 p-4">
+      {onDeny && <details className="rounded-lg border border-stone-200 bg-stone-50 p-4">
         <summary className="cursor-pointer text-sm font-medium text-stone-700">
           I do not recognise this — decline it
         </summary>
@@ -551,7 +553,25 @@ function ApprovalForm({
             Decline
           </Button>
         </div>
-      </details>
+      </details>}
+    </div>
+  );
+}
+
+function ExpiryControls({ busy, onSave }: { busy: boolean; onSave: (days?: number) => void }) {
+  const [days, setDays] = useState(0);
+  return (
+    <div className="mt-4 space-y-2">
+      <Label>End date (optional)</Label>
+      <p className="text-sm text-stone-600">No end date by default. A date you choose stays until you change or remove it.</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <select aria-label="Connection end date" value={days} disabled={busy} onChange={(event) => setDays(Number(event.target.value))} className="min-h-11 rounded border border-stone-300 bg-white px-3 text-sm">
+          {EXPIRY_CHOICES.map((choice) => <option key={choice.days} value={choice.days}>{choice.label}</option>)}
+        </select>
+        <Button type="button" variant="outline" disabled={busy} onClick={() => onSave(days || undefined)} className="min-h-11">
+          {days ? "Set end date" : "Remove end date"}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -660,6 +680,7 @@ export function AiConnectionCenter({
   const [connections, setConnections] = useState(initialConnections);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const inFlight = useRef(new Set<string>());
 
   const pending = connections.filter((row) => row.status === "pending");
   const active = connections.filter((row) => row.status === "active");
@@ -668,6 +689,8 @@ export function AiConnectionCenter({
   );
 
   async function send(grantId: string, body: Record<string, unknown>, success: string) {
+    if (inFlight.current.has(grantId)) return;
+    inFlight.current.add(grantId);
     setBusyId(grantId);
     try {
       const response = await fetch("/api/ai-connections", {
@@ -676,13 +699,24 @@ export function AiConnectionCenter({
         body: JSON.stringify({ ...body, grantId }),
       });
       const payload = (await response.json().catch(() => ({}))) as {
+        id?: string;
+        connection?: ConnectionRow;
         error?: string;
         status?: ConnectionRow["status"];
         scopes?: FamilyHistoryScope[];
         removed?: boolean;
+        expiresAt?: number | null;
+        boundary?: ConnectionBoundary;
+        scopeChoice?: "full" | "chosen";
       };
       if (!response.ok) {
         toast.error(payload.error ?? "That connection change could not be applied.");
+        return;
+      }
+      // An approval can create a replacement grant. Never activate the old ID,
+      // including when talking to a backend predating the complete-row response.
+      if (body.action === "approve" && !payload.id) {
+        toast.error("Approval could not be refreshed. Reload to see the current connection.");
         return;
       }
       toast.success(success);
@@ -690,10 +724,18 @@ export function AiConnectionCenter({
         if (payload.removed) return current.filter((row) => row.id !== grantId);
         return current.map((row) =>
           row.id === grantId
-            ? {
+            ? payload.connection ?? {
                 ...row,
+                id: payload.id ?? row.id,
+                ...(payload.id && payload.id !== row.id ? {
+                  revokedAt: null, revokedReason: null, consentSnapshot: null,
+                  lastUsedAt: null, lastToolName: null, useCount: 0,
+                } : {}),
                 status: payload.status ?? row.status,
                 scopes: payload.scopes ?? row.scopes,
+                expiresAt: payload.expiresAt === undefined ? row.expiresAt : payload.expiresAt,
+                boundary: payload.boundary ?? row.boundary,
+                scopeChoice: payload.scopeChoice ?? row.scopeChoice,
               }
             : row,
         );
@@ -701,7 +743,8 @@ export function AiConnectionCenter({
     } catch {
       toast.error("That connection change could not be sent. Check your network and try again.");
     } finally {
-      setBusyId(null);
+      inFlight.current.delete(grantId);
+      setBusyId((current) => current === grantId ? null : current);
     }
   }
 
@@ -727,10 +770,8 @@ export function AiConnectionCenter({
           Everything an AI can ever be given here
         </h2>
         <p className="mt-2 text-sm leading-6 text-stone-600">
-          These six permissions are the whole list. There is no seventh, no hidden one, and no
-          setting that grants more — anything not named here has no way in at all. Every consent
-          screen below is built from this same list, so what you are shown and what the server
-          allows cannot drift apart.
+          Full access includes every current permission below and future tools. You can choose fewer
+          permissions or an end date. Review, privacy, and publishing safeguards still apply.
         </p>
         <ul className="mt-4 space-y-3">
           {FAMILY_HISTORY_SCOPE_INFO.map((scope) => (
@@ -786,7 +827,7 @@ export function AiConnectionCenter({
                         label: input.label,
                         scopes: input.scopes,
                         boundary: input.boundary,
-                        expiresInDays: input.expiresInDays,
+                        expiresInDays: input.expiresInDays || undefined,
                       },
                       "Approved. This connection now works inside exactly what you chose.",
                     )
@@ -846,7 +887,7 @@ export function AiConnectionCenter({
                       <dt className="text-xs font-semibold uppercase tracking-wider text-stone-500">
                         Runs out
                       </dt>
-                      <dd className="mt-1 text-stone-800">{formatDate(connection.expiresAt)}</dd>
+                      <dd className="mt-1 text-stone-800">{connection.expiresAt == null ? "No end date" : formatDate(connection.expiresAt)}</dd>
                     </div>
                     <div>
                       <dt className="text-xs font-semibold uppercase tracking-wider text-stone-500">
@@ -875,6 +916,7 @@ export function AiConnectionCenter({
                       this page can never rewrite what you agreed to.
                     </p>
                   ) : null}
+                  <ExpiryControls busy={busyId === connection.id} onSave={(expiresInDays) => send(connection.id, { action: "expiry", expiresInDays }, expiresInDays ? "End date saved as your choice." : "End date removed.")} />
                   <ActiveConnectionControls
                     connection={connection}
                     busy={busyId === connection.id}
@@ -927,6 +969,18 @@ export function AiConnectionCenter({
                     {connection.revokedReason ? ` You noted: “${connection.revokedReason}”` : ""}
                   </p>
                 </div>
+                {(connection.status === "revoked" || connection.status === "denied") && (
+                  <details className="w-full">
+                    <summary className="cursor-pointer text-sm font-medium text-emerald-800">Review and approve again</summary>
+                    <p className="mt-2 text-sm text-stone-600">This connection stays off until you approve the choices below. Choose a new end date for this new approval.</p>
+                    <ApprovalForm
+                      connection={connection}
+                      busy={busyId === connection.id}
+                      onApprove={(input) => send(connection.id, { action: "approve", ...input, expiresInDays: input.expiresInDays || undefined }, "Approved with the choices you reviewed.")}
+                    />
+                  </details>
+                )}
+                {connection.status === "expired" && <ExpiryControls busy={busyId === connection.id} onSave={(expiresInDays) => send(connection.id, { action: "expiry", expiresInDays }, "End date updated. Your scopes and record boundary are unchanged.")} />}
                 <Button
                   type="button"
                   variant="outline"
@@ -1040,7 +1094,7 @@ export function AiConnectionCenter({
         <p className="mt-3 flex gap-2 text-sm leading-6 text-stone-600">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
           If it still refuses everything, look at the status above. A connection that ran out or was
-          turned off is refused on purpose, and reconnecting will not change that — approve a fresh
+          turned off is refused on purpose. Signing in again reveals it here so you can review and approve a new
           request instead.
         </p>
       </section>

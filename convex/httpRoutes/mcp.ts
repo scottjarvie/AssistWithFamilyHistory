@@ -19,10 +19,16 @@ import {
   type AccessRefusal,
   type GrantResolution,
 } from "../../lib/mcp/authorize";
+import { effectiveScopes } from "../../lib/mcp/grantDefaults";
 import { EVIDENCE_SKIP_GUIDANCE } from "../mcpEvidence";
 
 const SERVER_NAME = "assist-with-family-history";
 const SERVER_VERSION = "0.3.0";
+// Preserve the current rich record batches while bounding pre-schema work.
+// A near-byte-limit mixed records batch can exceed 32K entries. Keep 64K
+// headroom for that supported shape while rejecting compact array bombs before
+// schema validation; the independent 256 KiB transport limit still applies.
+const MAX_MCP_TOOL_INPUT_ELEMENTS = 65_536;
 const DEFAULT_RESOURCE = "https://assistwithfamilyhistory.com/mcp";
 const LEGACY_RESOURCE_HOST = "discovertheirstories.com";
 const LEGACY_ISSUER_HOST = "clerk.discovertheirstories.com";
@@ -604,10 +610,13 @@ export function createFamilyHistoryServer(
   const grantId = grant?.grantId;
 
   const instructions = grant
-    ? `Call family_history_get_brief first. Search, then hydrate a stable ID before editing. For a source that touches several people at once — a census page, a family group sheet — use family_history_save_records: one call, per-item results. Use family_history_save_complete_result when the pass must be all-or-nothing. Never publish, delete, merge identities, or invent owner/workspace IDs. This connection is approved for: ${grant.scopes.join(", ")}. Tools available to it: ${permitted.map((tool) => tool.name).join(", ")}.`
+    ? `Call family_history_get_brief first. Search, then hydrate a stable ID before editing. For a source that touches several people at once — a census page, a family group sheet — use family_history_save_records: one call, per-item results. Use family_history_save_complete_result when the pass must be all-or-nothing. Never publish, delete, merge identities, or invent owner/workspace IDs. This connection is approved for: ${effectiveScopes(grant).join(", ")}. Tools available to it: ${permitted.map((tool) => tool.name).join(", ")}.`
     : `This AI connection has not been approved for Assist With Family History yet. Signing in proved who the person is; it did not decide what this connection may do. Ask the person to open ${CONNECTION_SETTINGS_URL}, choose which parts of their research this connection may use, and approve it. No Family History tools are available until they do.`;
 
-  const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, { instructions });
+  const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, {
+    instructions,
+    maxToolInputElements: MAX_MCP_TOOL_INPUT_ELEMENTS,
+  });
 
   /** Register the canonical name and its compatibility alias on ONE handler. */
   const registerTool = (
@@ -980,7 +989,7 @@ export function createFamilyHistoryServer(
     ownerId: principal.subject,
     actorId: "oauth-chosen-ai",
     actorKind: "chosen_ai" as const,
-    scopes: queueScopesForGrant(grant?.scopes ?? []),
+    scopes: queueScopesForGrant(grant ? effectiveScopes(grant) : []),
     credentialId: `${principal.issuer}#${principal.clientId}`,
   };
 
@@ -1183,7 +1192,7 @@ async function handleMcp(actionCtx: ActionCtx, request: Request) {
   };
   const handler = createMcpHandler(
     () => createFamilyHistoryServer(actionCtx, principal, resolution),
-    { legacy: "stateless", responseMode: "json", onerror: () => console.error("[MCP] Family History protocol error") },
+    { legacy: "stateless", responseMode: "json", maxRequestBodySize: FAMILY_HISTORY_MCP_LIMITS.requestBytes, onerror: () => console.error("[MCP] Family History protocol error") },
   );
   return await handler.fetch(request, { authInfo: auth });
 }

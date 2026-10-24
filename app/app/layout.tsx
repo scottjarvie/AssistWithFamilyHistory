@@ -24,6 +24,9 @@ import { isClerkEnabled } from "@/lib/clerk/config";
 import { createPageMetadata } from "@/lib/seo";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
+// Every /app route depends on the signed-in vault owner, so never prerender it.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = createPageMetadata({
   title: "Workspace",
   description: "Keep people, relationships, sources, research findings, and stories connected in your private Family History workspace.",
