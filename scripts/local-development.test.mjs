@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { validate, environment } from './local-development.mjs';
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 const actualConfig=JSON.parse(readFileSync(new URL('./local-development.json',import.meta.url)));
 const config=structuredClone(actualConfig); config.live.ownerEnforcementVerified=true;
 test('actual Live profile is withheld until production owner enforcement is verified',()=>assert.throws(()=>validate('live',values('live'),actualConfig),/withheld/));
@@ -9,4 +11,6 @@ const values=(mode)=>({CONVEX_DEPLOYMENT:config[mode].deployment,NEXT_PUBLIC_CON
 test('exact own identity/backend accepted in both modes',()=>{for(const mode of ['live','sandbox']) assert.deepEqual(validate(mode,values(mode),config),values(mode));});
 test('foreign backend and issuer rejected',()=>{for(const mode of ['live','sandbox']) {assert.throws(()=>validate(mode,{...values(mode),NEXT_PUBLIC_CONVEX_URL:'https://wrong.convex.cloud'},config));assert.throws(()=>validate(mode,{...values(mode),NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:'pk_test_'+Buffer.from('other.clerk.accounts.dev$').toString('base64')},config));}});
 test('server secrets and provider fields refused',()=>{assert.throws(()=>validate('live',{...values('live'),CLERK_SECRET_KEY:'sk_live_placeholder'},config));assert.throws(()=>validate('sandbox',{...values('sandbox'),OPENROUTER_API_KEY:'placeholder'},config));});
-test('inherited credentials blanked before dotenv reload',()=>{const env=environment(new URL('..',import.meta.url).pathname,values('live'),'live',{CLERK_SECRET_KEY:'placeholder',B2_APPLICATION_KEY:'placeholder',CONVEX_DEPLOY_KEY:'placeholder',OPENAI_API_KEY:'placeholder'});for(const key of ['CLERK_SECRET_KEY','B2_APPLICATION_KEY','CONVEX_DEPLOY_KEY','OPENAI_API_KEY'])assert.equal(env[key],'');});
+// A throwaway root with a synthetic dotenv file, so the test neither depends on
+// nor reads a developer's real env files (and works with Windows paths).
+test('inherited credentials blanked before dotenv reload',()=>{const root=mkdtempSync(join(tmpdir(),'awf-local-env-'));try{writeFileSync(join(root,'.env.local'),'SYNTHETIC_SERVICE_PASSWORD=placeholder\nPLAIN_SETTING=kept\n');const env=environment(root,values('live'),'live',{CLERK_SECRET_KEY:'placeholder',B2_APPLICATION_KEY:'placeholder',CONVEX_DEPLOY_KEY:'placeholder',OPENAI_API_KEY:'placeholder'});for(const key of ['CLERK_SECRET_KEY','B2_APPLICATION_KEY','CONVEX_DEPLOY_KEY','OPENAI_API_KEY','SYNTHETIC_SERVICE_PASSWORD','PLAIN_SETTING'])assert.equal(env[key],'',key);}finally{rmSync(root,{recursive:true,force:true});}});
