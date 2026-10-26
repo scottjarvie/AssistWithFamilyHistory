@@ -134,7 +134,8 @@
     "overrides": {
       "eslint-plugin-react-hooks": "7.0.1",
       "@clerk/shared@3.47.5>js-cookie": "3.0.7",
-      "convex@1.39.1>ws": "8.21.0"
+      "convex@1.39.1>ws": "8.21.0",
+      "zod@>=4.0.0 <4.6.6": "4.6.6"
     }
   },
   "engines": {
