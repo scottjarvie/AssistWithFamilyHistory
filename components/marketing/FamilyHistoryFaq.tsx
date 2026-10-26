@@ -1,3 +1,4 @@
+import { ChevronDown } from "lucide-react";
 import { SafeLink } from "@/components/layout/SafeLink";
 
 const questions = [
@@ -52,12 +53,15 @@ export function FamilyHistoryFaq() {
               See how the AI connection works
             </SafeLink>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="divide-y divide-[#d7cfbf] border-y border-[#c9b791]">
             {questions.map(({ question, answer }) => (
-              <article key={question} className="border border-[#c9b791] bg-[#fffaf2] p-5 shadow-[0_20px_35px_-34px_#111]">
-                <h3 className="text-xl leading-tight text-[#24323e]" data-display="true">{question}</h3>
-                <p className="mt-3 text-sm leading-6 text-[#5d5548]">{answer}</p>
-              </article>
+              <details key={question} className="group">
+                <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 py-4 [&::-webkit-details-marker]:hidden">
+                  <h3 className="text-xl leading-tight text-[#24323e]" data-display="true">{question}</h3>
+                  <ChevronDown className="h-5 w-5 shrink-0 text-[#9f5a2d] transition-transform group-open:rotate-180" aria-hidden="true" />
+                </summary>
+                <p className="max-w-2xl pb-5 text-sm leading-6 text-[#5d5548]">{answer}</p>
+              </details>
             ))}
           </div>
         </div>

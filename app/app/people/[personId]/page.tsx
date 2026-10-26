@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { SafeLink, SafeAnchor } from "@/components/layout/SafeLink";
 import {
-  ArrowLeft,
   ArrowRight,
   BookOpen,
   CheckCircle2,
@@ -29,6 +28,7 @@ import { getVaultAccessContext } from "@/lib/vault/server";
 import { ResearchChecksPanel } from "@/components/vault/ResearchChecksPanel";
 import { MediaPrivacyReviewPanel } from "@/components/vault/MediaPrivacyReviewPanel";
 import { ContextItemsPanel } from "@/components/vault/ContextItemsPanel";
+import { PersonHeader } from "@/components/vault/PersonHeader";
 import { publicStoryPath } from "@/lib/stories/slug";
 
 interface PageProps {
@@ -115,71 +115,18 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
 
   return (
     <div className="p-4 sm:p-8">
-      <SafeLink
-        href="/app/people"
-        className="mb-5 inline-flex items-center gap-2 text-sm text-stone-500 hover:text-stone-900"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back to People
-      </SafeLink>
+      <PersonHeader
+        person={workspace.person}
+        stats={workspace.stats}
+        operations={workspace.operations}
+        routeId={routeId}
+      />
 
-      <section className="rounded-[2rem] border border-stone-200 bg-white px-6 py-6 shadow-sm sm:px-8">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="mb-4 flex flex-wrap gap-2">
-              <Badge variant="secondary">{workspace.person.fsId || "Research subject"}</Badge>
-              <Badge variant="outline">{workspace.person.living ? "Living" : "Deceased"}</Badge>
-              {workspace.person.creationProvenance?.evidenceStatus === "unsourced" ? (
-                <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">Starting statement · needs a source</Badge>
-              ) : null}
-            </div>
-            <h1 className="font-[family-name:var(--font-cormorant-garamond)] text-4xl font-semibold text-stone-900 sm:text-5xl">
-              {workspace.person.displayName}
-            </h1>
-            <p className="mt-3 max-w-2xl text-stone-500">
-              {workspace.person.birth?.date?.original || "Unknown birth"} {workspace.person.birth?.place?.original ? `· ${workspace.person.birth.place.original}` : ""}
-              {"  "}
-              {workspace.person.death?.date?.original ? `to ${workspace.person.death.date.original}` : ""}
-              {workspace.person.death?.place?.original ? ` · ${workspace.person.death.place.original}` : ""}
-            </p>
-            {workspace.person.creationProvenance?.method === "manual_first_start" ? (
-              <p className="mt-4 max-w-2xl border-l-2 border-amber-500 pl-4 text-sm leading-6 text-stone-600">
-                Added privately by you as part of the first family connection. It is not treated as sourced evidence until a source is linked and reviewed.
-              </p>
-            ) : null}
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Button asChild className="bg-amber-700 hover:bg-amber-800">
-                <SafeLink href={`/app/people/${routeId}/ai`}>Run AI Analysis</SafeLink>
-              </Button>
-              <Button asChild variant="outline">
-                <SafeAnchor href={`/api/people/${routeId}/context-pack?format=markdown`}>Download Context Pack</SafeAnchor>
-              </Button>
-              <Button asChild variant="outline">
-                <SafeAnchor href={`/api/people/${routeId}/context-pack`}>Structured JSON</SafeAnchor>
-              </Button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:w-[420px] lg:grid-cols-2">
-            {[
-              ["Sources", workspace.stats.sources],
-              ["Memories", workspace.stats.memories],
-              ["Places", workspace.stats.places],
-              ["Imports", workspace.stats.imports],
-            ].map(([label, value]) => (
-              <div key={label} className="rounded-2xl bg-stone-50 px-4 py-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-stone-400">{label}</p>
-                <p className="mt-2 text-2xl font-semibold text-stone-900">{value}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <Tabs defaultValue="overview" className="mt-8 space-y-6">
-        <TabsList className="h-auto flex-wrap justify-start gap-2 rounded-2xl bg-transparent p-0">
+      <Tabs defaultValue="overview" className="mt-6 space-y-6">
+        {/* One scrolling row on phones (nine tabs would otherwise wrap to three rows); wraps from sm up. */}
+        <TabsList className="-mx-4 flex h-auto w-auto justify-start gap-2 overflow-x-auto rounded-none bg-transparent px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
           {["overview", "sources", "timeline", "relationships", "places", "memories", "documents", "stories", "research"].map((tab) => (
-            <TabsTrigger key={tab} value={tab} className="rounded-full border border-stone-200 bg-white px-4 py-2 capitalize data-[state=active]:border-amber-300 data-[state=active]:bg-amber-50">
+            <TabsTrigger key={tab} value={tab} className="min-h-11 flex-none rounded-full border border-stone-200 bg-white px-4 py-2 capitalize data-[state=active]:border-amber-300 data-[state=active]:bg-amber-50 sm:min-h-9">
               {tab}
             </TabsTrigger>
           ))}
