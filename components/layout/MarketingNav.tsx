@@ -74,7 +74,7 @@ export function MarketingNav() {
         </div>
 
         {mobileMenuOpen && (
-          <div className="border-t border-[#b79f7a55] py-4 md:hidden">
+          <div className="max-h-[calc(100dvh-4.5rem)] overflow-y-auto overscroll-contain border-t border-[#b79f7a55] py-4 md:hidden">
             <div className="flex flex-col gap-1">
               {navLinks.map((link) => (
                 <SafeLink
