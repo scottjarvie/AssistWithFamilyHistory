@@ -1,12 +1,13 @@
 // Source-only local native snapshot. No runtime, state, deploy or provider changes.
 import {existsSync,mkdirSync,readFileSync,readdirSync,writeFileSync,unlinkSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
-import {resolve,dirname} from 'node:path';
+import {resolve,dirname,sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
 import ts from 'typescript';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
-const target=resolve(root,'sandbox-backend');
+// RECORD_ONLY_SANDBOX_TARGET lets the snapshot test prepare a throwaway copy.
+const target=process.env.RECORD_ONLY_SANDBOX_TARGET?resolve(process.env.RECORD_ONLY_SANDBOX_TARGET):resolve(root,'sandbox-backend');
 if(existsSync(resolve(target,'.convex')))throw Error('Persistent state exists: preserve it and coordinate source adoption');
 if(existsSync(target))throw Error('Snapshot exists: explicitly preserve/archive before preparation');
 const whitelist=JSON.parse(readFileSync(resolve(root,'scripts/record-only-actions.json')));
@@ -14,11 +15,12 @@ const hashes=JSON.parse(readFileSync(resolve(root,'scripts/record-only-action-ha
 mkdirSync(target,{recursive:true});
 const archive=resolve(target,'.tracked-source.tar');
 execFileSync('git',['archive','--output',archive,'HEAD'],{cwd:root});
-execFileSync('tar',['-xf',archive,'-C',target]);unlinkSync(archive);
+// Relative paths: GNU tar on Windows reads a drive letter (C:) as a remote host.
+execFileSync('tar',['-xf','.tracked-source.tar'],{cwd:target});unlinkSync(archive);
 function runtimeFiles(directory) {return readdirSync(directory,{withFileTypes:true}).flatMap(entry=>entry.isDirectory()?runtimeFiles(resolve(directory,entry.name)):[resolve(directory,entry.name)]);}
 const rewritten=[];
 for(const file of runtimeFiles(resolve(target,'convex'))){
- const relative=file.slice(resolve(target,'convex').length+1);
+ const relative=file.slice(resolve(target,'convex').length+1).split(sep).join('/');
  if(relative.startsWith('_generated/')||relative.startsWith('tests/')||relative.includes('.test.')||!/\.[jt]s$/.test(file))continue;
  const source=readFileSync(file,'utf8');
  if(/\b(?:actionGeneric|internalActionGeneric|httpActionGeneric)\b/.test(source))throw Error('Unreviewed direct builder '+relative);
@@ -26,7 +28,8 @@ for(const file of runtimeFiles(resolve(target,'convex'))){
  if(next!==source){writeFileSync(file,next);rewritten.push(relative);}
 }
 for(const [file,names] of Object.entries(whitelist)){
- const original=readFileSync(resolve(root,'convex',file),'utf8');
+ // Hash the committed (LF) text even in a CRLF Windows checkout.
+ const original=readFileSync(resolve(root,'convex',file),'utf8').replace(/\r\n/g,'\n');
  const source=ts.createSourceFile(file,original,ts.ScriptTarget.Latest,true);
  const replacements=[];const found=new Set();
  for(const statement of source.statements){
