@@ -73,7 +73,7 @@ export function StoryReviewAssignmentForm({
         value={reviewer}
         onChange={(event) => setReviewer(event.target.value)}
         placeholder="Assign reviewer"
-        className="h-10 w-full border border-stone-300 bg-white px-3 text-sm text-stone-900 outline-none focus:border-amber-600"
+        className="h-11 w-full border border-stone-300 bg-white px-3 text-base text-stone-900 outline-none focus:border-amber-600 md:pointer-fine:h-9 md:pointer-fine:text-sm"
       />
       <textarea
         value={note}
@@ -105,7 +105,7 @@ export function StoryReviewAssignmentForm({
             value={secondReviewerName}
             onChange={(event) => setSecondReviewerName(event.target.value)}
             placeholder="Assign second reviewer"
-            className="h-10 w-full border border-stone-300 bg-white px-3 text-sm text-stone-900 outline-none focus:border-amber-600"
+            className="h-11 w-full border border-stone-300 bg-white px-3 text-base text-stone-900 outline-none focus:border-amber-600 md:pointer-fine:h-9 md:pointer-fine:text-sm"
           />
           <label className="flex min-h-11 items-center gap-2 text-sm text-stone-700 md:pointer-fine:min-h-0">
             <input

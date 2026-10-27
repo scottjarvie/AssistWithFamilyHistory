@@ -5,6 +5,7 @@ import {
   BookOpen,
   CheckCircle2,
   CircleAlert,
+  CircleMinus,
   Files,
   Globe2,
   ImageIcon,
@@ -114,7 +115,7 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
   const media = workspace.media ?? [];
 
   return (
-    <div className="p-4 sm:p-8">
+    <div className="min-w-0 [overflow-wrap:anywhere] p-4 sm:p-8">
       <PersonHeader
         person={workspace.person}
         stats={workspace.stats}
@@ -126,7 +127,7 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
         {/* One scrolling row on phones (nine tabs would otherwise wrap to three rows); wraps from sm up. */}
         <TabsList className="-mx-4 flex h-auto w-auto justify-start gap-2 overflow-x-auto rounded-none bg-transparent px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
           {["overview", "sources", "timeline", "relationships", "places", "memories", "documents", "stories", "research"].map((tab) => (
-            <TabsTrigger key={tab} value={tab} className="min-h-11 flex-none rounded-full border border-stone-200 bg-white px-4 py-2 capitalize data-[state=active]:border-amber-300 data-[state=active]:bg-amber-50 sm:min-h-9">
+            <TabsTrigger key={tab} value={tab} className="min-h-11 flex-none rounded-full border border-stone-200 bg-white px-4 py-2 capitalize data-[state=active]:border-amber-300 data-[state=active]:bg-amber-50 sm:pointer-fine:min-h-9">
               {tab}
             </TabsTrigger>
           ))}
@@ -142,7 +143,7 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
             <CardContent>
               {workspace.operations.nextActions.length === 0 ? (
                 <p className="text-sm leading-6 text-stone-600">
-                  <span className="font-medium text-emerald-800">No priority gaps right now.</span> This person is in good operational shape. Move into Story Writer, place context, or longer narrative work.
+                  <span className="font-medium text-stone-900">No missing or review-needed checks are queued.</span> Work in progress can still remain. Review the research checks below before choosing the next step.
                 </p>
               ) : (
                 <ol className="space-y-2">
@@ -163,12 +164,12 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
                   <div>
                     <CardTitle className="text-2xl">Story Readiness</CardTitle>
                     <CardDescription>
-                      Whether this person is ready to draft or publish, check by check.
+                      Research coverage helps plan a draft. Review, privacy, and publication checks happen on the saved story.
                     </CardDescription>
                   </div>
                   <div className="text-left sm:text-right">
                     <p className="text-4xl font-semibold text-stone-900">{workspace.operations.completionPercent}%</p>
-                    <p className="text-xs uppercase tracking-[0.18em] text-stone-400">coverage</p>
+                    <p className="text-xs uppercase tracking-[0.18em] text-stone-400">research coverage</p>
                   </div>
                 </div>
               </CardHeader>
@@ -178,13 +179,16 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
                     <div key={check.key} className="border border-stone-200 bg-stone-50 px-3 py-3">
                       <div className="flex items-center gap-2">
                         {check.status === "complete" ? (
-                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                          <CheckCircle2 aria-hidden="true" className="h-4 w-4 shrink-0 text-emerald-600" />
+                        ) : check.status === "not_applicable" ? (
+                          <CircleMinus aria-hidden="true" className="h-4 w-4 shrink-0 text-stone-500" />
                         ) : (
-                          <CircleAlert className="h-4 w-4 text-amber-700" />
+                          <CircleAlert aria-hidden="true" className="h-4 w-4 shrink-0 text-amber-700" />
                         )}
                         <p className="text-sm font-medium text-stone-900">{check.label}</p>
                       </div>
-                      <p className="mt-2 text-xs leading-5 text-stone-500">{check.summary || check.status}</p>
+                      <p className="mt-2 text-xs font-medium capitalize text-stone-700">{check.status.replace(/_/g, " ")}</p>
+                      {check.summary ? <p className="mt-1 text-xs leading-5 text-stone-500">{check.summary}</p> : null}
                     </div>
                   ))}
                 </div>
@@ -214,8 +218,12 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
                   <span className="font-medium text-stone-900">{workspace.person.displayName}</span>
                   {workspace.person.birth?.date?.original ? ` was born ${workspace.person.birth.date.original}` : " has an unknown birth date"}
                   {workspace.person.birth?.place?.original ? ` in ${workspace.person.birth.place.original}` : ""}.
-                  {workspace.person.death?.date?.original ? ` Death is recorded as ${workspace.person.death.date.original}` : ""}
-                  {workspace.person.death?.place?.original ? ` in ${workspace.person.death.place.original}` : ""}.
+                  {workspace.person.death?.date?.original || workspace.person.death?.place?.original ? (
+                    <>
+                      {workspace.person.death.date?.original ? ` Death is recorded as ${workspace.person.death.date.original}` : " Death is recorded"}
+                      {workspace.person.death.place?.original ? ` in ${workspace.person.death.place.original}` : ""}.
+                    </>
+                  ) : null}
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   {[

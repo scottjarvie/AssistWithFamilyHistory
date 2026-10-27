@@ -301,10 +301,10 @@ export default async function OperationsPage({ searchParams }: { searchParams: S
               <Gauge className="h-5 w-5 text-amber-700" />
               <CardTitle>Progress Logic</CardTitle>
             </div>
-            <CardDescription>Story readiness means ready to draft or publish, not simply having any story.</CardDescription>
+            <CardDescription>Story workflow labels combine research gaps and the saved story state.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-stone-600">
-            <p>Required checks drive readiness more than optional ones, stale work is flagged separately, and saved stories add signal only after evidence coverage is strong enough to support drafting or publishing.</p>
+            <p>Missing required evidence and place context guide the next research step. Saved drafts can move into review; privacy and publication checks happen on each saved story. Stale checks are flagged separately.</p>
           </CardContent>
         </Card>
       </section>

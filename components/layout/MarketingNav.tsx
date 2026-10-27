@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { SafeLink } from "@/components/layout/SafeLink";
 import { Compass, Menu, Sparkles, X } from "lucide-react";
-import { useState } from "react";
+import { useId, useRef, useState } from "react";
 
 const navLinks = [
   { href: "/features", label: "Features" },
@@ -15,9 +15,20 @@ const navLinks = [
 
 export function MarketingNav() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobileMenuId = useId();
+  const menuToggleRef = useRef<HTMLButtonElement>(null);
 
   return (
-    <nav className="fixed inset-x-0 top-0 z-50 border-b border-[#b79f7a55] bg-[#f8f4ec]/80 backdrop-blur-xl">
+    <nav
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && mobileMenuOpen) {
+          event.preventDefault();
+          setMobileMenuOpen(false);
+          menuToggleRef.current?.focus();
+        }
+      }}
+      className="fixed inset-x-0 top-0 z-50 border-b border-[#b79f7a55] bg-[#f8f4ec]/80 backdrop-blur-xl"
+    >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-[4.5rem] items-center justify-between">
           <SafeLink
@@ -60,9 +71,12 @@ export function MarketingNav() {
           </div>
 
           <button
+            ref={menuToggleRef}
+            type="button"
             className="inline-flex h-11 w-11 items-center justify-center rounded-md text-[#2e3d46] md:hidden"
             aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
             aria-expanded={mobileMenuOpen}
+            aria-controls={mobileMenuId}
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
             {mobileMenuOpen ? (
@@ -73,30 +87,28 @@ export function MarketingNav() {
           </button>
         </div>
 
-        {mobileMenuOpen && (
-          <div className="max-h-[calc(100dvh-4.5rem)] overflow-y-auto overscroll-contain border-t border-[#b79f7a55] py-4 md:hidden">
-            <div className="flex flex-col gap-1">
-              {navLinks.map((link) => (
-                <SafeLink
-                  key={link.href}
-                  href={link.href}
-                  className="flex min-h-11 items-center px-2 text-base font-medium tracking-wide text-[#2e3d46] transition-colors hover:text-[#9f5a2d]"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  {link.label}
-                </SafeLink>
-              ))}
-              <Button
-                asChild
-                className="mt-2 h-11 rounded-full border border-[#1f45547a] bg-[#234d5e] text-[#f7f3e8] hover:bg-[#1f4554]"
+        <div id={mobileMenuId} hidden={!mobileMenuOpen} className="max-h-[calc(100dvh-4.5rem)] overflow-y-auto overscroll-contain border-t border-[#b79f7a55] py-4 md:hidden">
+          <div className="flex flex-col gap-1">
+            {navLinks.map((link) => (
+              <SafeLink
+                key={link.href}
+                href={link.href}
+                className="flex min-h-11 items-center px-2 text-base font-medium tracking-wide text-[#2e3d46] transition-colors hover:text-[#9f5a2d]"
+                onClick={() => setMobileMenuOpen(false)}
               >
-                <SafeLink href="/app" onClick={() => setMobileMenuOpen(false)}>
-                  Open workspace
-                </SafeLink>
-              </Button>
-            </div>
+                {link.label}
+              </SafeLink>
+            ))}
+            <Button
+              asChild
+              className="mt-2 h-11 rounded-full border border-[#1f45547a] bg-[#234d5e] text-[#f7f3e8] hover:bg-[#1f4554]"
+            >
+              <SafeLink href="/app" onClick={() => setMobileMenuOpen(false)}>
+                Open workspace
+              </SafeLink>
+            </Button>
           </div>
-        )}
+        </div>
       </div>
     </nav>
   );
