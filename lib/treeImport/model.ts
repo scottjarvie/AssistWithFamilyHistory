@@ -27,6 +27,8 @@ export const TREE_IMPORT_KIND_SINGULAR: Record<TreeImportKind, string> = {
 export const TREE_IMPORT_LIMITS = {
   /** Records of every kind together in one batch call. */
   recordsPerBatch: 500,
+  /** UTF-8 bytes of internal virtual preview state; larger previews must split. */
+  planStateBytes: 2 * 1024 * 1024,
   /**
    * Work units per Convex transaction. A person costs 1 + its facts, a
    * citation 1 + its targets. Kept well under Convex's per-transaction

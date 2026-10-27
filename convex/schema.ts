@@ -37,6 +37,9 @@ const externalIdValidator = v.object({
   url: v.optional(v.string()),
 });
 
+/** Server-owned last-import fingerprint; never adopts a human-modified row. */
+const importStateValidator = v.object({ version: v.literal(1), system: v.string(), hash: v.string(), linksHash: v.optional(v.string()) });
+
 /** A reference to any record in the vault, used by Connections. */
 const recordRefValidator = v.object({
   kind: v.union(
@@ -173,6 +176,7 @@ export default defineSchema({
     // and the whole-tree import that last brought them in.
     externalIds: v.optional(v.array(externalIdValidator)),
     importJobId: v.optional(v.id("treeImports")),
+    importState: v.optional(importStateValidator),
     
     // Metadata
     createdAt: v.number(),
@@ -256,6 +260,7 @@ export default defineSchema({
     importKey: v.optional(v.string()),
     externalIds: v.optional(v.array(externalIdValidator)),
     importJobId: v.optional(v.id("treeImports")),
+    importState: v.optional(importStateValidator),
 
     creationProvenance: v.optional(
       v.object({
@@ -357,6 +362,7 @@ export default defineSchema({
     importKey: v.optional(v.string()),
     externalIds: v.optional(v.array(externalIdValidator)),
     importJobId: v.optional(v.id("treeImports")),
+    importState: v.optional(importStateValidator),
     creationProvenance: v.optional(creationProvenanceValidator),
 
     // Metadata
@@ -550,6 +556,7 @@ export default defineSchema({
     imageUrl: v.optional(v.string()),
     externalIds: v.optional(v.array(externalIdValidator)),
     importJobId: v.optional(v.id("treeImports")),
+    importState: v.optional(importStateValidator),
     creationProvenance: v.optional(creationProvenanceValidator),
 
     // Notes
@@ -606,6 +613,7 @@ export default defineSchema({
     conflictsWith: v.optional(v.array(v.id("citations"))),
     externalIds: v.optional(v.array(externalIdValidator)),
     importJobId: v.optional(v.id("treeImports")),
+    importState: v.optional(importStateValidator),
     creationProvenance: v.optional(creationProvenanceValidator),
     
     // Metadata
@@ -989,6 +997,7 @@ export default defineSchema({
     importKey: v.optional(v.string()),
     externalIds: v.optional(v.array(externalIdValidator)),
     importJobId: v.optional(v.id("treeImports")),
+    importState: v.optional(importStateValidator),
     creationProvenance: v.optional(creationProvenanceValidator),
 
     // FamilySearch integration
@@ -1220,6 +1229,7 @@ export default defineSchema({
     text: v.string(),
     externalIds: v.optional(v.array(externalIdValidator)),
     importJobId: v.optional(v.id("treeImports")),
+    importState: v.optional(importStateValidator),
     creationProvenance: v.optional(creationProvenanceValidator),
     createdAt: v.number(),
     updatedAt: v.number(),

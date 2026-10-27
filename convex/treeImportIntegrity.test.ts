@@ -176,7 +176,7 @@ describe("tree import integrity boundaries", () => {
       { kind: "persons", index: 0, item: { ...person("original"), otherIds: [{ system: "gedcom", id: "@P@" }], facts: [{ key: "birth", type: "BIRT" }] } },
     ] });
     const second: any = await t.query(internal.treeImport.planTreeImportChunk, {
-      ...base, plannedKeys: first.plannedKeys, ...(first.plannedBindings ? { plannedBindings: first.plannedBindings } : {}), ...(first.plannedRecords ? { plannedRecords: first.plannedRecords } : {}), items: [
+      ...base, plannedKeys: first.plannedKeys, ...(first.plannedBindings ? { plannedBindings: first.plannedBindings } : {}), ...(first.plannedRecords ? { plannedRecords: first.plannedRecords } : {}), ...(first.plannedRows ? { plannedRows: first.plannedRows } : {}), ...(first.plannedLinks ? { plannedLinks: first.plannedLinks } : {}), items: [
         { kind: "persons", index: 1, item: { ...person("alias"), otherIds: [{ system: "gedcom", id: "@P@" }], facts: [{ key: "other", type: "RESI" }] } },
         { kind: "relationships", index: 0, item: { key: "self", type: "Couple", person1Key: "original", person2Key: "alias" } },
       ],

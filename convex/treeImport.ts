@@ -28,7 +28,7 @@ import type { Doc, Id, TableNames } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { internalAction, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { canonicalJson, FAMILY_HISTORY_MCP_LIMITS } from "../lib/mcp/contract";
+import { canonicalJson, hashMcpInput, FAMILY_HISTORY_MCP_LIMITS } from "../lib/mcp/contract";
 import {
   addCounts,
   childRelationTypeFor,
@@ -71,9 +71,9 @@ const self = (internal as any).treeImport;
 /* ------------------------------------------------------------------ writer */
 
 /**
- * Dry runs and real runs share one code path. A dry run gets a writer that
- * hands back placeholder ids and changes nothing, so "what would happen" is
- * computed by exactly the code that would make it happen.
+ * Dry runs use the same import rules with forked virtual rows and links.
+ * They save nothing, do not reserve database versions, and refuse previews
+ * whose internal state exceeds the bounded preview budget.
  */
 type Writer = {
   dryRun: boolean;
@@ -109,6 +109,32 @@ type ImportProvenance = {
   recordedAt: number;
 };
 
+type PlannedRow = { table: TableNames; doc: Record<string, any> };
+type CitationTarget = { targetType: "person" | "relationship" | "event" | "note" | "media" | "place"; targetId: string; field?: string };
+type ImportState = { version: 1; system: string; hash: string; linksHash?: string };
+
+// Fixed persisted fields, including defaults and merged IDs. Timestamps and
+// review metadata are not import-owned and never establish refresh authority.
+const IMPORT_FIELDS: Partial<Record<TableNames, readonly string[]>> = {
+  persons: ["name", "alternateNames", "sex", "living", "birth", "death", "fsId", "tags", "externalIds"],
+  relationships: ["type", "childRelationType", "person1", "person2", "facts", "familySearchId", "externalIds"],
+  events: ["type", "customType", "date", "place", "description", "externalIds"],
+  sources: ["title", "type", "repository", "url", "author", "publicationDate", "citationText", "recordDate", "recordPlace", "notes", "fsId", "externalIds"],
+  citations: ["sourceId", "page", "confidence", "extractedText", "url", "accessDate", "notes", "externalIds"],
+  media: ["type", "title", "description", "url", "mimeType", "date", "personIds", "sourceId", "familySearchUrl", "externalIds"],
+  notes: ["subject", "noteType", "title", "text", "externalIds"],
+};
+
+async function recordHash(table: TableNames, row: Record<string, any>): Promise<string> {
+  const fields = IMPORT_FIELDS[table];
+  if (!fields) fail("VALIDATION_ERROR", "This record type has no safe import projection.", "Leave this row out and report the unsupported record type.");
+  return await hashMcpInput({ version: 1, table, values: Object.fromEntries(fields.map(field => [field, clean(row[field] ?? null)])) });
+}
+
+function refreshConflict(): never {
+  fail("CONFLICT", "This record was edited or its import ownership cannot be verified.", "Keep the person's changes. Review this record in Family History and leave it out of automatic refresh until reconciled; resend the other rows.");
+}
+
 type ChunkContext = {
   ctx: QueryCtx;
   w: Writer;
@@ -123,6 +149,8 @@ type ChunkContext = {
   duplicatesSuggested: number;
   /** Planned citation -> source and fact -> person bindings, carried across dry chunks. */
   bindings: Map<string, string>;
+  rows: Map<string, PlannedRow>;
+  links: Map<string, CitationTarget[]>;
 };
 
 type RecordType = Doc<"mcpRecordKeys">["recordType"];
@@ -216,6 +244,8 @@ async function remember(c: ChunkContext, singular: string, key: string, recordId
 }
 
 async function ownedRow<T extends TableNames>(c: ChunkContext, table: T, id: string): Promise<Doc<T> | null> {
+  const planned = c.w.dryRun ? c.rows.get(id) : undefined;
+  if (planned) return planned.table === table && matchesVaultOwner(planned.doc.vaultOwnerId, c.owner) ? planned.doc as Doc<T> : null;
   if (isPlaceholder(id)) return null;
   const normalized = c.ctx.db.normalizeId(table, id);
   if (!normalized) return null;
@@ -240,6 +270,32 @@ function mergeExternalIds(existing: ExternalId[] | undefined, incoming: External
   return merged;
 }
 
+async function patchRow(c: ChunkContext, table: TableNames, id: string, patch: Record<string, any>) {
+  if (c.w.dryRun) {
+    const row = await ownedRow(c, table, id);
+    if (!row) fail("NOT_FOUND", "The planned record is unavailable.", "Run a fresh preview.");
+    c.rows.set(id, { table, doc: { ...row, ...clean(patch) } });
+  } else await c.w.patch(id, patch);
+}
+
+async function citationTargets(c: ChunkContext, id: string): Promise<CitationTarget[]> {
+  if (c.w.dryRun && c.links.has(id)) return c.links.get(id)!;
+  if (isPlaceholder(id)) return [];
+  const rows = await c.ctx.db.query("citationLinks").withIndex("by_citation", q => q.eq("citationId", id as Id<"citations">)).collect();
+  return rows.filter(row => row.vaultOwnerId === c.owner).map(row => clean({ targetType: row.targetType, targetId: row.targetId, field: row.field }));
+}
+
+async function linksHash(c: ChunkContext, id: string) {
+  return await hashMcpInput((await citationTargets(c, id)).map(row => canonicalJson(row)).sort());
+}
+
+async function stateIntact(c: ChunkContext, table: TableNames, row: Record<string, any>): Promise<boolean> {
+  const state = row.importState as ImportState | undefined;
+  if (!importOwned(row) || state?.version !== 1 || typeof state.system !== "string" || !/^[a-z0-9_.-]{2,40}$/.test(state.system) || !/^[a-f0-9]{64}$/.test(state.hash ?? "")) return false;
+  if (state.hash !== await recordHash(table, row)) return false;
+  return table !== "citations" || (typeof state.linksHash === "string" && state.linksHash === await linksHash(c, String(row._id)));
+}
+
 type UpsertOutcome = { id: string; status: ItemResult["status"]; kept?: string[] };
 
 /**
@@ -260,45 +316,36 @@ async function upsertRow(
 ): Promise<UpsertOutcome> {
   const now = Date.now();
   if (!args.existingId) {
-    const inserted = await c.w.insert(args.table, {
-      vaultOwnerId: c.owner,
-      ...clean(args.doc),
-      ...args.createOnly,
-      importJobId: c.job._id,
-      creationProvenance: c.provenance,
-      createdAt: now,
-      updatedAt: now,
-    });
-    const id = c.w.dryRun ? `planned:${externalRecordKey(c.job.system, args.singular, args.key)}` : inserted;
+    const doc = clean({ vaultOwnerId: c.owner, ...clean(args.doc), ...args.createOnly, importJobId: c.job._id, creationProvenance: c.provenance, createdAt: now, updatedAt: now });
+    const importState: ImportState = { version: 1, system: c.job.system, hash: await recordHash(args.table, doc) };
+    const id = c.w.dryRun
+      ? `planned:${externalRecordKey(c.job.system, args.singular, args.key)}`
+      : await c.w.insert(args.table, { ...doc, importState });
+    if (c.w.dryRun) c.rows.set(id, { table: args.table, doc: { ...doc, importState, _id: id, _creationTime: Number.MAX_SAFE_INTEGER - 1_000_000 + c.rows.size } });
     await remember(c, args.singular, args.key, id);
     return { id, status: "created" };
   }
-  if (isPlaceholder(args.existingId)) {
-    if (args.linked) await remember(c, args.singular, args.key, args.existingId);
-    return { id: args.existingId, status: args.linked ? "linked" : "unchanged" };
-  }
   const row = await ownedRow(c, args.table, args.existingId);
   if (!row) fail("NOT_FOUND", "The record this outside id pointed to is gone.", "Send the record again under a new key, or ask the person what happened to it.");
-  const patch: Record<string, unknown> = {};
-  const kept: string[] = [];
   const owned = importOwned(row as any);
-  for (const [field, value] of Object.entries(args.doc)) {
-    if (value === undefined) continue;
-    const current = (row as any)[field];
-    if (field === "externalIds") {
-      const merged = mergeExternalIds(current, value as ExternalId[]);
-      if (!same(merged, current)) patch.externalIds = merged;
-      continue;
-    }
-    if (same(current, value)) continue;
-    if (owned || isEmpty(current)) patch[field] = value;
+  const incoming = Object.fromEntries(Object.entries(args.doc).filter(([, value]) => value !== undefined));
+  if (incoming.externalIds) incoming.externalIds = mergeExternalIds((row as any).externalIds, incoming.externalIds as ExternalId[]);
+  const differences = Object.entries(incoming).filter(([field, value]) => !same((row as any)[field], value));
+  if (owned && differences.length) {
+    if (!(await stateIntact(c, args.table, row)) || ((row as any).importState.system !== c.job.system && differences.some(([field]) => field !== "externalIds"))) refreshConflict();
+  }
+  const patch: Record<string, any> = {};
+  const kept: string[] = [];
+  for (const [field, value] of differences) {
+    if (owned || field === "externalIds" || isEmpty((row as any)[field])) patch[field] = value;
     else kept.push(field);
   }
   if (args.linked) await remember(c, args.singular, args.key, String(row._id));
-  if (Object.keys(patch).length > 0) {
-    await c.w.patch(String(row._id), { ...clean(patch), ...(owned ? { importJobId: c.job._id } : {}), updatedAt: now });
+  if (Object.keys(patch).length) {
+    if (owned) patch.importState = { ...(row as any).importState, hash: await recordHash(args.table, { ...row, ...patch }) };
+    await patchRow(c, args.table, String(row._id), { ...clean(patch), ...(owned ? { importJobId: c.job._id } : {}), updatedAt: now });
   }
-  const status: ItemResult["status"] = args.linked ? "linked" : Object.keys(patch).length > 0 ? "updated" : "unchanged";
+  const status: ItemResult["status"] = args.linked ? "linked" : Object.keys(patch).length ? "updated" : "unchanged";
   return { id: String(row._id), status, ...(kept.length ? { kept } : {}) };
 }
 
@@ -461,12 +508,19 @@ async function importFact(c: ChunkContext, personId: string, personKey: string, 
 
 async function duplicateCandidates(c: ChunkContext, name: { given: string; surname: string }, birthYear: number | undefined) {
   if (birthYear === undefined || !name.surname) return [];
-  const rows = await c.ctx.db
+  const overlaid = c.w.dryRun ? [...c.rows.values()].filter(row => row.table === "persons").map(row => row.doc) : [];
+  const existingOverlays = overlaid.filter(row => !isPlaceholder(String(row._id))).length;
+  const databaseRows = await c.ctx.db
     .query("persons")
     .withIndex("by_owner_surname_birth_year", (q) =>
       q.eq("vaultOwnerId", c.owner).eq("name.surname", name.surname).gte("birth.date.year", birthYear - 2).lte("birth.date.year", birthYear + 2),
     )
-    .take(TREE_IMPORT_LIMITS.duplicateScanPerPerson);
+    .take(TREE_IMPORT_LIMITS.duplicateScanPerPerson + existingOverlays);
+  const overlayIds = new Set(overlaid.map(row => String(row._id)));
+  const rows = [...databaseRows.filter(row => !overlayIds.has(String(row._id))), ...overlaid]
+    .filter(row => row.vaultOwnerId === c.owner && row.name.surname === name.surname && row.birth?.date?.year >= birthYear - 2 && row.birth?.date?.year <= birthYear + 2)
+    .sort((a, b) => a.birth.date.year - b.birth.date.year || a._creationTime - b._creationTime || String(a._id).localeCompare(String(b._id)))
+    .slice(0, TREE_IMPORT_LIMITS.duplicateScanPerPerson);
   const found: string[] = [];
   for (const row of rows) {
     const reason = duplicateReason(
@@ -629,8 +683,8 @@ async function importMedia(c: ChunkContext, item: any): Promise<Omit<ItemResult,
       url: item.url,
       mimeType: item.mimeType,
       date: item.date,
-      personIds: personIds.filter((id) => !isPlaceholder(id)),
-      sourceId: sourceId && !isPlaceholder(sourceId) ? sourceId : undefined,
+      personIds,
+      sourceId,
       familySearchUrl: c.job.system === "familysearch" ? item.url : undefined,
       externalIds: externalIdsFor(c, key, undefined, item.url),
     },
@@ -673,13 +727,19 @@ async function importCitation(c: ChunkContext, item: any): Promise<Omit<ItemResu
       : String((await ownedRow(c, "citations", existingId))!.sourceId);
     if (previousSource !== sourceId) fail("IDEMPOTENCY_CONFLICT", "This citation key already belongs to a different source.", "Reuse the key with its original source, or send a distinct citation key for this source.");
   }
+  const currentLinks = existingId ? await citationTargets(c, existingId) : [];
+  const missing = targets.filter(target => !currentLinks.some(link => link.targetType === target.targetType && link.targetId === target.targetId));
+  if (existingId && missing.length) {
+    const row = await ownedRow(c, "citations", existingId);
+    if (!row || !(await stateIntact(c, "citations", row)) || row.importState?.system !== c.job.system) refreshConflict();
+  }
   const saved = await upsertRow(c, {
     table: "citations",
     singular: "citation",
     key,
     existingId,
     doc: {
-      sourceId: isPlaceholder(sourceId) ? undefined : sourceId,
+      sourceId,
       page: item.page,
       confidence: confidenceForQuality(item.quality),
       extractedText: cleanText(item.extractedText, "citation extractedText", FAMILY_HISTORY_MCP_LIMITS.notes),
@@ -691,19 +751,18 @@ async function importCitation(c: ChunkContext, item: any): Promise<Omit<ItemResu
     createOnly: { isEvidence: true, importKey: `import:${externalRecordKey(c.job.system, "citation", key)}` },
   });
   c.bindings.set(saved.id, sourceId);
-  if (!isPlaceholder(saved.id)) {
-    for (const target of targets) {
-      if (isPlaceholder(target.targetId)) continue;
-      const rows = await c.ctx.db
-        .query("citationLinks")
-        .withIndex("by_citation_and_target", (q) =>
-          q.eq("citationId", saved.id as Id<"citations">).eq("targetType", target.targetType).eq("targetId", target.targetId),
-        )
-        .take(1);
-      if (rows.length === 0) {
-        await c.w.insert("citationLinks", { vaultOwnerId: c.owner, citationId: saved.id, ...target, createdAt: Date.now() });
-      }
-    }
+  let links = currentLinks;
+  let added = false;
+  for (const target of targets) {
+    if (links.some(link => link.targetType === target.targetType && link.targetId === target.targetId)) continue;
+    await c.w.insert("citationLinks", { vaultOwnerId: c.owner, citationId: saved.id, ...target, createdAt: Date.now() });
+    links = [...links, target];
+    added = true;
+  }
+  if (c.w.dryRun) c.links.set(saved.id, links);
+  if (saved.status === "created" || added) {
+    const row = (await ownedRow(c, "citations", saved.id))!;
+    await patchRow(c, "citations", saved.id, { importState: { ...row.importState!, linksHash: await linksHash(c, saved.id) } });
   }
   return { key, status: saved.status, id: saved.id, ...(saved.kept ? { kept: saved.kept } : {}) };
 }
@@ -828,6 +887,8 @@ export const planTreeImportChunk = internalQuery({
     plannedKeys: v.array(v.string()),
     plannedRecords: v.optional(v.array(v.object({ key: v.string(), id: v.string() }))),
     plannedBindings: v.optional(v.array(v.object({ id: v.string(), parentId: v.string() }))),
+    plannedRows: v.optional(v.array(v.object({ id: v.string(), table: v.string(), doc: v.any() }))),
+    plannedLinks: v.optional(v.array(v.object({ id: v.string(), targets: v.any() }))),
   },
   handler: async (ctx, args) => {
     const owner = ownerFromPrincipal(args.principal);
@@ -837,22 +898,32 @@ export const planTreeImportChunk = internalQuery({
       ctx, w: dryWriter(), owner, job, provenance: importProvenance(args.principal, args.operationId),
       local: new Map((args.plannedRecords ?? []).map(row => [row.key, row.id])), planned: new Set(args.plannedKeys), plannedNow: [], duplicatesSuggested: 0,
       bindings: new Map((args.plannedBindings ?? []).map(row => [row.id, row.parentId])),
+      rows: new Map((args.plannedRows ?? []).map(row => [row.id, { table: row.table as TableNames, doc: row.doc }])),
+      links: new Map((args.plannedLinks ?? []).map(row => [row.id, row.targets as CitationTarget[]])),
     };
     const results = await runChunk(args.items as TreeImportItem[], async item => {
       // A failed plan must not publish phantom references or duplicate counters.
-      const row = { ...c, local: new Map(c.local), plannedNow: [], duplicatesSuggested: 0, bindings: new Map(c.bindings) };
+      const row = { ...c, local: new Map(c.local), plannedNow: [], duplicatesSuggested: 0, bindings: new Map(c.bindings), rows: new Map(c.rows), links: new Map(c.links) };
       const saved = await IMPORTERS[item.kind](row, item.item);
       c.local = row.local;
       c.plannedNow.push(...row.plannedNow);
       c.duplicatesSuggested += row.duplicatesSuggested;
       c.bindings = row.bindings;
+      c.rows = row.rows;
+      c.links = row.links;
       return saved;
     });
-    return {
-      results, plannedKeys: c.plannedNow, duplicatesSuggested: c.duplicatesSuggested,
+    const state = {
+      plannedKeys: [...new Set([...c.planned, ...c.plannedNow])],
       plannedBindings: [...c.bindings].map(([id, parentId]) => ({ id, parentId })),
       plannedRecords: [...c.local].map(([key, id]) => ({ key, id })),
+      plannedRows: [...c.rows].map(([id, row]) => ({ id, table: row.table, doc: row.doc })),
+      plannedLinks: [...c.links].map(([id, targets]) => ({ id, targets })),
     };
+    if (new TextEncoder().encode(JSON.stringify(state)).byteLength > TREE_IMPORT_LIMITS.planStateBytes) {
+      machineError("VALIDATION_ERROR", "This preview needs too much temporary state.", "Split this preview into smaller batches. Nothing from the preview was saved.");
+    }
+    return { results, duplicatesSuggested: c.duplicatesSuggested, ...state };
   },
 });
 
@@ -868,7 +939,7 @@ export const applyTreeImportItem = internalMutation({
     const job = await loadJob(ctx, owner, args.importJobId, true);
     const c: ChunkContext = {
       ctx, w: liveWriter(ctx), owner, job, provenance: importProvenance(args.principal, args.operationId),
-      local: new Map(), planned: new Set(), plannedNow: [], duplicatesSuggested: 0, bindings: new Map(),
+      local: new Map(), planned: new Set(), plannedNow: [], duplicatesSuggested: 0, bindings: new Map(), rows: new Map(), links: new Map(),
     };
     const item = args.item as TreeImportItem;
     try {
@@ -960,7 +1031,7 @@ export const prepareTreeImportBatch = internalQuery({
 function compactResults(results: ItemResult[]) {
   // Unchanged rows need no id to act on; leaving them as counts keeps a
   // 500-row receipt well inside its size budget.
-  return results.filter((row) => row.status !== "unchanged");
+  return results.filter((row) => row.status !== "unchanged" || row.kept?.length);
 }
 
 /** After every chunk: the batch's one activity entry, progress, and receipt. */
@@ -1121,10 +1192,12 @@ export const importTreeBatch = internalAction({
     const planned: string[] = [];
     let plannedBindings: Array<{ id: string; parentId: string }> = [];
     let plannedRecords: Array<{ key: string; id: string }> = [];
+    let plannedRows: Array<{ id: string; table: string; doc: any }> = [];
+    let plannedLinks: Array<{ id: string; targets: any }> = [];
     let duplicatesSuggested = 0;
     for (const [index, items] of chunks.entries()) {
-      const chunk: { results: ItemResult[]; plannedKeys: string[]; duplicatesSuggested: number; plannedBindings?: Array<{ id: string; parentId: string }>; plannedRecords?: Array<{ key: string; id: string }> } = dryRun
-        ? await ctx.runQuery(self.planTreeImportChunk, { ...base, operationId: args.operationId, items, plannedKeys: planned, plannedBindings, plannedRecords })
+      const chunk: { results: ItemResult[]; plannedKeys: string[]; duplicatesSuggested: number; plannedBindings?: Array<{ id: string; parentId: string }>; plannedRecords?: Array<{ key: string; id: string }>; plannedRows?: Array<{ id: string; table: string; doc: any }>; plannedLinks?: Array<{ id: string; targets: any }> } = dryRun
+        ? await ctx.runQuery(self.planTreeImportChunk, { ...base, operationId: args.operationId, items, plannedKeys: planned, plannedBindings, plannedRecords, plannedRows, plannedLinks })
         : await ctx.runMutation(self.applyTreeImportChunk, {
           ...base,
           operationId: `${args.operationId}#${index}`,
@@ -1132,9 +1205,11 @@ export const importTreeBatch = internalAction({
           items,
         });
       results.push(...chunk.results);
-      planned.push(...chunk.plannedKeys);
+      planned.splice(0, planned.length, ...chunk.plannedKeys);
       plannedBindings = chunk.plannedBindings ?? plannedBindings;
       plannedRecords = chunk.plannedRecords ?? plannedRecords;
+      plannedRows = chunk.plannedRows ?? plannedRows;
+      plannedLinks = chunk.plannedLinks ?? plannedLinks;
       duplicatesSuggested += chunk.duplicatesSuggested;
     }
 
@@ -1145,8 +1220,8 @@ export const importTreeBatch = internalAction({
         batchIndex: input.batchIndex,
         counts: addCounts(emptyCounts(), results),
         possibleDuplicates: duplicatesSuggested,
-        results: results.filter((row) => row.status !== "unchanged"),
-        note: "Nothing was saved. Statuses say what a real send of this batch would do. Rows that would fail say why; fix them before sending for real.",
+        results: results.filter((row) => row.status !== "unchanged" || row.kept?.length),
+        note: "Nothing was saved. These record-status and duplicate predictions use the current data and earlier planned rows. A preview does not reserve versions or authority; later data or connection changes can change the real result.",
       };
     }
     return await ctx.runMutation(self.recordTreeImportBatch, {

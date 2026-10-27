@@ -56,6 +56,9 @@ beside them.
   notes and the duplicate-suggestion connections: the provenance of each
   import. `creationProvenance.method = "import"` marks records an import
   created.
+- Optional server-owned `importState` on the seven imported record tables
+  (not connections): version, original system and managed-field hash;
+  citations also keep a link-state hash.
 - `events.creationProvenance` and `citations.creationProvenance` (they had none).
 - New `notes` table: a note on any record (person, relationship, one fact,
   source, citation, media) via the shared record reference. GEDCOM NOTE.
@@ -103,13 +106,25 @@ kind: `ext:familysearch:person:KWCJ-RN4`. The key lives in `mcpRecordKeys`
 
 ### The update rule
 
-- A record an import created takes the newer outside values on a later batch
-  (`updated`), or reports `unchanged`.
-- Anything else (the person typed it, or an older capture made it) is never
-  overwritten. The import fills only its blank fields and names every field it
-  left alone in `kept`. That is how "Grandma" stays "Grandma" even when
-  FamilySearch says "Erzsébet".
-- Outside ids are always merged in, never replaced.
+- A new import-created record receives a versioned SHA-256 fingerprint of the
+  fixed, persisted fields the importer manages, after defaults and merged IDs.
+  Citations also record a fingerprint of their owner-scoped target links.
+- A later same-system refresh may change these fields only while they still
+  match the last imported state. A human correction, removed citation target,
+  missing/invalid baseline or uncertain source authority returns a per-row
+  `CONFLICT`; that row's writes and aliases roll back. There is no force flag.
+- A no-op never adopts a human-modified or unverified state. Exact operation
+  replay returns its original receipt without writing the old values again.
+- Other systems may append outside-ID metadata to an intact record while
+  retaining its original system authority; they cannot replace its managed
+  fields. Import sessions share owner/system outside identities; they are not
+  separate tree security workspaces.
+- A record created manually keeps the original rule: fill blanks, retain
+  existing nonempty values and report `kept`. It never gains import ownership
+  just because an import linked it. An unchanged row with `kept` remains visible
+  in the results so the disagreement is not hidden.
+- Omitted optional fields are retained, not deleted. Review/rights/AI-use flags
+  remain owner-controlled and are never granted by an import refresh.
 
 ### Batches, chunks and resuming
 
@@ -127,8 +142,13 @@ kind: `ext:familysearch:person:KWCJ-RN4`. The key lives in `mcpRecordKeys`
   refused with the expected number. The AI's own `cursor` (where it is in its
   walk, up to 500 characters) is stored with each batch and returned by
   `begin` and `get`.
-- `dryRun: true` runs the same code with a writer that changes nothing and
-  returns what a real send would do, including in-batch references.
+- `dryRun: true` runs the same record rules against forked virtual rows,
+  patches, citation links and duplicate candidates, including across chunks.
+  Failed plans publish none of their state. Repeated keys, earlier field
+  updates and planned people therefore affect later predictions. The internal
+  plan is limited to2MiB in UTF-8; larger previews fail clearly and must split.
+  A preview saves nothing and reserves neither versions nor connection
+  authority, so later data or grant changes may change the real result.
 - Each batch writes one `treeImportBatches` row and one `agentActivity` row
   ("batch 7: 480 created, 20 updated, 0 failed, 3 possible duplicates"), so the
   connection centre shows the work.
@@ -207,7 +227,23 @@ No live deployment was touched.
 - **Live proof.** One real FamilySearch walk of a small branch by Scott's own
   AI, after deploy.
 
-## Needs Scott
+## Release hold: existing grants and new tools
+
+The three tools extend what existing eligible whole-workspace grants can do
+under the existing research-write/context-read scopes. Passing tests does not
+approve that automatic access expansion. Keep the feature local/draft until
+its separate release review accepts the scope and consent implications. See
+[whole-tree import access review](../security/whole-tree-import-access-review.md).
+PR90's separate publication question does not authorize this feature or a
+combined candidate.
+
+Notes storage is implemented; public person-context retrieval still follows
+`getPersonWorkspace`/`getPersonOriginals`, so general imported-note reading and
+its UI remain follow-up. Do not claim every imported note is publicly available
+to a connected AI. No5,000-person reproof or hosted-client acceptance is claimed
+by the new small-fixture integrity tests.
+
+## Original product/provider questions
 
 - **FamilySearch terms.** FamilySearch's terms of use limit automated access to
   its site. The person's AI reading their own tree in their own signed-in
