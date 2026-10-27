@@ -2152,6 +2152,57 @@ export const getPlaceWorkspace = internalQuery({
   },
 });
 
+/**
+ * Whether this owner's workspace is genuinely empty, so the two-person private
+ * first start may be offered. One indexed `.first()` per owner table instead
+ * of loading the whole vault: the People pages only need this yes/no.
+ */
+export async function isFirstStartEligible(ctx: QueryCtx, vaultOwnerId: string): Promise<boolean> {
+  const firstOwned = (table: string) =>
+    ctx.db
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .query(table as any)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .withIndex("by_owner" as any, (q: any) => q.eq("vaultOwnerId", vaultOwnerId))
+      .first();
+  const rows = await Promise.all(FIRST_START_EMPTY_TABLES.map(firstOwned));
+  return rows.every((row) => row === null);
+}
+
+/** Every owner table that, holding anything at all, means the workspace has begun. */
+export const FIRST_START_EMPTY_TABLES = [
+  "persons",
+  "relationships",
+  "events",
+  "personEvents",
+  "places",
+  "sources",
+  "citations",
+  "citationLinks",
+  "sourceFacts",
+  "media",
+  "contextItems",
+  "importRuns",
+  "researchTasks",
+  "researchLog",
+  "documents",
+  "stories",
+  "storyReviewEvents",
+  "historicalContext",
+  "researchChecks",
+  "provisionalRelatives",
+  "queueItems",
+] as const;
+
+export const getFirstStartEligibility = internalQuery({
+  args: {
+    vaultOwnerId: v.string(),
+  },
+  handler: async (ctx, args) => ({
+    firstStartEligible: await isFirstStartEligible(ctx, normalizeVaultOwnerId(args.vaultOwnerId)),
+  }),
+});
+
 export const getDashboardSummary = internalQuery({
   args: {
     vaultOwnerId: v.string(),
@@ -2160,32 +2211,7 @@ export const getDashboardSummary = internalQuery({
     const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
     const peopleRows = buildPeopleRows(snapshot);
     const personById = new Map(snapshot.people.map((person) => [String(person._id), person]));
-    const firstQueueItem = await ctx.db
-      .query("queueItems")
-      .withIndex("by_owner", (q) => q.eq("vaultOwnerId", normalizeVaultOwnerId(args.vaultOwnerId)))
-      .first();
-    const firstStartEligible =
-      !firstQueueItem &&
-      snapshot.people.length === 0 &&
-      snapshot.relationships.length === 0 &&
-      snapshot.events.length === 0 &&
-      snapshot.personEvents.length === 0 &&
-      snapshot.places.length === 0 &&
-      snapshot.sources.length === 0 &&
-      snapshot.citations.length === 0 &&
-      snapshot.citationLinks.length === 0 &&
-      snapshot.sourceFacts.length === 0 &&
-      snapshot.media.length === 0 &&
-      snapshot.contextItems.length === 0 &&
-      snapshot.importRuns.length === 0 &&
-      snapshot.researchTasks.length === 0 &&
-      snapshot.researchLog.length === 0 &&
-      snapshot.documents.length === 0 &&
-      snapshot.stories.length === 0 &&
-      snapshot.storyReviewEvents.length === 0 &&
-      snapshot.historicalContext.length === 0 &&
-      snapshot.researchChecks.length === 0 &&
-      snapshot.provisionalRelatives.length === 0;
+    const firstStartEligible = await isFirstStartEligible(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
 
     return {
       firstStartEligible,
