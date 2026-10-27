@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync, mkdirSync, appendFileSync, symlinkSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync, mkdirSync, appendFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -8,6 +8,18 @@ import { fileURLToPath } from "node:url";
 
 const hook = fileURLToPath(new URL("../.claude/hooks/cloud-session-setup.sh", import.meta.url));
 const quote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
+// Match run-verify.mjs: prefer Git Bash over the Windows WSL shim.
+function selectBash(platform = process.platform, exists = existsSync) {
+  const candidates = platform === "win32"
+    ? ["C:\\Program Files\\Git\\bin\\bash.exe", "C:\\Program Files\\Git\\usr\\bin\\bash.exe"]
+    : ["/bin/bash", "/usr/bin/bash"];
+  return candidates.find(exists) ?? "bash";
+}
+const bash = selectBash();
+const bashPath = (value) => value.replaceAll("\\", "/").replace(/^([A-Za-z]):\//, (_, drive) => `/${drive.toLowerCase()}/`);
+const shellEnvironment = (values) => Object.fromEntries(Object.entries(values).map(([key, value]) => [
+  key, value && ["PATH", "TMPDIR", "CLAUDE_PROJECT_DIR", "CLAUDE_ENV_FILE", "NVM_DIR", "FAKE_SELECTED_BIN", "FAKE_CALLS"].includes(key) ? bashPath(value) : value,
+]));
 
 function fixture(t, version = "22.23.4") {
   const root = mkdtempSync(path.join(tmpdir(), "family-history-cloud-hook-"));
@@ -19,11 +31,11 @@ function fixture(t, version = "22.23.4") {
   const nvm = path.join(root, "nvm");
   const temp = path.join(root, "temp");
   for (const dir of [project, bin, selected, nvm, temp]) mkdirSync(dir);
+  const executable = (file, contents) => writeFileSync(file, `#!/bin/bash\n${contents}\n`, { mode: 0o755 });
   // No system PATH: even the missing-Corepack test cannot reach a real tool.
+  // Shell wrappers need no symlink privileges; Git Bash owns these POSIX paths.
   for (const name of ["bash", "cat", "tr", "dirname", "rm", "mkdir", "chmod"]) {
-    const utility = [path.join("/bin", name), path.join("/usr/bin", name)].find(existsSync);
-    assert.ok(utility, `basic utility ${name} must exist`);
-    symlinkSync(utility, path.join(bin, name));
+    executable(path.join(bin, name), `if [ -x /bin/${name} ]; then exec /bin/${name} "$@"; else exec /usr/bin/${name} "$@"; fi`);
   }
   const callsFile = path.join(root, "calls");
   const envFile = path.join(root, "session-env");
@@ -34,16 +46,15 @@ function fixture(t, version = "22.23.4") {
   writeFileSync(path.join(project, ".nvmrc"), "22.23.4\n");
   writeFileSync(path.join(project, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
   writeFileSync(path.join(project, "package.json"), JSON.stringify({ packageManager: "pnpm@10.26.0+sha512.synthetic", dependencies: {} }));
-  const executable = (file, contents) => writeFileSync(file, `#!/bin/bash\n${contents}\n`, { mode: 0o755 });
   for (const [dir, initial] of [[bin, version], [selected, "22.23.4"]]) {
     writeFileSync(path.join(dir, "version"), initial);
     executable(path.join(dir, "node"), `
 case "$1:$2" in
-  '-p:process.versions.node') cat ${quote(path.join(dir, "version"))}; printf '\\n' ;;
-  *) exec ${quote(process.execPath)} "$@" ;;
+  '-p:process.versions.node') cat ${quote(bashPath(path.join(dir, "version")))}; printf '\\n' ;;
+  *) exec ${quote(bashPath(process.execPath))} "$@" ;;
 esac`);
   }
-  executable(path.join(bin, "corepack"), `
+  const corepackStub = `
 printf '%s\\n' "corepack $*" >> "$FAKE_CALLS"
 case "$*" in
   'pnpm --version') printf '%s\\n' "\${FAKE_PNPM_VERSION:-10.26.0}" ;;
@@ -57,8 +68,8 @@ case "$*" in
     printf 'stub dependencies\\n' > node_modules/installed-by-test
     ;;
   *) echo 'Unexpected Corepack command' >&2; exit 99 ;;
-esac`);
-  symlinkSync(path.join(bin, "corepack"), path.join(selected, "corepack"));
+esac`;
+  for (const dir of [bin, selected]) executable(path.join(dir, "corepack"), corepackStub);
   // These traps prevent an accidental fallback from escaping the stub harness.
   for (const name of ["npm", "pnpm"]) {
     executable(path.join(bin, name), `printf '%s\\n' 'unexpected ${name}' >> "$FAKE_CALLS"; exit 98`);
@@ -74,11 +85,11 @@ nvm() {
 }
 `);
   const run = (overrides = {}) => {
-    const result = spawnSync("/bin/bash", [hook], {
+    const result = spawnSync(bash, [bashPath(hook)], {
       cwd: root,
       timeout: 10_000,
       encoding: "utf8",
-      env: {
+      env: shellEnvironment({
         HOME: process.env.HOME,
         PATH: bin,
         TMPDIR: temp,
@@ -89,7 +100,7 @@ nvm() {
         FAKE_SELECTED_BIN: selected,
         FAKE_CALLS: callsFile,
         ...overrides,
-      },
+      }),
     });
     assert.ifError(result.error);
     assert.equal(result.status, 0, result.stderr);
@@ -101,6 +112,19 @@ nvm() {
   const installs = () => calls().filter((line) => line === "corepack pnpm install --frozen-lockfile --prod=false").length;
   return { root, project, bin, selected, nvm, callsFile, envFile, stamp, log, run, calls, installs };
 }
+
+test("Windows selects the repository's Git Bash candidates rather than WSL", () => {
+  const first = "C:\\Program Files\\Git\\bin\\bash.exe";
+  const second = "C:\\Program Files\\Git\\usr\\bin\\bash.exe";
+  assert.equal(selectBash("win32", (file) => file === first || file === second), first);
+  assert.equal(selectBash("win32", (file) => file === second), second);
+  assert.equal(selectBash("win32", () => false), "bash");
+});
+
+test("fixture paths use Git Bash drive spelling without losing shell characters", () => {
+  assert.equal(bashPath("C:\\Users\\Test User\\selected ' $(touch unexpected-command)"), "/c/Users/Test User/selected ' $(touch unexpected-command)");
+  assert.equal(bashPath("/tmp/selected ' bin"), "/tmp/selected ' bin");
+});
 
 test("local and desktop sessions are complete no-ops", (t) => {
   const f = fixture(t, "24.0.0");
@@ -133,12 +157,12 @@ test("same-major patch mismatch selects the exact pin and safely persists PATH",
   const f = fixture(t, "22.22.0");
   assert.match(f.run(), /installed dependencies/);
   assert.deepEqual(f.calls(), ["nvm install 22.23.4", "nvm use 22.23.4", "corepack pnpm --version", "corepack pnpm install --frozen-lockfile --prod=false"]);
-  const result = spawnSync("/bin/bash", ["-c", 'source "$1"; printf "%s\\n" "$PATH"; command -v pnpm; node -p process.versions.node; pnpm --version', "test", f.envFile], {
-    cwd: f.root, encoding: "utf8", env: { PATH: f.bin, FAKE_CALLS: f.callsFile },
+  const result = spawnSync(bash, ["-c", 'source "$1"; printf "%s\\n" "$PATH"; command -v pnpm; node -p process.versions.node; pnpm --version', "test", bashPath(f.envFile)], {
+    cwd: f.root, encoding: "utf8", env: shellEnvironment({ PATH: f.bin, FAKE_CALLS: f.callsFile }),
   });
   assert.equal(result.status, 0);
-  const localBin = path.join(f.project, "node_modules/.cloud-session-bin");
-  assert.equal(result.stdout, `${localBin}:${f.selected}:${f.bin}\n${localBin}/pnpm\n22.23.4\n10.26.0\n`);
+  const localBin = bashPath(path.join(f.project, "node_modules/.cloud-session-bin"));
+  assert.equal(result.stdout, `${localBin}:${bashPath(f.selected)}:${bashPath(f.bin)}\n${localBin}/pnpm\n22.23.4\n10.26.0\n`);
   assert.equal(existsSync(path.join(f.root, "unexpected-command")), false);
 });
 
