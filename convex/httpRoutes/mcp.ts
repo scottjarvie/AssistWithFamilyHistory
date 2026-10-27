@@ -1006,6 +1006,7 @@ export function createFamilyHistoryServer(
       if (input.action === "list") {
         return await actionCtx.runAction(queue.agentListQueueItems, {
           principal: queuePrincipal,
+          mcpGrantId: grant?.grantId,
           state: input.state,
           priority: input.priority,
           paginationOpts: { numItems: input.limit, cursor: input.cursor ?? null },

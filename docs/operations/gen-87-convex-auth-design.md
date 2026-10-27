@@ -37,8 +37,11 @@ TRUST_BOUNDARY_MODE accepts two values:
 | enforce, unset, or anything else | Throw before protected data is read or changed | No insert |
 
 Tenant checks fail closed (2026-10-21). Only the exact value shadow opts out,
-and only the throwaway `pnpm preview:local` backend sets it. Unset, empty, or
-misspelled values enforce.
+and the intended policy limits it to the throwaway `pnpm preview:local` backend.
+Unset, empty, or misspelled values enforce. This describes source behavior, not
+verified production configuration. Before release, prove the production Clerk
+Convex JWT template, issuer/audience parity, authenticated owner-bound transport,
+and anonymous guest migration posture; do not set shadow to bypass missing proof.
 
 The Next server mirrors this value. In enforce mode,
 getAuthedConvexClient() fails closed when Clerk, the issuer, the session, or

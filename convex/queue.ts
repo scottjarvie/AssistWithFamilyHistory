@@ -10,6 +10,7 @@ import {
   type TenantAccessDecision,
 } from "./access";
 import { matchesVaultOwner } from "./vaultCore";
+import { assertGrantPermits } from "./mcpGrants";
 import {
   QUEUE_LIMITS,
   assertCommandAllowed,
@@ -516,33 +517,25 @@ const listQueueArgs = {
 };
 
 export const listQueueItemsInternal = internalQuery({
-  args: listQueueArgs,
+  args: { ...listQueueArgs, mcpGrantId: v.optional(v.string()) },
   handler: async (ctx, args) => {
+    const grant = args.mcpGrantId ? await assertGrantPermits(ctx, {
+      owner: args.vaultOwnerId, grantId: args.mcpGrantId,
+      toolName: "family_history_get_queue", input: { action: "list" },
+    }) : null;
+    const allowedIds = grant?.boundary.queueItemIds;
     const requested = Math.min(args.paginationOpts.numItems, QUEUE_LIMITS.itemPage);
     const paginationOpts = { ...args.paginationOpts, numItems: requested };
-    if (args.state) {
-      return ctx.db
-        .query("queueItems")
-        .withIndex("by_owner_state_updated", (q) =>
-          q.eq("vaultOwnerId", args.vaultOwnerId).eq("state", args.state!),
-        )
-        .order("desc")
-        .paginate(paginationOpts);
-    }
-    if (args.priority) {
-      return ctx.db
-        .query("queueItems")
-        .withIndex("by_owner_priority_updated", (q) =>
-          q.eq("vaultOwnerId", args.vaultOwnerId).eq("priority", args.priority!),
-        )
-        .order("desc")
-        .paginate(paginationOpts);
-    }
-    return ctx.db
-      .query("queueItems")
-      .withIndex("by_owner_updated", (q) => q.eq("vaultOwnerId", args.vaultOwnerId))
-      .order("desc")
-      .paginate(paginationOpts);
+    const query = args.state
+      ? ctx.db.query("queueItems").withIndex("by_owner_state_updated", (q) => q.eq("vaultOwnerId", args.vaultOwnerId).eq("state", args.state!))
+      : args.priority
+        ? ctx.db.query("queueItems").withIndex("by_owner_priority_updated", (q) => q.eq("vaultOwnerId", args.vaultOwnerId).eq("priority", args.priority!))
+        : ctx.db.query("queueItems").withIndex("by_owner_updated", (q) => q.eq("vaultOwnerId", args.vaultOwnerId));
+    // Filter before pagination and expiry reconciliation: an outside row must
+    // neither leak nor be mutated as a side effect of a narrowed list request.
+    return (allowedIds?.length
+      ? query.filter((q) => q.or(...allowedIds.map((id) => q.eq(q.field("_id"), id))))
+      : query).order("desc").paginate(paginationOpts);
   },
 });
 
@@ -620,6 +613,7 @@ function verifyPrincipal(principal: VerifiedQueuePrincipal, toolName: QueueAgent
 export const agentListQueueItems = internalAction({
   args: {
     principal: principalValidator,
+    mcpGrantId: v.optional(v.string()),
     state: v.optional(queueStateValidator),
     priority: v.optional(queuePriorityValidator),
     paginationOpts: paginationOptsValidator,
@@ -628,6 +622,7 @@ export const agentListQueueItems = internalAction({
     const actor = verifyPrincipal(args.principal, "list_queue_items");
     const result = await ctx.runQuery(internal.queue.listQueueItemsInternal, {
       vaultOwnerId: actor.ownerId,
+      mcpGrantId: args.mcpGrantId,
       state: args.state,
       priority: args.priority,
       paginationOpts: args.paginationOpts,
