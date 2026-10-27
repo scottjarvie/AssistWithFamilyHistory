@@ -63,6 +63,9 @@ const OWNED_TABLES = [
   "agentActivity",
   "mcpOperations",
   "mcpRecordKeys",
+  "notes",
+  "treeImports",
+  "treeImportBatches",
   // A guest can only reach a grant by connecting an AI before signing up, but
   // if one exists it must follow them rather than being orphaned.
   "mcpGrants",
