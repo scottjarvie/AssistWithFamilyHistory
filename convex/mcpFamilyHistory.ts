@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import type { Doc, Id, TableNames } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { internalMutation, internalQuery } from "./_generated/server";
+import { anyApi } from "convex/server";
 import { FAMILY_HISTORY_MCP_LIMITS } from "../lib/mcp/contract";
 import { matchesVaultOwner } from "./vaultCore";
 import { assertGrantPermits } from "./mcpGrants";
@@ -487,8 +488,19 @@ async function saveSourceEvidenceRecord(ctx: MutationCtx, owner: string, input: 
   if (citationInput.mode === "create") {
     const key = cleanKey(citationInput.createKey, "citation.createKey");
     const mapping = await mappedRecord(ctx, owner, "citation", key);
-    if (mapping) citationId = (await owned(ctx, "citations", mapping.recordId, owner, "Citation"))._id;
-    else {
+    if (mapping) {
+      const row = await owned(ctx, "citations", mapping.recordId, owner, "Citation");
+      // A createKey names one citation of one source. Reusing it for another
+      // source would hang this evidence on the wrong source's citation.
+      if (row.sourceId !== sourceId) {
+        machineError(
+          "IDEMPOTENCY_CONFLICT",
+          "This citation createKey already names a citation on a different source.",
+          "Use a new citation createKey for this source, or save this evidence against the citation's original source.",
+        );
+      }
+      citationId = row._id;
+    } else {
       citationId = await ctx.db.insert("citations", {
         vaultOwnerId: owner,
         sourceId,
@@ -1490,7 +1502,10 @@ function failureOf(error: unknown, index: number, createKey?: string): BatchItem
   const at = raw.indexOf(marker);
   if (at >= 0) {
     try {
-      const parsed = JSON.parse(raw.slice(at + marker.length)) as {
+      // An error that crossed a sub-transaction may carry a stack after the
+      // one-line JSON payload.
+      const payload = raw.slice(at + marker.length);
+      const parsed = JSON.parse(payload.includes("\n") ? payload.slice(0, payload.indexOf("\n")) : payload) as {
         code?: string;
         message?: string;
         recovery?: string;
@@ -1511,15 +1526,186 @@ function failureOf(error: unknown, index: number, createKey?: string): BatchItem
     createKey,
     status: "failed",
     reason: "INTERNAL_ERROR: this row could not be saved.",
-    whatToDo: "Correct this row and send it again on its own. The rows that succeeded are already saved.",
+    whatToDo: "Correct this row and send it again on its own. Nothing from this row was saved; the rows that succeeded are.",
   };
 }
+
+const BATCH_ITEM_ORDER = ["places", "topics", "people", "relationships", "events", "evidence", "stories", "connections"] as const;
+type BatchItemKind = typeof BATCH_ITEM_ORDER[number];
+type BatchKeyKind = "people" | "places" | "topics" | "events" | "sources" | "stories";
+type BatchMaps = Record<BatchKeyKind, Map<string, string>>;
+type BatchKeys = Partial<Record<BatchKeyKind, Record<string, string>>>;
+
+/** Which of the call's createKey maps each kind of row may read. */
+const BATCH_KEYS_NEEDED: Record<BatchItemKind, BatchKeyKind[]> = {
+  places: ["places"],
+  topics: ["places", "topics"],
+  people: ["places"],
+  relationships: ["people", "places"],
+  events: ["people", "places"],
+  evidence: ["people", "places"],
+  stories: ["people"],
+  connections: ["people", "places", "topics", "events", "sources", "stories"],
+};
+
+type BatchItemOutcome = {
+  id: string;
+  status: "created" | "updated" | "skipped";
+  reason?: string;
+  whatToDo?: string;
+  /** createKeys this row added, for the rows after it in the same call. */
+  keys: BatchKeys;
+};
+
+function statusOf(created: boolean, item: any): "created" | "updated" | "skipped" {
+  return created ? "created" : item?.mode === "create" ? "skipped" : "updated";
+}
+
+async function saveOneBatchItem(
+  ctx: MutationCtx,
+  owner: string,
+  provenance: McpProvenance,
+  kind: BatchItemKind,
+  item: any,
+  maps: BatchMaps,
+): Promise<Omit<BatchItemOutcome, "keys">> {
+  const createKey = typeof item?.createKey === "string" ? item.createKey : undefined;
+  switch (kind) {
+    case "places": {
+      const saved = await savePlaceRecord(ctx, owner, item, provenance, maps.places);
+      return { id: String(saved.id), status: statusOf(saved.created, item) };
+    }
+    case "topics": {
+      const saved = await saveTopicRecord(ctx, owner, item, provenance, maps.places, maps.topics);
+      return { id: String(saved.id), status: statusOf(saved.created, item) };
+    }
+    case "people": {
+      const saved = await savePersonRecord(ctx, owner, await resolvePlaceKeys(ctx, owner, maps.places, item), provenance);
+      if (createKey) maps.people.set(createKey, String(saved.id));
+      return {
+        id: String(saved.id),
+        status: statusOf(saved.created, item),
+        ...(saved.created || item?.mode !== "create"
+          ? {}
+          : { reason: "Already saved under this createKey.", whatToDo: "Nothing to do; the earlier record was reused." }),
+      };
+    }
+    case "relationships": {
+      const resolved = { ...item };
+      if (item?.mode === "create") {
+        resolved.person1 = await resolveBatchPerson(ctx, owner, maps.people, { id: item.person1, createKey: item.person1CreateKey }, "person1");
+        resolved.person2 = await resolveBatchPerson(ctx, owner, maps.people, { id: item.person2, createKey: item.person2CreateKey }, "person2");
+      }
+      delete resolved.person1CreateKey;
+      delete resolved.person2CreateKey;
+      const saved = await saveRelationshipRecord(ctx, owner, await resolvePlaceKeys(ctx, owner, maps.places, resolved), provenance);
+      return { id: String(saved.id), status: statusOf(saved.created, item) };
+    }
+    case "events": {
+      const resolved = { ...item };
+      if (Array.isArray(item?.personRoles)) {
+        resolved.personRoles = [];
+        for (const role of item.personRoles) {
+          resolved.personRoles.push({
+            role: role.role,
+            personId: await resolveBatchPerson(ctx, owner, maps.people, { id: role.personId, createKey: role.personCreateKey }, "personRoles.personId"),
+          });
+        }
+      }
+      const saved = await saveEventRecord(ctx, owner, await resolvePlaceKeys(ctx, owner, maps.places, resolved));
+      if (createKey) maps.events.set(createKey, String(saved.id));
+      return { id: String(saved.id), status: statusOf(saved.created, item) };
+    }
+    case "evidence": {
+      const resolved = { ...item };
+      if (Array.isArray(item?.links)) {
+        resolved.links = [];
+        for (const link of item.links) {
+          const copy = { ...link };
+          if (link.targetType === "person") {
+            copy.targetId = await resolveBatchPerson(ctx, owner, maps.people, { id: link.targetId, createKey: link.targetCreateKey }, "links.targetId");
+          }
+          delete copy.targetCreateKey;
+          resolved.links.push(copy);
+        }
+      }
+      if (Array.isArray(item?.facts)) {
+        resolved.facts = [];
+        for (const fact of item.facts) {
+          const copy = { ...fact };
+          copy.personId = await resolveBatchPerson(ctx, owner, maps.people, { id: fact.personId, createKey: fact.personCreateKey }, "facts.personId");
+          delete copy.personCreateKey;
+          resolved.facts.push(copy);
+        }
+      }
+      if (Array.isArray(item?.personas)) {
+        resolved.personas = [];
+        for (const persona of item.personas) {
+          const copy = { ...persona };
+          if (persona.personId || persona.personCreateKey) {
+            copy.personId = await resolveBatchPerson(ctx, owner, maps.people, { id: persona.personId, createKey: persona.personCreateKey }, "personas.personId");
+          }
+          delete copy.personCreateKey;
+          resolved.personas.push(copy);
+        }
+      }
+      const saved = await saveSourceEvidenceRecord(ctx, owner, await resolvePlaceKeys(ctx, owner, maps.places, resolved), provenance);
+      const sourceKey = typeof item?.source?.createKey === "string" ? item.source.createKey : undefined;
+      if (sourceKey) maps.sources.set(sourceKey, String(saved.sourceId));
+      return { id: String(saved.citationId), status: saved.sourceCreated || saved.citationCreated ? "created" : "updated" };
+    }
+    case "stories": {
+      const resolved = { ...item };
+      if (item?.personCreateKey || item?.personId) {
+        resolved.personId = await resolveBatchPerson(ctx, owner, maps.people, { id: item.personId, createKey: item.personCreateKey }, "story.personId");
+      }
+      delete resolved.personCreateKey;
+      const saved = await saveStoryRecord(ctx, owner, resolved);
+      if (createKey) maps.stories.set(createKey, String(saved.id));
+      return { id: String(saved.id), status: statusOf(saved.created, item) };
+    }
+    case "connections": {
+      const connectionKeys = new Map<string, Map<string, string>>([
+        ["person", maps.people], ["place", maps.places], ["topic", maps.topics],
+        ["event", maps.events], ["source", maps.sources], ["story", maps.stories],
+      ]);
+      const saved = await saveConnectionRecord(ctx, owner, item, provenance, connectionKeys);
+      return { id: String(saved.id), status: saved.created ? "created" : "skipped" };
+    }
+  }
+}
+
+/**
+ * One row of a save_records call, as its own sub-transaction. Called only by
+ * `saveRecords` (after it has checked the grant and the operation receipt);
+ * if anything in the row throws, every write the row made is rolled back.
+ */
+export const saveBatchItem = internalMutation({
+  args: { owner: v.string(), provenance: v.any(), kind: v.string(), item: v.any(), keys: v.any() },
+  handler: async (ctx, args): Promise<BatchItemOutcome> => {
+    const kind = args.kind as BatchItemKind;
+    if (!BATCH_ITEM_ORDER.includes(kind)) machineError("VALIDATION_ERROR", "Unknown batch row kind.", "Send rows only in the documented arrays.");
+    const given = (args.keys ?? {}) as BatchKeys;
+    const maps = Object.fromEntries(
+      (["people", "places", "topics", "events", "sources", "stories"] as const).map((name) => [name, new Map(Object.entries(given[name] ?? {}))]),
+    ) as BatchMaps;
+    const saved = await saveOneBatchItem(ctx, args.owner, args.provenance as McpProvenance, kind, args.item, maps);
+    const keys: BatchKeys = {};
+    for (const [name, map] of Object.entries(maps) as Array<[BatchKeyKind, Map<string, string>]>) {
+      const added = [...map].filter(([key, value]) => given[name]?.[key] !== value);
+      if (added.length > 0) keys[name] = Object.fromEntries(added);
+    }
+    return { ...saved, keys };
+  },
+});
 
 /**
  * One call, one approval, one transaction, per-item results.
  *
  * Failures are caught INSIDE the mutation on purpose: one bad row must not
  * discard a good pass. A partial answer with its gaps named beats a refusal.
+ * Each row runs in its own sub-transaction (`saveBatchItem`), so a row that
+ * fails part-way is rolled back whole rather than half-saved.
  * Use save_complete_result when the caller genuinely wants all-or-nothing.
  */
 export const saveRecords = internalMutation({
@@ -1550,12 +1736,9 @@ export const saveRecords = internalMutation({
       }
     }
 
-    const batchPeople = new Map<string, string>();
-    const batchPlaces = new Map<string, string>();
-    const batchTopics = new Map<string, string>();
-    const batchEvents = new Map<string, string>();
-    const batchSources = new Map<string, string>();
-    const batchStories = new Map<string, string>();
+    const keys: BatchMaps = {
+      people: new Map(), places: new Map(), topics: new Map(), events: new Map(), sources: new Map(), stories: new Map(),
+    };
     const results: Record<string, BatchItemResult[]> = {
       places: [], topics: [], people: [], relationships: [], events: [], evidence: [], stories: [], connections: [],
     };
@@ -1565,196 +1748,37 @@ export const saveRecords = internalMutation({
       counts[item.status] += 1;
     };
 
-    // Places first: a source, an event or a person's birth may name a place
-    // saved in this same call by its createKey. Parents before children is the
-    // caller's order to keep.
-    for (const [index, item] of (input.places ?? []).entries()) {
-      const createKey = typeof item?.createKey === "string" ? item.createKey : undefined;
-      try {
-        const saved = await savePlaceRecord(ctx, owner, item, provenance, batchPlaces);
-        record("places", {
-          index,
-          createKey,
-          id: String(saved.id),
-          status: saved.created ? "created" : item?.mode === "create" ? "skipped" : "updated",
-        });
-      } catch (error) {
-        record("places", failureOf(error, index, createKey));
-      }
-    }
-
-    for (const [index, item] of (input.topics ?? []).entries()) {
-      const createKey = typeof item?.createKey === "string" ? item.createKey : undefined;
-      try {
-        const saved = await saveTopicRecord(ctx, owner, item, provenance, batchPlaces, batchTopics);
-        record("topics", {
-          index,
-          createKey,
-          id: String(saved.id),
-          status: saved.created ? "created" : item?.mode === "create" ? "skipped" : "updated",
-        });
-      } catch (error) {
-        record("topics", failureOf(error, index, createKey));
-      }
-    }
-
-    for (const [index, item] of (input.people ?? []).entries()) {
-      const createKey = typeof item?.createKey === "string" ? item.createKey : undefined;
-      try {
-        const saved = await savePersonRecord(ctx, owner, await resolvePlaceKeys(ctx, owner, batchPlaces, item), provenance);
-        if (createKey) batchPeople.set(createKey, String(saved.id));
-        record("people", {
-          index,
-          createKey,
-          id: String(saved.id),
-          status: saved.created ? "created" : item?.mode === "create" ? "skipped" : "updated",
-          ...(saved.created || item?.mode !== "create"
-            ? {}
-            : { reason: "Already saved under this createKey.", whatToDo: "Nothing to do; the earlier record was reused." }),
-        });
-      } catch (error) {
-        record("people", failureOf(error, index, createKey));
-      }
-    }
-
-    for (const [index, item] of (input.relationships ?? []).entries()) {
-      const createKey = typeof item?.createKey === "string" ? item.createKey : undefined;
-      try {
-        const resolved = { ...item };
-        if (item?.mode === "create") {
-          resolved.person1 = await resolveBatchPerson(ctx, owner, batchPeople, { id: item.person1, createKey: item.person1CreateKey }, "person1");
-          resolved.person2 = await resolveBatchPerson(ctx, owner, batchPeople, { id: item.person2, createKey: item.person2CreateKey }, "person2");
-        }
-        delete resolved.person1CreateKey;
-        delete resolved.person2CreateKey;
-        const saved = await saveRelationshipRecord(ctx, owner, await resolvePlaceKeys(ctx, owner, batchPlaces, resolved), provenance);
-        record("relationships", {
-          index,
-          createKey,
-          id: String(saved.id),
-          status: saved.created ? "created" : item?.mode === "create" ? "skipped" : "updated",
-        });
-      } catch (error) {
-        record("relationships", failureOf(error, index, createKey));
-      }
-    }
-
-    for (const [index, item] of (input.events ?? []).entries()) {
-      const createKey = typeof item?.createKey === "string" ? item.createKey : undefined;
-      try {
-        const resolved = { ...item };
-        if (Array.isArray(item?.personRoles)) {
-          resolved.personRoles = [];
-          for (const role of item.personRoles) {
-            resolved.personRoles.push({
-              role: role.role,
-              personId: await resolveBatchPerson(ctx, owner, batchPeople, { id: role.personId, createKey: role.personCreateKey }, "personRoles.personId"),
-            });
-          }
-        }
-        const saved = await saveEventRecord(ctx, owner, await resolvePlaceKeys(ctx, owner, batchPlaces, resolved));
-        if (createKey) batchEvents.set(createKey, String(saved.id));
-        record("events", {
-          index,
-          createKey,
-          id: String(saved.id),
-          status: saved.created ? "created" : item?.mode === "create" ? "skipped" : "updated",
-        });
-      } catch (error) {
-        record("events", failureOf(error, index, createKey));
-      }
-    }
-
-    for (const [index, item] of (input.evidence ?? []).entries()) {
-      const createKey = typeof item?.source?.createKey === "string" ? item.source.createKey : undefined;
-      try {
-        const resolved = { ...item };
-        if (Array.isArray(item?.links)) {
-          resolved.links = [];
-          for (const link of item.links) {
-            resolved.links.push(
-              link.targetType === "person"
-                ? { ...link, targetId: await resolveBatchPerson(ctx, owner, batchPeople, { id: link.targetId, createKey: link.targetCreateKey }, "links.targetId"), targetCreateKey: undefined }
-                : link,
-            );
-          }
-          resolved.links = resolved.links.map((link: any) => {
-            const copy = { ...link };
-            delete copy.targetCreateKey;
-            return copy;
+    // Each row is its own sub-transaction: a row that fails part-way leaves
+    // nothing behind, while the rows around it still save. Order matters:
+    // places first (a source, event or birth may name one by createKey), then
+    // topics, people, relationships, events, evidence, stories, and
+    // connections last so either end may be anything saved above.
+    for (const kind of BATCH_ITEM_ORDER) {
+      for (const [index, item] of (input[kind] ?? []).entries()) {
+        const createKey = kind === "evidence"
+          ? (typeof item?.source?.createKey === "string" ? item.source.createKey : undefined)
+          : (typeof item?.createKey === "string" ? item.createKey : undefined);
+        try {
+          const outcome: BatchItemOutcome = await ctx.runMutation(anyApi.mcpFamilyHistory.saveBatchItem, {
+            owner,
+            provenance,
+            kind,
+            item,
+            keys: Object.fromEntries(BATCH_KEYS_NEEDED[kind].map((name) => [name, Object.fromEntries(keys[name])])),
           });
-        }
-        if (Array.isArray(item?.facts)) {
-          resolved.facts = [];
-          for (const fact of item.facts) {
-            const copy = { ...fact };
-            copy.personId = await resolveBatchPerson(ctx, owner, batchPeople, { id: fact.personId, createKey: fact.personCreateKey }, "facts.personId");
-            delete copy.personCreateKey;
-            resolved.facts.push(copy);
+          for (const [name, added] of Object.entries(outcome.keys)) {
+            for (const [key, value] of Object.entries(added ?? {})) keys[name as BatchKeyKind].set(key, value);
           }
+          record(kind, {
+            index,
+            createKey,
+            id: outcome.id,
+            status: outcome.status,
+            ...(outcome.reason ? { reason: outcome.reason, whatToDo: outcome.whatToDo } : {}),
+          });
+        } catch (error) {
+          record(kind, failureOf(error, index, createKey));
         }
-        if (Array.isArray(item?.personas)) {
-          resolved.personas = [];
-          for (const persona of item.personas) {
-            const copy = { ...persona };
-            if (persona.personId || persona.personCreateKey) {
-              copy.personId = await resolveBatchPerson(ctx, owner, batchPeople, { id: persona.personId, createKey: persona.personCreateKey }, "personas.personId");
-            }
-            delete copy.personCreateKey;
-            resolved.personas.push(copy);
-          }
-        }
-        const saved = await saveSourceEvidenceRecord(ctx, owner, await resolvePlaceKeys(ctx, owner, batchPlaces, resolved), provenance);
-        if (createKey) batchSources.set(createKey, String(saved.sourceId));
-        record("evidence", {
-          index,
-          createKey,
-          id: String(saved.citationId),
-          status: saved.sourceCreated || saved.citationCreated ? "created" : "updated",
-        });
-      } catch (error) {
-        record("evidence", failureOf(error, index, createKey));
-      }
-    }
-
-    for (const [index, item] of (input.stories ?? []).entries()) {
-      const createKey = typeof item?.createKey === "string" ? item.createKey : undefined;
-      try {
-        const resolved = { ...item };
-        if (item?.personCreateKey || item?.personId) {
-          resolved.personId = await resolveBatchPerson(ctx, owner, batchPeople, { id: item.personId, createKey: item.personCreateKey }, "story.personId");
-        }
-        delete resolved.personCreateKey;
-        const saved = await saveStoryRecord(ctx, owner, resolved);
-        if (createKey) batchStories.set(createKey, String(saved.id));
-        record("stories", {
-          index,
-          createKey,
-          id: String(saved.id),
-          status: saved.created ? "created" : item?.mode === "create" ? "skipped" : "updated",
-        });
-      } catch (error) {
-        record("stories", failureOf(error, index, createKey));
-      }
-    }
-
-    // Connections last, so either end may be anything saved above.
-    const connectionKeys = new Map<string, Map<string, string>>([
-      ["person", batchPeople], ["place", batchPlaces], ["topic", batchTopics],
-      ["event", batchEvents], ["source", batchSources], ["story", batchStories],
-    ]);
-    for (const [index, item] of (input.connections ?? []).entries()) {
-      const createKey = typeof item?.createKey === "string" ? item.createKey : undefined;
-      try {
-        const saved = await saveConnectionRecord(ctx, owner, item, provenance, connectionKeys);
-        record("connections", {
-          index,
-          createKey,
-          id: String(saved.id),
-          status: saved.created ? "created" : "skipped",
-        });
-      } catch (error) {
-        record("connections", failureOf(error, index, createKey));
       }
     }
 
