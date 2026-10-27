@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowUpCircle, CheckCircle2, PlusCircle, Wrench } from "lucide-react";
+import { ArrowUpCircle, CheckCircle2, ChevronDown, PlusCircle, Wrench } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   releaseItemsForCategory,
@@ -75,7 +75,7 @@ export function ReleaseLog({ entries }: { entries: ReleaseEntry[] }) {
               })}
             </div>
 
-            {entry.whatToCheck?.length ? <section className="border-t border-[#eadfc9] bg-[#fbf8f1] px-5 py-5 sm:px-7"><h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-[#7c4425]">What to check</h3><ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-[#625947]">{entry.whatToCheck.map((item) => <li key={item}>{item}</li>)}</ul></section> : null}
+            {entry.whatToCheck?.length ? <details className="group border-t border-[#eadfc9] bg-[#fbf8f1] px-5 sm:px-7"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 py-3 [&::-webkit-details-marker]:hidden"><h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-[#7c4425]">What to check <span className="font-normal normal-case tracking-normal text-[#8a7e66]">({entry.whatToCheck.length})</span></h3><ChevronDown className="h-4 w-4 shrink-0 text-[#7c4425] transition-transform group-open:rotate-180" aria-hidden="true" /></summary><ul className="list-disc space-y-2 pb-5 pl-5 text-sm leading-6 text-[#625947]">{entry.whatToCheck.map((item) => <li key={item}>{item}</li>)}</ul></details> : null}
           </article>
         ))}
       </div>

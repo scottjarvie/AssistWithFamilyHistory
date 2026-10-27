@@ -23,6 +23,7 @@ import {
   type CatalogTool,
   type FamilyHistoryScope,
 } from "./catalog";
+import { effectiveScopes, effectiveExpiry, type GrantChoices } from "./grantDefaults";
 import type { McpMachineErrorCode } from "./contract";
 
 export type GrantBoundaryKind = "whole_workspace" | "selected_people" | "queue_only";
@@ -45,6 +46,7 @@ export type ResolvedGrant = {
   clientId: string;
   issuer: string;
   scopes: FamilyHistoryScope[];
+  scopeChoice?: "full" | "chosen";
   boundary: GrantBoundary;
   expiresAt?: number;
 };
@@ -103,7 +105,7 @@ export const GRANT_REFUSALS: Record<string, AccessRefusal> = {
     allowed: false,
     code: "GRANT_REVOKED",
     message: "The person turned this AI connection off.",
-    recovery: `Stop calling Family History tools. If the person wants to reconnect, they can remove this connection from the list at ${CONNECTION_SETTINGS_URL} and sign in again.`,
+    recovery: `Stop calling Family History tools. If the person wants to reconnect, they must open Settings at ${CONNECTION_SETTINGS_URL} and choose "Review and approve again" for this connection. Removing it from the list does not clear the refusal.`,
   },
   GRANT_DENIED: {
     allowed: false,
@@ -115,7 +117,7 @@ export const GRANT_REFUSALS: Record<string, AccessRefusal> = {
     allowed: false,
     code: "GRANT_EXPIRED",
     message: "This AI connection's approval has run out.",
-    recovery: `Ask the person to renew or re-approve the connection at ${CONNECTION_SETTINGS_URL}, then retry.`,
+    recovery: `Ask the person to change or remove their chosen end date at ${CONNECTION_SETTINGS_URL}, then retry.`,
   },
   SCOPE_NOT_GRANTED: {
     allowed: false,
@@ -159,8 +161,9 @@ export function refusalForResolution(resolution: GrantResolution): AccessRefusal
  * Expiry is decided here, in code, at read time. A token lifetime is never
  * trusted to end a grant.
  */
-export function isGrantExpired(grant: { expiresAt?: number }, now: number): boolean {
-  return typeof grant.expiresAt === "number" && grant.expiresAt <= now;
+export function isGrantExpired(grant: Omit<GrantChoices, "scopes">, now: number): boolean {
+  const expiresAt = effectiveExpiry(grant);
+  return typeof expiresAt === "number" && expiresAt <= now;
 }
 
 /* -------------------------------------------------------- record boundaries */
@@ -386,14 +389,14 @@ export function decideToolAccess(params: {
   // An unknown tool name and a known tool this grant does not cover are the
   // same refusal on purpose: a caller must not be able to probe the catalog.
   if (!tool) return refusal("SCOPE_NOT_GRANTED");
-  if (!grant.scopes.includes(tool.requiredScope)) return refusal("SCOPE_NOT_GRANTED");
+  if (!effectiveScopes(grant).includes(tool.requiredScope)) return refusal("SCOPE_NOT_GRANTED");
 
   if (input !== undefined) {
     const args = (input ?? {}) as Record<string, unknown>;
     for (const conditional of tool.conditionalScopes ?? []) {
       const value = args[conditional.whenInputHas];
       const present = Array.isArray(value) ? value.length > 0 : value !== undefined && value !== null;
-      if (present && !grant.scopes.includes(conditional.scope)) return refusal("SCOPE_NOT_GRANTED");
+      if (present && !effectiveScopes(grant).includes(conditional.scope)) return refusal("SCOPE_NOT_GRANTED");
     }
     if (!boundaryPermits(tool, grant.boundary, namedRecordsInInput(tool.name, input))) {
       return refusal("OUTSIDE_GRANT_BOUNDARY");

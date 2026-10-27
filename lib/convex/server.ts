@@ -33,10 +33,10 @@ export function getConvexClient(): ConvexHttpClient {
 }
 
 // Tenant-private Convex calls must carry the caller's verified Clerk JWT. In
-// shadow mode we preserve the legacy anonymous fallback so would-be denials can
-// be measured. In enforce mode a missing Clerk/JWT configuration or token is a
-// hard failure: silently sending an unauthenticated request would make every
-// protected operation fail farther downstream with less useful diagnostics.
+// shadow mode we preserve the legacy transport fallback so would-be denials can
+// be measured. REQUIRE_AUTH still requires a signed-in Clerk session, even
+// before the Convex JWT issuer is configured. Enforce mode additionally requires
+// a Convex JWT: an unauthenticated request would fail farther downstream.
 export async function getAuthedConvexClient(options?: {
   requireAuthentication?: boolean;
 }): Promise<ConvexHttpClient> {
@@ -52,30 +52,43 @@ export async function getAuthedConvexClient(options?: {
   // Mirrors convex/access.ts: only the explicit `shadow` opt-out relaxes this.
   const enforcing = process.env.TRUST_BOUNDARY_MODE !== "shadow";
   const requireAuthentication = options?.requireAuthentication === true || enforcing;
+  const requireSession = process.env.REQUIRE_AUTH === "true";
+
+  if (!isClerkEnabled()) {
+    if (requireAuthentication || requireSession) {
+      throw new Error("Authenticated Convex access requires Clerk to be configured and enabled");
+    }
+    return client;
+  }
 
   // Only mint a "convex" template token in an environment actually configured
   // for Convex auth — i.e. where CLERK_JWT_ISSUER_DOMAIN is set (the same gate
   // that makes Convex trust the token; see auth.config.ts). This keeps the call
-  // a complete no-op anywhere the convex JWT template / issuer aren't set up
+  // a token-minting no-op anywhere the convex JWT template / issuer aren't set up
   // (e.g. production until GEN-103 step E), so we never attempt — or error on —
   // a getToken({template:"convex"}) the instance can't satisfy.
-  if (!isClerkEnabled() || !process.env.CLERK_JWT_ISSUER_DOMAIN) {
+  if (!process.env.CLERK_JWT_ISSUER_DOMAIN) {
     if (requireAuthentication) {
       throw new Error(
         "Authenticated Convex access requires Clerk and CLERK_JWT_ISSUER_DOMAIN",
       );
     }
-    return client;
+    if (!requireSession) return client;
   }
 
   try {
-    const { getToken } = await auth();
-    const token = await getToken({ template: "convex" });
+    const authState = await auth();
+    if (requireSession && !authState.userId) {
+      throw new Error("Authenticated Convex access requires an authenticated Clerk session");
+    }
+    if (!process.env.CLERK_JWT_ISSUER_DOMAIN) return client;
+
+    const token = await authState.getToken({ template: "convex" });
     if (token) {
       client.setAuth(token);
       return client;
     }
-    if (requireAuthentication) {
+    if (requireAuthentication || requireSession) {
       throw new Error("Authenticated Convex access requires an authenticated Clerk session");
     }
   } catch (error) {
@@ -84,7 +97,7 @@ export async function getAuthedConvexClient(options?: {
       { route: "convex", configured: isConvexConfigured() },
       error,
     );
-    if (requireAuthentication) {
+    if (requireAuthentication || requireSession) {
       throw new Error("Unable to authenticate this protected Convex request", { cause: error });
     }
   }

@@ -3,7 +3,6 @@ import { ShieldCheck } from "lucide-react";
 import { Footer } from "@/components/layout/Footer";
 import { MarketingNav } from "@/components/layout/MarketingNav";
 import { ReleaseLog } from "@/components/updates/ReleaseLog";
-import { Badge } from "@/components/ui/badge";
 import { releaseNotes } from "@/lib/releaseNotes";
 import { createPageMetadata } from "@/lib/seo";
 
@@ -18,10 +17,9 @@ export default function UpdatesPage() {
   return (
     <div className="min-h-screen bg-[#f8f4ec]">
       <MarketingNav />
-      <main className="pt-24">
+      <main className="pt-[4.5rem]">
         <section className="border-b border-[#d8c7a7] bg-[#1f2f35] px-4 py-12 text-white sm:px-6 lg:px-8">
           <div className="mx-auto max-w-5xl">
-            <Badge className="mb-5 bg-white/10 text-white hover:bg-white/10">Product updates</Badge>
             <h1 className="font-[family-name:var(--font-cormorant-garamond)] text-5xl font-semibold leading-[0.95] sm:text-6xl">What&apos;s New</h1>
             <p className="mt-5 text-sm font-medium text-[#d9cdb5]">Latest record · v{latest.version} · {latest.status}</p>
             <p className="mt-5 max-w-3xl text-lg leading-8 text-[#d9cdb5]">A public, privacy-safe explanation of what changed, why it matters, and where to find it.</p>
