@@ -308,7 +308,8 @@ async function capturedRow(c: ChunkContext, table: "persons" | "sources", fsId: 
   if (mine || c.owner !== normalizeVaultOwnerId()) return mine;
   // Preserve the existing legacy-local rule without exposing unowned rows to
   // an ordinary signed-in owner or rewriting their ownership.
-  return await c.ctx.db.query(table).withIndex("by_owner_fsId", q => q.eq("vaultOwnerId", undefined).eq("fsId", fsId)).first();
+  const unowned = await c.ctx.db.query(table).withIndex("by_owner_fsId", q => q.eq("vaultOwnerId", undefined).eq("fsId", fsId)).first();
+  return unowned ?? await c.ctx.db.query(table).withIndex("by_owner_fsId", q => q.eq("vaultOwnerId", "").eq("fsId", fsId)).first();
 }
 
 /* ----------------------------------------------------------------- persons */

@@ -306,11 +306,11 @@ describe("tree import integrity boundaries", () => {
     expect(after.sources.filter((p: any) => p.vaultOwnerId !== OWNER)).toEqual(before.sources.filter((p: any) => p.vaultOwnerId !== OWNER));
   });
 
-  test("legacy unowned PID rows remain linkable only by the existing local vault owner", async () => {
+  test.each([undefined, ""])("legacy unowned PID rows remain linkable only by the existing local vault owner (storedOwner=%s)", async legacyOwner => {
     const { t, grantId, job } = await setup(DEFAULT_LOCAL_VAULT_OWNER);
     const ids = await t.run(async ctx => {
-      const p = await ctx.db.insert("persons", { fsId: "LEGACY-PID", name: { given: "Legacy", surname: "Fixture" }, sex: "unknown", living: false, researchStatus: "basic", createdAt: 1, updatedAt: 1 });
-      const source = await ctx.db.insert("sources", { fsId: "LEGACY-SOURCE", title: "Legacy source", type: "other", createdAt: 1, updatedAt: 1 });
+      const p = await ctx.db.insert("persons", { ...(legacyOwner === undefined ? {} : { vaultOwnerId: legacyOwner }), fsId: "LEGACY-PID", name: { given: "Legacy", surname: "Fixture" }, sex: "unknown", living: false, researchStatus: "basic", createdAt: 1, updatedAt: 1 });
+      const source = await ctx.db.insert("sources", { ...(legacyOwner === undefined ? {} : { vaultOwnerId: legacyOwner }), fsId: "LEGACY-SOURCE", title: "Legacy source", type: "other", createdAt: 1, updatedAt: 1 });
       return { person: String(p), source: String(source) };
     });
     const result = await send(t, grantId, job, { persons: [person("LEGACY-PID")], sources: [{ key: "LEGACY-SOURCE", title: "Imported" }] }, "legacy", DEFAULT_LOCAL_VAULT_OWNER);
