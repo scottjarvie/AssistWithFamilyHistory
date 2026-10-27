@@ -59,6 +59,12 @@ const authMiddleware = clerkMiddleware(
 const hostedProxy = hasClerkKeys
   ? authMiddleware
   : function proxy() {
+      if (requireAuth) {
+        return new NextResponse("Authentication is unavailable", {
+          status: 503,
+          headers: { "Cache-Control": "private, no-store" },
+        });
+      }
       return NextResponse.next();
     };
 

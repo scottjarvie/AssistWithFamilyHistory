@@ -16,6 +16,14 @@ That ordering is deliberate: new backend functions and tables exist before any
 page can call them. When you merge a pull request into `main`, the release is
 already on its way out.
 
+Hosted production fails before invoking any build command if the deploy key is
+missing, has the wrong type or deployment, or the frontend backend URL does not
+match `https://accomplished-dodo-308.convex.cloud`. A failed coordinated command
+also fails the release; there is no plain-build fallback in production. Missing
+configuration is an operational hold for the release owner, not authorization
+to change settings or credentials. Offline `pnpm build` and keyless local/CI
+wrapper builds outside the production environment remain usable.
+
 There is nothing else to do. No pinned worktree, no manual `vercel deploy`, no
 hand-run `convex deploy`.
 
