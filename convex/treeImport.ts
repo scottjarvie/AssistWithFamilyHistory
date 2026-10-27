@@ -61,7 +61,7 @@ import {
   principalValidator,
   type McpPrincipal,
 } from "./mcpFamilyHistory";
-import { matchesVaultOwner } from "./vaultCore";
+import { matchesVaultOwner, normalizeVaultOwnerId } from "./vaultCore";
 
 const BEGIN_TOOL = "family_history_begin_tree_import";
 const BATCH_TOOL = "family_history_import_tree_batch";
@@ -302,6 +302,15 @@ async function upsertRow(
   return { id: String(row._id), status, ...(kept.length ? { kept } : {}) };
 }
 
+/** Resolve an older capture inside its owner index before taking a row. */
+async function capturedRow(c: ChunkContext, table: "persons" | "sources", fsId: string) {
+  const mine = await c.ctx.db.query(table).withIndex("by_owner_fsId", q => q.eq("vaultOwnerId", c.owner).eq("fsId", fsId)).first();
+  if (mine || c.owner !== normalizeVaultOwnerId()) return mine;
+  // Preserve the existing legacy-local rule without exposing unowned rows to
+  // an ordinary signed-in owner or rewriting their ownership.
+  return await c.ctx.db.query(table).withIndex("by_owner_fsId", q => q.eq("vaultOwnerId", undefined).eq("fsId", fsId)).first();
+}
+
 /* ----------------------------------------------------------------- persons */
 
 function factDescription(fact: { value?: string; description?: string }) {
@@ -330,8 +339,7 @@ async function importPerson(c: ChunkContext, item: any): Promise<Omit<ItemResult
   let linked = false;
   if (!existingId && c.job.system === "familysearch") {
     // People captured earlier by the browser extension carry the PID as fsId.
-    const legacy = await c.ctx.db.query("persons").withIndex("by_fsId", (q) => q.eq("fsId", key)).take(10);
-    const mine = legacy.find((row) => matchesVaultOwner(row.vaultOwnerId, c.owner));
+    const mine = await capturedRow(c, "persons", key);
     if (mine) {
       existingId = String(mine._id);
       linked = true;
@@ -563,8 +571,7 @@ async function importSource(c: ChunkContext, item: any): Promise<Omit<ItemResult
   let existingId = await lookup(c, "source", key);
   let linked = false;
   if (!existingId && c.job.system === "familysearch") {
-    const legacy = await c.ctx.db.query("sources").withIndex("by_fsId", (q) => q.eq("fsId", key)).take(10);
-    const mine = legacy.find((row) => matchesVaultOwner(row.vaultOwnerId, c.owner));
+    const mine = await capturedRow(c, "sources", key);
     if (mine) {
       existingId = String(mine._id);
       linked = true;

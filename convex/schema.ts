@@ -181,6 +181,7 @@ export default defineSchema({
     .index("by_owner", ["vaultOwnerId"])
     .index("by_owner_creation_operation", ["vaultOwnerId", "creationProvenance.operationId"])
     .index("by_fsId", ["fsId"])
+    .index("by_owner_fsId", ["vaultOwnerId", "fsId"])
     .index("by_surname", ["name.surname"])
     // Whole-tree import duplicate suggestions: same owner, surname, nearby birth year.
     .index("by_owner_surname_birth_year", ["vaultOwnerId", "name.surname", "birth.date.year"])
@@ -561,6 +562,7 @@ export default defineSchema({
     .index("by_owner", ["vaultOwnerId"])
     .index("by_type", ["type"])
     .index("by_fsId", ["fsId"])
+    .index("by_owner_fsId", ["vaultOwnerId", "fsId"])
     .index("by_repository", ["repository"])
     .index("by_import_key", ["importKey"]),
 

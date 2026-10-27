@@ -5,6 +5,7 @@ import schema from "./schema";
 import { internal } from "./_generated/api";
 import { seedGrant } from "../lib/mcp/testSupport";
 import { externalRecordKey } from "../lib/treeImport/model";
+import { DEFAULT_LOCAL_VAULT_OWNER } from "../lib/vault/constants";
 
 const modules = import.meta.glob("./**/*.ts");
 const OWNER = "user_import_integrity_AAAAAAAA";
@@ -278,6 +279,48 @@ describe("tree import integrity boundaries", () => {
     expect(next).toMatchObject({ nextBatchIndex: 3, cursor: "after-2", status: "open" });
     const final = await send(t, grantId, job, { batchIndex: 2, cursor: "after-2", final: true, persons: [person("two")] }, "finish-latest");
     expect(final).toMatchObject({ nextBatchIndex: 3, cursor: "after-2", status: "completed" });
+  });
+
+
+  test("owner PID linking is not hidden by ten other vaults with the same outside ids", async () => {
+    const { t, grantId, job } = await setup();
+    const ids = await t.run(async ctx => {
+      for (let i = 0; i < 10; i++) {
+        await ctx.db.insert("persons", { vaultOwnerId: `${OTHER}-${i}`, fsId: "COMMON-PID", name: { given: "Foreign", surname: "Fixture" }, sex: "unknown", living: false, researchStatus: "basic", createdAt: 1, updatedAt: 1 });
+        await ctx.db.insert("sources", { vaultOwnerId: `${OTHER}-${i}`, fsId: "COMMON-SOURCE", title: "Foreign source", type: "other", createdAt: 1, updatedAt: 1 });
+      }
+      const p = await ctx.db.insert("persons", { vaultOwnerId: OWNER, fsId: "COMMON-PID", name: { given: "Hand entered", surname: "Fixture" }, sex: "unknown", living: false, researchStatus: "basic", createdAt: 1, updatedAt: 1 });
+      const source = await ctx.db.insert("sources", { vaultOwnerId: OWNER, fsId: "COMMON-SOURCE", title: "Hand entered source", type: "other", createdAt: 1, updatedAt: 1 });
+      return { person: String(p), source: String(source) };
+    });
+    const before = await data(t);
+    const result = await send(t, grantId, job, { persons: [person("COMMON-PID", "Imported")], sources: [{ key: "COMMON-SOURCE", title: "Imported title" }] });
+    expect(result.results.find((r: any) => r.kind === "persons")).toMatchObject({ status: "linked", id: ids.person });
+    expect(result.results.find((r: any) => r.kind === "sources")).toMatchObject({ status: "linked", id: ids.source });
+    const after = await data(t);
+    expect(after.persons).toHaveLength(before.persons.length);
+    expect(after.sources).toHaveLength(before.sources.length);
+    expect(after.persons.find((p: any) => p._id === ids.person).name.given).toBe("Hand entered");
+    expect(after.sources.find((p: any) => p._id === ids.source).title).toBe("Hand entered source");
+    expect(after.persons.filter((p: any) => p.vaultOwnerId !== OWNER)).toEqual(before.persons.filter((p: any) => p.vaultOwnerId !== OWNER));
+    expect(after.sources.filter((p: any) => p.vaultOwnerId !== OWNER)).toEqual(before.sources.filter((p: any) => p.vaultOwnerId !== OWNER));
+  });
+
+  test("legacy unowned PID rows remain linkable only by the existing local vault owner", async () => {
+    const { t, grantId, job } = await setup(DEFAULT_LOCAL_VAULT_OWNER);
+    const ids = await t.run(async ctx => {
+      const p = await ctx.db.insert("persons", { fsId: "LEGACY-PID", name: { given: "Legacy", surname: "Fixture" }, sex: "unknown", living: false, researchStatus: "basic", createdAt: 1, updatedAt: 1 });
+      const source = await ctx.db.insert("sources", { fsId: "LEGACY-SOURCE", title: "Legacy source", type: "other", createdAt: 1, updatedAt: 1 });
+      return { person: String(p), source: String(source) };
+    });
+    const result = await send(t, grantId, job, { persons: [person("LEGACY-PID")], sources: [{ key: "LEGACY-SOURCE", title: "Imported" }] }, "legacy", DEFAULT_LOCAL_VAULT_OWNER);
+    expect(result.results.find((r: any) => r.kind === "persons")).toMatchObject({ status: "linked", id: ids.person });
+    expect(result.results.find((r: any) => r.kind === "sources")).toMatchObject({ status: "linked", id: ids.source });
+    const otherGrant = await seedGrant(t, { vaultOwnerId: OWNER });
+    const otherJob: any = await t.mutation(internal.treeImport.beginTreeImport, { principal: principal(), grantId: otherGrant, operationId: "ordinary-begin", requestHash: "ordinary-begin", input: { importKey: "ordinary", system: "familysearch", label: "Ordinary synthetic owner" } });
+    const ordinary = await send(t, otherGrant, otherJob.importJobId, { persons: [person("LEGACY-PID")], sources: [{ key: "LEGACY-SOURCE", title: "My own source" }] }, "ordinary");
+    expect(ordinary.results.every((r: any) => r.status === "created")).toBe(true);
+    expect(ordinary.results.every((r: any) => r.id !== ids.person && r.id !== ids.source)).toBe(true);
   });
 
 });
