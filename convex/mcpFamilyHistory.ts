@@ -1534,7 +1534,9 @@ const BATCH_ITEM_ORDER = ["places", "topics", "people", "relationships", "events
 type BatchItemKind = typeof BATCH_ITEM_ORDER[number];
 type BatchKeyKind = "people" | "places" | "topics" | "events" | "sources" | "stories";
 type BatchMaps = Record<BatchKeyKind, Map<string, string>>;
-type BatchKeys = Partial<Record<BatchKeyKind, Record<string, string>>>;
+// Semantic keys are arbitrary strings, not Convex object field names.
+// Entry arrays preserve Unicode and leading-$ keys across subtransactions.
+type BatchKeys = Partial<Record<BatchKeyKind, Array<[string, string]>>>;
 
 /** Which of the call's createKey maps each kind of row may read. */
 const BATCH_KEYS_NEEDED: Record<BatchItemKind, BatchKeyKind[]> = {
@@ -1687,13 +1689,14 @@ export const saveBatchItem = internalMutation({
     if (!BATCH_ITEM_ORDER.includes(kind)) machineError("VALIDATION_ERROR", "Unknown batch row kind.", "Send rows only in the documented arrays.");
     const given = (args.keys ?? {}) as BatchKeys;
     const maps = Object.fromEntries(
-      (["people", "places", "topics", "events", "sources", "stories"] as const).map((name) => [name, new Map(Object.entries(given[name] ?? {}))]),
+      (["people", "places", "topics", "events", "sources", "stories"] as const).map((name) => [name, new Map(given[name] ?? [])]),
     ) as BatchMaps;
     const saved = await saveOneBatchItem(ctx, args.owner, args.provenance as McpProvenance, kind, args.item, maps);
     const keys: BatchKeys = {};
     for (const [name, map] of Object.entries(maps) as Array<[BatchKeyKind, Map<string, string>]>) {
-      const added = [...map].filter(([key, value]) => given[name]?.[key] !== value);
-      if (added.length > 0) keys[name] = Object.fromEntries(added);
+      const previous = new Map(given[name] ?? []);
+      const added = [...map].filter(([key, value]) => previous.get(key) !== value);
+      if (added.length > 0) keys[name] = added;
     }
     return { ...saved, keys };
   },
@@ -1764,10 +1767,10 @@ export const saveRecords = internalMutation({
             provenance,
             kind,
             item,
-            keys: Object.fromEntries(BATCH_KEYS_NEEDED[kind].map((name) => [name, Object.fromEntries(keys[name])])),
+            keys: Object.fromEntries(BATCH_KEYS_NEEDED[kind].map((name) => [name, [...keys[name]]])),
           });
           for (const [name, added] of Object.entries(outcome.keys)) {
-            for (const [key, value] of Object.entries(added ?? {})) keys[name as BatchKeyKind].set(key, value);
+            for (const [key, value] of added ?? []) keys[name as BatchKeyKind].set(key, value);
           }
           record(kind, {
             index,

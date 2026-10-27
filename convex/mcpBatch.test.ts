@@ -382,3 +382,162 @@ describe("family_history_save_records", () => {
     expect(people).toHaveLength(0);
   });
 });
+
+describe("batch key transport and rollback boundaries", () => {
+  test.each(["$synthetic", "person:José", "__proto__"])("semantic createKey %s remains a string value across subtransactions", async (key) => {
+    const t = convexTest(schema, modules);
+    const grantId = await seedGrant(t, { vaultOwnerId: OWNER });
+    const args = { principal: principal(), grantId, operationId: `unicode-key-${key}`, requestHash: `unicode-key-${key}`, input: {
+      summary: "Synthetic semantic keys remain compatible.",
+      places: [{ mode: "create", createKey: `place:${key}`, name: "Synthetic place", type: "city" }],
+      topics: [{ mode: "create", createKey: `topic:${key}`, name: "Synthetic topic", kind: "religion", placeCreateKeys: [`place:${key}`] }],
+      people: [{ ...personRow(key, "Synthetic"), birth: { place: { original: "Synthetic place", placeCreateKey: `place:${key}` } } }],
+      evidence: [{ source: { mode: "create", createKey: `source:${key}`, title: "Synthetic source", type: "other" }, citation: { mode: "create", createKey: `citation:${key}`, confidence: "high" }, personas: [{ personaKey: "subject", nameAsWritten: "Synthetic", personCreateKey: key }] }],
+      stories: [{ mode: "create", createKey: `story:${key}`, personCreateKey: key, type: "biography", title: "Synthetic story", content: "Synthetic", status: "draft" }],
+      events: [{ mode: "create", createKey: `event:${key}`, type: "census", personRoles: [{ personCreateKey: key, role: "primary" }] }],
+      connections: [{ createKey: `connection:${key}`, from: { kind: "person", createKey: key }, to: { kind: "event", createKey: `event:${key}` }, relation: "about" }, { createKey: `source-story:${key}`, from: { kind: "source", createKey: `source:${key}` }, to: { kind: "story", createKey: `story:${key}` }, relation: "about" }],
+    } };
+    const first = await t.mutation(internal.mcpFamilyHistory.saveRecords, args);
+    expect(first.counts).toMatchObject({ created: 8, failed: 0 });
+    const eventId = first.results.events[0].id;
+    const personId = first.results.people[0].id;
+    const roles = await t.run((ctx) => ctx.db.query("personEvents").collect());
+    expect(roles).toMatchObject([{ personId, eventId }]);
+    const replay = await t.mutation(internal.mcpFamilyHistory.saveRecords, args);
+    expect(replay).toEqual({ ...first, deduplicated: true });
+    const repeated = await t.mutation(internal.mcpFamilyHistory.saveRecords, { ...args, operationId: `new-op-${key}`, requestHash: `new-op-${key}` });
+    expect(repeated.counts).toMatchObject({ skipped: 7, updated: 1, failed: 0 });
+    expect(await t.run((ctx) => ctx.db.query("persons").collect())).toHaveLength(1);
+    expect(await t.run((ctx) => ctx.db.query("events").collect())).toHaveLength(1);
+  });
+});
+
+const RECORD_TABLES = ["persons", "places", "topics", "relationships", "events", "personEvents", "sources", "citations", "citationLinks", "sourceContents", "recordPersonas", "sourceFacts", "stories", "connections", "mcpRecordKeys"] as const;
+type BatchTest = ReturnType<typeof convexTest>;
+async function recordSnapshot(t: BatchTest) {
+  return t.run(async (ctx) => Object.fromEntries(await Promise.all(RECORD_TABLES.map(async (table) => [table, await ctx.db.query(table).collect()]))));
+}
+function evidenceRow(key: string) {
+  return { source: { mode: "create", createKey: `source:${key}`, title: `Synthetic ${key}`, type: "other" }, citation: { mode: "create", createKey: `citation:${key}`, confidence: "high" } };
+}
+function saveBatch(t: BatchTest, grantId: string, operationId: string, input: unknown, subject = OWNER) {
+  return t.mutation(internal.mcpFamilyHistory.saveRecords, { principal: principal(subject), grantId, operationId, requestHash: `hash:${operationId}`, input });
+}
+
+describe("row rollback across inserts, updates and shared references", () => {
+  test("a late failed evidence update restores every earlier write and its original versions", async () => {
+    const t = convexTest(schema, modules);
+    const grantId = await seedGrant(t, { vaultOwnerId: OWNER });
+    const person = await saveBatch(t, grantId, "late-person", { summary: "Synthetic person", people: [personRow("person:late", "Synthetic")] });
+    const personId = person.results.people[0].id;
+    const seed = await t.mutation(internal.mcpFamilyHistory.saveSourceEvidence, { principal: principal(), grantId, operationId: "late-evidence-seed", requestHash: "late-evidence-seed", input: { ...evidenceRow("late"), facts: [{ factKey: "fact:late", personId, factType: "name", label: "Original", value: "Original", confidence: "high" }] } });
+    const sourceId = seed.evidence.sourceId;
+    const citationId = seed.evidence.citationId;
+    const before = await recordSnapshot(t);
+    const versions = await t.run(async (ctx) => ({ source: await ctx.db.get(sourceId), citation: await ctx.db.get(citationId) }));
+    const row = {
+      source: { mode: "update", sourceId, expectedUpdatedAt: versions.source!.updatedAt, title: "Changed source" },
+      citation: { mode: "update", citationId, expectedUpdatedAt: versions.citation!.updatedAt, notes: "Changed citation" },
+      links: [{ targetType: "person", targetId: personId, field: "name" }],
+      contents: [{ contentKey: "content:late", kind: "transcription", madeBy: { kind: "person" }, text: "Synthetic transcription" }],
+      personas: [{ personaKey: "persona:late", nameAsWritten: "Synthetic", personId }],
+      facts: [
+        { factKey: "fact:late", personId, factType: "name", label: "Changed", value: "Changed", confidence: "high" },
+        { factKey: "fact:late:missing-persona", personId, factType: "name", label: "Late failure", value: "Synthetic", confidence: "high", personaKey: "missing-persona" },
+      ],
+    };
+    const input = { summary: "One sibling succeeds; late evidence failure must undo the whole row.", people: [personRow("person:successful-sibling", "Successful")], evidence: [row] };
+    const first = await saveBatch(t, grantId, "late-failed-update", input);
+    expect(first.counts).toMatchObject({ created: 1, failed: 1 });
+    expect(first.results.evidence[0].reason).toMatch(/VALIDATION_ERROR|NOT_FOUND/);
+    const after = await recordSnapshot(t);
+    for (const table of RECORD_TABLES) {
+      if (table === "persons") expect(after[table]).toHaveLength(before[table].length + 1);
+      else if (table === "mcpRecordKeys") expect(after[table].filter((r: { recordKey?: string }) => r.recordKey !== "person:successful-sibling")).toEqual(before[table]);
+      else expect(after[table], table).toEqual(before[table]);
+    }
+    expect(await saveBatch(t, grantId, "late-failed-update", input)).toEqual({ ...first, deduplicated: true });
+    expect(await recordSnapshot(t)).toEqual(after);
+    const corrected = { ...row, facts: [row.facts[0], { ...row.facts[1], personaKey: "persona:late" }] };
+    const retried = await saveBatch(t, grantId, "late-corrected-update", { summary: "Correct only the failed row with original versions.", evidence: [corrected] });
+    expect(retried.counts).toMatchObject({ updated: 1, failed: 0 });
+    expect(await t.run((ctx) => ctx.db.get(sourceId))).toMatchObject({ title: "Changed source" });
+    expect(await t.run((ctx) => ctx.db.query("sourceFacts").collect())).toHaveLength(2);
+  });
+
+  test("a failed new source never leaks a key to later rows, while valid shared-source rows persist", async () => {
+    const t = convexTest(schema, modules);
+    const grantId = await seedGrant(t, { vaultOwnerId: OWNER });
+    const good = evidenceRow("shared-good");
+    const bad = { ...evidenceRow("shared-bad"), contents: [{ contentKey: "shared-bad-content", kind: "transcription", madeBy: { kind: "person" } }] };
+    const link = (key: string, source: string) => ({ createKey: key, from: { kind: "person", createKey: "person:shared" }, to: { kind: "source", createKey: source }, relation: "about" });
+    const input = { summary: "Synthetic shared references around a failed source.", people: [personRow("person:shared", "Synthetic")], evidence: [good, bad, { ...good, citation: { mode: "create", createKey: "citation:shared-second", confidence: "high" } }], connections: [link("link:good", "source:shared-good"), link("link:bad", "source:shared-bad")] };
+    const saved = await saveBatch(t, grantId, "shared-source-mixed", input);
+    expect(saved.results.evidence.map((row: { status: string }) => row.status)).toEqual(["created", "failed", "created"]);
+    expect(saved.results.connections.map((row: { status: string }) => row.status)).toEqual(["created", "failed"]);
+    const sources = await t.run((ctx) => ctx.db.query("sources").collect());
+    expect(sources).toHaveLength(1);
+    const citations = await t.run((ctx) => ctx.db.query("citations").collect());
+    expect(citations).toHaveLength(2);
+    expect(citations.every((row) => row.sourceId === sources[0]._id)).toBe(true);
+    expect(await t.run((ctx) => ctx.db.query("mcpRecordKeys").collect())).not.toContainEqual(expect.objectContaining({ recordKey: "source:shared-bad" }));
+    const snapshot = await recordSnapshot(t);
+    expect(await saveBatch(t, grantId, "shared-source-mixed", input)).toEqual({ ...saved, deduplicated: true });
+    expect(await recordSnapshot(t)).toEqual(snapshot);
+    const retry = await saveBatch(t, grantId, "shared-source-corrected", { summary: "Corrected failed source and its failed dependent link.", evidence: [{ ...bad, contents: [{ ...bad.contents[0], text: "Corrected synthetic text" }] }], connections: [link("link:bad", "source:shared-bad")] });
+    expect(retry.counts).toMatchObject({ created: 2, failed: 0 });
+    expect(await t.run((ctx) => ctx.db.query("sources").collect())).toHaveLength(2);
+  });
+
+  test("wrong-owner citation references roll back own-source updates; equal keys stay owner-scoped", async () => {
+    const t = convexTest(schema, modules);
+    const grantId = await seedGrant(t, { vaultOwnerId: OWNER });
+    const otherGrant = await seedGrant(t, { vaultOwnerId: OTHER });
+    const own = await saveBatch(t, grantId, "owner-shared-key", { summary: "Owner A source.", evidence: [evidenceRow("same-key")] });
+    const foreign = await saveBatch(t, otherGrant, "other-shared-key", { summary: "Owner B source.", evidence: [evidenceRow("same-key")] }, OTHER);
+    expect(own.results.evidence[0].id).not.toBe(foreign.results.evidence[0].id);
+    const before = await recordSnapshot(t);
+    const source = await t.run(async (ctx) => (await ctx.db.query("sources").collect()).find((row) => row.vaultOwnerId === OWNER)!);
+    const citation = await t.run(async (ctx) => (await ctx.db.query("citations").collect()).find((row) => row.vaultOwnerId === OTHER)!);
+    const result = await saveBatch(t, grantId, "owner-cross-citation", { summary: "Do not update another owner's citation.", evidence: [{ source: { mode: "update", sourceId: source._id, expectedUpdatedAt: source.updatedAt, title: "Must roll back" }, citation: { mode: "update", citationId: citation._id, expectedUpdatedAt: citation.updatedAt, notes: "Must never save" } }] });
+    expect(result.results.evidence[0].status).toBe("failed");
+    expect(result.results.evidence[0].reason).toMatch(/NOT_FOUND/);
+    expect(await recordSnapshot(t)).toEqual(before);
+  });
+
+  test("complete-result citation-key conflict rolls back its entire call", async () => {
+    const t = convexTest(schema, modules);
+    const grantId = await seedGrant(t, { vaultOwnerId: OWNER });
+    await saveBatch(t, grantId, "complete-key-seed", { summary: "Existing source.", evidence: [evidenceRow("complete-seed")] });
+    const before = await recordSnapshot(t);
+    await expect(t.mutation(internal.mcpFamilyHistory.saveCompleteResult, { principal: principal(), grantId, operationId: "complete-key-conflict", requestHash: "complete-key-conflict", input: { summary: "All or nothing.", person: personRow("person:complete-rollback", "Synthetic"), evidence: [{ ...evidenceRow("complete-other"), citation: evidenceRow("complete-seed").citation }] } })).rejects.toThrow(/IDEMPOTENCY_CONFLICT/);
+    expect(await recordSnapshot(t)).toEqual(before);
+  });
+
+  test("a fatal outer failure rolls back successful subtransactions and leaves no receipt", async () => {
+    const t = convexTest(schema, modules);
+    const grantId = await seedGrant(t, { vaultOwnerId: OWNER });
+    const before = await recordSnapshot(t);
+    await expect(saveBatch(t, grantId, "outer-summary-failure", { summary: "", people: [personRow("person:outer-failure", "Synthetic")], evidence: [evidenceRow("outer-failure")] })).rejects.toThrow(/VALIDATION_ERROR/);
+    expect(await recordSnapshot(t)).toEqual(before);
+    expect(await t.run((ctx) => ctx.db.query("mcpOperations").collect())).toEqual([]);
+  });
+
+  test("grant refusal happens before nested writes, including receipt replay", async () => {
+    const t = convexTest(schema, modules);
+    const grantId = await seedGrant(t, { vaultOwnerId: OWNER });
+    const input = { summary: "Synthetic grant-bound batch.", people: [personRow("person:grant-proof", "Synthetic")] };
+    const first = await saveBatch(t, grantId, "grant-proof", input);
+    expect(first.counts.failed).toBe(0);
+    const before = await recordSnapshot(t);
+    await t.run(async (ctx) => {
+      const row = await ctx.db.query("mcpGrants").filter((q) => q.eq(q.field("vaultOwnerId"), OWNER)).first();
+      await ctx.db.patch(row!._id, { status: "revoked" });
+    });
+    await expect(saveBatch(t, grantId, "grant-proof", input)).rejects.toThrow(/GRANT_REVOKED/);
+    await expect(saveBatch(t, grantId, "grant-new-after-revoke", input)).rejects.toThrow(/GRANT_REVOKED/);
+    const foreign = await seedGrant(t, { vaultOwnerId: OTHER });
+    await expect(saveBatch(t, foreign, "wrong-grant-owner", input)).rejects.toThrow(/GRANT_REQUIRED/);
+    expect(await recordSnapshot(t)).toEqual(before);
+  });
+});
