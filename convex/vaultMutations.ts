@@ -13,7 +13,7 @@ import {
   getTrustBoundaryMode,
   handlePolicyViolationMutation,
 } from "./access";
-import { buildStoryBundle, loadStoryScopedSnapshot } from "./vault";
+import { buildStoryBundle, isFirstStartEligible, loadStoryScopedSnapshot } from "./vault";
 import {
   buildProvisionalDedupeKey,
   filterByVaultOwner,
@@ -458,30 +458,7 @@ export const startPrivateWorkspace = mutation({
       };
     }
 
-    const workspaceChecks = await Promise.all([
-      ctx.db.query("persons").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("relationships").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("events").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("personEvents").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("places").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("sources").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("citations").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("citationLinks").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("sourceFacts").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("media").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("contextItems").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("stories").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("importRuns").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("documents").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("researchTasks").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("researchLog").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("storyReviewEvents").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("provisionalRelatives").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("researchChecks").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("historicalContext").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-      ctx.db.query("queueItems").withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId)).first(),
-    ]);
-    if (workspaceChecks.some(Boolean)) {
+    if (!(await isFirstStartEligible(ctx, vaultOwnerId))) {
       throw new Error("First start is only available in an empty private workspace");
     }
 
@@ -1253,8 +1230,30 @@ export const attachMediaFile = mutation({
       if (existing?.storageId && existing.storageId !== args.storageId) {
         await ctx.storage.delete(existing.storageId);
       }
+      // A B2-backed item's pinned original and display copies would otherwise
+      // keep winning over the new bytes in every delivery path. The new file
+      // becomes the active one; the earlier B2 original is kept as history,
+      // and its camera date/location proposal (read from those old bytes) goes
+      // with it.
+      const replacedB2Files = existing?.b2Original
+        ? [
+            ...(existing.replacedB2Files ?? []),
+            {
+              replacedAt: now,
+              original: existing.b2Original,
+              ...(existing.b2Renditions ? { renditions: existing.b2Renditions } : {}),
+              ...(existing.metadataProposal ? { metadataProposal: existing.metadataProposal } : {}),
+            },
+          ]
+        : existing?.replacedB2Files;
       await ctx.db.patch(args.mediaId, {
         ...shared,
+        mediaState: undefined,
+        renditionState: undefined,
+        b2Original: undefined,
+        b2Renditions: undefined,
+        metadataProposal: undefined,
+        replacedB2Files,
         rightsStatus: existing?.rightsStatus ?? "unknown",
         personIds: Array.from(
           new Set([...(existing?.personIds ?? []), ...(args.personIds ?? [])]),

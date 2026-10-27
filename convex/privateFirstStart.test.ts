@@ -115,4 +115,43 @@ describe("private first start", () => {
     );
     expect(new Set(owners)).toEqual(new Set([OWNER]));
   });
+
+  test("the People pages' small eligibility read agrees with the dashboard and stays per owner", async () => {
+    vi.stubEnv("TRUST_BOUNDARY_MODE", "enforce");
+    const t = convexTest(schema, modules);
+    const eligibility = (owner: string) =>
+      t.withIdentity({ subject: owner }).action(api.vaultReads.getFirstStartEligibility, { vaultOwnerId: owner });
+
+    await expect(eligibility(OWNER)).resolves.toEqual({ firstStartEligible: true });
+
+    // A Queue item alone means the workspace has begun.
+    await t.withIdentity({ subject: OTHER_OWNER }).mutation(api.queue.createQueueItem, {
+      vaultOwnerId: OTHER_OWNER,
+      directive: "Find the 1900 census for the family.",
+      idempotencyKey: "first-start-queue-only",
+    });
+    await expect(eligibility(OTHER_OWNER)).resolves.toEqual({ firstStartEligible: false });
+    await expect(
+      t.withIdentity({ subject: OTHER_OWNER }).action(api.vaultReads.getDashboardSummary, { vaultOwnerId: OTHER_OWNER }),
+    ).resolves.toMatchObject({ firstStartEligible: false });
+
+    // Another family's records never count against this one.
+    await expect(eligibility(OWNER)).resolves.toEqual({ firstStartEligible: true });
+
+    await t.withIdentity({ subject: OWNER }).mutation(api.vaultMutations.startPrivateWorkspace, firstStartArgs());
+    await expect(eligibility(OWNER)).resolves.toEqual({ firstStartEligible: false });
+
+    // Asking about someone else's workspace is refused, not answered.
+    await expect(
+      t.withIdentity({ subject: OWNER }).action(api.vaultReads.getFirstStartEligibility, { vaultOwnerId: OTHER_OWNER }),
+    ).rejects.toThrow(/owner_mismatch/);
+  });
+});
+
+
+test("first-start eligibility keeps the existing authenticated-owner policy", async () => {
+  vi.stubEnv("TRUST_BOUNDARY_MODE", "enforce");
+  const t = convexTest(schema, modules);
+  await expect(t.action(api.vaultReads.getFirstStartEligibility, { vaultOwnerId: OWNER })).rejects.toThrow(/missing_identity/);
+  await expect(t.withIdentity({ subject: OTHER_OWNER }).action(api.vaultReads.getFirstStartEligibility, { vaultOwnerId: OWNER })).rejects.toThrow(/owner_mismatch/);
 });

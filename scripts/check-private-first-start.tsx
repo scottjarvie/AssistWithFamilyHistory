@@ -35,4 +35,25 @@ assert.match(mutationSource, /evidenceStatus: "unsourced"/);
 assert.match(mutationSource, /by_owner_creation_operation/);
 assert.match(mutationSource, /First start is only available in an empty private workspace/);
 
+// The People pages ask only "may the first start be offered?". They must not
+// load the whole-vault dashboard summary for that yes/no.
+for (const page of ["../app/app/people/page.tsx", "../app/app/people/new/page.tsx"]) {
+  const pageSource = readFileSync(new URL(page, import.meta.url), "utf8");
+  assert.match(pageSource, /api\.vaultReads\.getFirstStartEligibility/, page);
+  assert.doesNotMatch(pageSource, /getDashboardSummary/, page);
+}
+assert.match(mutationSource, /isFirstStartEligible\(ctx, vaultOwnerId\)/);
+
+// Every table the whole-vault snapshot reads, plus the Queue, decides emptiness.
+const vaultSource = readFileSync(new URL("../convex/vault.ts", import.meta.url), "utf8");
+const snapshotSource = vaultSource.slice(
+  vaultSource.indexOf("export async function getVaultSnapshot"),
+  vaultSource.indexOf("export async function getVaultSnapshot") + 3_000,
+);
+const snapshotTables = [...snapshotSource.matchAll(/byOwner\("(\w+)"\)/g)].map((match) => match[1]);
+const emptyTablesSource = vaultSource.slice(vaultSource.indexOf("export const FIRST_START_EMPTY_TABLES"));
+const emptyTables = [...emptyTablesSource.slice(0, emptyTablesSource.indexOf("] as const")).matchAll(/"(\w+)"/g)].map((match) => match[1]);
+assert.ok(snapshotTables.length >= 20, "found the snapshot's owner tables");
+assert.deepEqual([...emptyTables].sort(), [...snapshotTables, "queueItems"].sort());
+
 console.log("Private first-start UI, authority, and evidence-boundary contract passed");
