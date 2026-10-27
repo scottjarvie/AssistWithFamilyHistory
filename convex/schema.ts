@@ -50,6 +50,14 @@ const recordRefValidator = v.object({
   id: v.string(),
 });
 
+/** One exact provider object version, as pinned on a B2-backed media row. */
+const b2ObjectValidator = v.object({
+  bucketClass: v.union(v.literal("private"), v.literal("public")),
+  bucketName: v.string(), objectKey: v.string(), versionId: v.string(), sha256: v.string(),
+  contentType: v.string(), sizeBytes: v.number(), width: v.optional(v.number()), height: v.optional(v.number()),
+  metadataClean: v.boolean(), verifiedAt: v.string(), transformation: v.optional(v.string()), sourceSha256: v.optional(v.string()),
+});
+
 export default defineSchema({
   /**
    * PERSONS
@@ -919,6 +927,16 @@ export default defineSchema({
         metadataClean: v.boolean(), verifiedAt: v.string(), transformation: v.optional(v.string()), sourceSha256: v.optional(v.string()),
       }),
     })),
+    /**
+     * B2 files this item served before the person replaced its bytes. Kept as
+     * history so a replacement never silently loses an original; delivery
+     * follows only the active file (storageId, or b2Original/b2Renditions).
+     */
+    replacedB2Files: v.optional(v.array(v.object({
+      replacedAt: v.number(),
+      original: b2ObjectValidator,
+      renditions: v.optional(v.object({ tiny: b2ObjectValidator, medium: b2ObjectValidator, large: b2ObjectValidator })),
+    }))),
     metadataProposal: v.optional(v.object({
       temporal: v.object({
         cameraCaptureTime: v.optional(v.string()),

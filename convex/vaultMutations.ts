@@ -1230,8 +1230,29 @@ export const attachMediaFile = mutation({
       if (existing?.storageId && existing.storageId !== args.storageId) {
         await ctx.storage.delete(existing.storageId);
       }
+      // A B2-backed item's pinned original and display copies would otherwise
+      // keep winning over the new bytes in every delivery path. The new file
+      // becomes the active one; the earlier B2 original is kept as history,
+      // and its camera date/location proposal (read from those old bytes) goes
+      // with it.
+      const replacedB2Files = existing?.b2Original
+        ? [
+            ...(existing.replacedB2Files ?? []),
+            {
+              replacedAt: now,
+              original: existing.b2Original,
+              ...(existing.b2Renditions ? { renditions: existing.b2Renditions } : {}),
+            },
+          ]
+        : existing?.replacedB2Files;
       await ctx.db.patch(args.mediaId, {
         ...shared,
+        mediaState: undefined,
+        renditionState: undefined,
+        b2Original: undefined,
+        b2Renditions: undefined,
+        metadataProposal: undefined,
+        replacedB2Files,
         rightsStatus: existing?.rightsStatus ?? "unknown",
         personIds: Array.from(
           new Set([...(existing?.personIds ?? []), ...(args.personIds ?? [])]),
