@@ -70,7 +70,7 @@ export function AppMobileNav({ accountMode, vaultOwnerId, clerkEnabled }: Sideba
             <button
               type="button"
               aria-label="Open app navigation"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-stone-700 text-stone-200"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-stone-700 text-stone-200"
             >
               <Menu className="h-5 w-5" />
             </button>
