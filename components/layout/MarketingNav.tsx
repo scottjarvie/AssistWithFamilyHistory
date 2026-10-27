@@ -60,7 +60,7 @@ export function MarketingNav() {
           </div>
 
           <button
-            className="rounded-md p-2 text-[#2e3d46] md:hidden"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-md text-[#2e3d46] md:hidden"
             aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
             aria-expanded={mobileMenuOpen}
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -74,13 +74,13 @@ export function MarketingNav() {
         </div>
 
         {mobileMenuOpen && (
-          <div className="border-t border-[#b79f7a55] py-4 md:hidden">
-            <div className="flex flex-col gap-4">
+          <div className="max-h-[calc(100dvh-4.5rem)] overflow-y-auto overscroll-contain border-t border-[#b79f7a55] py-4 md:hidden">
+            <div className="flex flex-col gap-1">
               {navLinks.map((link) => (
                 <SafeLink
                   key={link.href}
                   href={link.href}
-                  className="px-2 text-sm font-medium tracking-wide text-[#2e3d46] transition-colors hover:text-[#9f5a2d]"
+                  className="flex min-h-11 items-center px-2 text-base font-medium tracking-wide text-[#2e3d46] transition-colors hover:text-[#9f5a2d]"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   {link.label}

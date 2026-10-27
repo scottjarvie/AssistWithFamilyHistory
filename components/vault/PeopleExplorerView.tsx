@@ -54,7 +54,7 @@ export function PeopleExplorerView({
             defaultValue={query}
             aria-label="Search people"
             placeholder="Search by name, FamilySearch ID, or years"
-            className="h-11 bg-white pl-9 md:h-10"
+            className="h-11 bg-white pl-9 md:pointer-fine:h-10"
           />
         </div>
         <div className="grid grid-cols-[1fr_auto] gap-2 sm:contents">
@@ -62,7 +62,7 @@ export function PeopleExplorerView({
             name="status"
             aria-label="Research state"
             defaultValue={status || ""}
-            className="h-11 rounded-md border border-stone-200 bg-white px-3 text-base text-stone-700 md:h-10 md:text-sm"
+            className="h-11 rounded-md border border-stone-200 bg-white px-3 text-base text-stone-700 md:pointer-fine:h-10 md:pointer-fine:text-sm"
           >
             <option value="">All research states</option>
             <option value="not_started">Not started</option>
@@ -71,7 +71,7 @@ export function PeopleExplorerView({
             <option value="thorough">Thorough</option>
             <option value="complete">Complete</option>
           </select>
-          <Button type="submit" className="h-11 bg-stone-900 hover:bg-stone-800 md:h-10">Filter</Button>
+          <Button type="submit" className="h-11 bg-stone-900 hover:bg-stone-800 md:pointer-fine:h-10">Filter</Button>
         </div>
       </form>
 

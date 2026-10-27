@@ -107,7 +107,7 @@ export function StoryReviewAssignmentForm({
             placeholder="Assign second reviewer"
             className="h-10 w-full border border-stone-300 bg-white px-3 text-sm text-stone-900 outline-none focus:border-amber-600"
           />
-          <label className="flex items-center gap-2 text-sm text-stone-700">
+          <label className="flex min-h-11 items-center gap-2 text-sm text-stone-700 md:pointer-fine:min-h-0">
             <input
               type="checkbox"
               checked={secondReviewApproved}
