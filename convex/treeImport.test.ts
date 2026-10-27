@@ -80,7 +80,7 @@ async function importsWholeTree(people: number) {
     }
     expect(failed).toBe(0);
 
-    const progress = (await t.query(internal.treeImport.getTreeImport, { principal: principal(), importJobId: job.importJobId })) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const progress = (await t.query(internal.treeImport.getTreeImport, { principal: principal(), grantId, importJobId: job.importJobId })) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
     expect(progress.import.status).toBe("completed");
     expect(progress.import.peopleSaved).toBe(people);
     expect(progress.import.nextBatchIndex).toBe(batches.length);
@@ -166,7 +166,7 @@ describe("whole-tree import", () => {
       const again = await send(t, grantId, job.importJobId, 0, batches[0]);
       expect(again.deduplicated).toBe(true);
       expect(again.counts).toEqual(first.counts);
-      const progress = (await t.query(internal.treeImport.getTreeImport, { principal: principal(), importJobId: job.importJobId })) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+      const progress = (await t.query(internal.treeImport.getTreeImport, { principal: principal(), grantId, importJobId: job.importJobId })) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
       expect(progress.import.recordsReceived).toBe(100);
       expect(progress.recentBatches).toHaveLength(1);
     });
@@ -184,7 +184,7 @@ describe("whole-tree import", () => {
       expect(dry.results.filter((row: { status: string }) => row.status === "failed")).toEqual([]);
       expect(await countRows(t, "persons")).toBe(0);
       expect(await countRows(t, "mcpRecordKeys")).toBe(0);
-      const progress = (await t.query(internal.treeImport.getTreeImport, { principal: principal(), importJobId: job.importJobId })) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+      const progress = (await t.query(internal.treeImport.getTreeImport, { principal: principal(), grantId, importJobId: job.importJobId })) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
       expect(progress.import.nextBatchIndex).toBe(0);
     });
 
@@ -277,7 +277,7 @@ describe("whole-tree import", () => {
     expect(result.results[0].possibleDuplicates).toEqual([String(existing)]);
     expect(result.duplicatesSuggested).toBe(1);
     expect(await countRows(t, "persons")).toBe(2);
-    const progress = (await t.query(internal.treeImport.getTreeImport, { principal: principal(), importJobId: job.importJobId })) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const progress = (await t.query(internal.treeImport.getTreeImport, { principal: principal(), grantId, importJobId: job.importJobId })) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
     expect(progress.possibleDuplicates).toHaveLength(1);
     expect(progress.possibleDuplicates[0]).toMatchObject({ possiblySameAsId: String(existing), possiblySameAsName: "Jan Kowalczyk" });
     const connection = await t.run(async (ctx) => ctx.db.query("connections").collect());

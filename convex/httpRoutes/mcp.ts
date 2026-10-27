@@ -1102,7 +1102,7 @@ export function createFamilyHistoryServer(
     // Import progress spans the whole tree, so a selected-people connection is refused here.
     const decision = decideToolAccess({ toolName: "family_history_get_tree_import", resolution, now: Date.now(), input });
     if (!decision.allowed) return refusalResult(decision);
-    return read("family_history_get_tree_import", () => actionCtx.runQuery(treeImport.getTreeImport, { principal, ...input }));
+    return read("family_history_get_tree_import", () => actionCtx.runQuery(treeImport.getTreeImport, { principal, grantId, ...input }));
   });
 
   registerTool("family_history_add_source_content", {

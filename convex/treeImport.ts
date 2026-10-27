@@ -121,6 +121,8 @@ type ChunkContext = {
   planned: Set<string>;
   plannedNow: string[];
   duplicatesSuggested: number;
+  /** Planned citation -> source and fact -> person bindings, carried across dry chunks. */
+  bindings: Map<string, string>;
 };
 
 type RecordType = Doc<"mcpRecordKeys">["recordType"];
@@ -187,7 +189,12 @@ async function lookup(c: ChunkContext, singular: string, key: string, system: st
       q.eq("vaultOwnerId", c.owner).eq("recordType", RECORD_TYPE[singular]).eq("recordKey", mapKey),
     )
     .unique();
-  return row?.recordId ?? null;
+  if (!row) return null;
+  const table = { person: "persons", relationship: "relationships", source: "sources", citation: "citations", note: "notes", media: "media", fact: "events" }[singular] as TableNames | undefined;
+  if (!table || !(await ownedRow(c, table, row.recordId))) {
+    fail("NOT_FOUND", "The record this outside id pointed to is gone or unavailable.", "Correct the outside id or ask the person to review the missing record, then resend this row.");
+  }
+  return row.recordId;
 }
 
 async function remember(c: ChunkContext, singular: string, key: string, recordId: string, system: string = c.job.system) {
@@ -253,7 +260,7 @@ async function upsertRow(
 ): Promise<UpsertOutcome> {
   const now = Date.now();
   if (!args.existingId) {
-    const id = await c.w.insert(args.table, {
+    const inserted = await c.w.insert(args.table, {
       vaultOwnerId: c.owner,
       ...clean(args.doc),
       ...args.createOnly,
@@ -262,10 +269,14 @@ async function upsertRow(
       createdAt: now,
       updatedAt: now,
     });
+    const id = c.w.dryRun ? `planned:${externalRecordKey(c.job.system, args.singular, args.key)}` : inserted;
     await remember(c, args.singular, args.key, id);
     return { id, status: "created" };
   }
-  if (isPlaceholder(args.existingId)) return { id: args.existingId, status: "unchanged" };
+  if (isPlaceholder(args.existingId)) {
+    if (args.linked) await remember(c, args.singular, args.key, args.existingId);
+    return { id: args.existingId, status: args.linked ? "linked" : "unchanged" };
+  }
   const row = await ownedRow(c, args.table, args.existingId);
   if (!row) fail("NOT_FOUND", "The record this outside id pointed to is gone.", "Send the record again under a new key, or ask the person what happened to it.");
   const patch: Record<string, unknown> = {};
@@ -391,6 +402,13 @@ async function importFact(c: ChunkContext, personId: string, personKey: string, 
   const factKey = factKeyFor(personKey, fact);
   const mapped = eventTypeFor(fact.type);
   const existingId = await lookup(c, "fact", factKey);
+  if (existingId) {
+    const belongs = isPlaceholder(existingId)
+      ? c.bindings.get(existingId) === personId
+      : (await c.ctx.db.query("personEvents").withIndex("by_event", q => q.eq("eventId", existingId as Id<"events">)).collect())
+        .some(link => link.vaultOwnerId === c.owner && String(link.personId) === personId);
+    if (!belongs) fail("IDEMPOTENCY_CONFLICT", "This fact key already belongs to a different person.", "Keep the original person's fact key, or send a distinct key for this person's fact.");
+  }
   const saved = await upsertRow(c, {
     table: "events",
     singular: "fact",
@@ -406,6 +424,7 @@ async function importFact(c: ChunkContext, personId: string, personKey: string, 
     },
     createOnly: { importKey: `import:${externalRecordKey(c.job.system, "fact", factKey)}` },
   });
+  c.bindings.set(saved.id, personId);
   if (saved.status === "created") {
     await c.w.insert("personEvents", {
       vaultOwnerId: c.owner,
@@ -626,11 +645,18 @@ async function importCitation(c: ChunkContext, item: any): Promise<Omit<ItemResu
   if (!sourceId) fail("MISSING_SOURCE", `Source ${sourceKey} has not been imported yet.`, "Send the source first, then resend this row.");
   const targets = [];
   for (const target of item.targets.slice(0, TREE_IMPORT_LIMITS.targetsPerCitation)) targets.push(await resolveTarget(c, target));
+  const existingId = await lookup(c, "citation", key);
+  if (existingId) {
+    const previousSource = isPlaceholder(existingId)
+      ? c.bindings.get(existingId)
+      : String((await ownedRow(c, "citations", existingId))!.sourceId);
+    if (previousSource !== sourceId) fail("IDEMPOTENCY_CONFLICT", "This citation key already belongs to a different source.", "Reuse the key with its original source, or send a distinct citation key for this source.");
+  }
   const saved = await upsertRow(c, {
     table: "citations",
     singular: "citation",
     key,
-    existingId: await lookup(c, "citation", key),
+    existingId,
     doc: {
       sourceId: isPlaceholder(sourceId) ? undefined : sourceId,
       page: item.page,
@@ -643,6 +669,7 @@ async function importCitation(c: ChunkContext, item: any): Promise<Omit<ItemResu
     },
     createOnly: { isEvidence: true, importKey: `import:${externalRecordKey(c.job.system, "citation", key)}` },
   });
+  c.bindings.set(saved.id, sourceId);
   if (!isPlaceholder(saved.id)) {
     for (const target of targets) {
       if (isPlaceholder(target.targetId)) continue;
@@ -709,12 +736,14 @@ function keyOf(item: TreeImportItem): string {
   return `#${item.index}`;
 }
 
-async function runChunk(c: ChunkContext, items: TreeImportItem[]): Promise<ItemResult[]> {
+async function runChunk(
+  items: TreeImportItem[],
+  save: (item: TreeImportItem) => Promise<Omit<ItemResult, "kind" | "index">>,
+): Promise<ItemResult[]> {
   const results: ItemResult[] = [];
   for (const item of items) {
-    const importer = IMPORTERS[item.kind];
     try {
-      const saved = await importer(c, item.item);
+      const saved = await save(item);
       results.push({ kind: item.kind, index: item.index, ...saved });
     } catch (error) {
       if (error instanceof ItemFailure) {
@@ -728,7 +757,7 @@ async function runChunk(c: ChunkContext, items: TreeImportItem[]): Promise<ItemR
       let whatToDo = "Correct this row and send it again. The other rows in this batch are saved.";
       if (at >= 0) {
         try {
-          const parsed = JSON.parse(raw.slice(at + marker.length));
+          const parsed = JSON.parse(raw.slice(at + marker.length).split("\n", 1)[0]);
           reason = `${parsed.code}: ${parsed.message}`;
           whatToDo = parsed.recovery ?? whatToDo;
         } catch { /* stable fallback */ }
@@ -773,18 +802,62 @@ const chunkArgs = {
 
 /** A dry run of one chunk. Reads only; the writer changes nothing. */
 export const planTreeImportChunk = internalQuery({
-  args: { ...chunkArgs, plannedKeys: v.array(v.string()) },
+  args: {
+    ...chunkArgs,
+    plannedKeys: v.array(v.string()),
+    plannedRecords: v.optional(v.array(v.object({ key: v.string(), id: v.string() }))),
+    plannedBindings: v.optional(v.array(v.object({ id: v.string(), parentId: v.string() }))),
+  },
   handler: async (ctx, args) => {
     const owner = ownerFromPrincipal(args.principal);
     await assertGrantPermits(ctx, { owner, grantId: args.grantId, toolName: BATCH_TOOL, input: {} });
     const job = await loadJob(ctx, owner, args.importJobId, true);
     const c: ChunkContext = {
       ctx, w: dryWriter(), owner, job, provenance: importProvenance(args.principal, args.operationId),
-      local: new Map(), planned: new Set(args.plannedKeys), plannedNow: [], duplicatesSuggested: 0,
+      local: new Map((args.plannedRecords ?? []).map(row => [row.key, row.id])), planned: new Set(args.plannedKeys), plannedNow: [], duplicatesSuggested: 0,
+      bindings: new Map((args.plannedBindings ?? []).map(row => [row.id, row.parentId])),
     };
-    const results = await runChunk(c, args.items as TreeImportItem[]);
-    const suggested = results.reduce((total, row) => total + (row.possibleDuplicates?.length ?? 0), 0);
-    return { results, plannedKeys: c.plannedNow, duplicatesSuggested: suggested };
+    const results = await runChunk(args.items as TreeImportItem[], async item => {
+      // A failed plan must not publish phantom references or duplicate counters.
+      const row = { ...c, local: new Map(c.local), plannedNow: [], duplicatesSuggested: 0, bindings: new Map(c.bindings) };
+      const saved = await IMPORTERS[item.kind](row, item.item);
+      c.local = row.local;
+      c.plannedNow.push(...row.plannedNow);
+      c.duplicatesSuggested += row.duplicatesSuggested;
+      c.bindings = row.bindings;
+      return saved;
+    });
+    return {
+      results, plannedKeys: c.plannedNow, duplicatesSuggested: c.duplicatesSuggested,
+      plannedBindings: [...c.bindings].map(([id, parentId]) => ({ id, parentId })),
+      plannedRecords: [...c.local].map(([key, id]) => ({ key, id })),
+    };
+  },
+});
+
+/** Each real row is a subtransaction: all its writes roll back on failure. */
+export const applyTreeImportItem = internalMutation({
+  args: {
+    principal: principalValidator, grantId: v.optional(v.string()), importJobId: v.string(), operationId: v.string(),
+    item: v.object({ kind: v.string(), index: v.number(), item: v.any() }),
+  },
+  handler: async (ctx, args) => {
+    const owner = ownerFromPrincipal(args.principal);
+    await assertGrantPermits(ctx, { owner, grantId: args.grantId, toolName: BATCH_TOOL, input: {} });
+    const job = await loadJob(ctx, owner, args.importJobId, true);
+    const c: ChunkContext = {
+      ctx, w: liveWriter(ctx), owner, job, provenance: importProvenance(args.principal, args.operationId),
+      local: new Map(), planned: new Set(), plannedNow: [], duplicatesSuggested: 0, bindings: new Map(),
+    };
+    const item = args.item as TreeImportItem;
+    try {
+      const saved = await IMPORTERS[item.kind](c, item.item);
+      return { saved, duplicatesSuggested: c.duplicatesSuggested };
+    } catch (error) {
+      // Preserve actionable item failures when the exception crosses the child boundary.
+      if (error instanceof ItemFailure) machineError(error.code, error.message, error.whatToDo);
+      throw error;
+    }
   },
 });
 
@@ -799,18 +872,21 @@ export const applyTreeImportChunk = internalMutation({
       .withIndex("by_owner_operation", (q) => q.eq("vaultOwnerId", owner).eq("operationId", args.operationId))
       .unique();
     if (receipt) {
-      if (receipt.requestHash !== args.requestHash) {
+      if (receipt.toolName !== `${BATCH_TOOL}#chunk` || receipt.requestHash !== args.requestHash) {
         machineError("IDEMPOTENCY_CONFLICT", "This operation ID was already used for a different batch.", "Reuse the original batch exactly, or mint a new operationId.");
       }
       return JSON.parse(receipt.resultJson) as { results: ItemResult[]; plannedKeys: string[]; duplicatesSuggested: number };
     }
-    const job = await loadJob(ctx, owner, args.importJobId, true);
-    const c: ChunkContext = {
-      ctx, w: liveWriter(ctx), owner, job, provenance: importProvenance(args.principal, args.operationId),
-      local: new Map(), planned: new Set(), plannedNow: [], duplicatesSuggested: 0,
-    };
-    const results = await runChunk(c, args.items as TreeImportItem[]);
-    const result = { results, plannedKeys: [], duplicatesSuggested: c.duplicatesSuggested };
+    await loadJob(ctx, owner, args.importJobId, true);
+    let duplicatesSuggested = 0;
+    const results = await runChunk(args.items as TreeImportItem[], async item => {
+      const row: { saved: Omit<ItemResult, "kind" | "index">; duplicatesSuggested: number } = await ctx.runMutation(self.applyTreeImportItem, {
+        principal: args.principal, grantId: args.grantId, importJobId: args.importJobId, operationId: args.operationId, item,
+      });
+      duplicatesSuggested += row.duplicatesSuggested;
+      return row.saved;
+    });
+    const result = { results, plannedKeys: [], duplicatesSuggested };
     await ctx.db.insert("mcpOperations", {
       vaultOwnerId: owner,
       operationId: args.operationId,
@@ -889,7 +965,12 @@ export const recordTreeImportBatch = internalMutation({
       .query("mcpOperations")
       .withIndex("by_owner_operation", (q) => q.eq("vaultOwnerId", owner).eq("operationId", args.operationId))
       .unique();
-    if (existing) return { ...(JSON.parse(existing.resultJson) as Record<string, unknown>), deduplicated: true };
+    if (existing) {
+      if (existing.toolName !== BATCH_TOOL || existing.requestHash !== args.requestHash) {
+        machineError("IDEMPOTENCY_CONFLICT", "This operation ID was already used for a different batch.", "Reuse the original batch exactly, or mint a new operationId.");
+      }
+      return { ...(JSON.parse(existing.resultJson) as Record<string, unknown>), deduplicated: true };
+    }
     const job = await loadJob(ctx, owner, args.importJobId, true);
     const results = args.results as ItemResult[];
     const batchCounts = addCounts(emptyCounts(), results);
@@ -1012,10 +1093,12 @@ export const importTreeBatch = internalAction({
     const chunks = chunkBatch(input);
     const results: ItemResult[] = [];
     const planned: string[] = [];
+    let plannedBindings: Array<{ id: string; parentId: string }> = [];
+    let plannedRecords: Array<{ key: string; id: string }> = [];
     let duplicatesSuggested = 0;
     for (const [index, items] of chunks.entries()) {
-      const chunk: { results: ItemResult[]; plannedKeys: string[]; duplicatesSuggested: number } = dryRun
-        ? await ctx.runQuery(self.planTreeImportChunk, { ...base, operationId: args.operationId, items, plannedKeys: planned })
+      const chunk: { results: ItemResult[]; plannedKeys: string[]; duplicatesSuggested: number; plannedBindings?: Array<{ id: string; parentId: string }>; plannedRecords?: Array<{ key: string; id: string }> } = dryRun
+        ? await ctx.runQuery(self.planTreeImportChunk, { ...base, operationId: args.operationId, items, plannedKeys: planned, plannedBindings, plannedRecords })
         : await ctx.runMutation(self.applyTreeImportChunk, {
           ...base,
           operationId: `${args.operationId}#${index}`,
@@ -1024,6 +1107,8 @@ export const importTreeBatch = internalAction({
         });
       results.push(...chunk.results);
       planned.push(...chunk.plannedKeys);
+      plannedBindings = chunk.plannedBindings ?? plannedBindings;
+      plannedRecords = chunk.plannedRecords ?? plannedRecords;
       duplicatesSuggested += chunk.duplicatesSuggested;
     }
 
@@ -1136,11 +1221,13 @@ function jobSummary(job: Doc<"treeImports">) {
 export const getTreeImport = internalQuery({
   args: {
     principal: principalValidator,
+    grantId: v.optional(v.string()),
     importJobId: v.optional(v.string()),
     suggestionsCursor: v.optional(v.union(v.string(), v.null())),
   },
   handler: async (ctx, args) => {
     const owner = ownerFromPrincipal(args.principal);
+    await assertGrantPermits(ctx, { owner, grantId: args.grantId, toolName: "family_history_get_tree_import", input: {} });
     if (!args.importJobId) {
       const jobs = await ctx.db
         .query("treeImports")
@@ -1161,9 +1248,12 @@ export const getTreeImport = internalQuery({
       .paginate({ numItems: 25, cursor: args.suggestionsCursor ?? null });
     const suggestions = [];
     for (const row of page.page) {
-      if (row.vaultOwnerId !== owner || row.state !== "proposed") continue;
-      const a = await ctx.db.get(row.from.id as Id<"persons">);
-      const b = await ctx.db.get(row.to.id as Id<"persons">);
+      if (row.vaultOwnerId !== owner || row.state !== "proposed" || row.from.kind !== "person" || row.to.kind !== "person") continue;
+      const aId = ctx.db.normalizeId("persons", row.from.id);
+      const bId = ctx.db.normalizeId("persons", row.to.id);
+      const a = aId ? await ctx.db.get(aId) : null;
+      const b = bId ? await ctx.db.get(bId) : null;
+      if (!a || !b || a.vaultOwnerId !== owner || b.vaultOwnerId !== owner) continue;
       suggestions.push({
         connectionId: row._id,
         personId: row.from.id,
