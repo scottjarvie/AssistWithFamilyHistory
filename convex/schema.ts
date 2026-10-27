@@ -2009,6 +2009,9 @@ export default defineSchema({
     toolName: v.string(),
     requestHash: v.string(),
     resultJson: v.string(),
+    // Exact receipt retries may reuse the original result only under the same
+    // approving authority. Legacy receipts still require current record checks.
+    authoritySnapshot: v.optional(v.string()),
     clientId: v.string(),
     createdAt: v.number(),
   })

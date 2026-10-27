@@ -181,3 +181,29 @@ describe("required auth session guard", () => {
       .rejects.toThrow("CLERK_JWT_ISSUER_DOMAIN");
   });
 });
+
+
+describe.each(["", "enfroce", "SHADOW", " shadow "])("default tenant enforcement (%s)", (mode) => {
+  beforeEach(() => {
+    enableClerk();
+    vi.stubEnv("TRUST_BOUNDARY_MODE", mode);
+    mocks.auth.mockResolvedValue({ userId: "user_synthetic", getToken: mocks.getToken });
+  });
+
+  it("requires issuer configuration before constructing a protected transport", async () => {
+    await expect(getAuthedConvexClient()).rejects.toThrow("CLERK_JWT_ISSUER_DOMAIN");
+    expect(mocks.setAuth).not.toHaveBeenCalled();
+  });
+
+  it("refuses missing tokens and attaches a legitimate audience-specific token", async () => {
+    vi.stubEnv("CLERK_JWT_ISSUER_DOMAIN", "https://synthetic-issuer.example");
+    mocks.getToken.mockResolvedValue(null);
+    await expect(getAuthedConvexClient()).rejects.toThrow("Unable to authenticate");
+    expect(mocks.setAuth).not.toHaveBeenCalled();
+    mocks.getToken.mockResolvedValue("synthetic-convex-jwt");
+    await expect(getAuthedConvexClient()).resolves.toBeDefined();
+    expect(mocks.getToken).toHaveBeenLastCalledWith({ template: "convex" });
+    expect(mocks.setAuth).toHaveBeenCalledExactlyOnceWith("synthetic-convex-jwt");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});

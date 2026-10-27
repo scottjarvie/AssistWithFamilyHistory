@@ -264,4 +264,24 @@ describe("original records", () => {
     const content = decideToolAccess({ toolName: "family_history_add_source_content", resolution, now: Date.now(), input: { sourceId: "s" } });
     expect(content.allowed).toBe(false);
   });
+
+  test("a selected-people grant cannot link a single-source persona to another person", () => {
+    const resolution = {
+      state: "active" as const,
+      grant: {
+        grantId: "g", clientId: "c", issuer: "i",
+        scopes: ["family_history:research:write"] as never,
+        boundary: { kind: "selected_people" as const, personIds: ["p1"] },
+      },
+    };
+    const input = (personId: string) => ({
+      source: { mode: "create", createKey: "source:x", title: "X", type: "census" },
+      citation: { mode: "create", createKey: "citation:x", confidence: "high" },
+      personas: [{ personaKey: "persona:x", nameAsWritten: "X", personId }],
+    });
+    for (const toolName of ["family_history_save_source_evidence", "save_source_evidence"]) {
+      expect(decideToolAccess({ toolName, resolution, now: Date.now(), input: input("p2") }).allowed).toBe(false);
+      expect(decideToolAccess({ toolName, resolution, now: Date.now(), input: input("p1") }).allowed).toBe(true);
+    }
+  });
 });

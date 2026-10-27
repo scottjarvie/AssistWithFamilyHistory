@@ -418,6 +418,60 @@ describe("record boundaries", () => {
     expect(real.body).toEqual(invented.body);
   });
 
+  test("a selected-people grant's brief and search discover only its own people", async () => {
+    const t = convexTest(schema, modules);
+    const inside = await seedPerson(t, OWNER_A, "Inside");
+    const outside = await seedPerson(t, OWNER_A, "Outside");
+    await t.run(async (ctx) => {
+      const now = Date.now();
+      for (const [personId, label] of [[inside, "Inside"], [outside, "Outside"]] as const) {
+        await ctx.db.insert("stories", {
+          vaultOwnerId: OWNER_A, personId, type: "biography", title: `${label} Boundary story`,
+          content: "synthetic", citationIds: [], status: "draft", generatedBy: "human", createdAt: now, updatedAt: now,
+        });
+        await ctx.db.insert("researchTasks", {
+          vaultOwnerId: OWNER_A, personId, type: "record_search", title: `${label} Boundary task`,
+          status: "todo", priority: "medium", aiSuggested: false, createdAt: now, updatedAt: now,
+        });
+        await ctx.db.insert("researchLog", {
+          vaultOwnerId: OWNER_A, entityType: "person", entityId: personId, activityType: "other",
+          summary: `${label} Boundary finding`, status: "done", createdAt: now, updatedAt: now,
+        });
+      }
+      await ctx.db.insert("sources", { vaultOwnerId: OWNER_A, title: "Outside Boundary source", type: "other", createdAt: now, updatedAt: now });
+    });
+    await seedGrant(t, {
+      vaultOwnerId: OWNER_A,
+      clientId: CLIENT_ID,
+      issuer: ISSUER,
+      boundary: { kind: "selected_people", personIds: [String(inside)] },
+    });
+
+    const brief = await callTool(t, OWNER_A, "family_history_get_brief", {});
+    expect(brief.isError).toBe(false);
+    const briefText = JSON.stringify(brief.body);
+    expect(briefText).toContain("Inside Boundary");
+    expect(briefText).not.toContain("Outside");
+    expect(briefText).not.toContain(String(outside));
+
+    const search = await callTool(t, OWNER_A, "family_history_search", { query: "Boundary" });
+    expect(search.isError).toBe(false);
+    const searchText = JSON.stringify(search.body);
+    expect(searchText).toContain("Inside Boundary");
+    expect(searchText).not.toContain("Outside");
+    expect(searchText).not.toContain(String(outside));
+  });
+
+  test("a whole-workspace grant still discovers the whole vault", async () => {
+    const t = convexTest(schema, modules);
+    await seedPerson(t, OWNER_A, "Inside");
+    await seedPerson(t, OWNER_A, "Outside");
+    await seedGrant(t, { vaultOwnerId: OWNER_A, clientId: CLIENT_ID, issuer: ISSUER });
+    const search = await callTool(t, OWNER_A, "family_history_search", { query: "Boundary", kinds: ["person"] });
+    expect(search.isError).toBe(false);
+    expect((search.body as { results: unknown[] }).results).toHaveLength(2);
+  });
+
   test("a queue-only grant reaches no record tools at all", async () => {
     const t = convexTest(schema, modules);
     await seedGrant(t, {
@@ -550,5 +604,43 @@ describe("token audience", () => {
     await seedGrant(t, { vaultOwnerId: OWNER_A, clientId: CLIENT_ID, issuer: ISSUER });
     const response = await t.fetch("/mcp", rpc("tools/list", await tokenFor(OWNER_A, undefined)));
     expect(response.status).toBe(200);
+  });
+});
+
+
+describe("explicit Queue list boundary", () => {
+  test.each(["selected_people", "queue_only", "whole_workspace"] as const)("%s filters before pagination and outside expiry reconciliation", async (kind) => {
+    const t = convexTest(schema, modules);
+    const queueItem = async (label: string) => (await t.withIdentity({ subject: OWNER_A }).mutation(api.queue.createQueueItem, { vaultOwnerId: OWNER_A, directive: label, chosenAiId: "oauth-chosen-ai", idempotencyKey: label })).item._id;
+    const allowed = [await queueItem("Allowed first"), await queueItem("Allowed second")];
+    const outside = await queueItem("Outside expired item");
+    await t.run((ctx) => ctx.db.patch(outside, { state: "working", activeActorKind: "chosen_ai", activeActorId: "oauth-chosen-ai", leaseExpiresAt: Date.now() - 1000 }));
+    const before = await t.run((ctx) => ctx.db.get(outside));
+    const grantId = await seedGrant(t, { vaultOwnerId: OWNER_A, clientId: CLIENT_ID, issuer: ISSUER, scopes: ["family_history:queue:read"], boundary: { kind, personIds: [], queueItemIds: allowed.map(String) } });
+    const seen = [];
+    let cursor: string | null = null;
+    for (let page = 0; page < 5; page++) {
+      const result = await callTool(t, OWNER_A, "family_history_get_queue", { action: "list", limit: 1, cursor });
+      expect(result.isError).toBe(false);
+      expect(JSON.stringify(result)).not.toContain("Outside expired item");
+      seen.push(...(result.body!.page as Array<{ _id: string }>).map((row) => row._id));
+      if (result.body!.isDone) break;
+      cursor = result.body!.continueCursor as string;
+    }
+    expect(seen.sort()).toEqual(allowed.map(String).sort());
+    expect(await t.run((ctx) => ctx.db.get(outside))).toEqual(before);
+    await t.run((ctx) => ctx.db.patch(grantId as import("./_generated/dataModel").Id<"mcpGrants">, { status: "revoked" }));
+    const revoked = await callTool(t, OWNER_A, "family_history_get_queue", { action: "list" });
+    expect(revoked.isError).toBe(true);
+    expect(revoked.body?.code).toBe("GRANT_REVOKED");
+  });
+
+  test.each([undefined, []])("an absent or empty Queue item restriction preserves scope-authorized access (%j)", async (queueItemIds) => {
+    const t = convexTest(schema, modules);
+    const item = await t.withIdentity({ subject: OWNER_A }).mutation(api.queue.createQueueItem, { vaultOwnerId: OWNER_A, directive: "Allowed unbounded Queue", chosenAiId: "oauth-chosen-ai", idempotencyKey: "unbounded" });
+    await seedGrant(t, { vaultOwnerId: OWNER_A, clientId: CLIENT_ID, issuer: ISSUER, scopes: ["family_history:queue:read"], boundary: { kind: "queue_only", queueItemIds } });
+    const result = await callTool(t, OWNER_A, "family_history_get_queue", { action: "list" });
+    expect(result.isError).toBe(false);
+    expect((result.body?.page as Array<{ _id: string }>).map((row) => row._id)).toEqual([item.item._id]);
   });
 });

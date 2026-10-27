@@ -729,7 +729,7 @@ they cannot see Vercel's.** `convex/auth.config.ts`, `convex/access.ts`, and
 | `CLERK_JWT_ISSUER_DOMAIN` | `https://clerk.assistwithfamilyhistory.com` | `convex/auth.config.ts` | **No trusted provider is registered.** Every authenticated Convex call loses its identity; also the fallback source for `MCP_AUTH_SERVER_URL`. |
 | `MCP_RESOURCE_URL` | `https://assistwithfamilyhistory.com/mcp` | `convex/httpRoutes/mcp.ts` | Falls back to the same canonical default in code, so this is a confirmation. A *wrong* value is worse than an absent one. |
 | `MCP_AUTH_SERVER_URL` | `https://clerk.assistwithfamilyhistory.com` | `convex/httpRoutes/mcp.ts` | Falls back to `CLERK_JWT_ISSUER_DOMAIN`. If both are absent, `/mcp` throws `Missing MCP_AUTH_SERVER_URL`. |
-| `TRUST_BOUNDARY_MODE` | whatever posture is already in force (`shadow` or `enforce`) | `convex/access.ts`, `convex/trustBoundary.ts` | Only the exact string `enforce` denies; anything else is shadow. **Do not change this as part of this release.** |
+| `TRUST_BOUNDARY_MODE` | whatever posture is already in force (`shadow` or `enforce`) | `convex/access.ts`, `convex/trustBoundary.ts` | Since 2026-10-21 only the exact string `shadow` relaxes checks; unset or anything else enforces. **Do not change this as part of this release.** |
 
 Read them without changing anything:
 

@@ -291,9 +291,9 @@ describe("Family History joined MCP acceptance cleanup", () => {
     vi.stubEnv("CONVEX_CLOUD_URL", "https://accomplished-dodo-308.convex.cloud");
     const t = convexTest(schema, modules);
     await expect(t.action(api.mcpAcceptanceFixture.inspect, { vaultOwnerId: OWNER, runKey: RUN_KEY }))
-      .rejects.toThrow("requires the exact authenticated synthetic test identity");
+      .rejects.toThrow(/requires the exact authenticated synthetic test identity|missing_identity/);
     await expect(t.withIdentity({ subject: "user_someone_else" }).action(api.mcpAcceptanceFixture.inspect, { vaultOwnerId: OWNER, runKey: RUN_KEY }))
-      .rejects.toThrow("requires the exact authenticated synthetic test identity");
+      .rejects.toThrow(/requires the exact authenticated synthetic test identity|owner_mismatch/);
   });
 
   test("refuses cleanup when an unmarked record reuses the synthetic person", async () => {
