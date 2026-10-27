@@ -52,7 +52,7 @@ export default async function PeoplePage({
   let firstStartEligible = false;
 
   try {
-    const [peopleResult, eligibility] = await Promise.all([
+    const [peopleResult, summary] = await Promise.all([
       client.action(api.vaultReads.getPeopleExplorer, {
         vaultOwnerId,
         search: params.q || undefined,
@@ -66,10 +66,10 @@ export default async function PeoplePage({
             : undefined,
         limit: visibleCount + 1,
       }),
-      client.action(api.vaultReads.getFirstStartEligibility, { vaultOwnerId }),
+      client.action(api.vaultReads.getDashboardSummary, { vaultOwnerId }),
     ]);
     people = peopleResult;
-    firstStartEligible = eligibility.firstStartEligible;
+    firstStartEligible = summary.firstStartEligible;
   } catch (error) {
     const issue = getConvexRuntimeIssue(error);
 
