@@ -283,4 +283,32 @@ describe("tree import safe refresh and truthful preview", () => {
     expect(after.citations[0].importState.linksHash).not.toBe(before.citations[0].importState.linksHash);
   });
 
+
+  test.each([false, true])("preview links distinct relationship keys for the same pair (personsAlreadySaved=%s)", async personsAlreadySaved => {
+    const { t, send } = await setup();
+    const persons = [person("A"), person("B", "Other")];
+    if (personsAlreadySaved) await send({ persons }, "initial");
+    const input = { ...(personsAlreadySaved ? {} : { persons }), relationships: ["R1", "R2"].map(key => ({ key, type: "Couple", person1Key: "A", person2Key: "B" })) };
+    const before = await snapshot(t);
+    const dry = await send({ ...input, dryRun: true }, "dry");
+    expect(await snapshot(t)).toEqual(before);
+    const real = await send(input, "real");
+    expect(dry.counts).toEqual(real.counts);
+    expect(real.counts.relationships).toMatchObject({ created: 1, linked: 1 });
+    expect((await snapshot(t)).relationships).toHaveLength(1);
+  });
+
+  test.each(["out", "in"])("preview relationship matching sees prior moved-%s endpoints", async direction => {
+    const { t, send } = await setup();
+    const rel = (key: string, a: string, b: string) => ({ key, type: "Couple", person1Key: a, person2Key: b });
+    await send({ persons: [person("A"), person("B", "B"), person("C", "C"), person("D", "D")], relationships: [rel("old", direction === "out" ? "A" : "C", direction === "out" ? "B" : "D")] }, "initial");
+    const input = { relationships: [rel("old", direction === "out" ? "C" : "A", direction === "out" ? "D" : "B"), rel("new", "A", "B")] };
+    const before = await snapshot(t);
+    const dry = await send({ ...input, dryRun: true }, "dry");
+    expect(await snapshot(t)).toEqual(before);
+    const real = await send(input, "real");
+    expect(dry.counts).toEqual(real.counts);
+    expect(real.counts.relationships).toMatchObject({ updated: 1, ...(direction === "out" ? { created: 1 } : { linked: 1 }) });
+  });
+
 });

@@ -578,13 +578,21 @@ async function importRelationship(c: ChunkContext, item: any): Promise<Omit<Item
   if (person1 === person2) fail("VALIDATION_ERROR", "A person cannot be related to themself.", "Check the two person keys.");
   let existingId = await lookup(c, "relationship", key);
   let linked = false;
-  if (!existingId && !isPlaceholder(person1) && !isPlaceholder(person2)) {
-    // A relationship the person already entered by hand is the same one.
-    const rows = await c.ctx.db
+  if (!existingId) {
+    // Match both persisted and earlier virtual rows, including planned people.
+    // Refill the DB window when an overlaid relationship moved out of it.
+    const overlaid = c.w.dryRun ? [...c.rows.values()].filter(row => row.table === "relationships").map(row => row.doc) : [];
+    const existingOverlays = overlaid.filter(row => !isPlaceholder(String(row._id))).length;
+    const databaseRows = isPlaceholder(person1) ? [] : await c.ctx.db
       .query("relationships")
       .withIndex("by_type_person1", (q) => q.eq("type", item.type).eq("person1", person1 as Id<"persons">))
-      .take(50);
-    const match = rows.find((row) => row.person2 === person2 && matchesVaultOwner(row.vaultOwnerId, c.owner));
+      .take(50 + existingOverlays);
+    const overlayIds = new Set(overlaid.map(row => String(row._id)));
+    const rows = [...databaseRows.filter(row => !overlayIds.has(String(row._id))), ...overlaid]
+      .filter(row => row.type === item.type && String(row.person1) === person1)
+      .sort((a, b) => a._creationTime - b._creationTime || String(a._id).localeCompare(String(b._id)))
+      .slice(0, 50);
+    const match = rows.find((row) => String(row.person2) === person2 && matchesVaultOwner(row.vaultOwnerId, c.owner));
     if (match) {
       existingId = String(match._id);
       linked = true;
