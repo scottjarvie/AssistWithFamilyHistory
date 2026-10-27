@@ -397,18 +397,32 @@ async function importPerson(c: ChunkContext, item: any): Promise<Omit<ItemResult
   };
 }
 
+/** Composite outside keys must also agree with the fact's actual person link. */
+async function assertFactPerson(c: ChunkContext, factId: string, personId: string) {
+  const belongs = isPlaceholder(factId)
+    ? c.bindings.get(factId) === personId
+    : !isPlaceholder(personId) && Boolean(await c.ctx.db.query("personEvents")
+      .withIndex("by_person_and_event", q => q.eq("personId", personId as Id<"persons">).eq("eventId", factId as Id<"events">))
+      .filter(q => q.eq(q.field("vaultOwnerId"), c.owner)).first());
+  if (!belongs) fail("IDEMPOTENCY_CONFLICT", "This fact key already belongs to a different person.", "Keep the original person's fact key, or send a distinct key for this person's fact.");
+}
+
+async function factFor(c: ChunkContext, personKey: unknown, key: unknown): Promise<string> {
+  const personKeyText = requiredKey(personKey, "fact personKey");
+  const personId = await personFor(c, personKeyText, "fact personKey");
+  const factKey = `${personKeyText}/${requiredKey(key, "fact key")}`;
+  const id = await lookup(c, "fact", factKey);
+  if (!id) fail("MISSING_TARGET", `The fact ${factKey} has not been imported yet.`, "Send the person's fact first, then resend this row.");
+  await assertFactPerson(c, id, personId);
+  return id;
+}
+
 async function importFact(c: ChunkContext, personId: string, personKey: string, fact: any) {
   if (typeof fact?.type !== "string" || !fact.type.trim()) return;
   const factKey = factKeyFor(personKey, fact);
   const mapped = eventTypeFor(fact.type);
   const existingId = await lookup(c, "fact", factKey);
-  if (existingId) {
-    const belongs = isPlaceholder(existingId)
-      ? c.bindings.get(existingId) === personId
-      : (await c.ctx.db.query("personEvents").withIndex("by_event", q => q.eq("eventId", existingId as Id<"events">)).collect())
-        .some(link => link.vaultOwnerId === c.owner && String(link.personId) === personId);
-    if (!belongs) fail("IDEMPOTENCY_CONFLICT", "This fact key already belongs to a different person.", "Keep the original person's fact key, or send a distinct key for this person's fact.");
-  }
+  if (existingId) await assertFactPerson(c, existingId, personId);
   const saved = await upsertRow(c, {
     table: "events",
     singular: "fact",
@@ -631,9 +645,8 @@ async function resolveTarget(c: ChunkContext, target: TargetInput): Promise<{ ta
   const key = requiredKey(target?.key, "target key");
   const singular = target.kind === "fact" ? "fact" : target.kind;
   if (!(target.kind in TARGET_TABLE)) fail("VALIDATION_ERROR", `Unknown target kind ${String(target.kind)}.`, "Use person, relationship, fact, note or media.");
-  const lookupKey = target.kind === "fact" ? `${requiredKey(target.personKey, "target personKey")}/${key}` : key;
-  const id = await lookup(c, singular, lookupKey);
-  if (!id) fail("MISSING_TARGET", `The ${target.kind} ${lookupKey} has not been imported yet.`, "Send what the citation supports first, then resend this row.");
+  const id = target.kind === "fact" ? await factFor(c, target.personKey, key) : await lookup(c, singular, key);
+  if (!id) fail("MISSING_TARGET", `The ${target.kind} ${key} has not been imported yet.`, "Send what the citation supports first, then resend this row.");
   return { targetType: TARGET_TABLE[target.kind], targetId: id, ...(target.field ? { field: target.field.slice(0, 80) } : {}) };
 }
 
@@ -697,8 +710,8 @@ async function importNote(c: ChunkContext, item: any): Promise<Omit<ItemResult, 
   const subject = item.subject ?? {};
   const kind = NOTE_SUBJECT_KIND[subject.kind as keyof typeof NOTE_SUBJECT_KIND];
   if (!kind) fail("VALIDATION_ERROR", "A note needs a subject.", "Say which person, relationship, fact, source, citation or media the note belongs to.");
-  const subjectKey = subject.kind === "fact" ? `${requiredKey(subject.personKey, "subject personKey")}/${requiredKey(subject.key, "subject key")}` : requiredKey(subject.key, "subject key");
-  const subjectId = await lookup(c, subject.kind === "fact" ? "fact" : subject.kind, subjectKey);
+  const subjectKey = requiredKey(subject.key, "subject key");
+  const subjectId = subject.kind === "fact" ? await factFor(c, subject.personKey, subjectKey) : await lookup(c, subject.kind, subjectKey);
   if (!subjectId) fail("MISSING_TARGET", `The ${subject.kind} ${subjectKey} has not been imported yet.`, "Send the record the note belongs to first, then resend this row.");
   const saved = await upsertRow(c, {
     table: "notes",
@@ -981,15 +994,20 @@ export const recordTreeImportBatch = internalMutation({
       .map((row) => ({ kind: row.kind, key: row.key.slice(0, TREE_IMPORT_LIMITS.key), reason: (row.reason ?? "failed").slice(0, 300) }));
     const now = Date.now();
     const nextBatchIndex = Math.max(job.nextBatchIndex, args.batchIndex + 1);
-    const cursor = cleanText(args.cursor, "cursor", TREE_IMPORT_LIMITS.cursor) ?? job.cursor;
+    // Corrections may resend earlier indexes, but resume/completion belong to
+    // the latest committed frontier. Resending that latest batch may finish it.
+    const atFrontier = args.batchIndex >= job.nextBatchIndex - 1;
+    const batchCursor = cleanText(args.cursor, "cursor", TREE_IMPORT_LIMITS.cursor) ?? job.cursor;
+    const cursor = atFrontier ? batchCursor : job.cursor;
+    const completed = args.final && atFrontier;
     await ctx.db.patch(job._id, {
       counts,
       nextBatchIndex,
       cursor,
       recordsReceived: job.recordsReceived + args.records,
       duplicatesSuggested: job.duplicatesSuggested + args.duplicatesSuggested,
-      status: args.final ? "completed" : "open",
-      ...(args.final ? { completedAt: now } : {}),
+      status: completed ? "completed" : "open",
+      ...(completed ? { completedAt: now } : {}),
       updatedAt: now,
     });
     await ctx.db.insert("treeImportBatches", {
@@ -1001,7 +1019,7 @@ export const recordTreeImportBatch = internalMutation({
       counts: batchCounts,
       duplicatesSuggested: args.duplicatesSuggested,
       failures,
-      cursor,
+      cursor: batchCursor,
       createdAt: now,
     });
     const totals = Object.values(batchCounts).reduce(
@@ -1026,7 +1044,7 @@ export const recordTreeImportBatch = internalMutation({
       importJobId: job._id,
       batchIndex: args.batchIndex,
       nextBatchIndex,
-      status: args.final ? "completed" : "open",
+      status: completed ? "completed" : "open",
       cursor: cursor ?? null,
       counts: batchCounts,
       duplicatesSuggested: args.duplicatesSuggested,

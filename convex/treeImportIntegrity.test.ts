@@ -241,4 +241,43 @@ describe("tree import integrity boundaries", () => {
     await expect(t.query(internal.treeImport.getTreeImport, { principal: principal(), grantId: expired, importJobId: job })).rejects.toThrow(/GRANT_EXPIRED/);
   });
 
+
+  test.each([[false, false], [true, false], [false, true], [true, true]])("fact citation and note targets verify the named person (personExists=%s,dryRun=%s)", async (personExists, dryRun) => {
+    const { t, grantId, job } = await setup();
+    await send(t, grantId, job, {
+      sources: [{ key: "source", title: "Synthetic source" }],
+      persons: [{ ...person("A/B"), facts: [{ key: "C", type: "RESI" }] }, ...(personExists ? [person("A")] : [])],
+    }, "fact-target-initial");
+    const before = await data(t);
+    const wrongTarget = { kind: "fact", personKey: "A", key: "B/C" };
+    const result = await send(t, grantId, job, { dryRun, citations: [{ key: "target-citation", sourceKey: "source", targets: [wrongTarget] }], notes: [{ key: "target-note", text: "Synthetic note", subject: wrongTarget }] }, "wrong-fact-target");
+    expect(result.counts.citations.failed).toBe(1);
+    expect(result.counts.notes.failed).toBe(1);
+    expect(result.results.every((r: any) => r.reason.includes(personExists ? "IDEMPOTENCY_CONFLICT" : "MISSING_PERSON"))).toBe(true);
+    expect(await data(t)).toEqual(before);
+    const target = { kind: "fact", personKey: "A/B", key: "C" };
+    const valid = await send(t, grantId, job, { dryRun, citations: [{ key: "target-citation", sourceKey: "source", targets: [target] }], notes: [{ key: "target-note", text: "Synthetic note", subject: target }] }, "valid-fact-target");
+    expect(valid.counts.citations.created).toBe(1);
+    expect(valid.counts.notes.created).toBe(1);
+    const after = await data(t);
+    if (dryRun) expect(after).toEqual(before);
+    else {
+      expect(after.citationLinks[0].targetId).toBe(before.events[0]._id);
+      expect(after.notes[0].subject.id).toBe(before.events[0]._id);
+    }
+  });
+
+  test("an older corrected batch cannot rewind the cursor or complete a later frontier", async () => {
+    const { t, grantId, job } = await setup();
+    await send(t, grantId, job, { batchIndex: 0, cursor: "after-0", persons: [person("zero")] }, "zero");
+    await send(t, grantId, job, { batchIndex: 1, cursor: "after-1", persons: [person("one")] }, "one");
+    const corrected = await send(t, grantId, job, { batchIndex: 0, cursor: "after-0", final: true, persons: [person("zero", "Corrected")] }, "correct-old-zero");
+    expect(corrected).toMatchObject({ nextBatchIndex: 2, cursor: "after-1", status: "open" });
+    expect((await data(t)).persons.find((p: any) => p.fsId === "zero").name.given).toBe("Corrected");
+    const next = await send(t, grantId, job, { batchIndex: 2, cursor: "after-2", persons: [person("two")] }, "two");
+    expect(next).toMatchObject({ nextBatchIndex: 3, cursor: "after-2", status: "open" });
+    const final = await send(t, grantId, job, { batchIndex: 2, cursor: "after-2", final: true, persons: [person("two")] }, "finish-latest");
+    expect(final).toMatchObject({ nextBatchIndex: 3, cursor: "after-2", status: "completed" });
+  });
+
 });
