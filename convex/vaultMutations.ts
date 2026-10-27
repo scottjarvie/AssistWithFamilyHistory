@@ -1242,6 +1242,7 @@ export const attachMediaFile = mutation({
               replacedAt: now,
               original: existing.b2Original,
               ...(existing.b2Renditions ? { renditions: existing.b2Renditions } : {}),
+              ...(existing.metadataProposal ? { metadataProposal: existing.metadataProposal } : {}),
             },
           ]
         : existing?.replacedB2Files;

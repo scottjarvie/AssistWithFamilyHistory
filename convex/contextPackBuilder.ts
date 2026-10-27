@@ -1,4 +1,5 @@
 import type { Doc } from "./_generated/dataModel";
+import { currentMediaForExport } from "../lib/media/currentMediaForExport";
 
 type ContextPackCitation = Pick<
   Doc<"citations">,
@@ -154,7 +155,7 @@ export function buildContextPack(workspace: ContextPackWorkspace, gates: Context
     // GEN-72: filter media by AI eligibility (reviewed/redacted +
     // non-private + aiUseAllowed=true). Items the user opted out of AI
     // use must not ship to the AI context-pack export.
-    memories: workspace.media.filter(gates.isContextPackEligibleMedia),
+    memories: workspace.media.filter(gates.isContextPackEligibleMedia).map(currentMediaForExport),
     sourceFacts: workspace.sourceFacts,
     reviewedContextItems,
     // Source-doc rows can contain raw extraction text, private notes,

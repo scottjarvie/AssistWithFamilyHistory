@@ -58,6 +58,32 @@ const b2ObjectValidator = v.object({
   metadataClean: v.boolean(), verifiedAt: v.string(), transformation: v.optional(v.string()), sourceSha256: v.optional(v.string()),
 });
 
+/** Camera/GPS proposal and the person's decision for one exact original. */
+const mediaMetadataProposalValidator = v.object({
+  temporal: v.object({
+    cameraCaptureTime: v.optional(v.string()),
+    scanTime: v.optional(v.string()),
+    fileModifiedTime: v.optional(v.string()),
+    uploadTime: v.string(),
+    inferredHistoricalEventDate: v.optional(v.string()),
+  }),
+  location: v.optional(v.object({
+    latitude: v.number(),
+    longitude: v.number(),
+    source: v.literal("embedded_gps"),
+    status: v.literal("proposed"),
+    association: v.union(v.literal("person_media"), v.literal("event"), v.literal("place")),
+    precision: v.literal("exact_private"),
+    disclosurePrecision: v.union(v.literal("withheld"), v.literal("locality"), v.literal("region")),
+  })),
+  extractedFromOriginalSha256: v.string(),
+  extractedAt: v.string(),
+  reversible: v.literal(true),
+  decision: v.union(v.literal("pending"), v.literal("accepted"), v.literal("declined")),
+  acceptedAt: v.optional(v.string()),
+  declinedAt: v.optional(v.string()),
+});
+
 export default defineSchema({
   /**
    * PERSONS
@@ -936,31 +962,9 @@ export default defineSchema({
       replacedAt: v.number(),
       original: b2ObjectValidator,
       renditions: v.optional(v.object({ tiny: b2ObjectValidator, medium: b2ObjectValidator, large: b2ObjectValidator })),
+      metadataProposal: v.optional(mediaMetadataProposalValidator),
     }))),
-    metadataProposal: v.optional(v.object({
-      temporal: v.object({
-        cameraCaptureTime: v.optional(v.string()),
-        scanTime: v.optional(v.string()),
-        fileModifiedTime: v.optional(v.string()),
-        uploadTime: v.string(),
-        inferredHistoricalEventDate: v.optional(v.string()),
-      }),
-      location: v.optional(v.object({
-        latitude: v.number(),
-        longitude: v.number(),
-        source: v.literal("embedded_gps"),
-        status: v.literal("proposed"),
-        association: v.union(v.literal("person_media"), v.literal("event"), v.literal("place")),
-        precision: v.literal("exact_private"),
-        disclosurePrecision: v.union(v.literal("withheld"), v.literal("locality"), v.literal("region")),
-      })),
-      extractedFromOriginalSha256: v.string(),
-      extractedAt: v.string(),
-      reversible: v.literal(true),
-      decision: v.union(v.literal("pending"), v.literal("accepted"), v.literal("declined")),
-      acceptedAt: v.optional(v.string()),
-      declinedAt: v.optional(v.string()),
-    })),
+    metadataProposal: v.optional(mediaMetadataProposalValidator),
     recordedVia: v.optional(v.object({
       actorKind: v.union(v.literal("person"), v.literal("chosen_ai"), v.literal("migration")),
       clientName: v.optional(v.string()),

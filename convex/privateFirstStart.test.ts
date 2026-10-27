@@ -147,3 +147,11 @@ describe("private first start", () => {
     ).rejects.toThrow(/owner_mismatch/);
   });
 });
+
+
+test("first-start eligibility keeps the existing authenticated-owner policy", async () => {
+  vi.stubEnv("TRUST_BOUNDARY_MODE", "enforce");
+  const t = convexTest(schema, modules);
+  await expect(t.action(api.vaultReads.getFirstStartEligibility, { vaultOwnerId: OWNER })).rejects.toThrow(/missing_identity/);
+  await expect(t.withIdentity({ subject: OTHER_OWNER }).action(api.vaultReads.getFirstStartEligibility, { vaultOwnerId: OWNER })).rejects.toThrow(/owner_mismatch/);
+});

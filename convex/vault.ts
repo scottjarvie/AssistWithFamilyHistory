@@ -2154,10 +2154,15 @@ export const getPlaceWorkspace = internalQuery({
 
 /**
  * Whether this owner's workspace is genuinely empty, so the two-person private
- * first start may be offered. One indexed `.first()` per owner table instead
- * of loading the whole vault: the People pages only need this yes/no.
+ * first start may be offered. At most one indexed `.first()` per owner table;
+ * populated person graphs stop after one read. Only pass an owned snapshot
+ * already loaded by this query in the same transaction (the dashboard).
  */
-export async function isFirstStartEligible(ctx: QueryCtx, vaultOwnerId: string): Promise<boolean> {
+export async function isFirstStartEligible(
+  ctx: QueryCtx,
+  vaultOwnerId: string,
+  ownedSnapshot?: VaultSnapshot,
+): Promise<boolean> {
   const firstOwned = (table: string) =>
     ctx.db
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2165,7 +2170,17 @@ export async function isFirstStartEligible(ctx: QueryCtx, vaultOwnerId: string):
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .withIndex("by_owner" as any, (q: any) => q.eq("vaultOwnerId", vaultOwnerId))
       .first();
-  const rows = await Promise.all(FIRST_START_EMPTY_TABLES.map(firstOwned));
+  // Dashboard already loaded this owner's graph in the same query transaction.
+  // Reuse it instead of fetching those 20 tables again just to test emptiness.
+  if (ownedSnapshot) {
+    if (Object.values(ownedSnapshot).some((rows) => rows.length > 0)) return false;
+    return (await firstOwned("queueItems")) === null;
+  }
+
+  // Most existing workspaces have people. Avoid fetching even the first
+  // document/story body in those families; empty graphs still check every table.
+  if (await firstOwned("persons")) return false;
+  const rows = await Promise.all(FIRST_START_EMPTY_TABLES.filter((table) => table !== "persons").map(firstOwned));
   return rows.every((row) => row === null);
 }
 
@@ -2211,7 +2226,7 @@ export const getDashboardSummary = internalQuery({
     const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
     const peopleRows = buildPeopleRows(snapshot);
     const personById = new Map(snapshot.people.map((person) => [String(person._id), person]));
-    const firstStartEligible = await isFirstStartEligible(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
+    const firstStartEligible = await isFirstStartEligible(ctx, normalizeVaultOwnerId(args.vaultOwnerId), snapshot);
 
     return {
       firstStartEligible,
