@@ -75,6 +75,7 @@
     "check:production-live": "tsx scripts/check-production-live.ts",
     "mcp:lifecycle": "tsx scripts/mcp-lifecycle.ts",
     "test:convex": "vitest run",
+    "test:tree-import-5k": "vitest run --config vitest.treeimport.config.ts",
     "dev:live": "node scripts/local-development.mjs live",
     "dev:sandbox": "node scripts/local-development.mjs sandbox",
     "dev:backend": "node scripts/local-development.mjs backend",

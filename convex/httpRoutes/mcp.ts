@@ -12,6 +12,7 @@ import {
   hashMcpInput,
 } from "../../lib/mcp/contract";
 import { FAMILY_HISTORY_SCOPES, findTool } from "../../lib/mcp/catalog";
+import { TREE_IMPORT_LIMITS } from "../../lib/treeImport/model";
 import {
   CONNECTION_SETTINGS_URL,
   decideToolAccess,
@@ -41,6 +42,7 @@ const queue = (internal as any).queue;
 const evidence = (internal as any).mcpEvidence;
 const mediaEvidence = (internal as any).mediaEvidenceStorage;
 const grants = (internal as any).mcpGrants;
+const treeImport = (internal as any).treeImport;
 
 type VerifiedPrincipal = {
   issuer: string;
@@ -451,6 +453,121 @@ function compactPersonWorkspace(workspace: any) {
     truncated: ["relationships", "events", "sources", "citations", "sourceFacts", "researchTasks", "researchLog", "stories", "places"].some((key) => (workspace[key]?.length ?? 0) > cap),
   };
 }
+
+/* ------------------------------------------------- whole-tree import input */
+
+const importKey = z.string().trim().min(1).max(TREE_IMPORT_LIMITS.key);
+const importExternalId = z.object({
+  system: z.string().trim().min(2).max(TREE_IMPORT_LIMITS.system),
+  id: importKey,
+  url: z.string().url().max(2_000).optional(),
+}).strict();
+const importPlace = z.object({ original: z.string().trim().min(1).max(500) }).strict();
+const importFact = z.object({
+  key: importKey.optional(),
+  type: z.string().trim().min(1).max(200),
+  date: dateValue.optional(),
+  place: importPlace.optional(),
+  value: z.string().trim().max(1_000).optional(),
+  description: z.string().trim().max(2_000).optional(),
+}).strict();
+const importTarget = z.object({
+  kind: z.enum(["person", "relationship", "fact", "note", "media"]),
+  key: importKey,
+  personKey: importKey.optional(),
+  field: z.string().trim().max(80).optional(),
+}).strict();
+const importPerson = z.object({
+  key: importKey,
+  otherIds: z.array(importExternalId).max(10).optional(),
+  names: z.array(z.object({
+    type: z.string().trim().max(80).optional(),
+    given: z.string().trim().max(160).optional(),
+    surname: z.string().trim().max(160).optional(),
+    prefix: z.string().trim().max(80).optional(),
+    suffix: z.string().trim().max(80).optional(),
+    nickname: z.string().trim().max(160).optional(),
+    preferred: z.boolean().optional(),
+  }).strict()).min(1).max(TREE_IMPORT_LIMITS.namesPerPerson),
+  sex: z.enum(["male", "female", "unknown"]).optional(),
+  living: z.boolean(),
+  facts: z.array(importFact).max(TREE_IMPORT_LIMITS.factsPerPerson).optional(),
+  tags: z.array(z.string().trim().min(1).max(80)).max(30).optional(),
+  sourceUrl: z.string().url().max(2_000).optional(),
+}).strict();
+const importRelationship = z.object({
+  key: importKey,
+  type: z.enum(["Couple", "ParentChild"]),
+  person1Key: importKey,
+  person2Key: importKey,
+  lineage: z.enum(["biological", "adopted", "step", "foster", "guardianship", "unknown"]).optional(),
+  facts: z.array(z.object({ type: z.string().trim().min(1).max(120), date: dateValue.optional(), place: importPlace.optional(), description: z.string().trim().max(1_000).optional() }).strict()).max(20).optional(),
+  otherIds: z.array(importExternalId).max(10).optional(),
+}).strict();
+const importSource = z.object({
+  key: importKey,
+  title: z.string().trim().min(1).max(FAMILY_HISTORY_MCP_LIMITS.shortText),
+  type: z.string().trim().max(80).optional(),
+  repository: z.string().trim().max(500).optional(),
+  url: z.string().url().max(2_000).optional(),
+  author: z.string().trim().max(500).optional(),
+  publicationDate: z.string().trim().max(160).optional(),
+  citationText: z.string().trim().max(FAMILY_HISTORY_MCP_LIMITS.notes).optional(),
+  recordDate: z.string().trim().max(160).optional(),
+  recordPlace: z.string().trim().max(500).optional(),
+  notes: z.string().trim().max(FAMILY_HISTORY_MCP_LIMITS.notes).optional(),
+  otherIds: z.array(importExternalId).max(10).optional(),
+}).strict();
+const importCitation = z.object({
+  key: importKey.optional(),
+  sourceKey: importKey,
+  page: z.string().trim().max(500).optional(),
+  quality: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]).optional(),
+  extractedText: z.string().trim().max(FAMILY_HISTORY_MCP_LIMITS.notes).optional(),
+  url: z.string().url().max(2_000).optional(),
+  accessDate: z.string().trim().max(80).optional(),
+  notes: z.string().trim().max(FAMILY_HISTORY_MCP_LIMITS.notes).optional(),
+  targets: z.array(importTarget).min(1).max(TREE_IMPORT_LIMITS.targetsPerCitation),
+}).strict();
+const importNote = z.object({
+  key: importKey,
+  title: z.string().trim().max(FAMILY_HISTORY_MCP_LIMITS.shortText).optional(),
+  text: z.string().trim().min(1).max(TREE_IMPORT_LIMITS.noteText),
+  noteType: z.enum(["general", "research", "biography", "transcription", "source", "other"]).optional(),
+  subject: z.object({
+    kind: z.enum(["person", "relationship", "fact", "media", "source", "citation"]),
+    key: importKey,
+    personKey: importKey.optional(),
+  }).strict(),
+}).strict();
+const importMedia = z.object({
+  key: importKey,
+  title: z.string().trim().min(1).max(FAMILY_HISTORY_MCP_LIMITS.shortText),
+  type: z.enum(["photo", "document", "scan", "video", "audio", "other"]).optional(),
+  url: z.string().url().max(2_000).optional(),
+  description: z.string().trim().max(FAMILY_HISTORY_MCP_LIMITS.notes).optional(),
+  mimeType: z.string().trim().max(120).optional(),
+  date: z.object({ year: z.number().int().optional(), month: z.number().int().min(1).max(12).optional(), day: z.number().int().min(1).max(31).optional() }).strict().optional(),
+  personKeys: z.array(importKey).max(50).optional(),
+  sourceKey: importKey.optional(),
+}).strict();
+const treeImportPerKind = TREE_IMPORT_LIMITS.recordsPerBatch;
+// The 500-record total is enforced again in convex/treeImport.ts; a refine()
+// here would hide the object shape from the published tool schema.
+const treeImportBatchInput = z.object({
+  operationId,
+  importJobId: id,
+  batchIndex: z.number().int().min(0),
+  cursor: z.string().max(TREE_IMPORT_LIMITS.cursor).optional(),
+  dryRun: z.boolean().optional(),
+  final: z.boolean().optional(),
+  sources: z.array(importSource).max(treeImportPerKind).optional(),
+  persons: z.array(importPerson).max(treeImportPerKind).optional(),
+  relationships: z.array(importRelationship).max(treeImportPerKind).optional(),
+  media: z.array(importMedia).max(treeImportPerKind).optional(),
+  citations: z.array(importCitation).max(treeImportPerKind).optional(),
+  notes: z.array(importNote).max(treeImportPerKind).optional(),
+}).strict();
 
 function withOperation<T extends z.ZodType>(schema: T) {
   return z.intersection(z.object({ operationId }).strict(), schema);
@@ -961,6 +1078,36 @@ export function createFamilyHistoryServer(
     annotations: writeSafe,
   }, (input: any) => write("family_history_save_records", mcp.saveRecords, input));
 
+  registerTool("family_history_begin_tree_import", {
+    inputSchema: z.object({
+      operationId,
+      importKey: z.string().trim().min(3).max(FAMILY_HISTORY_MCP_LIMITS.recordKey),
+      system: z.string().trim().min(2).max(TREE_IMPORT_LIMITS.system).regex(/^[A-Za-z0-9_.-]+$/),
+      label: z.string().trim().min(1).max(FAMILY_HISTORY_MCP_LIMITS.shortText),
+      rootExternalId: z.string().trim().min(1).max(TREE_IMPORT_LIMITS.key).optional(),
+      expectedPeople: z.number().int().min(0).max(1_000_000).optional(),
+    }).strict(),
+    annotations: writeSafe,
+  }, (input: any) => write("family_history_begin_tree_import", treeImport.beginTreeImport, input));
+
+  registerTool("family_history_import_tree_batch", {
+    inputSchema: treeImportBatchInput,
+    annotations: writeSafe,
+  }, (input: any) => writeAction("family_history_import_tree_batch", treeImport.importTreeBatch, input));
+
+  registerTool("family_history_get_tree_import", {
+    inputSchema: z.object({
+      importJobId: id.optional(),
+      suggestionsCursor: z.string().max(500).nullable().optional(),
+    }).strict(),
+    annotations: readOnly,
+  }, async (input: any) => {
+    // Import progress spans the whole tree, so a selected-people connection is refused here.
+    const decision = decideToolAccess({ toolName: "family_history_get_tree_import", resolution, now: Date.now(), input });
+    if (!decision.allowed) return refusalResult(decision);
+    return read("family_history_get_tree_import", () => actionCtx.runQuery(treeImport.getTreeImport, { principal, ...input }));
+  });
+
   registerTool("family_history_add_source_content", {
     inputSchema: z.object({
       operationId,
@@ -1142,7 +1289,7 @@ async function handleMcp(actionCtx: ActionCtx, request: Request) {
   if (typeof subject !== "string" || typeof principalIssuer !== "string") return challenge(resource);
   const rawBody = await request.clone().arrayBuffer();
   if (rawBody.byteLength > FAMILY_HISTORY_MCP_LIMITS.requestBytes) {
-    return new Response(JSON.stringify({ error: "request_too_large", error_description: "Family History MCP requests are limited to 256 KiB." }), { status: 413, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
+    return new Response(JSON.stringify({ error: "request_too_large", error_description: `Family History MCP requests are limited to ${FAMILY_HISTORY_MCP_LIMITS.requestBytes / 1024} KiB.` }), { status: 413, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
   }
 
   // Parsed before the grant is resolved because the client's self-declared name

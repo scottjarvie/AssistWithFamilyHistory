@@ -257,6 +257,14 @@ export function namedRecordsInInput(toolName: string, input: unknown): NamedReco
       if (args.mode === "update") found.unattributable = true;
       break;
     }
+    case "family_history_begin_tree_import":
+    case "family_history_import_tree_batch":
+    case "family_history_get_tree_import": {
+      // A whole tree is, by definition, not a set of already-approved people.
+      // Import needs a whole-workspace connection.
+      found.unattributable = true;
+      break;
+    }
     case "family_history_add_source_content": {
       // A source is not a person; selected-people grants cannot attribute it.
       found.unattributable = true;

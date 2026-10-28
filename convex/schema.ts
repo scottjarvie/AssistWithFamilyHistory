@@ -30,6 +30,13 @@ const creationProvenanceValidator = v.object({
   recordedAt: v.number(),
 });
 
+/** An id a record has on an outside site: a FamilySearch PID, an Ancestry id, a GEDCOM xref. */
+const externalIdValidator = v.object({
+  system: v.string(),
+  id: v.string(),
+  url: v.optional(v.string()),
+});
+
 /** A reference to any record in the vault, used by Connections. */
 const recordRefValidator = v.object({
   kind: v.union(
@@ -195,6 +202,11 @@ export default defineSchema({
       })
     ),
     creationRole: v.optional(v.union(v.literal("starting_person"), v.literal("related_person"))),
+
+    // Ids this person has on outside sites (FamilySearch PID, GEDCOM xref, ...)
+    // and the whole-tree import that last brought them in.
+    externalIds: v.optional(v.array(externalIdValidator)),
+    importJobId: v.optional(v.id("treeImports")),
     
     // Metadata
     createdAt: v.number(),
@@ -204,6 +216,8 @@ export default defineSchema({
     .index("by_owner_creation_operation", ["vaultOwnerId", "creationProvenance.operationId"])
     .index("by_fsId", ["fsId"])
     .index("by_surname", ["name.surname"])
+    // Whole-tree import duplicate suggestions: same owner, surname, nearby birth year.
+    .index("by_owner_surname_birth_year", ["vaultOwnerId", "name.surname", "birth.date.year"])
     .index("by_research_status", ["researchStatus"])
     .index("by_living", ["living"]),
 
@@ -273,6 +287,8 @@ export default defineSchema({
     // FamilySearch integration
     familySearchId: v.optional(v.string()),
     importKey: v.optional(v.string()),
+    externalIds: v.optional(v.array(externalIdValidator)),
+    importJobId: v.optional(v.id("treeImports")),
 
     creationProvenance: v.optional(
       v.object({
@@ -372,7 +388,10 @@ export default defineSchema({
     description: v.optional(v.string()),
     notes: v.optional(v.string()),
     importKey: v.optional(v.string()),
-    
+    externalIds: v.optional(v.array(externalIdValidator)),
+    importJobId: v.optional(v.id("treeImports")),
+    creationProvenance: v.optional(creationProvenanceValidator),
+
     // Metadata
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -562,11 +581,8 @@ export default defineSchema({
     language: v.optional(v.string()),
     citationText: v.optional(v.string()),
     imageUrl: v.optional(v.string()),
-    externalIds: v.optional(v.array(v.object({
-      system: v.string(),
-      id: v.string(),
-      url: v.optional(v.string()),
-    }))),
+    externalIds: v.optional(v.array(externalIdValidator)),
+    importJobId: v.optional(v.id("treeImports")),
     creationProvenance: v.optional(creationProvenanceValidator),
 
     // Notes
@@ -620,6 +636,9 @@ export default defineSchema({
     // Notes and conflicts
     notes: v.optional(v.string()),
     conflictsWith: v.optional(v.array(v.id("citations"))),
+    externalIds: v.optional(v.array(externalIdValidator)),
+    importJobId: v.optional(v.id("treeImports")),
+    creationProvenance: v.optional(creationProvenanceValidator),
     
     // Metadata
     createdAt: v.number(),
@@ -642,7 +661,9 @@ export default defineSchema({
       v.literal("person"),
       v.literal("relationship"),
       v.literal("event"),
-      v.literal("place")
+      v.literal("place"),
+      v.literal("note"),
+      v.literal("media")
     ),
     targetId: v.string(),                       // ID of the linked record
     field: v.optional(v.string()),              // What specific field this supports
@@ -860,13 +881,15 @@ export default defineSchema({
     reason: v.optional(v.string()),
     state: v.union(v.literal("proposed"), v.literal("accepted"), v.literal("rejected")),
     importKey: v.optional(v.string()),
+    importJobId: v.optional(v.id("treeImports")),
     creationProvenance: v.optional(creationProvenanceValidator),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_owner", ["vaultOwnerId"])
     .index("by_from", ["from.kind", "from.id"])
-    .index("by_to", ["to.kind", "to.id"]),
+    .index("by_to", ["to.kind", "to.id"])
+    .index("by_import_job", ["importJobId"]),
 
   /**
    * MEDIA
@@ -984,7 +1007,10 @@ export default defineSchema({
     personIds: v.array(v.id("persons")),
     sourceId: v.optional(v.id("sources")),
     importKey: v.optional(v.string()),
-    
+    externalIds: v.optional(v.array(externalIdValidator)),
+    importJobId: v.optional(v.id("treeImports")),
+    creationProvenance: v.optional(creationProvenanceValidator),
+
     // FamilySearch integration
     familySearchUrl: v.optional(v.string()),
 
@@ -1192,6 +1218,85 @@ export default defineSchema({
     .index("by_person_fsId", ["personFsId"])
     .index("by_imported_at", ["importedAt"])
     .index("by_capture_id", ["captureId"]),
+
+  /**
+   * NOTES
+   * Free-text notes attached to any record: a person, a relationship, one fact
+   * (an event), a source, a citation, a photo. GEDCOM NOTE / GEDCOM X Note.
+   * Private like everything else; an imported note says where it came from.
+   */
+  notes: defineTable({
+    vaultOwnerId: v.string(),
+    subject: recordRefValidator,
+    noteType: v.union(
+      v.literal("general"),
+      v.literal("research"),
+      v.literal("biography"),
+      v.literal("transcription"),
+      v.literal("source"),
+      v.literal("other"),
+    ),
+    title: v.optional(v.string()),
+    text: v.string(),
+    externalIds: v.optional(v.array(externalIdValidator)),
+    importJobId: v.optional(v.id("treeImports")),
+    creationProvenance: v.optional(creationProvenanceValidator),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner", ["vaultOwnerId"])
+    .index("by_subject", ["subject.kind", "subject.id"]),
+
+  /**
+   * TREE IMPORTS
+   * One resumable whole-tree import session: a person's AI walking their tree
+   * on an outside site and sending it here in batches. Holds progress and the
+   * AI's own resume cursor; every record it touched points back here.
+   */
+  treeImports: defineTable({
+    vaultOwnerId: v.string(),
+    importKey: v.string(),
+    system: v.string(),
+    label: v.string(),
+    rootExternalId: v.optional(v.string()),
+    status: v.union(v.literal("open"), v.literal("completed")),
+    nextBatchIndex: v.number(),
+    cursor: v.optional(v.string()),
+    expectedPeople: v.optional(v.number()),
+    recordsReceived: v.number(),
+    duplicatesSuggested: v.number(),
+    // Per kind (sources, persons, relationships, media, citations, notes):
+    // created / updated / unchanged / linked / failed. Shape: lib/treeImport/model.ts ImportCounts.
+    counts: v.any(),
+    clientId: v.string(),
+    grantId: v.optional(v.id("mcpGrants")),
+    startedAt: v.number(),
+    updatedAt: v.number(),
+    completedAt: v.optional(v.number()),
+  })
+    .index("by_owner", ["vaultOwnerId"])
+    .index("by_owner_key", ["vaultOwnerId", "importKey"])
+    .index("by_owner_updated", ["vaultOwnerId", "updatedAt"]),
+
+  /** One row per batch an import received: the per-batch activity entry. */
+  treeImportBatches: defineTable({
+    vaultOwnerId: v.string(),
+    importJobId: v.id("treeImports"),
+    batchIndex: v.number(),
+    operationId: v.string(),
+    records: v.number(),
+    counts: v.any(),
+    duplicatesSuggested: v.number(),
+    failures: v.array(v.object({
+      kind: v.string(),
+      key: v.string(),
+      reason: v.string(),
+    })),
+    cursor: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_owner", ["vaultOwnerId"])
+    .index("by_job_batch", ["importJobId", "batchIndex"]),
 
   /**
    * FAMILYSEARCH SYNC
@@ -2055,6 +2160,8 @@ export default defineSchema({
       v.literal("connection"),
       v.literal("source_content"),
       v.literal("persona"),
+      v.literal("note"),
+      v.literal("media"),
     ),
     recordKey: v.string(),
     recordId: v.string(),
