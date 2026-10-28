@@ -2,9 +2,9 @@
 
 > **Philosophy status:** Canonical product identity and claim boundary
 >
-> **Product document version:** 1.10.0
+> **Product document version:** 1.11.0
 >
-> **Philosophy date:** 2026-09-03
+> **Philosophy date:** 2026-10-21
 >
 > **Capability evidence last verified:** 2026-09-03
 >
@@ -30,9 +30,11 @@ provenance only and are not a current operating dependency.
 > **Canonical:**
 > `docs/planning/assist-with-family-history-project-philosophy.md`
 >
-> **Family Core:** Assist With Sites — Core Philosophy v1.6.3 (2026-08-08)
+> **Family Core:** Assist With Sites — Core Philosophy v1.17.1 (2026-10-14)
 >
-> **Aligned:** 2026-08-08 — the complete published Core, repository, tracker,
+> **Aligned:** 2026-10-21 — re-audited against Core v1.17.1 in the
+> [Core 1.17.1 alignment amendment](#amendment-2026-10-21-core-1-17-1-alignment)
+> below. First aligned 2026-08-08 (Core v1.6.3) — the complete published Core, repository, tracker,
 > delivery configuration, and public deployment records reviewed through
 > prerequisite merge `f7edb92` and state proof `dc30429`
 >
@@ -57,7 +59,8 @@ provenance only and are not a current operating dependency.
 > Tracker/provider setup is **Current / verified** in AWF-WO-001 through useful
 > state commit `dc30429`. Independent audit remains **Not audited** in AWF-0004;
 > that fact does not erase the observed delivery evidence. Product capability
-> gaps remain explicit rather than assumptions.
+> gaps remain explicit rather than assumptions. The 2026-10-21 amendment lists
+> each Core 1.17.1 requirement still deferred, with the tracker item that owns it.
 >
 > **Differs:** Family History keeps its
 > research-to-story purpose and audience; Research Spine; domain objects and
@@ -76,7 +79,9 @@ provenance only and are not a current operating dependency.
 > commit `dc30429`; Actions run `31273074126`; Vercel ignored deployment
 > `dpl_8FfUtYW5FBJ6sZLbXGkiZtbQvf3a`; retained live deployment
 > `dpl_vngjLJMJRMBgo7dM6gpBvT2p7C6J`. Product capabilities remain separately
-> unverified where marked **Unknown**.
+> unverified where marked **Unknown**. Core v1.17.1 re-audit: commit
+> `1114f6ce8c4af56c48e7b9e97eccf97929d917a9`, source SHA-256
+> `a2442bbb3a6713079e77c88b3825174ca465cd74667cb8611517e93b32a36683`.
 
 > **Owner authority clarification:** 2026-08-09 — a person may discuss or
 > direct their chosen AI however they want outside Family History. The product
@@ -159,6 +164,100 @@ Use these status labels throughout this revision:
 
 This matrix is the current contradiction/adoption record. The dated capability
 ledger later in the document provides the deeper repository evidence boundary.
+
+## Amendment 2026-10-21: Core 1.17.1 alignment
+
+> **Dated:** 2026-10-21 · **By:** Claude (Opus 5.5), unattended run · **Core reviewed:**
+> Assist With Sites — Core Philosophy **v1.17.1** (2026-10-14), read from
+> `scottjarvie/assistwithlife` `origin/main`, `planning/assist-with-sites-core-philosophy.md`.
+> **Repository reviewed:** `origin/main` at `6dfb0d6` (PR #85, 2026-10-14).
+> This is an audit record, not a claim that anything below is live beyond what the evidence column says.
+
+The alignment record above was first written against Core v1.6.3 (2026-08-08). Since then the
+family Core has changed in ways that matter here, in plain terms:
+
+- **The Queue is three states plus one flag.** Waiting on AI, AI working, Answered, with
+  "Needs your input" as a flag that can sit on any of them, including an Answered item.
+  The four-state list in "Four Queue states, exactly" below is out of date (Core §4, §17.2 step 4).
+- **Signing in is the approval.** OAuth sign-in plus Allow grants the whole ordinary toolset;
+  `/settings/ai` only narrows. Family History adopted this in PR #82.
+- **Every site has a Library** (Research, Prompts, Resources; labels may vary) and an
+  **AI Suggestions** surface beside the Queue. A connected AI may add attributed Queue items.
+- **"True or absent."** A public page says a feature exists or says nothing. "Coming soon" is
+  only for a major feature Scott has deliberately deferred for months (Core §10, ruling of 2026-08-20).
+  This changes the meaning of the **Coming soon** status label used in the matrix above:
+  read it as "build target in the tracker", never as public copy.
+- **Synchronized `/ai`, `/ai.txt`, `/llms.txt`** generated from the catalogue, plus a
+  first-party upload relay so nobody allowlists Backblaze (Core §6, 1.13.0).
+- **Dense data:** Table, List and Grid on every data-heavy page, with search, sort and the
+  two-line filter, and the same filter vocabulary in the MCP find tools (Core §14).
+- **Local Live and Local Sandbox on `main`**, and the delivery rule: preview on localhost,
+  ship in batches, the AI merges routine work (Core §16.5, §16.6).
+
+Status words in this table: **Adopted** (repository evidence shows it), **Deferred** (a
+build target, with the tracker item that owns it), **Differs** (a deliberate Family History
+expression, with the reason).
+
+| Core section | Requirement | Family History | Evidence |
+|---|---|---|---|
+| §2, §17.2.1 | Project Philosophy aligned to the current Core | Adopted (by this amendment) | This section. `docs/tracker/tracker.json` `familyCore.label` still reads v1.6.3 and should be updated in the same change |
+| §16.1 | Repo-owned Cards, Work Orders, Guide | Adopted | `docs/tracker/` (GUIDE.md, tracker.json, cards, work-orders AWF-WO-001 to 020) |
+| §2, §6 | Home page: promise line, person/AI/site roles, FAQ, `/ai` invitation | Deferred (partial) | FAQ and `/ai` link on `app/page.tsx`; Site Guide "Pages and features" says Home lacks the promise line and the person/AI/site explanation |
+| §6 | Public Ideas and Usage page at `/ideas-and-usage` | Deferred | No `app/ideas-and-usage/` route; Site Guide lists it "to build" |
+| §4, §17.2.4 | Three lifecycle states plus Needs-your-input flag, tab order Waiting on AI first, Everything last | Deferred | `convex/schema.ts` `queueItems.state` is `needs_you, working, waiting_for_your_ai, done`; `lib/queue/contract.ts` `QUEUE_STATES`. Owned by AWF-0060; migration plan in AWF-0073 |
+| §4 | Archive with Show archived; delete | Deferred (delete only) | `convex/queue.ts` `deleteQueueItemBatch` hard-deletes; cancel writes `state: "done", condition: "canceled"`; no archive field |
+| §4 | Queue item page | Deferred | No `app/app/queue/[id]` route; AWF-0060 |
+| §4 | Connected AI may add attributed Queue items | Deferred | Catalog has only `family_history_get_queue` and `family_history_update_queue` (`lib/mcp/catalog.ts`); Site Guide gap list |
+| §4 | AI Suggestions surface | Deferred | No route or table; AWF-0060 |
+| §4 | Priority is the person's; the AI sets no priority | Adopted | `queueItems.priority` is set at creation; `family_history_update_queue` input schemas in `convex/httpRoutes/mcp.ts` carry no priority field |
+| §4 | "Add context" by domain | Differs | Three Family History groups (research subject, evidence, work thread) on `queueItems.context`; Site Guide renames them who or where / evidence / work |
+| §4b, §5 | Library in main nav; catalogue and checkout tools | Deferred | No `/library` route, no catalogue tool. Site Guide AWF-WO-019 |
+| §4b | Shelf labels | Differs | Site Guide: Research · Sources · Instructions · Stories. Core permits per-site labels and an added shelf |
+| §5 | Remote stateless `/mcp` on 2026-07-28 | Adopted | `app/mcp/route.ts`, `convex/httpRoutes/mcp.ts`, both `.well-known/oauth-protected-resource` routes |
+| §5 | Domain-prefixed underscore tool names | Adopted | 16 tools whose names start with `family_history_` plus 12 aliases with `ALIAS_SUNSET` in `lib/mcp/catalog.ts` |
+| §5 | Signing in is the approval; Settings only narrows | Adopted | PR #82 (`e0afbda`); `convex/mcpGrants.ts`; owner decision 6 Oct 2026 in the Site Guide |
+| §5 | Read and write separate; no broad database tool | Adopted | `family_history:queue:read` vs `queue:work` scopes; `NEVER_EXPOSED` / `NEVER_PERMITTED` in the catalog |
+| §5 | Connected and supported claims need a real-client proof | Deferred | Site Guide: no real client has run against production; AWF-0043 (needs-you) |
+| §6 | `/ai` and `/ai.txt` generated from the catalogue | Adopted | `app/ai.txt/route.ts` imports `FAMILY_HISTORY_TOOLS`; `check:public-ai-truth` |
+| §6 | `/llms.txt` from the same source | Deferred | `app/llms.txt/route.ts` does not read the catalog; Site Guide says it names old aliases |
+| §6 | First-party upload relay; never allowlist Backblaze | Adopted | `app/api/mcp-media-upload/[uploadRef]/[token]/route.ts`; PRs #81 and #83; `lib/media/evidenceB2.ts` |
+| §7, §17.2.6 | Activity entry on anything an AI creates or changes | Deferred (partial) | `queueActivity` and `agentActivity` tables exist; no single per-record history yet |
+| §7, §9 | Export, delete, `/settings/data`, `/delete-account` | Deferred | No such routes; Site Guide "Export and delete: to build" |
+| §8 | Visibility field, Private by default | Adopted | `privacyLevel` (private default) on `media` and `contextItems`; Unlisted and Trusted held by the 6 Oct owner decision "No new sharing in the first builds" |
+| §9 | Stack: GitHub, Vercel, Convex, Clerk, Backblaze for media | Adopted | `vercel.json`, `convex/`, Clerk sign-in routes, `bucketClass: private, public` in `convex/schema.ts` |
+| §9 | Shared URL map (`/queue`, `/me`, `/settings/ai`, top-level collections) | Deferred | Signed-in pages live under `/app/`; `app/settings/ai/page.tsx` redirects to `/app/settings/ai`. The Site Guide targets the Core map with permanent redirects, so this is a gap, not a deliberate difference |
+| §10 | `/updates` with Local / In review / Backend live / Public & live | Adopted | `app/updates/page.tsx`. The habit lapsed: Site Guide notes no release entry since 2.2.0 (17 Aug) despite later shipments |
+| §10 | True or absent; no "Coming soon" | Deferred | Site Guide: `/features` and `/roadmap` still show "Coming soon" |
+| §11 | `/me` with the vital counts | Deferred | No route; Site Guide card list AWF-0010, 0016 to 0021 |
+| §11 | `/admin`, deployment-allowlisted, counts only | Deferred | No route; `app/app/api/admin` is the old API-key console, slated for retirement |
+| §12 | Support link with registered source key | Deferred (partial) | `lib/site/supportDesk.ts` and `check:support-contact` send people to the Life desk; no source key or header/footer link |
+| §15 | Row of sites | Deferred | Not built (Site Guide) |
+| §13 | Own palette and motif | Differs | Parchment, evidence green `#245a43`, annotation rust `#a65332`, archive gold `#98702b` (`tracker.json` palette). The Core registry row "walnut sepia + gold-leaf" is a proposal; Family History keeps its settled archival identity |
+| §13 | Dark and light, first-class | Deferred | Philosophy matrix: product UI does not yet prove light/dark |
+| §13 | Phone shell with bottom nav | Deferred | Site Guide design: People · Sources · Queue · Library · Menu; not built |
+| §14 | Table · List · Grid, sort, two-line filter, same vocabulary in MCP | Deferred | Site Guide: views not built; search needs typed text and has no paging |
+| §16.5 | Local Live and Local Sandbox on `main` | Adopted | PR #79 (`831c07f`) and #85; `dev:live` / `dev:sandbox` in `package.json`; `scripts/local-development.mjs`; AWF-WO-020 |
+| §16.6 | Localhost first; batches; AI merges routine work | Adopted | `AGENTS.md` "Delivering Changes" cites §16.6; PR #84; `scripts/vercel-ignore-build.mjs` |
+
+Tally: 14 Adopted, 21 Deferred, 3 Differs.
+
+**Core 1.18.0, noted only.** A reconciled 1.18.0 draft (2026-10-21) is not yet on `main`. Its
+additions that touch Family History: navigation placement is the person's choice (§13; already
+AWF-0051), connected building blocks are filters too (§14), durable context behind an answer
+(§4b; close to AWF-0070's "original record first"), a two-column Ideas and Usage page and
+home-page refinements (§1, §6), and a public bucket plus one private user bucket per site
+(§16.3; Family History's two B2 buckets already match). Re-audit when 1.18.0 merges.
+
+### What this does not change
+
+- Family History's own philosophy stays authoritative for its purpose, users, domain objects,
+  evidence model, living-person review, voice and design. The Core is the shared chassis.
+- Where this Project Philosophy and the canonical Site Guide (Edition 2, 6 October 2026)
+  differ, the Site Guide's dated owner decisions win, as the Site Guide itself states.
+- The section "Four Queue states, exactly" stays in place as history until AWF-0060 ships;
+  its state list is superseded by Core §4 and the Site Guide's Queue entry, which already
+  name the family lifecycle and order.
+- Nothing here changes code, data, providers or public pages.
 
 ## One-sentence identity
 
@@ -1873,6 +1972,12 @@ before it was run.
 
 ## Changelog
 
+- **1.11.0 · 2026-10-21** — re-audited the product against Core v1.17.1
+  (2026-10-14) and recorded the result as a dated amendment: 14 requirements
+  adopted, 21 deferred with their tracker owners, 3 deliberate differences. The
+  Queue's four stored states (with "needs you" as a state) do not yet match
+  Core §4's three states plus a Needs-your-input flag; AWF-0073 holds the data
+  migration plan. No code, data, provider or public-page change.
 - **1.10.0 · 2026-09-03** — corrected the chosen-AI capability record to the
   deployed seven-permission, sixteen-tool catalog and the private image-upload
   work. Made the authority tiers explicit: OAuth grants nothing automatically,

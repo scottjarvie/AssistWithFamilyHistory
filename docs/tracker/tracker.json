@@ -6,10 +6,10 @@
   "idPrefix": "AWF",
   "projectPhilosophy": "../planning/assist-with-family-history-project-philosophy.md",
   "familyCore": {
-    "label": "Assist With Sites — Core Philosophy v1.6.3",
-    "date": "2026-08-08",
-    "commit": "db658ab091bcfbb71f62db55d5b8b6d51b64e52f",
-    "sourceSha256": "6c354eb33422d6b48453c578b93d5a32551fbe3008ce58673a0f11437335a30c",
+    "label": "Assist With Sites — Core Philosophy v1.17.1",
+    "date": "2026-10-14",
+    "commit": "1114f6ce8c4af56c48e7b9e97eccf97929d917a9",
+    "sourceSha256": "a2442bbb3a6713079e77c88b3825174ca465cd74667cb8611517e93b32a36683",
     "url": "https://github.com/scottjarvie/assistwithlife/blob/main/planning/assist-with-sites-core-philosophy.md"
   },
   "guide": "GUIDE.md",
