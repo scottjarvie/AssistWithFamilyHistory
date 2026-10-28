@@ -29,7 +29,7 @@ const contactItems = [
   },
   {
     title: "Privacy Questions",
-    label: "View privacy request status",
+    label: "View privacy intake status",
     description: "Questions about storage, processing, or data handling.",
   },
 ];
