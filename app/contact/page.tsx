@@ -19,17 +19,17 @@ export const metadata: Metadata = createPageMetadata({
 const contactItems = [
   {
     title: "General Support",
-    label: "Open a support request",
+    label: "View support desk status",
     description: "Questions about setup, usage, and troubleshooting.",
   },
   {
     title: "Feature Requests",
-    label: "Share product feedback",
+    label: "View feedback intake status",
     description: "Suggestions for new tools, improvements, and workflows.",
   },
   {
     title: "Privacy Questions",
-    label: "Ask a privacy question",
+    label: "View privacy request status",
     description: "Questions about storage, processing, or data handling.",
   },
 ];
@@ -52,8 +52,9 @@ export default function ContactPage() {
               >
                 {SUPPORT_DESK_LABEL}
               </SafeAnchor>
-              . {NO_DIRECT_EMAIL_STATEMENT} Bring a support request, feedback, or a
-              privacy question there and it reaches the same place.
+              . {NO_DIRECT_EMAIL_STATEMENT} Check the desk&apos;s current intake status
+              before preparing a request. If intake is closed, it cannot accept
+              or save support, feedback, or privacy requests.
             </p>
           </div>
 
