@@ -331,6 +331,17 @@ async function savePersonRecord(ctx: MutationCtx, owner: string, input: any, pro
   }
   const row = await owned(ctx, "persons", input.personId, owner, "Person");
   assertFresh(row, input.expectedUpdatedAt, "Person");
+  // A person the owner entered or imported carries their conclusions about who
+  // this is. An AI proposes a different name, sex, living state or date as a
+  // candidate source fact; it does not rewrite the person's record.
+  const identityChanges = PERSON_IDENTITY_FIELDS.filter((field) => input[field] !== undefined);
+  if (identityChanges.length > 0 && row.creationProvenance?.actorKind !== "chosen_ai") {
+    machineError(
+      "FORBIDDEN",
+      `Only the person can change ${identityChanges.join(", ")} on a person they entered or imported.`,
+      "Propose the correction as a candidate source fact with family_history_save_source_evidence, or record it as a research finding. Research status, priority, notes and tags can still be updated.",
+    );
+  }
   const patch = pickDefined(input, [
     "name", "alternateNames", "sex", "living", "birth", "death", "researchStatus", "researchPriority", "notes", "tags",
   ]);
@@ -433,9 +444,39 @@ async function saveEventRecord(ctx: MutationCtx, owner: string, input: any) {
   return { id: eventId, created, updatedAt: now, createKey };
 }
 
+/**
+ * The research permission is "proposals only": a connected AI may propose,
+ * flag a conflict or reject its own reading, but accepting a conclusion is the
+ * person's. Checked before the first write so a refused row saves nothing.
+ */
+async function assertFactsAreProposals(ctx: MutationCtx, owner: string, facts: any[]) {
+  for (const fact of facts) {
+    if (fact?.status === "accepted") {
+      machineError(
+        "FORBIDDEN",
+        "Only the person can accept a source fact.",
+        "Save it as candidate (the default) or conflict; the person accepts it in Family History.",
+      );
+    }
+    const mapping = typeof fact?.factKey === "string" ? await mappedRecord(ctx, owner, "source_fact", cleanKey(fact.factKey, "factKey")) : null;
+    const existing = mapping ? await ctx.db.get(mapping.recordId as Id<"sourceFacts">) : null;
+    if (existing && matchesVaultOwner(existing.vaultOwnerId, owner) && existing.status === "accepted") {
+      machineError(
+        "FORBIDDEN",
+        "This source fact is accepted, and an AI cannot overwrite an accepted fact.",
+        "Leave it as it is, or save a new fact under a new factKey with status conflict and a conflictReason.",
+      );
+    }
+  }
+}
+
+/** Identity fields an AI may change only on a person it created itself. */
+const PERSON_IDENTITY_FIELDS = ["name", "alternateNames", "sex", "living", "birth", "death"] as const;
+
 async function saveSourceEvidenceRecord(ctx: MutationCtx, owner: string, input: any, provenance?: McpProvenance) {
   const now = Date.now();
   const sourceInput = input.source;
+  await assertFactsAreProposals(ctx, owner, input.facts ?? []);
   await assertOwnedPlaceRefs(ctx, owner, sourceInput, "Source coverage place");
   let sourceId: Id<"sources">;
   let sourceCreated = false;
