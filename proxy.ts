@@ -5,6 +5,10 @@ import { isAnonymousVaultEnabled, isClerkEnabled } from "@/lib/clerk/config";
 import { canonicalizeProductionUrl } from "@/lib/site/canonicalProductionUrl";
 import { VAULT_PREVIEW_COOKIE } from "@/lib/vault/constants";
 import { PROTECTED_ROUTE_PATTERNS } from "@/lib/vault/protectedRoutes";
+import {
+  isVaultPageRead,
+  signedOutVaultSignInLocation,
+} from "@/lib/vault/signedOutVaultRedirect";
 
 const isProtectedRoute = createRouteMatcher([...PROTECTED_ROUTE_PATTERNS]);
 
@@ -31,6 +35,22 @@ const authMiddleware = clerkMiddleware(
     const authState = await auth();
 
     if ((requireAuth || !allowAnonymousVault) && isProtectedRoute(req)) {
+      // Signed-out reads of vault pages redirect to sign-in for every Accept
+      // value. auth.protect() alone rewrites non-document requests to 404.
+      // Signed-in visitors, writes, and credentialed calls still use protect().
+      if (
+        !authState.userId &&
+        !req.headers.get("authorization") &&
+        isVaultPageRead(req.nextUrl.pathname, req.method)
+      ) {
+        const response = NextResponse.redirect(
+          signedOutVaultSignInLocation(req.nextUrl),
+          307,
+        );
+        response.headers.set("Cache-Control", "private, no-store");
+        return response;
+      }
+
       await auth.protect();
       return;
     }
