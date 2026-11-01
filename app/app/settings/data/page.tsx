@@ -43,8 +43,7 @@ export default function YourDataPage() {
             Download my export
           </a>
           <p>
-            Photos and scans are listed in the file as records. Their original files are not inside it;
-            open each one from its person or source to download it.
+            Photos and scans are listed in the file as records. Their original files are not inside it.
           </p>
           <p>A large tree can take a minute to prepare. Keep this tab open until the download finishes.</p>
         </CardContent>
