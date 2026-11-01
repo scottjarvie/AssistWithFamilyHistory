@@ -549,7 +549,8 @@ export const listQueueItemsInternal = internalQuery({
 /**
  * A connection narrowed to named Queue items lists exactly those items, never
  * the owner's whole Queue. Read by id (the list is small and person-chosen),
- * newest first, paged by offset.
+ * newest creation first. The immutable creation-time/ID cursor survives expiry
+ * reconciliation changing updatedAt or removing rows from a state filter.
  */
 export const listAllowedQueueItemsInternal = internalQuery({
   args: { ...listQueueArgs, queueItemIds: v.array(v.string()) },
@@ -563,11 +564,31 @@ export const listAllowedQueueItemsInternal = internalQuery({
       if (args.priority && item.priority !== args.priority) continue;
       rows.push(item);
     }
-    rows.sort((a, b) => b.updatedAt - a.updatedAt);
-    const parsed = Number.parseInt(args.paginationOpts.cursor ?? "0", 10);
-    const start = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
-    const end = start + Math.min(args.paginationOpts.numItems, QUEUE_LIMITS.itemPage);
-    return { page: rows.slice(start, end), isDone: end >= rows.length, continueCursor: String(Math.min(end, rows.length)) };
+    rows.sort((a, b) => b._creationTime - a._creationTime || (a._id < b._id ? 1 : a._id > b._id ? -1 : 0));
+    let remaining = rows;
+    const cursor = args.paginationOpts.cursor;
+    if (cursor !== null) {
+      let key: unknown;
+      try {
+        key = JSON.parse(cursor);
+      } catch {
+        throw new Error("Invalid Queue continuation cursor; restart pagination.");
+      }
+      if (!Array.isArray(key) || key.length !== 2 || typeof key[0] !== "number" ||
+          !Number.isFinite(key[0]) || typeof key[1] !== "string" || !ctx.db.normalizeId("queueItems", key[1])) {
+        throw new Error("Invalid Queue continuation cursor; restart pagination.");
+      }
+      const [createdAt, id] = key as [number, string];
+      remaining = rows.filter((item) => item._creationTime < createdAt ||
+        (item._creationTime === createdAt && item._id < id));
+    }
+    const page = remaining.slice(0, Math.min(args.paginationOpts.numItems, QUEUE_LIMITS.itemPage));
+    const last = page.at(-1);
+    return {
+      page,
+      isDone: page.length >= remaining.length,
+      continueCursor: last ? JSON.stringify([last._creationTime, last._id]) : cursor ?? "",
+    };
   },
 });
 
