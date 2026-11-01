@@ -1,11 +1,11 @@
 import { notFound } from "next/navigation";
 import { SafeLink, SafeAnchor } from "@/components/layout/SafeLink";
 import {
-  ArrowLeft,
   ArrowRight,
   BookOpen,
   CheckCircle2,
   CircleAlert,
+  CircleMinus,
   Files,
   Globe2,
   ImageIcon,
@@ -29,6 +29,7 @@ import { getVaultAccessContext } from "@/lib/vault/server";
 import { ResearchChecksPanel } from "@/components/vault/ResearchChecksPanel";
 import { MediaPrivacyReviewPanel } from "@/components/vault/MediaPrivacyReviewPanel";
 import { ContextItemsPanel } from "@/components/vault/ContextItemsPanel";
+import { PersonHeader } from "@/components/vault/PersonHeader";
 import { publicStoryPath } from "@/lib/stories/slug";
 
 interface PageProps {
@@ -114,78 +115,48 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
   const media = workspace.media ?? [];
 
   return (
-    <div className="p-4 sm:p-8">
-      <SafeLink
-        href="/app/people"
-        className="mb-5 inline-flex items-center gap-2 text-sm text-stone-500 hover:text-stone-900"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back to People
-      </SafeLink>
+    <div className="min-w-0 [overflow-wrap:anywhere] p-4 sm:p-8">
+      <PersonHeader
+        person={workspace.person}
+        stats={workspace.stats}
+        operations={workspace.operations}
+        routeId={routeId}
+      />
 
-      <section className="rounded-[2rem] border border-stone-200 bg-white px-6 py-6 shadow-sm sm:px-8">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="mb-4 flex flex-wrap gap-2">
-              <Badge variant="secondary">{workspace.person.fsId || "Research subject"}</Badge>
-              <Badge variant="outline">{workspace.person.living ? "Living" : "Deceased"}</Badge>
-              {workspace.person.creationProvenance?.evidenceStatus === "unsourced" ? (
-                <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">Starting statement · needs a source</Badge>
-              ) : null}
-            </div>
-            <h1 className="font-[family-name:var(--font-cormorant-garamond)] text-4xl font-semibold text-stone-900 sm:text-5xl">
-              {workspace.person.displayName}
-            </h1>
-            <p className="mt-3 max-w-2xl text-stone-500">
-              {workspace.person.birth?.date?.original || "Unknown birth"} {workspace.person.birth?.place?.original ? `· ${workspace.person.birth.place.original}` : ""}
-              {"  "}
-              {workspace.person.death?.date?.original ? `to ${workspace.person.death.date.original}` : ""}
-              {workspace.person.death?.place?.original ? ` · ${workspace.person.death.place.original}` : ""}
-            </p>
-            {workspace.person.creationProvenance?.method === "manual_first_start" ? (
-              <p className="mt-4 max-w-2xl border-l-2 border-amber-500 pl-4 text-sm leading-6 text-stone-600">
-                Added privately by you as part of the first family connection. It is not treated as sourced evidence until a source is linked and reviewed.
-              </p>
-            ) : null}
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Button asChild className="bg-amber-700 hover:bg-amber-800">
-                <SafeLink href={`/app/people/${routeId}/ai`}>Run AI Analysis</SafeLink>
-              </Button>
-              <Button asChild variant="outline">
-                <SafeAnchor href={`/api/people/${routeId}/context-pack?format=markdown`}>Download Context Pack</SafeAnchor>
-              </Button>
-              <Button asChild variant="outline">
-                <SafeAnchor href={`/api/people/${routeId}/context-pack`}>Structured JSON</SafeAnchor>
-              </Button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:w-[420px] lg:grid-cols-2">
-            {[
-              ["Sources", workspace.stats.sources],
-              ["Memories", workspace.stats.memories],
-              ["Places", workspace.stats.places],
-              ["Imports", workspace.stats.imports],
-            ].map(([label, value]) => (
-              <div key={label} className="rounded-2xl bg-stone-50 px-4 py-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-stone-400">{label}</p>
-                <p className="mt-2 text-2xl font-semibold text-stone-900">{value}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <Tabs defaultValue="overview" className="mt-8 space-y-6">
-        <TabsList className="h-auto flex-wrap justify-start gap-2 rounded-2xl bg-transparent p-0">
+      <Tabs defaultValue="overview" className="mt-6 space-y-6">
+        {/* One scrolling row on phones (nine tabs would otherwise wrap to three rows); wraps from sm up. */}
+        <TabsList className="-mx-4 flex h-auto w-auto justify-start gap-2 overflow-x-auto rounded-none bg-transparent px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
           {["overview", "sources", "timeline", "relationships", "places", "memories", "documents", "stories", "research"].map((tab) => (
-            <TabsTrigger key={tab} value={tab} className="rounded-full border border-stone-200 bg-white px-4 py-2 capitalize data-[state=active]:border-amber-300 data-[state=active]:bg-amber-50">
+            <TabsTrigger key={tab} value={tab} className="min-h-11 flex-none rounded-full border border-stone-200 bg-white px-4 py-2 capitalize data-[state=active]:border-amber-300 data-[state=active]:bg-amber-50 sm:pointer-fine:min-h-9">
               {tab}
             </TabsTrigger>
           ))}
         </TabsList>
 
         <TabsContent value="overview">
+          {/* What's next leads; readiness and actions follow; the detailed numbers come last. */}
+          <Card className="mb-5 border-amber-200 bg-amber-50/40">
+            <CardHeader>
+              <CardTitle>Priority Gaps</CardTitle>
+              <CardDescription>The checks blocking stronger AI context packs and story outputs.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {workspace.operations.nextActions.length === 0 ? (
+                <p className="text-sm leading-6 text-stone-600">
+                  <span className="font-medium text-stone-900">No missing or review-needed checks are queued.</span> Work in progress can still remain. Review the research checks below before choosing the next step.
+                </p>
+              ) : (
+                <ol className="space-y-2">
+                  {workspace.operations.nextActions.map((action: string) => (
+                    <li key={action} className="border-l-2 border-amber-500 bg-white px-3 py-2 text-sm leading-6 text-stone-700">
+                      {action}
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </CardContent>
+          </Card>
+
           <section className="mb-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
             <Card className="border-stone-200 bg-white">
               <CardHeader>
@@ -193,12 +164,12 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
                   <div>
                     <CardTitle className="text-2xl">Story Readiness</CardTitle>
                     <CardDescription>
-                      The overview starts with whether this person is ready to draft or publish, then keeps the operating data within reach.
+                      Research coverage helps plan a draft. Review, privacy, and publication checks happen on the saved story.
                     </CardDescription>
                   </div>
                   <div className="text-left sm:text-right">
                     <p className="text-4xl font-semibold text-stone-900">{workspace.operations.completionPercent}%</p>
-                    <p className="text-xs uppercase tracking-[0.18em] text-stone-400">coverage</p>
+                    <p className="text-xs uppercase tracking-[0.18em] text-stone-400">research coverage</p>
                   </div>
                 </div>
               </CardHeader>
@@ -208,13 +179,16 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
                     <div key={check.key} className="border border-stone-200 bg-stone-50 px-3 py-3">
                       <div className="flex items-center gap-2">
                         {check.status === "complete" ? (
-                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                          <CheckCircle2 aria-hidden="true" className="h-4 w-4 shrink-0 text-emerald-600" />
+                        ) : check.status === "not_applicable" ? (
+                          <CircleMinus aria-hidden="true" className="h-4 w-4 shrink-0 text-stone-500" />
                         ) : (
-                          <CircleAlert className="h-4 w-4 text-amber-700" />
+                          <CircleAlert aria-hidden="true" className="h-4 w-4 shrink-0 text-amber-700" />
                         )}
                         <p className="text-sm font-medium text-stone-900">{check.label}</p>
                       </div>
-                      <p className="mt-2 text-xs leading-5 text-stone-500">{check.summary || check.status}</p>
+                      <p className="mt-2 text-xs font-medium capitalize text-stone-700">{check.status.replace(/_/g, " ")}</p>
+                      {check.summary ? <p className="mt-1 text-xs leading-5 text-stone-500">{check.summary}</p> : null}
                     </div>
                   ))}
                 </div>
@@ -244,8 +218,12 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
                   <span className="font-medium text-stone-900">{workspace.person.displayName}</span>
                   {workspace.person.birth?.date?.original ? ` was born ${workspace.person.birth.date.original}` : " has an unknown birth date"}
                   {workspace.person.birth?.place?.original ? ` in ${workspace.person.birth.place.original}` : ""}.
-                  {workspace.person.death?.date?.original ? ` Death is recorded as ${workspace.person.death.date.original}` : ""}
-                  {workspace.person.death?.place?.original ? ` in ${workspace.person.death.place.original}` : ""}.
+                  {workspace.person.death?.date?.original || workspace.person.death?.place?.original ? (
+                    <>
+                      {workspace.person.death.date?.original ? ` Death is recorded as ${workspace.person.death.date.original}` : " Death is recorded"}
+                      {workspace.person.death.place?.original ? ` in ${workspace.person.death.place.original}` : ""}.
+                    </>
+                  ) : null}
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   {[
@@ -332,107 +310,7 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
             </Card>
           </section>
 
-          <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-            <Card className="border-stone-200">
-              <CardHeader>
-                <CardTitle>Story Inputs</CardTitle>
-                <CardDescription>The vault pieces most useful to an AI story workflow.</CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-3 md:grid-cols-2">
-                {[
-                  { icon: ScrollText, label: "Evidence sources", value: workspace.stats.sources },
-                  { icon: Globe2, label: "Places", value: workspace.stats.places },
-                  { icon: ImageIcon, label: "Memories", value: workspace.stats.memories },
-                  { icon: Network, label: "Relationships", value: workspace.relationships.length },
-                  { icon: BookOpen, label: "Open research tasks", value: workspace.researchTasks.length },
-                ].map((item) => (
-                  <div key={item.label} className="rounded-2xl bg-stone-50 px-4 py-4">
-                    <item.icon className="mb-3 h-5 w-5 text-amber-700" />
-                    <p className="text-sm text-stone-500">{item.label}</p>
-                    <p className="mt-1 text-2xl font-semibold text-stone-900">{item.value}</p>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            <Card className="border-stone-200">
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-amber-700" />
-                  <CardTitle>Latest Imports</CardTitle>
-                </div>
-                <CardDescription>Recent FamilySearch captures merged into this person.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {workspace.importRuns.length === 0 ? (
-                  <EmptyWorkspaceState
-                    title="No imports yet"
-                    description="Start with a FamilySearch capture package so this workspace has evidence, places, and memories to build from."
-                    actionHref="/app/imports"
-                    actionLabel="Open Imports"
-                  />
-                ) : (
-                  workspace.importRuns.slice(0, 4).map((run) => (
-                    <div key={String(run._id)} className="rounded-2xl border border-stone-200 px-4 py-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="font-medium text-stone-900">{run.pageTypes.join(" + ")}</p>
-                        <Badge variant="secondary">{run.mergeStatus}</Badge>
-                      </div>
-                      <p className="mt-2 text-sm text-stone-500">{new Date(run.importedAt).toLocaleString()}</p>
-                      {run.warnings.length > 0 ? (
-                        <p className="mt-2 text-sm text-amber-800">{run.warnings.length} warning(s) still need review.</p>
-                      ) : null}
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="mt-5 grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-            <Card className="border-stone-200 bg-gradient-to-br from-white to-stone-50">
-              <CardHeader>
-                <CardTitle>Operations Status</CardTitle>
-                <CardDescription>The auto-inferred research backend view for this person.</CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-3 md:grid-cols-2">
-                {[
-                  ["Completion", `${workspace.operations.completionPercent}%`],
-                  ["Critical gaps", workspace.operations.requiredMissingCount],
-                  ["Recommended gaps", workspace.operations.recommendedMissingCount],
-                  ["Stale checks", workspace.operations.staleChecksCount],
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-2xl bg-white px-4 py-4 ring-1 ring-stone-200">
-                    <p className="text-xs uppercase tracking-[0.2em] text-stone-400">{label}</p>
-                    <p className="mt-2 text-2xl font-semibold text-stone-900">{value}</p>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            <Card className="border-stone-200">
-              <CardHeader>
-                <CardTitle>Priority Gaps</CardTitle>
-                <CardDescription>The checks blocking stronger AI context packs and story outputs.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {workspace.operations.nextActions.length === 0 ? (
-                  <EmptyWorkspaceState
-                    title="No priority gaps right now"
-                    description="This person is in good operational shape. Move into Story Writer, place context, or longer narrative work."
-                  />
-                ) : (
-                  workspace.operations.nextActions.map((action: string) => (
-                    <div key={action} className="rounded-2xl border border-stone-200 px-4 py-4 text-sm text-stone-600">
-                      {action}
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card className="mt-5 border-stone-200 bg-gradient-to-br from-white to-amber-50/60">
+          <Card className="mb-5 border-stone-200 bg-gradient-to-br from-white to-amber-50/60">
             <CardHeader>
               <CardTitle>Next Actions</CardTitle>
               <CardDescription>Move from imported evidence to agent-ready research outputs.</CardDescription>
@@ -497,6 +375,85 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
               )}
             </CardContent>
           </Card>
+
+          <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+            <Card className="border-stone-200">
+              <CardHeader>
+                <CardTitle>Story Inputs</CardTitle>
+                <CardDescription>The vault pieces most useful to an AI story workflow.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-3">
+                {[
+                  { icon: ScrollText, label: "Evidence sources", value: workspace.stats.sources },
+                  { icon: Globe2, label: "Places", value: workspace.stats.places },
+                  { icon: ImageIcon, label: "Memories", value: workspace.stats.memories },
+                  { icon: Network, label: "Relationships", value: workspace.relationships.length },
+                  { icon: BookOpen, label: "Open research tasks", value: workspace.researchTasks.length },
+                ].map((item) => (
+                  <div key={item.label} className="rounded-2xl bg-stone-50 px-4 py-4">
+                    <item.icon className="mb-3 h-5 w-5 text-amber-700" />
+                    <p className="text-sm text-stone-500">{item.label}</p>
+                    <p className="mt-1 text-2xl font-semibold text-stone-900">{item.value}</p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            <Card className="border-stone-200">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-amber-700" />
+                  <CardTitle>Latest Imports</CardTitle>
+                </div>
+                <CardDescription>Recent FamilySearch captures merged into this person.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {workspace.importRuns.length === 0 ? (
+                  <EmptyWorkspaceState
+                    title="No imports yet"
+                    description="Start with a FamilySearch capture package so this workspace has evidence, places, and memories to build from."
+                    actionHref="/app/imports"
+                    actionLabel="Open Imports"
+                  />
+                ) : (
+                  workspace.importRuns.slice(0, 4).map((run) => (
+                    <div key={String(run._id)} className="rounded-2xl border border-stone-200 px-4 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="font-medium text-stone-900">{run.pageTypes.join(" + ")}</p>
+                        <Badge variant="secondary">{run.mergeStatus}</Badge>
+                      </div>
+                      <p className="mt-2 text-sm text-stone-500">{new Date(run.importedAt).toLocaleString()}</p>
+                      {run.warnings.length > 0 ? (
+                        <p className="mt-2 text-sm text-amber-800">{run.warnings.length} warning(s) still need review.</p>
+                      ) : null}
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="mt-5">
+            <Card className="border-stone-200 bg-gradient-to-br from-white to-stone-50">
+              <CardHeader>
+                <CardTitle>Operations Status</CardTitle>
+                <CardDescription>The auto-inferred research backend view for this person.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                {[
+                  ["Completion", `${workspace.operations.completionPercent}%`],
+                  ["Critical gaps", workspace.operations.requiredMissingCount],
+                  ["Recommended gaps", workspace.operations.recommendedMissingCount],
+                  ["Stale checks", workspace.operations.staleChecksCount],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-2xl bg-white px-4 py-4 ring-1 ring-stone-200">
+                    <p className="text-xs uppercase tracking-[0.2em] text-stone-400">{label}</p>
+                    <p className="mt-2 text-2xl font-semibold text-stone-900">{value}</p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="sources">

@@ -230,6 +230,15 @@ export const getPlaceWorkspace = action({
     }),
 });
 
+/** The People pages' small question: may the private first start be offered? */
+export const getFirstStartEligibility = action({
+  args: { vaultOwnerId: v.string() },
+  handler: async (ctx, args): Promise<FunctionReturnType<typeof vaultInternal.getFirstStartEligibility>> =>
+    ctx.runQuery(vaultInternal.getFirstStartEligibility, {
+      vaultOwnerId: await authorizedOwner(ctx, "vault.getFirstStartEligibility", args.vaultOwnerId),
+    }),
+});
+
 export const getDashboardSummary = action({
   args: { vaultOwnerId: v.string() },
   handler: async (ctx, args): Promise<FunctionReturnType<typeof vaultInternal.getDashboardSummary>> =>

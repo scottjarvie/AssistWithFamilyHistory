@@ -68,3 +68,6 @@ sandbox-backend-before-source-owned-guard-20261007/
 .record-only-codegen-test-*/
 dependency-donor-receipt.json
 .local-sandbox/
+
+# Per-user agent settings (may hold local permission rules; never commit)
+.claude/settings.local.json

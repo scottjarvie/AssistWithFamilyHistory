@@ -37,6 +37,11 @@ export async function getVaultAccessContext(): Promise<VaultAccessContext> {
     return {vaultOwnerId:session.userId,userId:session.userId,mode:"user"};
   }
   if (!isClerkEnabled()) {
+    // Shared local ownership is only for non-hosted development/test use.
+    // REQUIRE_AUTH must fail closed even during the Convex shadow rollout.
+    if (process.env.REQUIRE_AUTH === "true" || process.env.NODE_ENV === "production" || process.env.VERCEL) {
+      throw new Error("Vault access requires Clerk authentication to be configured and enabled");
+    }
     return {
       vaultOwnerId: DEFAULT_LOCAL_VAULT_OWNER,
       userId: null,
@@ -54,17 +59,20 @@ export async function getVaultAccessContext(): Promise<VaultAccessContext> {
       };
     }
   } catch (error) {
-    if (!isExpectedDynamicServerUsage(error)) {
-      console.warn("Unable to resolve Clerk auth for vault access:", error);
+    if (isExpectedDynamicServerUsage(error)) {
+      // Let Next.js bail out of static prerendering instead of treating the
+      // request as unauthenticated (which would fail the production build).
+      throw error;
     }
+    console.warn("Unable to resolve Clerk auth for vault access:", error);
+  }
+
+  if (process.env.REQUIRE_AUTH === "true" || !isAnonymousVaultEnabled()) {
+    throw new Error("Authentication required for vault access. Set ALLOW_ANONYMOUS_VAULT=true only for explicit guest-preview deployments.");
   }
 
   const cookieStore = await cookies();
   const cookieOwner = cookieStore.get(VAULT_PREVIEW_COOKIE)?.value?.trim();
-
-  if (!isAnonymousVaultEnabled()) {
-    throw new Error("Authentication required for vault access. Set ALLOW_ANONYMOUS_VAULT=true only for explicit guest-preview deployments.");
-  }
 
   return {
     vaultOwnerId: cookieOwner || DEFAULT_ANONYMOUS_VAULT_OWNER,

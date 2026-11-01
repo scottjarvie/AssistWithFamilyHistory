@@ -11,7 +11,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from "vit
 import { convexTest } from "convex-test";
 import { exportJWK, generateKeyPair, SignJWT, type KeyLike } from "jose";
 import schema from "./schema";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import {
   FAMILY_HISTORY_ALL_TOOL_NAMES,
   FAMILY_HISTORY_SCOPES,
@@ -214,7 +214,9 @@ describe("grant states: sign-in approves, the person's no stands", () => {
     expect(rows[0].status).toBe("active");
     expect(rows[0].boundary.kind).toBe("whole_workspace");
     expect([...rows[0].scopes].sort()).toEqual([...FAMILY_HISTORY_SCOPES].sort());
-    expect(rows[0].expiresAt! - Date.now()).toBeGreaterThan(89 * 24 * 60 * 60 * 1000);
+    expect(rows[0].expiresAt).toBeUndefined();
+    expect(rows[0].scopeChoice).toBe("full");
+    expect(rows[0].expiryChoice).toBe("none");
     expect(JSON.parse(rows[0].consentSnapshot!).approvedBy).toBe("sign_in");
     // The never-list is outside the scope ceiling, so sign-in cannot reach it.
     expect(await toolNames(t, OWNER_A)).not.toContain("family_history_delete_person");
@@ -241,7 +243,7 @@ describe("grant states: sign-in approves, the person's no stands", () => {
     expect(rows[0].status).toBe("active");
   });
 
-  test("an expired term renews on the next signed-in request and keeps the person's narrowing", async () => {
+  test("an ambiguous expired term stays expired on sign-in and keeps the person's narrowing", async () => {
     const t = convexTest(schema, modules);
     await seedGrant(t, {
       vaultOwnerId: OWNER_A,
@@ -251,13 +253,13 @@ describe("grant states: sign-in approves, the person's no stands", () => {
       expiresAt: Date.now() - 1_000,
     });
     const call = await callTool(t, OWNER_A, "family_history_get_brief", {});
-    expect(call.isError).toBe(false);
+    expect(call.isError).toBe(true);
+    expect(call.body.code).toBe("GRANT_EXPIRED");
     const rows = await t.run(async (ctx) => await ctx.db.query("mcpGrants").collect());
     expect(rows).toHaveLength(1);
-    expect(rows[0].status).toBe("active");
     expect(rows[0].scopes).toEqual(["family_history:context:read"]);
-    expect(rows[0].expiresAt!).toBeGreaterThan(Date.now());
-    expect(await toolNames(t, OWNER_A)).not.toContain("family_history_save_records");
+    expect(rows[0].expiresAt!).toBeLessThan(Date.now());
+    expect(await toolNames(t, OWNER_A)).toEqual([]);
   });
 
   test("revoking a grant denies the very next request with the same token", async () => {
@@ -276,6 +278,36 @@ describe("grant states: sign-in approves, the person's no stands", () => {
     expect(after.isError).toBe(true);
     expect(after.body.code).toBe("GRANT_REVOKED");
     expect(await toolNames(t, OWNER_A)).toEqual([]);
+  });
+
+  test("revoking newest of multiple legacy approvals refuses the next MCP call with the same token", async () => {
+    const t = convexTest(schema, modules);
+    const olderId = await seedGrant(t, { vaultOwnerId: OWNER_A, clientId: CLIENT_ID, issuer: ISSUER });
+    const newestId = await seedGrant(t, { vaultOwnerId: OWNER_A, clientId: CLIENT_ID, issuer: ISSUER });
+    await t.run((ctx) => ctx.db.patch(olderId as never, { consentedAt: Date.now() - 1000 }));
+    const token = await tokenFor(OWNER_A);
+    const call = async () => {
+      const response = await t.fetch("/mcp", rpc("tools/call", token, { name: "family_history_get_brief", arguments: {} }));
+      const payload = await response.json();
+      expect(payload.error).toBeUndefined();
+      return payload.result;
+    };
+    expect((await call()).isError).not.toBe(true);
+    const own = t.withIdentity({ subject: OWNER_A });
+    await own.mutation(api.mcpGrants.revokeGrant, { vaultOwnerId: OWNER_A, grantId: newestId as never });
+    const refused = await call();
+    expect(refused.isError).toBe(true);
+    expect(JSON.parse(refused.content.find((block: { type: string }) => block.type === "text").text).code).toBe("GRANT_REVOKED");
+    expect(await toolNames(t, OWNER_A)).toEqual([]);
+    const approved = await own.mutation(api.mcpGrants.approveGrant, {
+      vaultOwnerId: OWNER_A, grantId: newestId as never, label: "Explicit reapproval",
+      scopes: ["family_history:context:read"], boundary: { kind: "whole_workspace" }, expiresInDays: 7,
+    });
+    expect([olderId, newestId]).not.toContain(String(approved.id));
+    expect((await call()).isError).not.toBe(true);
+    for (const id of [olderId, newestId]) {
+      expect(await t.run((ctx) => ctx.db.get(id as never))).toMatchObject({ status: "revoked" });
+    }
   });
 });
 
