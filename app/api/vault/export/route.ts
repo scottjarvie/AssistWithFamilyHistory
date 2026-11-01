@@ -34,7 +34,7 @@ export async function GET() {
       const write = (text: string) => controller.enqueue(encoder.encode(text));
       try {
         write(`{"product":"Assist With Family History","format":"awfh-export-1","exportedAt":${JSON.stringify(exportedAt)},`);
-        write(`"note":"Every record in your private workspace, with who made it and when. Files are listed as records; download originals from each record.","tables":{`);
+        write(`"note":"Every record in your private workspace, with who made it and when. Files are listed as records; original files are not included.","tables":{`);
         for (const [tableIndex, table] of EXPORT_TABLES.entries()) {
           write(`${tableIndex ? "," : ""}${JSON.stringify(table)}:[`);
           let cursor: string | null = null;

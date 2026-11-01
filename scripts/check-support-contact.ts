@@ -98,6 +98,21 @@ if (deletionPage.includes("have your workspace deleted") ||
   failures.push("/delete-account must describe deletion availability and exclude original files from its export promise.");
 }
 
+// Export guidance must not send people to a per-file download that does not exist.
+for (const rel of [
+  "app/delete-account/page.tsx",
+  "app/app/settings/data/page.tsx",
+  "app/api/vault/export/route.ts",
+]) {
+  const text = readFileSync(rel, "utf8").replace(/\s+/g, " ");
+  if (/open each one from its person or source to download it|download (?:each )?originals? from each record/i.test(text)) {
+    failures.push(`${rel} must not promise per-file original downloads.`);
+  }
+  if (!/original files are not inside it|original files are not included/.test(text)) {
+    failures.push(`${rel} must explain that exports exclude original files.`);
+  }
+}
+
 if (failures.length > 0) {
   console.error("Support-contact contract failed:\n");
   for (const failure of failures) console.error(`  - ${failure}`);

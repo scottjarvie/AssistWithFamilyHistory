@@ -36,8 +36,7 @@ export default function DeleteAccountPage() {
             </li>
             <li>
               Download your export. It holds workspace records, with who made them and when.
-              Photos and scans are listed as records. Their original files are not inside it;
-              open each one from its person or source to download it.
+              Photos and scans are listed as records. Their original files are not inside it.
             </li>
             <li>
               Check the current intake status at{" "}
