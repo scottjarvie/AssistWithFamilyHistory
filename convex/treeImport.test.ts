@@ -360,13 +360,13 @@ describe("whole-tree import", () => {
     expect((await t.run(async ctx => ctx.db.get(id)))?.tags).toEqual([]);
   });
 
-  test("GEDCOM xrefs are local to a file and stable on resume", async () => {
+  test.each(["gedcom", "gedcom7", "GEDCOM", "gedcom-5.5.1"])("%s xrefs are local to a file and stable on resume", async (system) => {
     const t = convexTest(schema, modules);
     const grantId = await seedGrant(t, { vaultOwnerId: OWNER });
     for (const file of ["file-a", "file-b"]) {
       const job = await t.mutation(internal.treeImport.beginTreeImport, {
         principal: principal(), grantId, operationId: `begin-${file}`, requestHash: file,
-        input: { importKey: file, system: "gedcom", label: file },
+        input: { importKey: file, system, label: file },
       }) as { importJobId: string };
       const persons = [{ key: "@I1@", living: false, names: [{ given: file }], facts: [{ key: "birth", type: "birth", date: { original: "1900" } }] }];
       const sources = [{ key: "@S1@", title: file }];
@@ -376,6 +376,32 @@ describe("whole-tree import", () => {
     expect(await countRows(t, "persons")).toBe(2);
     expect(await countRows(t, "events")).toBe(2);
     expect(await countRows(t, "sources")).toBe(2);
+  });
+
+  test.each(["gedcom7", "GEDCOM", "gedcom-5.5.1"])("%s otherIds cannot link people across files or sites", async (system) => {
+    const t = convexTest(schema, modules);
+    const grantId = await seedGrant(t, { vaultOwnerId: OWNER });
+    const ids: string[] = [];
+    for (const [index, jobSystem] of [system, system, "ancestry", "ancestry"].entries()) {
+      const file = `other-id-file-${index}`;
+      const job = await t.mutation(internal.treeImport.beginTreeImport, {
+        principal: principal(), grantId, operationId: `begin-${file}`, requestHash: file,
+        input: { importKey: file, system: jobSystem, label: file },
+      }) as { importJobId: string };
+      const result = await send(t, grantId, job.importJobId, 0, {
+        persons: [{ key: file, living: false, names: [{ given: file }], otherIds: [{ system, id: "@I1@" }] }],
+      });
+      expect(result.results[0].status).toBe("created");
+      ids.push(result.results[0].id);
+    }
+    expect(new Set(ids).size).toBe(4);
+    const people = await t.run(async ctx => ctx.db.query("persons").collect());
+    expect(people).toHaveLength(4);
+    expect(people.every(p => p.externalIds?.some(id => id.system === system && id.id === "@I1@"))).toBe(true);
+    // Site imports retain the supplied xrefs as evidence but cannot register
+    // them in an unrelated file's namespace.
+    const keys = await t.run(async ctx => ctx.db.query("mcpRecordKeys").collect());
+    expect(keys.filter(k => k.recordKey.includes("@I1@"))).toHaveLength(2);
   });
 
   test("a connection limited to selected people cannot import a tree", { timeout: 300_000 }, async () => {

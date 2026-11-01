@@ -353,7 +353,7 @@ export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
     writes: true,
     title: "Begin or resume a whole-tree import",
     description:
-      "WHOLE-TREE IMPORT, STEP 1. Start one resumable import session for a tree the person keeps on another site (system: \"familysearch\", \"ancestry\", \"gedcom\", ...), or resume the session with the same importKey. Returns importJobId, nextBatchIndex and the resume cursor you saved last time. Family History never signs into the other site; you read the tree the person can see and send it here. Needs a whole-workspace connection.",
+      "WHOLE-TREE IMPORT, STEP 1. Start one resumable import session for a tree the person keeps on another site (system: \"familysearch\", \"ancestry\", \"gedcom\", ...), or resume the session with the same importKey. For GEDCOM files (including GEDCOM-prefixed system names such as gedcom7 or gedcom-5.5.1, case-insensitive), use one unique importKey per file and reuse it only to resume or reimport that same file. GEDCOM record IDs and otherIds are file-local, never global person identities. Returns importJobId, nextBatchIndex and the resume cursor you saved last time. Family History never signs into the other site; you read the tree the person can see and send it here. Needs a whole-workspace connection.",
     humanSummary: "Starts (or picks up) bringing a whole family tree in from another site.",
     implementedBy: "convex/treeImport.beginTreeImport",
   },
