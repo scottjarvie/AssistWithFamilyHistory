@@ -6,8 +6,8 @@ import { createPageMetadata } from "@/lib/seo";
 import { SUPPORT_DESK_LABEL, SUPPORT_DESK_URL } from "@/lib/site/supportDesk";
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Deleting your account",
-  description: "How to take your data out of Assist With Family History and have your workspace deleted.",
+  title: "Account deletion status and data export",
+  description: "Export your workspace records from Assist With Family History and check account deletion availability. Self-service deletion is not available yet.",
   path: "/delete-account",
 });
 
@@ -25,7 +25,7 @@ export default function DeleteAccountPage() {
           <p className="text-sm font-medium uppercase tracking-wide text-stone-500">Your data</p>
           <h1 className="text-4xl font-bold text-stone-900">Deleting your account</h1>
           <p className="text-lg">
-            Your family history is yours. You can take a full copy at any time, and
+            Your family history is yours. You can export your workspace records at any time, and
             review what account deletion will remove when it is available.
           </p>
 
@@ -34,7 +34,11 @@ export default function DeleteAccountPage() {
             <li>
               Sign in and open <strong>Your data</strong> (<Link className="underline" href="/app/settings/data">/app/settings/data</Link>).
             </li>
-            <li>Download your export. It holds every record, with who made it and when.</li>
+            <li>
+              Download your export. It holds workspace records, with who made them and when.
+              Photos and scans are listed as records. Their original files are not inside it;
+              open each one from its person or source to download it.
+            </li>
             <li>
               Check the current intake status at{" "}
               <SafeAnchor className="underline" href={SUPPORT_DESK_URL} rel="noreferrer" target="_blank">
