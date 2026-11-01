@@ -19,7 +19,7 @@
  *      ever changes that semantics, so the limitation is locked into the suite.
  *   3. MIGRATION RUNTIME — runs the real migrateGuestVault mutation end-to-end.
  */
-import { describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { convexTest } from "convex-test";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
@@ -178,7 +178,7 @@ describe("owner isolation (real withIndex(by_owner) paths)", () => {
     await seedOwner(t, OWNER_A, "A");
     await seedOwner(t, OWNER_B, "B");
 
-    const rowsA = await t.action(api.vaultReads.getPeopleExplorer, { vaultOwnerId: OWNER_A });
+    const rowsA = await t.withIdentity({ subject: OWNER_A }).action(api.vaultReads.getPeopleExplorer, { vaultOwnerId: OWNER_A });
     const namesA = rowsA.map((r) => r.displayName);
 
     // A sees exactly its two people, NONE of B's.
@@ -205,7 +205,7 @@ describe("owner isolation (real withIndex(by_owner) paths)", () => {
       );
     });
 
-    const ws = await t.action(api.vaultReads.getPersonWorkspace, {
+    const ws = await t.withIdentity({ subject: OWNER_A }).action(api.vaultReads.getPersonWorkspace, {
       vaultOwnerId: OWNER_A,
       personIdentifier: String(a.primary),
     });
@@ -253,7 +253,7 @@ describe("owner isolation (real withIndex(by_owner) paths)", () => {
       );
     });
 
-    const pack = await t.action(api.vaultReads.getContextPack, {
+    const pack = await t.withIdentity({ subject: OWNER_A }).action(api.vaultReads.getContextPack, {
       vaultOwnerId: OWNER_A,
       personIdentifier: String(a.primary),
     });
@@ -294,7 +294,7 @@ describe("owner isolation (real withIndex(by_owner) paths)", () => {
       );
     });
 
-    const pack = await t.action(api.vaultReads.getContextPack, {
+    const pack = await t.withIdentity({ subject: OWNER_A }).action(api.vaultReads.getContextPack, {
       vaultOwnerId: OWNER_A,
       personIdentifier: String(a.primary),
     });
@@ -331,7 +331,7 @@ describe("array-index regression (media.personIds element-contains)", () => {
     const t = convexTest(schema, modules);
     const a = await seedOwner(t, OWNER_A, "A");
 
-    const ws = await t.action(api.vaultReads.getPersonWorkspace, {
+    const ws = await t.withIdentity({ subject: OWNER_A }).action(api.vaultReads.getPersonWorkspace, {
       vaultOwnerId: OWNER_A,
       personIdentifier: String(a.primary),
     });
@@ -407,6 +407,10 @@ describe("array-index regression (media.personIds element-contains)", () => {
 // ---------------------------------------------------------------------------
 
 describe("migrateGuestVault (real mutation)", () => {
+  // Guest migration is the legacy path that only the explicit shadow opt-out
+  // permits; enforce (the default) denies it as guest_source_unverified.
+  beforeEach(() => vi.stubEnv("TRUST_BOUNDARY_MODE", "shadow"));
+  afterEach(() => vi.unstubAllEnvs());
   const GUEST = "guest_aaaaaaaa-1111-2222-3333-444444444444";
   const USER = "user_2migrationTargetUser";
 
@@ -487,7 +491,10 @@ describe("migrateGuestVault (real mutation)", () => {
 // ---------------------------------------------------------------------------
 
 describe("guarded private reads", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
   test("shadow mode preserves legacy data while logging a mismatched identity", async () => {
+    vi.stubEnv("TRUST_BOUNDARY_MODE", "shadow");
     const t = convexTest(schema, modules);
     const a = await seedOwner(t, OWNER_A, "A");
     await seedOwner(t, OWNER_B, "B");

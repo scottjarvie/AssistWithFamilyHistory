@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { internalMutation, query } from "./_generated/server";
-import { requireTrustBoundarySuperAdmin } from "./access";
+import { getTrustBoundaryMode, requireTrustBoundarySuperAdmin } from "./access";
 
 export const recordShadowDenial = internalMutation({
   args: {
@@ -40,10 +40,7 @@ export const getShadowLogSummary = query({
     };
 
     return {
-      mode:
-        process.env.TRUST_BOUNDARY_MODE === "enforce"
-          ? "enforce" as const
-          : "shadow" as const,
+      mode: getTrustBoundaryMode(),
       since,
       generatedAt: now,
       total: rows.length,

@@ -31,8 +31,13 @@ export type TenantAccessDecision = {
 
 type AuthContext = Pick<MutationCtx, "auth"> | Pick<ActionCtx, "auth">;
 
+/**
+ * Tenant checks fail closed. Only the exact opt-out value `shadow` keeps the
+ * legacy log-and-continue behavior (used by the throwaway local preview
+ * backend); unset, empty, or misspelled values all enforce.
+ */
 export function getTrustBoundaryMode(value = process.env.TRUST_BOUNDARY_MODE): TrustBoundaryMode {
-  return value === "enforce" ? "enforce" : "shadow";
+  return value === "shadow" ? "shadow" : "enforce";
 }
 
 export function decideTenantAccess(input: {

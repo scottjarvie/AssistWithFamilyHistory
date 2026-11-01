@@ -72,9 +72,9 @@ The API and page keep their checks, but cannot broaden the Convex response.
 
 ## Shadow rollout
 
-TRUST_BOUNDARY_MODE defaults to shadow. Shadow preserves legacy behavior and
-writes function, caller, reason, and timestamp to trustBoundaryShadowLog.
-Enforce throws. The superadmin-only summary and full flip procedure are in the
+TRUST_BOUNDARY_MODE defaults to enforce, which throws (fail closed since
+2026-10-21). Only the exact value shadow opts out: it preserves legacy behavior
+and writes function, caller, reason, and timestamp to trustBoundaryShadowLog. The superadmin-only summary and full flip procedure are in the
 [guarded rollout runbook](../operations/gen-87-clerk-convex-auth-setup.md).
 
 Guest migration is deliberately denied in enforce because the guest source ID

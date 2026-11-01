@@ -29,8 +29,43 @@ async function seedPerson(t: ReturnType<typeof convexTest>, owner = OWNER_A) {
 }
 
 describe("TRUST_BOUNDARY_MODE", () => {
-  test("unset mode defaults to shadow, allows an anonymous private read, and persists the denial", async () => {
+  test("unset mode fails closed and denies an anonymous private read", async () => {
     vi.stubEnv("TRUST_BOUNDARY_MODE", "");
+    const t = convexTest(schema, modules);
+    await seedPerson(t);
+
+    await expect(
+      t.action(api.vaultReads.getPeopleExplorer, { vaultOwnerId: OWNER_A }),
+    ).rejects.toThrow(/missing_identity/);
+
+    const logs = await t.run((ctx) => ctx.db.query("trustBoundaryShadowLog").collect());
+    expect(logs).toHaveLength(0);
+  });
+
+  test("a misspelled mode fails closed for a cross-tenant connection listing", async () => {
+    vi.stubEnv("TRUST_BOUNDARY_MODE", "enfroce");
+    const t = convexTest(schema, modules);
+
+    await expect(
+      t.withIdentity({ subject: OWNER_B }).action(api.mcpGrants.listConnections, {
+        vaultOwnerId: OWNER_A,
+      }),
+    ).rejects.toThrow(/owner_mismatch/);
+  });
+
+  test("verified subject is the tenant claim; missing or forged alternative claims cannot replace it", async () => {
+    vi.stubEnv("TRUST_BOUNDARY_MODE", "");
+    const t = convexTest(schema, modules);
+    await seedPerson(t);
+    await expect(t.withIdentity({ subject: "", tenant_id: OWNER_A }).action(api.vaultReads.getPeopleExplorer, { vaultOwnerId: OWNER_A })).rejects.toThrow(/missing_identity/);
+    await expect(t.withIdentity({ subject: OWNER_B, tenant_id: OWNER_A }).action(api.vaultReads.getPeopleExplorer, { vaultOwnerId: OWNER_A })).rejects.toThrow(/owner_mismatch/);
+    const own = await t.withIdentity({ subject: OWNER_A }).action(api.vaultReads.getPeopleExplorer, { vaultOwnerId: OWNER_A });
+    expect(own).toHaveLength(1);
+    expect(own[0].vaultOwnerId).toBe(OWNER_A);
+  });
+
+  test("explicit shadow opt-out allows an anonymous private read and persists the denial", async () => {
+    vi.stubEnv("TRUST_BOUNDARY_MODE", "shadow");
     const t = convexTest(schema, modules);
     await seedPerson(t);
 
