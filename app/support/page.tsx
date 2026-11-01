@@ -21,8 +21,9 @@ export default function SupportPage() {
           <p className="text-sm font-medium uppercase tracking-wide text-stone-500">Getting help</p>
           <h1 className="text-4xl font-bold text-stone-900">Help comes from one place</h1>
           <p className="text-lg">
-            Something broken, something confusing, or an idea: all of it goes to {SUPPORT_DESK_LABEL},
-            the desk that serves every Assist With site. {NO_DIRECT_EMAIL_STATEMENT}
+            Support for every Assist With site runs through {SUPPORT_DESK_LABEL}. {NO_DIRECT_EMAIL_STATEMENT}{" "}
+            Check the desk&apos;s current intake status before preparing a request. If intake is closed,
+            it cannot accept or save support, feedback, or privacy requests.
           </p>
           <SafeAnchor
             className="inline-flex min-h-[44px] items-center rounded-md bg-stone-900 px-4 font-medium text-white hover:bg-stone-700"
@@ -30,14 +31,14 @@ export default function SupportPage() {
             rel="noreferrer"
             target="_blank"
           >
-            Open the support desk
+            View support desk status
           </SafeAnchor>
 
-          <h2 className="text-2xl font-semibold text-stone-900">What to send</h2>
+          <h2 className="text-2xl font-semibold text-stone-900">What to send when intake is open</h2>
           <ul className="list-disc space-y-2 pl-6">
             <li>What you were doing, what happened, and what you expected instead.</li>
             <li>Which part it was: a person or source page, the Queue, an import, or your AI&apos;s connection.</li>
-            <li>Improvements count too. &ldquo;This was confusing&rdquo; is worth sending.</li>
+            <li>Improvements count too. &ldquo;This was confusing&rdquo; is worth sharing when intake is open.</li>
           </ul>
 
           <h2 className="text-2xl font-semibold text-stone-900">What not to send</h2>
