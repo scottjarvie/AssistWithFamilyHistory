@@ -58,11 +58,12 @@ export default function YourDataPage() {
         <CardContent className="space-y-3 text-sm text-stone-700">
           <p>
             Deleting has to remove every record and every stored copy of every file, so it is being built
-            carefully rather than quickly. Until it is here, download your export first, then ask at{" "}
+            carefully. Until it is here, download your export first. Check the current intake status at{" "}
             <SafeAnchor className="underline" href={SUPPORT_DESK_URL} rel="noreferrer" target="_blank">
               {SUPPORT_DESK_LABEL}
             </SafeAnchor>{" "}
-            for your workspace to be deleted.
+            before preparing a deletion request. If intake is closed, the desk cannot accept or save
+            your request.
           </p>
           <p>
             How deletion will work, and what it removes, is on <Link className="underline" href="/delete-account">Deleting your account</Link>.
