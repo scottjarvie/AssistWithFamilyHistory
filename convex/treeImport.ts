@@ -41,6 +41,7 @@ import {
   eventTypeFor,
   externalRecordKey,
   factKeyFor,
+  isGedcomSystem,
   sourceTypeFor,
   splitNames,
   TREE_IMPORT_LIMITS,
@@ -338,7 +339,7 @@ async function importPerson(c: ChunkContext, item: any): Promise<Omit<ItemResult
   if (!existingId) {
     // The same person imported earlier from another site, under that site's id.
     for (const other of otherIds) {
-      if (other.system.toLowerCase() === "gedcom" && c.job.system !== "gedcom") continue;
+      if (isGedcomSystem(other.system) && !isGedcomSystem(c.job.system)) continue;
       const found = await lookup(c, "person", other.id, other.system.toLowerCase());
       if (found) {
         existingId = found;
@@ -376,7 +377,7 @@ async function importPerson(c: ChunkContext, item: any): Promise<Omit<ItemResult
   // Remember the person's ids on other sites too, so an import from there
   // lands on this same person instead of making a second one.
   for (const other of otherIds) {
-    if (other.system.toLowerCase() === "gedcom" && c.job.system !== "gedcom") continue;
+    if (isGedcomSystem(other.system) && !isGedcomSystem(c.job.system)) continue;
     const system = other.system.toLowerCase();
     if (system === c.job.system && other.id === key) continue;
     const mapped = await lookup(c, "person", other.id, system);
@@ -1204,9 +1205,9 @@ export const getTreeImport = internalQuery({
       suggestions.push({
         connectionId: row._id,
         personId: row.from.id,
-        personName: a ? `${a.name.given} ${a.name.surname}`.trim() : null,
+        personName: `${a.name.given} ${a.name.surname}`.trim(),
         possiblySameAsId: row.to.id,
-        possiblySameAsName: b ? `${b.name.given} ${b.name.surname}`.trim() : null,
+        possiblySameAsName: `${b.name.given} ${b.name.surname}`.trim(),
         reason: row.reason ?? null,
         reviewAt: `/app/people/${row.from.id}`,
       });

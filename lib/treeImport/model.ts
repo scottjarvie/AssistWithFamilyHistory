@@ -169,9 +169,14 @@ export type TreeImportItem = { kind: TreeImportKind; index: number; item: any };
 
 /* -------------------------------------------------------------- record keys */
 
+/** GEDCOM xrefs are file-local, including versioned or differently cased labels. */
+export function isGedcomSystem(system: string): boolean {
+  return system.trim().toLowerCase().startsWith("gedcom");
+}
+
 /** The durable lookup key for one outside record, namespaced by kind. */
 export function externalRecordKey(system: string, singularKind: string, key: string, fileScope?: string): string {
-  if (system.trim().toLowerCase() === "gedcom") {
+  if (isGedcomSystem(system)) {
     if (!fileScope) throw new Error("GEDCOM record keys require an import file scope.");
     return `ext:gedcom:${encodeURIComponent(fileScope)}:${singularKind}:${key.trim()}`;
   }
