@@ -570,6 +570,66 @@ describe("record boundaries", () => {
     expect(third.isDone).toBe(true);
   });
 
+  test("named Queue listing rechecks revoked and expired grants before reconciling rows", async () => {
+    vi.stubEnv("TRUST_BOUNDARY_MODE", "enforce");
+    for (const status of ["revoked", "expired"] as const) {
+      const t = convexTest(schema, modules);
+      const now = Date.now();
+      const item = (await t.withIdentity({ subject: OWNER_A }).mutation(api.queue.createQueueItem, {
+        vaultOwnerId: OWNER_A, directive: "Synthetic retained expiry row.", idempotencyKey: `fresh:${status}`,
+      })).item;
+      const grantId = await seedGrant(t, {
+        vaultOwnerId: OWNER_A, clientId: CLIENT_ID, issuer: ISSUER,
+        boundary: { kind: "queue_only", queueItemIds: [String(item._id)] },
+      });
+      // The verified transport principal can outlive a grant change. The data
+      // query must recheck the grant before it reads or reconciles the Queue.
+      const principal = { ownerId: OWNER_A, actorId: "synthetic-stale-principal", actorKind: "chosen_ai" as const,
+        scopes: ["queue:read"], credentialId: "synthetic-credential" };
+      await t.run(async (ctx) => {
+        await ctx.db.patch(item._id, { state: "working", condition: "active", activeActorKind: "chosen_ai",
+          activeActorId: "synthetic-stale-principal", leaseExpiresAt: now - 1 });
+        await ctx.db.patch(grantId as never, status === "revoked"
+          ? { status: "revoked" } : { expiresAt: now - 1 });
+      });
+      await expect(t.action(internal.queue.agentListQueueItems, {
+        principal, mcpGrantId: grantId, paginationOpts: { numItems: 1, cursor: null },
+      })).rejects.toThrow(/MCP_FAMILY_HISTORY_ERROR/);
+      expect(await t.run((ctx) => ctx.db.get(item._id))).toMatchObject({ state: "working", leaseExpiresAt: now - 1 });
+    }
+  });
+
+  test("named Queue listing uses the freshly narrowed boundary and retains cursor order", async () => {
+    vi.stubEnv("TRUST_BOUNDARY_MODE", "enforce");
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const items = [];
+    for (const key of ["old", "middle", "new"]) {
+      items.push((await t.withIdentity({ subject: OWNER_A }).mutation(api.queue.createQueueItem, {
+        vaultOwnerId: OWNER_A, directive: `Synthetic fresh boundary ${key}.`, idempotencyKey: `fresh-boundary:${key}`,
+      })).item);
+    }
+    const ordered = [...items].sort((a, b) => b._creationTime - a._creationTime || (a._id < b._id ? 1 : -1));
+    const grantId = await seedGrant(t, { vaultOwnerId: OWNER_A, clientId: CLIENT_ID, issuer: ISSUER,
+      boundary: { kind: "queue_only", queueItemIds: ordered.map((item) => String(item._id)) } });
+    const principal = { ownerId: OWNER_A, actorId: "synthetic-stale-principal", actorKind: "chosen_ai" as const,
+      scopes: ["queue:read"], credentialId: "synthetic-credential" };
+    const list = (cursor: string | null) => t.action(internal.queue.agentListQueueItems, {
+      principal, mcpGrantId: grantId, paginationOpts: { numItems: 1, cursor },
+    });
+    const first = await list(null);
+    expect(first.page.map((item) => item._id)).toEqual([ordered[0]._id]);
+    await t.run(async (ctx) => {
+      await ctx.db.patch(grantId as never, { boundary: { kind: "queue_only", queueItemIds: [String(ordered[2]._id)] } });
+      await ctx.db.patch(ordered[1]._id, { state: "working", condition: "active", activeActorKind: "chosen_ai",
+        activeActorId: "synthetic-stale-principal", leaseExpiresAt: now - 1, updatedAt: now });
+    });
+    const second = await list(first.continueCursor);
+    expect(second.page.map((item) => item._id)).toEqual([ordered[2]._id]);
+    expect(second.isDone).toBe(true);
+    expect(await t.run((ctx) => ctx.db.get(ordered[1]._id))).toMatchObject({ state: "working", leaseExpiresAt: now - 1 });
+  });
+
   test("a whole-workspace grant without a Queue boundary still lists every Queue item", async () => {
     vi.stubEnv("TRUST_BOUNDARY_MODE", "enforce");
     const t = convexTest(schema, modules);

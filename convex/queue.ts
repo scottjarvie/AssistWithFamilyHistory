@@ -1,7 +1,7 @@
 import { paginationOptsValidator, type PaginationResult } from "convex/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
-import type { ActionCtx, MutationCtx } from "./_generated/server";
+import type { ActionCtx, MutationCtx, QueryCtx } from "./_generated/server";
 import { action, internalAction, internalMutation, internalQuery, mutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import {
@@ -524,6 +524,9 @@ export const listQueueItemsInternal = internalQuery({
       toolName: "family_history_get_queue", input: { action: "list" },
     }) : null;
     const allowedIds = grant?.boundary.queueItemIds;
+    // Resolve the boundary in the same query that reads rows. A cached
+    // transport selection must not outlive revocation or narrowing.
+    if (allowedIds?.length) return listAllowedQueueItems(ctx, args, allowedIds);
     const requested = Math.min(args.paginationOpts.numItems, QUEUE_LIMITS.itemPage);
     const paginationOpts = { ...args.paginationOpts, numItems: requested };
     const query = args.state
@@ -531,11 +534,7 @@ export const listQueueItemsInternal = internalQuery({
       : args.priority
         ? ctx.db.query("queueItems").withIndex("by_owner_priority_updated", (q) => q.eq("vaultOwnerId", args.vaultOwnerId).eq("priority", args.priority!))
         : ctx.db.query("queueItems").withIndex("by_owner_updated", (q) => q.eq("vaultOwnerId", args.vaultOwnerId));
-    // Filter before pagination and expiry reconciliation: an outside row must
-    // neither leak nor be mutated as a side effect of a narrowed list request.
-    return (allowedIds?.length
-      ? query.filter((q) => q.or(...allowedIds.map((id) => q.eq(q.field("_id"), id))))
-      : query).order("desc").paginate(paginationOpts);
+    return query.order("desc").paginate(paginationOpts);
   },
 });
 
@@ -545,45 +544,47 @@ export const listQueueItemsInternal = internalQuery({
  * newest creation first. The immutable creation-time/ID cursor survives expiry
  * reconciliation changing updatedAt or removing rows from a state filter.
  */
-export const listAllowedQueueItemsInternal = internalQuery({
-  args: { ...listQueueArgs, queueItemIds: v.array(v.string()) },
-  handler: async (ctx, args): Promise<PaginationResult<QueueItem>> => {
-    const rows: QueueItem[] = [];
-    for (const raw of new Set(args.queueItemIds)) {
-      const id = ctx.db.normalizeId("queueItems", raw);
-      const item = id ? await ctx.db.get(id) : null;
-      if (!item || !matchesVaultOwner(item.vaultOwnerId, args.vaultOwnerId)) continue;
-      if (args.state && item.state !== args.state) continue;
-      if (args.priority && item.priority !== args.priority) continue;
-      rows.push(item);
+async function listAllowedQueueItems(
+  ctx: QueryCtx,
+  args: { vaultOwnerId: string; state?: QueueItem["state"]; priority?: QueueItem["priority"];
+    paginationOpts: { numItems: number; cursor: string | null } },
+  queueItemIds: string[],
+): Promise<PaginationResult<QueueItem>> {
+  const rows: QueueItem[] = [];
+  for (const raw of new Set(queueItemIds)) {
+    const id = ctx.db.normalizeId("queueItems", raw);
+    const item = id ? await ctx.db.get(id) : null;
+    if (!item || !matchesVaultOwner(item.vaultOwnerId, args.vaultOwnerId)) continue;
+    if (args.state && item.state !== args.state) continue;
+    if (args.priority && item.priority !== args.priority) continue;
+    rows.push(item);
+  }
+  rows.sort((a, b) => b._creationTime - a._creationTime || (a._id < b._id ? 1 : a._id > b._id ? -1 : 0));
+  let remaining = rows;
+  const cursor = args.paginationOpts.cursor;
+  if (cursor !== null) {
+    let key: unknown;
+    try {
+      key = JSON.parse(cursor);
+    } catch {
+      throw new Error("Invalid Queue continuation cursor; restart pagination.");
     }
-    rows.sort((a, b) => b._creationTime - a._creationTime || (a._id < b._id ? 1 : a._id > b._id ? -1 : 0));
-    let remaining = rows;
-    const cursor = args.paginationOpts.cursor;
-    if (cursor !== null) {
-      let key: unknown;
-      try {
-        key = JSON.parse(cursor);
-      } catch {
-        throw new Error("Invalid Queue continuation cursor; restart pagination.");
-      }
-      if (!Array.isArray(key) || key.length !== 2 || typeof key[0] !== "number" ||
-          !Number.isFinite(key[0]) || typeof key[1] !== "string" || !ctx.db.normalizeId("queueItems", key[1])) {
-        throw new Error("Invalid Queue continuation cursor; restart pagination.");
-      }
-      const [createdAt, id] = key as [number, string];
-      remaining = rows.filter((item) => item._creationTime < createdAt ||
-        (item._creationTime === createdAt && item._id < id));
+    if (!Array.isArray(key) || key.length !== 2 || typeof key[0] !== "number" ||
+        !Number.isFinite(key[0]) || typeof key[1] !== "string" || !ctx.db.normalizeId("queueItems", key[1])) {
+      throw new Error("Invalid Queue continuation cursor; restart pagination.");
     }
-    const page = remaining.slice(0, Math.min(args.paginationOpts.numItems, QUEUE_LIMITS.itemPage));
-    const last = page.at(-1);
-    return {
-      page,
-      isDone: page.length >= remaining.length,
-      continueCursor: last ? JSON.stringify([last._creationTime, last._id]) : cursor ?? "",
-    };
-  },
-});
+    const [createdAt, id] = key as [number, string];
+    remaining = rows.filter((item) => item._creationTime < createdAt ||
+      (item._creationTime === createdAt && item._id < id));
+  }
+  const page = remaining.slice(0, Math.min(args.paginationOpts.numItems, QUEUE_LIMITS.itemPage));
+  const last = page.at(-1);
+  return {
+    page,
+    isDone: page.length >= remaining.length,
+    continueCursor: last ? JSON.stringify([last._creationTime, last._id]) : cursor ?? "",
+  };
+}
 
 export const listQueueItems = action({
   args: listQueueArgs,
@@ -663,9 +664,6 @@ export const agentListQueueItems = internalAction({
     state: v.optional(queueStateValidator),
     priority: v.optional(queuePriorityValidator),
     paginationOpts: paginationOptsValidator,
-    // The grant's named Queue items, when the person narrowed the connection
-    // to them. Absent or empty means the grant names no Queue boundary.
-    queueItemIds: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args): Promise<PaginationResult<QueueItem>> => {
     const actor = verifyPrincipal(args.principal, "list_queue_items");
@@ -676,9 +674,7 @@ export const agentListQueueItems = internalAction({
       priority: args.priority,
       paginationOpts: args.paginationOpts,
     };
-    const result = args.queueItemIds && args.queueItemIds.length > 0
-      ? await ctx.runQuery(internal.queue.listAllowedQueueItemsInternal, { ...listArgs, queueItemIds: args.queueItemIds })
-      : await ctx.runQuery(internal.queue.listQueueItemsInternal, listArgs);
+    const result = await ctx.runQuery(internal.queue.listQueueItemsInternal, listArgs);
     const page: QueueItem[] = [];
     for (const item of result.page) {
       const transition = queueExpiryTransition(item, Date.now());
