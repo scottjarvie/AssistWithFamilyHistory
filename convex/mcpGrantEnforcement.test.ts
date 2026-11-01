@@ -485,6 +485,105 @@ describe("record boundaries", () => {
     expect(names).not.toContain("family_history_get_brief");
     expect(names).not.toContain("family_history_save_person");
   });
+
+  test("a grant narrowed to named Queue items lists only those items", async () => {
+    vi.stubEnv("TRUST_BOUNDARY_MODE", "enforce");
+    const t = convexTest(schema, modules);
+    const create = (key: string) => t.withIdentity({ subject: OWNER_A }).mutation(api.queue.createQueueItem, {
+      vaultOwnerId: OWNER_A,
+      directive: `Synthetic Queue directive ${key}.`,
+      idempotencyKey: `grant-queue:${key}`,
+    });
+    const allowed = (await create("allowed")).item;
+    const excluded = (await create("excluded")).item;
+    await seedGrant(t, {
+      vaultOwnerId: OWNER_A,
+      clientId: CLIENT_ID,
+      issuer: ISSUER,
+      boundary: { kind: "queue_only", queueItemIds: [String(allowed._id)] },
+    });
+    const listed = await callTool(t, OWNER_A, "family_history_get_queue", { action: "list" });
+    expect(listed.isError).toBe(false);
+    const ids = (listed.body as { page: Array<{ _id: string }> }).page.map((item) => item._id);
+    expect(ids).toEqual([String(allowed._id)]);
+    expect(ids).not.toContain(String(excluded._id));
+    // Filters still apply inside the boundary.
+    const none = await callTool(t, OWNER_A, "family_history_get_queue", { action: "list", state: "done" });
+    expect((none.body as { page: unknown[] }).page).toEqual([]);
+    // The excluded item stays out of reach by id too.
+    const detail = await callTool(t, OWNER_A, "family_history_get_queue", { action: "detail", queueItemId: String(excluded._id) });
+    expect(detail.isError).toBe(true);
+  });
+
+  test("named Queue paging does not skip working items after expiry reconciliation", async () => {
+    vi.stubEnv("TRUST_BOUNDARY_MODE", "enforce");
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const items = [];
+    for (const key of ["oldest", "middle", "expired"]) {
+      const created = await t.withIdentity({ subject: OWNER_A }).mutation(api.queue.createQueueItem, {
+        vaultOwnerId: OWNER_A,
+        directive: `Synthetic paging directive ${key}.`,
+        idempotencyKey: `paging:${key}`,
+      });
+      items.push(created.item);
+    }
+    await t.run(async (ctx) => {
+      for (const [index, item] of items.entries()) {
+        await ctx.db.patch(item._id, {
+          updatedAt: now - 3_000 + index,
+          state: "working",
+          condition: "active",
+          activeActorKind: "chosen_ai",
+          activeActorId: "synthetic-paging-ai",
+          leaseExpiresAt: now + 120_000,
+        });
+      }
+    });
+    const ordered = [...items].sort((a, b) => b._creationTime - a._creationTime || (a._id < b._id ? 1 : -1));
+    // Put the expired row first for both the old updatedAt order and the
+    // immutable creation-time/ID order used by the continuation cursor.
+    await t.run(async (ctx) => {
+      await ctx.db.patch(ordered[0]._id, { updatedAt: now, leaseExpiresAt: now - 1 });
+      await ctx.db.patch(ordered[1]._id, { updatedAt: now - 1 });
+      await ctx.db.patch(ordered[2]._id, { updatedAt: now - 2 });
+    });
+    await seedGrant(t, {
+      vaultOwnerId: OWNER_A, clientId: CLIENT_ID, issuer: ISSUER,
+      boundary: { kind: "queue_only", queueItemIds: items.map((item) => String(item._id)) },
+    });
+    const list = async (cursor: string | null) => {
+      const result = await callTool(t, OWNER_A, "family_history_get_queue", {
+        action: "list", state: "working", limit: 1, cursor,
+      });
+      expect(result.isError).toBe(false);
+      return result.body as { page: Array<{ _id: string }>; isDone: boolean; continueCursor: string };
+    };
+    const first = await list(null);
+    expect(first.page).toEqual([]);
+    expect(first.isDone).toBe(false);
+    expect(await t.run((ctx) => ctx.db.get(ordered[0]._id))).toMatchObject({ state: "needs_you" });
+    const second = await list(first.continueCursor);
+    expect(second.page.map((item) => item._id)).toEqual([String(ordered[1]._id)]);
+    const third = await list(second.continueCursor);
+    expect(third.page.map((item) => item._id)).toEqual([String(ordered[2]._id)]);
+    expect(third.isDone).toBe(true);
+  });
+
+  test("a whole-workspace grant without a Queue boundary still lists every Queue item", async () => {
+    vi.stubEnv("TRUST_BOUNDARY_MODE", "enforce");
+    const t = convexTest(schema, modules);
+    for (const key of ["one", "two"]) {
+      await t.withIdentity({ subject: OWNER_A }).mutation(api.queue.createQueueItem, {
+        vaultOwnerId: OWNER_A,
+        directive: `Synthetic Queue directive ${key}.`,
+        idempotencyKey: `grant-queue-all:${key}`,
+      });
+    }
+    await seedGrant(t, { vaultOwnerId: OWNER_A, clientId: CLIENT_ID, issuer: ISSUER });
+    const listed = await callTool(t, OWNER_A, "family_history_get_queue", { action: "list" });
+    expect((listed.body as { page: unknown[] }).page).toHaveLength(2);
+  });
 });
 
 describe("cross-owner isolation", () => {
