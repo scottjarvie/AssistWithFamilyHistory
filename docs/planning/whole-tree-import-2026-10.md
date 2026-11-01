@@ -87,15 +87,19 @@ people is refused (`OUTSIDE_GRANT_BOUNDARY`). The MCP request ceiling rose from
 Every record is keyed by its id on the outside site, namespaced by system and
 kind: `ext:familysearch:person:KWCJ-RN4`. The key lives in `mcpRecordKeys`
 (owner-scoped, indexed), so lookups are one index read.
+For GEDCOM, `importKey` must identify one file and remain stable when resuming
+that file. Its encoded value scopes every xref (people, facts, sources and
+links), so `@I1@` in two files cannot silently identify the same person.
 
 - Facts are keyed under their person: `KWCJ-RN4/<fact id>`. Send the
   FamilySearch fact id, or a stable name like `birth`, if a citation or note
   needs to point at the fact. A fact without a key gets one derived from its
   type, date, place and value.
 - A citation without its own id is keyed by its source, page and targets.
-- `otherIds` on a person (an Ancestry id, a GEDCOM xref) are remembered in
-  their own namespace, so a later import from that other system lands on the
-  same person.
+- Globally stable `otherIds` on a person (such as FamilySearch or Ancestry
+  ids) are remembered in their own namespace. GEDCOM xrefs are file-local;
+  they cannot establish a cross-file identity. To link a GEDCOM person to an
+  existing person, send that person's globally stable id in `otherIds`.
 - People and sources captured earlier by the browser extension (which set
   `fsId`) are found by PID and linked, not duplicated.
 - A couple or parent-child pair the person already entered by hand is found by
@@ -103,8 +107,10 @@ kind: `ext:familysearch:person:KWCJ-RN4`. The key lives in `mcpRecordKeys`
 
 ### The update rule
 
-- A record an import created takes the newer outside values on a later batch
-  (`updated`), or reports `unchanged`.
+- A later batch refreshes fields only while they still match the values the
+  import last wrote (`updated`), or reports `unchanged`. Manual corrections,
+  including cleared fields, are retained. Legacy rows without the optional
+  import baseline retain populated fields conservatively.
 - Anything else (the person typed it, or an older capture made it) is never
   overwritten. The import fills only its blank fields and names every field it
   left alone in `kept`. That is how "Grandma" stays "Grandma" even when
@@ -220,3 +226,22 @@ No live deployment was touched.
   children). They stay private and out of AI context notes, but they are now
   stored. Confirm that is acceptable, or say if living people should be
   skipped by default.
+
+### PR 86 repair verification — 1 November 2026
+
+Four regression tests failed before the repair and passed afterward: living
+people withheld from duplicate suggestions, complete rollback of a person row
+when a later fact fails, manual corrections surviving reimport, and file-local
+GEDCOM xrefs. Duplicate reads also filter historical suggestions if either
+endpoint is now living. There is no dedicated person AI privacy review flag;
+living people remain excluded from this suggestion path until that exists.
+
+Rows use nested mutations, following `save_records`' rollback boundary. The
+optional `mcpRecordKeys.lastImportedJson` baseline distinguishes unchanged
+imported fields from later edits. No schema fields or tables were removed,
+and uploaded originals are untouched. Main was brought in by a normal merge.
+
+Verification: application tests, Convex tests (including the 300-person import),
+typecheck, lint, production build, and all remaining verification contracts
+passed locally. The optional 5,000-person stress test and authenticated/live
+provider flows were not run. No screen changes, merge of this PR, or deployment.

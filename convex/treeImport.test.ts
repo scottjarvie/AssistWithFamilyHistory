@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- Regression fixtures exercise malformed input and dynamic MCP responses. */
 /**
  * Whole-tree import: a person's AI bringing their whole FamilySearch-shaped
  * tree in through MCP, in batches, keyed by outside ids.
@@ -289,7 +290,7 @@ describe("whole-tree import", () => {
     const grantId = await seedGrant(t, { vaultOwnerId: OWNER });
     const fs = await begin(t, grantId);
     await send(t, grantId, fs.importJobId, 0, {
-      persons: [{ key: "SYN-B", otherIds: [{ system: "gedcom", id: "@I42@" }], names: [{ given: "Bram", surname: "De Vries" }], living: false }],
+      persons: [{ key: "SYN-B", names: [{ given: "Bram", surname: "De Vries" }], living: false }],
     });
     const gedcom = (await t.mutation(internal.treeImport.beginTreeImport, {
       principal: principal(),
@@ -299,10 +300,82 @@ describe("whole-tree import", () => {
       input: { importKey: "gedcom-family-file", system: "gedcom", label: "Old family file" },
     })) as { importJobId: string };
     const result = await send(t, grantId, gedcom.importJobId, 0, {
-      persons: [{ key: "@I42@", names: [{ given: "Bram", surname: "De Vries" }], living: false }],
+      persons: [{ key: "@I42@", otherIds: [{ system: "familysearch", id: "SYN-B" }], names: [{ given: "Bram", surname: "De Vries" }], living: false }],
     });
     expect(result.counts.persons.created).toBe(0);
     expect(await countRows(t, "persons")).toBe(1);
+  });
+
+  test("unreviewed living people are absent from batch and persisted duplicate suggestions", async () => {
+    const t = convexTest(schema, modules);
+    const grantId = await seedGrant(t, { vaultOwnerId: OWNER });
+    const job = await begin(t, grantId);
+    const person = (key: string, living: boolean) => ({ key, living, names: [{ given: "Private", surname: "Example" }], facts: [{ type: "birth", date: { original: "1980", year: 1980 } }] });
+    await send(t, grantId, job.importJobId, 0, { persons: [person("living", true)] });
+    const result = await send(t, grantId, job.importJobId, 1, { persons: [person("deceased", false)] });
+    expect(result.results[0].possibleDuplicates ?? []).toEqual([]);
+    // A historical suggestion must disappear too when either endpoint is living.
+    const ids = await t.run(async (ctx) => {
+      const people = await ctx.db.query("persons").collect();
+      return people.map(p => p._id);
+    });
+    await t.run(async (ctx) => { await ctx.db.insert("connections", {
+      vaultOwnerId: OWNER, from: { kind: "person", id: ids[0] }, to: { kind: "person", id: ids[1] },
+      relation: "possibly_same_as", state: "proposed", reason: "Private name and year", importJobId: job.importJobId as any,
+      createdAt: Date.now(), updatedAt: Date.now(),
+    }); });
+    const progress = await t.query(internal.treeImport.getTreeImport, { principal: principal(), importJobId: job.importJobId });
+    expect(progress.possibleDuplicates).toEqual([]);
+  });
+
+  test("failed person facts roll back the person and keys while a good sibling saves", async () => {
+    const t = convexTest(schema, modules);
+    const grantId = await seedGrant(t, { vaultOwnerId: OWNER });
+    const job = await begin(t, grantId);
+    const result = await send(t, grantId, job.importJobId, 0, { persons: [
+      { key: "bad", living: false, names: [{ given: "Bad" }], facts: [{ type: "residence", date: { original: "1900", month: "invalid" } }] } as any,
+      { key: "good", living: false, names: [{ given: "Good" }] },
+    ] });
+    expect(result.results.map((r: any) => r.status)).toEqual(["failed", "created"]);
+    expect(await countRows(t, "persons")).toBe(1);
+    expect(await countRows(t, "mcpRecordKeys")).toBe(1);
+    expect(await countRows(t, "events")).toBe(0);
+  });
+
+  test("reimport preserves a manual correction but refreshes unchanged imported fields", async () => {
+    const t = convexTest(schema, modules);
+    const grantId = await seedGrant(t, { vaultOwnerId: OWNER });
+    const job = await begin(t, grantId);
+    const original = { key: "edited", living: false, names: [{ given: "Original" }], tags: ["old"] };
+    await send(t, grantId, job.importJobId, 0, { persons: [original] });
+    const id = await t.run(async ctx => (await ctx.db.query("persons").unique())!._id);
+    await t.run(async ctx => { await ctx.db.patch(id, { name: { given: "Corrected", surname: "" } }); });
+    await send(t, grantId, job.importJobId, 1, { persons: [{ ...original, tags: ["new"] }] });
+    const person = await t.run(async ctx => ctx.db.get(id));
+    expect(person?.name.given).toBe("Corrected");
+    expect(person?.tags).toEqual(["new"]);
+    // Explicitly clearing an imported field is also a manual correction.
+    await t.run(async ctx => { await ctx.db.patch(id, { tags: [] }); });
+    await send(t, grantId, job.importJobId, 2, { persons: [{ ...original, tags: ["newer"] }] });
+    expect((await t.run(async ctx => ctx.db.get(id)))?.tags).toEqual([]);
+  });
+
+  test("GEDCOM xrefs are local to a file and stable on resume", async () => {
+    const t = convexTest(schema, modules);
+    const grantId = await seedGrant(t, { vaultOwnerId: OWNER });
+    for (const file of ["file-a", "file-b"]) {
+      const job = await t.mutation(internal.treeImport.beginTreeImport, {
+        principal: principal(), grantId, operationId: `begin-${file}`, requestHash: file,
+        input: { importKey: file, system: "gedcom", label: file },
+      }) as { importJobId: string };
+      const persons = [{ key: "@I1@", living: false, names: [{ given: file }], facts: [{ key: "birth", type: "birth", date: { original: "1900" } }] }];
+      const sources = [{ key: "@S1@", title: file }];
+      await send(t, grantId, job.importJobId, 0, { persons, sources });
+      await send(t, grantId, job.importJobId, 1, { persons, sources });
+    }
+    expect(await countRows(t, "persons")).toBe(2);
+    expect(await countRows(t, "events")).toBe(2);
+    expect(await countRows(t, "sources")).toBe(2);
   });
 
   test("a connection limited to selected people cannot import a tree", { timeout: 300_000 }, async () => {

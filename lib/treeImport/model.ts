@@ -170,7 +170,11 @@ export type TreeImportItem = { kind: TreeImportKind; index: number; item: any };
 /* -------------------------------------------------------------- record keys */
 
 /** The durable lookup key for one outside record, namespaced by kind. */
-export function externalRecordKey(system: string, singularKind: string, key: string): string {
+export function externalRecordKey(system: string, singularKind: string, key: string, fileScope?: string): string {
+  if (system.trim().toLowerCase() === "gedcom") {
+    if (!fileScope) throw new Error("GEDCOM record keys require an import file scope.");
+    return `ext:gedcom:${encodeURIComponent(fileScope)}:${singularKind}:${key.trim()}`;
+  }
   return `ext:${system.trim().toLowerCase()}:${singularKind}:${key.trim()}`;
 }
 
