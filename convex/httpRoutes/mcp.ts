@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- Generated Convex references and SDK callbacks cross a runtime-validated MCP boundary. */
 import type { HttpRouter } from "convex/server";
+import { currentMediaForExport } from "../../lib/media/currentMediaForExport";
 import { EVIDENCE_LARGE_ORIGINAL_MAX_BYTES, EVIDENCE_UPLOAD_TYPES } from "../../lib/media/evidenceStandard";
 import { McpServer, createMcpHandler, type AuthInfo } from "@modelcontextprotocol/server";
 import { createRemoteJWKSet, errors as joseErrors, jwtVerify } from "jose";
@@ -441,7 +442,7 @@ function compactPersonWorkspace(workspace: any) {
     researchLog: (workspace.researchLog ?? []).slice(0, cap),
     stories: (workspace.stories ?? []).slice(0, cap),
     contextItems: (workspace.contextItems ?? []).filter((item: any) => item.aiUseAllowed && item.reviewStatus === "reviewed").slice(0, cap),
-    media: (workspace.media ?? []).filter((item: any) => item.aiUseAllowed && item.reviewStatus === "reviewed").slice(0, cap),
+    media: (workspace.media ?? []).filter((item: any) => item.aiUseAllowed && item.reviewStatus === "reviewed").slice(0, cap).map(currentMediaForExport),
     places: (workspace.places ?? []).slice(0, cap),
     researchChecks: (workspace.researchChecks ?? []).slice(0, cap),
     operations: workspace.operations,
@@ -747,10 +748,12 @@ export function createFamilyHistoryServer(
         return { ...workspace, ...originals, truncated: workspace.truncated || originals.truncated };
       }
       if (input.kind === "story") {
-        return await actionCtx.runQuery(vault.getStoryReview, {
+        const bundle = await actionCtx.runQuery(vault.getStoryReview, {
           vaultOwnerId: principal.subject,
           storyId: input.id as any,
         });
+        // The human review view retains history; AI context gets current media.
+        return bundle ? { ...bundle, media: bundle.media.map(currentMediaForExport) } : null;
       }
       return await actionCtx.runQuery(mcp.getRecordContext, { principal, kind: input.kind, id: input.id });
     });

@@ -50,6 +50,40 @@ const recordRefValidator = v.object({
   id: v.string(),
 });
 
+/** One exact provider object version, as pinned on a B2-backed media row. */
+const b2ObjectValidator = v.object({
+  bucketClass: v.union(v.literal("private"), v.literal("public")),
+  bucketName: v.string(), objectKey: v.string(), versionId: v.string(), sha256: v.string(),
+  contentType: v.string(), sizeBytes: v.number(), width: v.optional(v.number()), height: v.optional(v.number()),
+  metadataClean: v.boolean(), verifiedAt: v.string(), transformation: v.optional(v.string()), sourceSha256: v.optional(v.string()),
+});
+
+/** Camera/GPS proposal and the person's decision for one exact original. */
+const mediaMetadataProposalValidator = v.object({
+  temporal: v.object({
+    cameraCaptureTime: v.optional(v.string()),
+    scanTime: v.optional(v.string()),
+    fileModifiedTime: v.optional(v.string()),
+    uploadTime: v.string(),
+    inferredHistoricalEventDate: v.optional(v.string()),
+  }),
+  location: v.optional(v.object({
+    latitude: v.number(),
+    longitude: v.number(),
+    source: v.literal("embedded_gps"),
+    status: v.literal("proposed"),
+    association: v.union(v.literal("person_media"), v.literal("event"), v.literal("place")),
+    precision: v.literal("exact_private"),
+    disclosurePrecision: v.union(v.literal("withheld"), v.literal("locality"), v.literal("region")),
+  })),
+  extractedFromOriginalSha256: v.string(),
+  extractedAt: v.string(),
+  reversible: v.literal(true),
+  decision: v.union(v.literal("pending"), v.literal("accepted"), v.literal("declined")),
+  acceptedAt: v.optional(v.string()),
+  declinedAt: v.optional(v.string()),
+});
+
 export default defineSchema({
   /**
    * PERSONS
@@ -919,30 +953,18 @@ export default defineSchema({
         metadataClean: v.boolean(), verifiedAt: v.string(), transformation: v.optional(v.string()), sourceSha256: v.optional(v.string()),
       }),
     })),
-    metadataProposal: v.optional(v.object({
-      temporal: v.object({
-        cameraCaptureTime: v.optional(v.string()),
-        scanTime: v.optional(v.string()),
-        fileModifiedTime: v.optional(v.string()),
-        uploadTime: v.string(),
-        inferredHistoricalEventDate: v.optional(v.string()),
-      }),
-      location: v.optional(v.object({
-        latitude: v.number(),
-        longitude: v.number(),
-        source: v.literal("embedded_gps"),
-        status: v.literal("proposed"),
-        association: v.union(v.literal("person_media"), v.literal("event"), v.literal("place")),
-        precision: v.literal("exact_private"),
-        disclosurePrecision: v.union(v.literal("withheld"), v.literal("locality"), v.literal("region")),
-      })),
-      extractedFromOriginalSha256: v.string(),
-      extractedAt: v.string(),
-      reversible: v.literal(true),
-      decision: v.union(v.literal("pending"), v.literal("accepted"), v.literal("declined")),
-      acceptedAt: v.optional(v.string()),
-      declinedAt: v.optional(v.string()),
-    })),
+    /**
+     * B2 files this item served before the person replaced its bytes. Kept as
+     * history so a replacement never silently loses an original; delivery
+     * follows only the active file (storageId, or b2Original/b2Renditions).
+     */
+    replacedB2Files: v.optional(v.array(v.object({
+      replacedAt: v.number(),
+      original: b2ObjectValidator,
+      renditions: v.optional(v.object({ tiny: b2ObjectValidator, medium: b2ObjectValidator, large: b2ObjectValidator })),
+      metadataProposal: v.optional(mediaMetadataProposalValidator),
+    }))),
+    metadataProposal: v.optional(mediaMetadataProposalValidator),
     recordedVia: v.optional(v.object({
       actorKind: v.union(v.literal("person"), v.literal("chosen_ai"), v.literal("migration")),
       clientName: v.optional(v.string()),
