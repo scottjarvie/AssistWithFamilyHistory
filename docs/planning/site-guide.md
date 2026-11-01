@@ -391,3 +391,12 @@ The work to close these gaps is proposed as Work Orders AWF-WO-015 to AWF-WO-019
 
 - **Edition 2 · 6 October 2026** — Scott ruled on all nine building-block decisions and the guide became canonical. Added Projects (holding Questions), several trees as separate workspaces, Claims in place of Facts, photos connectable from inside Sources, family-memory Sources, Topics, sign-in as the AI approval, and no new sharing in the first builds. Decisions now follow the Scriptures shape: a dated table here, with the questions and options in `site-guide-content.json`.
 - **Draft edition 1 · 6 October 2026** — First Site Guide, written from the Project Philosophy 1.10.0, the Core Site Guide proposal (24 September), Core Philosophy 1.14.x, MCP/OAuth standard 1.3.0, media standard 1.8.0, the Scriptures (edition 9) and Languages (v1.1) guides, the current schema and routes, and 6 October audits of MCP, media and pages. Proposes the building-block model and nine decisions for Scott, and Work Orders AWF-WO-015 to AWF-WO-019.
+
+### 23 October 2026 — AI connection defaults (Scott, 22 October)
+
+Connecting an AI gives it every current and future tool with no end date by default.
+The person may deliberately choose fewer permissions or an end date in AI Connections;
+sign-in must never undo those choices. Full access is a durable choice, resolved against
+the current catalog, rather than a scope list frozen on the day of connection. Existing
+review, evidence privacy, publishing and other per-action safety gates still apply.
+Implementation and verification are separate from production delivery.
