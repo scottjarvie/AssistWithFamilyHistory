@@ -166,18 +166,13 @@ function isEmpty(value: unknown): boolean {
   return false;
 }
 
-/** Created by a tree import, so a later import of the same tree may refresh it. */
-function importOwned(row: { creationProvenance?: { method?: string } }): boolean {
-  return row.creationProvenance?.method === "import";
-}
-
 /** A planned (dry-run) or not-yet-real id: never read from or written against. */
 function isPlaceholder(id: string): boolean {
   return id.startsWith("planned:") || id.startsWith("dry:");
 }
 
 async function lookup(c: ChunkContext, singular: string, key: string, system: string = c.job.system): Promise<string | null> {
-  const mapKey = externalRecordKey(system, singular, key);
+  const mapKey = externalRecordKey(system, singular, key, c.job.importKey);
   const local = c.local.get(mapKey);
   if (local) return local;
   if (c.planned.has(mapKey)) return `planned:${mapKey}`;
@@ -190,8 +185,8 @@ async function lookup(c: ChunkContext, singular: string, key: string, system: st
   return row?.recordId ?? null;
 }
 
-async function remember(c: ChunkContext, singular: string, key: string, recordId: string, system: string = c.job.system) {
-  const mapKey = externalRecordKey(system, singular, key);
+async function remember(c: ChunkContext, singular: string, key: string, recordId: string, system: string = c.job.system, imported?: Record<string, unknown>) {
+  const mapKey = externalRecordKey(system, singular, key, c.job.importKey);
   c.local.set(mapKey, recordId);
   if (c.w.dryRun) {
     c.plannedNow.push(mapKey);
@@ -203,6 +198,7 @@ async function remember(c: ChunkContext, singular: string, key: string, recordId
     recordType: RECORD_TYPE[singular],
     recordKey: mapKey,
     recordId,
+    ...(imported ? { lastImportedJson: JSON.stringify(clean(imported)) } : {}),
     createdAt: now,
     updatedAt: now,
   });
@@ -236,8 +232,8 @@ function mergeExternalIds(existing: ExternalId[] | undefined, incoming: External
 type UpsertOutcome = { id: string; status: ItemResult["status"]; kept?: string[] };
 
 /**
- * The one update rule. Import-owned rows take the outside values; anything
- * else only has its blanks filled, and every disagreement is reported back.
+ * Refresh only fields still equal to their last imported value. Manual edits
+ * and legacy populated fields are retained, with disagreements reported back.
  */
 async function upsertRow(
   c: ChunkContext,
@@ -262,7 +258,7 @@ async function upsertRow(
       createdAt: now,
       updatedAt: now,
     });
-    await remember(c, args.singular, args.key, id);
+    await remember(c, args.singular, args.key, id, c.job.system, args.doc);
     return { id, status: "created" };
   }
   if (isPlaceholder(args.existingId)) return { id: args.existingId, status: "unchanged" };
@@ -270,7 +266,13 @@ async function upsertRow(
   if (!row) fail("NOT_FOUND", "The record this outside id pointed to is gone.", "Send the record again under a new key, or ask the person what happened to it.");
   const patch: Record<string, unknown> = {};
   const kept: string[] = [];
-  const owned = importOwned(row as any);
+  const mapping = await c.ctx.db.query("mcpRecordKeys").withIndex("by_owner_type_key", q =>
+    q.eq("vaultOwnerId", c.owner).eq("recordType", RECORD_TYPE[args.singular]).eq("recordKey", externalRecordKey(c.job.system, args.singular, args.key, c.job.importKey)),
+  ).unique();
+  const baseline = mapping?.lastImportedJson ? JSON.parse(mapping.lastImportedJson) : null;
+  // Creation provenance is historical, never permission to replace later edits.
+  // Legacy rows without a baseline conservatively retain populated fields.
+  const imported: Record<string, unknown> = { ...(baseline ?? {}) };
   for (const [field, value] of Object.entries(args.doc)) {
     if (value === undefined) continue;
     const current = (row as any)[field];
@@ -280,12 +282,18 @@ async function upsertRow(
       continue;
     }
     if (same(current, value)) continue;
-    if (owned || isEmpty(current)) patch[field] = value;
+    if (baseline && Object.hasOwn(baseline, field) ? same(current, baseline[field]) : isEmpty(current)) {
+      patch[field] = value;
+      imported[field] = value;
+    }
     else kept.push(field);
   }
   if (args.linked) await remember(c, args.singular, args.key, String(row._id));
   if (Object.keys(patch).length > 0) {
-    await c.w.patch(String(row._id), { ...clean(patch), ...(owned ? { importJobId: c.job._id } : {}), updatedAt: now });
+    await c.w.patch(String(row._id), { ...clean(patch), updatedAt: now });
+  }
+  if (mapping && !c.w.dryRun && Object.keys(patch).length > 0) {
+    await c.w.patch(String(mapping._id), { lastImportedJson: JSON.stringify(clean(imported)) });
   }
   const status: ItemResult["status"] = args.linked ? "linked" : Object.keys(patch).length > 0 ? "updated" : "unchanged";
   return { id: String(row._id), status, ...(kept.length ? { kept } : {}) };
@@ -330,6 +338,7 @@ async function importPerson(c: ChunkContext, item: any): Promise<Omit<ItemResult
   if (!existingId) {
     // The same person imported earlier from another site, under that site's id.
     for (const other of otherIds) {
+      if (other.system.toLowerCase() === "gedcom" && c.job.system !== "gedcom") continue;
       const found = await lookup(c, "person", other.id, other.system.toLowerCase());
       if (found) {
         existingId = found;
@@ -351,7 +360,7 @@ async function importPerson(c: ChunkContext, item: any): Promise<Omit<ItemResult
     externalIds: externalIdsFor(c, key, item.otherIds, item.sourceUrl),
   };
   let duplicates: string[] = [];
-  if (!existingId) duplicates = await duplicateCandidates(c, name, yearOf(doc.birth?.date));
+  if (!existingId && !item.living) duplicates = await duplicateCandidates(c, name, yearOf(doc.birth?.date));
   const saved = await upsertRow(c, {
     table: "persons",
     singular: "person",
@@ -367,6 +376,7 @@ async function importPerson(c: ChunkContext, item: any): Promise<Omit<ItemResult
   // Remember the person's ids on other sites too, so an import from there
   // lands on this same person instead of making a second one.
   for (const other of otherIds) {
+    if (other.system.toLowerCase() === "gedcom" && c.job.system !== "gedcom") continue;
     const system = other.system.toLowerCase();
     if (system === c.job.system && other.id === key) continue;
     const mapped = await lookup(c, "person", other.id, system);
@@ -404,7 +414,7 @@ async function importFact(c: ChunkContext, personId: string, personKey: string, 
       description: factDescription(fact),
       externalIds: fact.key ? [{ system: c.job.system, id: String(fact.key) }] : undefined,
     },
-    createOnly: { importKey: `import:${externalRecordKey(c.job.system, "fact", factKey)}` },
+    createOnly: { importKey: `import:${externalRecordKey(c.job.system, "fact", factKey, c.job.importKey)}` },
   });
   if (saved.status === "created") {
     await c.w.insert("personEvents", {
@@ -427,6 +437,9 @@ async function duplicateCandidates(c: ChunkContext, name: { given: string; surna
     .take(TREE_IMPORT_LIMITS.duplicateScanPerPerson);
   const found: string[] = [];
   for (const row of rows) {
+    // Persons have no explicit AI privacy review flag yet. Fail closed for
+    // living people until a dedicated reviewed state is available.
+    if (row.living) continue;
     const reason = duplicateReason(
       { given: name.given, surname: name.surname, birthYear },
       { given: row.name.given, surname: row.name.surname, birthYear: row.birth?.date?.year },
@@ -517,7 +530,7 @@ async function importRelationship(c: ChunkContext, item: any): Promise<Omit<Item
       familySearchId: c.job.system === "familysearch" ? key : undefined,
       externalIds: externalIdsFor(c, key, item.otherIds),
     },
-    createOnly: { importKey: `import:${externalRecordKey(c.job.system, "relationship", key)}` },
+    createOnly: { importKey: `import:${externalRecordKey(c.job.system, "relationship", key, c.job.importKey)}` },
   });
   return { key, status: saved.status, id: saved.id, ...(saved.kept ? { kept: saved.kept } : {}) };
 }
@@ -557,7 +570,7 @@ async function importSource(c: ChunkContext, item: any): Promise<Omit<ItemResult
       fsId: c.job.system === "familysearch" ? key : undefined,
       externalIds: externalIdsFor(c, key, item.otherIds, item.url),
     },
-    createOnly: { importKey: `import:${externalRecordKey(c.job.system, "source", key)}` },
+    createOnly: { importKey: `import:${externalRecordKey(c.job.system, "source", key, c.job.importKey)}` },
   });
   return { key, status: saved.status, id: saved.id, ...(saved.kept ? { kept: saved.kept } : {}) };
 }
@@ -594,7 +607,7 @@ async function importMedia(c: ChunkContext, item: any): Promise<Omit<ItemResult,
       externalIds: externalIdsFor(c, key, undefined, item.url),
     },
     createOnly: {
-      importKey: `import:${externalRecordKey(c.job.system, "media", key)}`,
+      importKey: `import:${externalRecordKey(c.job.system, "media", key, c.job.importKey)}`,
       privacyLevel: "private",
       reviewStatus: "unreviewed",
       rightsStatus: "unknown",
@@ -641,7 +654,7 @@ async function importCitation(c: ChunkContext, item: any): Promise<Omit<ItemResu
       notes: cleanText(item.notes, "citation notes", FAMILY_HISTORY_MCP_LIMITS.notes),
       externalIds: item.key ? [{ system: c.job.system, id: String(item.key) }] : undefined,
     },
-    createOnly: { isEvidence: true, importKey: `import:${externalRecordKey(c.job.system, "citation", key)}` },
+    createOnly: { isEvidence: true, importKey: `import:${externalRecordKey(c.job.system, "citation", key, c.job.importKey)}` },
   });
   if (!isPlaceholder(saved.id)) {
     for (const target of targets) {
@@ -714,7 +727,12 @@ async function runChunk(c: ChunkContext, items: TreeImportItem[]): Promise<ItemR
   for (const item of items) {
     const importer = IMPORTERS[item.kind];
     try {
-      const saved = await importer(c, item.item);
+      const saved = c.w.dryRun
+        ? await importer(c, item.item)
+        : await (c.ctx as MutationCtx).runMutation(self.applyTreeImportItem, {
+          owner: c.owner, job: c.job, provenance: c.provenance, item,
+        });
+      if (!c.w.dryRun) c.duplicatesSuggested += saved.possibleDuplicates?.length ?? 0;
       results.push({ kind: item.kind, index: item.index, ...saved });
     } catch (error) {
       if (error instanceof ItemFailure) {
@@ -770,6 +788,24 @@ const chunkArgs = {
   operationId: v.string(),
   items: v.array(v.object({ kind: v.string(), index: v.number(), item: v.any() })),
 };
+
+/** Each row is a subtransaction: a late fact/link failure rolls back all writes. */
+export const applyTreeImportItem = internalMutation({
+  args: { owner: v.string(), job: v.any(), provenance: v.any(), item: v.any() },
+  handler: async (ctx, args): Promise<Omit<ItemResult, "kind" | "index">> => {
+    const c: ChunkContext = {
+      ctx, w: liveWriter(ctx), owner: args.owner, job: args.job, provenance: args.provenance,
+      local: new Map(), planned: new Set(), plannedNow: [], duplicatesSuggested: 0,
+    };
+    const item = args.item as TreeImportItem;
+    try {
+      return await IMPORTERS[item.kind](c, item.item);
+    } catch (error) {
+      if (error instanceof ItemFailure) machineError(error.code as any, error.message, error.whatToDo);
+      throw error;
+    }
+  },
+});
 
 /** A dry run of one chunk. Reads only; the writer changes nothing. */
 export const planTreeImportChunk = internalQuery({
@@ -1164,6 +1200,7 @@ export const getTreeImport = internalQuery({
       if (row.vaultOwnerId !== owner || row.state !== "proposed") continue;
       const a = await ctx.db.get(row.from.id as Id<"persons">);
       const b = await ctx.db.get(row.to.id as Id<"persons">);
+      if (!a || !b || a.living || b.living || a.vaultOwnerId !== owner || b.vaultOwnerId !== owner) continue;
       suggestions.push({
         connectionId: row._id,
         personId: row.from.id,

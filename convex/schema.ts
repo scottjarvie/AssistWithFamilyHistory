@@ -2165,6 +2165,8 @@ export default defineSchema({
     ),
     recordKey: v.string(),
     recordId: v.string(),
+    // Last values actually written by a tree import; detects later human edits.
+    lastImportedJson: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
