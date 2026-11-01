@@ -175,7 +175,10 @@ describe("chosen-AI lifecycle ladder (locally provable rungs)", () => {
     expect(granted[0].observedClientName).toContain(RUN_KEY);
 
     // The person narrows it to reading only.
-    await t.run(async (ctx) => ctx.db.patch(granted[0]._id, { scopes: ["family_history:context:read"] }));
+    await t.withIdentity({ subject: OWNER }).mutation(
+      (await import("./_generated/api")).api.mcpGrants.reduceGrantScopes,
+      { vaultOwnerId: OWNER, grantId: granted[0]._id, scopes: ["family_history:context:read"] },
+    );
 
     const afterApproval = await connect(t, token);
     const names = (await afterApproval.listTools()).tools.map((tool) => tool.name);

@@ -14,7 +14,7 @@
  *   - every record boundary the grant model supports can be chosen;
  *   - a scope that can change things is visibly marked as such;
  *   - the revoke control states the immediate-effect promise the backend keeps;
- *   - nothing is pre-ticked, so approval is always an explicit act;
+ *   - all scopes and no end date are the defaults;
  *   - the manual fallback brief names what it deliberately leaves out and
  *     carries no authority; and
  *   - no OAuth vocabulary leaks into the person-facing copy.
@@ -174,21 +174,19 @@ assert.match(
   "Narrowing must explain that giving a permission back needs a fresh approval",
 );
 
-/* -------------------------------------------------------- no defaults */
+/* ---------------------------------------------------- full defaults */
 
-assert.doesNotMatch(
-  markup,
-  /name="boundary-grant_pending_fixture"[^>]*type="radio"[^>]*checked=""[^>]*value/,
-  "Boundary choice must not silently default to a wider boundary",
-);
 const preTickedScopes = FAMILY_HISTORY_SCOPE_INFO.filter((scope) =>
   new RegExp(`id="approve-${pending.id}-${scope.scope}"[^>]*checked`).test(markup),
 );
 assert.equal(
   preTickedScopes.length,
-  0,
-  "No permission may be pre-ticked on the consent screen; approval must be an explicit act",
+  FAMILY_HISTORY_SCOPES.length,
+  "Every permission must be included by default",
 );
+
+assert.match(markup, /aria-pressed="true"[^>]*>No end date/, "Settings must select no end date by default");
+assert.match(markup, /Remove end date/, "The person must be able to remove an end date");
 
 /* --------------------------------------------- stale tools and fallback */
 
@@ -292,3 +290,26 @@ console.log(
   `Connection-centre honesty contract passed (${FAMILY_HISTORY_SCOPE_INFO.length} scopes, ` +
     `${NEVER_EXPOSED.length} never-exposed, ${NEVER_PERMITTED.length} never-permitted entries rendered)`,
 );
+
+// Closed connections expose the existing approval form only through an explicit
+// settings disclosure, preserving saved narrowing rather than preselecting full.
+const closed: ConnectionRow = {
+  ...active,
+  id: "grant_revoked_fixture",
+  status: "revoked",
+  boundary: { kind: "selected_people", personIds: ["synthetic-person"] },
+};
+const closedMarkup = decode(renderToStaticMarkup(React.createElement(AiConnectionCenter, {
+  initialConnections: [closed], initialActivity: [],
+})));
+assert.match(closedMarkup, /Review and approve again/);
+assert.match(closedMarkup, /stays off until you approve/);
+assert.match(closedMarkup, /Approve exactly this/);
+assert.match(closedMarkup, /Remove from this list/);
+assert.match(closedMarkup, /synthetic-person/);
+for (const scope of FAMILY_HISTORY_SCOPES) {
+  const checked = new RegExp(`id="approve-${closed.id}-${scope}"[^>]*checked`).test(closedMarkup);
+  assert.equal(checked, closed.scopes.includes(scope), "Reapproval must retain chosen scopes in the initial form");
+}
+assert.match(closedMarkup, new RegExp(`id="boundary-${closed.id}-selected_people"[^>]*checked`));
+assert.ok(!closedMarkup.includes("I do not recognise this"), "Closed connections cannot submit the pending-only decline action");

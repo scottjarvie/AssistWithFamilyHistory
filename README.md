@@ -59,7 +59,7 @@ Capture FamilySearch data, merge it into a canonical vault, and move from eviden
 
 ### Prerequisites
 
-- Node.js 20 (see `.nvmrc`)
+- Node.js 22.23.4 or newer patched 22.x (see `.nvmrc`; Vercel selects `22.x` via `engines.node`)
 - pnpm (recommended) or npm
 
 ### Installation
@@ -259,7 +259,12 @@ Sign-in is powered by Clerk, and the auth posture is driven entirely by environm
 - `REQUIRE_AUTH=true` forces sign-in on `/app` and protected API routes (the `PROTECTED_ROUTE_PATTERNS`).
 - `ALLOW_ANONYMOUS_VAULT` (or `NEXT_PUBLIC_ALLOW_ANONYMOUS_VAULT`) governs guest-vault posture. When anonymous vaults are **not** enabled, protected routes require sign-in. When enabled, signed-out visitors get a cookie-backed guest vault instead. Guest vaults are off by default — enable only for an explicit preview deployment.
 
-When Clerk keys are absent, `proxy.ts` short-circuits to a pass-through and no auth runs at all.
+When `REQUIRE_AUTH=true` and Clerk is missing or disabled, `proxy.ts` returns
+503 with caching disabled. Vault access also fails closed on hosted deployments
+instead of assigning the shared `local-dev` owner. `REQUIRE_AUTH` takes priority
+over anonymous-vault flags. In Convex shadow mode, private server calls still
+require a signed-in Clerk session when `REQUIRE_AUTH=true`; a verified session
+can use the legacy transport until the Convex JWT issuer is configured.
 
 **Convex tenant boundary.** Private Convex calls also carry a Clerk JWT from
 `getAuthedConvexClient()`; the backend verifies that token and the requested

@@ -148,7 +148,7 @@ export default async function OperationsPage({ searchParams }: { searchParams: S
   return (
     <div className="p-4 sm:p-8">
       <section className="mb-8 rounded-[2rem] border border-stone-200 bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.16),_transparent_28%),linear-gradient(135deg,_rgba(255,255,255,0.96),_rgba(251,247,240,0.98))] px-6 py-7 shadow-sm">
-        <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+        <div className="flex flex-col gap-6 2xl:flex-row 2xl:items-end 2xl:justify-between">
           <div>
             <Badge variant="secondary" className="mb-4">Research operations backend</Badge>
             <h1 className="text-3xl font-bold text-stone-900 sm:text-4xl">Operations</h1>
@@ -207,27 +207,28 @@ export default async function OperationsPage({ searchParams }: { searchParams: S
 
       <section className="mb-6">
         <form className="rounded-[1.75rem] border border-stone-200 bg-white p-4 shadow-sm">
-          <div className="grid gap-3 xl:grid-cols-[1.1fr_170px_180px_190px_170px_190px_120px_120px_auto]">
-            <div className="relative">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="relative sm:col-span-2">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
               <Input
                 name="q"
+                aria-label="Search operations"
                 defaultValue={params.q}
                 placeholder="Search names, places, relatives"
                 className="pl-9"
               />
             </div>
-            <select name="type" defaultValue={params.type || ""} className="h-10 rounded-md border border-stone-200 bg-white px-3 text-sm text-stone-700">
+            <select name="type" aria-label="Row type" defaultValue={params.type || ""} className="h-11 rounded-md border border-stone-200 bg-white px-3 text-base text-stone-700 md:pointer-fine:h-10 md:pointer-fine:text-sm">
               <option value="">All rows</option>
               <option value="person">Canonical people</option>
               <option value="provisional">Provisional relatives</option>
             </select>
-            <select name="storyStatus" defaultValue={params.storyStatus || ""} className="h-10 rounded-md border border-stone-200 bg-white px-3 text-sm text-stone-700">
+            <select name="storyStatus" aria-label="Saved story state" defaultValue={params.storyStatus || ""} className="h-11 rounded-md border border-stone-200 bg-white px-3 text-base text-stone-700 md:pointer-fine:h-10 md:pointer-fine:text-sm">
               <option value="">Any saved story state</option>
               <option value="has_story">Has saved draft/page</option>
               <option value="no_story">No saved draft yet</option>
             </select>
-            <select name="storyWorkflow" defaultValue={params.storyWorkflow || ""} className="h-10 rounded-md border border-stone-200 bg-white px-3 text-sm text-stone-700">
+            <select name="storyWorkflow" aria-label="Story readiness" defaultValue={params.storyWorkflow || ""} className="h-11 rounded-md border border-stone-200 bg-white px-3 text-base text-stone-700 md:pointer-fine:h-10 md:pointer-fine:text-sm">
               <option value="">Any readiness</option>
               <option value="needs_genealogy_evidence">Needs genealogy</option>
               <option value="needs_context_research">Needs context</option>
@@ -235,7 +236,7 @@ export default async function OperationsPage({ searchParams }: { searchParams: S
               <option value="ready_to_review">Ready to review</option>
               <option value="published">Published</option>
             </select>
-            <select name="missingCheck" defaultValue={params.missingCheck || ""} className="h-10 rounded-md border border-stone-200 bg-white px-3 text-sm text-stone-700">
+            <select name="missingCheck" aria-label="Missing check" defaultValue={params.missingCheck || ""} className="h-11 rounded-md border border-stone-200 bg-white px-3 text-base text-stone-700 md:pointer-fine:h-10 md:pointer-fine:text-sm">
               <option value="">Any missing check</option>
               <option value="identity_review">Identity review</option>
               <option value="biography">Biography</option>
@@ -245,7 +246,7 @@ export default async function OperationsPage({ searchParams }: { searchParams: S
               <option value="census">Census</option>
               <option value="church_records">Church records</option>
             </select>
-            <select name="sortBy" defaultValue={params.sortBy || "missingCritical"} className="h-10 rounded-md border border-stone-200 bg-white px-3 text-sm text-stone-700">
+            <select name="sortBy" aria-label="Sort by" defaultValue={params.sortBy || "missingCritical"} className="h-11 rounded-md border border-stone-200 bg-white px-3 text-base text-stone-700 md:pointer-fine:h-10 md:pointer-fine:text-sm">
               <option value="missingCritical">Sort: Missing critical</option>
               <option value="completion">Sort: Completion</option>
               <option value="lastTouched">Sort: Last touched</option>
@@ -253,15 +254,15 @@ export default async function OperationsPage({ searchParams }: { searchParams: S
               <option value="storyReadiness">Sort: Draft/publish readiness</option>
               <option value="newestImport">Sort: Newest import</option>
             </select>
-            <select name="sortDirection" defaultValue={params.sortDirection || "desc"} className="h-10 rounded-md border border-stone-200 bg-white px-3 text-sm text-stone-700">
+            <select name="sortDirection" aria-label="Sort direction" defaultValue={params.sortDirection || "desc"} className="h-11 rounded-md border border-stone-200 bg-white px-3 text-base text-stone-700 md:pointer-fine:h-10 md:pointer-fine:text-sm">
               <option value="desc">Desc</option>
               <option value="asc">Asc</option>
             </select>
-            <select name="staleOnly" defaultValue={params.staleOnly || ""} className="h-10 rounded-md border border-stone-200 bg-white px-3 text-sm text-stone-700">
+            <select name="staleOnly" aria-label="Freshness" defaultValue={params.staleOnly || ""} className="h-11 rounded-md border border-stone-200 bg-white px-3 text-base text-stone-700 md:pointer-fine:h-10 md:pointer-fine:text-sm">
               <option value="">Any freshness</option>
               <option value="true">Stale only</option>
             </select>
-            <button className="inline-flex h-10 items-center justify-center rounded-md bg-stone-900 px-4 text-sm font-medium text-white hover:bg-stone-800">
+            <button className="inline-flex h-11 items-center justify-center rounded-md bg-stone-900 px-4 text-sm font-medium text-white hover:bg-stone-800 md:pointer-fine:h-10">
               Apply
             </button>
           </div>
@@ -300,10 +301,10 @@ export default async function OperationsPage({ searchParams }: { searchParams: S
               <Gauge className="h-5 w-5 text-amber-700" />
               <CardTitle>Progress Logic</CardTitle>
             </div>
-            <CardDescription>Story readiness means ready to draft or publish, not simply having any story.</CardDescription>
+            <CardDescription>Story workflow labels combine research gaps and the saved story state.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-stone-600">
-            <p>Required checks drive readiness more than optional ones, stale work is flagged separately, and saved stories add signal only after evidence coverage is strong enough to support drafting or publishing.</p>
+            <p>Missing required evidence and place context guide the next research step. Saved drafts can move into review; privacy and publication checks happen on each saved story. Stale checks are flagged separately.</p>
           </CardContent>
         </Card>
       </section>

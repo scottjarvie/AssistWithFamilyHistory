@@ -33,6 +33,7 @@ export type ConnectionRow = {
   clientProvenance: "cimd" | "dcr" | "manual";
   clientMetadataUrl: string | null;
   scopes: FamilyHistoryScope[];
+  scopeChoice?: "full" | "chosen";
   boundary: ConnectionBoundary;
   status: GrantStatus;
   requestedAt: number;
@@ -86,7 +87,7 @@ export const approveGrantRef = makeFunctionReference<
     boundary: ConnectionBoundary;
     expiresInDays?: number;
   },
-  { id: string; status: "active"; scopes: FamilyHistoryScope[]; boundary: ConnectionBoundary; expiresAt: number }
+  { id: string; status: "active"; scopes: FamilyHistoryScope[]; boundary: ConnectionBoundary; expiresAt: number | null }
 >("mcpGrants:approveGrant");
 
 export const denyGrantRef = makeFunctionReference<
@@ -98,7 +99,7 @@ export const denyGrantRef = makeFunctionReference<
 export const reduceGrantScopesRef = makeFunctionReference<
   "mutation",
   { vaultOwnerId: string; grantId: string; scopes: string[] },
-  { id: string; scopes: FamilyHistoryScope[] }
+  { id: string; scopes: FamilyHistoryScope[]; scopeChoice: "full" | "chosen" }
 >("mcpGrants:reduceGrantScopes");
 
 export const revokeGrantRef = makeFunctionReference<
@@ -112,3 +113,9 @@ export const removeGrantRef = makeFunctionReference<
   { vaultOwnerId: string; grantId: string },
   { id: string; removed: true }
 >("mcpGrants:removeGrant");
+
+export const updateGrantExpiryRef = makeFunctionReference<
+  "mutation",
+  { vaultOwnerId: string; grantId: string; expiresInDays?: number },
+  { id: string; status: "active"; expiresAt: number | null }
+>("mcpGrants:updateGrantExpiry");
