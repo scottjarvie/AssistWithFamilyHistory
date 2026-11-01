@@ -371,3 +371,53 @@ test("receipt shortcuts never cross grants or survive revocation/expiry; legacy 
   await expect(t.mutation(internal.mcpFamilyHistory.saveResearchWork, { ...researchArgs, operationId: "legacy-outside-receipt", requestHash: "legacy-outside-receipt", input: { task: { mode: "update", taskId: other.task, expectedUpdatedAt: 1, title: "Bad" } } })).rejects.toThrow(/OUTSIDE_GRANT_BOUNDARY/);
   await expect(t.mutation(internal.mcpFamilyHistory.savePerson, { ...args, requestHash: "different-input" })).rejects.toThrow(/IDEMPOTENCY_CONFLICT/);
 });
+
+
+test("selected discovery excludes unselected, foreign and unattributed records for every requested kind", async () => {
+  const t = convexTest(schema, modules);
+  const inside = await person(t, "Allowed");
+  const outside = await person(t, "Allowed outside");
+  const foreign = await person(t, "Allowed foreign", OTHER);
+  const own = await records(t, inside, "Allowed");
+  await records(t, outside, "Allowed outside");
+  await records(t, foreign, "Allowed foreign");
+  await t.run(async (ctx) => {
+    await ctx.db.insert("sources", { vaultOwnerId: OWNER, title: "Allowed source", type: "other", createdAt: 1, updatedAt: 1 });
+    await ctx.db.insert("stories", { vaultOwnerId: OWNER, type: "biography", title: "Allowed unattributed", content: "Synthetic", citationIds: [], status: "draft", generatedBy: "human", createdAt: 1, updatedAt: 1 });
+  });
+  const grantId = await seedGrant(t, { vaultOwnerId: OWNER, scopes: ["family_history:context:read"], boundary: { kind: "selected_people", personIds: [String(inside), String(foreign)] } });
+  const result = await brief(t, grantId);
+  expect(result.recentPeople.map((row) => row.id)).toEqual([inside]);
+  expect(result.recentStories.map((row) => row.id)).toEqual([own.story]);
+  expect(result.openResearchTasks.map((row) => row.id)).toEqual([own.task]);
+  expect(result.recentFindings.map((row) => row.id)).toEqual([own.finding]);
+  const found = await t.query(internal.mcpFamilyHistory.search, { principal: principal(), grantId, query: "Allowed" });
+  expect(new Set(found.results.map((row) => row.id))).toEqual(new Set([inside, own.story, own.task, own.finding]));
+});
+
+test("selected discovery sorts rows before returning a truncated cross-person scan", async () => {
+  const t = convexTest(schema, modules);
+  const older = await person(t, "Allowed older");
+  const newer = await person(t, "Allowed newer");
+  // The newer person is scanned first, but their records are older.
+  await records(t, newer, "Allowed old record");
+  await t.run(async (ctx) => {
+    for (let i = 0; i < FAMILY_HISTORY_MCP_LIMITS.searchScanPerType; i++) {
+      const base = { vaultOwnerId: OWNER, createdAt: 1, updatedAt: 1 };
+      await ctx.db.insert("stories", { ...base, personId: older, type: "biography", title: "Allowed newest story", content: "Synthetic", citationIds: [], status: "draft", generatedBy: "human" });
+      await ctx.db.insert("researchTasks", { ...base, personId: older, type: "record_search", title: "Allowed newest task", status: "todo", priority: "medium", aiSuggested: false });
+      await ctx.db.insert("researchLog", { ...base, entityType: "person", entityId: older, activityType: "other", summary: "Allowed newest finding", status: "done" });
+    }
+  });
+  const grantId = await seedGrant(t, { vaultOwnerId: OWNER, boundary: { kind: "selected_people", personIds: [String(older), String(newer)] } });
+  const result = await brief(t, grantId);
+  expect(result.truncated).toBe(true);
+  expect(result.recentStories[0].title).toBe("Allowed newest story");
+  expect(result.openResearchTasks[0].title).toBe("Allowed newest task");
+  expect(result.recentFindings[0].summary).toBe("Allowed newest finding");
+  for (const kind of ["story", "research_task", "research_finding"]) {
+    const found = await t.query(internal.mcpFamilyHistory.search, { principal: principal(), grantId, query: "Allowed", kinds: [kind], limit: 1 });
+    expect(found.truncated).toBe(true);
+    expect(JSON.stringify(found.results)).toContain("Allowed newest");
+  }
+});

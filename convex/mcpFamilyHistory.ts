@@ -1359,8 +1359,12 @@ async function discoveryRows<T extends "stories" | "researchTasks" | "researchLo
     return { rows: rows as unknown as Doc<T>[], truncated: rows.length === take };
   }
   const rows: Doc<T>[] = [];
+  const result = (truncated: boolean) => ({
+    rows: rows.sort((a, b) => b._creationTime - a._creationTime),
+    truncated,
+  });
   for (const person of scope.people) {
-    if (rows.length === take) return { rows, truncated: true };
+    if (rows.length === take) return result(true);
     const remaining = take - rows.length;
     const query = table === "researchLog"
       ? ctx.db.query("researchLog").withIndex("by_entity", (q) => q.eq("entityType", "person").eq("entityId", String(person._id)))
@@ -1369,10 +1373,9 @@ async function discoveryRows<T extends "stories" | "researchTasks" | "researchLo
         : ctx.db.query("researchTasks").withIndex("by_person", (q) => q.eq("personId", person._id));
     const selected = await query.filter((q) => q.eq(q.field("vaultOwnerId"), owner)).order("desc").take(remaining);
     rows.push(...selected as unknown as Doc<T>[]);
-    if (selected.length === remaining) return { rows, truncated: true };
+    if (selected.length === remaining) return result(true);
   }
-  rows.sort((a, b) => b._creationTime - a._creationTime);
-  return { rows, truncated: false };
+  return result(false);
 }
 
 async function discoveryQueue(ctx: QueryCtx, owner: string, scope: DiscoveryScope, take: number) {
