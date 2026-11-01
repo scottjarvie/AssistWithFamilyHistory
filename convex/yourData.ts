@@ -29,10 +29,10 @@ const PEOPLE_CAP = 5_000;
 const SMALL_CAP = 1_000;
 const DAY = 24 * 60 * 60 * 1000;
 
-async function ownedRows(ctx: QueryCtx, table: TableNames, owner: string, cap: number) {
+async function ownedRows(ctx: QueryCtx, table: TableNames, owner: string, cap: number, order: "asc" | "desc" = "asc") {
   // Every table read here declares a by_owner index (scripts/check-owned-tables-parity.ts).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rows = await (ctx.db.query(table) as any).withIndex("by_owner", (q: any) => q.eq("vaultOwnerId", owner)).take(cap + 1);
+  const rows = await (ctx.db.query(table) as any).withIndex("by_owner", (q: any) => q.eq("vaultOwnerId", owner)).order(order).take(cap + 1);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return { rows: rows.slice(0, cap) as any[], more: rows.length > cap };
 }
@@ -54,7 +54,7 @@ async function readYourStats(ctx: QueryCtx, owner: string) {
     ownedRows(ctx, "stories", owner, SMALL_CAP),
     ownedRows(ctx, "queueItems", owner, SMALL_CAP),
     ownedRows(ctx, "mcpGrants", owner, 100),
-    ownedRows(ctx, "agentActivity", owner, SMALL_CAP),
+    ownedRows(ctx, "agentActivity", owner, SMALL_CAP, "desc"),
   ]);
   const since = Date.now() - 30 * DAY;
   const recentAi = activity.rows.filter((row) => row.principalKind === "mcp" && row.outcome === "ok" && row.createdAt >= since);
@@ -155,6 +155,10 @@ export const exportPageInternal = internalQuery({
 
 async function authorizedOwner(ctx: Parameters<typeof authorizeTenantAction>[0] & { runMutation: (ref: FunctionReference<"mutation", "internal">, args: TrustBoundaryShadowEntry) => Promise<unknown> }, functionName: string, suppliedOwner: string) {
   const decision = await authorizeTenantAction(ctx, functionName, suppliedOwner, (entry) => ctx.runMutation(shadowRecorder, entry));
+  // These private reads must fail closed even during the shadow rollout.
+  if (!decision.allowed || decision.callerKind !== "authenticated" || decision.owner !== decision.caller) {
+    throw new Error(`Trust boundary denied: ${decision.reason ?? "owner_mismatch"}`);
+  }
   return decision.owner;
 }
 

@@ -13,7 +13,7 @@ export const metadata: Metadata = createPageMetadata({
 
 /**
  * The public explanation of deletion (Core §7; app stores ask for one).
- * Honest about today: export is self-service, deletion is by request until
+ * Honest about today: export is self-service, deletion is not self-service until
  * the in-app deletion (tracker AWF-0074) ships.
  */
 export default function DeleteAccountPage() {
@@ -25,8 +25,8 @@ export default function DeleteAccountPage() {
           <p className="text-sm font-medium uppercase tracking-wide text-stone-500">Your data</p>
           <h1 className="text-4xl font-bold text-stone-900">Deleting your account</h1>
           <p className="text-lg">
-            Your family history is yours. You can take a full copy at any time, and you can have
-            everything Assist With Family History holds for you deleted.
+            Your family history is yours. You can take a full copy at any time, and
+            review what account deletion will remove when it is available.
           </p>
 
           <h2 className="text-2xl font-semibold text-stone-900">Today</h2>
@@ -36,16 +36,16 @@ export default function DeleteAccountPage() {
             </li>
             <li>Download your export. It holds every record, with who made it and when.</li>
             <li>
-              Ask at{" "}
+              Check the current intake status at{" "}
               <SafeAnchor className="underline" href={SUPPORT_DESK_URL} rel="noreferrer" target="_blank">
                 {SUPPORT_DESK_LABEL}
               </SafeAnchor>{" "}
-              for your workspace to be deleted. Deleting from inside the app is being built and is not
-              available yet.
+              before preparing a deletion request. If intake is closed, the desk cannot accept or save
+              your request. Deleting from inside the app is being built and is not available yet.
             </li>
           </ol>
 
-          <h2 className="text-2xl font-semibold text-stone-900">What deleting removes</h2>
+          <h2 className="text-2xl font-semibold text-stone-900">What deletion will remove</h2>
           <p>
             Every person, relationship, fact, source, citation, note, story and Queue item in your
             workspace, with their history; every photo, scan and document you or your AI uploaded,
