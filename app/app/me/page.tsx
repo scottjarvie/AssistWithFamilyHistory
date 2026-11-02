@@ -108,8 +108,8 @@ export default async function YourStatsPage() {
               <strong>{formatCount(stats.ai.savesLast30Days, stats.ai.savesCapped)}</strong> saves in the last 30 days.
             </p>
             <p>
-              <strong>{stats.people.byYourAi.toLocaleString("en-US")}</strong> people were added by your AI,{" "}
-              {stats.people.fromImports.toLocaleString("en-US")} of them through an import.
+              <strong>{stats.people.byYourAi.toLocaleString("en-US")}</strong> people were added by your AI.{" "}
+              {stats.people.fromImports.toLocaleString("en-US")} people came through an import.
             </p>
           </CardContent>
         </Card>
