@@ -36,5 +36,10 @@
   ],
   "researchLog.ts": [
     "listForEntity"
+  ],
+  "yourData.ts": [
+    "getYourStats",
+    "getLibraryShelves",
+    "exportPage"
   ]
 }

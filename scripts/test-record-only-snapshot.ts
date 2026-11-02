@@ -43,7 +43,7 @@ test('each vetted statement calls raw builder only through its explicit approved
   const uses=[...source.matchAll(/export const (\w+) = recordOnlyAction\(/g)].map(match=>match[1]);
   assert.deepEqual(uses,names);count+=uses.length;
  }
- assert.equal(count,26);
+ assert.equal(count,29);
  assert.match(readFileSync(inSnapshot('convex/vaultReads.ts'),'utf8'),/export const getOwnedMediaFile = action\(/);
  assert.match(readFileSync(inSnapshot('convex/access.ts'),'utf8'),/return "enforce"/);
 });

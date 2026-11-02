@@ -24,5 +24,8 @@
   "importRuns.ts:getByCaptureId": "e925c132d414b21bdc6f7eae0a089fb0faf9319986496719b4919ebc94a4377f",
   "places.ts:getByFsId": "a68fc09ce602632630536006be38451dcc16f5958d3e0edb71047640aa9f6399",
   "places.ts:list": "6262a70e978b602a5256eb8c304aac1a5216cf6ae4964a6e0348ff108ed38f9c",
-  "researchLog.ts:listForEntity": "36ffbe58bd058470d9db0ed2f10f02a535a7fde2d747c020aad5d3fb27f563a8"
+  "researchLog.ts:listForEntity": "36ffbe58bd058470d9db0ed2f10f02a535a7fde2d747c020aad5d3fb27f563a8",
+  "yourData.ts:getYourStats": "6e0a989872fdb825f20c4cdc250d71d2d771cbbbf445abb19704f5712eabeeb4",
+  "yourData.ts:getLibraryShelves": "9a91f8c47e93fbf1d94fc95e14ecbe48e644e30d125c7a92c184f66523b9fc0b",
+  "yourData.ts:exportPage": "abc33b7c2003b77183362c10f5de57208819442b8683e2707d0a60b9693ba720"
 }

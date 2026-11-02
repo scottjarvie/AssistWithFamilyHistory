@@ -43,6 +43,7 @@ import type * as vaultCore from "../vaultCore.js";
 import type * as vaultMigration from "../vaultMigration.js";
 import type * as vaultMutations from "../vaultMutations.js";
 import type * as vaultReads from "../vaultReads.js";
+import type * as yourData from "../yourData.js";
 
 import type {
   ApiFromModules,
@@ -86,6 +87,7 @@ declare const fullApi: ApiFromModules<{
   vaultMigration: typeof vaultMigration;
   vaultMutations: typeof vaultMutations;
   vaultReads: typeof vaultReads;
+  yourData: typeof yourData;
 }>;
 
 /**
