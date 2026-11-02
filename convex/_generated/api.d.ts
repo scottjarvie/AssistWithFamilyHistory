@@ -36,6 +36,7 @@ import type * as relationships from "../relationships.js";
 import type * as researchLog from "../researchLog.js";
 import type * as researchTasks from "../researchTasks.js";
 import type * as sources from "../sources.js";
+import type * as treeImport from "../treeImport.js";
 import type * as trustBoundary from "../trustBoundary.js";
 import type * as vault from "../vault.js";
 import type * as vaultCore from "../vaultCore.js";
@@ -78,6 +79,7 @@ declare const fullApi: ApiFromModules<{
   researchLog: typeof researchLog;
   researchTasks: typeof researchTasks;
   sources: typeof sources;
+  treeImport: typeof treeImport;
   trustBoundary: typeof trustBoundary;
   vault: typeof vault;
   vaultCore: typeof vaultCore;

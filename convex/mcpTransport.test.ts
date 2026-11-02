@@ -5,9 +5,10 @@ import { convexTest } from "convex-test";
 import { exportJWK, generateKeyPair, SignJWT, type KeyLike } from "jose";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import schema from "./schema";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { FAMILY_HISTORY_ALL_TOOL_NAMES, FAMILY_HISTORY_SCOPES } from "../lib/mcp/catalog";
 import { seedGrant } from "../lib/mcp/testSupport";
+import { FAMILY_HISTORY_MCP_LIMITS } from "../lib/mcp/contract";
 
 const modules = import.meta.glob("./**/*.ts");
 const RESOURCE = "https://family-history.example.test/mcp";
@@ -662,4 +663,63 @@ test.each(["person", "story"] as const)("%s context exports current media withou
   expect(response.status).toBe(200); const payload = await response.json(); expect(payload.result.isError).not.toBe(true);
   const context = JSON.parse(payload.result.content[0].text); expect(context.media).toEqual([expect.objectContaining({ _id: mediaId, title: "Current reviewed replacement" })]);
   const text = JSON.stringify(payload); expect(text).not.toContain("replacedB2Files"); expect(text).not.toContain("synthetic-old-private"); expect(text).not.toContain("exact_private");
+});
+
+
+test("person MCP context returns imported notes only for the owned deceased person", async () => {
+  const t = convexTest(schema, modules);
+  const grantId = await approvedConnection(t);
+  const principal = { issuer: ISSUER, subject: SUBJECT, clientId: CLIENT_ID, scopes: [] };
+  const job = await t.mutation(internal.treeImport.beginTreeImport, {
+    principal, grantId, operationId: "notes-context-begin", requestHash: "notes-context-begin",
+    input: { importKey: "synthetic-notes-context", system: "familysearch", label: "Synthetic notes" },
+  });
+  await t.action(internal.treeImport.importTreeBatch, {
+    principal, grantId, operationId: "notes-context-batch", requestHash: "notes-context-batch",
+    input: { importJobId: job.importJobId, batchIndex: 0,
+      persons: [
+        { key: "deceased", names: [{ given: "Synthetic", surname: "Deceased" }], living: false },
+        { key: "living", names: [{ given: "Synthetic", surname: "Living" }], living: true },
+      ], notes: [
+        { key: "deceased-note", text: "Own imported deceased note.", subject: { kind: "person", key: "deceased" } },
+        { key: "living-note", text: "Private imported living note.", subject: { kind: "person", key: "living" } },
+      ],
+    },
+  });
+  const people = await t.run(ctx => ctx.db.query("persons").withIndex("by_owner", q => q.eq("vaultOwnerId", SUBJECT)).collect());
+  const deceased = people.find(row => !row.living)!;
+  const living = people.find(row => row.living)!;
+  await t.run(async ctx => {
+    await ctx.db.insert("notes", { vaultOwnerId: "user_foreign_note_owner", subject: { kind: "person", id: String(deceased._id) },
+      noteType: "general", text: "Foreign note must remain hidden.", createdAt: 1, updatedAt: 1 });
+  });
+  const context = async (id: string) => {
+    const response = await t.fetch("/mcp", modernRequest("tools/call", await accessToken(), {
+      name: "family_history_get_context", arguments: { kind: "person", id },
+    }, "family_history_get_context"));
+    const payload = await response.json();
+    return { payload, body: JSON.parse(payload.result.content[0].text) };
+  };
+  const own = await context(String(deceased._id));
+  expect(own.payload.result.isError).not.toBe(true);
+  expect(own.body.notes).toEqual([expect.objectContaining({ text: "Own imported deceased note." })]);
+  expect(JSON.stringify(own.payload)).not.toContain("Foreign note must remain hidden.");
+  const privatePerson = await context(String(living._id));
+  expect(privatePerson.body.notes).toEqual([]);
+  expect(JSON.stringify(privatePerson.payload)).not.toContain("Private imported living note.");
+  await t.run(ctx => ctx.db.patch(grantId as never, { boundary: { kind: "selected_people", personIds: [String(living._id)] } }));
+  const denied = await context(String(deceased._id));
+  expect(denied.payload.result.isError).toBe(true);
+  expect(JSON.stringify(denied.payload)).not.toContain("Own imported deceased note.");
+  await t.run(async ctx => {
+    await ctx.db.patch(grantId as never, { boundary: { kind: "whole_workspace" } });
+    for (let index = 0; index < FAMILY_HISTORY_MCP_LIMITS.contextRows; index += 1) {
+      await ctx.db.insert("notes", { vaultOwnerId: SUBJECT, subject: { kind: "person", id: String(deceased._id) },
+        noteType: "research", text: `Synthetic capped note ${index}.`, createdAt: 1, updatedAt: 1 });
+    }
+  });
+  const capped = await context(String(deceased._id));
+  expect(capped.body.notes).toHaveLength(FAMILY_HISTORY_MCP_LIMITS.contextRows);
+  expect(capped.body.truncated).toBe(true);
+  expect(JSON.stringify(capped.payload)).not.toContain("Foreign note must remain hidden.");
 });

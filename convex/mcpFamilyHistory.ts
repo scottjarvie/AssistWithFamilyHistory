@@ -10,14 +10,14 @@ import { assertGrantPermits } from "./mcpGrants";
 import { effectiveScopes, effectiveExpiry } from "../lib/mcp/grantDefaults";
 import { findTool } from "../lib/mcp/catalog";
 
-const principalValidator = v.object({
+export const principalValidator = v.object({
   issuer: v.string(),
   subject: v.string(),
   clientId: v.string(),
   scopes: v.array(v.string()),
 });
 
-type McpPrincipal = {
+export type McpPrincipal = {
   issuer: string;
   subject: string;
   clientId: string;
@@ -26,7 +26,7 @@ type McpPrincipal = {
 
 type RecordType = Doc<"mcpRecordKeys">["recordType"];
 
-function ownerFromPrincipal(principal: McpPrincipal): string {
+export function ownerFromPrincipal(principal: McpPrincipal): string {
   const owner = principal.subject.trim();
   if (!owner || !principal.issuer.trim() || !principal.clientId.trim()) {
     throw new Error("MCP_FAMILY_HISTORY_ERROR:" + JSON.stringify({
@@ -38,11 +38,11 @@ function ownerFromPrincipal(principal: McpPrincipal): string {
   return owner;
 }
 
-function machineError(code: string, message: string, recovery: string): never {
+export function machineError(code: string, message: string, recovery: string): never {
   throw new Error(`MCP_FAMILY_HISTORY_ERROR:${JSON.stringify({ code, message, recovery })}`);
 }
 
-function cleanText(value: unknown, label: string, max: number, required = false): string | undefined {
+export function cleanText(value: unknown, label: string, max: number, required = false): string | undefined {
   if (value === undefined || value === null) {
     if (required) machineError("VALIDATION_ERROR", `${label} is required.`, `Provide ${label}.`);
     return undefined;
@@ -392,7 +392,7 @@ async function assertSelectedWriteTargets(ctx: MutationCtx, owner: string, grant
   }
 }
 
-async function operation(
+export async function operation(
   ctx: MutationCtx,
   args: {
     principal: McpPrincipal;
@@ -1547,6 +1547,17 @@ export const search = internalQuery({
   },
 });
 
+/** Bound notes by owner and person before the read ceiling; living notes stay private. */
+async function personNotesForAi(ctx: QueryCtx, owner: string, person: Doc<"persons">, max: number) {
+  const rows = person.living ? [] : await ctx.db.query("notes")
+    .withIndex("by_owner_subject", q => q.eq("vaultOwnerId", owner).eq("subject.kind", "person").eq("subject.id", String(person._id)))
+    .take(max + 1);
+  return {
+    notes: rows.slice(0, max).map(row => ({ id: row._id, noteType: row.noteType, title: row.title ?? null, text: row.text })),
+    truncated: rows.length > max,
+  };
+}
+
 export const getRecordContext = internalQuery({
   args: { principal: principalValidator, kind: v.string(), id: v.string() },
   handler: async (ctx, args) => {
@@ -1577,8 +1588,10 @@ export const getRecordContext = internalQuery({
         .filter((row): row is Doc<"citations"> => Boolean(row && matchesVaultOwner(row.vaultOwnerId, owner)));
       const sources = (await Promise.all(citations.map((citation) => ctx.db.get(citation.sourceId))))
         .filter((row): row is Doc<"sources"> => Boolean(row && matchesVaultOwner(row.vaultOwnerId, owner)));
+      const personNotes = await personNotesForAi(ctx, owner, person, max);
       return {
         kind: "person",
+        notes: personNotes.notes,
         person,
         relationships,
         events,
@@ -1587,7 +1600,7 @@ export const getRecordContext = internalQuery({
         stories: stories.filter((row) => matchesVaultOwner(row.vaultOwnerId, owner)).slice(0, max),
         researchTasks: tasks.filter((row) => matchesVaultOwner(row.vaultOwnerId, owner)).slice(0, max),
         researchFindings: findings.filter((row) => matchesVaultOwner(row.vaultOwnerId, owner)).slice(0, max),
-        truncated: [asPerson1, asPerson2, personEventLinks, stories, tasks, findings, citationLinks].some((rows) => rows.length > max),
+        truncated: [asPerson1, asPerson2, personEventLinks, stories, tasks, findings, citationLinks].some((rows) => rows.length > max) || personNotes.truncated,
       };
     }
     if (args.kind === "story") {
@@ -2126,14 +2139,16 @@ export const getPersonOriginals = internalQuery({
     const owner = ownerFromPrincipal(args.principal);
     const max = FAMILY_HISTORY_MCP_LIMITS.contextRows;
     const person = await owned(ctx, "persons", args.personId, owner, "Person");
-    const [personas, related] = await Promise.all([
+    const [personas, related, personNotes] = await Promise.all([
       ctx.db.query("recordPersonas").withIndex("by_person", (q) => q.eq("personId", person._id)).take(max + 1),
       connectionsFor(ctx, owner, "person", String(person._id), max),
+      personNotesForAi(ctx, owner, person, max),
     ]);
     return {
       recordPersonas: personas.filter((row) => row.vaultOwnerId === owner && row.linkState !== "rejected").slice(0, max),
       connections: related.connections,
-      truncated: personas.length > max || related.truncated,
+      notes: personNotes.notes,
+      truncated: personas.length > max || related.truncated || personNotes.truncated,
     };
   },
 });
