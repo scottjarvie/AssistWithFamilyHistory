@@ -1,4 +1,4 @@
-[Newest-first gallery](gallery.html) · Audit refinements:57/57 full steps,60 browser checks,22 fresh captures pass.433-image gallery rebuild queued. Opus approves preservation/privacy and prior Queue/Operations fixes; next meaningful review with Settings. All-page goal active; local only.
+[Newest-first gallery](gallery.html) · Audit refinements committed atb5058bb:57/57 full steps,60 browser checks,22 fresh captures;433-image gallery checks/preview/display pass. Opus accepts preservation/privacy and prior Queue/Operations fixes; next meaningful review with Settings. All-page goal active; local only.
 
 
 
