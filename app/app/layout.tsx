@@ -24,6 +24,9 @@ import { isClerkEnabled } from "@/lib/clerk/config";
 import { createPageMetadata } from "@/lib/seo";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
+// Every /app route depends on the signed-in vault owner, so never prerender it.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = createPageMetadata({
   title: "Workspace",
   description: "Keep people, relationships, sources, research findings, and stories connected in your private Family History workspace.",
@@ -54,19 +57,19 @@ export default async function AppLayout({
           auth. Mounting it unconditionally crashed env-less prerenders (CI build)
           and would crash any Clerk-disabled deploy at runtime. */}
       {isClerkEnabled() && !localPublicAuthEnabled() && <GuestVaultMigrationGate />}
-      <main className="min-h-screen pt-16 transition-all duration-300 md:ml-64 md:pt-0">
+      <main className="min-h-screen transition-all duration-300 md:ml-64">
         <AppTopBar clerkEnabled={isClerkEnabled()} />
         {children}
         <footer className="border-t border-stone-200 px-4 py-6 text-sm text-stone-500 md:px-8">
-          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-0 md:gap-y-2">
             <span>Assist With Family History</span>
-            <SafeLink href="/privacy" className="hover:text-stone-900 hover:underline">
+            <SafeLink href="/privacy" className="inline-flex min-h-11 items-center hover:text-stone-900 hover:underline md:pointer-fine:min-h-0">
               Privacy
             </SafeLink>
-            <SafeLink href="/contact" className="hover:text-stone-900 hover:underline">
+            <SafeLink href="/contact" className="inline-flex min-h-11 items-center hover:text-stone-900 hover:underline md:pointer-fine:min-h-0">
               Contact
             </SafeLink>
-            <SafeLink href="/updates" className="hover:text-stone-900 hover:underline">
+            <SafeLink href="/updates" className="inline-flex min-h-11 items-center hover:text-stone-900 hover:underline md:pointer-fine:min-h-0">
               Updates
             </SafeLink>
           </div>

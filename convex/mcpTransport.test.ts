@@ -254,6 +254,64 @@ describe("stateless Family History MCP transport", () => {
     }
   });
 
+  test("single-record write tools publish one object with every field, not an allOf a client flattens away", async () => {
+    // Claude rendered the old `allOf: [{operationId}, oneOf[...]]` shape as
+    // `{operationId}` alone, so the AI never saw `mode`, `name` or `personId`.
+    const t = convexTest(schema, modules);
+    await approvedConnection(t);
+    const response = await t.fetch("/mcp", modernRequest("tools/list", await accessToken()));
+    type PublishedSchema = {
+      type?: string;
+      allOf?: unknown;
+      additionalProperties?: unknown;
+      required?: string[];
+      properties: Record<string, { enum?: string[] }>;
+    };
+    const tools = (await response.json()).result.tools as Array<{ name: string; inputSchema: PublishedSchema }>;
+    const byName = new Map(tools.map((tool) => [tool.name, tool.inputSchema]));
+    const expected: Record<string, string[]> = {
+      family_history_save_person: ["operationId", "mode", "createKey", "personId", "expectedUpdatedAt", "name", "sex", "living"],
+      family_history_save_relationship: ["operationId", "mode", "createKey", "relationshipId", "type", "person1", "person2"],
+      family_history_save_event: ["operationId", "mode", "createKey", "eventId", "type", "personRoles"],
+      family_history_save_source_evidence: ["operationId", "source", "citation", "facts"],
+      family_history_save_research_work: ["operationId", "task", "finding"],
+      family_history_save_story_work: ["operationId", "mode", "createKey", "storyId", "title", "content"],
+    };
+    for (const [name, keys] of Object.entries(expected)) {
+      for (const toolName of [name, name.replace(/^family_history_/, "")]) {
+        const inputSchema = byName.get(toolName)!;
+        expect(inputSchema, toolName).toBeDefined();
+        expect(inputSchema.type, toolName).toBe("object");
+        expect(inputSchema.allOf, toolName).toBeUndefined();
+        expect(inputSchema.additionalProperties, toolName).toBe(false);
+        expect(inputSchema.required, toolName).toContain("operationId");
+        for (const key of keys) expect(Object.keys(inputSchema.properties), `${toolName}.${key}`).toContain(key);
+      }
+    }
+    expect(byName.get("family_history_save_person")!.properties.mode.enum).toEqual(["create", "update"]);
+  });
+
+  test("the object envelope still enforces each mode's own rules on the server", async () => {
+    const t = convexTest(schema, modules);
+    await approvedConnection(t);
+    const call = async (args: Record<string, unknown>) => {
+      const response = await t.fetch("/mcp", modernRequest("tools/call", await accessToken(), {
+        name: "family_history_save_person",
+        arguments: args,
+      }, "family_history_save_person"));
+      return (await response.json());
+    };
+    const refusedOutcome = (payload: { error?: unknown; result?: { isError?: boolean } }) => payload.error !== undefined || payload.result?.isError === true;
+    // A create without the create-only required name and sex.
+    expect(refusedOutcome(await call({ operationId: "envelope-missing", mode: "create", createKey: "person:envelope:missing", living: false }))).toBe(true);
+    // An update field on a create.
+    expect(refusedOutcome(await call({ operationId: "envelope-mixed", mode: "create", createKey: "person:envelope:mixed", name: { given: "A", surname: "B" }, sex: "unknown", living: false, personId: "abc", expectedUpdatedAt: 1 }))).toBe(true);
+    // An unknown key.
+    expect(refusedOutcome(await call({ operationId: "envelope-unknown", mode: "create", createKey: "person:envelope:unknown", name: { given: "A", surname: "B" }, sex: "unknown", living: false, species: "x" }))).toBe(true);
+    const ok = await call({ operationId: "envelope-valid", mode: "create", createKey: "person:envelope:valid", name: { given: "Envelope", surname: "Valid" }, sex: "unknown", living: false });
+    expect(refusedOutcome(ok)).toBe(false);
+  });
+
   test("the official v2 MCP client negotiates, lists tools, and saves through the stateless handler", async () => {
     const t = convexTest(schema, modules);
     await approvedConnection(t);
@@ -586,4 +644,22 @@ describe("reconnecting refreshes the tool list without a session to reset", () =
     const tools = payload.result?.tools ?? [];
     expect(tools).toHaveLength(0);
   });
+});
+
+test.each(["person", "story"] as const)("%s context exports current media without historical private originals", async kind => {
+  const t = convexTest(schema, modules); await approvedConnection(t);
+  const { personId, mediaId, storyId } = await t.run(async ctx => {
+    const personId = await ctx.db.insert("persons", { vaultOwnerId: SUBJECT, name: { given: "Synthetic", surname: "Replacement" }, sex: "unknown", living: false, researchStatus: "basic", createdAt: 1, updatedAt: 1 });
+    const mediaId = await ctx.db.insert("media", { vaultOwnerId: SUBJECT, title: "Current reviewed replacement", type: "document", personIds: [personId], reviewStatus: "reviewed", privacyLevel: "family_review", rightsStatus: "owned", aiUseAllowed: true, createdAt: 1, updatedAt: 1,
+      replacedB2Files: [{ replacedAt: 1, original: { bucketClass: "private", bucketName: "synthetic-old-private-bucket", objectKey: "synthetic-old-private-original", versionId: "old-version", sha256: "a".repeat(64), contentType: "image/jpeg", sizeBytes: 1, metadataClean: false, verifiedAt: "2026-10-01T00:00:00Z" }, metadataProposal: { temporal: { uploadTime: "2026-10-01T00:00:00Z" }, location: { latitude: 1.25, longitude: 2.5, source: "embedded_gps", status: "proposed", association: "person_media", precision: "exact_private", disclosurePrecision: "withheld" }, extractedFromOriginalSha256: "a".repeat(64), extractedAt: "2026-10-01T00:00:00Z", reversible: true, decision: "declined", declinedAt: "2026-10-02T00:00:00Z" } }],
+    });
+    const storyId = await ctx.db.insert("stories", { vaultOwnerId: SUBJECT, personId, title: "Synthetic draft", content: "Synthetic story content.", type: "biography", status: "draft", generatedBy: "human", citationIds: [], createdAt: 1, updatedAt: 1 });
+    return { personId, mediaId, storyId };
+  });
+  const ownerReview = await t.withIdentity({ subject: SUBJECT }).action(api.vaultReads.getStoryReview, { vaultOwnerId: SUBJECT, storyId });
+  expect(ownerReview?.media[0].replacedB2Files).toHaveLength(1);
+  const response = await t.fetch("/mcp", modernRequest("tools/call", await accessToken(), { name: "family_history_get_context", arguments: { kind, id: String(kind === "person" ? personId : storyId) } }, "family_history_get_context"));
+  expect(response.status).toBe(200); const payload = await response.json(); expect(payload.result.isError).not.toBe(true);
+  const context = JSON.parse(payload.result.content[0].text); expect(context.media).toEqual([expect.objectContaining({ _id: mediaId, title: "Current reviewed replacement" })]);
+  const text = JSON.stringify(payload); expect(text).not.toContain("replacedB2Files"); expect(text).not.toContain("synthetic-old-private"); expect(text).not.toContain("exact_private");
 });

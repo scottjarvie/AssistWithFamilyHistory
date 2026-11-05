@@ -10,14 +10,10 @@
  * This wrapper is the Vercel `buildCommand` (see vercel.json). It decides
  * whether to coordinate a Convex deploy with the build, then runs the build:
  *
- *   - No CONVEX_DEPLOY_KEY            → plain `next build` (local, CI, and any
- *                                       env without the secret stay green — the
- *                                       Convex step is a safe no-op).
- *   - PROD key in production          → repository-local Convex deploy command.
- *   - PREVIEW key in preview          → the same command, targeting an isolated
- *                                       preview deployment.
- *   - Any key/environment mismatch    → plain `next build` (fail closed: an
- *                                       incorrectly scoped key cannot deploy).
+ *   - Hosted production must deploy the documented production backend; absent
+ *     or mismatched configuration is an operational hold before any build.
+ *   - Offline/local/CI builds remain plain builds without a deploy key.
+ *   - Preview keys deploy only in preview; mismatches never deploy.
  *
  * Repository-local binaries are invoked with `npx --no-install`: this avoids
  * depending on a caller-provided `node_modules/.bin` PATH and prevents package
@@ -48,6 +44,16 @@ export function resolveBuildPlan(env = process.env) {
   const vercelEnv = env.VERCEL_ENV; // "production" | "preview" | "development" | undefined
   const isProductionKey = key.startsWith("prod:");
   const isPreviewKey = key.startsWith("preview:");
+
+  if (vercelEnv === "production") {
+    if (!hasKey) throw new Error("Production build held: required Convex deployment key is missing");
+    if (!key.startsWith("prod:accomplished-dodo-308|") || !key.split("|", 2)[1]) {
+      throw new Error("Production build held: deploy key must target the documented production backend");
+    }
+    if (env.NEXT_PUBLIC_CONVEX_URL !== "https://accomplished-dodo-308.convex.cloud") {
+      throw new Error("Production build held: frontend backend binding must match the documented production backend");
+    }
+  }
 
   if (!hasKey) {
     return {
@@ -80,14 +86,14 @@ export function resolveBuildPlan(env = process.env) {
   };
 }
 
-function main() {
-  const plan = resolveBuildPlan(process.env);
+export function runBuild(env, runner = execSync) {
+  const plan = resolveBuildPlan(env);
   console.log(`[vercel-build] ${plan.reason}`);
   console.log(`[vercel-build] $ ${plan.command}`);
-  execSync(plan.command, { stdio: "inherit", env: process.env });
+  runner(plan.command, { stdio: "inherit", env });
 }
 
 // Run only when invoked directly (`node scripts/vercel-build.mjs`), not on import.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main();
+  runBuild(process.env);
 }

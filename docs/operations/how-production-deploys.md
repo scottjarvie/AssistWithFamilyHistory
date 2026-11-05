@@ -16,6 +16,14 @@ That ordering is deliberate: new backend functions and tables exist before any
 page can call them. When you merge a pull request into `main`, the release is
 already on its way out.
 
+Hosted production fails before invoking any build command if the deploy key is
+missing, has the wrong type or deployment, or the frontend backend URL does not
+match `https://accomplished-dodo-308.convex.cloud`. A failed coordinated command
+also fails the release; there is no plain-build fallback in production. Missing
+configuration is an operational hold for the release owner, not authorization
+to change settings or credentials. Offline `pnpm build` and keyless local/CI
+wrapper builds outside the production environment remain usable.
+
 There is nothing else to do. No pinned worktree, no manual `vercel deploy`, no
 hand-run `convex deploy`.
 
@@ -27,12 +35,12 @@ canonical tool or product permission in *this* commit is missing from the
 deployed copy. That makes it a real fingerprint of the running build.
 
 **Never decide freshness from the status code of a route under `/app`.** Those
-are protected, so a signed-out request gets an auth refusal, and Clerk
-content-negotiates it: a browser (`Accept: text/html`) is redirected `307` to
-`/sign-in`, while anything else — `curl`'s wildcard Accept included — is
-rewritten to a flat **404**, marked `x-clerk-auth-reason: protect-rewrite`. That
-404 is identical on every build. It cannot distinguish a stale deploy from a
-current one, and it never becomes a 200 while signed out.
+are protected. A signed-out read — a browser or a bare `curl` — is redirected
+`307` to `/sign-in` and back to the page that was requested. That redirect is
+the same on every build, and it never becomes a 200 while signed out. Until
+October 2026, Clerk rewrote any signed-out request that did not accept HTML to
+a flat **404** (`x-clerk-auth-reason: protect-rewrite`). That 404 was identical
+on every build too.
 
 This is not hypothetical. On 2026-08-17, `curl .../app/settings/ai` → 404 was
 read as proof that production was still serving a pre-release commit. It was

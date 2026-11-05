@@ -957,20 +957,19 @@ Fourteen lines, twelve of them carrying `[alias: …]`.
 pnpm check:production-live
 ```
 
-Signed out, this route answers **`307 → /sign-in`** to a browser — that is the
-`REQUIRE_AUTH` posture working. It is not a freshness signal, and the check
-above deliberately proves freshness from `/ai.txt` instead.
+Signed out, this route answers **`307 → /sign-in`**, including a bare `curl`,
+and comes back to the requested page after sign-in. That is the `REQUIRE_AUTH`
+posture working. It is not a freshness signal, and the check above deliberately
+proves freshness from `/ai.txt` instead.
 
-> **Do not probe this route with a bare `curl`.** A request that does not send
-> `Accept: text/html` is treated by Clerk as a data request and rewritten to
-> **404** (`x-clerk-auth-reason: protect-rewrite`), on every build, forever.
-> This document previously called that 404 "the clearest single signal of
-> whether this release landed". It is the opposite: it is constant, so it can
-> only ever produce a false negative. On 2026-08-17 it convinced several
-> sessions in a row that a correct, healthy production deployment had failed,
-> and a recovery effort was queued against a release that had already shipped.
-> An auth refusal and a missing route look identical from outside; prove
-> freshness from an unauthenticated, content-bearing surface.
+> **Do not treat this route's status code as a deploy signal.** Before October
+> 2026 a request that did not send `Accept: text/html` was rewritten to **404**
+> (`x-clerk-auth-reason: protect-rewrite`) on every build. This document once
+> called that 404 "the clearest single signal of whether this release landed".
+> It was the opposite: it was constant, so it could only produce a false
+> negative. On 2026-08-17 it convinced several sessions that a healthy
+> production deployment had failed. The redirect that replaced it is constant
+> too. Prove freshness from an unauthenticated, content-bearing surface.
 
 Then open it signed in as the synthetic acceptance identity and confirm by eye:
 the pending request appears with the client's observed name (**not** a tool name

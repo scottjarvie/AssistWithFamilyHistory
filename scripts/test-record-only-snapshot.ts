@@ -14,6 +14,15 @@ before(()=>{
 });
 after(()=>{if(preparedRoot)rmSync(preparedRoot,{recursive:true,force:true});});
 const inSnapshot=(path:string)=>join(snapshotRoot,path);
+// git archive emits LF, while a Windows checkout may use CRLF. Ignore only
+// that representation difference: every other generated-source byte matters.
+const normalizeLineEndings=(source:string)=>source.replace(/\r\n/g,'\n');
+test('generated-source comparison accepts CRLF but detects content changes',()=>{
+ const source='export const action = actionGeneric;\n';
+ assert.equal(normalizeLineEndings(source.replace(/\n/g,'\r\n')),source);
+ assert.notEqual(normalizeLineEndings(source.replace('actionGeneric','internalActionGeneric')),source);
+ assert.notEqual(normalizeLineEndings(source.replace(/\n/g,'\r')),source);
+});
 test('source-owned guard survives fresh generated builders and refuses every unapproved action registration',async()=>{
  const folder=mkdtempSync(resolve('.record-only-codegen-test-'));
  try{
@@ -30,7 +39,7 @@ test('source-owned guard survives fresh generated builders and refuses every una
   }
  }
  assert.equal(executed,false);
- assert.equal(readFileSync('convex/_generated/server.js','utf8'),readFileSync(inSnapshot('convex/_generated/server.js'),'utf8'));
+ assert.equal(normalizeLineEndings(readFileSync('convex/_generated/server.js','utf8')),normalizeLineEndings(readFileSync(inSnapshot('convex/_generated/server.js'),'utf8')));
  }finally{rmSync(folder,{recursive:true,force:true});}
 });
 test('each vetted statement calls raw builder only through its explicit approved alias',()=>{
