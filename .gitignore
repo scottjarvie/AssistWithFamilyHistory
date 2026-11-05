@@ -71,3 +71,12 @@ dependency-donor-receipt.json
 
 # Per-user agent settings (may hold local permission rules; never commit)
 .claude/settings.local.json
+
+# Council captures and blind packets (local evidence; never private data)
+design-council/reference/
+design-council/*/baseline/
+design-council/*/round-*/ours/
+design-council/*/round-*/packet/
+design-council/*/round-*/manifest.json
+design-council/*/round-*/judge-brief.md
+design-council/*/round-*/judges/*.raw.md

@@ -3,6 +3,7 @@ import { ArrowRight, BookOpen, Database, FileUp, Sparkles, TableProperties, User
 import type { FunctionReturnType } from "convex/server";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ArchiveIllustration } from "@/components/design/ArchiveIllustration";
 import type { api } from "@/convex/_generated/api";
 
 export type DashboardSummary = FunctionReturnType<typeof api.vaultReads.getDashboardSummary>;
@@ -45,7 +46,7 @@ export function DashboardView({ summary }: { summary: DashboardSummary }) {
   return (
     <div className="p-4 sm:p-8">
       {isEmptyWorkspace ? (
-        <section className="border border-stone-200 bg-[#1f2f35] px-6 py-8 text-white shadow-[0_24px_60px_rgba(28,25,23,0.18)] sm:px-8">
+        <section className="border border-border bg-[#1f2f35] px-6 py-8 text-white shadow-[0_24px_60px_rgba(28,25,23,0.18)] sm:px-8">
           <Badge className="mb-4 bg-white/10 text-white hover:bg-white/10">Your private workspace is ready</Badge>
           <h1 className="max-w-3xl font-[family-name:var(--font-cormorant-garamond)] text-4xl font-semibold leading-tight sm:text-5xl">
             Begin with someone you know. Build the evidence from there.
@@ -81,15 +82,16 @@ export function DashboardView({ summary }: { summary: DashboardSummary }) {
         <>
           <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h1 className="font-[family-name:var(--font-cormorant-garamond)] text-4xl font-semibold leading-tight text-stone-900 sm:text-5xl">
+              <p className="mb-2 font-mono text-xs uppercase tracking-[.16em] text-primary">Your research desk</p>
+              <h1 className="font-[family-name:var(--font-cormorant-garamond)] text-4xl font-semibold leading-tight text-foreground sm:text-5xl">
                 Your family workspace
               </h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600 sm:text-base">
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
                 Pick up a person, work a research gap, or move a finished draft into Story Studio.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Button asChild className="min-h-11 bg-amber-700 text-white hover:bg-amber-800">
+              <Button asChild className="min-h-11 bg-primary text-primary-foreground hover:bg-primary/90">
                 <Link href="/app/stories">
                   Open Story Studio
                   <ArrowRight className="ml-2 h-4 w-4" />
@@ -102,38 +104,41 @@ export function DashboardView({ summary }: { summary: DashboardSummary }) {
           </header>
 
           <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-            <section aria-labelledby="recent-people-title" className="border border-stone-200 bg-white shadow-sm">
-              <div className="flex items-center justify-between gap-3 border-b border-stone-200 px-4 py-3 sm:px-5">
-                <h2 id="recent-people-title" className="text-lg font-semibold text-stone-900">Pick up where you left off</h2>
-                <Link href="/app/people" className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-amber-800 hover:text-amber-900">
+            <section aria-labelledby="recent-people-title" className="folio-tray">
+              <div className="folio-tray-heading flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
+                <h2 id="recent-people-title" className="text-lg font-semibold text-foreground">Pick up where you left off</h2>
+                <Link href="/app/people" className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary hover:text-primary/80">
                   All people <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
               {summary.recentPeople.length === 0 ? (
-                <p className="px-4 py-8 text-center text-sm text-stone-500 sm:px-5">
-                  No people yet. <Link href="/app/people/new" className="font-medium text-amber-800 underline underline-offset-4">Add a person</Link> or bring in a capture from Imports.
+                <p className="px-4 py-8 text-center text-sm text-muted-foreground sm:px-5">
+                  No people yet. <Link href="/app/people/new" className="font-medium text-primary underline underline-offset-4">Add a person</Link> or bring in a capture from Imports.
                 </p>
               ) : (
-                <ul className="divide-y divide-stone-100">
+                <ul className="divide-y divide-border">
                   {summary.recentPeople.map((person) => (
                     <li key={String(person._id)}>
                       <Link
                         href={`/app/people/${person.routeId}`}
-                        className="flex min-h-14 items-center justify-between gap-3 px-4 py-3 transition hover:bg-amber-50/50 sm:px-5"
+                        className="flex min-h-14 items-center justify-between gap-3 px-4 py-3 transition hover:bg-muted/60 sm:px-5"
                       >
-                        <div className="min-w-0">
-                          <p className="truncate font-medium text-stone-900">{person.displayName}</p>
-                          <p className="text-sm text-stone-500">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <ArchiveIllustration className="h-14 w-14 shrink-0 rounded-sm bg-muted text-primary" />
+                          <div>
+                          <p className="font-medium text-foreground">{person.displayName}</p>
+                          <p className="text-sm text-muted-foreground">
                             {lifeYears(person)}
                             <span className="capitalize"> · {person.researchStatus.replace(/_/g, " ")}</span>
                             {person.operations.requiredMissingCount > 0 ? (
-                              <span className="text-amber-800">
+                              <span className="text-primary">
                                 {" "}· {person.operations.requiredMissingCount} critical {person.operations.requiredMissingCount === 1 ? "gap" : "gaps"}
                               </span>
                             ) : null}
                           </p>
+                          </div>
                         </div>
-                        <ArrowRight className="h-4 w-4 shrink-0 text-stone-400" />
+                        <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                       </Link>
                     </li>
                   ))}
@@ -142,45 +147,46 @@ export function DashboardView({ summary }: { summary: DashboardSummary }) {
             </section>
 
             <div className="space-y-6">
-              <section aria-label="Workspace counts" className="grid grid-cols-3 border border-stone-200 bg-white shadow-sm">
+              <section aria-label="Workspace counts" className="grid grid-cols-3 folio-tray">
                 {[
-                  ["People", summary.counts.people],
-                  ["Places", summary.counts.places],
-                  ["Stories", summary.counts.stories],
-                  ["Imports", summary.counts.imports],
-                  ["Documents", summary.counts.documents],
-                  ["Open tasks", summary.counts.openTasks],
-                ].map(([label, value], index) => (
-                  <div
+                  ["People", summary.counts.people, "/app/people"],
+                  ["Places", summary.counts.places, "/app/places"],
+                  ["Stories", summary.counts.stories, "/app/stories"],
+                  ["Imports", summary.counts.imports, "/app/imports"],
+                  ["Documents", summary.counts.documents, "/app/people"],
+                  ["Open tasks", summary.counts.openTasks, "/app/research"],
+                ].map(([label, value, href], index) => (
+                  <Link
+                    href={String(href)}
                     key={label}
-                    className={`px-3 py-3 sm:px-4 ${index % 3 !== 0 ? "border-l border-stone-100" : ""} ${index >= 3 ? "border-t border-stone-100" : ""}`}
+                    className={`px-3 py-3 sm:px-4 ${index % 3 !== 0 ? "border-l border-border" : ""} ${index >= 3 ? "border-t border-border" : ""}`}
                   >
-                    <p className="text-2xl font-semibold text-stone-900">{value}</p>
-                    <p className="text-xs text-stone-500">{label}</p>
-                  </div>
+                    <p className="text-2xl font-semibold text-foreground">{value}</p>
+                    <p className="text-xs text-muted-foreground">{label}</p>
+                  </Link>
                 ))}
               </section>
 
-              <section aria-labelledby="recent-imports-title" className="border border-stone-200 bg-white shadow-sm">
-                <div className="border-b border-stone-200 px-4 py-3 sm:px-5">
-                  <h2 id="recent-imports-title" className="text-lg font-semibold text-stone-900">Recent imports</h2>
-                  <p className="text-sm text-stone-500">Latest FamilySearch captures merged into the vault.</p>
+              <section aria-labelledby="recent-imports-title" className="folio-tray">
+                <div className="folio-tray-heading px-4 py-3 sm:px-5">
+                  <h2 id="recent-imports-title" className="text-lg font-semibold text-foreground">Recent imports</h2>
+                  <p className="text-sm text-muted-foreground">Latest FamilySearch captures merged into the vault.</p>
                 </div>
                 {summary.recentImports.length === 0 ? (
-                  <p className="px-4 py-6 text-sm text-stone-500 sm:px-5">
-                    No imports yet. Start with a FamilySearch capture in the <Link href="/app/imports" className="font-medium text-amber-800 underline underline-offset-4">Imports workspace</Link>.
+                  <p className="px-4 py-6 text-sm text-muted-foreground sm:px-5">
+                    No imports yet. Start with a FamilySearch capture in the <Link href="/app/imports" className="font-medium text-primary underline underline-offset-4">Imports workspace</Link>.
                   </p>
                 ) : (
-                  <ul className="divide-y divide-stone-100">
+                  <ul className="divide-y divide-border">
                     {summary.recentImports.map((run) => (
                       <li key={String(run._id)}>
                         <Link
                           href={run.personRouteId ? `/app/people/${run.personRouteId}` : "/app/imports"}
-                          className="flex min-h-14 items-start justify-between gap-3 px-4 py-3 transition hover:bg-amber-50/50 sm:px-5"
+                          className="flex min-h-14 items-start justify-between gap-3 px-4 py-3 transition hover:bg-muted/60 sm:px-5"
                         >
                           <div className="min-w-0">
-                            <p className="truncate font-medium text-stone-900">{run.personName}</p>
-                            <p className="text-sm text-stone-500">
+                            <p className="truncate font-medium text-foreground">{run.personName}</p>
+                            <p className="text-sm text-muted-foreground">
                               {run.pageTypes.join(" + ")} import · {new Date(run.importedAt).toLocaleString()}
                             </p>
                           </div>
@@ -197,31 +203,31 @@ export function DashboardView({ summary }: { summary: DashboardSummary }) {
       )}
 
       <section aria-labelledby="workspace-map-title" className="mt-8">
-        <h2 id="workspace-map-title" className="text-lg font-semibold text-stone-900">Everything in your workspace</h2>
+        <h2 id="workspace-map-title" className="text-lg font-semibold text-foreground">Everything in your workspace</h2>
         <ul className="mt-3 grid gap-3 md:grid-cols-2">
           {workflowStations.map((item) => (
             <li key={item.title}>
               <Link
                 href={item.href}
-                className="flex h-full items-start gap-3 border border-stone-200 bg-white px-4 py-4 shadow-sm transition hover:border-amber-300 hover:bg-amber-50/40"
+                className="folio-tray flex h-full items-start gap-3 px-4 py-4 transition hover:border-primary/40 hover:bg-muted/60"
               >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-amber-100 text-amber-700">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-secondary text-primary">
                   <item.icon className="h-5 w-5" aria-hidden="true" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block font-medium text-stone-900">{item.title}</span>
-                  <span className="mt-1 block text-sm leading-6 text-stone-500">{item.description}</span>
+                  <span className="block font-medium text-foreground">{item.title}</span>
+                  <span className="mt-1 block text-sm leading-6 text-muted-foreground">{item.description}</span>
                 </span>
-                <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-stone-400" aria-hidden="true" />
+                <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
               </Link>
             </li>
           ))}
         </ul>
         {!isEmptyWorkspace ? (
-          <p className="mt-4 flex max-w-3xl gap-2 text-sm leading-6 text-stone-600">
-            <Sparkles className="mt-1 h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
+          <p className="mt-4 flex max-w-3xl gap-2 text-sm leading-6 text-muted-foreground">
+            <Sparkles className="mt-1 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
             <span>
-              <span className="font-medium text-stone-900">AI context packs.</span> Every person page can export a Markdown or JSON context pack built from sources, memories, places, relationships, and open research gaps, ready for story-writing or research agents. The staged AI analysis flow stays available inside each person.
+              <span className="font-medium text-foreground">AI context packs.</span> Every person page can export a Markdown or JSON context pack built from sources, memories, places, relationships, and open research gaps, ready for story-writing or research agents. The staged AI analysis flow stays available inside each person.
             </span>
           </p>
         ) : null}

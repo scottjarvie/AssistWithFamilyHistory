@@ -1,0 +1,102 @@
+{
+  "baseURL": "http://localhost:3457",
+  "timezone": "America/Phoenix",
+  "hide": [
+    "nextjs-portal"
+  ],
+  "defaultVariants": [
+    "desktop-light",
+    "mobile-light"
+  ],
+  "shots": [
+    {
+      "name": "home",
+      "path": "/design-council-preview",
+      "capabilities": [
+        {
+          "can": "open all people",
+          "text": "All people"
+        },
+        {
+          "can": "open Story Studio",
+          "text": "Open Story Studio"
+        },
+        {
+          "can": "open research operations",
+          "text": "Work Research Queue"
+        },
+        {
+          "can": "see source import status",
+          "text": "Recent imports"
+        }
+      ]
+    },
+    {
+      "name": "people",
+      "path": "/design-council-preview?page=people",
+      "capabilities": [
+        {
+          "can": "search",
+          "selector": "input[name=q]"
+        },
+        {
+          "can": "filter research state",
+          "selector": "select[name=status]"
+        },
+        {
+          "can": "open a person",
+          "selector": "a[href='/app/people/synthetic-0']"
+        },
+        {
+          "can": "see document counts",
+          "text": "2 documents"
+        }
+      ]
+    },
+    {
+      "name": "empty",
+      "path": "/design-council-preview?page=empty",
+      "capabilities": [
+        {
+          "can": "create first connection",
+          "text": "Add your first connection"
+        },
+        {
+          "can": "import reviewed capture",
+          "text": "Or bring in a capture you have reviewed"
+        }
+      ]
+    },
+    {
+      "name": "home-dark",
+      "path": "/design-council-preview?theme=dark"
+    },
+    {
+      "name": "people-dark",
+      "path": "/design-council-preview?page=people&theme=dark"
+    }
+  ],
+  "references": [
+    {
+      "name": "national-archives",
+      "url": "https://www.archives.gov/research/genealogy",
+      "variants": [
+        "desktop-light"
+      ]
+    },
+    {
+      "name": "uk-archives",
+      "url": "https://www.nationalarchives.gov.uk/help-with-your-research/research-guides/census-records/",
+      "variants": [
+        "desktop-light"
+      ]
+    },
+    {
+      "name": "github-issues",
+      "url": "https://github.com/microsoft/vscode/issues",
+      "variants": [
+        "desktop-light"
+      ]
+    }
+  ]
+}

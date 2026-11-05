@@ -48,7 +48,13 @@
 }
 
 :root {
-  --radius: 0.8rem;
+  --radius: 0.5rem;
+  --surface-wash: #e2d8bf;
+  --surface-glow: #f0dcc2;
+  --annotation: #91502e;
+  --annotation-surface: #f4e8dc;
+  --evidence: #355d4c;
+  --evidence-surface: #e6ede5;
   --background: #f7f3e8;
   --foreground: #1d212a;
   --card: #fdf9f0;
@@ -88,6 +94,18 @@
 }
 
 .dark {
+  color-scheme: dark;
+  --surface-wash: #202d30;
+  --surface-glow: #28251f;
+  --annotation: #e2aa7c;
+  --annotation-surface: #33281f;
+  --evidence: #a3c6aa;
+  --evidence-surface: #22352d;
+  --brand-ink: #f5f0e6;
+  --brand-parchment: #12161d;
+  --brand-gold: #d99a5f;
+  --brand-teal: #7ba5b8;
+  --brand-rust: #e2aa7c;
   --background: #12161d;
   --foreground: #f5f0e6;
   --card: #181d25;
@@ -129,9 +147,9 @@
     @apply bg-background text-foreground;
     font-family: var(--font-instrument-sans), ui-sans-serif, sans-serif;
     background-image:
-      radial-gradient(circle at 0% 15%, #e2d8bf 0%, transparent 45%),
-      radial-gradient(circle at 90% 0%, #f0dcc2 0%, transparent 35%),
-      linear-gradient(120deg, #f7f3e8 0%, #f4efe1 40%, #f8f4eb 100%);
+      radial-gradient(circle at 0% 15%, var(--surface-wash) 0%, transparent 45%),
+      radial-gradient(circle at 90% 0%, var(--surface-glow) 0%, transparent 35%),
+      linear-gradient(120deg, var(--background), var(--background));
     background-attachment: fixed;
   }
   h1,
@@ -239,5 +257,25 @@
     .shimmer-divider {
       animation: none !important;
     }
+  }
+}
+
+/* Research folio primitives: quiet surfaces, folder labels, readable evidence. */
+@layer components {
+  .folio-tray {
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: 0 .5rem .5rem .5rem;
+    background: var(--card);
+    box-shadow: 0 2px 4px color-mix(in srgb, var(--foreground) 4%, transparent);
+  }
+  .folio-tray-heading {
+    border-bottom: 1px solid var(--border);
+    background: color-mix(in srgb, var(--muted) 55%, var(--card));
+  }
+  .folio-tray-heading h2 { font-family: var(--font-instrument-sans), sans-serif; font-size: .875rem; font-weight: 600; }
+  .folio-tray:before {
+    content: ''; position: absolute; top: -5px; left: -1px; width: 3rem; height: 5px;
+    background: var(--secondary); border: 1px solid var(--border); border-bottom: 0; border-radius: 4px 4px 0 0;
   }
 }
