@@ -221,6 +221,7 @@ export default defineSchema({
     .index("by_owner", ["vaultOwnerId"])
     .index("by_owner_creation_operation", ["vaultOwnerId", "creationProvenance.operationId"])
     .index("by_fsId", ["fsId"])
+    .index("by_owner_fsId", ["vaultOwnerId", "fsId"])
     .index("by_surname", ["name.surname"])
     // Whole-tree import duplicate suggestions: same owner, surname, nearby birth year.
     .index("by_owner_surname_birth_year", ["vaultOwnerId", "name.surname", "birth.date.year"])
@@ -1291,6 +1292,20 @@ export default defineSchema({
     .index("by_owner_updated", ["vaultOwnerId", "updatedAt"]),
 
   /** One row per batch an import received: the per-batch activity entry. */
+  /** Internal chunk/detail identities are separate from caller operation IDs. */
+  treeImportReceipts: defineTable({
+    vaultOwnerId: v.string(),
+    importJobId: v.id("treeImports"),
+    operationId: v.string(),
+    chunkIndex: v.number(),
+    detailIndex: v.number(), // -1 is the chunk, nonnegative is a detail page.
+    requestHash: v.string(),
+    resultJson: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_owner", ["vaultOwnerId"])
+    .index("by_owner_job_operation_chunk_detail", ["vaultOwnerId", "importJobId", "operationId", "chunkIndex", "detailIndex"]),
+
   treeImportBatches: defineTable({
     vaultOwnerId: v.string(),
     importJobId: v.id("treeImports"),

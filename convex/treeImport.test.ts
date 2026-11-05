@@ -943,6 +943,9 @@ test("actual large-conflict imports store bounded chunk pages and retain citatio
   const t = convexTest({ schema, modules, transactionLimits: true });
   const grant = await seedGrant(t, { vaultOwnerId: OWNER });
   const job = await begin(t, grant);
+  const publicOperation = "abcdefgh#0:detail:0";
+  const publicBatch = { sources: [{ key: "public-receipt-source", title: "Public operation" }] };
+  await send(t, grant, job.importJobId, 0, publicBatch, {}, publicOperation);
   const personKeys = ["?".repeat(199) + "A", "?".repeat(199) + "B"];
   const facts = Array.from({ length: 60 }, (_, i) => ({ key: "?".repeat(198) + String(i).padStart(2, "0"), type: "occupation", value: "Initial", description: "Original", date: { original: "1800", year: 1800 }, place: { original: "Initial place" } }));
   const generatedCitation = { sourceKey: "S", targets: [{ kind: "person" as const, key: personKeys[0] }] };
@@ -952,7 +955,7 @@ test("actual large-conflict imports store bounded chunk pages and retain citatio
     persons: personKeys.map((key, i) => ({ key, living: false, names: [{ given: `Synthetic${i}` }], facts: facts.map(f => ({ ...f })) })),
     citations: [generatedCitation, { key: sharedKey, sourceKey: "S", targets: [{ kind: "person", key: personKeys[1] }] }],
   };
-  const first = await send(t, grant, job.importJobId, 0, batch);
+  const first = await send(t, grant, job.importJobId, 1, batch);
   expect(first.results.filter((r: any) => r.status === "failed")).toEqual([]);
   await t.run(async ctx => {
     for (const event of await ctx.db.query("events").collect()) await ctx.db.patch(event._id, {
@@ -963,29 +966,33 @@ test("actual large-conflict imports store bounded chunk pages and retain citatio
   for (const person of batch.persons!) for (const fact of person.facts!) {
     fact.value = "Updated"; fact.description = "Changed"; fact.date = { original: "1900", year: 1900 }; fact.place = { original: "Incoming place" };
   }
-  const result = await send(t, grant, job.importJobId, 1, batch, {}, "actual-large-conflicts");
+  const result = await send(t, grant, job.importJobId, 2, batch, {}, "abcdefgh");
   expect(result.results).toEqual([]);
   expect(result.resultsTrimmed).toContain("retained conflicts");
   const receipts = await t.run(async ctx => ctx.db.query("mcpOperations").collect());
-  expect(receipts.some(row => row.toolName === "family_history_import_tree_batch#detail")).toBe(true);
+  const privateReceipts = await t.run(async ctx => ctx.db.query("treeImportReceipts").collect());
+  expect(privateReceipts.some(row => row.detailIndex >= 0)).toBe(true);
+  expect(privateReceipts.every(row => new TextEncoder().encode(JSON.stringify(row)).byteLength < 1024 * 1024)).toBe(true);
+  expect(receipts.filter(row => row.operationId === publicOperation)).toHaveLength(1);
   expect(receipts.every(row => new TextEncoder().encode(JSON.stringify(row)).byteLength < 1024 * 1024)).toBe(true);
   const entries: any[] = [];
   let cursor: { resultsChunkIndex: number; resultsOffset: number } | null = { resultsChunkIndex: 0, resultsOffset: 0 };
   while (cursor) {
-    const page = await t.query(internal.treeImport.getTreeImport, { principal: principal(), importJobId: job.importJobId, resultsOperationId: "actual-large-conflicts", ...cursor }) as any;
+    const page = await t.query(internal.treeImport.getTreeImport, { principal: principal(), importJobId: job.importJobId, resultsOperationId: "abcdefgh", ...cursor }) as any;
     entries.push(...page.results); cursor = page.next;
   }
   expect(entries.filter(row => row.kept)).toHaveLength(480);
   const citationEntries = entries.filter(row => row.kind === "citations");
   expect(citationEntries.map(row => row.keyOrigin).sort()).toEqual(["explicit", "generated"]);
   const notes = citationEntries.map((row, i) => ({ key: `result-note-${i}`, text: `Synthetic note ${i}`, subject: { kind: "citation" as const, key: row.key, keyOrigin: row.keyOrigin } }));
-  const noted = await send(t, grant, job.importJobId, 2, { notes });
+  const noted = await send(t, grant, job.importJobId, 3, { notes });
   expect(noted.results.filter((r: any) => r.status === "failed")).toEqual([]);
   const storedNotes = await t.run(async ctx => ctx.db.query("notes").collect());
   expect(storedNotes.map(row => row.subject.id).sort()).toEqual(citationEntries.map(row => row.id).sort());
-  const replay = await send(t, grant, job.importJobId, 1, batch, {}, "actual-large-conflicts");
+  const replay = await send(t, grant, job.importJobId, 2, batch, {}, "abcdefgh");
   expect(replay.deduplicated).toBe(true);
   expect(replay.resultDetails).toEqual(result.resultDetails);
+  expect((await send(t, grant, job.importJobId, 0, publicBatch, {}, publicOperation)).deduplicated).toBe(true);
 });
 
 test.each([0, 122])("dry media and citation updates preserve virtual person/source references (padding %i)", { timeout: 300_000 }, async padding => {
@@ -1091,6 +1098,112 @@ test.each([{ padding: 0, moveFirst: false }, { padding: 124, moveFirst: false },
   const outcomes = (r: any) => r.results.filter((row: any) => row.key === "R1" || row.key === "R2").map((row: any) => ({ key: row.key, status: row.status, kept: row.kept ?? [] }));
   expect(outcomes(dry)).toEqual(outcomes(real));
   expect(outcomes(real)).toEqual([{ key: "R1", status: "updated", kept: [] }, { key: "R2", status: "created", kept: [] }]);
+});
+
+test.each(["abcdefgh#0", "abcdefgh#0:detail:0"])("public operation IDs cannot alias internal chunk receipts (%s)", async publicOperation => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  const first = { sources: [{ key: "S1", title: "One" }] };
+  const second = { sources: [{ key: "S2", title: "Two" }] };
+  await send(t, grant, job.importJobId, 0, first, {}, publicOperation);
+  const result = await send(t, grant, job.importJobId, 1, second, {}, "abcdefgh");
+  expect(result.results).toEqual([expect.objectContaining({ key: "S2", status: "created" })]);
+  expect((await send(t, grant, job.importJobId, 0, first, {}, publicOperation)).deduplicated).toBe(true);
+  expect((await send(t, grant, job.importJobId, 1, second, {}, "abcdefgh")).deduplicated).toBe(true);
+  expect(await countRows(t, "sources")).toBe(2);
+});
+
+test("legacy completed chunks resume without rewriting their records", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  await send(t, grant, job.importJobId, 0, { sources: [{ key: "S", title: "Initial" }] });
+  const source = await t.run(async ctx => (await ctx.db.query("sources").collect())[0]);
+  const operationId = "legacy-resume";
+  await t.run(async ctx => {
+    await ctx.db.insert("mcpOperations", {
+      vaultOwnerId: OWNER, operationId: `${operationId}#0`, toolName: "family_history_import_tree_batch#chunk", requestHash: `hash-${operationId}#0`,
+      resultJson: JSON.stringify({ results: [{ kind: "sources", index: 0, key: "S", id: source._id, status: "unchanged" }], plannedKeys: [], duplicatesSuggested: 0 }),
+      clientId: "synthetic-mcp-client", createdAt: 1,
+    });
+  });
+  const result = await send(t, grant, job.importJobId, 1, { sources: [{ key: "S", title: "Initial" }] }, {}, operationId);
+  expect(result.counts.sources.unchanged).toBe(1);
+  expect(await t.run(ctx => ctx.db.get(source._id))).toEqual(source);
+  expect((await send(t, grant, job.importJobId, 1, { sources: [{ key: "S", title: "Initial" }] }, {}, operationId)).deduplicated).toBe(true);
+});
+
+test.each([false, true])("unversioned fact tuples verify the owning person (encoded collision %s)", async collision => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  const originalKey = collision ? "A%2FB" : "P";
+  const incomingKey = collision ? "A/B" : "P";
+  const original = { key: originalKey, living: false, names: [{ given: "Original" }], facts: [{ key: "C", type: "occupation", value: "Farmer" }] };
+  await send(t, grant, job.importJobId, 0, { persons: [original], sources: [{ key: "S", title: "Synthetic" }] });
+  if (collision) await send(t, grant, job.importJobId, 1, { persons: [{ key: incomingKey, living: false, names: [{ given: "Different person" }] }] });
+  await t.run(async ctx => {
+    const mapping = (await ctx.db.query("mcpRecordKeys").collect()).find(row => row.recordKey === externalRecordKey("familysearch", "fact", factKeyFor(originalKey, original.facts[0])))!;
+    await ctx.db.patch(mapping._id, { recordKey: externalRecordKey("familysearch", "fact", `${originalKey}/C`), externalKeyVersion: undefined });
+  });
+  const snapshot = () => t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), events: await ctx.db.query("events").collect(), keys: await ctx.db.query("mcpRecordKeys").collect(), links: await ctx.db.query("personEvents").collect() }));
+  const before = await snapshot();
+  const batch: TreeImportBatch = {
+    persons: [{ ...original, key: incomingKey, facts: [{ ...original.facts[0], value: "Teacher" }] }],
+    citations: [{ key: "CITE", sourceKey: "S", targets: [{ kind: "fact", personKey: incomingKey, key: "C", keyOrigin: "explicit" }] }],
+  };
+  const index = collision ? 2 : 1;
+  const dry = await send(t, grant, job.importJobId, index, batch, { dryRun: true }, `dry-tuple-${collision}`);
+  expect(await snapshot()).toEqual(before);
+  const real = await send(t, grant, job.importJobId, index, batch);
+  if (collision) {
+    for (const result of [dry, real]) {
+      expect(result.results).toHaveLength(2);
+      expect(result.results.every((row: any) => row.status === "failed" && row.reason.includes("LEGACY_IDENTITY_REVIEW_REQUIRED"))).toBe(true);
+    }
+    expect(await snapshot()).toEqual(before);
+    expect(await countRows(t, "citations")).toBe(0);
+  } else {
+    expect(real.results.filter((row: any) => row.status === "failed")).toEqual([]);
+    expect(dry.counts).toEqual(real.counts);
+    const after = await snapshot();
+    expect(after.events).toHaveLength(1);
+    expect(after.events[0]._id).toBe(before.events[0]._id);
+    expect(after.events[0].description).toBe("Teacher");
+    expect(after.links).toEqual(before.links);
+  }
+});
+
+test.each(["forward", "reverse", "primary"])("conflicting person aliases refuse identity assignment before writing (%s)", async order => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  const aliases = [{ system: "ancestry", id: "A" }, { system: "myheritage", id: "B" }];
+  await send(t, grant, job.importJobId, 0, { persons: aliases.map((alias, i) => ({ key: `P${i}`, living: false, names: [{ given: `Original${i}` }], otherIds: [alias] })) });
+  const snapshot = () => t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), keys: await ctx.db.query("mcpRecordKeys").collect(), events: await ctx.db.query("events").collect() }));
+  const before = await snapshot();
+  const batch: TreeImportBatch = { persons: [{ key: order === "primary" ? "P0" : "New", living: false, names: [{ given: "Incoming" }], otherIds: order === "primary" ? [aliases[1]] : order === "reverse" ? [...aliases].reverse() : aliases, facts: [{ key: "new-fact", type: "occupation", value: "Teacher" }] }] };
+  for (const dryRun of [true, false]) {
+    const result = await send(t, grant, job.importJobId, 1, batch, { dryRun }, `aliases-${order}-${dryRun}`);
+    expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("AMBIGUOUS_PERSON_IDENTITY") })]);
+    expect(await snapshot()).toEqual(before);
+  }
+});
+
+test("FamilySearch legacy linking uses the owner index beyond foreign records", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const personId = await t.run(async ctx => {
+    const doc = { fsId: "SYN-OWNED", name: { given: "Owner correction", surname: "Synthetic" }, living: false, sex: "unknown" as const, researchStatus: "basic" as const, createdAt: 1, updatedAt: 1 };
+    for (let i = 0; i < 12; i++) await ctx.db.insert("persons", { ...doc, vaultOwnerId: `user_foreign_${i}` });
+    return ctx.db.insert("persons", { ...doc, vaultOwnerId: OWNER });
+  });
+  const job = await begin(t, grant);
+  const result = await send(t, grant, job.importJobId, 0, { persons: [{ key: "SYN-OWNED", living: false, names: [{ given: "Incoming" }] }] });
+  expect(result.results).toEqual([expect.objectContaining({ id: personId, status: "linked", kept: expect.arrayContaining(["name"]) })]);
+  expect(await countRows(t, "persons")).toBe(13);
+  expect((await t.run(ctx => ctx.db.get(personId)))?.name.given).toBe("Owner correction");
 });
 
 test("citation link additions report updated, dry planning agrees, repeated targets stay idempotent", async () => {

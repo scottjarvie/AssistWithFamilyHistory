@@ -353,3 +353,16 @@ rows, adds planned rows, and preserves the bounded index order before selecting
 an equivalent relationship. Planned moves of either endpoint therefore do not
 reuse an obsolete stored match; excessive index adjustments refuse a smaller
 batch rather than producing a false prediction.
+
+Unversioned fact mappings must verify both the outside fact ID and its owned
+person/event link before use. Ambiguous encoded mappings refuse import without
+rekeying originals. Person imports resolve every eligible alias before writing;
+aliases identifying different people fail instead of choosing by input order.
+Legacy FamilySearch PID lookup is owner-indexed.
+
+Internal chunk and detail receipts use `treeImportReceipts`, keyed by owner,
+import job, raw parent operation ID, numeric chunk and numeric detail index.
+Caller operation IDs remain in `mcpOperations` and cannot collide with internal
+receipts. Unambiguous legacy chunk receipts remain readable for resume; old
+collisions refuse explicitly. The new private receipt table follows vault
+ownership migration with the existing operational tables.

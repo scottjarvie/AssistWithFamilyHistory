@@ -210,6 +210,25 @@ async function lookup(c: ChunkContext, singular: string, key: string, system: st
   if (row && row.externalKeyVersion !== 2 && (legacyKey !== mapKey || key.startsWith(`${singular}:`) || key.includes(`:${singular}:`))) {
     fail("LEGACY_IDENTITY_REVIEW_REQUIRED", "This older mapping could have been built from different external-system components.", "Review the original mapping before linking; nothing was rekeyed.");
   }
+  if (row && row.externalKeyVersion !== 2 && singular === "fact") {
+    // An old raw tuple can equal a new escaped tuple for a different person.
+    // Outside fact IDs alone cannot establish the owning person.
+    const parts = key.split("/");
+    let personKey: string | undefined;
+    let factKey: string | undefined;
+    try {
+      if (parts.length === 2) [personKey, factKey] = parts.map(decodeURIComponent);
+    } catch { /* A malformed old tuple is deliberately refused below. */ }
+    const personId = personKey ? await lookup(c, "person", personKey, system) : null;
+    const event = await ownedRow(c, "events", row.recordId);
+    const person = personId ? await ownedRow(c, "persons", personId) : null;
+    const link = person && event && !isPlaceholder(personId!) ? await c.ctx.db.query("personEvents")
+      .withIndex("by_person_and_event", q => q.eq("personId", person._id).eq("eventId", event._id)).unique() : null;
+    if (!person || !event || !link || !matchesVaultOwner(link.vaultOwnerId, c.owner)
+      || !event.externalIds?.some(id => id.system.trim().toLowerCase() === system.trim().toLowerCase() && id.id.trim() === factKey)) {
+      fail("LEGACY_IDENTITY_REVIEW_REQUIRED", "The complete person/fact identity of this older mapping cannot be verified.", "Review the original person, fact and mapping; nothing was rekeyed or overwritten.");
+    }
+  }
   return row?.recordId ?? null;
 }
 
@@ -406,30 +425,29 @@ async function importPerson(c: ChunkContext, item: any): Promise<Omit<ItemResult
     });
   };
 
-  let existingId = await lookup(c, "person", key);
-  let linked = false;
+  const primaryId = await lookup(c, "person", key);
+  const candidates = new Set<string>(primaryId ? [primaryId] : []);
+  let existingId = primaryId;
   if (!existingId && c.job.system === "familysearch") {
     // People captured earlier by the browser extension carry the PID as fsId.
-    const legacy = await c.ctx.db.query("persons").withIndex("by_fsId", (q) => q.eq("fsId", key)).take(10);
-    const mine = legacy.find((row) => matchesVaultOwner(row.vaultOwnerId, c.owner));
-    if (mine) {
-      existingId = String(mine._id);
-      linked = true;
-    }
+    const legacy = await c.ctx.db.query("persons").withIndex("by_owner_fsId", (q) => q.eq("vaultOwnerId", c.owner).eq("fsId", key)).take(2);
+    for (const mine of legacy) candidates.add(String(mine._id));
   }
   const otherIds: ExternalId[] = Array.isArray(item.otherIds) ? item.otherIds : [];
-  if (!existingId) {
-    // The same person imported earlier from another site, under that site's id.
-    for (const other of otherIds) {
-      if (isGedcomSystem(other.system) && !isGedcomSystem(c.job.system)) continue;
-      const found = await lookup(c, "person", other.id, other.system.toLowerCase());
-      if (found) {
-        existingId = found;
-        linked = true;
-        break;
-      }
-    }
+  const aliases = new Map<string, { system: string; id: string; mapped: string | null }>();
+  for (const other of otherIds) {
+    if (isGedcomSystem(other.system) && !isGedcomSystem(c.job.system)) continue;
+    const system = other.system.trim().toLowerCase();
+    const id = requiredKey(other.id, "otherIds.id");
+    const aliasKey = externalRecordKey(system, "person", id, c.job.importKey);
+    if (aliases.has(aliasKey)) continue;
+    const mapped = await lookup(c, "person", id, system);
+    aliases.set(aliasKey, { system, id, mapped });
+    if (mapped) candidates.add(mapped);
   }
+  if (candidates.size > 1) fail("AMBIGUOUS_PERSON_IDENTITY", "These outside IDs already identify different people; no identity was selected.", "Have the person resolve the conflicting aliases before retrying; all originals were retained.");
+  existingId = [...candidates][0] ?? null;
+  const linked = !primaryId && !!existingId;
 
   const doc = {
     importedNames: clean(item.names),
@@ -459,13 +477,9 @@ async function importPerson(c: ChunkContext, item: any): Promise<Omit<ItemResult
   }
   // Remember the person's ids on other sites too, so an import from there
   // lands on this same person instead of making a second one.
-  for (const other of otherIds) {
-    if (isGedcomSystem(other.system) && !isGedcomSystem(c.job.system)) continue;
-    const system = other.system.toLowerCase();
-    if (system === c.job.system && other.id === key) continue;
-    const mapped = await lookup(c, "person", other.id, system);
-    if (!mapped) await remember(c, "person", other.id, saved.id, system);
-    else if (mapped !== saved.id) saved.kept = [...(saved.kept ?? []), `otherIds:${system}:${other.id}`];
+  for (const other of aliases.values()) {
+    if (other.system === c.job.system && other.id === key) continue;
+    if (!other.mapped) await remember(c, "person", other.id, saved.id, other.system);
   }
 
   for (const fact of facts.slice(0, TREE_IMPORT_LIMITS.factsPerPerson)) {
@@ -960,6 +974,19 @@ export const planTreeImportChunk = internalQuery({
 const CHUNK_RECEIPT_BYTES = 64_000;
 const DETAIL_PAGE_BYTES = 48_000;
 
+async function importReceipt(ctx: QueryCtx | MutationCtx, owner: string, jobId: Id<"treeImports">, operationId: string, chunkIndex: number, detailIndex: number) {
+  const receipt = await ctx.db.query("treeImportReceipts").withIndex("by_owner_job_operation_chunk_detail", q =>
+    q.eq("vaultOwnerId", owner).eq("importJobId", jobId).eq("operationId", operationId).eq("chunkIndex", chunkIndex).eq("detailIndex", detailIndex)).unique();
+  if (receipt) return receipt;
+  // Read old receipts without creating more entries in their ambiguous domain.
+  const legacyId = `${operationId}#${chunkIndex}${detailIndex < 0 ? "" : `:detail:${detailIndex}`}`;
+  const rows = await ctx.db.query("mcpOperations").withIndex("by_owner_operation", q => q.eq("vaultOwnerId", owner).eq("operationId", legacyId)).take(2);
+  const expectedTool = `${BATCH_TOOL}#${detailIndex < 0 ? "chunk" : "detail"}`;
+  const matches = rows.filter(row => row.toolName === expectedTool && (!JSON.parse(row.resultJson).importJobId || JSON.parse(row.resultJson).importJobId === String(jobId)));
+  if (rows.length > 1) machineError("LEGACY_IDENTITY_REVIEW_REQUIRED", "Older receipt identities collide.", "Review the original operation receipts; no receipt was overwritten.");
+  return matches[0] ?? null;
+}
+
 function resultEntries(results: ItemResult[]): Record<string, unknown>[] {
   return results.flatMap<Record<string, unknown>>(row => {
     const { kept, ...base } = row;
@@ -968,7 +995,7 @@ function resultEntries(results: ItemResult[]): Record<string, unknown>[] {
 }
 
 /** Store expanded conflicts before they can exceed a Convex document. */
-async function boundedChunkResult(ctx: MutationCtx, args: { operationId: string; requestHash: string }, owner: string, importJobId: string, results: ItemResult[], duplicatesSuggested: number, clientId: string) {
+async function boundedChunkResult(ctx: MutationCtx, args: { batchOperationId: string; chunkIndex: number; requestHash: string }, owner: string, importJobId: Id<"treeImports">, results: ItemResult[], duplicatesSuggested: number) {
   const full = { importJobId, results, plannedKeys: [] as string[], duplicatesSuggested };
   if (new TextEncoder().encode(JSON.stringify(full)).byteLength <= CHUNK_RECEIPT_BYTES) return full;
   const entries = resultEntries(results);
@@ -982,9 +1009,9 @@ async function boundedChunkResult(ctx: MutationCtx, args: { operationId: string;
     page.push(entry); bytes += size;
   }
   if (page.length) pages.push(page);
-  for (const [index, entries] of pages.entries()) await ctx.db.insert("mcpOperations", {
-    vaultOwnerId: owner, operationId: `${args.operationId}:detail:${index}`, toolName: `${BATCH_TOOL}#detail`, requestHash: `${args.requestHash}:detail:${index}`,
-    resultJson: JSON.stringify({ importJobId, entries }), clientId, createdAt: Date.now(),
+  for (const [index, entries] of pages.entries()) await ctx.db.insert("treeImportReceipts", {
+    vaultOwnerId: owner, importJobId, operationId: args.batchOperationId, chunkIndex: args.chunkIndex, detailIndex: index, requestHash: args.requestHash,
+    resultJson: JSON.stringify({ importJobId, entries }), createdAt: Date.now(),
   });
   const compact = { ...full, results: results.map(row => {
     const { kept, ...rest } = row;
@@ -996,34 +1023,33 @@ async function boundedChunkResult(ctx: MutationCtx, args: { operationId: string;
 
 /** One chunk of a real batch: one transaction, replay-safe under its own receipt. */
 export const applyTreeImportChunk = internalMutation({
-  args: { ...chunkArgs, requestHash: v.string() },
+  args: { ...chunkArgs, requestHash: v.string(), batchOperationId: v.string(), chunkIndex: v.number() },
   handler: async (ctx, args) => {
     const owner = ownerFromPrincipal(args.principal);
     await assertGrantPermits(ctx, { owner, grantId: args.grantId, toolName: BATCH_TOOL, input: {} });
-    const receipt = await ctx.db
-      .query("mcpOperations")
-      .withIndex("by_owner_operation", (q) => q.eq("vaultOwnerId", owner).eq("operationId", args.operationId))
-      .unique();
+    const job = await loadJob(ctx, owner, args.importJobId, false);
+    const receipt = await importReceipt(ctx, owner, job._id, args.batchOperationId, args.chunkIndex, -1);
     if (receipt) {
       if (receipt.requestHash !== args.requestHash) {
         machineError("IDEMPOTENCY_CONFLICT", "This operation ID was already used for a different batch.", "Reuse the original batch exactly, or mint a new operationId.");
       }
       return JSON.parse(receipt.resultJson) as { results: ItemResult[]; plannedKeys: string[]; duplicatesSuggested: number };
     }
-    const job = await loadJob(ctx, owner, args.importJobId, true);
+    if (job.status !== "open") machineError("VALIDATION_ERROR", "That tree import is already marked complete.", "Reopen it with family_history_begin_tree_import.");
     const c: ChunkContext = {
       ctx, w: liveWriter(ctx), owner, job, provenance: importProvenance(args.principal, args.operationId),
       local: new Map(), planned: new Set(), plannedNow: [], baselines: new Map(), duplicatesSuggested: 0,
     };
     const results = await runChunk(c, args.items as TreeImportItem[]);
-    const result = await boundedChunkResult(ctx, args, owner, String(job._id), results, c.duplicatesSuggested, args.principal.clientId);
-    await ctx.db.insert("mcpOperations", {
+    const result = await boundedChunkResult(ctx, args, owner, job._id, results, c.duplicatesSuggested);
+    await ctx.db.insert("treeImportReceipts", {
       vaultOwnerId: owner,
-      operationId: args.operationId,
-      toolName: `${BATCH_TOOL}#chunk`,
+      importJobId: job._id,
+      operationId: args.batchOperationId,
+      chunkIndex: args.chunkIndex,
+      detailIndex: -1,
       requestHash: args.requestHash,
       resultJson: JSON.stringify(result),
-      clientId: args.principal.clientId,
       createdAt: Date.now(),
     });
     return result;
@@ -1096,7 +1122,10 @@ export const recordTreeImportBatch = internalMutation({
       .query("mcpOperations")
       .withIndex("by_owner_operation", (q) => q.eq("vaultOwnerId", owner).eq("operationId", args.operationId))
       .unique();
-    if (existing) return { ...(JSON.parse(existing.resultJson) as Record<string, unknown>), deduplicated: true };
+    if (existing) {
+      if (existing.toolName !== BATCH_TOOL || existing.requestHash !== args.requestHash) machineError("IDEMPOTENCY_CONFLICT", "This operation ID belongs to different input.", "Reuse the original input or a new operationId.");
+      return { ...(JSON.parse(existing.resultJson) as Record<string, unknown>), deduplicated: true };
+    }
     const job = await loadJob(ctx, owner, args.importJobId, true);
     const results = args.results as ItemResult[];
     const batchCounts = addCounts(emptyCounts(), results);
@@ -1230,6 +1259,8 @@ export const importTreeBatch = internalAction({
         : await ctx.runMutation(self.applyTreeImportChunk, {
           ...base,
           operationId: `${args.operationId}#${index}`,
+          batchOperationId: args.operationId,
+          chunkIndex: index,
           requestHash: `${args.requestHash}#${index}`,
           items,
         });
@@ -1375,8 +1406,8 @@ export const getTreeImport = internalQuery({
       const receipt = await ctx.db.query("mcpOperations").withIndex("by_owner_operation", q => q.eq("vaultOwnerId", owner).eq("operationId", args.resultsOperationId!)).unique();
       const summary = receipt?.toolName === BATCH_TOOL ? JSON.parse(receipt.resultJson) : null;
       if (!summary || summary.importJobId !== String(job._id) || chunkIndex >= (summary.resultDetails?.chunkCount ?? 0)) machineError("NOT_FOUND", "That result page is not available for this import.", "Use the operationId and chunk count returned by the batch.");
-      const chunk = await ctx.db.query("mcpOperations").withIndex("by_owner_operation", q => q.eq("vaultOwnerId", owner).eq("operationId", `${args.resultsOperationId}#${chunkIndex}`)).unique();
-      const data = chunk?.toolName === `${BATCH_TOOL}#chunk` ? JSON.parse(chunk.resultJson) : null;
+      const chunk = await importReceipt(ctx, owner, job._id, args.resultsOperationId, chunkIndex, -1);
+      const data = chunk ? JSON.parse(chunk.resultJson) : null;
       if (!data || data.importJobId !== String(job._id)) machineError("NOT_FOUND", "The detailed chunk receipt is not available.", "Use a batch with retrievable resultDetails.");
       let page: Record<string, unknown>[];
       let total: number;
@@ -1387,8 +1418,8 @@ export const getTreeImport = internalQuery({
         let localOffset = offset;
         while (pageIndex < counts.length && localOffset >= counts[pageIndex]) { localOffset -= counts[pageIndex]; pageIndex++; }
         if (pageIndex >= counts.length) machineError("VALIDATION_ERROR", "Result offset is outside the chunk.", "Use the returned next cursor.");
-        const detail = await ctx.db.query("mcpOperations").withIndex("by_owner_operation", q => q.eq("vaultOwnerId", owner).eq("operationId", `${args.resultsOperationId}#${chunkIndex}:detail:${pageIndex}`)).unique();
-        const value = detail?.toolName === `${BATCH_TOOL}#detail` ? JSON.parse(detail.resultJson) : null;
+        const detail = await importReceipt(ctx, owner, job._id, args.resultsOperationId, chunkIndex, pageIndex);
+        const value = detail ? JSON.parse(detail.resultJson) : null;
         if (!value || value.importJobId !== String(job._id)) machineError("NOT_FOUND", "That result detail is unavailable for this import.", "Use the returned resultDetails pointer.");
         page = value.entries.slice(localOffset, localOffset + 10);
       } else {
