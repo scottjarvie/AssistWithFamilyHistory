@@ -114,9 +114,13 @@ export type SourceInput = {
   otherIds?: ExternalId[];
 };
 
+export type KeyOrigin = "explicit" | "generated";
+
 export type TargetInput = {
   kind: "person" | "relationship" | "fact" | "note" | "media";
   key: string;
+  /** Select the identity domain when referring to a generated fact key. */
+  keyOrigin?: KeyOrigin;
   /** For kind "fact": the person the fact belongs to. */
   personKey?: string;
   /** For kind "person": which part of the person, e.g. "birth" or "name". */
@@ -141,7 +145,7 @@ export type NoteInput = {
   title?: string;
   text: string;
   noteType?: "general" | "research" | "biography" | "transcription" | "source" | "other";
-  subject: TargetInput | { kind: "source" | "citation"; key: string };
+  subject: TargetInput | { kind: "source" | "citation"; key: string; keyOrigin?: KeyOrigin };
 };
 
 export type MediaInput = {
@@ -219,9 +223,9 @@ export function factKeyFor(personKey: string, fact: FactInput): string {
 export function citationKeyFor(citation: CitationInput): string {
   if (citation.key?.trim()) return citation.key.trim();
   const targets = citation.targets.map(target => JSON.stringify([
-    target.kind, target.personKey?.trim() ?? "", target.key.trim(), target.field ?? "",
+    target.kind, target.personKey?.trim() ?? "", target.key.trim(), target.field ?? "", target.keyOrigin ?? null,
   ])).sort();
-  return `${citation.sourceKey.trim()}#${stableHash(JSON.stringify([citation.page ?? "", targets]))}`;
+  return stableHash(JSON.stringify([citation.sourceKey.trim(), citation.page ?? "", targets]));
 }
 
 /** FNV-1a 64-bit, hex. Deterministic, synchronous and fine for record keys. */
@@ -431,6 +435,8 @@ export type ItemResult = {
   index: number;
   key: string;
   status: ItemStatus;
+  /** Citation results identify which lookup domain contains the returned key. */
+  keyOrigin?: KeyOrigin;
   id?: string;
   reason?: string;
   whatToDo?: string;

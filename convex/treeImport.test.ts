@@ -420,8 +420,8 @@ describe("composite import identities", () => {
     const batch: TreeImportBatch = {
       sources: [{ key: "s", title: "Synthetic source" }],
       persons: [
-        { key: "A/B", living: false, names: [{ given: "One" }], facts: [{ key: "C", type: "residence", value: "First" }] },
-        { key: "A", living: false, names: [{ given: "Two" }], facts: [{ key: "B/C", type: "residence", value: "Second" }] },
+        { key: "A/B", living: false, names: [{ given: "One" }], facts: [{ key: "C", type: "residence", value: "First", date: { original: "1900", year: 1900 } }] },
+        { key: "A", living: false, names: [{ given: "Two" }], facts: [{ key: "B/C", type: "residence", value: "Second", date: { original: "1910", year: 1910 } }] },
       ],
       citations: [
         { key: "c1", sourceKey: "s", targets: [{ kind: "fact", personKey: "A/B", key: "C" }] },
@@ -440,6 +440,14 @@ describe("composite import identities", () => {
     }));
     expect(snapshot.events.map(e => e.description).sort()).toEqual(["First", "Second"]);
     expect(new Set(snapshot.people.map(e => e.eventId)).size).toBe(2);
+    const firstEvent = snapshot.events.find(e => e.description === "First")!;
+    const secondEvent = snapshot.events.find(e => e.description === "Second")!;
+    expect(firstEvent.date?.original).toBe("1900");
+    expect(secondEvent.date?.original).toBe("1910");
+    expect(snapshot.people).toEqual(expect.arrayContaining([
+      expect.objectContaining({ personId: first.results.find((r: any) => r.kind === "persons" && r.key === "A/B").id, eventId: firstEvent._id }),
+      expect.objectContaining({ personId: first.results.find((r: any) => r.kind === "persons" && r.key === "A").id, eventId: secondEvent._id }),
+    ]));
     expect(new Set(snapshot.links.map(e => e.targetId)).size).toBe(2);
     expect(new Set(snapshot.notes.map(e => e.subject.id)).size).toBe(2);
     const resumed = await begin(t, grant);
@@ -531,4 +539,130 @@ test("explicit IDs cannot impersonate generated fact or citation identities", as
   const data = await t.run(async ctx => ({ events: await ctx.db.query("events").collect(), citations: await ctx.db.query("citations").collect() }));
   expect(data.events.map(r => r.description).sort()).toEqual(["Anonymous fact", "Explicit fact"]);
   expect(data.citations.map(r => r.extractedText).sort()).toEqual(["Anonymous citation", "Explicit citation"]);
+});
+
+
+test("notes and citations distinguish generated keys, reject ambiguous defaults and preserve explicit targets", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  const fact = { type: "residence", value: "Generated" };
+  const factKey = decodeURIComponent(factKeyFor("P", fact).slice(2));
+  const citation = { sourceKey: "s", targets: [{ kind: "person" as const, key: "P" }], extractedText: "Generated" };
+  const citationKey = citationKeyFor(citation);
+  const result = await send(t, grant, job.importJobId, 0, {
+    sources: [{ key: "s", title: "Synthetic" }],
+    persons: [{ key: "P", living: false, names: [{ given: "Synthetic" }], facts: [fact,
+      { key: factKey, type: "residence", value: "Explicit" },
+    ] }],
+    citations: [citation, { ...citation, key: citationKey, extractedText: "Explicit" },
+      { key: "fact-generated", sourceKey: "s", targets: [{ kind: "fact", personKey: "P", key: factKey, keyOrigin: "generated" }] },
+      { key: "fact-explicit", sourceKey: "s", targets: [{ kind: "fact", personKey: "P", key: factKey, keyOrigin: "explicit" }] },
+    ],
+    notes: [
+      { key: "generated-note", text: "Generated citation", subject: { kind: "citation", key: citationKey, keyOrigin: "generated" } },
+      { key: "explicit-note", text: "Explicit citation", subject: { kind: "citation", key: citationKey, keyOrigin: "explicit" } },
+      { key: "ambiguous-note", text: "Refuse to guess", subject: { kind: "citation", key: citationKey } },
+      { key: "generated-fact-note", text: "Generated fact", subject: { kind: "fact", personKey: "P", key: factKey, keyOrigin: "generated" } },
+    ],
+  });
+  expect(result.results.filter((r: any) => r.status === "failed")).toMatchObject([{ kind: "notes", key: "ambiguous-note", reason: expect.stringContaining("AMBIGUOUS_TARGET") }]);
+  const results = result.results.filter((r: any) => r.kind === "citations");
+  expect(results[0]).toMatchObject({ key: citationKey, keyOrigin: "generated" });
+  expect(results[1]).toMatchObject({ key: citationKey, keyOrigin: "explicit" });
+  const data = await t.run(async ctx => ({ notes: await ctx.db.query("notes").collect(), citations: await ctx.db.query("citations").collect(), events: await ctx.db.query("events").collect(), links: await ctx.db.query("citationLinks").collect() }));
+  expect(data.notes.find(n => n.text === "Generated citation")!.subject.id).toBe(results[0].id);
+  expect(data.notes.find(n => n.text === "Explicit citation")!.subject.id).toBe(results[1].id);
+  const generatedEvent = data.events.find(e => e.description === "Generated")!;
+  const explicitEvent = data.events.find(e => e.description === "Explicit")!;
+  expect(data.links.find(l => l.citationId === results[2].id)!.targetId).toBe(generatedEvent._id);
+  expect(data.links.find(l => l.citationId === results[3].id)!.targetId).toBe(explicitEvent._id);
+  expect(data.notes.find(n => n.text === "Generated fact")!.subject.id).toBe(generatedEvent._id);
+});
+
+test("generated citations accept maximum source IDs and notes can resume with their returned keys", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  for (const [index, length] of [184, 200].entries()) {
+    const sourceKey = "S".repeat(length);
+    const batch: TreeImportBatch = {
+      sources: [{ key: sourceKey, title: "Long source" }],
+      persons: [{ key: "P", living: false, names: [{ given: "Synthetic" }] }],
+      citations: [{ sourceKey, targets: [{ kind: "person", key: "P", field: "birth" }] }],
+    };
+    const first = await send(t, grant, job.importJobId, index * 2, batch);
+    expect(first.results.filter((r: any) => r.status === "failed")).toEqual([]);
+    const citation = first.results.find((r: any) => r.kind === "citations");
+    expect(citation.key.length).toBeLessThanOrEqual(200);
+    const resumed = await send(t, grant, job.importJobId, index * 2 + 1, {
+      ...batch, notes: [{ key: `note-${length}`, text: "Synthetic note", subject: { kind: "citation", key: citation.key, keyOrigin: citation.keyOrigin } }],
+    });
+    expect(resumed.results.filter((r: any) => r.status === "failed" || (r.kind === "citations" && r.status === "created"))).toEqual([]);
+  }
+  expect(await countRows(t, "citations")).toBe(2);
+  expect(await countRows(t, "notes")).toBe(2);
+});
+
+test("fallback citation delimiter collision preserves text and all field links regardless of target order", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  const citations: NonNullable<TreeImportBatch["citations"]> = [
+    { sourceKey: "s", extractedText: "First original", targets: [{ kind: "person", key: "A:B", field: "birth" }] },
+    { sourceKey: "s", extractedText: "Second original", targets: [{ kind: "person", key: "A", field: "B:birth" }] },
+    { sourceKey: "s", extractedText: "Two fields", targets: [
+      { kind: "person", key: "A", field: "name" }, { kind: "person", key: "A", field: "birth" }, { kind: "person", key: "A" },
+    ] },
+  ];
+  expect(legacyCitationKeyFor(citations[0])).toBe(legacyCitationKeyFor(citations[1]));
+  const batch: TreeImportBatch = {
+    sources: [{ key: "s", title: "Synthetic source" }],
+    persons: [{ key: "A:B", living: false, names: [{ given: "One" }] }, { key: "A", living: false, names: [{ given: "Two" }] }], citations,
+  };
+  const first = await send(t, grant, job.importJobId, 0, batch);
+  expect(first.results.filter((r: any) => r.status === "failed")).toEqual([]);
+  const citationRows = first.results.filter((r: any) => r.kind === "citations");
+  const before = await t.run(async ctx => ({ citations: await ctx.db.query("citations").collect(), links: await ctx.db.query("citationLinks").collect() }));
+  expect(before.citations.map(c => c.extractedText).sort()).toEqual(["First original", "Second original", "Two fields"]);
+  expect(before.links.filter(l => l.citationId === citationRows[2].id).map(l => l.field ?? "all").sort()).toEqual(["all", "birth", "name"]);
+  citations[2].targets.reverse();
+  const again = await send(t, grant, job.importJobId, 1, batch);
+  expect(again.results.filter((r: any) => r.status === "failed" || r.status === "created")).toEqual([]);
+  const after = await t.run(async ctx => ({ citations: await ctx.db.query("citations").collect(), links: await ctx.db.query("citationLinks").collect() }));
+  expect(after).toEqual(before);
+});
+
+
+test("an explicit outside ID cannot overwrite a legacy generated row with the same spelling", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  const fact = { type: "residence", value: "Original generated fact" };
+  const citation = { sourceKey: "s", targets: [{ kind: "person" as const, key: "P" }], extractedText: "Original generated citation" };
+  await send(t, grant, job.importJobId, 0, {
+    sources: [{ key: "s", title: "Synthetic" }],
+    persons: [{ key: "P", living: false, names: [{ given: "Synthetic" }], facts: [fact] }], citations: [citation],
+  });
+  await t.run(async ctx => {
+    const rows = await ctx.db.query("mcpRecordKeys").collect();
+    for (const [kind, current, oldKind, oldKey] of [
+      ["factGenerated", factKeyFor("P", fact), "fact", legacyFactKeyFor("P", fact)],
+      ["citationGenerated", citationKeyFor(citation), "citation", legacyCitationKeyFor(citation)],
+    ]) {
+      const mapping = rows.find(r => r.recordKey === externalRecordKey("familysearch", kind, current))!;
+      await ctx.db.patch(mapping._id, { recordKey: externalRecordKey("familysearch", oldKind, oldKey) });
+    }
+  });
+  const before = await t.run(async ctx => ({ events: await ctx.db.query("events").collect(), citations: await ctx.db.query("citations").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() }));
+  const result = await send(t, grant, job.importJobId, 1, {
+    persons: [{ key: "P", living: false, names: [{ given: "Synthetic" }], facts: [
+      { key: legacyFactKeyFor("P", fact).slice(2), type: "residence", value: "Explicit different fact" },
+    ] }],
+    citations: [{ ...citation, key: legacyCitationKeyFor(citation), extractedText: "Explicit different citation" }],
+  });
+  expect(result.results).toHaveLength(2);
+  expect(result.results.every((r: any) => r.status === "failed" && r.reason.includes("LEGACY_IDENTITY_REVIEW_REQUIRED"))).toBe(true);
+  const after = await t.run(async ctx => ({ events: await ctx.db.query("events").collect(), citations: await ctx.db.query("citations").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() }));
+  expect(after).toEqual(before);
 });

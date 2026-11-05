@@ -267,6 +267,17 @@ This is source behavior, not a claim of deployed or provider-tested capability.
 Generated facts and citations have dedicated durable lookup namespaces
 (`factGenerated` and `citationGenerated`), separate from explicit outside IDs.
 An explicit ID that spells a generated key therefore remains a distinct record.
-Send a stable explicit key for facts or citations that notes must reference;
-fact citation targets likewise refer to explicit fact keys. Generated identities
-are internal fallback identities, not aliases for explicit outside IDs.
+Prefer a stable explicit key for facts or citations that other records reference.
+Citation results report both `key` and `keyOrigin` (`explicit` or `generated`).
+Use those values in a note's subject to name the intended citation. Fact targets
+and note subjects also accept `keyOrigin`; a generated fact's local key is its
+normalized type plus `~` and the hash used by `factKeyFor` (without the person
+prefix). Supplying an explicit fact ID avoids needing to compute that fallback.
+When `keyOrigin` is omitted, lookup succeeds only when the key resolves in one
+domain; two different matches return `AMBIGUOUS_TARGET`, without guessing.
+Generated citation keys hash the source ID, page and sorted structured target
+tuples into a fixed-length key, so maximum-length source IDs remain supported.
+Field-specific links retain separate entries for each supported field, including
+a whole-record link without a field. Repeating a batch adds no duplicate links.
+Older rows without matching outside-ID evidence cannot be refreshed as explicit
+IDs merely because a generated key happens to spell an incoming explicit ID.

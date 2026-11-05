@@ -199,6 +199,42 @@ async function rejectLegacyIdentity(c: ChunkContext, singular: string, key: stri
   }
 }
 
+/** A missing origin remains compatible only when exactly one domain resolves. */
+async function lookupReference(c: ChunkContext, kind: string, key: string, origin: unknown): Promise<string | null> {
+  if (origin !== undefined && origin !== "explicit" && origin !== "generated") {
+    fail("VALIDATION_ERROR", "Unknown keyOrigin.", "Use explicit or generated for keyOrigin.");
+  }
+  const supportsGenerated = kind === "fact" || kind === "citation";
+  if (origin === "generated" && !supportsGenerated) {
+    fail("VALIDATION_ERROR", "This record kind has no generated key domain.", "Use generated only for fact or citation references.");
+  }
+  if (origin === "explicit" || !supportsGenerated) {
+    const id = await lookup(c, kind, key);
+    if (origin === "explicit" && supportsGenerated) {
+      const externalKey = kind === "fact" ? key.slice(key.indexOf("/") + 1) : key;
+      await assertExplicitIdentity(c, kind === "fact" ? "events" : "citations", id, kind === "fact" ? decodeURIComponent(externalKey) : externalKey);
+    }
+    return id;
+  }
+  const generated = await lookup(c, `${kind}Generated`, key);
+  if (origin === "generated") return generated;
+  const explicit = await lookup(c, kind, key);
+  if (explicit && generated && explicit !== generated) {
+    fail("AMBIGUOUS_TARGET", "Both an explicit and a generated record use this key.", "Set keyOrigin to explicit or generated to identify the intended record.");
+  }
+  return explicit ?? generated;
+}
+
+/** Old generated rows have no outside ID; never refresh one as an explicit ID. */
+async function assertExplicitIdentity(c: ChunkContext, table: "events" | "citations", id: string | null, key: string) {
+  if (!id || isPlaceholder(id)) return;
+  const row = await ownedRow(c, table, id);
+  if (row && !row.externalIds?.some(external => external.system === c.job.system && external.id.trim() === key.trim())) {
+    fail("LEGACY_IDENTITY_REVIEW_REQUIRED", "This explicit key points at an older record without matching outside-ID evidence. The original was retained.",
+      "Have the person review the old mapping before retrying. Do not rekey the original automatically.");
+  }
+}
+
 async function remember(c: ChunkContext, singular: string, key: string, recordId: string, system: string = c.job.system, imported?: Record<string, unknown>) {
   const mapKey = externalRecordKey(system, singular, key, c.job.importKey);
   c.local.set(mapKey, recordId);
@@ -417,6 +453,7 @@ async function importFact(c: ChunkContext, personId: string, personKey: string, 
   await rejectLegacyIdentity(c, singular, factKey, legacyFactKeyFor(personKey, fact), "fact");
   const mapped = eventTypeFor(fact.type);
   const existingId = await lookup(c, singular, factKey);
+  if (singular === "fact") await assertExplicitIdentity(c, "events", existingId, fact.key);
   const saved = await upsertRow(c, {
     table: "events",
     singular,
@@ -643,7 +680,7 @@ async function resolveTarget(c: ChunkContext, target: TargetInput): Promise<{ ta
   if (!(target.kind in TARGET_TABLE)) fail("VALIDATION_ERROR", `Unknown target kind ${String(target.kind)}.`, "Use person, relationship, fact, note or media.");
   const lookupKey = target.kind === "fact" ? factTargetKey(requiredKey(target.personKey, "target personKey"), key) : key;
   if (target.kind === "fact") await rejectLegacyIdentity(c, "fact", lookupKey, `${target.personKey!.trim()}/${key}`);
-  const id = await lookup(c, singular, lookupKey);
+  const id = await lookupReference(c, singular, lookupKey, target.keyOrigin);
   if (!id) fail("MISSING_TARGET", `The ${target.kind} ${lookupKey} has not been imported yet.`, "Send what the citation supports first, then resend this row.");
   return { targetType: TARGET_TABLE[target.kind], targetId: id, ...(target.field ? { field: target.field.slice(0, 80) } : {}) };
 }
@@ -658,11 +695,13 @@ async function importCitation(c: ChunkContext, item: any): Promise<Omit<ItemResu
   if (!sourceId) fail("MISSING_SOURCE", `Source ${sourceKey} has not been imported yet.`, "Send the source first, then resend this row.");
   const targets = [];
   for (const target of item.targets.slice(0, TREE_IMPORT_LIMITS.targetsPerCitation)) targets.push(await resolveTarget(c, target));
+  const existingId = await lookup(c, singular, key);
+  if (singular === "citation") await assertExplicitIdentity(c, "citations", existingId, key);
   const saved = await upsertRow(c, {
     table: "citations",
     singular,
     key,
-    existingId: await lookup(c, singular, key),
+    existingId,
     doc: {
       sourceId: isPlaceholder(sourceId) ? undefined : sourceId,
       page: item.page,
@@ -683,13 +722,14 @@ async function importCitation(c: ChunkContext, item: any): Promise<Omit<ItemResu
         .withIndex("by_citation_and_target", (q) =>
           q.eq("citationId", saved.id as Id<"citations">).eq("targetType", target.targetType).eq("targetId", target.targetId),
         )
+        .filter(q => q.eq(q.field("field"), target.field))
         .take(1);
       if (rows.length === 0) {
         await c.w.insert("citationLinks", { vaultOwnerId: c.owner, citationId: saved.id, ...target, createdAt: Date.now() });
       }
     }
   }
-  return { key, status: saved.status, id: saved.id, ...(saved.kept ? { kept: saved.kept } : {}) };
+  return { key, keyOrigin: singular === "citationGenerated" ? "generated" : "explicit", status: saved.status, id: saved.id, ...(saved.kept ? { kept: saved.kept } : {}) };
 }
 
 /* ------------------------------------------------------------------- notes */
@@ -704,7 +744,7 @@ async function importNote(c: ChunkContext, item: any): Promise<Omit<ItemResult, 
   if (!kind) fail("VALIDATION_ERROR", "A note needs a subject.", "Say which person, relationship, fact, source, citation or media the note belongs to.");
   const subjectKey = subject.kind === "fact" ? factTargetKey(requiredKey(subject.personKey, "subject personKey"), requiredKey(subject.key, "subject key")) : requiredKey(subject.key, "subject key");
   if (subject.kind === "fact") await rejectLegacyIdentity(c, "fact", subjectKey, `${subject.personKey.trim()}/${subject.key.trim()}`);
-  const subjectId = await lookup(c, subject.kind === "fact" ? "fact" : subject.kind, subjectKey);
+  const subjectId = await lookupReference(c, subject.kind === "fact" ? "fact" : subject.kind, subjectKey, subject.keyOrigin);
   if (!subjectId) fail("MISSING_TARGET", `The ${subject.kind} ${subjectKey} has not been imported yet.`, "Send the record the note belongs to first, then resend this row.");
   const saved = await upsertRow(c, {
     table: "notes",

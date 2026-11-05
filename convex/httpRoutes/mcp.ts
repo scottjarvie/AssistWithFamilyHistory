@@ -520,6 +520,7 @@ const importTarget = z.object({
   kind: z.enum(["person", "relationship", "fact", "note", "media"]),
   key: importKey,
   personKey: importKey.optional(),
+  keyOrigin: z.enum(["explicit", "generated"]).optional(),
   field: z.string().trim().max(80).optional(),
 }).strict();
 const importPerson = z.object({
@@ -583,6 +584,7 @@ const importNote = z.object({
     kind: z.enum(["person", "relationship", "fact", "media", "source", "citation"]),
     key: importKey,
     personKey: importKey.optional(),
+    keyOrigin: z.enum(["explicit", "generated"]).optional(),
   }).strict(),
 }).strict();
 const importMedia = z.object({
