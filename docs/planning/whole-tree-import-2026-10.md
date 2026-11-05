@@ -366,3 +366,8 @@ Caller operation IDs remain in `mcpOperations` and cannot collide with internal
 receipts. Unambiguous legacy chunk receipts remain readable for resume; old
 collisions refuse explicitly. The new private receipt table follows vault
 ownership migration with the existing operational tables.
+
+FamilySearch primary IDs, aliases and person references resolve importer mappings
+and owner-scoped captured PIDs together. Neither source outranks a conflicting
+identity. Dry planning applies the virtual person overlay and carries original
+PID index positions across chunks, so planned changes do not hide disagreements.

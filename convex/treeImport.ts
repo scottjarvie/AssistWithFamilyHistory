@@ -83,7 +83,7 @@ const self = (internal as any).treeImport;
 type Writer = {
   dryRun: boolean;
   rows?: Map<string, any>;
-  personIndexes?: Map<string, { surname: string; year: number | null }>;
+  personIndexes?: Map<string, { surname: string; year: number | null; fsId?: string }>;
   relationshipIndexes?: Map<string, { type: string; person1: string | null }>;
   insert<T extends TableNames>(table: T, doc: any): Promise<string>;
   patch(id: string, doc: Record<string, unknown>): Promise<void>;
@@ -97,7 +97,7 @@ function liveWriter(ctx: MutationCtx): Writer {
   };
 }
 
-function dryWriter(scope: string, rows: Map<string, any>, personIndexes: Map<string, { surname: string; year: number | null }>, relationshipIndexes: Map<string, { type: string; person1: string | null }>): Writer {
+function dryWriter(scope: string, rows: Map<string, any>, personIndexes: Map<string, { surname: string; year: number | null; fsId?: string }>, relationshipIndexes: Map<string, { type: string; person1: string | null }>): Writer {
   let counter = 0;
   return {
     dryRun: true,
@@ -219,7 +219,7 @@ async function lookup(c: ChunkContext, singular: string, key: string, system: st
     try {
       if (parts.length === 2) [personKey, factKey] = parts.map(decodeURIComponent);
     } catch { /* A malformed old tuple is deliberately refused below. */ }
-    const personId = personKey ? await lookup(c, "person", personKey, system) : null;
+    const personId = personKey ? (await resolvePersonIdentity(c, personKey, system)).id : null;
     const event = await ownedRow(c, "events", row.recordId);
     const person = personId ? await ownedRow(c, "persons", personId) : null;
     const link = person && event && !isPlaceholder(personId!) ? await c.ctx.db.query("personEvents")
@@ -249,6 +249,7 @@ async function lookupReference(c: ChunkContext, kind: string, key: string, origi
   if (origin === "generated" && !supportsGenerated) {
     fail("VALIDATION_ERROR", "This record kind has no generated key domain.", "Use generated only for fact or citation references.");
   }
+  if (kind === "person") return (await resolvePersonIdentity(c, key, c.job.system)).id;
   if (origin === "explicit" || !supportsGenerated) {
     const id = await lookup(c, kind, key);
     if (origin === "explicit" && supportsGenerated) {
@@ -307,7 +308,7 @@ async function ownedRow<T extends TableNames>(c: ChunkContext, table: T, id: str
   if (!row || !matchesVaultOwner((row as any).vaultOwnerId, c.owner)) return null;
   if (c.w.rows) {
     c.w.rows.set(id, clean(row));
-    if (table === "persons") c.w.personIndexes?.set(id, { surname: (row as Doc<"persons">).name.surname, year: (row as Doc<"persons">).birth?.date?.year ?? null });
+    if (table === "persons") c.w.personIndexes?.set(id, { surname: (row as Doc<"persons">).name.surname, year: (row as Doc<"persons">).birth?.date?.year ?? null, fsId: (row as Doc<"persons">).fsId });
     if (table === "relationships") c.w.relationshipIndexes?.set(id, { type: (row as Doc<"relationships">).type, person1: (row as Doc<"relationships">).person1 ?? null });
   }
   return row as Doc<T>;
@@ -408,6 +409,22 @@ function factDescription(fact: { value?: string; description?: string }) {
   return fact.value || fact.description || fact.value;
 }
 
+/** A FamilySearch mapping never outranks an existing owned PID identity. */
+async function resolvePersonIdentity(c: ChunkContext, key: string, system: string) {
+  const mapped = await lookup(c, "person", key, system);
+  const identities = new Set<string>(mapped ? [mapped] : []);
+  if (system.trim().toLowerCase() === "familysearch") {
+    const matches = (row: any) => row?.vaultOwnerId === c.owner && typeof row.living === "boolean" && !!row.name && row.fsId === key;
+    const movedOut = [...(c.w.personIndexes ?? [])].filter(([id, index]) => index.fsId === key && !matches(c.w.rows?.get(id))).length;
+    if (movedOut > TREE_IMPORT_LIMITS.duplicateScanPerPerson) fail("DRY_RUN_PLAN_LIMIT", "Too many planned PID index moves for a bounded identity lookup.", "Use smaller dry-run batches; nothing was saved.");
+    const legacy = await c.ctx.db.query("persons").withIndex("by_owner_fsId", q => q.eq("vaultOwnerId", c.owner).eq("fsId", key)).take(2 + movedOut);
+    for (const row of legacy) if (matches(c.w.rows?.get(String(row._id)) ?? row)) identities.add(String(row._id));
+    for (const row of c.w.rows?.values() ?? []) if (matches(row)) identities.add(String(row._id));
+  }
+  if (identities.size > 1) fail("AMBIGUOUS_PERSON_IDENTITY", "This outside ID identifies different existing people; no identity was selected.", "Have the person resolve the mapping and legacy PID disagreement before retrying; all originals were retained.");
+  return { mapped, id: [...identities][0] ?? null };
+}
+
 async function importPerson(c: ChunkContext, item: any): Promise<Omit<ItemResult, "kind" | "index">> {
   const key = requiredKey(item?.key, "key");
   if (!Array.isArray(item?.names) || item.names.length === 0) fail("VALIDATION_ERROR", "A person needs at least one name.", "Send names with given and surname as the site shows them.");
@@ -425,14 +442,8 @@ async function importPerson(c: ChunkContext, item: any): Promise<Omit<ItemResult
     });
   };
 
-  const primaryId = await lookup(c, "person", key);
-  const candidates = new Set<string>(primaryId ? [primaryId] : []);
-  let existingId = primaryId;
-  if (!existingId && c.job.system === "familysearch") {
-    // People captured earlier by the browser extension carry the PID as fsId.
-    const legacy = await c.ctx.db.query("persons").withIndex("by_owner_fsId", (q) => q.eq("vaultOwnerId", c.owner).eq("fsId", key)).take(2);
-    for (const mine of legacy) candidates.add(String(mine._id));
-  }
+  const primary = await resolvePersonIdentity(c, key, c.job.system);
+  const candidates = new Set<string>(primary.id ? [primary.id] : []);
   const otherIds: ExternalId[] = Array.isArray(item.otherIds) ? item.otherIds : [];
   const aliases = new Map<string, { system: string; id: string; mapped: string | null }>();
   for (const other of otherIds) {
@@ -441,13 +452,13 @@ async function importPerson(c: ChunkContext, item: any): Promise<Omit<ItemResult
     const id = requiredKey(other.id, "otherIds.id");
     const aliasKey = externalRecordKey(system, "person", id, c.job.importKey);
     if (aliases.has(aliasKey)) continue;
-    const mapped = await lookup(c, "person", id, system);
-    aliases.set(aliasKey, { system, id, mapped });
-    if (mapped) candidates.add(mapped);
+    const identity = await resolvePersonIdentity(c, id, system);
+    aliases.set(aliasKey, { system, id, mapped: identity.mapped });
+    if (identity.id) candidates.add(identity.id);
   }
   if (candidates.size > 1) fail("AMBIGUOUS_PERSON_IDENTITY", "These outside IDs already identify different people; no identity was selected.", "Have the person resolve the conflicting aliases before retrying; all originals were retained.");
-  existingId = [...candidates][0] ?? null;
-  const linked = !primaryId && !!existingId;
+  const existingId = [...candidates][0] ?? null;
+  const linked = !primary.mapped && !!existingId;
 
   const doc = {
     importedNames: clean(item.names),
@@ -597,7 +608,7 @@ async function suggestDuplicate(
 
 async function personFor(c: ChunkContext, key: unknown, label: string): Promise<string> {
   const personKey = requiredKey(key, label);
-  const id = await lookup(c, "person", personKey);
+  const id = (await resolvePersonIdentity(c, personKey, c.job.system)).id;
   if (!id) fail("MISSING_PERSON", `${label} ${personKey} has not been imported yet.`, "Send that person first, in this batch or an earlier one, then resend this row.");
   return id;
 }
@@ -958,7 +969,7 @@ export const planTreeImportChunk = internalQuery({
       machineError("VALIDATION_ERROR", "Dry-run keys need their original identity mappings.", "Restart the dry run and carry plannedRecords alongside plannedKeys between chunks.");
     }
     const c: ChunkContext = {
-      ctx, w: dryWriter(args.operationId, new Map<string, any>(args.plannedState?.rows ?? []), new Map<string, { surname: string; year: number | null }>(args.plannedState?.personIndexes ?? []), new Map<string, { type: string; person1: string | null }>(args.plannedState?.relationshipIndexes ?? [])), owner, job, provenance: importProvenance(args.principal, args.operationId),
+      ctx, w: dryWriter(args.operationId, new Map<string, any>(args.plannedState?.rows ?? []), new Map<string, { surname: string; year: number | null; fsId?: string }>(args.plannedState?.personIndexes ?? []), new Map<string, { type: string; person1: string | null }>(args.plannedState?.relationshipIndexes ?? [])), owner, job, provenance: importProvenance(args.principal, args.operationId),
       local, planned: new Set(args.plannedKeys), plannedNow: [], baselines: new Map<string, Record<string, unknown> | null>(args.plannedState?.baselines ?? []), duplicatesSuggested: 0,
     };
     const results = await runChunk(c, args.items as TreeImportItem[]);
