@@ -1,0 +1,18 @@
+{
+  "checkedAt": "2026-11-05T15:22:27.985Z",
+  "checks": [
+    "All16 headline/gap/workflow numbers open their complete actual matching fixture lists; Escape returns focus",
+    "All workflow Operations links and all8 priority people/facts stay directly reachable",
+    "Save view stores only owner-keyed metric/search/presentation metadata, with persistence disclosure and nested-dialog focus",
+    "Open as a view preserves the metric/search on the existing Audit route and saved views are discoverable from instruments",
+    "Another owner fixture does not see saved Audit views; original owner retains them",
+    "Unknown view falls back visibly to instruments",
+    "Zero-count metric opens an honest empty list; empty priority state preserved",
+    "Failed matching read stays unavailable with retry, never becomes a false zero",
+    "Bounded50-row pages load all120 matches without losing total or duplicating rows",
+    "Dashboard, full-height record sheet and nested Save view fit1440/1280/390/320px in light and dark"
+  ],
+  "errors": [],
+  "unexpectedAPIs": [],
+  "note": "Invented data only. No API request allowed through; not backend acceptance."
+}

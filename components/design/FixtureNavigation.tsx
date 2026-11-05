@@ -3,7 +3,7 @@ import {useEffect,type ReactNode} from "react";
 /** Synthetic harness only: keep real production link targets in markup while routing list navigation to invented fixtures. */
 export function FixtureNavigation({surface,children,theme}:{surface:string;children:ReactNode;theme?:string}) {
  useEffect(()=>{const previous=document.documentElement.classList.contains("dark");document.documentElement.classList.toggle("dark",theme==="dark");return()=>{document.documentElement.classList.toggle("dark",previous);};},[theme]);
- const routes:Record<string,string>={"/app":"home","/app/operations":"operations","/app/queue":"queue","/app/people":"people","/app/places":"places","/app/stories":"stories","/app/research":"research","/app/story-writer":"writing"};
+ const routes:Record<string,string>={"/app":"home","/app/audit":"audit","/app/operations":"operations","/app/queue":"queue","/app/people":"people","/app/places":"places","/app/stories":"stories","/app/research":"research","/app/story-writer":"writing"};
  return <div onSubmitCapture={e=>{const form=e.target as HTMLFormElement;if(form.method.toLowerCase()!=="get")return;
   const action=new URL(form.action||location.href);if(routes[action.pathname])form.action="/design-council-preview";
   const current=new URL(location.href);for(const [name,value] of Object.entries({surface,theme:theme||"",fixtureOwner:current.searchParams.get("fixtureOwner")||""})){

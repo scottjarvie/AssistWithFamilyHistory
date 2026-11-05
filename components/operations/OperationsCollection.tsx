@@ -14,7 +14,7 @@ const columns:CollectionColumn<Row>[]=[
  {key:"next",label:"Next action",width:220,compactRender:()=>null,render:r=>r.nextActions.length?<ul className="space-y-2">{r.nextActions.map(x=><li key={x}>{x}</li>)}</ul>:"Queue is clear for this row."},
  {key:"type",label:"Type",width:112,compactRender:()=>null,render:r=><><span className={r.rowType==="provisional"?"text-warning":""}>{r.rowType==="person"?"Canonical person":"Provisional relative"}</span><span className="mt-1 block text-xs text-muted-foreground">{label(r.badge)}</span></>,sortValue:r=>r.rowType},
  {key:"places",label:"Places",width:120,compactRender:()=>null,render:r=>r.places.join(" · ")||"No known places",sortValue:r=>r.places.join(" ")},
- {key:"coverage",label:"Coverage",width:88,compactRender:()=>null,render:r=><span className="font-mono">{r.coverage}%{r.stale>0&&<span className="mt-1 block font-sans text-xs text-warning">{count(r.stale,"stale check")}</span>}</span>,sortValue:r=>r.coverage},
+ {key:"coverage",label:"Coverage",width:120,compactRender:()=>null,render:r=><span className="font-mono">{r.coverage}%{r.stale>0&&<span className="mt-1 block whitespace-nowrap font-sans text-xs text-warning">{count(r.stale,"stale check")}</span>}</span>,sortValue:r=>r.coverage},
  {key:"evidence",label:"Evidence",width:108,compactRender:()=>null,render:r=><Evidence row={r}/>,sortValue:r=>r.sources},
  {key:"workflow",label:"Story state",width:124,compactRender:()=>null,render:workflow,sortValue:workflow},
  {key:"missing",label:"Missing checks",width:128,compactRender:()=>null,render:r=>r.missing.length?<ul className="space-y-1 text-warning">{r.missing.map(x=><li key={x}>{label(x)}</li>)}</ul>:<span className="text-success">None critical</span>,sortValue:r=>r.missing.length},

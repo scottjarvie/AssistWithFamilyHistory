@@ -117,3 +117,7 @@ design-council/*/queue-review-fixes/
 
 # Shared collection / Queue corrections after Opus27bee8e.
 design-council/*/review-refinements/
+
+# Audit instrument capture tranche.
+design-council/*/audit-instruments/
+design-council/*/audit-baseline/

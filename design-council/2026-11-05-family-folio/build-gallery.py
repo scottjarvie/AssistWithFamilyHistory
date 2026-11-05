@@ -4,13 +4,15 @@ from datetime import datetime, timezone
 import html, json, base64, re, os, subprocess
 run=Path(__file__).resolve().parent
 rounds=sorted([p for p in run.glob('round-*') if re.fullmatch(r'round-\d+',p.name) and (p/'ours').exists()],key=lambda p:int(p.name.split('-')[1]),reverse=True)
-sections=[('Shared collection and Queue refinements',run/'review-refinements'),('Research Operations collection',run/'operations-records'),('Queue navigation and review fixes',run/'queue-review-fixes'),('Personal Queue views and thread',run/'queue-records'),('Record reader review refinements',run/'record-review-fixes'),('Place and Story records',run/'place-story-records'),('Record review refinements',run/'record-stream/current'),('Person dossier and evidence stream',run/'record-stream/reviewed-c187b04'),('Activity, facets and Home refinements',run/'activity-facets'),('Collection review fixes',run/'collection-fixes')]+[(p.name,p/'ours') for p in rounds]+[('Starting collections · reconstructed now',run/'baseline-reconstructed'),('Starting page · now',run/'baseline')]
+sections=[('Audit instruments',run/'audit-instruments'),('Audit original · reconstructed now',run/'audit-baseline'),('Shared collection and Queue refinements',run/'review-refinements'),('Research Operations collection',run/'operations-records'),('Queue navigation and review fixes',run/'queue-review-fixes'),('Personal Queue views and thread',run/'queue-records'),('Record reader review refinements',run/'record-review-fixes'),('Place and Story records',run/'place-story-records'),('Record review refinements',run/'record-stream/current'),('Person dossier and evidence stream',run/'record-stream/reviewed-c187b04'),('Activity, facets and Home refinements',run/'activity-facets'),('Collection review fixes',run/'collection-fixes')]+[(p.name,p/'ours') for p in rounds]+[('Starting collections · reconstructed now',run/'baseline-reconstructed'),('Starting page · now',run/'baseline')]
 images=[]; blocks=[]
 score_file=run/'scores.json'
 score_data=json.loads(score_file.read_text()) if score_file.exists() else {}
 params=json.loads((run/'params.json').read_text())
 weights={c['key']:c.get('weight',1) for c in params.get('categories',[])}
 def score_line(title):
+ if title=='Audit instruments': return 'Newest Audit instruments · all16 record-backed metrics, private minimal drilldowns and saved views verified; exact-head cross-model review pending; no formal score'
+ if title=='Audit original · reconstructed now': return 'Original Audit route JSX with invented data/current shared runtime · reconstructed comparison, not a historical frozen capture'
  if title=='Shared collection and Queue refinements': return 'Newest lead corrections from Opus27bee8e · desktop fit, staged facets and visible-order Queue navigation verified; next meaningful cross-model review pending; no formal score'
  if title=='Research Operations collection': return 'Reviewed at27bee8e · preservation/privacy accepted, required layout/filter fixes in newest tranche; original reviewed images retained'
  if title=='Queue navigation and review fixes': return 'Reviewed at27bee8e · earlier correctness fixes accepted; required history/visible-order refinements in newest tranche; original reviewed images retained'
@@ -40,7 +42,11 @@ def score_line(title):
 for title,folder in sections:
  cards=[]
  score=score_line(title)
- for image in sorted(folder.glob('*.png')):
+ ordered=sorted(folder.glob('*.png'))
+ if title=='Audit instruments':
+  first=['audit-instruments--desktop-light.png','audit-instruments--mobile-light.png']
+  ordered=sorted(ordered,key=lambda image:(first.index(image.name) if image.name in first else len(first),image.name))
+ for image in ordered:
   label=image.stem.replace('--',' · '); index=len(images)
   if os.environ.get('COUNCIL_INLINE_PREVIEW'):
    # Keep the portable gallery at original PNG quality. The inline renderer has

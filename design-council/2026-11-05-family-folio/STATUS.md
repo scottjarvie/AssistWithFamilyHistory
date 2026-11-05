@@ -1,4 +1,4 @@
-[Newest-first gallery](gallery.html) · Lead refinements:57/57 full steps,109 browser/controller checks,62 final captures and388-image gallery pass. Required27bee8e fixes implemented; next meaningful Opus review with Audit. All-page goal active; local only.
+[Newest-first gallery](gallery.html) · Audit implemented:57/57 full steps,17 browser/controller checks,23 new captures;411-image gallery updated. Frozen-head Opus review next. All-page goal active; local only.
 
 
 
@@ -120,3 +120,6 @@ Shared filters stage several values, retain typed search and Cancel focus, then 
 **57/57 full steps pass**, Node22,52s (`/tmp/awf-review-kit-full-verify.log`).109 browser/controller checks pass;62 fresh captures (including1440/1280,320/390 checks, dark, expanded actions/details) and388-image gallery checks/clean preview/display pass. All data invented, no API request reached a backend. Earlier equal-column calc() and expanded-button overflow were caught by stronger width/real-click checks and corrected; no failed attempt is counted as final evidence. Minor Coverage heading/noun wrapping at1280 remains visual polish for the Audit pass. Whole-site acceptance/audit/formal round2 remain pending.
 
 Pure Audit projection foundation now lives in lib/audit/records.ts, outside Convex's function-module directory;3 privacy/predicate/reference/pagination tests are in the normal test/coverage commands. No Audit backend/API/UI is wired yet. The next meaningful Audit review must cover these lead changes; no delegate per small fix. Latest work is local only; no Card/WO completed.
+
+
+Audit instruments tranche: six tests validate actual16-metric count/list parity, minimal owner-safe DTOs, strict new-detail authorization in both legacy modes, pagination and HTTP validation/cache behavior.10 UI +5 intercepted controller +2 Operations fit checks pass;21 candidate/2 reconstructed captures pass. First full run correctly caught missing protected-route registration; added the new read route to the existing middleware/check registry, then57/57 passed on Node22 in51s (`/tmp/awf-audit-full-verify.log`). No configured backend or production data used.411-image portable/inline gallery includes all388 previous images. Exact-head Opus review pending; formal round2/page-wide acceptance and separate audit remain open. AWF-0071 doing, no Cards/WOs completed. All local only.
