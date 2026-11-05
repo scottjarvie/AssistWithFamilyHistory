@@ -2446,3 +2446,58 @@ test.each((["candidate", "accepted", "conflict", "rejected"] as const).flatMap(s
   const real = await send(t, grant, job.importJobId, 3, { citations: [additive] }); expect(dry.counts).toEqual(real.counts); expect(real.counts.citations.updated).toBe(1);
   const after = await snapshot(); expect(after.facts).toEqual(before.facts); expect(after.citations).toEqual(before.citations); expect(after.links).toHaveLength(before.links.length + 1); expect(after.links).toEqual(expect.arrayContaining(before.links)); expect(after.facts[0].sourceId).toBe(after.citations[0].sourceId); expect(after.facts[0].status).toBe(status);
 });
+
+
+test.each(["nickname", "given", "alternateNames", "birth"])("new provider identity cannot refill manually cleared %s from another mapping", async field => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const original = await begin(t, grant);
+  const names = [{ given: "William", surname: "Synthetic", nickname: "Bill", preferred: true }, { given: "Alternate", surname: "Synthetic" }];
+  const person = { key: "P", living: false, names, facts: [{ key: "B", type: "birth", date: { original: "1900", year: 1900 } }] };
+  await send(t, grant, original.importJobId, 0, { persons: [person] }); const row = (await t.run(ctx => ctx.db.query("persons").collect()))[0];
+  if (field === "birth") await t.mutation(internal.persons.updateBirth, { id: row._id, birth: {} });
+  else if (field === "alternateNames") await t.mutation(internal.persons.update, { id: row._id, alternateNames: [] });
+  else await t.mutation(internal.persons.update, { id: row._id, name: { given: field === "given" ? "" : "William", surname: "Synthetic", ...(field === "given" ? { nickname: "Bill" } : {}) } });
+  const job = await t.mutation(internal.treeImport.beginTreeImport, { principal: principal(), grantId: grant, operationId: `begin-new-alias-${field}`, requestHash: `begin-new-alias-${field}`, input: { importKey: `new-alias-${field}`, system: "ancestry", label: "Synthetic new provider" } }) as any;
+  const snapshot = () => t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), events: await ctx.db.query("events").collect(), keys: await ctx.db.query("mcpRecordKeys").collect(), roles: await ctx.db.query("personEvents").collect() })); const before = await snapshot();
+  const batch: TreeImportBatch = { persons: [{ ...person, key: "A", otherIds: [{ system: "familysearch", id: "P" }] }] };
+  for (const dryRun of [true, false]) {
+    const result = await send(t, grant, job.importJobId, 0, batch, { dryRun }, `new-alias-clearing-${field}-${dryRun}`);
+    expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("PERSON_ALIAS_CLEARING_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before);
+    expect(await send(t, grant, job.importJobId, 0, batch, { dryRun }, `new-alias-clearing-${field}-${dryRun}`)).toEqual(dryRun ? result : { ...result, deduplicated: true }); expect(await snapshot()).toEqual(before);
+  }
+});
+
+test("alias clearing protection survives an earlier safe registration and planning chunks", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const original = await begin(t, grant);
+  await send(t, grant, original.importJobId, 0, { persons: [{ key: "P", living: false, names: [{ given: "William", surname: "Synthetic", nickname: "Bill" }] }] });
+  const person = (await t.run(ctx => ctx.db.query("persons").collect()))[0]; await t.mutation(internal.persons.update, { id: person._id, name: { given: "William", surname: "Synthetic" } });
+  const job = await t.mutation(internal.treeImport.beginTreeImport, { principal: principal(), grantId: grant, operationId: "begin-safe-then-unsafe-alias", requestHash: "begin-safe-then-unsafe-alias", input: { importKey: "safe-then-unsafe-alias", system: "ancestry", label: "Synthetic planning chunks" } }) as any;
+  const safe = { key: "A", living: false, names: [{ given: "William", surname: "Synthetic" }], otherIds: [{ system: "familysearch", id: "P" }] };
+  const batch: TreeImportBatch = { persons: [...Array.from({ length: 125 }, () => safe), { ...safe, names: [{ given: "William", surname: "Synthetic", nickname: "Bill" }] }] };
+  expect(chunkBatch(batch)).toHaveLength(2);
+  const before = await t.run(ctx => ctx.db.query("persons").collect()); const dry = await send(t, grant, job.importJobId, 0, batch, { dryRun: true }, "dry-safe-then-unsafe-alias"); expect(await t.run(ctx => ctx.db.query("persons").collect())).toEqual(before);
+  const result = await send(t, grant, job.importJobId, 0, batch); expect(dry.counts).toEqual(result.counts); expect(result.counts.persons).toMatchObject({ linked: 1, unchanged: 124, failed: 1 });
+  expect(result.results.find((row: any) => row.index === 125)).toMatchObject({ status: "failed", reason: expect.stringContaining("PERSON_ALIAS_CLEARING_REVIEW_REQUIRED") });
+  expect((await t.run(ctx => ctx.db.get(person._id)))!.name.nickname).toBeUndefined(); expect(await countRows(t, "persons")).toBe(1);
+});
+
+test("new provider identity can fill a field no prior import populated", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const original = await begin(t, grant);
+  await send(t, grant, original.importJobId, 0, { persons: [{ key: "P", living: false, names: [{ given: "William", surname: "Synthetic" }] }] });
+  const job = await t.mutation(internal.treeImport.beginTreeImport, { principal: principal(), grantId: grant, operationId: "begin-new-alias-blank", requestHash: "begin-new-alias-blank", input: { importKey: "new-alias-blank", system: "ancestry", label: "Synthetic blank field" } }) as any;
+  const batch: TreeImportBatch = { persons: [{ key: "A", living: false, names: [{ given: "William", surname: "Synthetic", nickname: "Bill" }], otherIds: [{ system: "familysearch", id: "P" }] }] };
+  const dry = await send(t, grant, job.importJobId, 0, batch, { dryRun: true }, "dry-new-alias-blank"); const real = await send(t, grant, job.importJobId, 0, batch); expect(dry.counts).toEqual(real.counts); expect(real.counts.persons.linked).toBe(1);
+  expect((await t.run(ctx => ctx.db.query("persons").collect()))[0].name.nickname).toBe("Bill"); expect(await countRows(t, "persons")).toBe(1);
+});
+
+test.each([false, true])("record baseline lookup is bounded and owner-scoped (foreign=%s)", async foreign => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const original = await begin(t, grant);
+  await send(t, grant, original.importJobId, 0, { persons: [{ key: "P", living: false, names: [{ given: "William", surname: "Synthetic" }] }] });
+  const person = (await t.run(ctx => ctx.db.query("persons").collect()))[0];
+  await t.run(async ctx => { for (let i = 0; i < 51; i++) await ctx.db.insert("mcpRecordKeys", { vaultOwnerId: foreign ? "synthetic-other-mapping-owner" : OWNER, recordType: "person", recordKey: `synthetic-prior-${i}`, recordId: String(person._id), lastImportedJson: "{}", externalKeyVersion: 2, createdAt: i, updatedAt: i }); });
+  const job = await t.mutation(internal.treeImport.beginTreeImport, { principal: principal(), grantId: grant, operationId: `begin-alias-bound-${foreign}`, requestHash: `begin-alias-bound-${foreign}`, input: { importKey: `alias-bound-${foreign}`, system: "ancestry", label: "Synthetic baseline bounds" } }) as any;
+  const batch: TreeImportBatch = { persons: [{ key: "A", living: false, names: [{ given: "William", surname: "Synthetic", prefix: "Dr" }], otherIds: [{ system: "familysearch", id: "P" }] }] };
+  const before = await t.run(ctx => ctx.db.get(person._id)); const dry = await send(t, grant, job.importJobId, 0, batch, { dryRun: true }, `dry-alias-bound-${foreign}`); expect(await t.run(ctx => ctx.db.get(person._id))).toEqual(before);
+  const result = await send(t, grant, job.importJobId, 0, batch); expect(dry.counts).toEqual(result.counts);
+  if (foreign) { expect(result.counts.persons.linked).toBe(1); expect((await t.run(ctx => ctx.db.get(person._id)))!.name.prefix).toBe("Dr"); }
+  else { expect(result.results[0]).toMatchObject({ status: "failed", reason: expect.stringContaining("PERSON_ALIAS_CLEARING_REVIEW_REQUIRED") }); expect(await t.run(ctx => ctx.db.get(person._id))).toEqual(before); }
+});

@@ -2206,7 +2206,8 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_owner", ["vaultOwnerId"])
-    .index("by_owner_type_key", ["vaultOwnerId", "recordType", "recordKey"]),
+    .index("by_owner_type_key", ["vaultOwnerId", "recordType", "recordKey"])
+    .index("by_owner_type_record", ["vaultOwnerId", "recordType", "recordId"]),
 
   /**
    * Guarded-rollout telemetry for calls that shadow mode would deny.

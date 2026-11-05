@@ -533,3 +533,13 @@ decisions and the source/citation invariant. The lookup is bounded through
 by_citation and includes planning state. Unchanged evidence may still gain
 a target without changing those source facts. Replay preserves semantic
 results and reports deduplicated=true, distinct from a first execution.
+
+Person blank fills now check bounded owner/record import histories when the
+incoming identity has no authority over a field. A known prior import value
+followed by an empty current field requires review before another identity
+can refill it. This also covers an alias registered earlier without that
+field, including dry planning across chunks. Other mappings are never
+adopted as write authority; genuinely unpopulated fields may still be filled.
+Acceptance cleanup now scans imports within its existing owner ceiling and
+refuses deletion of any selected grant referenced by a surviving import,
+including completed imports. It does not delete imports or broaden cleanup.

@@ -362,6 +362,23 @@ function mergeableObject(value: unknown): value is Record<string, unknown> {
     && !Object.hasOwn(value, "placeId") && !(Object.hasOwn(value, "kind") && Object.hasOwn(value, "id"));
 }
 
+function hasImportedValue(value: unknown): boolean {
+  if (isEmpty(value)) return false;
+  if (Array.isArray(value)) return value.some(hasImportedValue);
+  if (mergeableObject(value)) return Object.values(value).some(hasImportedValue);
+  return true;
+}
+
+/** An incoming key cannot claim authority over a blank another import once filled. */
+function restoresUntrackedClearing(current: unknown, incoming: unknown, prior: unknown, baseline: unknown, known: boolean): boolean {
+  if (incoming === undefined) return false;
+  if (mergeableObject(current) && mergeableObject(incoming) && mergeableObject(prior)) {
+    const primary = mergeableObject(baseline) ? baseline : {};
+    return Object.entries(incoming).some(([key, value]) => restoresUntrackedClearing(current[key], value, prior[key], primary[key], known && Object.hasOwn(primary, key)));
+  }
+  return !known && isEmpty(current) && hasImportedValue(incoming) && hasImportedValue(prior);
+}
+
 /** Supplied leaves refresh independently; omitted leaves and manual edits stay. */
 function mergeImportedValue(current: unknown, incoming: unknown, baseline: unknown, hasBaseline: boolean, mergeFacts = false): { value: unknown; baseline: unknown; hasBaseline: boolean; kept: boolean } {
   if (same(current, incoming)) return { value: current, baseline, hasBaseline, kept: false };
@@ -464,6 +481,23 @@ async function upsertRow(
     q.eq("vaultOwnerId", c.owner).eq("recordType", RECORD_TYPE[args.singular]).eq("recordKey", mapKey),
   ).unique();
   const baseline = plannedBaseline ? c.baselines.get(mapKey) : mapping?.lastImportedJson ? JSON.parse(mapping.lastImportedJson) : null;
+  if (args.table === "persons") {
+    const wouldFill = (prior: Record<string, unknown>) => Object.entries(args.doc).some(([field, value]) => field !== "externalIds"
+      && restoresUntrackedClearing((row as any)[field], value, prior[field], baseline?.[field], !!baseline && Object.hasOwn(baseline, field)));
+    if (wouldFill(args.doc)) {
+      const max = FAMILY_HISTORY_MCP_LIMITS.contextRows;
+      const mappings = isPlaceholder(args.existingId) ? [] : await c.ctx.db.query("mcpRecordKeys")
+        .withIndex("by_owner_type_record", q => q.eq("vaultOwnerId", c.owner).eq("recordType", "person").eq("recordId", args.existingId!)).take(max + 1);
+      const priors = new Map<string, Record<string, unknown> | null>();
+      for (const prior of mappings) priors.set(prior.recordKey, c.baselines.has(prior.recordKey) ? c.baselines.get(prior.recordKey)! : prior.lastImportedJson ? JSON.parse(prior.lastImportedJson) : null);
+      for (const [key, prior] of c.baselines) if (c.local.get(key) === args.existingId) priors.set(key, prior);
+      priors.delete(mapKey);
+      if (mappings.length > max || [...priors.values()].some(prior => prior && wouldFill(prior))) {
+        fail("PERSON_ALIAS_CLEARING_REVIEW_REQUIRED", "This identity cannot safely refill a person field cleared after an earlier import.",
+          "Review the person and its import identities before restoring the field. This person item saved nothing; no alias was registered or original value restored.");
+      }
+    }
+  }
   // Creation provenance is historical, never permission to replace later edits.
   // Legacy rows without a baseline conservatively retain populated fields.
   const imported: Record<string, unknown> = { ...(baseline ?? {}) };

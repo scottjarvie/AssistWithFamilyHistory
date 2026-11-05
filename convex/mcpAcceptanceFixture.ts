@@ -86,7 +86,7 @@ function assertRunKey(value: string) {
   return runKey;
 }
 
-async function boundedOwnerRows<T extends "persons" | "relationships" | "events" | "personEvents" | "sources" | "citations" | "citationLinks" | "sourceFacts" | "researchTasks" | "researchLog" | "queueItems" | "stories" | "storyReviewEvents" | "agentActivity" | "mcpOperations" | "mcpRecordKeys" | "media" | "documents" | "mcpGrants" | "notes">(
+async function boundedOwnerRows<T extends "persons" | "relationships" | "events" | "personEvents" | "sources" | "citations" | "citationLinks" | "sourceFacts" | "researchTasks" | "researchLog" | "queueItems" | "stories" | "storyReviewEvents" | "agentActivity" | "mcpOperations" | "mcpRecordKeys" | "media" | "documents" | "mcpGrants" | "notes" | "treeImports">(
   ctx: FixtureCtx,
   table: T,
   owner: string,
@@ -139,7 +139,7 @@ async function fixtureGraph(ctx: FixtureCtx, runKeyInput: string) {
   const owner = assertAcceptanceDeployment();
   const runKey = assertRunKey(runKeyInput);
   const graph = await mappedRows(ctx, runKey, owner);
-  const [queueRows, operations, activity, personEvents, citationLinks, reviewEvents, allRelationships, allSourceFacts, allResearchTasks, allResearchLog, allStories, allMedia, allDocuments, allGrants, allNotes] = await Promise.all([
+  const [queueRows, operations, activity, personEvents, citationLinks, reviewEvents, allRelationships, allSourceFacts, allResearchTasks, allResearchLog, allStories, allMedia, allDocuments, allGrants, allNotes, allImports] = await Promise.all([
     boundedOwnerRows(ctx, "queueItems", owner),
     boundedOwnerRows(ctx, "mcpOperations", owner),
     boundedOwnerRows(ctx, "agentActivity", owner),
@@ -155,6 +155,7 @@ async function fixtureGraph(ctx: FixtureCtx, runKeyInput: string) {
     boundedOwnerRows(ctx, "documents", owner),
     boundedOwnerRows(ctx, "mcpGrants", owner),
     boundedOwnerRows(ctx, "notes", owner),
+    boundedOwnerRows(ctx, "treeImports", owner),
   ]);
   if (graph.mappings.length > 20) {
     throw new Error("Refusing cleanup because the marked MCP record graph exceeded its safety ceiling.");
@@ -253,6 +254,9 @@ async function fixtureGraph(ctx: FixtureCtx, runKeyInput: string) {
   }
   const grantIds = idSet(grants);
   const grantClientIds = new Set(grants.map((row) => row.clientId));
+  if (allImports.some(row => row.grantId && grantIds.has(String(row.grantId)))) {
+    throw new Error("Refusing cleanup because a surviving tree import references the marked connection.");
+  }
 
   // A client identifier shared with an unmarked connection is not this run's to
   // clean up: removing its cached registration would reach outside the fixture.

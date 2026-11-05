@@ -433,3 +433,34 @@ test("joined cleanup keeps the existing scan ceiling for notes", async () => {
   await t.run(async ctx => { const person = (await ctx.db.query("persons").collect())[0]; for (let i = 0; i < 101; i++) await ctx.db.insert("notes", { vaultOwnerId: OWNER, subject: { kind: "person", id: String(person._id) }, noteType: "general", text: `Original ${i}`, createdAt: i, updatedAt: i }); });
   await expect(t.withIdentity({ subject: OWNER }).mutation(api.mcpAcceptanceFixture.clear, { vaultOwnerId: OWNER, runKey: RUN_KEY, confirmation: FAMILY_HISTORY_ACCEPTANCE_CONFIRMATION })).rejects.toThrow("notes exceeded its bounded scan ceiling"); expect(await t.run(ctx => ctx.db.query("notes").collect())).toHaveLength(101);
 });
+
+
+test.each([false, true])("joined cleanup refuses a surviving import-to-marked-grant reference (completed=%s)", async completed => {
+  vi.stubEnv("CONVEX_CLOUD_URL", "https://accomplished-dodo-308.convex.cloud"); vi.stubEnv("TRUST_BOUNDARY_MODE", "enforce");
+  const t = convexTest({ schema, modules, transactionLimits: true }); await saveJoinedFixture(t);
+  const grant = (await t.run(ctx => ctx.db.query("mcpGrants").collect()))[0];
+  const job = await t.mutation(internal.treeImport.beginTreeImport, { principal: mcpPrincipal(), grantId: String(grant._id), operationId: `${RUN_KEY}:begin-tree-reference`, requestHash: "begin-tree-reference", input: { importKey: "surviving-tree-import", system: "familysearch", label: "Independent surviving import" } }) as { importJobId: string };
+  if (completed) await t.action(internal.treeImport.importTreeBatch, { principal: mcpPrincipal(), grantId: String(grant._id), operationId: `${RUN_KEY}:complete-tree-reference`, requestHash: "complete-tree-reference", input: { importJobId: job.importJobId, batchIndex: 0, final: true, persons: [{ key: "INDEPENDENT-PID", living: false, names: [{ given: "Independent" }] }] } });
+  const snapshot = () => t.run(async ctx => ({ imports: await ctx.db.query("treeImports").collect(), grants: await ctx.db.query("mcpGrants").collect(), keys: await ctx.db.query("mcpRecordKeys").collect(), operations: await ctx.db.query("mcpOperations").collect(), activity: await ctx.db.query("agentActivity").collect(), people: await ctx.db.query("persons").collect() })); const before = await snapshot();
+  expect(before.imports[0]).toMatchObject({ grantId: grant._id, status: completed ? "completed" : "open" });
+  const owner = t.withIdentity({ subject: OWNER });
+  await expect(owner.action(api.mcpAcceptanceFixture.inspect, { vaultOwnerId: OWNER, runKey: RUN_KEY })).rejects.toThrow("a surviving tree import references the marked connection");
+  await expect(owner.mutation(api.mcpAcceptanceFixture.clear, { vaultOwnerId: OWNER, runKey: RUN_KEY, confirmation: FAMILY_HISTORY_ACCEPTANCE_CONFIRMATION })).rejects.toThrow("a surviving tree import references the marked connection"); expect(await snapshot()).toEqual(before);
+});
+
+test("joined cleanup preserves an unrelated import and its unmarked grant", async () => {
+  vi.stubEnv("CONVEX_CLOUD_URL", "https://accomplished-dodo-308.convex.cloud"); vi.stubEnv("TRUST_BOUNDARY_MODE", "enforce");
+  const t = convexTest({ schema, modules, transactionLimits: true }); await saveJoinedFixture(t);
+  const clientId = "synthetic-unrelated-import-client"; const grantId = await seedGrant(t, { vaultOwnerId: OWNER, issuer: mcpPrincipal().issuer, clientId });
+  const job = await t.mutation(internal.treeImport.beginTreeImport, { principal: { ...mcpPrincipal(), clientId }, grantId, operationId: "unmarked-independent-import-begin", requestHash: "unmarked-independent-import-begin", input: { importKey: "unmarked-independent-import", system: "familysearch", label: "Unrelated import" } }) as { importJobId: string };
+  const before = await t.run(async ctx => { const id = ctx.db.normalizeId("treeImports", job.importJobId)!; return { job: await ctx.db.get(id), grant: await ctx.db.get(ctx.db.normalizeId("mcpGrants", grantId)!) }; });
+  await expect(t.withIdentity({ subject: OWNER }).mutation(api.mcpAcceptanceFixture.clear, { vaultOwnerId: OWNER, runKey: RUN_KEY, confirmation: FAMILY_HISTORY_ACCEPTANCE_CONFIRMATION })).resolves.toMatchObject({ removed: true });
+  expect(await t.run(async ctx => ({ job: await ctx.db.get(ctx.db.normalizeId("treeImports", job.importJobId)!), grant: await ctx.db.get(ctx.db.normalizeId("mcpGrants", grantId)!) }))).toEqual(before);
+});
+
+test("joined cleanup retains its scan ceiling for import references", async () => {
+  vi.stubEnv("CONVEX_CLOUD_URL", "https://accomplished-dodo-308.convex.cloud"); vi.stubEnv("TRUST_BOUNDARY_MODE", "enforce");
+  const t = convexTest({ schema, modules, transactionLimits: true }); await saveJoinedFixture(t);
+  await t.run(async ctx => { const grant = (await ctx.db.query("mcpGrants").collect())[0]; for (let i = 0; i < 101; i++) await ctx.db.insert("treeImports", { vaultOwnerId: OWNER, importKey: `import-bound-${i}`, system: "familysearch", label: "Synthetic bounded import", status: "open", nextBatchIndex: 0, recordsReceived: 0, duplicatesSuggested: 0, counts: {}, clientId: ACCEPTANCE_CLIENT_ID, grantId: grant._id, startedAt: i, updatedAt: i }); });
+  await expect(t.withIdentity({ subject: OWNER }).mutation(api.mcpAcceptanceFixture.clear, { vaultOwnerId: OWNER, runKey: RUN_KEY, confirmation: FAMILY_HISTORY_ACCEPTANCE_CONFIRMATION })).rejects.toThrow("treeImports exceeded its bounded scan ceiling"); expect(await t.run(ctx => ctx.db.query("treeImports").collect())).toHaveLength(101);
+});
