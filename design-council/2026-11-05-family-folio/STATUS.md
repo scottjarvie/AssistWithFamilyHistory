@@ -1,4 +1,4 @@
-[Newest-first gallery](gallery.html) · Settings batch:57/57 full steps,17 intercepted browser groups +11 Audit regressions,45 new candidate images and8 reconstructed originals.486-image gallery interactions pass; inline display and exact-head review pending admission. All-page goal active; local only.
+[Newest-first gallery](gallery.html) · Settings code committed atfe77e07:57/57 full steps,17 intercepted browser groups +11 Audit regressions,45 new candidate images and8 reconstructed originals.486-image gallery checks/clean preview/inline display pass. Exact-head review packet ready; Claude not woken under current instruction. All-page goal active; local only.
 
 [Newest-first gallery](gallery.html) · Audit refinements committed atb5058bb:57/57 full steps,60 browser checks,22 fresh captures;433-image gallery checks/preview/display pass. Opus accepts preservation/privacy and prior Queue/Operations fixes; next meaningful review with Settings. All-page goal active; local only.
 
@@ -131,3 +131,7 @@ Exact-head Opus review complete at030963f4d1b9bc098846a0ae5553fe1f05fda426: all 
 
 
 Final lead correction tranche: A-R1–A-R3 and all Audit should-fixes are implemented and verified. Source fixture consistency corrected (two linked citations belong to the synthetic person with two sources), targeted probe/all22 captures repeated, then57/57 full verification passes Node22 in60s.60 browser/controller checks pass, including real Next navigation, same-route saved search, multi-metric save/remove, retry/sign-in,320/390 compact rows and existing collection/Operations regressions.433-image gallery preserves all411 prior images. Full code review of these lead corrections joins the next meaningful Settings batch; no new tiny-fix delegate. AWF-0071 doing, audit not audited, no Cards/WOs complete. No push/PR/merge/deploy.
+
+## Frozen Settings receipt · newest tranche
+
+Code head fe77e07cf4e8183882854532b7e3e4afd0c37d86. Final57/57 full steps pass Node22 in49s;17 Settings/11 Audit browser groups and44 themed captures plus invented secret state pass. Gallery486 preserves all433 older images, newest first with numbered in-page lightbox/arrows/Escape; native interaction check and clean HTML preview/inline display completed. Compact-v3 JPEG adapter keeps inline attachment under its limit; portable gallery retains original PNGs. Exact-head packet: settings-review-packet.md, including b5058bb Audit fixes. No independent review or formal score invented; no Claude wake. AWF-0071 doing/audit not audited; AWF-0073 backlog. No completed Work Order, no release. Next long route: readers-next-route.md, then public/specialist families and full council. All source work stays local; no push/PR/merge/deploy, no reset/automatic95% pause.
