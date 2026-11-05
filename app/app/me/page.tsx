@@ -57,11 +57,11 @@ export default async function YourStatsPage() {
   }
 
   const tiles = [
-    { label: "People", value: formatCount(stats.people.count, stats.people.more), href: "/app/people", note: `${stats.people.living.toLocaleString("en-US")} marked living` },
+    { label: "People", value: formatCount(stats.people.count, stats.people.more), href: "/app/people", note: `${formatCount(stats.people.living, stats.people.more)} marked living` },
     { label: "Relationships", value: formatCount(stats.relationships.count, stats.relationships.more), href: "/app/people", note: "Couples and parent-child links" },
     { label: "Sources", value: formatCount(stats.sources.count, stats.sources.more), href: "/app/source-docs", note: `${formatCount(stats.citations.count, stats.citations.more)} citations` },
-    { label: "Stories", value: formatCount(stats.stories.count, stats.stories.more), href: "/app/stories", note: `${stats.stories.byStatus.published ?? 0} published` },
-    { label: "Queue", value: formatCount(stats.queue.count, stats.queue.more), href: "/app/queue", note: `${stats.queue.byState.needs_you ?? 0} need your input` },
+    { label: "Stories", value: formatCount(stats.stories.count, stats.stories.more), href: "/app/stories", note: `${formatCount(stats.stories.byStatus.published ?? 0, stats.stories.more)} published` },
+    { label: "Queue", value: formatCount(stats.queue.count, stats.queue.more), href: "/app/queue", note: `${formatCount(stats.queue.byState.needs_you ?? 0, stats.queue.more)} need your input` },
   ];
 
   return (
@@ -70,8 +70,7 @@ export default async function YourStatsPage() {
         <p className="text-sm font-medium uppercase tracking-wide text-stone-500">Your stats</p>
         <h1 className="text-3xl font-semibold text-stone-900">Your family history, counted</h1>
         <p className="max-w-2xl text-stone-600">
-          Everything here is private to you. Counts come straight from your workspace; very large
-          collections show a plus sign once they pass what one page reads.
+          Everything here is private to you. A plus sign means there may be more than the count shown.
         </p>
       </header>
 
@@ -101,15 +100,15 @@ export default async function YourStatsPage() {
           </CardHeader>
           <CardContent className="space-y-2 text-sm text-stone-700">
             <p>
-              <strong>{stats.ai.activeConnections}</strong> active connection{stats.ai.activeConnections === 1 ? "" : "s"}.{" "}
+              <strong>{formatCount(stats.ai.activeConnections, stats.ai.connectionsCapped)}</strong> active connection{stats.ai.activeConnections === 1 ? "" : "s"}.{" "}
               <Link className="underline" href="/app/settings/ai">Manage connections</Link>
             </p>
             <p>
               <strong>{formatCount(stats.ai.savesLast30Days, stats.ai.savesCapped)}</strong> saves in the last 30 days.
             </p>
             <p>
-              <strong>{stats.people.byYourAi.toLocaleString("en-US")}</strong> people were added by your AI,{" "}
-              {stats.people.fromImports.toLocaleString("en-US")} of them through an import.
+              <strong>{formatCount(stats.people.byYourAi, stats.people.more)}</strong> people were added by your AI.{" "}
+              {formatCount(stats.people.fromImports, stats.people.more)} people came through an import.
             </p>
           </CardContent>
         </Card>
@@ -123,7 +122,7 @@ export default async function YourStatsPage() {
               {Object.entries(QUEUE_LABELS).map(([state, label]) => (
                 <li key={state} className="flex justify-between">
                   <span>{label}</span>
-                  <span className="font-medium">{stats.queue.byState[state] ?? 0}</span>
+                  <span className="font-medium">{formatCount(stats.queue.byState[state] ?? 0, stats.queue.more)}</span>
                 </li>
               ))}
             </ul>
