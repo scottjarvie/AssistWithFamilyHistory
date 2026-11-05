@@ -21,6 +21,7 @@ export const create = mutation({
           surname: v.string(),
           suffix: v.optional(v.string()),
           prefix: v.optional(v.string()),
+          nickname: v.optional(v.string()),
         })
       )
     ),
@@ -36,6 +37,7 @@ export const create = mutation({
             month: v.optional(v.number()),
             day: v.optional(v.number()),
             approximate: v.optional(v.boolean()),
+            range: v.optional(v.boolean()),
           })
         ),
         place: v.optional(
@@ -57,6 +59,7 @@ export const create = mutation({
             month: v.optional(v.number()),
             day: v.optional(v.number()),
             approximate: v.optional(v.boolean()),
+            range: v.optional(v.boolean()),
           })
         ),
         place: v.optional(
@@ -215,6 +218,7 @@ export const update = mutation({
           surname: v.string(),
           suffix: v.optional(v.string()),
           prefix: v.optional(v.string()),
+          nickname: v.optional(v.string()),
         })
       )
     ),
@@ -230,6 +234,7 @@ export const update = mutation({
             month: v.optional(v.number()),
             day: v.optional(v.number()),
             approximate: v.optional(v.boolean()),
+            range: v.optional(v.boolean()),
           })
         ),
         place: v.optional(
@@ -251,6 +256,7 @@ export const update = mutation({
             month: v.optional(v.number()),
             day: v.optional(v.number()),
             approximate: v.optional(v.boolean()),
+            range: v.optional(v.boolean()),
           })
         ),
         place: v.optional(
@@ -300,6 +306,7 @@ export const updateBirth = mutation({
           month: v.optional(v.number()),
           day: v.optional(v.number()),
           approximate: v.optional(v.boolean()),
+          range: v.optional(v.boolean()),
         })
       ),
       place: v.optional(
@@ -334,6 +341,7 @@ export const updateDeath = mutation({
           month: v.optional(v.number()),
           day: v.optional(v.number()),
           approximate: v.optional(v.boolean()),
+          range: v.optional(v.boolean()),
         })
       ),
       place: v.optional(

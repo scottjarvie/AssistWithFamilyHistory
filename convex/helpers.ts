@@ -36,6 +36,7 @@ export const createPersonWithBirth = mutation({
         month: v.optional(v.number()),
         day: v.optional(v.number()),
         approximate: v.optional(v.boolean()),
+        range: v.optional(v.boolean()),
       })
     ),
     birthPlace: v.optional(
@@ -113,6 +114,7 @@ export const createCoupleWithMarriage = mutation({
         month: v.optional(v.number()),
         day: v.optional(v.number()),
         approximate: v.optional(v.boolean()),
+        range: v.optional(v.boolean()),
       })
     ),
     marriagePlace: v.optional(

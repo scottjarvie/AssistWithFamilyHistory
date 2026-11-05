@@ -333,6 +333,33 @@ function mergeExternalIds(existing: ExternalId[] | undefined, incoming: External
 
 type UpsertOutcome = { id: string; status: ItemResult["status"]; kept?: string[] };
 
+function mergeableObject(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value)
+    && !Object.hasOwn(value, "placeId") && !(Object.hasOwn(value, "kind") && Object.hasOwn(value, "id"));
+}
+
+/** Supplied leaves refresh independently; omitted leaves and manual edits stay. */
+function mergeImportedValue(current: unknown, incoming: unknown, baseline: unknown, hasBaseline: boolean): { value: unknown; baseline: unknown; hasBaseline: boolean; kept: boolean } {
+  if (same(current, incoming)) return { value: current, baseline, hasBaseline, kept: false };
+  if (mergeableObject(current) && mergeableObject(incoming)) {
+    const value: Record<string, unknown> = { ...current };
+    const old: Record<string, unknown> = hasBaseline && mergeableObject(baseline) ? baseline : {};
+    const imported: Record<string, unknown> = { ...old };
+    let known = hasBaseline;
+    let kept = false;
+    for (const [key, supplied] of Object.entries(incoming)) {
+      if (supplied === undefined) continue;
+      const next = mergeImportedValue(current[key], supplied, old[key], Object.hasOwn(old, key));
+      value[key] = next.value;
+      if (next.hasBaseline) { imported[key] = next.baseline; known = true; }
+      kept ||= next.kept;
+    }
+    return { value, baseline: imported, hasBaseline: known, kept };
+  }
+  if (hasBaseline ? same(current, baseline) : isEmpty(current)) return { value: incoming, baseline: incoming, hasBaseline: true, kept: false };
+  return { value: current, baseline, hasBaseline, kept: true };
+}
+
 /**
  * Refresh only fields still equal to their last imported value. Manual edits
  * and legacy populated fields are retained, with disagreements reported back.
@@ -384,12 +411,12 @@ async function upsertRow(
       if (!same(merged, current)) patch.externalIds = merged;
       continue;
     }
-    if (same(current, value)) continue;
-    if (baseline && Object.hasOwn(baseline, field) ? same(current, baseline[field]) : isEmpty(current)) {
-      patch[field] = value;
-      imported[field] = value;
+    const next = mergeImportedValue(current, value, baseline?.[field], !!baseline && Object.hasOwn(baseline, field));
+    if (!same(current, next.value)) {
+      patch[field] = next.value;
+      if (next.hasBaseline) imported[field] = next.baseline;
     }
-    else kept.push(field);
+    if (next.kept) kept.push(field);
   }
   if (args.linked) await remember(c, args.singular, args.key, String(row._id));
   if (Object.keys(patch).length > 0) {
@@ -408,6 +435,27 @@ async function upsertRow(
 function factDescription(fact: { value?: string; description?: string }) {
   if (fact.value && fact.description) return `${fact.value}. ${fact.description}`;
   return fact.value || fact.description || fact.value;
+}
+
+async function effectiveFactInput(c: ChunkContext, personKey: string, fact: any) {
+  if (typeof fact?.type !== "string" || !fact.type.trim()) return fact;
+  const key = factKeyFor(personKey, fact);
+  const singular = fact.key?.trim() ? "fact" : "factGenerated";
+  const id = await lookup(c, singular, key);
+  const previous = id ? await ownedRow(c, "events", id) : null;
+  if (!previous?.importedFact) return fact;
+  const mapKey = externalRecordKey(c.job.system, singular, key, c.job.importKey);
+  const mapping = c.baselines.has(mapKey) ? null : await c.ctx.db.query("mcpRecordKeys").withIndex("by_owner_type_key", q => q.eq("vaultOwnerId", c.owner).eq("recordType", "event").eq("recordKey", mapKey)).unique();
+  const baseline = c.baselines.has(mapKey) ? c.baselines.get(mapKey) : mapping?.lastImportedJson ? JSON.parse(mapping.lastImportedJson) : null;
+  const oldDate = previous.importedFact.date;
+  if (oldDate && fact.date && oldDate.original !== fact.date.original) {
+    const omitted = Object.keys(oldDate).filter(field => field !== "original" && (oldDate as any)[field] !== undefined && fact.date[field] === undefined);
+    const dateBaseline = baseline?.importedFact?.date;
+    const date = mergeImportedValue(oldDate, fact.date, dateBaseline, !!baseline?.importedFact && Object.hasOwn(baseline.importedFact, "date"));
+    if (omitted.length || date.kept) fail("FACT_DATE_CONFIRMATION_REQUIRED", "Changed fact date text cannot carry omitted or conflicting structured date metadata.",
+      "Review and resubmit the complete corrected date, including retained structured fields. This person/fact item saved nothing.");
+  }
+  return mergeImportedValue(previous.importedFact, fact, baseline?.importedFact, !!baseline && Object.hasOwn(baseline, "importedFact")).value as any;
 }
 
 /** A FamilySearch mapping never outranks an existing owned PID identity. */
@@ -430,7 +478,24 @@ async function importPerson(c: ChunkContext, item: any): Promise<Omit<ItemResult
   const key = requiredKey(item?.key, "key");
   if (!Array.isArray(item?.names) || item.names.length === 0) fail("VALIDATION_ERROR", "A person needs at least one name.", "Send names with given and surname as the site shows them.");
   if (typeof item.living !== "boolean") fail("VALIDATION_ERROR", "living must be true or false.", "Say whether the site marks this person as living.");
-  const facts: any[] = Array.isArray(item.facts) ? item.facts : [];
+  const facts: any[] = [];
+  const identities = new Map<string, any>();
+  for (const fact of (Array.isArray(item.facts) ? item.facts : []).slice(0, TREE_IMPORT_LIMITS.factsPerPerson)) {
+    if (typeof fact?.type === "string" && fact.type.trim()) {
+      const identity = JSON.stringify([fact.key?.trim() ? "explicit" : "generated", factKeyFor(key, fact)]);
+      if (identities.has(identity)) {
+        if (!same(identities.get(identity), fact)) fail("AMBIGUOUS_FACT_IDENTITY", "One person contains different assertions for the same fact identity.", "Combine the supplied fields into one fact before retrying; the original person and facts were retained.");
+        continue;
+      }
+      identities.set(identity, fact);
+    }
+    facts.push(fact);
+  }
+  const effectiveFacts = new Map<any, any>();
+  for (const type of ["birth", "death"]) {
+    const fact = facts.find(row => eventTypeFor(row?.type ?? "").type === type);
+    if (fact) effectiveFacts.set(fact, await effectiveFactInput(c, key, fact));
+  }
   const { name, alternateNames } = splitNames(item.names);
   if (!name.given && !name.surname) fail("VALIDATION_ERROR", "The preferred name is empty.", "Send at least a given name or a surname.");
   const embedded = (type: string) => {
@@ -439,7 +504,7 @@ async function importPerson(c: ChunkContext, item: any): Promise<Omit<ItemResult
     return clean({
       date: withYear(fact.date),
       place: fact.place?.original ? { original: fact.place.original } : undefined,
-      description: factDescription(fact),
+      description: fact.value !== undefined || fact.description !== undefined ? factDescription(effectiveFacts.get(fact) ?? fact) : undefined,
     });
   };
 
@@ -518,6 +583,7 @@ async function importFact(c: ChunkContext, personId: string, personKey: string, 
   const mapped = eventTypeFor(fact.type);
   const existingId = await lookup(c, singular, factKey);
   if (singular === "fact") await assertExplicitIdentity(c, "events", existingId, fact.key);
+  const effective = await effectiveFactInput(c, personKey, fact);
   const saved = await upsertRow(c, {
     table: "events",
     singular,
@@ -529,7 +595,7 @@ async function importFact(c: ChunkContext, personId: string, personKey: string, 
       importedFact: clean(fact),
       date: withYear(fact.date),
       place: fact.place?.original ? { original: fact.place.original } : undefined,
-      description: factDescription(fact),
+      description: fact.value !== undefined || fact.description !== undefined ? factDescription(effective) : undefined,
       externalIds: fact.key ? [{ system: c.job.system, id: String(fact.key) }] : undefined,
     },
     createOnly: { importKey: `import:${externalRecordKey(c.job.system, singular, factKey, c.job.importKey)}` },

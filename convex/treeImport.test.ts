@@ -1800,6 +1800,82 @@ test("dry imports leave the operation namespace unreserved", async () => {
   expect(await countRows(t, "treeImportReceipts")).toBe(0);
 });
 
+test.each(["birth", "death"].flatMap(type => [false, true].map(manual => ({ type, manual }))))("nested fact refresh preserves omitted fields and manual siblings ($type/$manual)", async ({ type, manual }) => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const person = { key: "P", living: false, names: [{ given: "Synthetic" }] };
+  await send(t, grant, job.importJobId, 0, { persons: [{ ...person, facts: [{ key: "F", type, date: { original: "1900" }, place: { original: "London" }, value: "Original value", description: "Original detail" }] }] });
+  if (manual) await t.run(async ctx => {
+    const p = (await ctx.db.query("persons").collect())[0]; const event = (await ctx.db.query("events").collect())[0];
+    await ctx.db.patch(p._id, { [type]: { ...(p as any)[type], place: { original: "Owner corrected place" } } });
+    await ctx.db.patch(event._id, { place: { original: "Owner corrected place" }, importedFact: { ...event.importedFact!, place: { original: "Owner corrected place" } } });
+  });
+  const snapshot = () => t.run(async ctx => ({ person: (await ctx.db.query("persons").collect())[0], event: (await ctx.db.query("events").collect())[0] }));
+  const before = await snapshot();
+  const batch: TreeImportBatch = { persons: [{ ...person, facts: [{ key: "F", type, date: { original: "1901" } }] }] };
+  const dry = await send(t, grant, job.importJobId, 1, batch, { dryRun: true }, `dry-partial-${type}-${manual}`);
+  expect(await snapshot()).toEqual(before);
+  const real = await send(t, grant, job.importJobId, 1, batch);
+  expect(dry.counts).toEqual(real.counts);
+  expect(real.results).toEqual([expect.objectContaining({ status: "updated" })]);
+  let after = await snapshot(); const place = manual ? "Owner corrected place" : "London";
+  expect((after.person as any)[type]).toMatchObject({ date: { original: "1901", year: 1901 }, place: { original: place }, description: "Original value. Original detail" });
+  expect(after.event).toMatchObject({ date: { original: "1901", year: 1901 }, place: { original: place }, description: "Original value. Original detail", importedFact: { key: "F", type, date: { original: "1901" }, place: { original: place }, value: "Original value", description: "Original detail" } });
+  await send(t, grant, job.importJobId, 2, { persons: [{ ...person, facts: [{ key: "F", type, value: "Updated value" }] }] });
+  after = await snapshot();
+  expect((after.person as any)[type]).toMatchObject({ date: { original: "1901" }, place: { original: place }, description: "Updated value. Original detail" });
+  expect(after.event.description).toBe("Updated value. Original detail");
+  expect(after.event.importedFact).toMatchObject({ date: { original: "1901" }, place: { original: place }, value: "Updated value", description: "Original detail" });
+  const replacement = await send(t, grant, job.importJobId, 3, { persons: [{ ...person, facts: [{ key: "F", type, place: { original: "New York" } }] }] });
+  after = await snapshot();
+  expect((after.person as any)[type].place.original).toBe(manual ? place : "New York");
+  expect(after.event.place?.original).toBe(manual ? place : "New York");
+  expect(after.event.importedFact?.place?.original).toBe(manual ? place : "New York");
+  if (manual) expect(replacement.results[0].kept).toEqual(expect.arrayContaining([type, "facts:P/F:place", "facts:P/F:importedFact"]));
+});
+
+test("nested refresh does not combine a changed place label with a retained linked identity", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const person = { key: "P", living: false, names: [{ given: "Synthetic" }] };
+  await send(t, grant, job.importJobId, 0, { persons: [{ ...person, facts: [{ key: "B", type: "birth", place: { original: "London" } }] }] });
+  const placeId = await t.run(async ctx => {
+    const id = await ctx.db.insert("places", { vaultOwnerId: OWNER, name: "London", fullName: "London, England", type: "city", createdAt: 1, updatedAt: 1 });
+    const p = (await ctx.db.query("persons").collect())[0]; const e = (await ctx.db.query("events").collect())[0];
+    await ctx.db.patch(p._id, { birth: { ...p.birth, place: { original: "London", placeId: id } } }); await ctx.db.patch(e._id, { place: { original: "London", placeId: id } }); return id;
+  });
+  const result = await send(t, grant, job.importJobId, 1, { persons: [{ ...person, facts: [{ key: "B", type: "birth", place: { original: "Paris" } }] }] });
+  expect(result.results[0].kept).toEqual(expect.arrayContaining(["birth", "facts:P/B:place"]));
+  const stored = await t.run(async ctx => ({ person: (await ctx.db.query("persons").collect())[0], event: (await ctx.db.query("events").collect())[0] }));
+  expect(stored.person.birth?.place).toEqual({ original: "London", placeId }); expect(stored.event.place).toEqual({ original: "London", placeId });
+});
+
+test.each([false, true])("one person refuses conflicting duplicate fact identities and deduplicates identical assertions (%s)", async identical => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const fact = { key: "B", type: "birth", value: "First", description: "Original" };
+  const result = await send(t, grant, job.importJobId, 0, { persons: [{ key: "P", living: false, names: [{ given: "Synthetic" }], facts: [fact, { ...fact, value: identical ? "First" : "Second" }] }] });
+  if (identical) { expect(result.results[0].status).toBe("created"); expect(await countRows(t, "events")).toBe(1); }
+  else { expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("AMBIGUOUS_FACT_IDENTITY") })]); expect(await countRows(t, "persons")).toBe(0); expect(await countRows(t, "events")).toBe(0); }
+});
+
+test("changed date text requires compatible retained structured metadata", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const person = { key: "P", living: false, names: [{ given: "Synthetic" }] };
+  await send(t, grant, job.importJobId, 0, { persons: [{ ...person, facts: [{ key: "B", type: "birth", date: { original: "between 1900 and 1905", year: 1900, formal: "+1900/+1905", range: true } }] }] });
+  const snapshot = () => t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), events: await ctx.db.query("events").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() }));
+  const before = await snapshot();
+  const partial: TreeImportBatch = { persons: [{ ...person, facts: [{ key: "B", type: "birth", date: { original: "1901" } }] }] };
+  for (const dryRun of [true, false]) {
+    const result = await send(t, grant, job.importJobId, 1, partial, { dryRun }, `structured-date-${dryRun}`);
+    expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("FACT_DATE_CONFIRMATION_REQUIRED") })]);
+    expect(await snapshot()).toEqual(before);
+  }
+  const complete = { original: "1901", year: 1901, formal: "+1901", range: false };
+  const accepted = await send(t, grant, job.importJobId, 2, { persons: [{ ...person, facts: [{ key: "B", type: "birth", date: complete }] }] });
+  expect(accepted.results[0].status).toBe("updated");
+  const after = await snapshot();
+  expect(after.people[0].birth?.date).toEqual(complete); expect(after.events[0].date).toEqual(complete); expect(after.events[0].importedFact?.date).toEqual(complete);
+});
+
 test("citation link additions report updated, dry planning agrees, repeated targets stay idempotent", async () => {
   const t = convexTest({ schema, modules, transactionLimits: true });
   const grant = await seedGrant(t, { vaultOwnerId: OWNER });

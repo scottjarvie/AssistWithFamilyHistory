@@ -274,6 +274,7 @@ const dateValue = z.object({
   day: z.number().int().min(1).max(31).optional(),
   approximate: z.boolean().optional(),
 }).strict();
+const rangeDateValue = dateValue.extend({ range: z.boolean().optional() }).strict();
 // placeCreateKey names a place saved earlier in the same call (or under that
 // key before); the server swaps it for the place id before anything is stored.
 const placeRef = z.object({ original: z.string().min(1).max(500), placeId: id.optional(), placeCreateKey: createKey.optional() }).strict();
@@ -286,11 +287,11 @@ const personName = z.object({
 }).strict();
 const personFields = {
   name: personName.optional(),
-  alternateNames: z.array(z.object({ type: z.string().max(80), given: z.string().max(160), surname: z.string().max(160), suffix: z.string().max(80).optional(), prefix: z.string().max(80).optional() }).strict()).max(30).optional(),
+  alternateNames: z.array(z.object({ type: z.string().max(80), given: z.string().max(160), surname: z.string().max(160), suffix: z.string().max(80).optional(), prefix: z.string().max(80).optional(), nickname: z.string().max(160).optional() }).strict()).max(30).optional(),
   sex: z.enum(["male", "female", "unknown"]).optional(),
   living: z.boolean().optional(),
-  birth: z.object({ date: dateValue.optional(), place: placeRef.optional(), description: z.string().max(1_000).optional() }).strict().optional(),
-  death: z.object({ date: dateValue.optional(), place: placeRef.optional(), description: z.string().max(1_000).optional() }).strict().optional(),
+  birth: z.object({ date: rangeDateValue.optional(), place: placeRef.optional(), description: z.string().max(1_000).optional() }).strict().optional(),
+  death: z.object({ date: rangeDateValue.optional(), place: placeRef.optional(), description: z.string().max(1_000).optional() }).strict().optional(),
   researchStatus: z.enum(["not_started", "basic", "in_progress", "thorough", "complete"]).optional(),
   researchPriority: z.number().int().min(1).max(10).optional(),
   notes: optionalNotes,
@@ -303,7 +304,7 @@ const personSave = z.discriminatedUnion("mode", [
 
 const relationshipFact = z.object({
   type: z.string().min(1).max(120),
-  date: dateValue.optional(),
+  date: rangeDateValue.optional(),
   place: placeRef.optional(),
   description: z.string().max(1_000).optional(),
 }).strict();
@@ -508,7 +509,7 @@ const importExternalId = z.object({
   url: z.string().url().max(2_000).optional(),
 }).strict();
 const importPlace = z.object({ original: z.string().trim().min(1).max(500) }).strict();
-const importDate = dateValue.extend({ range: z.boolean().optional() }).strict();
+const importDate = rangeDateValue;
 const importFact = z.object({
   key: importKey.optional(),
   type: z.string().trim().min(1).max(200),

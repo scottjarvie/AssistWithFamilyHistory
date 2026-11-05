@@ -423,3 +423,13 @@ Every chunk and finalization validates that binding; completion replaces the
 reservation in place. Dry runs never reserve or write. Older orphaned chunk
 receipts are adopted only by their original job/request, preventing another
 job or MCP tool from taking an interrupted operation identity.
+
+Nested partial refreshes merge supplied leaves against their imported baselines,
+retaining omitted details and protecting actual manual edits. Linked place and
+record-reference objects stay atomic. Raw imported facts and embedded/event
+projections retain omitted components; value-only refreshes retain descriptions.
+Changed date text requires retained structured date metadata to be resubmitted
+without manual conflicts. Conflicting duplicate fact identities within one
+person refuse atomically; identical duplicates are idempotent. Public person
+and relationship writers plus legacy Convex date/name validators preserve
+imported range dates and alternate nicknames. Authorization is unchanged.

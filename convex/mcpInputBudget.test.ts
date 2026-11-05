@@ -122,8 +122,7 @@ test("public tree import preserves date ranges through birth death events and re
     runAction: (ref: any, args: any) => { actionCalls++; return t.action(ref, args); },
   } as any;
   const resolution: Parameters<typeof createFamilyHistoryServer>[2] = { state: "active", grant: { grantId, clientId: principal.clientId, issuer: principal.issuer, scopes: ["family_history:research:write"], boundary: { kind: "whole_workspace" } } };
-  const callBatch = async (input: any) => {
-    const name = "family_history_import_tree_batch";
+  const callTool = async (name: string, input: any) => {
     const handler = createMcpHandler(() => createFamilyHistoryServer(actionCtx, principal, resolution), { legacy: "stateless", responseMode: "json" });
     try {
       const response = await handler.fetch(new Request("https://range.example.test/mcp", { method: "POST", headers: { "content-type": "application/json", "mcp-protocol-version": "2026-07-28", "mcp-method": "tools/call", "mcp-name": name }, body: JSON.stringify({ jsonrpc: "2.0", id: "range", method: "tools/call", params: { name, arguments: input, _meta: { "io.modelcontextprotocol/protocolVersion": "2026-07-28", "io.modelcontextprotocol/clientInfo": { name: "range-test", version: "1" }, "io.modelcontextprotocol/clientCapabilities": {} } } }) }));
@@ -131,10 +130,11 @@ test("public tree import preserves date ranges through birth death events and re
       return await response.json() as any;
     } finally { await handler.close(); }
   };
+  const callBatch = (input: any) => callTool("family_history_import_tree_batch", input);
   const ranged = (original: string) => ({ original, range: true });
   const input = {
     operationId: "range-import", importJobId: job.importJobId, batchIndex: 0,
-    persons: [{ key: "P", living: false, names: [{ given: "Ranged" }], facts: [{ key: "birth", type: "birth", date: ranged("between 1900 and 1905") }, { key: "death", type: "death", date: ranged("between 1970 and 1975") }, { key: "occupation", type: "occupation", date: ranged("between 1920 and 1930") }] }, { key: "Q", living: false, names: [{ given: "Partner" }] }],
+    persons: [{ key: "P", living: false, names: [{ given: "Ranged", preferred: true }, { given: "Alternate", surname: "Synthetic", nickname: "Range nickname" }], facts: [{ key: "birth", type: "birth", date: ranged("between 1900 and 1905") }, { key: "death", type: "death", date: ranged("between 1970 and 1975") }, { key: "occupation", type: "occupation", date: ranged("between 1920 and 1930") }] }, { key: "Q", living: false, names: [{ given: "Partner" }] }],
     relationships: [{ key: "R", type: "Couple", person1Key: "P", person2Key: "Q", facts: [{ type: "Marriage", date: ranged("between 1925 and 1930") }] }],
   };
   const result = await callBatch(input);
@@ -148,8 +148,19 @@ test("public tree import preserves date ranges through birth death events and re
   expect(stored.events).toHaveLength(3);
   for (const event of stored.events) { expect(event.date?.range).toBe(true); expect(event.importedFact?.date?.range).toBe(true); }
   expect(stored.relationships[0].facts?.[0].date).toMatchObject(ranged("between 1925 and 1930"));
+  const roundtrip = await callTool("family_history_save_person", { operationId: "range-person-roundtrip", mode: "update", personId: String(person._id), expectedUpdatedAt: person.updatedAt, birth: person.birth, death: person.death, alternateNames: person.alternateNames, researchPriority: 4 });
+  expect(roundtrip.result.isError).not.toBe(true);
+  const hydrated = await t.run(ctx => ctx.db.get(person._id));
+  expect(hydrated?.birth).toEqual(person.birth); expect(hydrated?.death).toEqual(person.death); expect(hydrated?.alternateNames).toEqual(person.alternateNames);
+  expect(hydrated?.alternateNames?.[0].nickname).toBe("Range nickname");
+  expect(hydrated?.researchPriority).toBe(4);
+  // Legacy internal writer shape compatibility, not an authorization/user proof.
+  await t.mutation(internal.persons.update, { id: person._id, birth: hydrated!.birth, death: hydrated!.death, alternateNames: hydrated!.alternateNames, researchPriority: 5 });
+  const preserved = await t.run(ctx => ctx.db.query("persons").collect());
+  expect(preserved.find(row => row._id === person._id)?.birth).toEqual(person.birth);
+  expect(preserved.find(row => row._id === person._id)?.alternateNames?.[0].nickname).toBe("Range nickname");
   const invalid = await callBatch({ operationId: "range-invalid", importJobId: job.importJobId, batchIndex: 1, persons: [{ key: "INVALID", living: false, names: [{ given: "Invalid" }], facts: [{ type: "birth", date: { original: "1900", range: "yes" } }] }] });
   expect(invalid.error ?? invalid.result?.isError).toBeTruthy();
   expect(actionCalls).toBe(1);
-  expect(await t.run(ctx => ctx.db.query("persons").collect())).toEqual(stored.people);
+  expect(await t.run(ctx => ctx.db.query("persons").collect())).toEqual(preserved);
 });
