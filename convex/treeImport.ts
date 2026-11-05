@@ -740,7 +740,7 @@ async function importFact(c: ChunkContext, personId: string, personKey: string, 
   if (previous) {
     const current = await ownedRow(c, "events", saved.id);
     const assertion = ["type", "customType", "importedFact", "date", "place", "description"] as const;
-    if (current && assertion.some(field => !same(previous[field], current[field])) && await hasRetainedAttachments(c, "event", saved.id)) {
+    if (current && assertion.some(field => !same(previous[field], current[field])) && (!isEmpty(previous.notes) || await hasRetainedAttachments(c, "event", saved.id))) {
       fail("FACT_ATTRIBUTION_REVIEW_REQUIRED", "Changed fact assertions cannot inherit retained notes or citation evidence.",
         "Review the fact and its attachments with the person. This person/fact item saved nothing; its original assertions and attachments were retained.");
     }
@@ -1161,6 +1161,17 @@ async function importCitation(c: ChunkContext, item: any): Promise<Omit<ItemResu
       .withIndex("by_citation", q => q.eq("citationId", saved.id as Id<"citations">)).first();
     if (virtualFact || retainedFact) fail("CITATION_SOURCE_FACT_REVIEW_REQUIRED", "Changed citation evidence cannot replace the basis of retained source facts or human decisions.",
       "Review the citation and its source facts with the person. This citation item saved nothing; its original source, evidence and decisions were retained.");
+    // Stories retain citation IDs, including after human review/publication.
+    // There is no reverse array index: bound the owner scan and refuse when
+    // absence cannot be established, rather than silently changing its basis.
+    const storyLimit = FAMILY_HISTORY_MCP_LIMITS.contextRows;
+    const stories = isPlaceholder(saved.id) ? [] : await c.ctx.db.query("stories")
+      .withIndex("by_owner", q => q.eq("vaultOwnerId", c.owner)).take(storyLimit + 1);
+    const virtualStory = [...(c.w.rows?.values() ?? [])].some(row => row.vaultOwnerId === c.owner && Array.isArray(row.citationIds) && row.citationIds.includes(saved.id));
+    if (stories.length > storyLimit || virtualStory || stories.some(story => story.citationIds.includes(saved.id as Id<"citations">))) {
+      fail("CITATION_STORY_REVIEW_REQUIRED", "Changed citation evidence cannot replace the basis of retained stories or exceed the bounded story-reference check.",
+        "Review the citation and its stories with the person. This citation item saved nothing; original evidence, stories and review history were retained.");
+    }
     const persisted = isPlaceholder(saved.id) ? [] : await c.ctx.db.query("citationLinks")
       .withIndex("by_citation", q => q.eq("citationId", saved.id as Id<"citations">)).take(TREE_IMPORT_LIMITS.targetsPerCitation + 1);
     const virtual = [...(c.w.rows?.values() ?? [])].filter(row => row.citationId === saved.id && row.targetType);

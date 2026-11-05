@@ -543,3 +543,17 @@ adopted as write authority; genuinely unpopulated fields may still be filled.
 Acceptance cleanup now scans imports within its existing owner ceiling and
 refuses deletion of any selected grant referenced by a surviving import,
 including completed imports. It does not delete imports or broaden cleanup.
+
+
+Citation/story and legacy event-note attribution follow-up (2026-11-05):
+Changed citation evidence now refuses when an owned story retains its citation
+ID, including drafts and reviewed/published stories. The owner-index scan is
+bounded at 50 stories; more rows require review because absence of a reference
+cannot be proved within that ceiling. Unchanged evidence can still gain a target.
+Fact assertion changes also honor nonempty legacy events.notes, alongside
+separate notes and citation links, with whole-item rollback. No notes, stories,
+review history or originals are deleted or reassigned. Added 12 synthetic cases
+for story states/source and excerpt refresh, bounded scans, owner isolation,
+legacy event writer, replay, rollback and permitted refreshes. All remain UNRUN;
+fixture review/publication metadata is in-memory setup, not real user proof.
+No UI route/layout changes, provider calls, real database writes or deployment.

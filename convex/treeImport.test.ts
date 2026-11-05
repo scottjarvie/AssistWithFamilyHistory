@@ -2501,3 +2501,80 @@ test.each([false, true])("record baseline lookup is bounded and owner-scoped (fo
   if (foreign) { expect(result.counts.persons.linked).toBe(1); expect((await t.run(ctx => ctx.db.get(person._id)))!.name.prefix).toBe("Dr"); }
   else { expect(result.results[0]).toMatchObject({ status: "failed", reason: expect.stringContaining("PERSON_ALIAS_CLEARING_REVIEW_REQUIRED") }); expect(await t.run(ctx => ctx.db.get(person._id))).toEqual(before); }
 });
+
+
+test.each((["draft", "review", "published"] as const).flatMap(status => ["source", "excerpt"].map(field => ({ status, field }))))("citation refresh preserves $status story evidence and history ($field)", async ({ status, field }) => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const citation = { key: "C", sourceKey: "A", extractedText: "Original evidence about P", targets: [{ kind: "person" as const, key: "P" }] };
+  await send(t, grant, job.importJobId, 0, { persons: ["P", "Q"].map(key => ({ key, living: false, names: [{ given: key }] })), sources: ["A", "B"].map(key => ({ key, title: key })), citations: [citation] });
+  const rows = await t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), citations: await ctx.db.query("citations").collect() }));
+  const person = rows.people.find(row => row.fsId === "P")!;
+  const owner = t.withIdentity({ subject: OWNER });
+  const draft = await owner.mutation(api.vaultMutations.upsertStoryDraft, { vaultOwnerId: OWNER, personId: person._id, type: "biography", title: "Retained story", content: "Original assertion about P", status: "draft", generatedBy: "human" });
+  // In-memory legacy story state, not a publication bypass or actual human review.
+  await t.run(ctx => ctx.db.patch(draft.storyId, { citationIds: [rows.citations[0]._id], status, ...(status !== "draft" ? { reviewedAt: 1 } : {}), ...(status === "published" ? { lastPublishedAt: 2 } : {}) }));
+  await owner.mutation(api.vaultMutations.recordStoryReviewEvent, { vaultOwnerId: OWNER, storyId: draft.storyId, eventType: "status_change", fromStatus: "draft", toStatus: status, actorRole: "first_party_owner", humanReviewNote: "Synthetic retained history" });
+  const snapshot = () => t.run(async ctx => ({ citations: await ctx.db.query("citations").collect(), stories: await ctx.db.query("stories").collect(), history: await ctx.db.query("storyReviewEvents").collect(), links: await ctx.db.query("citationLinks").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  const noop = await send(t, grant, job.importJobId, 1, { citations: [citation] }); expect(noop.counts.citations.unchanged).toBe(1); expect(await snapshot()).toEqual(before);
+  const changed = { ...citation, ...(field === "source" ? { sourceKey: "B" } : { extractedText: "Replacement assertion" }) };
+  for (const dryRun of [true, false]) {
+    const operation = `story-evidence-${status}-${field}-${dryRun}`;
+    const result = await send(t, grant, job.importJobId, 2, { citations: [changed] }, { dryRun }, operation);
+    expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("CITATION_STORY_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before);
+    expect(await send(t, grant, job.importJobId, 2, { citations: [changed] }, { dryRun }, operation)).toEqual(dryRun ? result : { ...result, deduplicated: true }); expect(await snapshot()).toEqual(before);
+  }
+  const additive = { ...citation, targets: [...citation.targets, { kind: "person" as const, key: "Q" }] };
+  const dry = await send(t, grant, job.importJobId, 3, { citations: [additive] }, { dryRun: true }, `dry-story-additive-${status}-${field}`);
+  const real = await send(t, grant, job.importJobId, 3, { citations: [additive] }); expect(dry.counts).toEqual(real.counts); expect(real.counts.citations.updated).toBe(1);
+  const after = await snapshot(); expect(after.citations).toEqual(before.citations); expect(after.stories).toEqual(before.stories); expect(after.history).toEqual(before.history); expect(after.links).toHaveLength(before.links.length + 1);
+});
+
+test.each([50, 51])("citation story absence check is bounded at %s owned stories", async count => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const citation = { key: "C", sourceKey: "S", extractedText: "Original", targets: [{ kind: "person" as const, key: "P" }] };
+  await send(t, grant, job.importJobId, 0, { persons: [{ key: "P", living: false, names: [{ given: "P" }] }], sources: [{ key: "S", title: "S" }], citations: [citation] });
+  await t.run(async ctx => { for (let i = 0; i < count; i++) await ctx.db.insert("stories", { vaultOwnerId: OWNER, type: "biography", title: `Unrelated ${i}`, content: "Unrelated story", citationIds: [], status: "draft", generatedBy: "human", createdAt: 1, updatedAt: 1 }); });
+  const before = await t.run(ctx => ctx.db.query("citations").collect()); const batch = { citations: [{ ...citation, extractedText: "Corrected" }] };
+  const dry = await send(t, grant, job.importJobId, 1, batch, { dryRun: true }, `dry-story-bound-${count}`); expect(await t.run(ctx => ctx.db.query("citations").collect())).toEqual(before);
+  const real = await send(t, grant, job.importJobId, 1, batch); expect(dry.counts).toEqual(real.counts);
+  if (count === 51) {
+    expect(real.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("CITATION_STORY_REVIEW_REQUIRED") })]); expect(await t.run(ctx => ctx.db.query("citations").collect())).toEqual(before);
+  } else { expect(real.counts.citations.updated).toBe(1); expect((await t.run(ctx => ctx.db.query("citations").collect()))[0].extractedText).toBe("Corrected"); }
+});
+
+test("foreign stories do not crowd out the owner citation-reference check", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const citation = { key: "C", sourceKey: "S", extractedText: "Original", targets: [{ kind: "person" as const, key: "P" }] };
+  await send(t, grant, job.importJobId, 0, { persons: [{ key: "P", living: false, names: [{ given: "P" }] }], sources: [{ key: "S", title: "S" }], citations: [citation] });
+  await t.run(async ctx => { for (let i = 0; i < 51; i++) await ctx.db.insert("stories", { vaultOwnerId: "another-owner", type: "biography", title: `Foreign ${i}`, content: "Foreign story", citationIds: [], status: "published", generatedBy: "human", createdAt: 1, updatedAt: 1 }); });
+  const before = await t.run(ctx => ctx.db.query("stories").collect()); const batch = { citations: [{ ...citation, extractedText: "Corrected" }] };
+  const dry = await send(t, grant, job.importJobId, 1, batch, { dryRun: true }, "dry-foreign-stories"); const real = await send(t, grant, job.importJobId, 1, batch);
+  expect(dry.counts).toEqual(real.counts); expect(real.counts.citations.updated).toBe(1); expect(await t.run(ctx => ctx.db.query("stories").collect())).toEqual(before);
+});
+
+test.each(["value", "type"])("legacy inline event notes protect fact %s refresh atomically", async field => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const fact = { key: "F", type: "occupation", value: "Farmer" }; const person = { key: "P", living: false, names: [{ given: "Original" }], facts: [fact] };
+  await send(t, grant, job.importJobId, 0, { persons: [person] }); const event = (await t.run(ctx => ctx.db.query("events").collect()))[0];
+  // Existing owner writer under a synthetic test principal, not actual user proof.
+  await t.withIdentity({ subject: OWNER }).mutation(api.vaultMutations.upsertEvent, { vaultOwnerId: OWNER, importKey: event.importKey, type: event.type, description: event.description, notes: "Explanation of the Farmer assertion" });
+  const snapshot = () => t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), events: await ctx.db.query("events").collect(), roles: await ctx.db.query("personEvents").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  const noop = await send(t, grant, job.importJobId, 1, { persons: [person] }); expect(noop.counts.persons.unchanged).toBe(1); expect(await snapshot()).toEqual(before);
+  const changed = { ...person, names: [{ given: "Must roll back" }], facts: [{ ...fact, ...(field === "value" ? { value: "Teacher" } : { type: "residence" }) }] };
+  for (const dryRun of [true, false]) {
+    const operation = `legacy-event-note-${field}-${dryRun}`; const result = await send(t, grant, job.importJobId, 2, { persons: [changed] }, { dryRun }, operation);
+    expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("FACT_ATTRIBUTION_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before);
+    expect(await send(t, grant, job.importJobId, 2, { persons: [changed] }, { dryRun }, operation)).toEqual(dryRun ? result : { ...result, deduplicated: true }); expect(await snapshot()).toEqual(before);
+  }
+});
+
+test("empty legacy inline event notes do not prevent unattached fact refresh", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const person = { key: "P", living: false, names: [{ given: "P" }], facts: [{ key: "F", type: "occupation", value: "Farmer" }] };
+  await send(t, grant, job.importJobId, 0, { persons: [person] }); const event = (await t.run(ctx => ctx.db.query("events").collect()))[0];
+  await t.withIdentity({ subject: OWNER }).mutation(api.vaultMutations.upsertEvent, { vaultOwnerId: OWNER, importKey: event.importKey, type: event.type, description: event.description, notes: "" });
+  const changed = { ...person, facts: [{ ...person.facts[0], value: "Teacher" }] }; const before = await t.run(ctx => ctx.db.query("events").collect());
+  const dry = await send(t, grant, job.importJobId, 1, { persons: [changed] }, { dryRun: true }, "dry-empty-event-note"); expect(await t.run(ctx => ctx.db.query("events").collect())).toEqual(before);
+  const real = await send(t, grant, job.importJobId, 1, { persons: [changed] }); expect(dry.counts).toEqual(real.counts); expect(real.counts.persons.updated).toBe(1);
+  expect((await t.run(ctx => ctx.db.query("events").collect()))[0]).toMatchObject({ _id: event._id, description: "Teacher", notes: "", importedFact: { type: "occupation", value: "Teacher" } });
+});
