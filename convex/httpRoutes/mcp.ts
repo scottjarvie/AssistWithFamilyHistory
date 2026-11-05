@@ -451,9 +451,11 @@ function compactPersonWorkspace(workspace: any) {
     places: (workspace.places ?? []).slice(0, cap),
     researchChecks: (workspace.researchChecks ?? []).slice(0, cap),
     operations: workspace.operations,
+    citationsWithheld: workspace.citationsWithheld ?? false,
+    citationReadTruncated: workspace.citationReadTruncated ?? false,
     stats: workspace.stats,
     privacyNote: living ? "Living-person notes are withheld from this context response. Reviewed AI-allowed context and media remain eligible." : "Private owner-scoped context. Only reviewed AI-allowed loose context and media are included.",
-    truncated: ["relationships", "events", "sources", "citations", "sourceFacts", "researchTasks", "researchLog", "stories", "places"].some((key) => (workspace[key]?.length ?? 0) > cap),
+    truncated: workspace.citationReadTruncated === true || ["relationships", "events", "sources", "citations", "sourceFacts", "researchTasks", "researchLog", "stories", "places"].some((key) => (workspace[key]?.length ?? 0) > cap),
   };
 }
 
@@ -905,6 +907,7 @@ export function createFamilyHistoryServer(
         const workspace = compactPersonWorkspace(await actionCtx.runQuery(vault.getPersonWorkspace, {
           vaultOwnerId: principal.subject,
           personIdentifier: input.id,
+          mcpCitationPrivacy: true,
         }));
         if (!workspace?.person?._id) return workspace;
         // The person as each record names them, and their typed connections.
@@ -918,9 +921,14 @@ export function createFamilyHistoryServer(
         const bundle = await actionCtx.runQuery(vault.getStoryReview, {
           vaultOwnerId: principal.subject,
           storyId: input.id as any,
+          mcpCitationPrivacy: true,
         });
         // The human review view retains history; AI context gets current media.
-        return bundle ? { ...bundle, media: bundle.media.map(currentMediaForExport) } : null;
+        return bundle ? { ...bundle,
+          person: bundle.person?.living ? { ...bundle.person, notes: undefined } : bundle.person,
+          relationships: bundle.relationships.map((row: any) => ({ ...row, relatedPerson: row.relatedPerson?.living ? { ...row.relatedPerson, notes: undefined } : row.relatedPerson })),
+          media: bundle.media.filter((row: any) => row.aiUseAllowed && ["reviewed", "redacted"].includes(row.reviewStatus) && row.privacyLevel !== "private" && row.rightsStatus !== "restricted").map(currentMediaForExport),
+        } : null;
       }
       return await actionCtx.runQuery(mcp.getRecordContext, { principal, kind: input.kind, id: input.id });
     });

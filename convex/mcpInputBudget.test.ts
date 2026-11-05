@@ -260,3 +260,39 @@ test("owner-scoped note reads cannot be crowded out by another vault's subject r
   const response = await f.callContext("event", f.ids.event); expect(response.result.structuredContent.notes).toEqual(expect.arrayContaining([expect.objectContaining({ text: "Owned note after foreign rows" })]));
   expect(response.result.structuredContent.truncated).toBe(false); expect(JSON.stringify(response)).not.toContain("Foreign private");
 });
+
+
+test.each(["privateMedia", "living", "foreign", "missing", "bounds", "sourceFactLiving"])("citation privacy cannot be bypassed by aggregated source/person/story context (%s)", async mode => {
+  const f = await importedNotesFixture(); const person = f.rows.people.find(row => row.fsId === "P")!;
+  const secret = `WITHHELD-CITATION-${mode}`; const secretUrl = `https://example.test/withheld-${mode}`;
+  const badTargets = mode === "privateMedia" ? [{ kind: "person", key: "P" }, { kind: "media", key: "M" }] : mode === "bounds" ? [{ kind: "person", key: "P" }, { kind: "fact", personKey: "P", key: "F", keyOrigin: "explicit" }] : mode === "sourceFactLiving" ? [{ kind: "person", key: "P" }] : [{ kind: "person", key: "P" }, { kind: "person", key: "L" }];
+  const imported = await f.batch(`context-privacy-${mode}`, 1, {
+    ...(mode === "privateMedia" || mode === "bounds" ? {} : { persons: [{ key: "L", living: true, names: [{ given: "Sensitive" }] }] }),
+    citations: [{ key: "BAD", sourceKey: "S", extractedText: secret, notes: `${secret}-notes`, url: secretUrl, targets: badTargets }, { key: "SAFE", sourceKey: "S", extractedText: "Visible safe citation", targets: [{ kind: "person", key: "P" }] }],
+  }) as any;
+  expect(imported.results.filter((row: any) => row.status === "failed")).toEqual([]);
+  const bad = imported.results.find((row: any) => row.kind === "citations" && row.key === "BAD");
+  const created = await f.t.run(async ctx => {
+    const badId = ctx.db.normalizeId("citations", bad.id)!;
+    const claimPerson = mode === "sourceFactLiving" ? (await ctx.db.query("persons").collect()).find(row => row.fsId === "L")! : person;
+    const sourceFactId = await ctx.db.insert("sourceFacts", { vaultOwnerId: f.principal.subject, personId: claimPerson._id, sourceId: f.rows.sources[0]._id, citationId: badId, importKey: `privacy-claim-${mode}`, factType: "birth", label: "Citation-backed claim", value: `${secret}-claim`, confidence: "high", status: "candidate", createdAt: 1, updatedAt: 1 });
+    const storyId = await ctx.db.insert("stories", { vaultOwnerId: f.principal.subject, personId: person._id, type: "biography", title: "Synthetic story", content: "No sensitive quotation in this story body.", citationIds: [badId], sourceFactIds: [String(sourceFactId)], status: "draft", generatedBy: "human", createdAt: 1, updatedAt: 1 });
+    if (mode === "foreign" || mode === "missing") { const l = (await ctx.db.query("persons").collect()).find(row => row.fsId === "L")!; if (mode === "foreign") await ctx.db.patch(l._id, { vaultOwnerId: "synthetic-other-citation-owner" }); else await ctx.db.delete(l._id); }
+    if (mode === "bounds") for (let i = 0; i < 50; i++) await ctx.db.insert("personEvents", { vaultOwnerId: f.principal.subject, personId: person._id, eventId: f.rows.events[0]._id, role: "primary", createdAt: i });
+    return { storyId, badId, sourceFactId };
+  });
+  const original = await f.t.run(ctx => ctx.db.get(created.badId));
+  const direct = await f.callContext("citation", bad.id); expect(direct.result.structuredContent.citation).toBeNull();
+  for (const [kind, id] of [["source", f.ids.source], ["person", String(person._id)], ["story", String(created.storyId)]]) {
+    const response = await f.callContext(kind, id); expect(response.result.isError).not.toBe(true); expect(response.result.structuredContent.citationsWithheld).toBe(true);
+    expect(JSON.stringify(response)).not.toContain(secret); expect(JSON.stringify(response)).not.toContain(secretUrl); expect(JSON.stringify(response)).toContain("Visible safe citation");
+    const internalContext = await f.t.query(internal.mcpFamilyHistory.getRecordContext, { principal: f.principal, kind, id }); expect(JSON.stringify(internalContext)).not.toContain(secret); expect(JSON.stringify(internalContext)).not.toContain(secretUrl);
+  }
+  // Ordinary owner review is still allowed to see originals. These are synthetic fixtures, not user/runtime proof.
+  const ownerView = await f.t.query(internal.vault.getPersonWorkspace, { vaultOwnerId: f.principal.subject, personIdentifier: String(person._id) }); expect(JSON.stringify(ownerView)).toContain(secret);
+  expect(await f.t.run(ctx => ctx.db.get(created.badId))).toEqual(original); expect(await f.t.run(ctx => ctx.db.get(created.sourceFactId))).not.toBeNull();
+  if (mode === "privateMedia") {
+    await f.reviewMedia();
+    for (const [kind, id] of [["citation", bad.id], ["source", f.ids.source], ["person", String(person._id)], ["story", String(created.storyId)]]) expect(JSON.stringify(await f.callContext(kind, id))).toContain(secret);
+  }
+});

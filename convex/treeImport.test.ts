@@ -2356,3 +2356,41 @@ test.each(["source", "excerpt", "target"])("explanatory citation notes prevent u
     expect(await send(t, grant, job.importJobId, 2, { citations: [changed] }, { dryRun }, `citation-note-attribution-${field}-${dryRun}`)).toEqual(result); expect(await snapshot()).toEqual(before);
   }
 });
+
+
+test.each(["birth", "death"].flatMap(type => ["exact", "nested", "unscoped", "unknown"].map(scope => ({ type, scope }))))("person $type refresh preserves $scope field citation attribution", async ({ type, scope }) => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const person = { key: "P", living: false, names: [{ given: "Original", surname: "Synthetic" }], facts: [{ key: "F", type, date: { original: "1900", year: 1900 } }] };
+  const field = scope === "exact" ? type : scope === "nested" ? `person.${type}.date.year` : scope === "unknown" ? "unclassified assertion" : undefined;
+  await send(t, grant, job.importJobId, 0, { persons: [person], sources: [{ key: "S", title: "1900 source" }], citations: [{ key: "C", sourceKey: "S", extractedText: "Evidence for 1900", targets: [{ kind: "person", key: "P", field }] }] });
+  const snapshot = () => t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), events: await ctx.db.query("events").collect(), notes: await ctx.db.query("notes").collect(), citations: await ctx.db.query("citations").collect(), links: await ctx.db.query("citationLinks").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  const noop = await send(t, grant, job.importJobId, 1, { persons: [person] }); expect(noop.counts.persons.unchanged).toBe(1); expect(await snapshot()).toEqual(before);
+  const batch: TreeImportBatch = { persons: [{ ...person, names: [{ given: "Must roll back", surname: "Synthetic" }], facts: [{ key: "F", type, date: { original: "1901", year: 1901 } }] }] };
+  for (const dryRun of [true, false]) {
+    const result = await send(t, grant, job.importJobId, 2, batch, { dryRun }, `person-citation-${type}-${scope}-${dryRun}`);
+    expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("PERSON_CITATION_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before);
+    expect(await send(t, grant, job.importJobId, 2, batch, { dryRun }, `person-citation-${type}-${scope}-${dryRun}`)).toEqual(result); expect(await snapshot()).toEqual(before);
+  }
+});
+
+test.each(["name", "sex", "living", "alternateNames"])("person-field evidence also protects imported %s assertions", async field => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const person = { key: "P", living: false, sex: "unknown" as const, names: [{ given: "Original", surname: "Synthetic", preferred: true }, { given: "Alternate", surname: "Synthetic" }] };
+  await send(t, grant, job.importJobId, 0, { persons: [person], sources: [{ key: "S", title: "Original assertion" }], citations: [{ key: "C", sourceKey: "S", targets: [{ kind: "person", key: "P", field }] }] });
+  const snapshot = () => t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), links: await ctx.db.query("citationLinks").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  const changed: NonNullable<TreeImportBatch["persons"]>[number] = { ...person, ...(field === "sex" ? { sex: "female" as const } : field === "living" ? { living: true } : { names: person.names.map((name, i) => i === (field === "name" ? 0 : 1) ? { ...name, given: "Replacement" } : name) }) };
+  for (const dryRun of [true, false]) {
+    const result = await send(t, grant, job.importJobId, 1, { persons: [changed] }, { dryRun }, `person-other-evidence-${field}-${dryRun}`);
+    expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("PERSON_CITATION_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before);
+  }
+});
+
+test("unrelated person fields can refresh while birth citations retain their assertion", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const person = { key: "P", living: false, sex: "unknown" as const, names: [{ given: "Original" }], facts: [{ key: "B", type: "birth", date: { original: "1900", year: 1900 } }] };
+  await send(t, grant, job.importJobId, 0, { persons: [person], sources: [{ key: "S", title: "Birth evidence" }], citations: [{ key: "C", sourceKey: "S", extractedText: "Birth in 1900", targets: [{ kind: "person", key: "P", field: "birth" }] }] });
+  const before = await t.run(ctx => ctx.db.query("citationLinks").collect());
+  const batch: TreeImportBatch = { persons: [{ ...person, sex: "female" }] };
+  const dry = await send(t, grant, job.importJobId, 1, batch, { dryRun: true }, "dry-unrelated-person-field"); const real = await send(t, grant, job.importJobId, 1, batch); expect(dry.counts).toEqual(real.counts); expect(real.counts.persons.updated).toBe(1);
+  const row = (await t.run(ctx => ctx.db.query("persons").collect()))[0]; expect(row.sex).toBe("female"); expect(row.birth?.date?.year).toBe(1900); expect(await t.run(ctx => ctx.db.query("citationLinks").collect())).toEqual(before);
+});

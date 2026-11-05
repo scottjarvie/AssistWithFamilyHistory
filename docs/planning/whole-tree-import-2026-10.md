@@ -505,3 +505,15 @@ media, restricted rights, missing/foreign references or excessive traversal.
 notesWithheld makes that limit explicit; cycles still check all reachable
 privacy constraints within the bound. Existing source/event/relationship
 representations remain, with owned people filtered in the touched readers.
+
+Citation privacy is shared by direct and aggregated MCP reads. Source
+contexts filter citation payloads/links/claims; MCP person/story snapshots
+are filtered before evidence groups and derived claims are assembled. Stored
+records and ordinary owner review remain intact. Bounded filtering reports
+citationsWithheld/citationReadTruncated. Citation-backed claims without an
+aggregated citation row are checked separately within the same candidate
+bound, and living source-fact associations also participate in the predicate.
+Person assertion refresh checks retained person-field citations before
+changing cited name/sex/living/birth/death fields. Unknown/unscoped fields
+require review; explicitly unrelated fields may refresh. The entire person
+item refuses atomically, preserving events, links and import baselines.

@@ -1,3 +1,4 @@
+import { filterMcpCitationSnapshot } from "./importedContextPrivacy";
 import { v } from "convex/values";
 import { internalQuery, query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -1528,9 +1529,18 @@ export const getPersonWorkspace = internalQuery({
   args: {
     vaultOwnerId: v.string(),
     personIdentifier: v.string(),
+    mcpCitationPrivacy: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     // GEN-92: per-person loader — fetches only this person's related rows.
+    if (args.mcpCitationPrivacy) {
+      const owner = normalizeVaultOwnerId(args.vaultOwnerId);
+      const snapshot = await loadPersonScopedSnapshot(ctx, owner, args.personIdentifier);
+      if (!snapshot) return null;
+      const filtered = await filterMcpCitationSnapshot(ctx, owner, snapshot);
+      const workspace = assemblePersonWorkspaceFromSnapshot(filtered.snapshot, args.personIdentifier);
+      return workspace ? { ...workspace, citationsWithheld: filtered.citationsWithheld, citationReadTruncated: filtered.citationReadTruncated } : null;
+    }
     return assemblePersonWorkspaceScoped(
       ctx,
       normalizeVaultOwnerId(args.vaultOwnerId),
@@ -1637,6 +1647,7 @@ export const getStoryReview = internalQuery({
   args: {
     vaultOwnerId: v.string(),
     storyId: v.id("stories"),
+    mcpCitationPrivacy: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     // GEN-92FU-COV: story-scoped loader instead of the whole vault.
@@ -1651,6 +1662,11 @@ export const getStoryReview = internalQuery({
       args.storyId
     );
     if (!snapshot) return null;
+    if (args.mcpCitationPrivacy) {
+      const filtered = await filterMcpCitationSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId), snapshot);
+      const story = filtered.snapshot.stories.find((entry) => entry._id === args.storyId);
+      return story ? { ...buildStoryBundle(filtered.snapshot, story), citationsWithheld: filtered.citationsWithheld, citationReadTruncated: filtered.citationReadTruncated } : null;
+    }
     const story = snapshot.stories.find((entry) => entry._id === args.storyId);
     return story ? buildStoryBundle(snapshot, story) : null;
   },

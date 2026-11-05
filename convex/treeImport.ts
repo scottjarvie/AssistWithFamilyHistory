@@ -604,6 +604,7 @@ async function importPerson(c: ChunkContext, item: any): Promise<Omit<ItemResult
   if (candidates.size > 1) fail("AMBIGUOUS_PERSON_IDENTITY", "These outside IDs already identify different people; no identity was selected.", "Have the person resolve the conflicting aliases before retrying; all originals were retained.");
   const existingId = [...candidates][0] ?? null;
   const linked = !primary.mapped && !!existingId;
+  const previous = existingId ? await ownedRow(c, "persons", existingId) : null;
 
   const doc = {
     importedNames: clean(item.names),
@@ -629,6 +630,29 @@ async function importPerson(c: ChunkContext, item: any): Promise<Omit<ItemResult
     doc,
     createOnly: { researchStatus: "basic" },
   });
+  if (previous) {
+    const current = await ownedRow(c, "persons", saved.id);
+    const assertions = ["name", "alternateNames", "importedNames", "sex", "living", "birth", "death"] as const;
+    const changed = current ? assertions.filter(field => !same(previous[field], current[field])) : [];
+    if (changed.length) {
+      const max = FAMILY_HISTORY_MCP_LIMITS.contextRows;
+      const links = isPlaceholder(saved.id) ? [] : await c.ctx.db.query("citationLinks")
+        .withIndex("by_target", q => q.eq("targetType", "person").eq("targetId", saved.id)).take(max + 1);
+      const virtual = [...(c.w.rows?.values() ?? [])].filter(row => row.targetType === "person" && row.targetId === saved.id);
+      const supportsChanged = (field: string | undefined) => {
+        if (!field?.trim()) return true;
+        const path = field.trim().toLowerCase().replace(/^person[.:]/, "");
+        const root = /^[a-z]+/.exec(path)?.[0] ?? "";
+        if (["name", "names", "alternatenames", "importednames"].includes(root)) return changed.some(key => ["name", "alternateNames", "importedNames"].includes(key));
+        if (!["sex", "living", "birth", "death"].includes(root)) return true; // Unrecognised field semantics require review.
+        return changed.some(key => key.toLowerCase() === root);
+      };
+      if (links.length > max || [...links, ...virtual].some(link => supportsChanged(link.field))) {
+        fail("PERSON_CITATION_REVIEW_REQUIRED", "Changed person assertions cannot inherit retained person-field citation evidence.",
+          "Review the person fields and their citations with the person. This person item saved nothing; its original fields, events and evidence were retained.");
+      }
+    }
+  }
   if (saved.status === "created") {
     for (const candidate of duplicates) await suggestDuplicate(c, saved.id, candidate, name, yearOf(doc.birth?.date));
   }

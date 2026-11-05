@@ -6,6 +6,7 @@ import { internalMutation, internalQuery } from "./_generated/server";
 import { anyApi } from "convex/server";
 import { FAMILY_HISTORY_MCP_LIMITS } from "../lib/mcp/contract";
 import { matchesVaultOwner } from "./vaultCore";
+import { canReadImportedNotes, filterMcpCitationRows } from "./importedContextPrivacy";
 import { assertGrantPermits } from "./mcpGrants";
 
 export const principalValidator = v.object({
@@ -1304,62 +1305,6 @@ export const search = internalQuery({
   },
 });
 
-const NOTE_CONTEXT_TABLE: Record<string, TableNames> = {
-  person: "persons", relationship: "relationships", event: "events", source: "sources",
-  citation: "citations", media: "media", note: "notes", place: "places",
-};
-
-async function noteContextRow(ctx: QueryCtx, owner: string, kind: string, id: string): Promise<any | null> {
-  const table = NOTE_CONTEXT_TABLE[kind];
-  if (!table) return null;
-  const normalized = ctx.db.normalizeId(table, id);
-  const row = normalized ? await ctx.db.get(normalized) : null;
-  return row && matchesVaultOwner((row as any).vaultOwnerId, owner) ? row : null;
-}
-
-/** A bounded, fail-closed privacy walk; cycles never skip an unchecked record. */
-async function canReadImportedNotes(ctx: QueryCtx, owner: string, kind: string, id: string,
-  state = { seen: new Set<string>(), remaining: FAMILY_HISTORY_MCP_LIMITS.contextRows as number }): Promise<boolean> {
-  const key = `${kind}:${id}`;
-  if (state.seen.has(key)) return true;
-  if (state.seen.size >= FAMILY_HISTORY_MCP_LIMITS.contextRows) return false;
-  const row = await noteContextRow(ctx, owner, kind, id);
-  if (!row) return false;
-  state.seen.add(key);
-  let refs: Array<{ kind: string; id: string }> = [];
-  const limit = state.remaining + 1;
-  if (kind === "person") return row.living === false;
-  if (kind === "place") return true;
-  if (kind === "relationship") refs = [row.person1, row.person2].map(id => ({ kind: "person", id: String(id) }));
-  else if (kind === "event") {
-    const roles = await ctx.db.query("personEvents").withIndex("by_event", q => q.eq("eventId", row._id)).take(limit);
-    if (roles.some(role => !matchesVaultOwner(role.vaultOwnerId, owner))) return false;
-    refs = roles.map(role => ({ kind: "person", id: String(role.personId) }));
-  } else if (kind === "media") {
-    if (row.aiUseAllowed !== true || row.privacyLevel === undefined || row.privacyLevel === "private"
-      || !["reviewed", "redacted"].includes(row.reviewStatus) || row.rightsStatus === "restricted") return false;
-    if (row.sourceId && !await noteContextRow(ctx, owner, "source", String(row.sourceId))) return false;
-    refs = row.personIds.map((id: string) => ({ kind: "person", id: String(id) }));
-  } else if (kind === "source") {
-    const [citations, facts] = await Promise.all([
-      ctx.db.query("citations").withIndex("by_source", q => q.eq("sourceId", row._id)).take(limit),
-      ctx.db.query("sourceFacts").withIndex("by_source", q => q.eq("sourceId", row._id)).take(limit),
-    ]);
-    if ([...citations, ...facts].some(item => !matchesVaultOwner(item.vaultOwnerId, owner))) return false;
-    refs = [...citations.map(item => ({ kind: "citation", id: String(item._id) })), ...facts.map(item => ({ kind: "person", id: String(item.personId) }))];
-  } else if (kind === "citation") {
-    if (!await noteContextRow(ctx, owner, "source", String(row.sourceId))) return false;
-    const links = await ctx.db.query("citationLinks").withIndex("by_citation", q => q.eq("citationId", row._id)).take(limit);
-    if (links.some(link => !matchesVaultOwner(link.vaultOwnerId, owner))) return false;
-    refs = links.map(link => ({ kind: link.targetType, id: link.targetId }));
-  } else if (kind === "note") refs = [row.subject];
-  else return false;
-  if (refs.length > state.remaining) return false;
-  state.remaining -= refs.length;
-  for (const ref of refs) if (!await canReadImportedNotes(ctx, owner, ref.kind, ref.id, state)) return false;
-  return true;
-}
-
 function noteForContext(row: Doc<"notes">, full = false) {
   const limit = FAMILY_HISTORY_MCP_LIMITS.contentPreviewChars;
   return { id: row._id, subject: row.subject, noteType: row.noteType, title: row.title ?? null,
@@ -1417,7 +1362,8 @@ export const getRecordContext = internalQuery({
         .filter((row) => matchesVaultOwner(row.vaultOwnerId, owner));
       const citations = (await Promise.all(citationLinks.slice(0, max).map((link) => ctx.db.get(link.citationId))))
         .filter((row): row is Doc<"citations"> => Boolean(row && matchesVaultOwner(row.vaultOwnerId, owner)));
-      const sources = (await Promise.all(citations.map((citation) => ctx.db.get(citation.sourceId))))
+      const visible = await filterMcpCitationRows(ctx, owner, citations);
+      const sources = (await Promise.all(visible.citations.map((citation) => ctx.db.get(citation.sourceId))))
         .filter((row): row is Doc<"sources"> => Boolean(row && matchesVaultOwner(row.vaultOwnerId, owner)));
       const noteContext = await readPersonNoteContext(ctx, owner, person);
       return {
@@ -1428,7 +1374,8 @@ export const getRecordContext = internalQuery({
         relationships,
         events,
         eventRoles: roles,
-        evidence: { citations, links: citationLinks.slice(0, max), sources },
+        evidence: { citations: visible.citations, links: citationLinks.filter(link => visible.allowedIds.has(String(link.citationId))).slice(0, max), sources },
+        citationsWithheld: visible.withheld,
         stories: stories.filter((row) => matchesVaultOwner(row.vaultOwnerId, owner)).slice(0, max),
         researchTasks: tasks.filter((row) => matchesVaultOwner(row.vaultOwnerId, owner)).slice(0, max),
         researchFindings: findings.filter((row) => matchesVaultOwner(row.vaultOwnerId, owner)).slice(0, max),
@@ -1443,12 +1390,14 @@ export const getRecordContext = internalQuery({
         Promise.all(story.citationIds.slice(0, max).map((citationId) => ctx.db.get(citationId))),
         ctx.db.query("storyReviewEvents").withIndex("by_story", (q) => q.eq("storyId", story._id)).order("desc").take(max + 1),
       ]);
+      const visible = await filterMcpCitationRows(ctx, owner, citations.filter((row): row is Doc<"citations"> => Boolean(row && matchesVaultOwner(row.vaultOwnerId, owner))));
       return {
         kind: "story",
-        story,
+        story: { ...story, citationIds: story.citationIds.filter(id => visible.allowedIds.has(String(id))) },
+        citationsWithheld: visible.withheld,
         person: person && matchesVaultOwner(person.vaultOwnerId, owner) ? person : null,
         relationship: relationship && matchesVaultOwner(relationship.vaultOwnerId, owner) ? relationship : null,
-        citations: citations.filter((row): row is Doc<"citations"> => Boolean(row && matchesVaultOwner(row.vaultOwnerId, owner))),
+        citations: visible.citations,
         reviewEvents: reviews.filter((row) => matchesVaultOwner(row.vaultOwnerId, owner)).slice(0, max),
         truncated: story.citationIds.length > max || reviews.length > max,
       };
@@ -1463,6 +1412,7 @@ export const getRecordContext = internalQuery({
         ctx.db.query("sourceFacts").withIndex("by_source", (q) => q.eq("sourceId", source._id)).take(max + 1),
         connectionsFor(ctx, owner, "source", String(source._id), max),
       ]);
+      const visible = await filterMcpCitationRows(ctx, owner, citations);
       const ownedContents = contents.filter((row) => row.vaultOwnerId === owner).slice(0, max);
       const noteContext = await readSubjectNoteContext(ctx, owner, "source", String(source._id));
       return {
@@ -1474,9 +1424,10 @@ export const getRecordContext = internalQuery({
         // in full with kind "source_content".
         contents: ownedContents.map((row) => contentForRead(row, FAMILY_HISTORY_MCP_LIMITS.contentPreviewChars)),
         personas: personas.filter((row) => row.vaultOwnerId === owner).slice(0, max),
-        claims: facts.filter((row) => matchesVaultOwner(row.vaultOwnerId, owner)).slice(0, max),
-        citations: citations.slice(0, max),
-        links,
+        claims: facts.filter((row) => matchesVaultOwner(row.vaultOwnerId, owner) && visible.allowedIds.has(String(row.citationId))).slice(0, max),
+        citations: visible.citations,
+        citationsWithheld: visible.withheld,
+        links: links.filter(link => visible.allowedIds.has(String(link.citationId))),
         connections: related.connections,
         truncated: noteContext.truncated || citations.length > max || links.length === max || contents.length > max || personas.length > max || facts.length > max || related.truncated,
       };
