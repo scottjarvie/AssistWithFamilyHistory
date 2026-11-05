@@ -1,4 +1,4 @@
-[Newest-first gallery](gallery.html) · Home approved structurally by Opus; People privacy follow-up implemented, full rerun pending. Site-wide redesign remains active.
+[Newest-first gallery](gallery.html) · Home approved structurally by Opus; People privacy follow-up passes full verification. Wider council work active. Site-wide redesign remains active.
 
 Last updated: 2026-11-05 America/Phoenix.
 
@@ -26,3 +26,9 @@ Last updated: 2026-11-05 America/Phoenix.
 - Follow-up also fixes natural sort direction labels, canonical column-set comparison, sheet focus return, sortable-header aria-sort, partial selection state, 44px checkbox targets and non-secure local UUID fallback. Saved-view dialog explicitly discloses that search terms remain in this browser after sign-out. Filter forms remount when canonical query facets change.
 - Full follow-up verification and updated captures are **pending**: the shared host heavy-run lease rejected the run before it started. No active verification process is being claimed.
 - Before kit reuse: implement Opus's compact phone/clean List row (F3), collection-specific filters, default/group ordering and the recommended Home refinements. No site-wide clearance or completed Card/Work Order claimed.
+
+## Latest verification receipt
+
+- Code head `89496a6`: **57/57 full verification steps passed**, Node 22.23.4, 53 seconds (`/tmp/awf-council-dto-verify.log`), including build and both new privacy-projection tests in the normal test suite. The host lease became available and the previously queued run completed successfully.
+- Gallery/17-interaction/12-capture/30-probe receipts still represent reviewed visual head `2bf2eec`; updated captures will accompany the compact phone/List and remaining collection tranche. No current-head visual/council clearance is implied by the full code check.
+- Next safe work: compact records, general collection facets and configured grouping, then remaining collections/record/Queue/settings/readers/specialist exploration. Preserve the minimal client-row boundary everywhere.

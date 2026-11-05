@@ -35,3 +35,7 @@ The follow-up adds `projectPeopleCollectionRow` on the server and a minimal clie
 Other small review fixes: natural newest/oldest labels, canonical visible-column order, focus return, aria-sort, partial selection, 44px checkbox targets, local UUID fallback and explicit saved-search persistence copy. Filter form keys prevent a cleared canonical query from retaining an old uncontrolled input value after soft navigation.
 
 Full follow-up verify/captures have **not run yet**: the shared host lease returned exit 75 before starting. The 57/57 and visual receipts above prove the reviewed head, not this newer patch. Do not convert that into current-head acceptance. Compact phone/List row and the wider all-page scope remain work.
+
+### Follow-up full check completed
+
+Code head `89496a6`: **57/57 passed** on Node 22.23.4, 53 seconds. Log `/tmp/awf-council-dto-verify.log`. The test-step log explicitly includes both “People discovery…” privacy contracts (`/tmp/awf-verify-test.log`, tests 46 and 47). Build, typecheck, lint and every contract passed. The earlier lease refusal is historical, no longer a verification blocker. Visual captures and cross-model receipt remain tied to `2bf2eec`; full check is not a substitute for the next updated visual/interaction packet.
