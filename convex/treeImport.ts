@@ -250,6 +250,7 @@ async function lookupReference(c: ChunkContext, kind: string, key: string, origi
     fail("VALIDATION_ERROR", "This record kind has no generated key domain.", "Use generated only for fact or citation references.");
   }
   if (kind === "person") return (await resolvePersonIdentity(c, key, c.job.system)).id;
+  if (kind === "source") return (await resolveSourceIdentity(c, key)).id;
   if (origin === "explicit" || !supportsGenerated) {
     const id = await lookup(c, kind, key);
     if (origin === "explicit" && supportsGenerated) {
@@ -667,19 +668,27 @@ async function importRelationship(c: ChunkContext, item: any): Promise<Omit<Item
 
 /* ----------------------------------------------------------------- sources */
 
+async function resolveSourceIdentity(c: ChunkContext, key: string) {
+  const mapped = await lookup(c, "source", key);
+  const identities = new Set<string>(mapped ? [mapped] : []);
+  if (c.job.system === "familysearch") {
+    const row = mapped ? await ownedRow(c, "sources", mapped) : null;
+    if (mapped && (!row || (row.fsId && row.fsId !== key))) fail("LEGACY_IDENTITY_REVIEW_REQUIRED", "The source mapping disagrees with its owned FamilySearch identity.", "Review the original source and mapping; neither was changed.");
+    const legacy = await c.ctx.db.query("sources").withIndex("by_owner_fsId", q => q.eq("vaultOwnerId", c.owner).eq("fsId", key)).take(2);
+    for (const source of legacy) identities.add(String(source._id));
+    // Source PIDs are never reassigned, so stored matches cannot move away.
+    for (const source of c.w.rows?.values() ?? []) if (source.vaultOwnerId === c.owner && source.fsId === key && typeof source.title === "string") identities.add(String(source._id));
+  }
+  if (identities.size > 1) fail("AMBIGUOUS_SOURCE_IDENTITY", "This outside source ID identifies different owned sources.", "Review the original sources before retrying; nothing was merged or rekeyed.");
+  return { mapped, id: [...identities][0] ?? null };
+}
+
 async function importSource(c: ChunkContext, item: any): Promise<Omit<ItemResult, "kind" | "index">> {
   const key = requiredKey(item?.key, "key");
   const title = cleanText(item.title, "source title", FAMILY_HISTORY_MCP_LIMITS.shortText, true)!;
-  let existingId = await lookup(c, "source", key);
-  let linked = false;
-  if (!existingId && c.job.system === "familysearch") {
-    const legacy = await c.ctx.db.query("sources").withIndex("by_fsId", (q) => q.eq("fsId", key)).take(10);
-    const mine = legacy.find((row) => matchesVaultOwner(row.vaultOwnerId, c.owner));
-    if (mine) {
-      existingId = String(mine._id);
-      linked = true;
-    }
-  }
+  const identity = await resolveSourceIdentity(c, key);
+  const existingId = identity.id;
+  const linked = !identity.mapped && !!existingId;
   const saved = await upsertRow(c, {
     table: "sources",
     singular: "source",
@@ -714,7 +723,7 @@ async function importMedia(c: ChunkContext, item: any): Promise<Omit<ItemResult,
   for (const personKey of item.personKeys ?? []) personIds.push(await personFor(c, personKey, "personKeys"));
   let sourceId: string | undefined;
   if (item.sourceKey) {
-    sourceId = (await lookup(c, "source", requiredKey(item.sourceKey, "sourceKey"))) ?? undefined;
+    sourceId = (await resolveSourceIdentity(c, requiredKey(item.sourceKey, "sourceKey"))).id ?? undefined;
     if (!sourceId) fail("MISSING_SOURCE", `Source ${item.sourceKey} has not been imported yet.`, "Send the source first, then resend this row.");
   }
   const saved = await upsertRow(c, {
@@ -768,12 +777,13 @@ async function importCitation(c: ChunkContext, item: any): Promise<Omit<ItemResu
   const key = requiredKey(citationKeyFor(item), "key");
   const singular = item.key?.trim() ? "citation" : "citationGenerated";
   await rejectLegacyIdentity(c, singular, key, legacyCitationKeyFor(item), "citation");
-  const sourceId = await lookup(c, "source", sourceKey);
+  const sourceId = (await resolveSourceIdentity(c, sourceKey)).id;
   if (!sourceId) fail("MISSING_SOURCE", `Source ${sourceKey} has not been imported yet.`, "Send the source first, then resend this row.");
   const targets = [];
   for (const target of item.targets.slice(0, TREE_IMPORT_LIMITS.targetsPerCitation)) targets.push(await resolveTarget(c, target));
   const existingId = await lookup(c, singular, key);
   if (singular === "citation") await assertExplicitIdentity(c, "citations", existingId, key);
+  const previous = existingId ? await ownedRow(c, "citations", existingId) : null;
   const saved = await upsertRow(c, {
     table: "citations",
     singular,
@@ -797,6 +807,18 @@ async function importCitation(c: ChunkContext, item: any): Promise<Omit<ItemResu
     // any partial refresh and its baseline before this failure is returned.
     fail("CITATION_EVIDENCE_CONFLICT", `Corrected citation fields conflict with the incoming evidence: ${saved.kept.join(", ")}.`,
       "Review the corrected citation with the person, then resend matching evidence and targets. This citation item saved nothing.");
+  }
+  const current = previous ? await ownedRow(c, "citations", saved.id) : null;
+  const evidenceFields = ["sourceId", "page", "confidence", "extractedText", "url", "accessDate", "notes"] as const;
+  if (previous && current && evidenceFields.some(field => !same(previous[field], current[field]))) {
+    const persisted = isPlaceholder(saved.id) ? [] : await c.ctx.db.query("citationLinks")
+      .withIndex("by_citation", q => q.eq("citationId", saved.id as Id<"citations">)).take(TREE_IMPORT_LIMITS.targetsPerCitation + 1);
+    const virtual = [...(c.w.rows?.values() ?? [])].filter(row => row.citationId === saved.id && row.targetType);
+    const supports = (link: any) => link.vaultOwnerId === c.owner && targets.some(target => target.targetType === link.targetType && target.targetId === link.targetId && target.field === link.field);
+    if (persisted.length > TREE_IMPORT_LIMITS.targetsPerCitation || ![...persisted, ...virtual].every(supports)) {
+      fail("CITATION_TARGET_REVIEW_REQUIRED", "Changed evidence does not explicitly support every existing citation target.",
+        "Review the citation and all its existing targets with the person. No original links were deleted and this citation item saved nothing.");
+    }
   }
   for (const target of targets) {
     const virtualLink = [...(c.w.rows?.values() ?? [])].some(row => row.citationId === saved.id && row.targetType === target.targetType && row.targetId === target.targetId && row.field === target.field && row.vaultOwnerId === c.owner);
@@ -831,6 +853,10 @@ async function importNote(c: ChunkContext, item: any): Promise<Omit<ItemResult, 
   const existingId = await lookup(c, "note", key);
   const previous = existingId ? await ownedRow(c, "notes", existingId) : null;
   const nextSubject = { kind, id: subjectId };
+  if (previous && !same(previous.subject, nextSubject)) {
+    fail("NOTE_SUBJECT_CONFLICT", "An existing imported note cannot be reassigned to a different subject.",
+      "Review the note and its subject with the person before retrying. This note item saved nothing.");
+  }
   const saved = await upsertRow(c, {
     table: "notes",
     singular: "note",
@@ -844,10 +870,6 @@ async function importNote(c: ChunkContext, item: any): Promise<Omit<ItemResult, 
       externalIds: externalIdsFor(c, key, undefined),
     },
   });
-  if (previous && !same(previous.subject, nextSubject) && saved.kept?.length) {
-    fail("NOTE_SUBJECT_CONFLICT", `Retained note fields cannot be combined with a different subject: ${saved.kept.join(", ")}.`,
-      "Review the note and its subject with the person before retrying. This note item saved nothing.");
-  }
   return { key, status: saved.status, id: saved.id, ...(saved.kept ? { kept: saved.kept } : {}) };
 }
 

@@ -608,6 +608,7 @@ export default defineSchema({
     .index("by_owner", ["vaultOwnerId"])
     .index("by_type", ["type"])
     .index("by_fsId", ["fsId"])
+    .index("by_owner_fsId", ["vaultOwnerId", "fsId"])
     .index("by_repository", ["repository"])
     .index("by_import_key", ["importKey"]),
 

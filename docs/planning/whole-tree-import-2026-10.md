@@ -382,6 +382,14 @@ file-scoped mapping, preserving repeated imports and references.
 
 Citation evidence conflicts fail the entire citation item before new links are
 added. Partial refreshes and import baselines roll back with that item, retaining
-original corrected evidence and links. Notes also refuse subject changes that
-would combine retained content with a different subject. Both failures name
+original corrected evidence and links. Existing notes retain their subjects
+during import, including when optional content is omitted. Failures name
 the conflict for user review; neither changes an original identity.
+
+Refreshing citation evidence must explicitly include every existing target,
+including field-specific and manual links. Otherwise the item refuses and
+rolls back; it never silently deletes links or applies new evidence to stale
+targets. This check includes virtual links across dry-run chunks and uses a
+bounded stored-link scan. FamilySearch source lookup and references use the
+owner/PID index; conflicting mappings or duplicate owned identities refuse
+without selecting, merging or rekeying an original.

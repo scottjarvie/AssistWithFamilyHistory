@@ -1426,6 +1426,132 @@ test.each(["subject", "text"])("note conflicts cannot move living-person content
   expect(JSON.stringify(context)).not.toContain("Owner private living correction");
 });
 
+test.each([false, true])("note reassignment refuses omitted living-person titles (manual title %s)", async manual => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  await send(t, grant, job.importJobId, 0, {
+    persons: [{ key: "A", living: true, names: [{ given: "Living" }] }, { key: "B", living: false, names: [{ given: "Deceased" }] }],
+    notes: [{ key: "N", title: "Sensitive living title", text: "Original living note", subject: { kind: "person", key: "A" } }],
+  });
+  if (manual) await t.run(async ctx => { const note = (await ctx.db.query("notes").collect())[0]; await ctx.db.patch(note._id, { title: "Owner sensitive living title" }); });
+  const snapshot = () => t.run(async ctx => ({ notes: await ctx.db.query("notes").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() }));
+  const before = await snapshot();
+  const batch: TreeImportBatch = { notes: [{ key: "N", text: "New deceased text", subject: { kind: "person", key: "B" } }] };
+  for (const dryRun of [true, false]) {
+    const result = await send(t, grant, job.importJobId, 1, batch, { dryRun }, `omitted-note-title-${manual}-${dryRun}`);
+    expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("NOTE_SUBJECT_CONFLICT") })]);
+    expect(await snapshot()).toEqual(before);
+  }
+  const b = await t.run(async ctx => (await ctx.db.query("persons").collect()).find(row => !row.living)!);
+  const context = await t.query(internal.mcpFamilyHistory.getPersonNotes, { principal: principal(), personId: String(b._id) });
+  expect(context.notes).toEqual([]);
+  const sameSubject = await send(t, grant, job.importJobId, 2, { notes: [{ key: "N", text: "Refreshed living note", subject: { kind: "person", key: "A" } }] });
+  expect(sameSubject.results).toEqual([expect.objectContaining({ status: "updated" })]);
+  expect((await snapshot()).notes[0].title).toBe(before.notes[0].title);
+});
+
+test.each([false, true])("citation evidence refresh must explicitly support all imported and manual targets (%s)", async includeAll => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  await send(t, grant, job.importJobId, 0, {
+    sources: [{ key: "S1", title: "Evidence A" }, { key: "S2", title: "Evidence B" }],
+    persons: ["A", "B"].map(key => ({ key, living: false, names: [{ given: key }] })),
+    citations: [{ key: "C", sourceKey: "S1", extractedText: "Excerpt about A", targets: [{ kind: "person", key: "A" }] }],
+  });
+  await t.run(async ctx => {
+    const citation = (await ctx.db.query("citations").collect())[0];
+    const a = (await ctx.db.query("persons").collect()).find(row => row.fsId === "A")!;
+    await ctx.db.insert("citationLinks", { vaultOwnerId: OWNER, citationId: citation._id, targetType: "person", targetId: String(a._id), field: "notes", createdAt: 1 });
+  });
+  const snapshot = () => t.run(async ctx => ({ citations: await ctx.db.query("citations").collect(), links: await ctx.db.query("citationLinks").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() }));
+  const before = await snapshot();
+  const batch: TreeImportBatch = { citations: [{ key: "C", sourceKey: "S2", extractedText: "Excerpt about B", targets: [...(includeAll ? [{ kind: "person" as const, key: "A" }, { kind: "person" as const, key: "A", field: "notes" }] : []), { kind: "person", key: "B" }] }] };
+  const dry = await send(t, grant, job.importJobId, 1, batch, { dryRun: true }, `dry-target-reassertion-${includeAll}`);
+  expect(await snapshot()).toEqual(before);
+  const real = await send(t, grant, job.importJobId, 1, batch);
+  expect(dry.counts).toEqual(real.counts);
+  if (includeAll) {
+    expect(real.results).toEqual([expect.objectContaining({ status: "updated" })]);
+    const after = await snapshot();
+    expect(after.citations[0].extractedText).toBe("Excerpt about B");
+    expect(after.citations[0].sourceId).not.toBe(before.citations[0].sourceId);
+    expect(after.links).toHaveLength(3);
+    expect(after.links).toEqual(expect.arrayContaining(before.links));
+  } else {
+    expect(real.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("CITATION_TARGET_REVIEW_REQUIRED") })]);
+    expect(await snapshot()).toEqual(before);
+  }
+});
+
+test.each([0, 121])("citation attribution guards include planned links across chunks (padding %i)", { timeout: 300_000 }, async padding => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  const batch: TreeImportBatch = {
+    sources: [{ key: "S1", title: "Evidence A" }, { key: "S2", title: "Evidence B" }],
+    persons: ["A", "B", ...Array.from({ length: padding }, (_, i) => `padding-${i}`)].map(key => ({ key, living: false, names: [{ given: key }] })),
+    citations: [{ key: "C", sourceKey: "S1", extractedText: "About A", targets: [{ kind: "person", key: "A" }] }, { key: "C", sourceKey: "S2", extractedText: "About B", targets: [{ kind: "person", key: "B" }] }],
+  };
+  const dry = await send(t, grant, job.importJobId, 0, batch, { dryRun: true }, `dry-planned-attribution-${padding}`);
+  expect(await countRows(t, "citations")).toBe(0);
+  const real = await send(t, grant, job.importJobId, 0, batch);
+  expect(dry.counts).toEqual(real.counts);
+  expect(real.counts.citations.created).toBe(1);
+  expect(real.counts.citations.failed).toBe(1);
+  expect(real.results.filter((row: any) => row.status === "failed")).toEqual([expect.objectContaining({ reason: expect.stringContaining("CITATION_TARGET_REVIEW_REQUIRED") })]);
+  const citations = await t.run(ctx => ctx.db.query("citations").collect());
+  expect(citations).toHaveLength(1);
+  expect(citations[0].extractedText).toBe("About A");
+  const links = await t.run(ctx => ctx.db.query("citationLinks").collect());
+  expect(links).toHaveLength(1);
+  const a = await t.run(async ctx => (await ctx.db.query("persons").collect()).find(row => row.fsId === "A")!);
+  expect(links[0].targetId).toBe(String(a._id));
+});
+
+test("legacy FamilySearch sources use owner indexing beyond foreign records", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const sourceId = await t.run(async ctx => {
+    const doc = { fsId: "S", title: "Original owned source", type: "other" as const, createdAt: 1, updatedAt: 1 };
+    for (let i = 0; i < 12; i++) await ctx.db.insert("sources", { ...doc, vaultOwnerId: `user_foreign_${i}` });
+    return ctx.db.insert("sources", { ...doc, vaultOwnerId: OWNER });
+  });
+  const foreign = await t.run(async ctx => (await ctx.db.query("sources").collect()).filter(row => row.vaultOwnerId !== OWNER));
+  const job = await begin(t, grant);
+  const batch: TreeImportBatch = { sources: [{ key: "S", title: "Incoming source" }], persons: [{ key: "P", living: false, names: [{ given: "Synthetic" }] }], citations: [{ key: "C", sourceKey: "S", targets: [{ kind: "person", key: "P" }] }] };
+  const dry = await send(t, grant, job.importJobId, 0, batch, { dryRun: true }, "dry-owned-legacy-source");
+  const real = await send(t, grant, job.importJobId, 0, batch);
+  expect(dry.counts).toEqual(real.counts);
+  expect(real.results.filter((row: any) => row.status === "failed")).toEqual([]);
+  expect(real.results.find((row: any) => row.kind === "sources")).toMatchObject({ id: String(sourceId), status: "linked", kept: expect.arrayContaining(["title"]) });
+  expect(await countRows(t, "sources")).toBe(13);
+  expect((await t.run(ctx => ctx.db.get(sourceId)))?.title).toBe("Original owned source");
+  expect((await t.run(ctx => ctx.db.query("citations").collect()))[0].sourceId).toBe(sourceId);
+  expect(await t.run(async ctx => (await ctx.db.query("sources").collect()).filter(row => row.vaultOwnerId !== OWNER))).toEqual(foreign);
+});
+
+test.each([false, true])("ambiguous legacy sources and conflicting mappings refuse without selecting an original (%s)", async mismapped => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  await send(t, grant, job.importJobId, 0, { sources: [{ key: "OTHER", title: "Other source" }], persons: [{ key: "P", living: false, names: [{ given: "Synthetic" }] }] });
+  await t.run(async ctx => {
+    const other = (await ctx.db.query("sources").collect())[0];
+    for (let i = 0; i < (mismapped ? 1 : 2); i++) await ctx.db.insert("sources", { vaultOwnerId: OWNER, fsId: "S", title: `Original S ${i}`, type: "other", createdAt: 1, updatedAt: 1 });
+    if (mismapped) await ctx.db.insert("mcpRecordKeys", { vaultOwnerId: OWNER, recordType: "source", externalKeyVersion: 2, recordKey: externalRecordKey("familysearch", "source", "S"), recordId: String(other._id), createdAt: 1, updatedAt: 1 });
+  });
+  const snapshot = () => t.run(async ctx => ({ sources: await ctx.db.query("sources").collect(), keys: await ctx.db.query("mcpRecordKeys").collect(), citations: await ctx.db.query("citations").collect() }));
+  const before = await snapshot();
+  for (const dryRun of [true, false]) {
+    const result = await send(t, grant, job.importJobId, 1, { sources: [{ key: "S", title: "Incoming" }], citations: [{ key: "C", sourceKey: "S", targets: [{ kind: "person", key: "P" }] }] }, { dryRun }, `ambiguous-source-${mismapped}-${dryRun}`);
+    expect(result.results).toHaveLength(2);
+    expect(result.results.every((row: any) => row.status === "failed" && row.reason.includes(mismapped ? "LEGACY_IDENTITY_REVIEW_REQUIRED" : "AMBIGUOUS_SOURCE_IDENTITY"))).toBe(true);
+    expect(await snapshot()).toEqual(before);
+  }
+});
+
 test("citation link additions report updated, dry planning agrees, repeated targets stay idempotent", async () => {
   const t = convexTest({ schema, modules, transactionLimits: true });
   const grant = await seedGrant(t, { vaultOwnerId: OWNER });
