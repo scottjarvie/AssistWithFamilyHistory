@@ -38,3 +38,7 @@ Every collection's rows must be a minimal server-projected DTO containing only d
 People, Places, Stories, writing candidates and research tasks share the kit. The default is a desktop Table and a phone List; explicit Table/List/Grid choices override it. Chosen fields wrap rather than clamp. Detail/actions stay outside recognition links. Numeric columns align right; image slots use handwritten SVG fallback, never inferred photos. New identity columns are versioned so older saved views keep information previously displayed in the identity.
 
 Collections declare their own URL facet keys and built-in views. Named views save and restore those facets together, without changing unrelated URL controls. Research activity uses only recorded entry kinds and timestamps; filters affect the real log list, with date inputs alongside pointer range selection. Server-recorded author origin is separate from unverified model hints. Original route queries and limits stay authoritative.
+
+### Identity links and compact facts
+
+`rowHref` must open the record named by the row identity. Tasks without a real task-detail route keep static titles; their Person field links explicitly to that person. List facts put numeric labels after counts, text bare, and ambiguous dates behind a short prefix such as Updated or Imported. Full field labels remain in table headers and fact titles.

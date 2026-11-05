@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 export type CollectionColumn<Row> = {
-  key: string; label: string; compactLabel?: string; numeric?: boolean; introducedVersion?: number;
+  key: string; label: string; compactLabel?: string; numeric?: boolean; fact?: "suffix" | "prefix" | "bare"; introducedVersion?: number;
   render: (row: Row) => ReactNode; sortValue?: (row: Row) => string | number; sortOnly?: boolean;
 };
 export type CollectionGroup<Row> = { key: string; label: string; value: (row: Row) => string; order?: (a: string, b: string) => number };

@@ -6,7 +6,7 @@ import { PlaceCollectionView } from "@/components/vault/PlaceCollectionView";
 import { StoriesCollectionView } from "@/components/vault/StoriesCollectionView";
 import { WritingCandidatesView } from "@/components/vault/WritingCandidatesView";
 import { ResearchOverviewView } from "@/components/vault/ResearchOverviewView";
-import { BaselinePlaces,BaselineStories,BaselineWriting,BaselineResearch } from "@/design-council/2026-11-05-family-folio/BaselineCollections";
+import { BaselinePlaces,BaselineStories,BaselineWriting,BaselineResearch } from "@/components/design/BaselineCollections";
 import { FixtureNavigation } from "@/components/design/FixtureNavigation";
 import { AppSidebar, AppMobileNav } from "@/components/layout/AppSidebar";
 import { AppTopBar } from "@/components/layout/AppTopBar";

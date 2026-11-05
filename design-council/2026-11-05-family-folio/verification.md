@@ -50,3 +50,9 @@ Code head `89496a6`: **57/57 passed** on Node 22.23.4, 53 seconds. Log `/tmp/awf
 - Full frozen-source verification rerun is pending after the TypeScript correction. Shared host and site leases and nice 10 apply; own dev server stopped before full verification. No push/PR/merge/deploy, no site-wide acceptance.
 
 Final frozen-source rerun: **57/57 passed**, Node 22.23.4, 47 seconds, log `/tmp/awf-collections3-final-verify.log`. Includes typecheck, lint, all tests/contracts, generated tracker parity and production build. The corrected option was the only source change after the accepted captures; it is unused by rendering. Full backend/authenticated route and formal council acceptance remain separate.
+
+## Opus small-finding follow-up
+
+Exact reviewed parent: `0ec9ea7`, Sol author / Opus5.5 reviewer; conditional receipt in `reviews/opus-collections-0ec9ea7.md`. Lead fixed required R1/R2 and small R3/R4/R6/R7 issues; status colors restored. **13/13 updated cross-page interactions** and **20/20 follow-up captures** pass with zero errors or overflow. Follow-up images are in `collection-fixes`, leaving the exact reviewed round-3 images intact. This newest gallery section is a capture update, not a formal scoring round. Full `pnpm verify`: **57/57 passed**, Node22, log `/tmp/awf-opus-collections-fixes-verify.log`. Own dev server was stopped first; host/site OS leases and nice10 used for the full run.
+
+The small lead fixes have no new cross-model receipt yet: they will be included in the next meaningful tranche review per the delegate policy. Remaining taste and date-range work is recorded in rounds.md and AWF-0071, not claimed complete. No authenticated backend acceptance or all-page clearance is implied. Gallery and screenshot assets are ignored, local evidence; the generated gallery embeds its assets and can be opened without a server.

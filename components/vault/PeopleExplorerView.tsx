@@ -18,7 +18,7 @@ const columns: CollectionColumn<PeopleExplorerRow>[] = [
   { key: "memories", numeric: true, label: "Memories", render: (p) => p.stats.memories, sortValue: (p) => p.stats.memories },
   { key: "documents", numeric: true, label: "Documents", render: (p) => p.stats.documents, sortValue: (p) => p.stats.documents },
   { key: "stories", numeric: true, label: "Story outputs", render: (p) => p.stats.stories, sortValue: (p) => p.stats.stories },
-  { key: "lastImport", label: "Last import (UTC)", render: (p) => p.latestImport ? <UtcDate value={p.latestImport.importedAt}/> : "No imports yet", sortValue: (p) => p.latestImport?.importedAt || 0 },
+  { key: "lastImport", fact: "prefix", compactLabel: "Imported", label: "Last import (UTC)", render: (p) => p.latestImport ? <UtcDate value={p.latestImport.importedAt}/> : "No imports yet", sortValue: (p) => p.latestImport?.importedAt || 0 },
 ];
 const researchStates = [["not_started", "Not started"], ["basic", "Basic"], ["in_progress", "In progress"], ["thorough", "Thorough"], ["complete", "Complete"]];
 

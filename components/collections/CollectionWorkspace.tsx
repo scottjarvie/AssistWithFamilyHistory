@@ -16,11 +16,11 @@ import { useCollectionPreferences, type CollectionView } from "./useCollectionPr
  * Never pass raw Convex documents here: the entire rows prop is serialized to the browser.
  * Sorting/grouping/selection cover loaded rows, never imply whole-vault operations.
  */
-export function CollectionWorkspace<Row>({ rows, columns, groups = [], rowKey, rowTitle, rowHref, renderIdentity, renderDetail, renderActions, imageSlot, primaryColumn, searchControls, preferenceKey, query = "", status = "", loadMoreHref, noun = "records", identityLabel = "Record", naturalDirection = "desc", naturalOrderLabel = "Recently touched", defaultGroup = "", columnVersion = 1, naturalLabels, filters, builtInViews = [], emptyState }: {
+export function CollectionWorkspace<Row>({ rows, columns, groups = [], rowKey, rowTitle, rowHref, renderIdentity, renderDetail, renderActions, imageSlot, primaryColumn, searchControls, preferenceKey, query = "", status = "", loadMoreHref, noun = "records", identityLabel = "Record", naturalOrderLabel = "Recently touched", defaultGroup = "", columnVersion = 1, naturalLabels, filters, builtInViews = [], emptyState }: {
   rows: Row[]; columns: CollectionColumn<Row>[]; groups?: CollectionGroup<Row>[];
   rowKey: (row: Row) => string; rowTitle: (row: Row) => string; rowHref: (row: Row) => string | null;
   renderIdentity: (row: Row) => ReactNode; renderDetail?: (row: Row) => ReactNode; renderActions?: (row: Row) => ReactNode; imageSlot?: (row: Row) => ReactNode; primaryColumn?: string; searchControls: ReactNode;
-  preferenceKey: string; query?: string; status?: string; loadMoreHref: string | null; noun?: string; identityLabel?: string; naturalDirection?: "asc" | "desc"; naturalOrderLabel?: string; defaultGroup?: string; columnVersion?: number; naturalLabels?: {forward:string;reverse:string}; filters?: Record<string, string>; builtInViews?: BuiltInCollectionView[]; emptyState: ReactNode;
+  preferenceKey: string; query?: string; status?: string; loadMoreHref: string | null; noun?: string; identityLabel?: string; naturalOrderLabel?: string; defaultGroup?: string; columnVersion?: number; naturalLabels?: {forward:string;reverse:string}; filters?: Record<string, string>; builtInViews?: BuiltInCollectionView[]; emptyState: ReactNode;
 }) {
   const [settings, saveSettings] = useCollectionPreferences(preferenceKey);
   const [selected, setSelected] = useState<string[]>([]);

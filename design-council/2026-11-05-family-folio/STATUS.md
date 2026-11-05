@@ -1,4 +1,4 @@
-[Newest-first gallery](gallery.html) · Five collection surfaces built locally; 57/57 checks and 20 captures pass; Opus tranche review next. All-page goal remains active.
+[Newest-first gallery](gallery.html) · Five collection surfaces built locally; 57/57 checks and 20 captures pass; Opus conditionally approves; lead fixes pass 57/57 checks and 20 fresh captures. All-page goal remains active.
 
 
 Last updated: 2026-11-05 America/Phoenix.
@@ -41,3 +41,11 @@ Last updated: 2026-11-05 America/Phoenix.
 - Newest gallery section is `round-3`; this is a capture tranche, **not a third formal scoring round**. Formal round 2 remains pending wider page-family work. Last formal score remains Sol 6.8, below target.
 - Opus exact-head review is next; no new acceptance claimed yet. AWF-0071 stays doing, separate audit not audited, no completed Cards/Work Orders.
 - Next long route: record dossier/evidence stream and counted sections; then Queue, settings/permission matrices, readers and specialist prototypes. Home taste refinements remain recorded in the previous Opus receipt.
+
+## Opus verdict and small follow-up
+
+Opus reviewed exact head `0ec9ea7` (Sol author, Opus 5.5 reviewer). No blocking privacy or capability issue; previous server-payload finding is resolved throughout the five collections. Conditional reuse required R1 identity-link purpose and R2 compact text labelling fixes, now implemented by the lead. Also fixed invalid task-state normalization, explicit Updated dates, status counts scoped to active facets, clean URLs, restored status colors and runtime independence from the run folder. Typecheck and 13 cross-page checks pass; fresh images/full follow-up check are being recorded. The full review is `reviews/opus-collections-0ec9ea7.md`.
+
+Taste remains unfinished: one control per facet with phone filter sheets, Stories reading presentation, a tighter People phone list, a dated/month-grouped Activity ledger and phone lane switcher, custom date-range validation/precedence, and the earlier Home refinements. These belong to active AWF-0071; no all-page audit or formal target clearance claimed. The next meaningful code review will include these lead fixes; no delegate is commissioned per small finding.
+
+Final follow-up receipt: **57/57 full steps**, **13/13 cross-page interactions**, **20/20 fresh captures** passed. Newest gallery section “Collection review fixes” contains this source's visuals, with the reviewed `0ec9ea7` images retained under round-3. The fixes await the next meaningful cross-model review; no formal score or all-page acceptance inferred. Latest code is a local commit only. All-page scope/AWF-0071 still active; audit not audited. Next route starts with the remaining collection/Activity taste refinements and then the record dossier/stream family.

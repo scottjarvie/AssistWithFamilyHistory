@@ -31,5 +31,5 @@ result=header+helpers+'''\nexport function BaselinePlaces({input,params}:{input:
  const person=(p:{name:string}|null)=>p?{name:{given:p.name,surname:""}}:null;
  const overview={tasks:tasks.map(r=>({_id:r.id,title:r.title,description:r.description,type:r.kind,priority:r.priority,person:person(r.person)})),logEntries:log.map(r=>({_id:r.id,summary:r.summary,activityType:r.kind,person:person(r.person)}))};
 '''+body(original('research'))+'\n}\n'
-(run/'BaselineCollections.tsx').write_text(result)
-print(run/'BaselineCollections.tsx')
+(run.parents[1]/'components/design/BaselineCollections.tsx').write_text(result)
+print(run.parents[1]/'components/design/BaselineCollections.tsx')

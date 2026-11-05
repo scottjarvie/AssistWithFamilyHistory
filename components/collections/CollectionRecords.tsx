@@ -16,7 +16,11 @@ export function CollectionRecords<Row>({ grouped, columns, view, compact, rowKey
   identityLabel: string; primaryColumn?: string; sortKey?: string; descending: boolean; onSort: (key: string) => void;
 }) {
   const picture = (row: Row, grid = false) => <div className={`${grid ? "h-20 w-20" : "h-8 w-8"} text-primary`}>{imageSlot?.(row) || <ArchiveIllustration className="h-full w-full"/>}</div>;
-  const facts = (row: Row, selected: CollectionColumn<Row>[]) => <p className="text-[13px] leading-6 text-muted-foreground [overflow-wrap:anywhere]">{selected.map((column, index) => <span key={column.key}>{index > 0 && <span aria-hidden="true"> · </span>}<span className="text-foreground tabular-nums">{column.render(row)}</span> {column.compactLabel ?? column.label}</span>)}</p>;
+  const facts = (row: Row, selected: CollectionColumn<Row>[]) => <p className="text-[13px] leading-6 text-muted-foreground [overflow-wrap:anywhere]">{selected.map((column, index) => {
+    const mode = column.fact || (column.numeric ? "suffix" : "bare");
+    const label = column.compactLabel ?? column.label;
+    return <span key={column.key} title={column.label}>{index > 0 && <span aria-hidden="true"> · </span>}{mode === "prefix" && `${label} `}<span className="text-foreground tabular-nums">{column.render(row)}</span>{mode === "suffix" && ` ${label}`}</span>;
+  })}</p>;
   const primary = columns.find((column) => column.key === primaryColumn);
   return <div className="space-y-5">{grouped.map(([name, rows]) => <section key={name} aria-label={name || "Loaded records"}>
     {name && <h2 className="mb-2 flex items-center gap-2 font-sans text-sm font-semibold capitalize">{name}<span className="rounded-full bg-secondary px-2 py-1 font-mono text-xs">{rows.length}</span></h2>}

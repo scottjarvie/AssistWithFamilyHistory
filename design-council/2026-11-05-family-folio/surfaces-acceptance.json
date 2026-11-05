@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-11-05T09:39:19.826Z",
+  "checkedAt": "2026-11-05T09:51:15.617Z",
   "checks": [
     "Places keeps kind and every event/citation/media count",
     "Place search and a saved query restore across full navigation",
@@ -7,7 +7,8 @@
     "Narrative is expandable without dropping the original four-line preview",
     "Saved Stories view restores q, status and workflow together",
     "Writing launcher retains source/context/readiness/workflow and each person session",
-    "Global research tasks remain readable and never get a fake detail link",
+    "Task identities stay static; explicit Person fields link to the person; global tasks have no fake detail link",
+    "Unknown task state normalizes to All states and keeps the complete loaded result",
     "AI provenance and self-reported model hints remain distinct",
     "Date-range selection and clear filter the real activity entries",
     "Dragging the activity date axis selects actual log entries",

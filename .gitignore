@@ -89,3 +89,6 @@ design-council/*/gallery-inline.html
 
 # Reconstructed archive JSX captures (current shared runtime; original route source).
 design-council/*/baseline-reconstructed/
+
+# Follow-up to the reviewed collection capture tranche.
+design-council/*/collection-fixes/
