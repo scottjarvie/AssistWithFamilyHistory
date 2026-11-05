@@ -263,3 +263,10 @@ would lose the original identity and is not a supported recovery. Other batch
 rows can continue and operation replay remains unchanged.
 
 This is source behavior, not a claim of deployed or provider-tested capability.
+
+Generated facts and citations have dedicated durable lookup namespaces
+(`factGenerated` and `citationGenerated`), separate from explicit outside IDs.
+An explicit ID that spells a generated key therefore remains a distinct record.
+Send a stable explicit key for facts or citations that notes must reference;
+fact citation targets likewise refer to explicit fact keys. Generated identities
+are internal fallback identities, not aliases for explicit outside IDs.

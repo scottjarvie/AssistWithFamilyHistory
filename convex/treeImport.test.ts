@@ -491,10 +491,10 @@ describe("composite import identities", () => {
       const mappings = await ctx.db.query("mcpRecordKeys").collect();
       for (const [kind, current, legacy] of [
         ["fact", factKeyFor("A/B", fact), legacyFactKeyFor("A/B", fact)],
-        ["citation", citationKeyFor(citation), legacyCitationKeyFor(citation)],
+        ["citationGenerated", citationKeyFor(citation), legacyCitationKeyFor(citation)],
       ]) {
         const row = mappings.find(r => r.recordKey === externalRecordKey("familysearch", kind, current))!;
-        await ctx.db.patch(row._id, { recordKey: externalRecordKey("familysearch", kind, legacy) });
+        await ctx.db.patch(row._id, { recordKey: externalRecordKey("familysearch", kind === "citationGenerated" ? "citation" : kind, legacy) });
       }
     });
     const before = await t.run(async ctx => ({ events: await ctx.db.query("events").collect(), citations: await ctx.db.query("citations").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() }));
@@ -505,4 +505,30 @@ describe("composite import identities", () => {
     const after = await t.run(async ctx => ({ events: await ctx.db.query("events").collect(), citations: await ctx.db.query("citations").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() }));
     expect(after).toEqual(before);
   });
+});
+
+
+test("explicit IDs cannot impersonate generated fact or citation identities", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  const anonymous = { type: "residence", value: "Anonymous fact" };
+  const generatedFactKey = decodeURIComponent(factKeyFor("P", anonymous).slice(2));
+  const citation = { sourceKey: "s", targets: [{ kind: "person" as const, key: "P" }], extractedText: "Anonymous citation" };
+  const batch: TreeImportBatch = {
+    sources: [{ key: "s", title: "Synthetic source" }],
+    persons: [{ key: "P", living: false, names: [{ given: "Synthetic" }], facts: [
+      anonymous, { key: generatedFactKey, type: "residence", value: "Explicit fact" },
+    ] }],
+    citations: [citation, { ...citation, key: citationKeyFor(citation), extractedText: "Explicit citation" }],
+  };
+  const first = await send(t, grant, job.importJobId, 0, batch);
+  expect(first.results.filter((r: any) => r.status === "failed")).toEqual([]);
+  expect(await countRows(t, "events")).toBe(2);
+  expect(await countRows(t, "citations")).toBe(2);
+  const again = await send(t, grant, job.importJobId, 1, batch);
+  expect(again.results.filter((r: any) => r.status === "failed" || r.status === "created")).toEqual([]);
+  const data = await t.run(async ctx => ({ events: await ctx.db.query("events").collect(), citations: await ctx.db.query("citations").collect() }));
+  expect(data.events.map(r => r.description).sort()).toEqual(["Anonymous fact", "Explicit fact"]);
+  expect(data.citations.map(r => r.extractedText).sort()).toEqual(["Anonymous citation", "Explicit citation"]);
 });

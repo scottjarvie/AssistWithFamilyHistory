@@ -137,6 +137,8 @@ const RECORD_TYPE: Record<string, RecordType> = {
   note: "note",
   media: "media",
   fact: "event",
+  factGenerated: "event",
+  citationGenerated: "citation",
 };
 
 class ItemFailure extends Error {
@@ -190,8 +192,8 @@ async function lookup(c: ChunkContext, singular: string, key: string, system: st
 }
 
 /** Never guess which record an old ambiguous composite identified. */
-async function rejectLegacyIdentity(c: ChunkContext, singular: string, key: string, legacyKey: string) {
-  if (key !== legacyKey && await lookup(c, singular, legacyKey)) {
+async function rejectLegacyIdentity(c: ChunkContext, singular: string, key: string, legacyKey: string, legacySingular: string = singular) {
+  if ((key !== legacyKey || singular !== legacySingular) && await lookup(c, legacySingular, legacyKey)) {
     fail("LEGACY_IDENTITY_REVIEW_REQUIRED", "An older import used an ambiguous record key. The original record has been retained.",
       "Have the person review the original import mapping before retrying; do not rename outside IDs to bypass this check.");
   }
@@ -411,12 +413,13 @@ async function importPerson(c: ChunkContext, item: any): Promise<Omit<ItemResult
 async function importFact(c: ChunkContext, personId: string, personKey: string, fact: any) {
   if (typeof fact?.type !== "string" || !fact.type.trim()) return;
   const factKey = factKeyFor(personKey, fact);
-  await rejectLegacyIdentity(c, "fact", factKey, legacyFactKeyFor(personKey, fact));
+  const singular = fact.key?.trim() ? "fact" : "factGenerated";
+  await rejectLegacyIdentity(c, singular, factKey, legacyFactKeyFor(personKey, fact), "fact");
   const mapped = eventTypeFor(fact.type);
-  const existingId = await lookup(c, "fact", factKey);
+  const existingId = await lookup(c, singular, factKey);
   const saved = await upsertRow(c, {
     table: "events",
-    singular: "fact",
+    singular,
     key: factKey,
     existingId,
     doc: {
@@ -427,7 +430,7 @@ async function importFact(c: ChunkContext, personId: string, personKey: string, 
       description: factDescription(fact),
       externalIds: fact.key ? [{ system: c.job.system, id: String(fact.key) }] : undefined,
     },
-    createOnly: { importKey: `import:${externalRecordKey(c.job.system, "fact", factKey, c.job.importKey)}` },
+    createOnly: { importKey: `import:${externalRecordKey(c.job.system, singular, factKey, c.job.importKey)}` },
   });
   if (saved.status === "created") {
     await c.w.insert("personEvents", {
@@ -649,16 +652,17 @@ async function importCitation(c: ChunkContext, item: any): Promise<Omit<ItemResu
   const sourceKey = requiredKey(item?.sourceKey, "sourceKey");
   if (!Array.isArray(item.targets) || item.targets.length === 0) fail("VALIDATION_ERROR", "A citation must support at least one record.", "Add targets: the person, fact or relationship this source supports.");
   const key = requiredKey(citationKeyFor(item), "key");
-  await rejectLegacyIdentity(c, "citation", key, legacyCitationKeyFor(item));
+  const singular = item.key?.trim() ? "citation" : "citationGenerated";
+  await rejectLegacyIdentity(c, singular, key, legacyCitationKeyFor(item), "citation");
   const sourceId = await lookup(c, "source", sourceKey);
   if (!sourceId) fail("MISSING_SOURCE", `Source ${sourceKey} has not been imported yet.`, "Send the source first, then resend this row.");
   const targets = [];
   for (const target of item.targets.slice(0, TREE_IMPORT_LIMITS.targetsPerCitation)) targets.push(await resolveTarget(c, target));
   const saved = await upsertRow(c, {
     table: "citations",
-    singular: "citation",
+    singular,
     key,
-    existingId: await lookup(c, "citation", key),
+    existingId: await lookup(c, singular, key),
     doc: {
       sourceId: isPlaceholder(sourceId) ? undefined : sourceId,
       page: item.page,
@@ -669,7 +673,7 @@ async function importCitation(c: ChunkContext, item: any): Promise<Omit<ItemResu
       notes: cleanText(item.notes, "citation notes", FAMILY_HISTORY_MCP_LIMITS.notes),
       externalIds: item.key ? [{ system: c.job.system, id: String(item.key) }] : undefined,
     },
-    createOnly: { isEvidence: true, importKey: `import:${externalRecordKey(c.job.system, "citation", key, c.job.importKey)}` },
+    createOnly: { isEvidence: true, importKey: `import:${externalRecordKey(c.job.system, singular, key, c.job.importKey)}` },
   });
   if (!isPlaceholder(saved.id)) {
     for (const target of targets) {
