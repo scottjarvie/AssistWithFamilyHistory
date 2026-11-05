@@ -50,10 +50,13 @@ interface SidebarAccessProps {
   accountMode: "user" | "local" | "anonymous";
   vaultOwnerId: string;
   clerkEnabled: boolean;
+  /** Synthetic layout harness may identify its rendered surface without changing navigation destinations. */
+  activePath?: string;
 }
 
-export function AppMobileNav({ accountMode, vaultOwnerId, clerkEnabled }: SidebarAccessProps) {
-  const pathname = usePathname();
+export function AppMobileNav({ accountMode, vaultOwnerId, clerkEnabled, activePath }: SidebarAccessProps) {
+  const actualPath = usePathname();
+  const pathname = activePath ?? actualPath;
 
   return (
     <header className="sticky top-0 z-30 border-b border-stone-800 bg-stone-900 text-white md:hidden">
@@ -133,8 +136,9 @@ export function AppMobileNav({ accountMode, vaultOwnerId, clerkEnabled }: Sideba
   );
 }
 
-export function AppSidebar({ accountMode, vaultOwnerId, clerkEnabled }: SidebarAccessProps) {
-  const pathname = usePathname();
+export function AppSidebar({ accountMode, vaultOwnerId, clerkEnabled, activePath }: SidebarAccessProps) {
+  const actualPath = usePathname();
+  const pathname = activePath ?? actualPath;
   const [collapsed, setCollapsed] = useState(false);
 
   return (
@@ -162,7 +166,7 @@ export function AppSidebar({ accountMode, vaultOwnerId, clerkEnabled }: SidebarA
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 py-4">
+      <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-4">
         <AppNavigationList
           collapsed={collapsed}
           pathname={pathname}

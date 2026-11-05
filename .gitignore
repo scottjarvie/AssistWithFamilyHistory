@@ -83,3 +83,6 @@ design-council/*/round-*/judges/*.raw.md
 
 # Self-contained generated council gallery embeds the ignored capture assets.
 design-council/*/gallery.html
+
+# Small local-path adapter for the inline HTML renderer; portable gallery remains separate.
+design-council/*/gallery-inline.html

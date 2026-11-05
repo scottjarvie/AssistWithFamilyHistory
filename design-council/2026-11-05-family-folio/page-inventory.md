@@ -23,8 +23,8 @@ All 45 existing `app/**/page.tsx` files are represented below. “Pending” mea
 | `/sign-up/[[...sign-up]]` | Site-specific authentication | Clerk SignUp | Sign-up, configuration fallback | Pending |
 | `/local-session` | Site-specific local authentication | LocalSessionBridge | Guarded local mode and return destination | Pending |
 | `/settings/ai` | Redirect | redirect | Retain redirect to /app/settings/ai | Pending |
-| `/app` | Home — desk trays | DashboardView | First start, recent people, workspace counts, recent imports, full workspace navigation, story/research links | Pending |
-| `/app/people` | Collection | PeopleExplorerView | Name/FS ID/year search, research-state filter, living/deceased, unsourced provenance, source/import/memory/document/story counts, last import, pagination, first connection/import CTA | Pending |
+| `/app` | Home — desk trays | DashboardView, FolioTray | First start, recent people, workspace counts, recent imports, full workspace navigation, story/research links | Structural trays built in tranche 2; independent acceptance pending |
+| `/app/people` | Collection | PeopleExplorerView, CollectionWorkspace | Name/FS ID/year search, research-state filter, living/deceased, unsourced provenance, source/import/memory/document/story counts, last import, pagination, first connection/import CTA | Grouped Table/List/Grid, saved browser views, sort, density, columns and selection built in tranche 2; independent acceptance pending |
 | `/app/people/new` | Site-specific focused creation | PrivateFamilyStart | Two people and relationship, correction, cancel, duplicate and error states, existing-workspace alternative | Pending |
 | `/app/people/[personId]` | Record + sticky sections | PersonHeader, ResearchChecksPanel, ContextItemsPanel, MediaPrivacyReviewPanel, DocumentsViewer, LifeTimeline | Claims/facts, sources, events, relationships/provisional relatives, places, memories/media, research tasks/log/checks, context, stories, imports, document and AI-analysis links | Pending |
 | `/app/people/[personId]/raw` | Learning-reader (reexport) | Source-docs raw page | Raw evidence, copy/download, back navigation | Pending |

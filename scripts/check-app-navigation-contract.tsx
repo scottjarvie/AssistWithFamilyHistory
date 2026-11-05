@@ -112,7 +112,8 @@ const mobileMarkup = renderToStaticMarkup(
   />
 );
 
-assert.match(mobileMarkup, /bg-amber-700 text-white[^>]*><svg[^>]*>.*?<\/svg><span>People<\/span>/);
+assert.match(mobileMarkup, /<a aria-current="page"[^>]*href="\/app\/people"/);
+assert.equal([...mobileMarkup.matchAll(/aria-current="page"/g)].length, 1, "Only the current destination is marked active");
 assert.match(mobileMarkup, /text-stone-300 hover:bg-stone-800/);
 assert.match(mobileMarkup, />Timeline<\/span><span class="text-xs bg-stone-700/);
 assert.doesNotMatch(mobileMarkup, /href="#"/);

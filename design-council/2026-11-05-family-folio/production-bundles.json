@@ -1,0 +1,18 @@
+{
+  "measuredAt": "2026-11-05T08:29:46.222Z",
+  "method": "Unique entryJSFiles in the successful local production build; includes shared/layout/error/metadata entries. Uncompressed and per-file gzip sums are upper bounds, not measured transfer or startup cost. Development capture payloads are not production bundle measurements.",
+  "pages": [
+    {
+      "page": "/app/page",
+      "files": 11,
+      "uncompressedKB": 293,
+      "gzipKB": 90
+    },
+    {
+      "page": "/app/people/page",
+      "files": 13,
+      "uncompressedKB": 422,
+      "gzipKB": 128
+    }
+  ]
+}

@@ -48,8 +48,28 @@
           "selector": "a[href='/app/people/synthetic-0']"
         },
         {
-          "can": "see document counts",
-          "text": "2 documents"
+          "can": "see labelled document counts",
+          "selector": "td[data-label=\"Documents\"]"
+        },
+        {
+          "can": "change grouping",
+          "selector": "select[aria-label=\"Group records\"]"
+        },
+        {
+          "can": "change sorting",
+          "selector": "select[aria-label=\"Sort loaded records\"]"
+        },
+        {
+          "can": "save a named view",
+          "text": "+ New view"
+        },
+        {
+          "can": "manage named views",
+          "text": "Manage views"
+        },
+        {
+          "can": "choose density and columns",
+          "text": "Options"
         }
       ]
     },
@@ -74,6 +94,30 @@
     {
       "name": "people-dark",
       "path": "/design-council-preview?page=people&theme=dark"
+    },
+    {
+      "name": "people-grid",
+      "path": "/design-council-preview?page=people",
+      "variants": [
+        "desktop-light"
+      ],
+      "actions": [
+        {
+          "click": "button:has-text(\"grid\")"
+        }
+      ]
+    },
+    {
+      "name": "people-options",
+      "path": "/design-council-preview?page=people",
+      "variants": [
+        "mobile-light"
+      ],
+      "actions": [
+        {
+          "click": "summary:has-text(\"Options\")"
+        }
+      ]
     }
   ],
   "references": [

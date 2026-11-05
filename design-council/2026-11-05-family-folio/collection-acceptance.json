@@ -1,0 +1,23 @@
+{
+  "checkedAt": "2026-11-05T08:44:28.157Z",
+  "checks": [
+    "Table keeps all four identities and all six evidence/date columns",
+    "Numeric sort and direction change actual order",
+    "Grouping retains every record",
+    "Grid and List retain every record link and all chosen fields",
+    "Columns can be hidden explicitly and restored",
+    "Bulk selection changes the visible subset without losing records",
+    "Named view, edited indicator, discard and reload persistence work",
+    "Saved views are isolated between two fixture account preference keys",
+    "Preferences do not copy records or selection IDs",
+    "Removing a named view leaves all records intact",
+    "Bounded result retains its next-page destination",
+    "320px table becomes labelled records without page overflow",
+    "Phone Group and Sort sheets keep all choices within 320px",
+    "Phone Options exposes full view controls and Grid stays within 320px",
+    "Unbroken long record name wraps at 320px without hiding text",
+    "Presentation still works when browser storage is blocked",
+    "Client-rendered import dates keep explicit UTC meaning across locale/timezone without hydration errors"
+  ],
+  "errors": []
+}

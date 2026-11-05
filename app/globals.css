@@ -4,6 +4,10 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  --color-annotation: var(--annotation);
+  --color-annotation-surface: var(--annotation-surface);
+  --color-evidence: var(--evidence);
+  --color-evidence-surface: var(--evidence-surface);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-instrument-sans);
@@ -260,22 +264,32 @@
   }
 }
 
-/* Research folio primitives: quiet surfaces, folder labels, readable evidence. */
 @layer components {
-  .folio-tray {
-    position: relative;
-    border: 1px solid var(--border);
-    border-radius: 0 .5rem .5rem .5rem;
-    background: var(--card);
-    box-shadow: 0 2px 4px color-mix(in srgb, var(--foreground) 4%, transparent);
-  }
-  .folio-tray-heading {
-    border-bottom: 1px solid var(--border);
-    background: color-mix(in srgb, var(--muted) 55%, var(--card));
-  }
-  .folio-tray-heading h2 { font-family: var(--font-instrument-sans), sans-serif; font-size: .875rem; font-weight: 600; }
-  .folio-tray:before {
-    content: ''; position: absolute; top: -5px; left: -1px; width: 3rem; height: 5px;
-    background: var(--secondary); border: 1px solid var(--border); border-bottom: 0; border-radius: 4px 4px 0 0;
-  }
+  .research-desk { padding: 1.25rem 1rem; border-radius: .75rem; background: color-mix(in srgb, var(--secondary) 36%, transparent); }
+  .folio-tray { min-width: 0; display: flex; flex-direction: column; position: relative; border: 1px solid var(--border); border-radius: .5rem; background: var(--card); box-shadow: 0 2px 3px color-mix(in srgb, var(--foreground) 5%, transparent); }
+  .folio-tray-header { display: flex; align-items: flex-start; gap: 1rem; min-height: 3rem; padding: 1rem 1rem .5rem; }
+  .folio-tray-tab { position: relative; margin-top: -1.85rem; padding: .4rem .7rem; border: 1px solid var(--border); border-bottom: 0; border-radius: .4rem .4rem 0 0; background: var(--card); font: 600 .75rem/1.4 var(--font-ibm-plex-mono), monospace; letter-spacing: .06em; text-transform: uppercase; }
+  .folio-tray-footer { display: flex; align-items: center; justify-content: space-between; min-height: 44px; margin-top: auto; padding: .65rem 1rem; border-top: 1px solid var(--border); color: var(--primary); font-size: .875rem; font-weight: 600; }
+  .folio-tray-footer:hover { background: var(--muted); }
+  .folio-tray-footer:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+}
+@media (max-width: 639px) { .research-desk { padding: 1.25rem .5rem; } }
+
+@layer components {
+  .collection-table th, .collection-table td { padding: .75rem; }
+  .collection-table.is-compact th, .collection-table.is-compact td { padding: .4rem .6rem; }
+  .collection-table thead th { font-weight: 600; white-space: nowrap; }
+}
+/* Table becomes a labelled record on phones; every chosen column stays visible. */
+@media (max-width: 639px) {
+  .collection-table { display: block; }
+  .collection-table thead { display: none; }
+  .collection-table tbody { display: block; }
+  .collection-table tr { display: grid; grid-template-columns: 2rem minmax(0,1fr) minmax(0,1fr); padding: .75rem; }
+  .collection-table tr > th { min-width: 0; grid-column: 2 / -1; }
+  .collection-table th, .collection-table td { padding: .35rem; }
+  .collection-table tr > td:not(:first-child) { min-width: 0; }
+  .collection-table tr > td:not(:first-child) > span { display: block; overflow-wrap: anywhere; }
+  .collection-table tr > td:nth-child(2n + 3) { grid-column: 2; }
+  .collection-table tr > td:nth-child(2n + 4) { grid-column: 3; }
 }

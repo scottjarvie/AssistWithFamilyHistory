@@ -10,7 +10,7 @@ Structure follows Scott's Assist design playbook (4 November). Product nouns, pr
 - `.dark` defines the same semantic roles, including illustration colors and background washes. Hard-coded light surfaces remain migration work until each route's pass.
 - Cormorant Garamond: editorial page headings. Instrument Sans: controls, labels, tray headings and body. IBM Plex Mono: small provenance labels and quantities. Keep body labels readable; do not reduce text to fit a dense layout.
 - Base radius .5rem; hairline borders. Space with the existing 4px Tailwind scale. Compact controls retain 44px touch targets; mouse controls can be smaller when labelled and discoverable.
-- `.folio-tray`: restrained paper surface with a folder edge. `.folio-tray-heading`: grouped tray label above its contents. Do not create decorative empty panels.
+- `.folio-tray`: restrained paper surface with a folder edge. `.folio-tray-tab`: the tray label on its folder edge. Each tray carries one count and a named footer destination. Do not create decorative empty panels.
 - `ArchiveIllustration`: Codex-written inline SVG, using currentColor, no network request. Decorative fallback for a missing image, never a claim that a portrait exists.
 
 ## Page families
@@ -20,3 +20,11 @@ Home leads with recently touched evidence; collection uses real saved views and 
 ## Scope truth
 
 This document records the target system and implemented primitives. It does not claim every page uses them yet. No data model, permission, provider, import or publishing behavior changes accompany this design tranche. New backend capabilities require their own implementation evidence.
+
+## Structural tranche · 5 November
+
+`FolioTray` is the shared Home primitive; populated Home uses seven evidence-first trays and keeps the complete workspace index. `CollectionWorkspace` is the reusable loaded-record presentation: Table/List/Grid, grouping, sort/direction, density, chosen columns, selection and saved views. Its phone table becomes labelled records rather than shrinking columns. Phone Group/Sort are single-level choice sheets; presentation lives in Options. Real filters remain with each route's search form.
+
+Saved views/preferences live only in the current browser, with an account-specific key provided by the authenticated route; saving a view explicitly retains its search terms and facets. Record objects and selection IDs are never copied into preferences. Storage denial leaves controls usable for the session. The new kit makes no global-query or server-cursor claim.
+
+The synthetic harness may identify which surface it renders for navigation highlighting. It is development-only, contains invented data and is reachable on a dev server's network interface; never copy real data into it.

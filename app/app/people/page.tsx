@@ -89,6 +89,7 @@ export default async function PeoplePage({
 
   return (
     <PeopleExplorerView
+      preferenceKey={`awf.collection.people.${vaultOwnerId}`}
       people={visiblePeople}
       firstStartEligible={firstStartEligible}
       query={params.q}
