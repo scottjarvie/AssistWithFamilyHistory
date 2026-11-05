@@ -1,3 +1,4 @@
+import { legacyExternalIdentityIsVerified } from "./importIdentity";
 /* eslint-disable @typescript-eslint/no-explicit-any -- Batch items are validated by the public MCP Zod schemas before dispatch. */
 /**
  * Whole-tree import over MCP.
@@ -207,6 +208,11 @@ async function lookup(c: ChunkContext, singular: string, key: string, system: st
     if (legacy && legacy.externalKeyVersion !== 2) fail("LEGACY_IDENTITY_REVIEW_REQUIRED", "An older external-system key is ambiguous; its original record was retained.", "Have the person review the legacy mapping before retrying; do not rekey it automatically.");
   }
   const row = await find(mapKey);
+  const table = REFERENCE_TABLE[singular === "factGenerated" ? "fact" : singular === "citationGenerated" ? "citation" : singular];
+  if (row && row.externalKeyVersion !== 2 && singular !== "fact" && !await legacyExternalIdentityIsVerified(c.ctx, c.owner, row, table, system, key, c.job.importKey)) {
+    fail("LEGACY_IDENTITY_REVIEW_REQUIRED", "This older mapping has no independently verifiable external-identity origin.",
+      "Review the original record and mapping; a caller-chosen bookkeeping key cannot establish identity. Nothing was rekeyed or overwritten.");
+  }
   if (row && row.externalKeyVersion !== 2 && (legacyKey !== mapKey || key.startsWith(`${singular}:`) || key.includes(`:${singular}:`))) {
     fail("LEGACY_IDENTITY_REVIEW_REQUIRED", "This older mapping could have been built from different external-system components.", "Review the original mapping before linking; nothing was rekeyed.");
   }

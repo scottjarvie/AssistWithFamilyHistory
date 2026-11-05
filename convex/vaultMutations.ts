@@ -1,3 +1,4 @@
+import { legacyExternalIdentityIsVerified } from "./importIdentity";
 import { v } from "convex/values";
 import { mutation, type MutationCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
@@ -317,6 +318,7 @@ async function resolveCapturedFamilySearchPerson(ctx: MutationCtx, owner: string
   ).take(2);
   if (mappings.length > 1) throw new Error("AMBIGUOUS_PERSON_IDENTITY: Duplicate FamilySearch mappings require review; no person was changed.");
   const mapping = mappings[0];
+  if (mapping && mapping.externalKeyVersion !== 2 && !await legacyExternalIdentityIsVerified(ctx, owner, mapping, "persons", "familysearch", pid)) throw new Error("LEGACY_IDENTITY_REVIEW_REQUIRED: This mapping has no verifiable external identity; bookkeeping keys cannot authorize attribution.");
   if (mapping && mapping.externalKeyVersion !== 2 && (pid.trim().startsWith("person:") || pid.includes(":person:"))) {
     throw new Error("LEGACY_IDENTITY_REVIEW_REQUIRED: The unversioned FamilySearch mapping is ambiguous; its original was retained.");
   }
@@ -570,6 +572,7 @@ async function resolveCapturedFamilySearchSource(ctx: MutationCtx, owner: string
   ).take(2);
   if (mappings.length > 1) throw new Error("AMBIGUOUS_SOURCE_IDENTITY: Duplicate source mappings require review; all originals were retained.");
   const mapping = mappings[0];
+  if (mapping && mapping.externalKeyVersion !== 2 && !await legacyExternalIdentityIsVerified(ctx, owner, mapping, "sources", "familysearch", key)) throw new Error("LEGACY_IDENTITY_REVIEW_REQUIRED: This mapping has no verifiable external identity; bookkeeping keys cannot authorize attribution.");
   if (mapping && mapping.externalKeyVersion !== 2 && (key.trim().startsWith("source:") || key.includes(":source:"))) throw new Error("LEGACY_IDENTITY_REVIEW_REQUIRED: The older source mapping is ambiguous.");
   let mapped: Doc<"sources"> | null = null;
   if (mapping) {

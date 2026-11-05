@@ -637,3 +637,25 @@ standard/compatibility capture and notes, retained living-relative details and
 source privacy, birth/death corrections and type swaps, rollback/replay and a
 non-projected positive case. All remain UNRUN, not actual user/Tier2 proof.
 No UI route/layout changes, provider exercise, production writes or deployment.
+
+
+External identity origin and legacy evidence writers (2026-11-05):
+Ordinary MCP semantic keys now reject the reserved ext: namespace. Existing
+unversioned mappings require independent owned record evidence: an explicit
+matching outside ID, or owned import-job provenance. GEDCOM file identity needs
+the original owned file job. Fact tuples retain their separate complete
+person/event/outside-ID verification. The same origin check covers capture
+person/source resolution. Originals and old mappings are never auto-rekeyed.
+Legacy MCP evidence updates now retain imported material and refuse changes
+under notes, source facts, linked assertions or stories, including an unchanged
+citation whose source is being changed. Unattached genuine MCP proposals can
+still be corrected; new candidate citations/content can reference an unchanged
+imported source. New targets on an existing proposal require its current
+evidence to be confirmed. Imported citations require their import/review path
+for new attribution. Link identity includes field and never rewrites an old
+field-specific link. All guards share the existing mutation rollback boundary.
+Added 24 synthetic cases for namespace rejection, old spoof/verified mappings,
+GEDCOM file origin, direct/batch evidence refusal, retained annotations and
+accepted facts/stories, proposal corrections and additive field-specific links.
+All remain UNRUN. No browser, provider, actual user or runtime proof is claimed;
+no UI route/layout edits, production writes or deployment occurred.

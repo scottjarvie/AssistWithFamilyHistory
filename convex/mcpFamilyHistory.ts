@@ -4,7 +4,7 @@ import type { Doc, Id, TableNames } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { internalMutation, internalQuery } from "./_generated/server";
 import { anyApi } from "convex/server";
-import { FAMILY_HISTORY_MCP_LIMITS } from "../lib/mcp/contract";
+import { canonicalJson, FAMILY_HISTORY_MCP_LIMITS } from "../lib/mcp/contract";
 import { matchesVaultOwner } from "./vaultCore";
 import { canReadImportedNotes, filterMcpCitationRows, filterMcpSourceRows, withoutInlineSourceNotes } from "./importedContextPrivacy";
 import { assertGrantPermits } from "./mcpGrants";
@@ -54,7 +54,9 @@ export function cleanText(value: unknown, label: string, max: number, required =
 }
 
 function cleanKey(value: unknown, label: string): string {
-  return cleanText(value, label, FAMILY_HISTORY_MCP_LIMITS.recordKey, true)!;
+  const key = cleanText(value, label, FAMILY_HISTORY_MCP_LIMITS.recordKey, true)!;
+  if (key.toLowerCase().startsWith("ext:")) machineError("VALIDATION_ERROR", `${label} uses the reserved external-identity namespace.`, "Use an ordinary semantic create key; external identities belong to the tree-import tools.");
+  return key;
 }
 
 function pickDefined(input: Record<string, unknown>, keys: string[]) {
@@ -494,6 +496,53 @@ async function assertFactsAreProposals(ctx: MutationCtx, owner: string, facts: a
 /** Identity fields an AI may change only on a person it created itself. */
 const PERSON_IDENTITY_FIELDS = ["name", "alternateNames", "sex", "living", "birth", "death"] as const;
 
+/** Generic evidence updates cannot rewrite imported or already-attributed material. */
+async function assertEvidenceRefresh(
+  ctx: MutationCtx, owner: string, kind: "source" | "citation", row: Doc<"sources"> | Doc<"citations">,
+  patch: Record<string, unknown>, allowedCitation?: string, force = false, attributionOnly = false,
+) {
+  if (!force && !Object.entries(patch).some(([field, value]) => canonicalJson((row as any)[field] ?? null) !== canonicalJson(value ?? null))) return;
+  const reject = () => machineError("EVIDENCE_ATTRIBUTION_REVIEW_REQUIRED", "This update would replace imported material or change retained evidence attribution.",
+    "Retain the originals and propose a new source/citation, or review the imported assertion with the person through the import workflow.");
+  const max = FAMILY_HISTORY_MCP_LIMITS.contextRows;
+  const mappings = await ctx.db.query("mcpRecordKeys").withIndex("by_owner_type_record", q =>
+    q.eq("vaultOwnerId", owner).eq("recordType", kind).eq("recordId", String(row._id)),
+  ).take(max + 1);
+  if (row.importJobId || row.creationProvenance?.method === "import" || mappings.length > max
+    || mappings.some(mapping => mapping.externalKeyVersion === 2 || mapping.lastImportedJson !== undefined || mapping.recordKey.startsWith("ext:"))) reject();
+  const createKey = row.importKey?.startsWith("mcp:") ? row.importKey.slice(4) : undefined;
+  if (!createKey || !mappings.some(mapping => mapping.recordKey === createKey)) reject();
+  if (kind === "source") {
+    const id = row._id as Id<"sources">;
+    const citations = await ctx.db.query("citations").withIndex("by_source", q => q.eq("sourceId", id)).take(2);
+    if (citations.some(citation => String(citation._id) !== allowedCitation)) reject();
+    if (citations[0]) await assertEvidenceRefresh(ctx, owner, "citation", citations[0], {}, undefined, true);
+    const retained = await Promise.all([
+      ctx.db.query("notes").withIndex("by_subject", q => q.eq("subject.kind", "source").eq("subject.id", String(id))).first(),
+      ctx.db.query("sourceContents").withIndex("by_source", q => q.eq("sourceId", id)).first(),
+      ctx.db.query("sourceFacts").withIndex("by_source", q => q.eq("sourceId", id)).first(),
+      ctx.db.query("recordPersonas").withIndex("by_source", q => q.eq("sourceId", id)).first(),
+      ctx.db.query("media").withIndex("by_source", q => q.eq("sourceId", id)).first(),
+      ctx.db.query("connections").withIndex("by_from", q => q.eq("from.kind", "source").eq("from.id", String(id))).first(),
+      ctx.db.query("connections").withIndex("by_to", q => q.eq("to.kind", "source").eq("to.id", String(id))).first(),
+    ]);
+    if (retained.some(Boolean)) reject();
+  } else {
+    const id = row._id as Id<"citations">;
+    if ((row as Doc<"citations">).editedText) reject();
+    const note = await ctx.db.query("notes").withIndex("by_subject", q => q.eq("subject.kind", "citation").eq("subject.id", String(id))).first();
+    if (note) reject();
+    if (!attributionOnly) {
+      const retained = await Promise.all([
+        ctx.db.query("sourceFacts").withIndex("by_citation", q => q.eq("citationId", id)).first(),
+        ctx.db.query("citationLinks").withIndex("by_citation", q => q.eq("citationId", id)).first(),
+      ]);
+      const stories = await ctx.db.query("stories").withIndex("by_owner", q => q.eq("vaultOwnerId", owner)).take(max + 1);
+      if (retained.some(Boolean) || stories.length > max || stories.some(story => story.citationIds.includes(id))) reject();
+    }
+  }
+}
+
 async function saveSourceEvidenceRecord(ctx: MutationCtx, owner: string, input: any, provenance?: McpProvenance) {
   const now = Date.now();
   const sourceInput = input.source;
@@ -540,6 +589,7 @@ async function saveSourceEvidenceRecord(ctx: MutationCtx, owner: string, input: 
     ]);
     if (patch.notes !== undefined) patch.notes = cleanText(patch.notes, "source notes", FAMILY_HISTORY_MCP_LIMITS.notes);
     if (patch.citationText !== undefined) patch.citationText = cleanText(patch.citationText, "source citationText", FAMILY_HISTORY_MCP_LIMITS.notes);
+    await assertEvidenceRefresh(ctx, owner, "source", row, patch, input.citation?.mode === "update" ? input.citation.citationId : undefined);
     await ctx.db.patch(row._id, { ...patch, updatedAt: now });
     sourceId = row._id;
   }
@@ -589,33 +639,38 @@ async function saveSourceEvidenceRecord(ctx: MutationCtx, owner: string, input: 
     for (const key of ["extractedText", "editedText", "notes"]) {
       if (patch[key] !== undefined) patch[key] = cleanText(patch[key], `citation ${key}`, FAMILY_HISTORY_MCP_LIMITS.notes);
     }
+    await assertEvidenceRefresh(ctx, owner, "citation", row, patch);
     await ctx.db.patch(row._id, { ...patch, updatedAt: now });
     citationId = row._id;
   }
 
   const linkIds: string[] = [];
+  const additions = new Map<string, any>();
   for (const link of input.links ?? []) {
     const table = ({ person: "persons", relationship: "relationships", event: "events", place: "places" } as const)[link.targetType as "person"];
     if (!table) machineError("VALIDATION_ERROR", "Unsupported citation target.", "Link evidence to a person, relationship, event, or place.");
     await owned(ctx, table, link.targetId, owner, "Citation target");
-    const rows = await ctx.db
-      .query("citationLinks")
-      .withIndex("by_citation_and_target", (q) => q.eq("citationId", citationId).eq("targetType", link.targetType).eq("targetId", link.targetId))
-      .collect();
-    const existing = rows.find((row) => matchesVaultOwner(row.vaultOwnerId, owner));
-    if (existing) {
-      if (link.field !== undefined) await ctx.db.patch(existing._id, { field: link.field });
-      linkIds.push(String(existing._id));
-    } else {
-      linkIds.push(String(await ctx.db.insert("citationLinks", {
-        vaultOwnerId: owner,
-        citationId,
-        targetType: link.targetType,
-        targetId: link.targetId,
-        field: link.field,
-        createdAt: now,
-      })));
-    }
+    const rows = await ctx.db.query("citationLinks")
+      .withIndex("by_citation_and_target", q => q.eq("citationId", citationId).eq("targetType", link.targetType).eq("targetId", link.targetId))
+      .filter(q => q.and(q.eq(q.field("vaultOwnerId"), owner), q.eq(q.field("field"), link.field))).take(1);
+    if (rows[0]) linkIds.push(String(rows[0]._id));
+    else additions.set(canonicalJson([link.targetType, link.targetId, link.field ?? null]), link);
+  }
+  if (additions.size && !citationCreated) {
+    const citation = await owned(ctx, "citations", String(citationId), owner, "Citation");
+    const fields = ["isEvidence", "page", "confidence", "extractedText", "editedText", "url", "accessDate", "notes"] as const;
+    if (fields.some(field => {
+      const current = citation[field];
+      if (current === undefined || current === null || current === "" || (field === "isEvidence" && current === true && citationInput[field] === undefined)) return false;
+      return canonicalJson(current) !== canonicalJson(citationInput[field] ?? null);
+    })) machineError("EVIDENCE_ATTRIBUTION_REVIEW_REQUIRED", "New targets require confirmation of the citation's current evidence.", "Read the citation and resubmit its complete current evidence, or propose a new citation.");
+    await assertEvidenceRefresh(ctx, owner, "citation", citation, {}, undefined, true, true);
+  }
+  for (const link of additions.values()) {
+    linkIds.push(String(await ctx.db.insert("citationLinks", {
+      vaultOwnerId: owner, citationId, targetType: link.targetType, targetId: link.targetId,
+      field: link.field, createdAt: now,
+    })));
   }
 
   // The original record's own content and the people as it names them come
