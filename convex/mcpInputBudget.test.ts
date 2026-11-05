@@ -4,6 +4,10 @@
 import { createMcpHandler } from "@modelcontextprotocol/server";
 import { getFunctionName } from "convex/server";
 import { expect, test } from "vitest";
+import { convexTest } from "convex-test";
+import schema from "./schema";
+import { internal } from "./_generated/api";
+import { seedGrant } from "../lib/mcp/testSupport";
 import { createFamilyHistoryServer } from "./httpRoutes/mcp";
 import { FAMILY_HISTORY_MCP_LIMITS } from "../lib/mcp/contract";
 
@@ -63,4 +67,45 @@ test("a near-byte-limit mixed records batch reaches its writer", async () => {
   expect(write?.input.input.topics).toHaveLength(30);
   expect(write?.input.input.relationships).toHaveLength(50);
   expect(write?.input.input.stories).toHaveLength(10);
+});
+
+
+test("public MCP person context returns imported notes only for the owning deceased person", async () => {
+  const t = convexTest({ schema, modules: import.meta.glob("./**/*.ts"), transactionLimits: true });
+  const owner = "synthetic-import-notes-owner";
+  const principal = { issuer: "https://notes.example.test", subject: owner, clientId: "synthetic-notes-ai", scopes: [] };
+  const grantId = await seedGrant(t, { vaultOwnerId: owner });
+  const job = await t.mutation(internal.treeImport.beginTreeImport, { principal, grantId, operationId: "notes-begin", requestHash: "notes-begin", input: { importKey: "notes-tree", system: "familysearch" } }) as any;
+  const result = await t.action(internal.treeImport.importTreeBatch, { principal, grantId, operationId: "notes-import", requestHash: "notes-import", input: {
+    importJobId: job.importJobId, batchIndex: 0,
+    persons: [{ key: "D", living: false, names: [{ given: "Deceased" }] }, { key: "L", living: true, names: [{ given: "Living" }] }],
+    notes: [{ key: "ND", text: "Imported deceased biography", subject: { kind: "person", key: "D" } }, { key: "NL", text: "Private living biography", subject: { kind: "person", key: "L" } }],
+  } }) as any;
+  expect(result.results.filter((r: any) => r.status === "failed")).toEqual([]);
+  const deceased = result.results.find((r: any) => r.kind === "persons" && r.key === "D").id;
+  const living = result.results.find((r: any) => r.kind === "persons" && r.key === "L").id;
+  await t.run(async ctx => { await ctx.db.insert("notes", { vaultOwnerId: "synthetic-other-owner", subject: { kind: "person", id: deceased }, noteType: "biography", text: "Other owner's private note", createdAt: 1, updatedAt: 1 }); });
+  const callContext = async (subject: string, id: string) => {
+    const name = "family_history_get_context";
+    const resolution: Parameters<typeof createFamilyHistoryServer>[2] = { state: "active", grant: { grantId, clientId: principal.clientId, issuer: principal.issuer, scopes: ["family_history:context:read"], boundary: { kind: "whole_workspace" } } };
+    const actionCtx = { runQuery: (ref: any, args: any) => t.query(ref, args), runMutation: (ref: any, args: any) => t.mutation(ref, args) } as any;
+    const handler = createMcpHandler(() => createFamilyHistoryServer(actionCtx, { ...principal, subject }, resolution), { legacy: "stateless", responseMode: "json" });
+    try {
+      const response = await handler.fetch(new Request("https://notes.example.test/mcp", { method: "POST", headers: { "content-type": "application/json", "mcp-protocol-version": "2026-07-28", "mcp-method": "tools/call", "mcp-name": name }, body: JSON.stringify({ jsonrpc: "2.0", id: "notes", method: "tools/call", params: { name, arguments: { kind: "person", id }, _meta: { "io.modelcontextprotocol/protocolVersion": "2026-07-28", "io.modelcontextprotocol/clientInfo": { name: "notes-test", version: "1" }, "io.modelcontextprotocol/clientCapabilities": {} } } }) }));
+      expect(response.status).toBe(200);
+      return await response.json() as any;
+    } finally { await handler.close(); }
+  };
+  const deceasedContext = await callContext(owner, deceased);
+  expect(deceasedContext.result.isError).not.toBe(true);
+  expect(deceasedContext.result.structuredContent.notes).toEqual([expect.objectContaining({ text: "Imported deceased biography" })]);
+  const livingContext = await callContext(owner, living);
+  expect(livingContext.result.isError).not.toBe(true);
+  expect(livingContext.result.structuredContent.notes).toEqual([]);
+  const foreignContext = await callContext("synthetic-other-owner", deceased);
+  for (const payload of [deceasedContext, livingContext, foreignContext]) expect(JSON.stringify(payload)).not.toContain("Other owner's private note");
+  for (const payload of [livingContext, foreignContext]) {
+    expect(JSON.stringify(payload)).not.toContain("Imported deceased biography");
+    expect(JSON.stringify(payload)).not.toContain("Private living biography");
+  }
 });

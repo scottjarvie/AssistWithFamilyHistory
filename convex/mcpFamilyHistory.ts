@@ -1303,6 +1303,27 @@ export const search = internalQuery({
   },
 });
 
+async function readPersonNoteContext(ctx: QueryCtx, owner: string, person: Doc<"persons">) {
+  const max = FAMILY_HISTORY_MCP_LIMITS.contextRows;
+  const rows = person.living ? [] : (await ctx.db.query("notes")
+    .withIndex("by_subject", q => q.eq("subject.kind", "person").eq("subject.id", String(person._id)))
+    .take(max + 1)).filter(row => row.vaultOwnerId === owner);
+  return {
+    notes: rows.slice(0, max).map(row => ({ id: row._id, noteType: row.noteType, title: row.title ?? null, text: row.text })),
+    truncated: rows.length > max,
+  };
+}
+
+/** Shared by the actual public person-context caller and the internal reader. */
+export const getPersonNotes = internalQuery({
+  args: { principal: principalValidator, personId: v.string() },
+  handler: async (ctx, args) => {
+    const owner = ownerFromPrincipal(args.principal);
+    const person = await owned(ctx, "persons", args.personId, owner, "Person");
+    return readPersonNoteContext(ctx, owner, person);
+  },
+});
+
 export const getRecordContext = internalQuery({
   args: { principal: principalValidator, kind: v.string(), id: v.string() },
   handler: async (ctx, args) => {
@@ -1333,18 +1354,10 @@ export const getRecordContext = internalQuery({
         .filter((row): row is Doc<"citations"> => Boolean(row && matchesVaultOwner(row.vaultOwnerId, owner)));
       const sources = (await Promise.all(citations.map((citation) => ctx.db.get(citation.sourceId))))
         .filter((row): row is Doc<"sources"> => Boolean(row && matchesVaultOwner(row.vaultOwnerId, owner)));
-      // Notes about this person (imported or otherwise). A living person's notes
-      // stay out of AI context, the same promise the context:read scope makes.
-      const noteRows = person.living
-        ? []
-        : (await ctx.db
-          .query("notes")
-          .withIndex("by_subject", (q) => q.eq("subject.kind", "person").eq("subject.id", String(person._id)))
-          .take(max + 1))
-          .filter((row) => row.vaultOwnerId === owner);
+      const noteContext = await readPersonNoteContext(ctx, owner, person);
       return {
         kind: "person",
-        notes: noteRows.slice(0, max).map((row) => ({ id: row._id, noteType: row.noteType, title: row.title ?? null, text: row.text })),
+        notes: noteContext.notes,
         person,
         relationships,
         events,
@@ -1353,7 +1366,7 @@ export const getRecordContext = internalQuery({
         stories: stories.filter((row) => matchesVaultOwner(row.vaultOwnerId, owner)).slice(0, max),
         researchTasks: tasks.filter((row) => matchesVaultOwner(row.vaultOwnerId, owner)).slice(0, max),
         researchFindings: findings.filter((row) => matchesVaultOwner(row.vaultOwnerId, owner)).slice(0, max),
-        truncated: [asPerson1, asPerson2, personEventLinks, stories, tasks, findings, citationLinks, noteRows].some((rows) => rows.length > max),
+        truncated: noteContext.truncated || [asPerson1, asPerson2, personEventLinks, stories, tasks, findings, citationLinks].some((rows) => rows.length > max),
       };
     }
     if (args.kind === "story") {

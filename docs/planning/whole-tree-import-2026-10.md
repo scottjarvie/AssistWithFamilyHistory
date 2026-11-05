@@ -271,7 +271,7 @@ Prefer a stable explicit key for facts or citations that other records reference
 Citation results report both `key` and `keyOrigin` (`explicit` or `generated`).
 Use those values in a note's subject to name the intended citation. Fact targets
 and note subjects also accept `keyOrigin`; a generated fact's local key is its
-normalized type plus `~` and the hash used by `factKeyFor` (without the person
+bounded `fact~` hash returned by `factReferenceKeyFor` (without a person
 prefix). Supplying an explicit fact ID avoids needing to compute that fallback.
 When `keyOrigin` is omitted, lookup succeeds only when the key resolves in one
 domain; two different matches return `AMBIGUOUS_TARGET`, without guessing.
@@ -281,3 +281,9 @@ Field-specific links retain separate entries for each supported field, including
 a whole-record link without a field. Repeating a batch adds no duplicate links.
 Older rows without matching outside-ID evidence cannot be refreshed as explicit
 IDs merely because a generated key happens to spell an incoming explicit ID.
+
+Person context on the public MCP route now reads imported person notes through
+the same bounded owner-filtered helper as the internal reader. Living-person
+notes remain withheld. Dry-run planning also restores local and cross-chunk
+planned identities when one item fails, matching the real nested transaction's
+rollback boundary; dependent rows cannot succeed against a failed phantom row.

@@ -906,8 +906,11 @@ export function createFamilyHistoryServer(
         }));
         if (!workspace?.person?._id) return workspace;
         // The person as each record names them, and their typed connections.
-        const originals = await actionCtx.runQuery(mcp.getPersonOriginals, { principal, personId: String(workspace.person._id) });
-        return { ...workspace, ...originals, truncated: workspace.truncated || originals.truncated };
+        const [originals, noteContext] = await Promise.all([
+          actionCtx.runQuery(mcp.getPersonOriginals, { principal, personId: String(workspace.person._id) }),
+          actionCtx.runQuery(mcp.getPersonNotes, { principal, personId: String(workspace.person._id) }),
+        ]);
+        return { ...workspace, ...originals, notes: noteContext.notes, truncated: workspace.truncated || originals.truncated || noteContext.truncated };
       }
       if (input.kind === "story") {
         const bundle = await actionCtx.runQuery(vault.getStoryReview, {

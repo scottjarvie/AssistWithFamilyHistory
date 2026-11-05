@@ -212,11 +212,15 @@ export function factTargetKey(personKey: string, key: string): string {
   return `${encodeURIComponent(personKey.trim())}/${encodeURIComponent(key.trim())}`;
 }
 
-export function factKeyFor(personKey: string, fact: FactInput): string {
-  const key = fact.key?.trim() || `${normalizeFactType(fact.type)}~${stableHash(JSON.stringify([
-    fact.date?.original ?? "", fact.place?.original ?? "", fact.value ?? "",
+/** A bounded local reference key, even for the longest allowed outside type. */
+export function factReferenceKeyFor(fact: FactInput): string {
+  return fact.key?.trim() || `fact~${stableHash(JSON.stringify([
+    normalizeFactType(fact.type), fact.date?.original ?? "", fact.place?.original ?? "", fact.value ?? "",
   ]))}`;
-  return factTargetKey(personKey, key);
+}
+
+export function factKeyFor(personKey: string, fact: FactInput): string {
+  return factTargetKey(personKey, factReferenceKeyFor(fact));
 }
 
 /** Structured tuples keep delimiters inside a target from changing its identity. */

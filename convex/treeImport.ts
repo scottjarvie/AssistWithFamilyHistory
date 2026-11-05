@@ -786,6 +786,8 @@ async function runChunk(c: ChunkContext, items: TreeImportItem[]): Promise<ItemR
   const results: ItemResult[] = [];
   for (const item of items) {
     const importer = IMPORTERS[item.kind];
+    // Match a real item's nested mutation rollback boundary for dry planning.
+    const before = c.w.dryRun ? { local: new Map(c.local), plannedNow: c.plannedNow.length, duplicatesSuggested: c.duplicatesSuggested } : null;
     try {
       const saved = c.w.dryRun
         ? await importer(c, item.item)
@@ -795,6 +797,12 @@ async function runChunk(c: ChunkContext, items: TreeImportItem[]): Promise<ItemR
       if (!c.w.dryRun) c.duplicatesSuggested += saved.possibleDuplicates?.length ?? 0;
       results.push({ kind: item.kind, index: item.index, ...saved });
     } catch (error) {
+      if (before) {
+        c.local.clear();
+        for (const [key, id] of before.local) c.local.set(key, id);
+        c.plannedNow.length = before.plannedNow;
+        c.duplicatesSuggested = before.duplicatesSuggested;
+      }
       if (error instanceof ItemFailure) {
         results.push({ kind: item.kind, index: item.index, key: keyOf(item), status: "failed", reason: `${error.code}: ${error.message}`, whatToDo: error.whatToDo });
         continue;

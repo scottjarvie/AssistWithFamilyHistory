@@ -18,7 +18,7 @@ import schema from "./schema";
 import { internal } from "./_generated/api";
 import { seedGrant } from "../lib/mcp/testSupport";
 import { generateSyntheticTree, packBatches, syntheticPid } from "../lib/treeImport/syntheticTree";
-import { citationKeyFor, externalRecordKey, factKeyFor, legacyCitationKeyFor, legacyFactKeyFor, type TreeImportBatch } from "../lib/treeImport/model";
+import { citationKeyFor, externalRecordKey, factKeyFor, factReferenceKeyFor, legacyCitationKeyFor, legacyFactKeyFor, type TreeImportBatch } from "../lib/treeImport/model";
 
 const modules = import.meta.glob("./**/*.ts");
 const OWNER = "user_tree_import_owner_AAAAAAAA";
@@ -665,4 +665,68 @@ test("an explicit outside ID cannot overwrite a legacy generated row with the sa
   expect(result.results.every((r: any) => r.status === "failed" && r.reason.includes("LEGACY_IDENTITY_REVIEW_REQUIRED"))).toBe(true);
   const after = await t.run(async ctx => ({ events: await ctx.db.query("events").collect(), citations: await ctx.db.query("citations").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() }));
   expect(after).toEqual(before);
+});
+
+
+test("maximum-length fact types keep generated references within the public key limit", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  const fact = { type: "X".repeat(200), value: "Long type" };
+  const key = factReferenceKeyFor(fact);
+  expect(key.length).toBeLessThanOrEqual(200);
+  const result = await send(t, grant, job.importJobId, 0, {
+    sources: [{ key: "s", title: "Synthetic" }],
+    persons: [{ key: "P", living: false, names: [{ given: "Synthetic" }], facts: [fact] }],
+    citations: [{ key: "c", sourceKey: "s", targets: [{ kind: "fact", personKey: "P", key, keyOrigin: "generated" }] }],
+    notes: [{ key: "n", text: "Generated fact", subject: { kind: "fact", personKey: "P", key, keyOrigin: "generated" } }],
+  });
+  expect(result.results.filter((r: any) => r.status === "failed")).toEqual([]);
+  const data = await t.run(async ctx => ({ events: await ctx.db.query("events").collect(), links: await ctx.db.query("citationLinks").collect(), notes: await ctx.db.query("notes").collect() }));
+  expect(data.events).toHaveLength(1);
+  expect(data.links[0].targetId).toBe(data.events[0]._id);
+  expect(data.notes[0].subject.id).toBe(data.events[0]._id);
+});
+
+test("failed dry-run items roll back planned identities so dependents match real execution", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  await send(t, grant, job.importJobId, 0, { persons: [{ key: "Legacy", living: false, names: [{ given: "Original" }], facts: [{ key: "C", type: "residence" }] }] });
+  await t.run(async ctx => {
+    const mapping = (await ctx.db.query("mcpRecordKeys").collect()).find(r => r.recordKey === externalRecordKey("familysearch", "fact", "Legacy/C"))!;
+    await ctx.db.patch(mapping._id, { recordKey: externalRecordKey("familysearch", "fact", "A/B/C") });
+  });
+  const batch: TreeImportBatch = {
+    sources: [{ key: "s", title: "Synthetic" }],
+    persons: [{ key: "A/B", living: false, names: [{ given: "Will fail" }], facts: [{ key: "C", type: "residence" }] }],
+    relationships: [{ key: "r", type: "ParentChild", person1Key: "Legacy", person2Key: "A/B" }],
+    citations: [{ key: "c", sourceKey: "s", targets: [{ kind: "person", key: "A/B" }] }],
+    notes: [{ key: "n", text: "Dependent", subject: { kind: "person", key: "A/B" } }],
+  };
+  // A later planning chunk receives only identities from successful earlier rows.
+  const initialPlan = await t.query(internal.treeImport.planTreeImportChunk, {
+    principal: principal(), grantId: grant, importJobId: job.importJobId, operationId: "plan-first", plannedKeys: [],
+    items: [{ kind: "sources", index: 0, item: batch.sources![0] }, { kind: "persons", index: 0, item: batch.persons![0] }],
+  });
+  expect(initialPlan.plannedKeys).toEqual([externalRecordKey("familysearch", "source", "s")]);
+  const dependentPlan = await t.query(internal.treeImport.planTreeImportChunk, {
+    principal: principal(), grantId: grant, importJobId: job.importJobId, operationId: "plan-next", plannedKeys: initialPlan.plannedKeys,
+    items: [{ kind: "relationships", index: 0, item: batch.relationships![0] }, { kind: "citations", index: 0, item: batch.citations![0] }, { kind: "notes", index: 0, item: batch.notes![0] }],
+  });
+  expect(dependentPlan.results.every(row => row.status === "failed")).toBe(true);
+  expect(dependentPlan.plannedKeys).toEqual([]);
+  const peopleBefore = await countRows(t, "persons");
+  const keysBefore = await countRows(t, "mcpRecordKeys");
+  const dry = await send(t, grant, job.importJobId, 1, batch, { dryRun: true }, "dry-failed-person");
+  expect(await countRows(t, "persons")).toBe(peopleBefore);
+  expect(await countRows(t, "mcpRecordKeys")).toBe(keysBefore);
+  const real = await send(t, grant, job.importJobId, 1, batch, {}, "real-failed-person");
+  const statuses = (r: any) => r.results.map((row: any) => ({ kind: row.kind, status: row.status, code: row.reason?.split(":")[0] }));
+  expect(statuses(dry)).toEqual(statuses(real));
+  expect(real.results.filter((r: any) => r.status === "failed")).toHaveLength(4);
+  expect(await countRows(t, "persons")).toBe(peopleBefore);
+  expect(await countRows(t, "relationships")).toBe(0);
+  expect(await countRows(t, "citations")).toBe(0);
+  expect(await countRows(t, "notes")).toBe(0);
 });
