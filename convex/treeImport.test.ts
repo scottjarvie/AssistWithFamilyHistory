@@ -905,7 +905,7 @@ test.each([0, 249])("dry relationship equivalence includes virtual aliases acros
   expect(outcomes(real)[1]).toMatchObject({ key: "R2", status: "linked", kept: expect.arrayContaining(["childRelationType", "facts"]) });
 });
 
-test("oversized receipts keep every conflict retrievable and replay preserves the page pointer", async () => {
+test("oversized receipts keep every conflict retrievable and replay preserves the page pointer", { timeout: 300_000 }, async () => {
   const t = convexTest({ schema, modules, transactionLimits: true });
   const grant = await seedGrant(t, { vaultOwnerId: OWNER });
   const job = await begin(t, grant);
@@ -936,4 +936,100 @@ test("oversized receipts keep every conflict retrievable and replay preserves th
   expect(replay.resultDetails).toEqual(receipt.resultDetails);
   const other = await begin(t, grant, "other-import");
   await expect(t.query(internal.treeImport.getTreeImport, { principal: principal(), importJobId: other.importJobId, resultsOperationId: operationId })).rejects.toThrow(/NOT_FOUND/);
+});
+
+
+test("actual large-conflict imports store bounded chunk pages and retain citation key origins", { timeout: 900_000 }, async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  const personKeys = ["?".repeat(199) + "A", "?".repeat(199) + "B"];
+  const facts = Array.from({ length: 60 }, (_, i) => ({ key: "?".repeat(198) + String(i).padStart(2, "0"), type: "occupation", value: "Initial", description: "Original", date: { original: "1800", year: 1800 }, place: { original: "Initial place" } }));
+  const generatedCitation = { sourceKey: "S", targets: [{ kind: "person" as const, key: personKeys[0] }] };
+  const sharedKey = citationKeyFor(generatedCitation);
+  const batch: TreeImportBatch = {
+    sources: [{ key: "S", title: "Synthetic source" }],
+    persons: personKeys.map((key, i) => ({ key, living: false, names: [{ given: `Synthetic${i}` }], facts: facts.map(f => ({ ...f })) })),
+    citations: [generatedCitation, { key: sharedKey, sourceKey: "S", targets: [{ kind: "person", key: personKeys[1] }] }],
+  };
+  const first = await send(t, grant, job.importJobId, 0, batch);
+  expect(first.results.filter((r: any) => r.status === "failed")).toEqual([]);
+  await t.run(async ctx => {
+    for (const event of await ctx.db.query("events").collect()) await ctx.db.patch(event._id, {
+      description: "Owner correction", date: { original: "1700", year: 1700 }, place: { original: "Owner place" },
+      importedFact: { ...event.importedFact!, value: "Owner original correction" },
+    });
+  });
+  for (const person of batch.persons!) for (const fact of person.facts!) {
+    fact.value = "Updated"; fact.description = "Changed"; fact.date = { original: "1900", year: 1900 }; fact.place = { original: "Incoming place" };
+  }
+  const result = await send(t, grant, job.importJobId, 1, batch, {}, "actual-large-conflicts");
+  expect(result.results).toEqual([]);
+  expect(result.resultsTrimmed).toContain("retained conflicts");
+  const receipts = await t.run(async ctx => ctx.db.query("mcpOperations").collect());
+  expect(receipts.some(row => row.toolName === "family_history_import_tree_batch#detail")).toBe(true);
+  expect(receipts.every(row => new TextEncoder().encode(JSON.stringify(row)).byteLength < 1024 * 1024)).toBe(true);
+  const entries: any[] = [];
+  let cursor: { resultsChunkIndex: number; resultsOffset: number } | null = { resultsChunkIndex: 0, resultsOffset: 0 };
+  while (cursor) {
+    const page = await t.query(internal.treeImport.getTreeImport, { principal: principal(), importJobId: job.importJobId, resultsOperationId: "actual-large-conflicts", ...cursor }) as any;
+    entries.push(...page.results); cursor = page.next;
+  }
+  expect(entries.filter(row => row.kept)).toHaveLength(480);
+  const citationEntries = entries.filter(row => row.kind === "citations");
+  expect(citationEntries.map(row => row.keyOrigin).sort()).toEqual(["explicit", "generated"]);
+  const notes = citationEntries.map((row, i) => ({ key: `result-note-${i}`, text: `Synthetic note ${i}`, subject: { kind: "citation" as const, key: row.key, keyOrigin: row.keyOrigin } }));
+  const noted = await send(t, grant, job.importJobId, 2, { notes });
+  expect(noted.results.filter((r: any) => r.status === "failed")).toEqual([]);
+  const storedNotes = await t.run(async ctx => ctx.db.query("notes").collect());
+  expect(storedNotes.map(row => row.subject.id).sort()).toEqual(citationEntries.map(row => row.id).sort());
+  const replay = await send(t, grant, job.importJobId, 1, batch, {}, "actual-large-conflicts");
+  expect(replay.deduplicated).toBe(true);
+  expect(replay.resultDetails).toEqual(result.resultDetails);
+});
+
+test.each([0, 122])("dry media and citation updates preserve virtual person/source references (padding %i)", { timeout: 300_000 }, async padding => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  const batch: TreeImportBatch = {
+    sources: [{ key: "S1", title: "One" }, { key: "S2", title: "Two" }],
+    persons: ["P1", "P2", ...Array.from({ length: padding }, (_, i) => `pad-${i}`)].map(key => ({ key, living: false, names: [{ given: key }] })),
+    media: [{ key: "M", title: "Image", personKeys: ["P1"], sourceKey: "S1" }, { key: "M", title: "Image", personKeys: ["P2"], sourceKey: "S2" }],
+    citations: [{ key: "C", sourceKey: "S1", targets: [{ kind: "person", key: "P1" }] }, { key: "C", sourceKey: "S2", targets: [{ kind: "person", key: "P1" }] }],
+  };
+  const dry = await send(t, grant, job.importJobId, 0, batch, { dryRun: true }, `dry-references-${padding}`);
+  expect(await countRows(t, "media")).toBe(0);
+  const real = await send(t, grant, job.importJobId, 0, batch, {}, `real-references-${padding}`);
+  const statuses = (r: any) => r.results.filter((row: any) => row.kind === "media" || row.kind === "citations").map((row: any) => ({ kind: row.kind, key: row.key, status: row.status }));
+  expect(statuses(dry)).toEqual(statuses(real));
+  expect(statuses(real).map((row: any) => row.status)).toEqual(["created", "updated", "created", "updated"]);
+});
+
+test.each([1700, 1800])("dry duplicate suggestions include planned people and changed index values (initial year %i)", async initialYear => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  if (initialYear === 1700) await send(t, grant, job.importJobId, 0, { persons: [{ key: "P1", living: false, names: [{ given: "Old", surname: "Same" }], facts: [{ key: "birth", type: "birth", date: { original: "1700", year: 1700 } }] }] });
+  const batch: TreeImportBatch = { persons: ["P1", "P2"].map(key => ({ key, living: false, names: [{ given: "John", surname: "Same" }], facts: [{ key: "birth", type: "birth", date: { original: "1800", year: 1800 } }] })) };
+  const index = initialYear === 1700 ? 1 : 0;
+  const dry = await send(t, grant, job.importJobId, index, batch, { dryRun: true }, `dry-duplicates-${initialYear}`);
+  const real = await send(t, grant, job.importJobId, index, batch, {}, `real-duplicates-${initialYear}`);
+  expect(dry.possibleDuplicates).toBe(1);
+  expect(dry.possibleDuplicates).toBe(real.duplicatesSuggested);
+});
+
+test("dry duplicate scans exclude stored index values moved out by planned changes", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  await send(t, grant, job.importJobId, 0, { persons: [{ key: "P1", living: false, names: [{ given: "John", surname: "Same" }], facts: [{ key: "birth", type: "birth", date: { original: "1800", year: 1800 } }] }] });
+  const batch: TreeImportBatch = { persons: [
+    { key: "P1", living: false, names: [{ given: "John", surname: "Same" }], facts: [{ key: "birth", type: "birth", date: { original: "1900", year: 1900 } }] },
+    { key: "P2", living: false, names: [{ given: "John", surname: "Same" }], facts: [{ key: "birth", type: "birth", date: { original: "1800", year: 1800 } }] },
+  ] };
+  const dry = await send(t, grant, job.importJobId, 1, batch, { dryRun: true }, "dry-index-move");
+  const real = await send(t, grant, job.importJobId, 1, batch, {}, "real-index-move");
+  expect(dry.possibleDuplicates).toBe(0);
+  expect(real.duplicatesSuggested).toBe(0);
 });

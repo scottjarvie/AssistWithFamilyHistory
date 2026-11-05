@@ -328,3 +328,15 @@ those details are explicitly unavailable, never fabricated.
 Dry-run relationship equivalence consults planned relationships in addition to
 stored relationships, so aliases link to one relationship and report retained
 lineage/facts even when the people themselves are only planned.
+
+Expanded chunk results are now byte-bounded before persistence. Large conflict
+sets go into owner/import-bound detail receipts of at most 48 KB of entries;
+the chunk receipt carries compact rows and page counts. Replay reuses those
+pages, and result retrieval retains `keyOrigin` on ordinary and conflict entries.
+This protects the [Convex document limit](https://docs.convex.dev/production/state/limits)
+at the chunk write, before the later batch-summary budget is applied.
+
+Virtual media and citations retain planned person/source IDs in their documents
+and baselines. Duplicate suggestions use effective planned person values plus a
+bounded persisted scan, including planned index moves. Large index adjustments
+refuse the dry run explicitly rather than increasing scan cost without bound.

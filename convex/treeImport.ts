@@ -82,6 +82,7 @@ const self = (internal as any).treeImport;
 type Writer = {
   dryRun: boolean;
   rows?: Map<string, any>;
+  personIndexes?: Map<string, { surname: string; year: number | null }>;
   insert<T extends TableNames>(table: T, doc: any): Promise<string>;
   patch(id: string, doc: Record<string, unknown>): Promise<void>;
 };
@@ -94,14 +95,15 @@ function liveWriter(ctx: MutationCtx): Writer {
   };
 }
 
-function dryWriter(scope: string, rows: Map<string, any>): Writer {
+function dryWriter(scope: string, rows: Map<string, any>, personIndexes: Map<string, { surname: string; year: number | null }>): Writer {
   let counter = 0;
   return {
     dryRun: true,
     rows,
+    personIndexes,
     insert: async (table, doc) => {
       const id = `dry:${encodeURIComponent(scope)}:${table}:${(counter += 1)}`;
-      rows.set(id, { ...clean(doc), _id: id });
+      rows.set(id, { ...clean(doc), _id: id, _creationTime: Date.now() });
       return id;
     },
     patch: async (id, doc) => {
@@ -274,7 +276,10 @@ async function ownedRow<T extends TableNames>(c: ChunkContext, table: T, id: str
   if (!normalized) return null;
   const row = await c.ctx.db.get(normalized as Id<T>);
   if (!row || !matchesVaultOwner((row as any).vaultOwnerId, c.owner)) return null;
-  if (c.w.rows) c.w.rows.set(id, clean(row));
+  if (c.w.rows) {
+    c.w.rows.set(id, clean(row));
+    if (table === "persons") c.w.personIndexes?.set(id, { surname: (row as Doc<"persons">).name.surname, year: (row as Doc<"persons">).birth?.date?.year ?? null });
+  }
   return row as Doc<T>;
 }
 
@@ -505,12 +510,21 @@ async function importFact(c: ChunkContext, personId: string, personKey: string, 
 
 async function duplicateCandidates(c: ChunkContext, name: { given: string; surname: string }, birthYear: number | undefined) {
   if (birthYear === undefined || !name.surname) return [];
-  const rows = await c.ctx.db
+  const inRange = (row: any) => row?.vaultOwnerId === c.owner && row.name?.surname === name.surname && typeof row.birth?.date?.year === "number" && Math.abs(row.birth.date.year - birthYear) <= 2;
+  const movedOut = [...(c.w.personIndexes ?? [])].filter(([id, index]) => index.surname === name.surname && index.year !== null && Math.abs(index.year - birthYear) <= 2 && !inRange(c.w.rows?.get(id))).length;
+  if (movedOut > TREE_IMPORT_LIMITS.duplicateScanPerPerson) fail("DRY_RUN_PLAN_LIMIT", "Too many planned index moves for a bounded duplicate scan.", "Use smaller dry-run batches; nothing was saved.");
+  const persisted = await c.ctx.db
     .query("persons")
     .withIndex("by_owner_surname_birth_year", (q) =>
       q.eq("vaultOwnerId", c.owner).eq("name.surname", name.surname).gte("birth.date.year", birthYear - 2).lte("birth.date.year", birthYear + 2),
-    )
-    .take(TREE_IMPORT_LIMITS.duplicateScanPerPerson);
+    ).take(TREE_IMPORT_LIMITS.duplicateScanPerPerson + movedOut);
+  const effective = new Map<string, any>();
+  for (const row of persisted) {
+    const current = c.w.rows?.get(String(row._id)) ?? row;
+    if (inRange(current)) effective.set(String(row._id), current);
+  }
+  for (const row of c.w.rows?.values() ?? []) if (typeof row.living === "boolean" && inRange(row)) effective.set(String(row._id), row);
+  const rows = [...effective.values()].sort((a, b) => a.birth.date.year - b.birth.date.year || (a._creationTime ?? a.createdAt) - (b._creationTime ?? b.createdAt)).slice(0, TREE_IMPORT_LIMITS.duplicateScanPerPerson);
   const found: string[] = [];
   for (const row of rows) {
     // Persons have no explicit AI privacy review flag yet. Fail closed for
@@ -681,8 +695,8 @@ async function importMedia(c: ChunkContext, item: any): Promise<Omit<ItemResult,
       url: item.url,
       mimeType: item.mimeType,
       date: item.date,
-      personIds: personIds.filter((id) => !isPlaceholder(id)),
-      sourceId: sourceId && !isPlaceholder(sourceId) ? sourceId : undefined,
+      personIds,
+      sourceId,
       familySearchUrl: c.job.system === "familysearch" ? item.url : undefined,
       externalIds: externalIdsFor(c, key, undefined, item.url),
     },
@@ -730,7 +744,7 @@ async function importCitation(c: ChunkContext, item: any): Promise<Omit<ItemResu
     key,
     existingId,
     doc: {
-      sourceId: isPlaceholder(sourceId) ? undefined : sourceId,
+      sourceId,
       page: item.page,
       confidence: confidenceForQuality(item.quality),
       extractedText: cleanText(item.extractedText, "citation extractedText", FAMILY_HISTORY_MCP_LIMITS.notes),
@@ -814,7 +828,7 @@ async function runChunk(c: ChunkContext, items: TreeImportItem[]): Promise<ItemR
   for (const item of items) {
     const importer = IMPORTERS[item.kind];
     // Match a real item's nested mutation rollback boundary for dry planning.
-    const before = c.w.dryRun ? { local: new Map(c.local), plannedNow: c.plannedNow.length, duplicatesSuggested: c.duplicatesSuggested, rows: new Map(c.w.rows), baselines: new Map(c.baselines) } : null;
+    const before = c.w.dryRun ? { local: new Map(c.local), plannedNow: c.plannedNow.length, duplicatesSuggested: c.duplicatesSuggested, rows: new Map(c.w.rows), baselines: new Map(c.baselines), personIndexes: new Map(c.w.personIndexes) } : null;
     try {
       const saved = c.w.dryRun
         ? await importer(c, item.item)
@@ -830,6 +844,7 @@ async function runChunk(c: ChunkContext, items: TreeImportItem[]): Promise<ItemR
         c.plannedNow.length = before.plannedNow;
         c.duplicatesSuggested = before.duplicatesSuggested;
         c.baselines = before.baselines;
+        if (c.w.personIndexes) { c.w.personIndexes.clear(); for (const [id, index] of before.personIndexes) c.w.personIndexes.set(id, index); }
         if (c.w.rows) {
           c.w.rows.clear();
           for (const [id, row] of before.rows) c.w.rows.set(id, row);
@@ -919,18 +934,55 @@ export const planTreeImportChunk = internalQuery({
       machineError("VALIDATION_ERROR", "Dry-run keys need their original identity mappings.", "Restart the dry run and carry plannedRecords alongside plannedKeys between chunks.");
     }
     const c: ChunkContext = {
-      ctx, w: dryWriter(args.operationId, new Map<string, any>(args.plannedState?.rows ?? [])), owner, job, provenance: importProvenance(args.principal, args.operationId),
+      ctx, w: dryWriter(args.operationId, new Map<string, any>(args.plannedState?.rows ?? []), new Map<string, { surname: string; year: number | null }>(args.plannedState?.personIndexes ?? [])), owner, job, provenance: importProvenance(args.principal, args.operationId),
       local, planned: new Set(args.plannedKeys), plannedNow: [], baselines: new Map<string, Record<string, unknown> | null>(args.plannedState?.baselines ?? []), duplicatesSuggested: 0,
     };
     const results = await runChunk(c, args.items as TreeImportItem[]);
     const suggested = results.reduce((total, row) => total + (row.possibleDuplicates?.length ?? 0), 0);
-    const plannedState = { rows: [...(c.w.rows ?? [])], baselines: [...c.baselines] };
+    const plannedState = { rows: [...(c.w.rows ?? [])], baselines: [...c.baselines], personIndexes: [...(c.w.personIndexes ?? [])] };
     if (new TextEncoder().encode(JSON.stringify(plannedState)).byteLength > FAMILY_HISTORY_MCP_LIMITS.requestBytes) {
       machineError("DRY_RUN_PLAN_LIMIT", "This dry-run document plan exceeds its memory budget.", "Use smaller dry-run batches; no records were saved.");
     }
     return { results, plannedState, plannedKeys: c.plannedNow, plannedRecords: [...c.local].map(([key, recordId]) => ({ key, recordId })), duplicatesSuggested: suggested };
   },
 });
+
+const CHUNK_RECEIPT_BYTES = 64_000;
+const DETAIL_PAGE_BYTES = 48_000;
+
+function resultEntries(results: ItemResult[]): Record<string, unknown>[] {
+  return results.flatMap<Record<string, unknown>>(row => {
+    const { kept, ...base } = row;
+    return kept?.length ? kept.map(field => clean({ ...base, kept: field })) : [clean(base)];
+  });
+}
+
+/** Store expanded conflicts before they can exceed a Convex document. */
+async function boundedChunkResult(ctx: MutationCtx, args: { operationId: string; requestHash: string }, owner: string, importJobId: string, results: ItemResult[], duplicatesSuggested: number, clientId: string) {
+  const full = { importJobId, results, plannedKeys: [] as string[], duplicatesSuggested };
+  if (new TextEncoder().encode(JSON.stringify(full)).byteLength <= CHUNK_RECEIPT_BYTES) return full;
+  const entries = resultEntries(results);
+  const pages: Record<string, unknown>[][] = [];
+  let page: Record<string, unknown>[] = [];
+  let bytes = 0;
+  for (const entry of entries) {
+    const size = new TextEncoder().encode(JSON.stringify(entry)).byteLength + 1;
+    if (size > DETAIL_PAGE_BYTES) machineError("RESULT_DETAIL_LIMIT", "One result detail exceeds its bounded page budget.", "Use shorter outside keys or smaller fact groups; this chunk was not saved.");
+    if (bytes + size > DETAIL_PAGE_BYTES && page.length) { pages.push(page); page = []; bytes = 0; }
+    page.push(entry); bytes += size;
+  }
+  if (page.length) pages.push(page);
+  for (const [index, entries] of pages.entries()) await ctx.db.insert("mcpOperations", {
+    vaultOwnerId: owner, operationId: `${args.operationId}:detail:${index}`, toolName: `${BATCH_TOOL}#detail`, requestHash: `${args.requestHash}:detail:${index}`,
+    resultJson: JSON.stringify({ importJobId, entries }), clientId, createdAt: Date.now(),
+  });
+  const compact = { ...full, results: results.map(row => {
+    const { kept, ...rest } = row;
+    return { ...rest, ...(kept?.length ? { keptCount: kept.length } : {}) };
+  }), detailEntryCounts: pages.map(entries => entries.length) };
+  if (new TextEncoder().encode(JSON.stringify(compact)).byteLength > 800_000) machineError("RESULT_DETAIL_LIMIT", "The compact chunk receipt exceeds its safe document budget.", "Use smaller batches; this chunk was not saved.");
+  return compact;
+}
 
 /** One chunk of a real batch: one transaction, replay-safe under its own receipt. */
 export const applyTreeImportChunk = internalMutation({
@@ -954,7 +1006,7 @@ export const applyTreeImportChunk = internalMutation({
       local: new Map(), planned: new Set(), plannedNow: [], baselines: new Map(), duplicatesSuggested: 0,
     };
     const results = await runChunk(c, args.items as TreeImportItem[]);
-    const result = { importJobId: String(job._id), results, plannedKeys: [], duplicatesSuggested: c.duplicatesSuggested };
+    const result = await boundedChunkResult(ctx, args, owner, String(job._id), results, c.duplicatesSuggested, args.principal.clientId);
     await ctx.db.insert("mcpOperations", {
       vaultOwnerId: owner,
       operationId: args.operationId,
@@ -1007,7 +1059,7 @@ export const prepareTreeImportBatch = internalQuery({
 function compactResults(results: ItemResult[]) {
   // Unchanged rows need no id to act on; leaving them as counts keeps a
   // 500-row receipt well inside its size budget.
-  return results.filter((row) => row.status !== "unchanged" || row.kept?.length);
+  return results.filter((row) => row.status !== "unchanged" || row.kept?.length || row.keptCount);
 }
 
 /** After every chunk: the batch's one activity entry, progress, and receipt. */
@@ -1104,7 +1156,7 @@ export const recordTreeImportBatch = internalMutation({
       resultDetails: { operationId: args.operationId, chunkCount: args.chunkCount ?? 0 },
     };
     let resultJson = JSON.stringify(result);
-    if (resultJson.length > FAMILY_HISTORY_MCP_LIMITS.resultJson) {
+    if (resultJson.length > FAMILY_HISTORY_MCP_LIMITS.resultJson || results.some(row => row.keptCount)) {
       result.results = [];
       result.resultsTrimmed = "Full results, including failures and retained conflicts, are available through family_history_get_tree_import using resultDetails.operationId, resultsChunkIndex and resultsOffset.";
       resultJson = JSON.stringify(result);
@@ -1185,7 +1237,7 @@ export const importTreeBatch = internalAction({
         batchIndex: input.batchIndex,
         counts: addCounts(emptyCounts(), results),
         possibleDuplicates: duplicatesSuggested,
-        results: results.filter((row) => row.status !== "unchanged" || row.kept?.length),
+        results: results.filter((row) => row.status !== "unchanged" || row.kept?.length || row.keptCount),
         note: "Nothing was saved. Statuses say what a real send of this batch would do. Rows that would fail say why; fix them before sending for real.",
       };
     }
@@ -1316,14 +1368,28 @@ export const getTreeImport = internalQuery({
       const chunk = await ctx.db.query("mcpOperations").withIndex("by_owner_operation", q => q.eq("vaultOwnerId", owner).eq("operationId", `${args.resultsOperationId}#${chunkIndex}`)).unique();
       const data = chunk?.toolName === `${BATCH_TOOL}#chunk` ? JSON.parse(chunk.resultJson) : null;
       if (!data || data.importJobId !== String(job._id)) machineError("NOT_FOUND", "The detailed chunk receipt is not available.", "Use a batch with retrievable resultDetails.");
-      // Expand kept fields so one very large conflict row can still be paged.
-      const entries = (data.results as ItemResult[]).flatMap<Record<string, unknown>>(row => row.kept?.length
-        ? row.kept.map(field => ({ kind: row.kind, index: row.index, key: row.key, status: row.status, id: row.id ?? null, kept: field }))
-        : [{ kind: row.kind, index: row.index, key: row.key, status: row.status, id: row.id ?? null, reason: row.reason ?? null, whatToDo: row.whatToDo ?? null }]);
-      const nextOffset = offset + 10;
-      const next = nextOffset < entries.length ? { resultsChunkIndex: chunkIndex, resultsOffset: nextOffset }
+      let page: Record<string, unknown>[];
+      let total: number;
+      if (data.detailEntryCounts) {
+        const counts = data.detailEntryCounts as number[];
+        total = counts.reduce((sum, count) => sum + count, 0);
+        let pageIndex = 0;
+        let localOffset = offset;
+        while (pageIndex < counts.length && localOffset >= counts[pageIndex]) { localOffset -= counts[pageIndex]; pageIndex++; }
+        if (pageIndex >= counts.length) machineError("VALIDATION_ERROR", "Result offset is outside the chunk.", "Use the returned next cursor.");
+        const detail = await ctx.db.query("mcpOperations").withIndex("by_owner_operation", q => q.eq("vaultOwnerId", owner).eq("operationId", `${args.resultsOperationId}#${chunkIndex}:detail:${pageIndex}`)).unique();
+        const value = detail?.toolName === `${BATCH_TOOL}#detail` ? JSON.parse(detail.resultJson) : null;
+        if (!value || value.importJobId !== String(job._id)) machineError("NOT_FOUND", "That result detail is unavailable for this import.", "Use the returned resultDetails pointer.");
+        page = value.entries.slice(localOffset, localOffset + 10);
+      } else {
+        const entries = resultEntries(data.results as ItemResult[]);
+        total = entries.length;
+        page = entries.slice(offset, offset + 10);
+      }
+      const nextOffset = offset + page.length;
+      const next = nextOffset < total ? { resultsChunkIndex: chunkIndex, resultsOffset: nextOffset }
         : chunkIndex + 1 < summary.resultDetails.chunkCount ? { resultsChunkIndex: chunkIndex + 1, resultsOffset: 0 } : null;
-      return { importJobId: String(job._id), resultsOperationId: args.resultsOperationId, resultsChunkIndex: chunkIndex, resultsOffset: offset, results: entries.slice(offset, nextOffset), next };
+      return { importJobId: String(job._id), resultsOperationId: args.resultsOperationId, resultsChunkIndex: chunkIndex, resultsOffset: offset, results: page, next };
     }
     const batches = await ctx.db
       .query("treeImportBatches")

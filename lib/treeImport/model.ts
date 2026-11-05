@@ -445,6 +445,8 @@ export type ItemResult = {
   status: ItemStatus;
   /** Citation results identify which lookup domain contains the returned key. */
   keyOrigin?: KeyOrigin;
+  /** Detailed kept fields are stored in bounded chunk pages when this is set. */
+  keptCount?: number;
   id?: string;
   reason?: string;
   whatToDo?: string;
