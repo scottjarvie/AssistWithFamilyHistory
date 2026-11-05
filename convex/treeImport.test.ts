@@ -2056,7 +2056,7 @@ test("relationship inferred years follow ordinary text-only corrections and resu
     const after = await snapshot(); expect(after.rows[0].facts![0].date).toEqual({ original, year: Number(original) });
     const mapping = after.keys.find(row => row.recordType === "relationship")!;
     expect(JSON.parse(mapping.lastImportedJson!)._relationshipInferredYears).toEqual([{ type: "marriage", original, year: Number(original) }]);
-    expect(await send(t, grant, job.importJobId, index + 1, batch)).toEqual(result); expect(await snapshot()).toEqual(after);
+    expect(await send(t, grant, job.importJobId, index + 1, batch)).toEqual({ ...result, deduplicated: true }); expect(await snapshot()).toEqual(after);
   }
   const before = await snapshot();
   for (const dryRun of [true, false]) {
@@ -2123,7 +2123,7 @@ test.each(["type", "title", "description", "url", "mimeType", "date", "personKey
   for (const dryRun of [true, false]) {
     const result = await send(t, grant, job.importJobId, 2, batch, { dryRun }, `reviewed-media-${field}-${dryRun}`);
     expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("MEDIA_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before);
-    expect(await send(t, grant, job.importJobId, 2, batch, { dryRun }, `reviewed-media-${field}-${dryRun}`)).toEqual(result);
+    expect(await send(t, grant, job.importJobId, 2, batch, { dryRun }, `reviewed-media-${field}-${dryRun}`)).toEqual(dryRun ? result : { ...result, deduplicated: true });
     expect(isContextPackEligibleMedia((await snapshot()).media[0])).toBe(true); // Original approved assertion, unchanged.
   }
 });
@@ -2160,7 +2160,7 @@ test.each(["person", "relationship", "fact", "media", "source", "citation", "not
   for (const dryRun of [true, false]) {
     const result = await send(t, grant, job.importJobId, 1, batch, { dryRun }, `stale-target-${kind}-${mode}-${dryRun}`);
     expect(result.results.length).toBeGreaterThan(0); expect(result.results.every((row: any) => row.status === "failed" && /MISSING_PERSON|MISSING_TARGET|MISSING_SOURCE|LEGACY_IDENTITY_REVIEW_REQUIRED/.test(row.reason))).toBe(true);
-    expect(await snapshot()).toEqual(before); expect(await send(t, grant, job.importJobId, 1, batch, { dryRun }, `stale-target-${kind}-${mode}-${dryRun}`)).toEqual(result); expect(await snapshot()).toEqual(before);
+    expect(await snapshot()).toEqual(before); expect(await send(t, grant, job.importJobId, 1, batch, { dryRun }, `stale-target-${kind}-${mode}-${dryRun}`)).toEqual(dryRun ? result : { ...result, deduplicated: true }); expect(await snapshot()).toEqual(before);
   }
 });
 
@@ -2180,7 +2180,7 @@ test.each(["primary", "alias", "relationship", "media", "citation", "note", "fac
   for (const dryRun of [true, false]) {
     const result = await send(t, grant, job.importJobId, 1, batch, { dryRun }, `corrected-pid-${route}-${dryRun}`);
     expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("LEGACY_IDENTITY_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before);
-    expect(await send(t, grant, job.importJobId, 1, batch, { dryRun }, `corrected-pid-${route}-${dryRun}`)).toEqual(result); expect(await snapshot()).toEqual(before);
+    expect(await send(t, grant, job.importJobId, 1, batch, { dryRun }, `corrected-pid-${route}-${dryRun}`)).toEqual(dryRun ? result : { ...result, deduplicated: true }); expect(await snapshot()).toEqual(before);
   }
   const correct = await send(t, grant, job.importJobId, 2, { persons: [{ key: "B", living: false, names: [{ given: "Original A" }], facts: [{ key: "B-F", type: "occupation", description: "Confirmed assertion for B" }] }] });
   expect(correct.results[0]).toMatchObject({ id: String(person._id), status: "linked" });
@@ -2205,7 +2205,7 @@ test.each(["person", "source"])("first-linked %s baselines preserve later manual
   for (const dryRun of [true, false]) {
     const result = await send(t, grant, job.importJobId, 1, batch, { dryRun }, `manual-cleared-link-${kind}-${dryRun}`);
     expect(result.results).toEqual([expect.objectContaining({ status: "unchanged", kept: expect.arrayContaining([kind === "person" ? "name" : "repository"]) })]); expect(await snapshot()).toEqual(cleared);
-    expect(await send(t, grant, job.importJobId, 1, batch, { dryRun }, `manual-cleared-link-${kind}-${dryRun}`)).toEqual(result);
+    expect(await send(t, grant, job.importJobId, 1, batch, { dryRun }, `manual-cleared-link-${kind}-${dryRun}`)).toEqual(dryRun ? result : { ...result, deduplicated: true });
   }
 });
 
@@ -2244,7 +2244,7 @@ test.each(["person1", "person2", "type", "lineage"].flatMap(change => ["note", "
   for (const dryRun of [true, false]) {
     const result = await send(t, grant, job.importJobId, 2, { relationships: [changed] }, { dryRun }, `relation-attachments-${change}-${attachment}-${dryRun}`);
     expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("RELATIONSHIP_ATTRIBUTION_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before);
-    expect(await send(t, grant, job.importJobId, 2, { relationships: [changed] }, { dryRun }, `relation-attachments-${change}-${attachment}-${dryRun}`)).toEqual(result); expect(await snapshot()).toEqual(before);
+    expect(await send(t, grant, job.importJobId, 2, { relationships: [changed] }, { dryRun }, `relation-attachments-${change}-${attachment}-${dryRun}`)).toEqual(dryRun ? result : { ...result, deduplicated: true }); expect(await snapshot()).toEqual(before);
   }
 });
 
@@ -2275,7 +2275,7 @@ test.each(["type", "customType", "date", "place", "value", "description"].flatMa
   for (const dryRun of [true, false]) {
     const result = await send(t, grant, job.importJobId, 2, batch, { dryRun }, `fact-attribution-${field}-${attachment}-${dryRun}`);
     expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("FACT_ATTRIBUTION_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before);
-    expect(await send(t, grant, job.importJobId, 2, batch, { dryRun }, `fact-attribution-${field}-${attachment}-${dryRun}`)).toEqual(result); expect(await snapshot()).toEqual(before);
+    expect(await send(t, grant, job.importJobId, 2, batch, { dryRun }, `fact-attribution-${field}-${attachment}-${dryRun}`)).toEqual(dryRun ? result : { ...result, deduplicated: true }); expect(await snapshot()).toEqual(before);
   }
 });
 
@@ -2295,7 +2295,7 @@ test.each(["type", "title", "description", "url", "mimeType", "date", "personKey
   for (const dryRun of [true, false]) {
     const result = await send(t, grant, job.importJobId, 2, batch, { dryRun }, `media-attribution-${field}-${attachment}-${dryRun}`);
     expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("MEDIA_ATTRIBUTION_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before);
-    expect(await send(t, grant, job.importJobId, 2, batch, { dryRun }, `media-attribution-${field}-${attachment}-${dryRun}`)).toEqual(result); expect(await snapshot()).toEqual(before);
+    expect(await send(t, grant, job.importJobId, 2, batch, { dryRun }, `media-attribution-${field}-${attachment}-${dryRun}`)).toEqual(dryRun ? result : { ...result, deduplicated: true }); expect(await snapshot()).toEqual(before);
   }
 });
 
@@ -2324,7 +2324,7 @@ test.each(["note", "citation", "both"])("relationship fact refresh protects reta
     const batch: TreeImportBatch = { relationships: [{ ...relation, facts: [{ type: "marriage", description: "Arizona" }] }] };
     const result = await send(t, grant, job.importJobId, 2, batch, { dryRun }, `relationship-fact-attachments-${attachment}-${dryRun}`);
     expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("RELATIONSHIP_ATTRIBUTION_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before);
-    expect(await send(t, grant, job.importJobId, 2, batch, { dryRun }, `relationship-fact-attachments-${attachment}-${dryRun}`)).toEqual(result); expect(await snapshot()).toEqual(before);
+    expect(await send(t, grant, job.importJobId, 2, batch, { dryRun }, `relationship-fact-attachments-${attachment}-${dryRun}`)).toEqual(dryRun ? result : { ...result, deduplicated: true }); expect(await snapshot()).toEqual(before);
   }
 });
 
@@ -2339,7 +2339,7 @@ test.each(["text", "title", "noteType"])("citation-backed note %s refresh preser
   for (const dryRun of [true, false]) {
     const result = await send(t, grant, job.importJobId, 3, batch, { dryRun }, `note-citation-attribution-${field}-${dryRun}`);
     expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("NOTE_ATTRIBUTION_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before);
-    expect(await send(t, grant, job.importJobId, 3, batch, { dryRun }, `note-citation-attribution-${field}-${dryRun}`)).toEqual(result); expect(await snapshot()).toEqual(before);
+    expect(await send(t, grant, job.importJobId, 3, batch, { dryRun }, `note-citation-attribution-${field}-${dryRun}`)).toEqual(dryRun ? result : { ...result, deduplicated: true }); expect(await snapshot()).toEqual(before);
   }
 });
 
@@ -2353,7 +2353,7 @@ test.each(["source", "excerpt", "target"])("explanatory citation notes prevent u
   for (const dryRun of [true, false]) {
     const result = await send(t, grant, job.importJobId, 2, { citations: [changed] }, { dryRun }, `citation-note-attribution-${field}-${dryRun}`);
     expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("CITATION_NOTE_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before);
-    expect(await send(t, grant, job.importJobId, 2, { citations: [changed] }, { dryRun }, `citation-note-attribution-${field}-${dryRun}`)).toEqual(result); expect(await snapshot()).toEqual(before);
+    expect(await send(t, grant, job.importJobId, 2, { citations: [changed] }, { dryRun }, `citation-note-attribution-${field}-${dryRun}`)).toEqual(dryRun ? result : { ...result, deduplicated: true }); expect(await snapshot()).toEqual(before);
   }
 });
 
@@ -2369,7 +2369,7 @@ test.each(["birth", "death"].flatMap(type => ["exact", "nested", "unscoped", "un
   for (const dryRun of [true, false]) {
     const result = await send(t, grant, job.importJobId, 2, batch, { dryRun }, `person-citation-${type}-${scope}-${dryRun}`);
     expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("PERSON_CITATION_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before);
-    expect(await send(t, grant, job.importJobId, 2, batch, { dryRun }, `person-citation-${type}-${scope}-${dryRun}`)).toEqual(result); expect(await snapshot()).toEqual(before);
+    expect(await send(t, grant, job.importJobId, 2, batch, { dryRun }, `person-citation-${type}-${scope}-${dryRun}`)).toEqual(dryRun ? result : { ...result, deduplicated: true }); expect(await snapshot()).toEqual(before);
   }
 });
 
@@ -2410,7 +2410,7 @@ test.each(["citation", "note", "content"].flatMap(material => ["url", "citationT
   for (const dryRun of [true, false]) {
     const result = await send(t, grant, job.importJobId, 2, { sources: [changed] }, { dryRun }, `source-attribution-${material}-${field}-${dryRun}`);
     expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("SOURCE_ATTRIBUTION_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before);
-    expect(await send(t, grant, job.importJobId, 2, { sources: [changed] }, { dryRun }, `source-attribution-${material}-${field}-${dryRun}`)).toEqual(result); expect(await snapshot()).toEqual(before);
+    expect(await send(t, grant, job.importJobId, 2, { sources: [changed] }, { dryRun }, `source-attribution-${material}-${field}-${dryRun}`)).toEqual(dryRun ? result : { ...result, deduplicated: true }); expect(await snapshot()).toEqual(before);
   }
 });
 
@@ -2421,4 +2421,28 @@ test("unattached source refresh remains available", async () => {
   const dry = await send(t, grant, job.importJobId, 1, batch, { dryRun: true }, "dry-unattached-source"); expect(await t.run(ctx => ctx.db.query("sources").collect())).toEqual(before);
   const real = await send(t, grant, job.importJobId, 1, batch); expect(dry.counts).toEqual(real.counts); expect(real.counts.sources.updated).toBe(1);
   expect((await t.run(ctx => ctx.db.query("sources").collect()))[0]).toMatchObject({ _id: before[0]._id, title: "Corrected", url: "https://example.test/b" });
+});
+
+
+test.each((["candidate", "accepted", "conflict", "rejected"] as const).flatMap(status => ["source", "excerpt"].map(field => ({ status, field }))))("citation refresh protects $status human source facts from changed $field", async ({ status, field }) => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const citation = { key: "C", sourceKey: "A", page: "12", extractedText: "Original A evidence", quality: 2, url: "https://example.test/a", accessDate: "2026-01-01", notes: "Original A citation", targets: [{ kind: "person" as const, key: "P" }] };
+  await send(t, grant, job.importJobId, 0, { persons: ["P", "Q"].map(key => ({ key, living: false, names: [{ given: key }] })), sources: ["A", "B"].map(key => ({ key, title: key })), citations: [citation] });
+  const rows = await t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), sources: await ctx.db.query("sources").collect(), citations: await ctx.db.query("citations").collect() }));
+  const person = rows.people.find(row => row.fsId === "P")!; const source = rows.sources.find(row => row.fsId === "A")!;
+  // Existing human writer + synthetic owner identity, never actual user/Tier2 proof.
+  await t.withIdentity({ subject: OWNER }).mutation(api.vaultMutations.upsertSourceFact, { vaultOwnerId: OWNER, personId: person._id, sourceId: source._id, citationId: rows.citations[0]._id, importKey: `human-source-fact-${status}-${field}`, factType: "birth", label: "Retained decision about A", value: "1900", confidence: "high", status });
+  const snapshot = () => t.run(async ctx => ({ citations: await ctx.db.query("citations").collect(), facts: await ctx.db.query("sourceFacts").collect(), links: await ctx.db.query("citationLinks").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  const noop = await send(t, grant, job.importJobId, 1, { citations: [citation] }); expect(noop.counts.citations.unchanged).toBe(1); expect(await snapshot()).toEqual(before);
+  const changed = { ...citation, ...(field === "source" ? { sourceKey: "B" } : { extractedText: "Different assertion from A" }) };
+  for (const dryRun of [true, false]) {
+    const result = await send(t, grant, job.importJobId, 2, { citations: [changed] }, { dryRun }, `citation-source-fact-${status}-${field}-${dryRun}`);
+    expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("CITATION_SOURCE_FACT_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before);
+    expect(await send(t, grant, job.importJobId, 2, { citations: [changed] }, { dryRun }, `citation-source-fact-${status}-${field}-${dryRun}`)).toEqual(dryRun ? result : { ...result, deduplicated: true }); expect(await snapshot()).toEqual(before);
+  }
+  // Same evidence can support another target while the retained fact keeps A/C.
+  const additive = { ...citation, targets: [...citation.targets, { kind: "person" as const, key: "Q" }] };
+  const dry = await send(t, grant, job.importJobId, 3, { citations: [additive] }, { dryRun: true }, `dry-source-fact-additive-${status}-${field}`);
+  const real = await send(t, grant, job.importJobId, 3, { citations: [additive] }); expect(dry.counts).toEqual(real.counts); expect(real.counts.citations.updated).toBe(1);
+  const after = await snapshot(); expect(after.facts).toEqual(before.facts); expect(after.citations).toEqual(before.citations); expect(after.links).toHaveLength(before.links.length + 1); expect(after.links).toEqual(expect.arrayContaining(before.links)); expect(after.facts[0].sourceId).toBe(after.citations[0].sourceId); expect(after.facts[0].status).toBe(status);
 });

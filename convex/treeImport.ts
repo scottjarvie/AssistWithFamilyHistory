@@ -1122,6 +1122,11 @@ async function importCitation(c: ChunkContext, item: any): Promise<Omit<ItemResu
       "Read the corrected citation and explicitly resubmit its evidence before adding targets or refreshing evidence. This citation item saved nothing.");
   }
   if (evidenceChanged) {
+    const virtualFact = [...(c.w.rows?.values() ?? [])].some(row => row.citationId === saved.id && typeof row.factType === "string" && row.personId && row.sourceId);
+    const retainedFact = isPlaceholder(saved.id) ? null : await c.ctx.db.query("sourceFacts")
+      .withIndex("by_citation", q => q.eq("citationId", saved.id as Id<"citations">)).first();
+    if (virtualFact || retainedFact) fail("CITATION_SOURCE_FACT_REVIEW_REQUIRED", "Changed citation evidence cannot replace the basis of retained source facts or human decisions.",
+      "Review the citation and its source facts with the person. This citation item saved nothing; its original source, evidence and decisions were retained.");
     const persisted = isPlaceholder(saved.id) ? [] : await c.ctx.db.query("citationLinks")
       .withIndex("by_citation", q => q.eq("citationId", saved.id as Id<"citations">)).take(TREE_IMPORT_LIMITS.targetsPerCitation + 1);
     const virtual = [...(c.w.rows?.values() ?? [])].filter(row => row.citationId === saved.id && row.targetType);

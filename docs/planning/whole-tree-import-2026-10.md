@@ -526,3 +526,10 @@ one privacy decision within an aggregate read. Source material changes
 also refuse atomically when retained citations, notes, captured content,
 claims, personas, media or typed connections would gain different attribution.
 Unchanged replay and unattached refresh remain available.
+
+Citation evidence refresh now also refuses when retained source facts would
+inherit a different source or assertion, preserving accepted and other human
+decisions and the source/citation invariant. The lookup is bounded through
+by_citation and includes planning state. Unchanged evidence may still gain
+a target without changing those source facts. Replay preserves semantic
+results and reports deduplicated=true, distinct from a first execution.
