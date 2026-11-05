@@ -84,6 +84,7 @@ type Writer = {
   dryRun: boolean;
   rows?: Map<string, any>;
   personIndexes?: Map<string, { surname: string; year: number | null }>;
+  relationshipIndexes?: Map<string, { type: string; person1: string | null }>;
   insert<T extends TableNames>(table: T, doc: any): Promise<string>;
   patch(id: string, doc: Record<string, unknown>): Promise<void>;
 };
@@ -96,12 +97,13 @@ function liveWriter(ctx: MutationCtx): Writer {
   };
 }
 
-function dryWriter(scope: string, rows: Map<string, any>, personIndexes: Map<string, { surname: string; year: number | null }>): Writer {
+function dryWriter(scope: string, rows: Map<string, any>, personIndexes: Map<string, { surname: string; year: number | null }>, relationshipIndexes: Map<string, { type: string; person1: string | null }>): Writer {
   let counter = 0;
   return {
     dryRun: true,
     rows,
     personIndexes,
+    relationshipIndexes,
     insert: async (table, doc) => {
       const id = `dry:${encodeURIComponent(scope)}:${table}:${(counter += 1)}`;
       rows.set(id, { ...clean(doc), _id: id, _creationTime: Date.now() });
@@ -287,6 +289,7 @@ async function ownedRow<T extends TableNames>(c: ChunkContext, table: T, id: str
   if (c.w.rows) {
     c.w.rows.set(id, clean(row));
     if (table === "persons") c.w.personIndexes?.set(id, { surname: (row as Doc<"persons">).name.surname, year: (row as Doc<"persons">).birth?.date?.year ?? null });
+    if (table === "relationships") c.w.relationshipIndexes?.set(id, { type: (row as Doc<"relationships">).type, person1: (row as Doc<"relationships">).person1 ?? null });
   }
   return row as Doc<T>;
 }
@@ -593,21 +596,21 @@ async function importRelationship(c: ChunkContext, item: any): Promise<Omit<Item
   if (person1 === person2) fail("VALIDATION_ERROR", "A person cannot be related to themself.", "Check the two person keys.");
   let existingId = await lookup(c, "relationship", key);
   let linked = false;
-  if (!existingId && c.w.rows) {
-    const match = [...c.w.rows.values()].find(row => row.type === item.type && row.person1 === person1 && row.person2 === person2 && matchesVaultOwner(row.vaultOwnerId, c.owner));
-    if (match) { existingId = String(match._id); linked = true; }
-  }
-  if (!existingId && !isPlaceholder(person1) && !isPlaceholder(person2)) {
-    // A relationship the person already entered by hand is the same one.
-    const rows = await c.ctx.db
-      .query("relationships")
-      .withIndex("by_type_person1", (q) => q.eq("type", item.type).eq("person1", person1 as Id<"persons">))
-      .take(50);
-    const match = rows.map(row => c.w.rows?.get(String(row._id)) ?? row).find(row => row.type === item.type && row.person1 === person1 && row.person2 === person2 && matchesVaultOwner(row.vaultOwnerId, c.owner));
-    if (match) {
-      existingId = String(match._id);
-      linked = true;
+  if (!existingId) {
+    const inIndex = (row: any) => row?.type === item.type && row.person1 === person1;
+    const movedOut = [...(c.w.relationshipIndexes ?? [])].filter(([id, original]) => original.type === item.type && original.person1 === person1 && !inIndex(c.w.rows?.get(id))).length;
+    if (movedOut > 50) fail("DRY_RUN_PLAN_LIMIT", "Too many planned relationship index moves for a bounded scan.", "Use smaller dry-run batches; nothing was saved.");
+    const persisted = isPlaceholder(person1) ? [] : await c.ctx.db.query("relationships")
+      .withIndex("by_type_person1", q => q.eq("type", item.type).eq("person1", person1 as Id<"persons">)).take(50 + movedOut);
+    const effective = new Map<string, any>();
+    for (const row of persisted) {
+      const current = c.w.rows?.get(String(row._id)) ?? row;
+      if (inIndex(current)) effective.set(String(row._id), current);
     }
+    for (const row of c.w.rows?.values() ?? []) if (inIndex(row)) effective.set(String(row._id), row);
+    const match = [...effective.values()].sort((a, b) => (a._creationTime ?? a.createdAt) - (b._creationTime ?? b.createdAt)).slice(0, 50)
+      .find(row => row.person2 === person2 && matchesVaultOwner(row.vaultOwnerId, c.owner));
+    if (match) { existingId = String(match._id); linked = true; }
   }
   const facts = Array.isArray(item.facts) && item.facts.length
     ? item.facts.map((fact: any) => clean({
@@ -834,7 +837,7 @@ async function runChunk(c: ChunkContext, items: TreeImportItem[]): Promise<ItemR
   for (const item of items) {
     const importer = IMPORTERS[item.kind];
     // Match a real item's nested mutation rollback boundary for dry planning.
-    const before = c.w.dryRun ? { local: new Map(c.local), plannedNow: c.plannedNow.length, duplicatesSuggested: c.duplicatesSuggested, rows: new Map(c.w.rows), baselines: new Map(c.baselines), personIndexes: new Map(c.w.personIndexes) } : null;
+    const before = c.w.dryRun ? { local: new Map(c.local), plannedNow: c.plannedNow.length, duplicatesSuggested: c.duplicatesSuggested, rows: new Map(c.w.rows), baselines: new Map(c.baselines), personIndexes: new Map(c.w.personIndexes), relationshipIndexes: new Map(c.w.relationshipIndexes) } : null;
     try {
       const saved = c.w.dryRun
         ? await importer(c, item.item)
@@ -851,6 +854,7 @@ async function runChunk(c: ChunkContext, items: TreeImportItem[]): Promise<ItemR
         c.duplicatesSuggested = before.duplicatesSuggested;
         c.baselines = before.baselines;
         if (c.w.personIndexes) { c.w.personIndexes.clear(); for (const [id, index] of before.personIndexes) c.w.personIndexes.set(id, index); }
+        if (c.w.relationshipIndexes) { c.w.relationshipIndexes.clear(); for (const [id, index] of before.relationshipIndexes) c.w.relationshipIndexes.set(id, index); }
         if (c.w.rows) {
           c.w.rows.clear();
           for (const [id, row] of before.rows) c.w.rows.set(id, row);
@@ -940,12 +944,12 @@ export const planTreeImportChunk = internalQuery({
       machineError("VALIDATION_ERROR", "Dry-run keys need their original identity mappings.", "Restart the dry run and carry plannedRecords alongside plannedKeys between chunks.");
     }
     const c: ChunkContext = {
-      ctx, w: dryWriter(args.operationId, new Map<string, any>(args.plannedState?.rows ?? []), new Map<string, { surname: string; year: number | null }>(args.plannedState?.personIndexes ?? [])), owner, job, provenance: importProvenance(args.principal, args.operationId),
+      ctx, w: dryWriter(args.operationId, new Map<string, any>(args.plannedState?.rows ?? []), new Map<string, { surname: string; year: number | null }>(args.plannedState?.personIndexes ?? []), new Map<string, { type: string; person1: string | null }>(args.plannedState?.relationshipIndexes ?? [])), owner, job, provenance: importProvenance(args.principal, args.operationId),
       local, planned: new Set(args.plannedKeys), plannedNow: [], baselines: new Map<string, Record<string, unknown> | null>(args.plannedState?.baselines ?? []), duplicatesSuggested: 0,
     };
     const results = await runChunk(c, args.items as TreeImportItem[]);
     const suggested = results.reduce((total, row) => total + (row.possibleDuplicates?.length ?? 0), 0);
-    const plannedState = { rows: [...(c.w.rows ?? [])], baselines: [...c.baselines], personIndexes: [...(c.w.personIndexes ?? [])] };
+    const plannedState = { rows: [...(c.w.rows ?? [])], baselines: [...c.baselines], personIndexes: [...(c.w.personIndexes ?? [])], relationshipIndexes: [...(c.w.relationshipIndexes ?? [])] };
     if (new TextEncoder().encode(JSON.stringify(plannedState)).byteLength > FAMILY_HISTORY_MCP_LIMITS.requestBytes) {
       machineError("DRY_RUN_PLAN_LIMIT", "This dry-run document plan exceeds its memory budget.", "Use smaller dry-run batches; no records were saved.");
     }

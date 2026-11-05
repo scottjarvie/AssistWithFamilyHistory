@@ -347,3 +347,9 @@ system/key combinations refuse for review without linking or rekeying originals.
 Safe existing mappings keep their keys. Dry relationship matching applies the
 virtual overlay before accepting a stored candidate. New citation links count as
 an updated outcome, and planned links participate in repeat detection.
+
+Relationship planning also tracks original index positions. It overlays changed
+rows, adds planned rows, and preserves the bounded index order before selecting
+an equivalent relationship. Planned moves of either endpoint therefore do not
+reuse an obsolete stored match; excessive index adjustments refuse a smaller
+batch rather than producing a false prediction.

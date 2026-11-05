@@ -1071,7 +1071,7 @@ test("ambiguous legacy system mappings refuse both aliases without rekeying orig
   expect(await t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() }))).toEqual(before);
 });
 
-test.each([0, 124])("dry relationship matching ignores persisted endpoints moved in virtual state (padding %i)", { timeout: 300_000 }, async padding => {
+test.each([{ padding: 0, moveFirst: false }, { padding: 124, moveFirst: false }, { padding: 0, moveFirst: true }, { padding: 124, moveFirst: true }])("dry relationship matching ignores persisted endpoints moved in virtual state ($padding/$moveFirst)", { timeout: 300_000 }, async ({ padding, moveFirst }) => {
   const t = convexTest({ schema, modules, transactionLimits: true });
   const grant = await seedGrant(t, { vaultOwnerId: OWNER });
   const job = await begin(t, grant);
@@ -1080,7 +1080,7 @@ test.each([0, 124])("dry relationship matching ignores persisted endpoints moved
     relationships: [{ key: "R1", type: "Couple", person1Key: "A", person2Key: "B" }],
   });
   const batch: TreeImportBatch = { relationships: [
-    { key: "R1", type: "Couple", person1Key: "A", person2Key: "C" },
+    { key: "R1", type: "Couple", person1Key: moveFirst ? "C" : "A", person2Key: moveFirst ? "B" : "C" },
     ...Array.from({ length: padding }, (_, i) => ({ key: `pad-${i}`, type: "Couple" as const, person1Key: "D", person2Key: "E" })),
     { key: "R2", type: "Couple", person1Key: "A", person2Key: "B" },
   ] };
