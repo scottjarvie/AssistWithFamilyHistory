@@ -383,6 +383,9 @@ async function saveRelationshipRecord(ctx: MutationCtx, owner: string, input: an
   }
   const row = await owned(ctx, "relationships", input.relationshipId, owner, "Relationship");
   assertFresh(row, input.expectedUpdatedAt, "Relationship");
+  if (row.creationProvenance?.actorKind !== "chosen_ai") {
+    machineError("FORBIDDEN", "Only the person can change a relationship they entered or imported.", "Propose the correction as a candidate source fact or research finding.");
+  }
   if (input.person1) await owned(ctx, "persons", input.person1, owner, "Relationship person");
   if (input.person2) await owned(ctx, "persons", input.person2, owner, "Relationship person");
   const patch = pickDefined(input, ["type", "childRelationType", "person1", "person2", "facts"]);
@@ -425,6 +428,9 @@ async function saveEventRecord(ctx: MutationCtx, owner: string, input: any) {
   } else {
     const row = await owned(ctx, "events", input.eventId, owner, "Event");
     assertFresh(row, input.expectedUpdatedAt, "Event");
+    if (!row.importKey?.startsWith("mcp:")) {
+      machineError("FORBIDDEN", "Only the person can change an event they entered or imported, including its person roles.", "Propose the correction as a candidate source fact or research finding.");
+    }
     const patch = pickDefined(input, ["type", "customType", "date", "endDate", "place", "description", "notes"]);
     if (patch.description !== undefined) patch.description = cleanText(patch.description, "event description", FAMILY_HISTORY_MCP_LIMITS.notes);
     if (patch.notes !== undefined) patch.notes = cleanText(patch.notes, "event notes", FAMILY_HISTORY_MCP_LIMITS.notes);

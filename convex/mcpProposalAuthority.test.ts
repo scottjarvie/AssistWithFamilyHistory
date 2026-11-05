@@ -53,6 +53,29 @@ function evidence(personId: string, status: string, factKey = "fact:proposal:bir
 }
 
 describe("proposals-only research authority", () => {
+  test("owner relationships, events and existing roles cannot be rewritten", async () => {
+    const t = convexTest(schema, modules);
+    const grantId = await seedGrant(t, { vaultOwnerId: OWNER });
+    const person1 = await ownerEnteredPerson(t);
+    const person2 = await ownerEnteredPerson(t);
+    const ids = await t.run(async (ctx) => {
+      const relationshipId = await ctx.db.insert("relationships", { vaultOwnerId: OWNER, type: "Couple", person1, person2, createdAt: 1, updatedAt: 1 });
+      const eventId = await ctx.db.insert("events", { vaultOwnerId: OWNER, type: "birth", createdAt: 1, updatedAt: 1 });
+      const roleId = await ctx.db.insert("personEvents", { vaultOwnerId: OWNER, personId: person1, eventId, role: "primary", createdAt: 1 });
+      return { relationshipId, eventId, roleId };
+    });
+    await expect(t.mutation(internal.mcpFamilyHistory.saveRelationship, {
+      principal, grantId, operationId: "owner-rel", requestHash: "owner-rel",
+      input: { mode: "update", relationshipId: ids.relationshipId, expectedUpdatedAt: 1, type: "ParentChild" },
+    })).rejects.toThrow(/FORBIDDEN/);
+    await expect(t.mutation(internal.mcpFamilyHistory.saveEvent, {
+      principal, grantId, operationId: "owner-event", requestHash: "owner-event",
+      input: { mode: "update", eventId: ids.eventId, expectedUpdatedAt: 1, type: "death", personRoles: [{ personId: person1, role: "witness" }] },
+    })).rejects.toThrow(/FORBIDDEN/);
+    expect(await t.run((ctx) => ctx.db.get(ids.relationshipId))).toMatchObject({ type: "Couple", updatedAt: 1 });
+    expect(await t.run((ctx) => ctx.db.get(ids.eventId))).toMatchObject({ type: "birth", updatedAt: 1 });
+    expect(await t.run((ctx) => ctx.db.get(ids.roleId))).toMatchObject({ role: "primary" });
+  });
   test("an AI cannot save a source fact as accepted, and the refused call saves nothing", async () => {
     const t = convexTest(schema, modules);
     const grantId = await seedGrant(t, { vaultOwnerId: OWNER });
