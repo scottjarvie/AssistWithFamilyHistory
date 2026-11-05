@@ -160,11 +160,11 @@ export function MediaPrivacyReviewPanel({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="@container space-y-4">
       <MediaUploadCard personId={personId} onUploaded={() => router.refresh()} />
 
       {media.length === 0 ? null : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 @[42rem]:grid-cols-2 @[72rem]:grid-cols-3">
           {media.map((item) => {
             const draft = drafts[item._id];
             const publicEligible =
@@ -217,7 +217,7 @@ export function MediaPrivacyReviewPanel({
                         the file to let one see the record.
                       </p>
                     )}
-                    <label className="mt-3 inline-flex min-h-11 cursor-pointer items-center gap-2 md:pointer-fine:min-h-0 rounded-md border border-border bg-white px-3 py-2 text-sm font-medium text-foreground hover:bg-muted">
+                    <label className="mt-3 inline-flex min-h-11 cursor-pointer items-center gap-2 md:pointer-fine:min-h-0 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium text-foreground hover:bg-muted">
                       <Upload className="h-4 w-4" />
                       {uploadingId === item._id
                         ? "Uploading…"
@@ -411,7 +411,7 @@ function FieldSelect({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-11 md:pointer-fine:h-10 w-full rounded-md border border-border bg-white px-3 text-base md:pointer-fine:text-sm font-normal normal-case tracking-normal text-foreground"
+        className="h-11 md:pointer-fine:h-10 w-full rounded-md border border-border bg-card px-3 text-base md:pointer-fine:text-sm font-normal normal-case tracking-normal text-foreground"
       >
         {options.map((option) => (
           <option key={option} value={option}>

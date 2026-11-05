@@ -49,10 +49,12 @@ export function PersonWorkspaceView({workspace,personId,documents,documentsError
   const sourceFacts = workspace.sourceFacts ?? [];
   const contextItems = workspace.contextItems ?? [];
   const media = workspace.media ?? [];
+  const firstFactByKind=new Map<string,number>();
+  sourceFacts.forEach((fact,index)=>{if(!firstFactByKind.has(fact.factType))firstFactByKind.set(fact.factType,index);});
 
   const stream: EvidenceStreamEntry[] = [
-    ...workspace.importRuns.map(run => ({id:`import-${run._id}`,kind:"imports",kindLabel:"Imports",date:run.importedAt,dateLabel:"Imported",author:"Not attributed",content:<><p className="text-sm font-semibold">{run.pageTypes.join(" + ")} <Badge variant={run.mergeStatus === "partial" ? "destructive" : "secondary"}>{run.mergeStatus}</Badge></p>{run.warnings.length > 0 && <p className="mt-2 text-sm text-annotation">{run.warnings.length} warning(s) still need review.</p>}</>})),
-    ...workspace.researchLog.map(entry => ({id:`log-${entry._id}`,kind:entry.activityType,kindLabel:entry.activityType.replace(/_/g," "),date:entry.updatedAt,dateLabel:"Updated",author:entry.creationProvenance?.actorKind === "user" ? "You" : entry.creationProvenance?.actorKind === "chosen_ai" || entry.creationProvenance?.actorKind === "first_party_ai" ? "AI" : entry.creationProvenance?.actorKind === "system" ? "System" : "Not attributed",content:<><p className="text-sm font-medium">{entry.summary}</p>{entry.details && <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{entry.details}</p>}</>})),
+    ...workspace.importRuns.map(run => ({id:`import-${run._id}`,kind:"imports",date:run.importedAt,dateLabel:"Imported",content:<><p className="text-sm font-semibold">{run.pageTypes.join(" + ")} <Badge variant="secondary" className={run.mergeStatus === "partial" ? "bg-annotation-surface text-annotation" : ""}>{run.mergeStatus}</Badge></p>{run.warnings.length > 0 && <p className="mt-2 text-sm text-annotation">{run.warnings.length} warning(s) still need review.</p>}</>})),
+    ...workspace.researchLog.map(entry => ({id:`log-${entry._id}`,kind:entry.activityType,date:entry.updatedAt,dateLabel:"Updated",authorKind:entry.creationProvenance?.actorKind||null,method:entry.creationProvenance?.method||null,modelHint:entry.model||null,content:<><p className="text-sm font-medium">{entry.summary}</p>{entry.details && <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{entry.details}</p>}</>})),
   ];
   const importNotice = !hasStoredRuns ? <div className="rounded-lg border border-dashed border-border bg-card p-4"><h3 className="font-sans text-sm font-semibold">No imports yet</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">Start with a FamilySearch capture package so this workspace has evidence, places, and memories to build from.</p><SafeLink href="/app/imports" className="mt-1 inline-flex min-h-11 items-center text-sm text-primary underline">Open Imports</SafeLink></div> : null;
   const priorities = <>
@@ -95,8 +97,8 @@ export function PersonWorkspaceView({workspace,personId,documents,documentsError
                     confidence: string;
                     status: string;
                     conflictReason?: string;
-                  }>).map((fact) => (
-                    <div key={fact._id} className="rounded-md border border-border bg-card px-4 py-3">
+                  }>).map((fact,index) => (
+                    <div id={firstFactByKind.get(fact.factType)===index?`record-source-facts-${fact.factType}`:undefined} key={fact._id} className="rounded-md border border-border bg-card px-4 py-3">
                       <div className="flex items-start justify-between gap-3">
                         <p className="font-medium text-foreground">{fact.factType.replace(/_/g, " ")}</p>
                         <Badge variant={fact.status === "conflict" ? "destructive" : "secondary"}>{fact.status}</Badge>
@@ -172,7 +174,7 @@ export function PersonWorkspaceView({workspace,personId,documents,documentsError
             </CardContent>
           </Card>
         </div>},
-{id:"relationships",label:"Relationships",count:workspace.relationships.length,updatedAt:latestUpdate([...workspace.relationships,...workspace.provisionalRelatives]),content:<div className="">
+{id:"relationships",label:"Relationships",count:workspace.relationships.length,detail:`${workspace.provisionalRelatives.length} provisional ${workspace.provisionalRelatives.length===1?"relative":"relatives"} kept separately`,updatedAt:latestUpdate(workspace.relationships),content:<div className="">
           <div className="grid gap-4 md:grid-cols-2">
             {(workspace.relationships as Array<{
               _id: string;
@@ -247,7 +249,7 @@ export function PersonWorkspaceView({workspace,personId,documents,documentsError
           {/* The panel always renders, because its upload control is how a
               person puts a scan into the vault at all — including the first
               one, when there is nothing here to import against yet. */}
-          <fieldset disabled={readonlyPreview}>{readonlyPreview && <p className="mb-2 text-xs text-annotation">Synthetic preview: upload and review mutations are disabled.</p>}<MediaPrivacyReviewPanel media={media} personId={String(workspace.person._id)} /></fieldset>
+          <fieldset className="min-w-0" disabled={readonlyPreview}>{readonlyPreview && <p className="mb-2 text-xs text-annotation">Synthetic preview: upload and review mutations are disabled.</p>}<MediaPrivacyReviewPanel media={media} personId={String(workspace.person._id)} /></fieldset>
           {media.length === 0 ? (
             <EmptyWorkspaceState
               title="No memories imported yet"
@@ -257,7 +259,7 @@ export function PersonWorkspaceView({workspace,personId,documents,documentsError
             />
           ) : null}
         </div>},
-{id:"documents",label:"Documents",count:documents.length,updatedAt:latestUpdate(documents),content:<div className="">
+{id:"documents",label:"Documents",count:documentsError?null:documents.length,updatedAt:latestUpdate(documents),content:<div className="">
           <Card className="border-border">
             <CardHeader>
               <CardTitle role="heading" aria-level={2} className="flex items-center gap-2">
@@ -323,7 +325,7 @@ export function PersonWorkspaceView({workspace,personId,documents,documentsError
             )}
           </div>
         </div>},
-{id:"research",label:"Research",count:workspace.researchChecks.length + workspace.researchTasks.length + contextItems.length,updatedAt:latestUpdate([...workspace.researchTasks,...contextItems]),content:<div className="">
+{id:"research",label:"Research",count:workspace.researchTasks.length + contextItems.length,detail:`${workspace.researchTasks.length} ${workspace.researchTasks.length===1?"task":"tasks"} · ${contextItems.length} ${contextItems.length===1?"context item":"context items"} · ${workspace.researchChecks.filter(check=>check.status==="missing"||check.status==="needs_review").length} checks need attention`,updatedAt:latestUpdate([...workspace.researchTasks,...contextItems]),content:<div className="">
           <div className="grid gap-5 xl:grid-cols-[1fr_1fr]">
             <Card className="border-border">
               <CardHeader>
@@ -350,7 +352,7 @@ export function PersonWorkspaceView({workspace,personId,documents,documentsError
               </CardContent>
             </Card>
 
-            <div className="rounded-lg border border-border bg-card p-4"><h2 className="font-sans text-base font-semibold">Research Log</h2><p className="mt-2 text-sm text-muted-foreground">What the vault has already gathered or generated now lives in the single dated evidence stream.</p><SafeAnchor href="#record-section-overview" className="mt-1 inline-flex min-h-11 items-center text-sm text-primary underline">Open research log and import stream</SafeAnchor></div>
+            <div className="rounded-lg border border-border bg-card p-4"><h2 className="font-sans text-base font-semibold">Research Log</h2><p className="mt-2 text-sm text-muted-foreground">What the vault has already gathered or generated now lives in the single dated evidence stream.</p><SafeAnchor href="#record-stream-research" className="mt-1 inline-flex min-h-11 items-center text-sm text-primary underline">Open research log and import stream</SafeAnchor></div>
           </div>
 
           <Card className="mt-5 border-border">
@@ -359,7 +361,7 @@ export function PersonWorkspaceView({workspace,personId,documents,documentsError
               <CardDescription>Override or confirm the inferred operational checklist for this person.</CardDescription>
             </CardHeader>
             <CardContent>
-              <fieldset disabled={readonlyPreview}>{readonlyPreview && <p className="mb-2 text-xs text-annotation">Synthetic preview: research mutations are disabled.</p>}<ResearchChecksPanel
+              <fieldset className="min-w-0" disabled={readonlyPreview}>{readonlyPreview && <p className="mb-2 text-xs text-annotation">Synthetic preview: research mutations are disabled.</p>}<ResearchChecksPanel
                 personIdentifier={workspace.person.routeId}
                 checks={workspace.researchChecks}
               /></fieldset>
@@ -370,7 +372,7 @@ export function PersonWorkspaceView({workspace,personId,documents,documentsError
             <div>{readonlyPreview && <p className="mb-2 text-xs text-annotation">Synthetic preview: drafts can be typed; context mutations are disabled.</p>}<ContextItemsPanel personIdentifier={routeId} contextItems={contextItems} readonlyPreview={readonlyPreview}/></div>
           </div>
         </div>}];
-  return <div className="min-w-0 p-4 [overflow-wrap:anywhere] sm:p-8"><RecordSections aside={<PersonHeader person={workspace.person} stats={workspace.stats} operations={workspace.operations} researchTaskCount={workspace.researchTasks.length} routeId={routeId}/>} sections={sections} overview={<div className="space-y-6">{priorities}{importNotice}<EvidenceStream entries={stream}/><div className="space-y-5">
+  return <div className="min-w-0 p-4 [overflow-wrap:anywhere] sm:p-8"><RecordSections aside={<PersonHeader person={workspace.person} stats={workspace.stats} operations={workspace.operations} researchTaskCount={workspace.researchTasks.length} evidence={Object.fromEntries(["birth","death"].map(kind=>{const candidates=sourceFacts.filter(fact=>fact.factType.includes(kind));return [kind,{count:candidates.length,conflict:candidates.some(fact=>fact.status==="conflict"),target:candidates[0]?`record-source-facts-${candidates[0].factType}`:"record-section-sources"}];}))} connections={workspace.relationships.flatMap(row=>row?[{id:String(row._id),name:row.relatedName,label:row.type==="Couple"?"Partner":"Parent/child",href:`/app/people/${row.relatedPerson.fsId||String(row.relatedPerson._id)}`}]:[])} routeId={routeId}/>} sections={sections} overview={<div className="space-y-6">{priorities}{importNotice}<EvidenceStream entries={stream}/><div className="space-y-5">
           {/* What's next leads; readiness and actions follow; the detailed numbers come last. */}
 
 
@@ -388,24 +390,7 @@ export function PersonWorkspaceView({workspace,personId,documents,documentsError
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-2">
-                  {storyReadinessChecks.map((check) => (
-                    <div key={check.key} className="border border-border bg-muted px-3 py-3">
-                      <div className="flex items-center gap-2">
-                        {check.status === "complete" ? (
-                          <CheckCircle2 aria-hidden="true" className="h-4 w-4 shrink-0 text-evidence" />
-                        ) : check.status === "not_applicable" ? (
-                          <CircleMinus aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground" />
-                        ) : (
-                          <CircleAlert aria-hidden="true" className="h-4 w-4 shrink-0 text-annotation" />
-                        )}
-                        <p className="text-sm font-medium text-foreground">{check.label}</p>
-                      </div>
-                      <p className="mt-2 text-xs font-medium capitalize text-foreground">{check.status.replace(/_/g, " ")}</p>
-                      {check.summary ? <p className="mt-1 text-xs leading-5 text-muted-foreground">{check.summary}</p> : null}
-                    </div>
-                  ))}
-                </div>
+                <ul className="divide-y divide-border">{storyReadinessChecks.map(check=><li key={check.key} className="py-3"><div className="flex items-center gap-2">{check.status==="complete"?<CheckCircle2 className="h-4 w-4 shrink-0 text-evidence"/>:check.status==="not_applicable"?<CircleMinus className="h-4 w-4 shrink-0 text-muted-foreground"/>:<CircleAlert className="h-4 w-4 shrink-0 text-annotation"/>}<p className="text-sm font-medium">{check.label}</p><span className="ml-auto text-right text-xs capitalize text-muted-foreground">{check.status.replace(/_/g," ")}</span></div>{check.summary&&<p className="mt-1 text-sm leading-6 text-muted-foreground">{check.summary}</p>}</li>)}</ul>
                 <div className="mt-5 flex flex-wrap gap-3">
                   <Button asChild className="bg-primary hover:bg-primary/90">
                     <SafeLink href={`/app/people/${routeId}/story-writer`}>Draft from context pack</SafeLink>
@@ -422,7 +407,7 @@ export function PersonWorkspaceView({workspace,personId,documents,documentsError
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card ">
+            <Card className="border-border bg-card " id="record-context">
               <CardHeader>
                 <CardTitle role="heading" aria-level={2}>Contextual Research</CardTitle>
                 <CardDescription>
@@ -496,7 +481,7 @@ export function PersonWorkspaceView({workspace,personId,documents,documentsError
               <CardTitle role="heading" aria-level={2}>Next Actions</CardTitle>
               <CardDescription>Move from imported evidence to agent-ready research outputs.</CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-2">
+            <CardContent className="divide-y divide-border">
               {[
                 {
                   href: `/app/people/${routeId}/raw`,
@@ -539,18 +524,18 @@ export function PersonWorkspaceView({workspace,personId,documents,documentsError
                   <SafeAnchor
                     key={action.label}
                     href={action.href}
-                    className="rounded-lg border border-border bg-card px-4 py-4 transition hover:border-annotation/40 hover:bg-annotation-surface/70"
+                    className="grid gap-1 py-3 transition hover:bg-muted/50"
                   >
                     <p className="font-medium text-foreground">{action.label}</p>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">{action.description}</p>
+                    <p className="text-sm leading-6 text-muted-foreground">{action.description}</p>
                   </SafeAnchor>
                 ) : (
                   <div
                     key={action.label}
-                    className="rounded-lg border border-dashed border-border bg-muted px-4 py-4"
+                    className="border-l-2 border-dashed border-border px-3 py-3"
                   >
                     <p className="font-medium text-foreground">{action.label}</p>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">{action.description}</p>
+                    <p className="text-sm leading-6 text-muted-foreground">{action.description}</p>
                   </div>
                 )
               )}

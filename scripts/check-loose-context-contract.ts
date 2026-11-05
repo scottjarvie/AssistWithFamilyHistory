@@ -7,6 +7,7 @@ const files = {
   route: read("app/api/context-items/route.ts"),
   panel: read("components/vault/ContextItemsPanel.tsx"),
   personPage: read("app/app/people/[personId]/page.tsx"),
+  personView: read("components/vault/PersonWorkspaceView.tsx"),
 };
 
 assert(files.schema.includes("contextItems"), "Context items table missing.");
@@ -18,7 +19,7 @@ assert(files.route.includes("AI use requires reviewed, non-private context"), "C
 assert(files.vault.includes("isContextPackEligibleContextItem"), "Context pack eligibility filter missing.");
 assert(files.vault.includes("reviewedContextItems"), "Context packs must include only reviewed loose context.");
 assert(files.panel.includes("Loose Context Intake"), "Context intake UI missing.");
-assert(files.personPage.includes("ContextItemsPanel"), "Person workspace must expose context intake.");
+assert(files.personPage.includes("<PersonWorkspaceView") && files.personView.includes("<ContextItemsPanel"), "Person route must render its workspace view with context intake.");
 
 console.log("Loose-context contract checks passed.");
 

@@ -6,7 +6,7 @@ export function FitSticky({children}:{children:ReactNode}) {
   const ref=useRef<HTMLDivElement>(null);
   const [fits,setFits]=useState(false);
   useEffect(()=>{
-    const measure=()=>{if(ref.current)setFits(innerWidth>=1280&&ref.current.getBoundingClientRect().height+32<innerHeight);};
+    const measure=()=>{if(ref.current)setFits(innerWidth>=1024&&ref.current.getBoundingClientRect().height+32<innerHeight);};
     const observer=new ResizeObserver(measure);
     if(ref.current)observer.observe(ref.current);
     const frame=requestAnimationFrame(measure);

@@ -1,10 +1,11 @@
 {
-  "checkedAt": "2026-11-05T10:33:48.325Z",
+  "checkedAt": "2026-11-05T11:06:15.849Z",
   "checks": [
     "Places keeps kind and every event/citation/media count",
     "Place search and a saved query restore across full navigation",
     "Stories preserves each review link and published-only public link",
     "Narrative is expandable without dropping the original four-line preview",
+    "All Stories and status tabs share the same search/workflow count scope",
     "Saved Stories view restores q, status and workflow together",
     "Writing launcher retains source/context/readiness/workflow and each person session",
     "Task identities stay static; explicit Person fields link to the person; global tasks have no fake detail link",

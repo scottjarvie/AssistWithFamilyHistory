@@ -78,7 +78,7 @@ export function LifeTimeline({ events }: { events: TimelineEvent[] }) {
             <span
               className={cn(
                 "absolute -left-[6px] mt-1.5 h-3 w-3 rounded-full border-2 border-card",
-                year !== null ? "bg-annotation-surface0" : "bg-muted-foreground",
+                year !== null ? "bg-annotation" : "bg-muted-foreground",
               )}
             />
             <div className="flex flex-wrap items-baseline gap-x-3">

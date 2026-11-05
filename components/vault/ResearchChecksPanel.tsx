@@ -149,7 +149,7 @@ export function ResearchChecksPanel({
                       status: event.target.value as CheckRecord["status"],
                     })
                   }
-                  className="h-11 md:pointer-fine:h-10 rounded-md border border-border bg-white px-3 text-base md:pointer-fine:text-sm text-foreground"
+                  className="h-11 md:pointer-fine:h-10 rounded-md border border-border bg-card px-3 text-base md:pointer-fine:text-sm text-foreground"
                 >
                   <option value="missing">Missing</option>
                   <option value="in_progress">In progress</option>
@@ -185,13 +185,13 @@ export function ResearchChecksPanel({
             value={taskTitle}
             onChange={(event) => setTaskTitle(event.target.value)}
             placeholder="Create a follow-up research task"
-            className="h-10 rounded-md border border-border bg-white px-3 text-sm text-foreground"
+            className="h-10 rounded-md border border-border bg-card px-3 text-sm text-foreground"
           />
           <Textarea
             value={taskDescription}
             onChange={(event) => setTaskDescription(event.target.value)}
             placeholder="Short description for the task"
-            className="min-h-24 bg-white"
+            className="min-h-24 bg-card"
           />
           <Button className="bg-primary hover:bg-primary/90" onClick={() => void createTask()}>
             Add Task

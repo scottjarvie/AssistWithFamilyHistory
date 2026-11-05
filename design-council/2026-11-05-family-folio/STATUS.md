@@ -1,4 +1,5 @@
-[Newest-first gallery](gallery.html) · Person dossier/stream and reviewed kit fixes built locally; 32 captures and 12 Record checks pass. Full check and exact-head Opus review next.
+[Newest-first gallery](gallery.html) · Record lead-review fixes pass 16 Record / 18 cross-page checks and 38 captures. 57/57 full checks passed; all-page goal remains active.
+
 
 
 
@@ -66,3 +67,11 @@ Frozen-tranche full check passed **57/57**, Node22,49s. Current captures are `ac
 - Source candidates/conflicts/citations, historical timeline, clearly provisional relatives, places, media privacy/upload, generated/legacy documents, full stories and review/public routes, research checks/tasks and private context intake remain. Unfinished real intake survives section changes. No-capture Open Imports and tool availability guards stay direct.
 - Required Opus7f1ab follow-ups are fixed in the kit: contextual counts/one status chooser, natural empty/singular facts, complete author totals, six-pixel drag threshold, phone period semantics and round chart marks. Five focused regressions,18 People interactions,17 cross-page interactions and12 Record checks pass. Two consecutive frozen Record runs passed; no page errors or API writes. Current32 captures and10 honest reconstructed original comparisons pass.
 - Gallery/current captures are synthetic, with media/check mutations disabled and context Save guarded; no backend acceptance implied. Full check and exact-head cross-model review are next. Formal round2/all-page target/audit remain unfinished. AWF-0071 doing, audit not audited; no completed Work Orders. Local only.
+
+## Record review follow-up · newest capture tranche
+
+Opus conditionally approved c187b04, confirming every original field/action and the server/client privacy boundary. Required count, Timeline, dark-control, shared attribution and phone activation fixes are implemented. Birth conflict/source cues and Connections added; log/import/context pointers now open the matching records. Unvisited media defers mounting and makes no image request; drafts remain after first visit. Readiness/actions are compact lists without losing explanations. True unavailable state and actual stored-record counts replace misleading zero/inferred totals.
+
+Six focused tests,18 cross-page checks and16 Record checks pass with zero errors/writes. All38 fresh desktop/phone/dark captures pass. Old reviewed images remain separately labelled; reconstructed originals remain honest comparisons. Full follow-up verification is next; current lead fixes await the next meaningful cross-model review. No formal scoring/target, complete Card/Work Order or all-page audit claimed. Next long route: Place/Story records, Queue, settings, readers, public and specialist pages. Local only.
+
+Final follow-up receipt: **57/57** full steps passed, Node22,51s; final38-capture container-width correction passed. Newest-first gallery shown inline after clean HTML preview; portable gallery retains original PNGs. Next meaningful Place/Story record review will cover these lead fixes. All-page work and separate audit remain unfinished.

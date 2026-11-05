@@ -1,29 +1,18 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type PointerEvent } from "react";
+import { ActivityGlyph } from "@/components/design/SectionGlyph";
+import { activityKindLabel as kindName,activityAuthorLabel,activityIsAi,activityOriginTitle } from "@/lib/activity/presentation";
 import { Button } from "@/components/ui/button";
 import { SafeLink } from "@/components/layout/SafeLink";
 import { UtcDate } from "@/components/design/UtcDate";
 import { activityDate, activityWindow, type ActivityDates, type ActivityPeriod } from "@/lib/activity/window";
 import type { ResearchLogRow } from "@/lib/vault/collectionRows";
 
-const names: Record<string, string> = {
-  tier1_bulk_import: "Bulk import", tier2_sources: "Sources", tier2_memories: "Memories", tier2_notes: "Notes",
-  tier2_relationships: "Relationships", tier2_places: "Places", tier3_deep_research: "Deep research",
-  tier3_narrative: "Narrative", tier3_browser_extras: "Browser research", context_research: "Context research",
-  location_deep_research: "Location research", building_research: "Building research", photos_collected: "Photos", other: "Other",
-};
-const kindName = (kind: string) => names[kind] || kind.replace(/_/g, " ");
-const isAi = (entry: ResearchLogRow) => entry.authorKind === "chosen_ai" || entry.authorKind === "first_party_ai";
-const authorName = (entry: ResearchLogRow) => entry.authorKind === "user" ? "You" : isAi(entry) ? "AI" : entry.authorKind === "system" ? "System" : "Not attributed";
+const isAi=(entry:ResearchLogRow)=>activityIsAi(entry.authorKind);
+const authorName=(entry:ResearchLogRow)=>activityAuthorLabel(entry.authorKind);
 const monthFormat = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
 const axisFormat = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-
-/** Small handwritten entry glyphs; text always names the kind. */
-function KindIcon({kind}:{kind:string}) {
-  const path=kind.includes("photos")||kind.includes("memories")?"M2 3h12v10H2z M3 11l3-3 2 2 3-4 2 5 M5 6h.01":kind.includes("relationships")?"M5 8h6 M5 4a2 2 0 1 1-4 0 2 2 0 0 1 4 0 M15 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0 M3 6v5 M13 5v5":"M3 2h7l3 3v9H3z M10 2v4h3 M5 8h6 M5 11h5";
-  return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={path}/></svg>;
-}
 
 /** Recorded updates, never historical family events or inferred AI authorship. */
 export function ActivityLedger({ entries }: { entries: ResearchLogRow[] }) {
@@ -79,7 +68,7 @@ export function ActivityLedger({ entries }: { entries: ResearchLogRow[] }) {
     <p className="mb-3 text-xs leading-5 text-muted-foreground">Dates are stored updates, in UTC. Periods end at the latest recorded update{entries.length ? ` (${axisFormat.format(latest)}, ${new Date(latest).getUTCFullYear()})` : ""}.</p>
     {period === "custom" && !window.invalid && <p className="mb-3 text-sm text-muted-foreground">Custom dates: {dates.start || "the beginning"} to {dates.end || "the latest update"} (UTC).</p>}
     {rows.length ? <div data-activity-ledger className="space-y-5">{[...months].map(([month, group]) => <div key={month}><h3 className="mb-2 font-sans text-sm font-semibold">{month} <span className="ml-1 font-mono text-xs text-muted-foreground">{group.length}</span></h3><ol className="divide-y divide-border rounded-lg border border-border bg-card">{group.map(entry => <li key={entry.id} data-activity-entry className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 p-3 md:grid-cols-[9rem_minmax(0,1fr)_auto]">
-      <p className="col-span-2 text-xs leading-5 text-muted-foreground md:col-span-1">Updated <UtcDate value={entry.updatedAt} withTime/></p><div className="min-w-0"><p className="break-words text-sm font-medium leading-6">{entry.summary}</p><p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground"><span className="inline-flex items-center gap-1"><KindIcon kind={entry.kind}/>{kindName(entry.kind)}</span>{entry.person && <SafeLink href={entry.person.href} className="inline-flex min-h-11 items-center text-primary underline">{entry.person.name}</SafeLink>}</p>{entry.modelHint && <p className="mt-1 text-xs leading-5 text-muted-foreground">Self-reported model hint: {entry.modelHint}. This is not verified provenance.</p>}</div><span className={`mt-1 inline-flex h-fit items-center rounded-full border border-border px-2 py-1 text-xs ${isAi(entry) ? "text-annotation" : "text-foreground"}`} title={entry.method ? `Server-recorded origin via ${entry.method}; connection display name not recorded` : "No origin was recorded"}>{authorName(entry)}</span>
+      <p className="col-span-2 text-xs leading-5 text-muted-foreground md:col-span-1">Updated <UtcDate value={entry.updatedAt} withTime/></p><div className="min-w-0"><p className="break-words text-sm font-medium leading-6">{entry.summary}</p><p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground"><span className="inline-flex items-center gap-1"><ActivityGlyph kind={entry.kind}/>{kindName(entry.kind)}</span>{entry.person && <SafeLink href={entry.person.href} className="inline-flex min-h-11 items-center text-primary underline">{entry.person.name}</SafeLink>}</p>{entry.modelHint && <p className="mt-1 text-xs leading-5 text-muted-foreground">Self-reported model hint: {entry.modelHint}. This is not verified provenance.</p>}</div><span className={`mt-1 inline-flex h-fit items-center rounded-full border border-border px-2 py-1 text-xs ${isAi(entry) ? "text-annotation" : "text-foreground"}`} title={activityOriginTitle(entry.method)}>{authorName(entry)}</span>
     </li>)}</ol></div>)}</div> : <p className="rounded-lg border border-dashed border-border bg-card p-6 text-sm text-muted-foreground">{entries.length ? "No activity matches these filters. Choose All and All kinds to restore the complete log." : "No research log activity yet. Imports, place work, and stories will create entries here."}</p>}
     <p className="mt-3 text-sm text-muted-foreground" aria-live="polite">{rows.length} of {entries.length} log entries shown. A kind gets a lane when its first activity is recorded.</p>
   </section>;

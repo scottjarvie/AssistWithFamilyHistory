@@ -170,7 +170,7 @@ function SelectField({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-11 md:pointer-fine:h-10 w-full rounded-md border border-border bg-white px-3 text-base md:pointer-fine:text-sm font-normal normal-case tracking-normal text-foreground"
+        className="h-11 md:pointer-fine:h-10 w-full rounded-md border border-border bg-card px-3 text-base md:pointer-fine:text-sm font-normal normal-case tracking-normal text-foreground"
       >
         {options.map((option) => (
           <option key={option} value={option}>

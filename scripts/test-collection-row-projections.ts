@@ -2,6 +2,7 @@ import {test} from "node:test";
 import assert from "node:assert/strict";
 import {projectPlaceRow,projectStoryRow,projectWritingCandidate,projectResearchTask,projectResearchLog} from "../lib/vault/collectionRows";
 import {canonicalFilters,applyCollectionFilters} from "../lib/collections/viewFilters";
+import {activityAuthorLabel,activityKindLabel} from "../lib/activity/presentation";
 import {countCollectionFacets} from "../lib/collections/facets";
 import {activityWindow, activityDay} from "../lib/activity/window";
 import {resolveCollectionColumns} from "../lib/collections/columnPreferences";
@@ -50,5 +51,10 @@ test("Custom activity dates replace a preset; open bounds survive and inverted d
 test("Facet counts share one engine and apply search plus every other active facet",()=>{
  const rows=[{status:"draft",workflow:"evidence",name:"Samuel"},{status:"review",workflow:"ready",name:"Samuel"},{status:"draft",workflow:"ready",name:"Mabel"}];
  const counts=countCollectionFacets(rows,[{key:"status",label:"Status",read:r=>r.status,options:[{value:"draft",label:"Draft"},{value:"review",label:"Review"}]},{key:"workflow",label:"Workflow",read:r=>r.workflow,options:[{value:"evidence",label:"Evidence"},{value:"ready",label:"Ready"}]}],{status:"review",workflow:"ready"},r=>r.name==="Samuel");
- assert.deepEqual(counts.map(f=>f.options.map(o=>o.count)),[[0,1],[0,1]]);
+ assert.deepEqual(counts.map(f=>f.options.map(o=>o.count)),[[0,1],[0,1]]);assert.deepEqual(counts.map(f=>f.count),[1,1]);
+});
+
+
+test("Shared activity wording distinguishes first-party and chosen AI without inventing unknown authors",()=>{
+ assert.equal(activityAuthorLabel("first_party_ai"),"Family History AI");assert.equal(activityAuthorLabel("chosen_ai"),"Your AI");assert.equal(activityAuthorLabel(null),"Not attributed");assert.equal(activityKindLabel("tier2_sources"),"Sources");
 });

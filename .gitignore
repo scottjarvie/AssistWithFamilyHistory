@@ -98,3 +98,6 @@ design-council/*/activity-facets/
 
 # Person record capture tranche, separate from formal judging packets.
 design-council/*/record-stream/
+
+# Compressed viewing copies for the inline council gallery.
+design-council/*/.gallery-preview/

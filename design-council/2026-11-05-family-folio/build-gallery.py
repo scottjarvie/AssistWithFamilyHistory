@@ -1,17 +1,18 @@
 """Rebuild the run's local, newest-first capture gallery; no server needed."""
 from pathlib import Path
 from datetime import datetime, timezone
-import html, json, base64, re, os
+import html, json, base64, re, os, subprocess
 run=Path(__file__).resolve().parent
 rounds=sorted([p for p in run.glob('round-*') if re.fullmatch(r'round-\d+',p.name) and (p/'ours').exists()],key=lambda p:int(p.name.split('-')[1]),reverse=True)
-sections=[('Person dossier and evidence stream',run/'record-stream/current'),('Activity, facets and Home refinements',run/'activity-facets'),('Collection review fixes',run/'collection-fixes')]+[(p.name,p/'ours') for p in rounds]+[('Starting collections · reconstructed now',run/'baseline-reconstructed'),('Starting page · now',run/'baseline')]
+sections=[('Record review refinements',run/'record-stream/current'),('Person dossier and evidence stream',run/'record-stream/reviewed-c187b04'),('Activity, facets and Home refinements',run/'activity-facets'),('Collection review fixes',run/'collection-fixes')]+[(p.name,p/'ours') for p in rounds]+[('Starting collections · reconstructed now',run/'baseline-reconstructed'),('Starting page · now',run/'baseline')]
 images=[]; blocks=[]
 score_file=run/'scores.json'
 score_data=json.loads(score_file.read_text()) if score_file.exists() else {}
 params=json.loads((run/'params.json').read_text())
 weights={c['key']:c.get('weight',1) for c in params.get('categories',[])}
 def score_line(title):
- if title=='Person dossier and evidence stream': return 'Newest record/kit capture tranche · review pending; synthetic mutations disabled; no formal score claimed'
+ if title=='Record review refinements': return 'Newest lead review fixes · checks/captures recorded, next meaningful cross-model review pending; no formal score'
+ if title=='Person dossier and evidence stream': return 'Reviewed at c187b04 · Opus conditional approval; original reviewed images retained, no formal score'
  if title=='Activity, facets and Home refinements': return 'Newest local capture tranche · exact-head review pending; no formal score claimed'
  if title=='Collection review fixes': return 'Lead fixes from Opus review · checks and fresh images recorded; next cross-model review pending'
  if 'reconstructed' in title: return 'Original page JSX from 99980b5, invented data under the current shared shell/runtime · reconstructed comparison, not a frozen original capture'
@@ -34,7 +35,16 @@ for title,folder in sections:
  score=score_line(title)
  for image in sorted(folder.glob('*.png')):
   label=image.stem.replace('--',' · '); index=len(images)
-  source=str(image) if os.environ.get('COUNCIL_INLINE_PREVIEW') else 'data:image/png;base64,'+base64.b64encode(image.read_bytes()).decode('ascii')
+  if os.environ.get('COUNCIL_INLINE_PREVIEW'):
+   # Keep the portable gallery at original PNG quality. The inline renderer has
+   # a 25 MiB attachment limit, so its adapter uses compressed viewing copies.
+   cache=run/'.gallery-preview'/'compact-v2'/image.relative_to(run).with_suffix('.jpg')
+   if not cache.exists() or cache.stat().st_mtime < image.stat().st_mtime:
+    cache.parent.mkdir(parents=True,exist_ok=True)
+    subprocess.run(['nice','-n','10','sips','-s','format','jpeg','-s','formatOptions','40','-Z','1200',str(image),'--out',str(cache)],check=True,stdout=subprocess.DEVNULL)
+   source=str(cache)
+  else:
+   source='data:image/png;base64,'+base64.b64encode(image.read_bytes()).decode('ascii')
   images.append(label)
   cards.append(f'<button class="shot" data-index="{index}"><img loading="lazy" src="{source}" alt="{html.escape(label)}"><span>{index+1}. {html.escape(label)}</span></button>')
  blocks.append(f'<section><h2>{html.escape(title)}</h2><p>{score} · synthetic fixture presentation; no backend acceptance claimed.</p><div class="shots">'+''.join(cards)+'</div></section>')

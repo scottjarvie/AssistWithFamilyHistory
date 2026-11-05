@@ -288,7 +288,7 @@
       ],
       "capabilities": [
         {
-          "can": "see upload surface even before first memory",
+          "can": "see populated memory privacy and upload controls",
           "text": "Upload"
         },
         {
@@ -300,6 +300,39 @@
     {
       "name": "person-dark",
       "path": "/design-council-preview?surface=person&theme=dark"
+    },
+    {
+      "name": "person-research-dark",
+      "path": "/design-council-preview?surface=person&theme=dark",
+      "actions": [
+        {
+          "click": "button[role=\"tab\"]:has-text(\"Research\")"
+        }
+      ]
+    },
+    {
+      "name": "person-memories-dark",
+      "path": "/design-council-preview?surface=person&theme=dark",
+      "actions": [
+        {
+          "click": "button[role=\"tab\"]:has-text(\"Memories\")"
+        }
+      ]
+    },
+    {
+      "name": "person-memories-empty",
+      "path": "/design-council-preview?surface=person-no-media",
+      "actions": [
+        {
+          "click": "button[role=\"tab\"]:has-text(\"Memories\")"
+        }
+      ],
+      "capabilities": [
+        {
+          "can": "keep first upload available in empty Memories",
+          "text": "Upload files"
+        }
+      ]
     }
   ],
   "references": [

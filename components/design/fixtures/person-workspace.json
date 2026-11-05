@@ -95,6 +95,7 @@
       "entityId": "persons:synthetic-1",
       "activityType": "context_research",
       "status": "done",
+      "model": "self-reported synthetic model",
       "summary": "Synthetic research update 1",
       "details": "Invented research detail retained in full, with interpretation separate from observation.",
       "creationProvenance": {
@@ -460,7 +461,25 @@
       "relatedName": "Samuel Finch"
     }
   ],
-  "media": [],
+  "media": [
+    {
+      "_id": "media:synthetic-1",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793808000000,
+      "updatedAt": 1793808000000,
+      "vaultOwnerId": "synthetic-design-only",
+      "type": "photo",
+      "title": "Invented memory illustration",
+      "url": "/illustrations/synthetic-record.svg",
+      "personIds": [
+        "persons:synthetic-1"
+      ],
+      "privacyLevel": "private",
+      "reviewStatus": "unreviewed",
+      "rightsStatus": "unknown",
+      "aiUseAllowed": false
+    }
+  ],
   "contextItems": [
     {
       "_id": "contextItems:synthetic-1",
@@ -731,11 +750,11 @@
       "personId": "persons:synthetic-1",
       "personFsId": "synthetic-eleanor",
       "checkKey": "memories",
-      "status": "missing",
+      "status": "complete",
       "applicability": "recommended",
       "completionSource": "inferred",
-      "confidence": 0.22,
-      "summary": "Look for memories, photos, scans, or letters.",
+      "confidence": 0.82,
+      "summary": "Memories or photos are attached.",
       "linkedSourceIds": [],
       "linkedPlaceIds": [],
       "linkedPersonIds": []
@@ -755,25 +774,24 @@
     }
   ],
   "operations": {
-    "completionPercent": 67,
+    "completionPercent": 75,
     "applicableCount": 14,
     "requiredMissingCount": 1,
-    "recommendedMissingCount": 2,
+    "recommendedMissingCount": 1,
     "staleChecksCount": 0,
     "criticalMissing": [
       "identity_review"
     ],
     "nextActions": [
       "Review identity confidence and import warnings.",
-      "Check probate, land, and newspaper collections.",
-      "Look for memories, photos, scans, or letters."
+      "Check probate, land, and newspaper collections."
     ]
   },
   "stats": {
     "sources": 1,
     "citations": 1,
     "events": 2,
-    "memories": 0,
+    "memories": 1,
     "stories": 1,
     "documents": 1,
     "places": 2,
