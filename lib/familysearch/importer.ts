@@ -595,6 +595,7 @@ async function maybeCreateRelationship(
   if (role.includes("spouse") || role.includes("wife") || role.includes("husband")) {
     const result = await client.mutation(api.vaultMutations.upsertRelationship, {
       vaultOwnerId,
+      preserveExisting: true,
       type: "Couple",
       person1: args.personId as never,
       person2: args.relatedPersonId as never,
@@ -605,6 +606,7 @@ async function maybeCreateRelationship(
   if (role.includes("father") || role.includes("mother") || role.includes("parent")) {
     const result = await client.mutation(api.vaultMutations.upsertRelationship, {
       vaultOwnerId,
+      preserveExisting: true,
       type: "ParentChild",
       childRelationType: "Biological",
       person1: args.relatedPersonId as never,
@@ -616,6 +618,7 @@ async function maybeCreateRelationship(
   if (role.includes("child") || role.includes("son") || role.includes("daughter")) {
     const result = await client.mutation(api.vaultMutations.upsertRelationship, {
       vaultOwnerId,
+      preserveExisting: true,
       type: "ParentChild",
       childRelationType: "Biological",
       person1: args.personId as never,

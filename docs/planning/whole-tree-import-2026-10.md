@@ -659,3 +659,24 @@ GEDCOM file origin, direct/batch evidence refusal, retained annotations and
 accepted facts/stories, proposal corrections and additive field-specific links.
 All remain UNRUN. No browser, provider, actual user or runtime proof is claimed;
 no UI route/layout edits, production writes or deployment occurred.
+
+
+Relationship capture and legacy FamilySearch identity (2026-11-05):
+All three capture relationship paths now request preserveExisting. Existing
+relationships retain lineage, facts, canonical IDs, import keys and timestamps.
+A capture-key participant/type disagreement, ambiguous equivalent rows or a
+self-relationship refuses instead of selecting or rewriting an original. New
+relationship creation remains available and never persists the control flag.
+Tree import reconciles its mapping with an owner-indexed legacy FamilySearch
+relationship ID before endpoint matching. Unmapped legacy ID disagreements
+refuse; duplicate IDs never select the first row. Citation/note references use
+the same resolver. Virtual PID index state stays in the bounded dry plan.
+Each new relationship mapping records the canonical PID observed at binding
+as private baseline metadata, not overwrite authority. This preserves valid
+alias resume and refuses old identities after a manual canonical correction.
+Older aliases lacking that witness require identity review; no silent migration
+or rekey occurs. A new owner/PID index requires Convex deployment.
+Added 17 synthetic cases across actual capture flows, legacy mismatches and
+references, owner isolation, canonical correction, aliases and positive resume.
+All remain UNRUN; no browser or actual user/Tier2 proof is claimed. No UI
+route/layout edits, real provider/database writes, or deployment occurred.

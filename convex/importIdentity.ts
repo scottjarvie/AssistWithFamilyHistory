@@ -34,3 +34,22 @@ export async function legacyExternalIdentityIsVerified(
   }
   return importOrigin || !!row.externalIds?.some(external => external.system.trim().toLowerCase() === normalizedSystem && external.id.trim() === key.trim());
 }
+
+/** Scope legacy relationship PID lookups before applying the duplicate bound. */
+export async function ownedFamilySearchRelationships(ctx: QueryCtx | MutationCtx, owner: string, key: string, limit = 2) {
+  const owners = matchesVaultOwner(undefined, owner) ? [owner, undefined] : [owner];
+  return (await Promise.all(owners.map(vaultOwnerId => ctx.db.query("relationships")
+    .withIndex("by_owner_familySearchId", q => q.eq("vaultOwnerId", vaultOwnerId).eq("familySearchId", key)).take(limit)))).flat();
+}
+
+/** Alias registration records the canonical PID observed, without rewrite authority. */
+export function relationshipPidAgrees(row: Doc<"relationships">, key: string, baseline?: Record<string, unknown> | null): boolean {
+  const witness = baseline?._relationshipIdentity;
+  if (witness && typeof witness === "object" && Object.hasOwn(witness, "familySearchId")) {
+    const id = (witness as { familySearchId?: unknown }).familySearchId;
+    return (typeof id === "string" || id === null) && (row.familySearchId ?? null) === id;
+  }
+  // An older primary mapping can still be verified directly. An older alias
+  // without a canonical-ID witness is deliberately left for identity review.
+  return row.familySearchId === key;
+}

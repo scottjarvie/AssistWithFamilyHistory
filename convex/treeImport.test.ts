@@ -2975,3 +2975,116 @@ test.each(["newTarget", "newField"])("legacy MCP cannot silently reattribute imp
   const target = before.people.find(row => row.fsId === (mode === "newTarget" ? "Q" : "P"))!;
   await expect(t.mutation(internal.mcpFamilyHistory.saveSourceEvidence, { principal: principal(), grantId, operationId: "refuse-import-attribution", requestHash: "refuse-import-attribution", input: { source: { mode: "update", sourceId: String(before.sources[0]._id), expectedUpdatedAt: before.sources[0].updatedAt }, citation: { mode: "update", citationId: String(before.citations[0]._id), expectedUpdatedAt: before.citations[0].updatedAt, isEvidence: true, confidence: "medium", page: "12", extractedText: "Original evidence" }, links: [{ targetType: "person", targetId: String(target._id), field: mode === "newTarget" ? "birth" : "death" }] } })).rejects.toThrow("EVIDENCE_ATTRIBUTION_REVIEW_REQUIRED"); expect(await snapshot()).toEqual(before);
 });
+
+
+test.each(["father", "child", "spouse"].flatMap(role => [false, true].map(manual => ({ role, manual }))))("capture retains relationship lineage, facts and identity ($role/manual=$manual)", async ({ role, manual }) => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const parentChild = role !== "spouse";
+  await send(t, grant, job.importJobId, 0, { persons: ["P", "C"].map(key => ({ key, living: false, names: [{ given: key, surname: "Person" }] })), relationships: [{ key: "R", type: parentChild ? "ParentChild" : "Couple", lineage: parentChild ? "adopted" : undefined, person1Key: "P", person2Key: "C", facts: [{ type: parentChild ? "adoption" : "marriage", description: "Original relationship fact" }] }], sources: [{ key: "OLD-S", title: "Retained source" }], citations: [{ key: "OLD-C", sourceKey: "OLD-S", extractedText: "Retained evidence", targets: [{ kind: "relationship", key: "R" }] }], notes: [{ key: "OLD-N", text: "Retained relationship explanation", subject: { kind: "relationship", key: "R" } }] });
+  const relationship = (await t.run(ctx => ctx.db.query("relationships").collect()))[0];
+  if (manual && parentChild) await t.mutation(internal.relationships.updateRelationType, { id: relationship._id, relationType: "Foster" });
+  if (manual && !parentChild) await t.mutation(internal.relationships.updateFacts, { id: relationship._id, facts: [{ type: "marriage", description: "Manually corrected relationship fact" }] });
+  const snapshot = () => t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), relationships: await ctx.db.query("relationships").collect(), sources: await ctx.db.query("sources").collect(), citations: await ctx.db.query("citations").collect(), notes: await ctx.db.query("notes").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  const root = role === "father" ? "C" : "P"; const related = role === "father" ? "P" : "C";
+  const capture = CapturePackageSchema.parse({ schemaVersion: "2.0", captureId: `preserve-relationship-${role}-${manual}`, capturedAt: "2026-01-01T00:00:00Z", extractorVersion: "synthetic-test", extractionDurationMs: 0, pageType: "sources", pageUrl: `https://example.test/capture/${root}`, pageTitle: "Synthetic relationship evidence", uiLocale: "en", person: { familySearchId: root, name: `${root} Person`, deathDate: "2000" }, sources: [{ id: "NEW-S", orderIndex: 0, sourceKey: "new-relationship-source", sourceType: "record", title: "New census evidence", citation: "New source names a relative", tags: [], indexed: { fields: [], textBlocks: [] }, rawText: "Synthetic captured record", expanded: true, expansionAttempts: 1, expansionSucceeded: true, relatedPeople: [{ familySearchId: related, name: `${related} Person`, role }] }], memories: [], diagnostics: { mode: "standard", warnings: [], errors: [] } });
+  const owner = t.withIdentity({ subject: OWNER }); const client = { mutation: (ref: any, args: any) => owner.mutation(ref, args) } as unknown as Parameters<typeof importCapturePackageToConvex>[0]["client"];
+  const result = await importCapturePackageToConvex({ client, vaultOwnerId: OWNER, capture, compatibilityMode: false, artifactPaths: {} }); expect(result.counts.sources).toBe(1); expect(result.counts.relationships).toBe(0);
+  const after = await snapshot(); expect(after.relationships).toEqual(before.relationships); expect(after.people).toEqual(before.people); expect(after.notes).toEqual(before.notes); expect(after.keys).toEqual(before.keys);
+  expect(after.sources.find(row => row._id === before.sources[0]._id)).toEqual(before.sources[0]); expect(after.citations.find(row => row._id === before.citations[0]._id)).toEqual(before.citations[0]);
+  if (parentChild) expect(after.relationships[0].childRelationType).toBe(manual ? "Foster" : "Adopted");
+});
+
+test("capture key reuse cannot change participants, while explicit owner lineage edits remain available", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  await send(t, grant, job.importJobId, 0, { persons: ["P", "C", "T"].map(key => ({ key, living: false, names: [{ given: key }] })), relationships: [{ key: "R", type: "ParentChild", lineage: "adopted", person1Key: "P", person2Key: "C" }] });
+  const rows = await t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), relationships: await ctx.db.query("relationships").collect() })); const rel = rows.relationships[0]; const third = rows.people.find(row => row.fsId === "T")!;
+  const owner = t.withIdentity({ subject: OWNER });
+  await expect(owner.mutation(api.vaultMutations.upsertRelationship, { vaultOwnerId: OWNER, preserveExisting: true, importKey: rel.importKey, type: "ParentChild", childRelationType: "Biological", person1: rel.person1!, person2: third._id })).rejects.toThrow("CAPTURE_RELATIONSHIP_REVIEW_REQUIRED"); expect(await t.run(ctx => ctx.db.query("relationships").collect())).toEqual(rows.relationships);
+  await owner.mutation(api.vaultMutations.upsertRelationship, { vaultOwnerId: OWNER, importKey: rel.importKey, type: "ParentChild", childRelationType: "Foster", person1: rel.person1!, person2: rel.person2! });
+  expect(await t.run(ctx => ctx.db.get(rel._id))).toMatchObject({ childRelationType: "Foster", person1: rel.person1, person2: rel.person2 });
+});
+
+test("capture refuses a self-relationship after identity reuse", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  await send(t, grant, job.importJobId, 0, { persons: [{ key: "P", living: false, names: [{ given: "P" }] }] }); const person = (await t.run(ctx => ctx.db.query("persons").collect()))[0];
+  await expect(t.withIdentity({ subject: OWNER }).mutation(api.vaultMutations.upsertRelationship, { vaultOwnerId: OWNER, preserveExisting: true, type: "ParentChild", person1: person._id, person2: person._id })).rejects.toThrow("VALIDATION_ERROR"); expect(await countRows(t, "relationships")).toBe(0);
+});
+
+test("capture and tree import refuse ambiguous equivalent relationship rows", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  await send(t, grant, job.importJobId, 0, { persons: ["P", "C"].map(key => ({ key, living: false, names: [{ given: key }] })) });
+  const ids = await t.run(async ctx => { const people = await ctx.db.query("persons").collect(); const person1 = people.find(row => row.fsId === "P")!._id; const person2 = people.find(row => row.fsId === "C")!._id; for (const key of ["R1", "R2"]) await ctx.db.insert("relationships", { vaultOwnerId: OWNER, type: "ParentChild", person1, person2, familySearchId: key, childRelationType: "Adopted", createdAt: 1, updatedAt: 1 }); return { person1, person2 }; });
+  const snapshot = () => t.run(async ctx => ({ relationships: await ctx.db.query("relationships").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  await expect(t.withIdentity({ subject: OWNER }).mutation(api.vaultMutations.upsertRelationship, { vaultOwnerId: OWNER, preserveExisting: true, type: "ParentChild", person1: ids.person1, person2: ids.person2 })).rejects.toThrow("AMBIGUOUS_RELATIONSHIP_IDENTITY"); expect(await snapshot()).toEqual(before);
+  for (const dryRun of [true, false]) { const result = await send(t, grant, job.importJobId, 1, { relationships: [{ key: "NEW-R", type: "ParentChild", lineage: "adopted", person1Key: "P", person2Key: "C" }] }, { dryRun }, `ambiguous-pair-${dryRun}`); expect(result.results[0].reason).toContain("AMBIGUOUS_RELATIONSHIP_IDENTITY"); expect(await snapshot()).toEqual(before); }
+});
+
+
+async function legacyRelationshipFixture(t: T) {
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  await send(t, grant, job.importJobId, 0, { persons: ["P", "C", "T"].map(key => ({ key, living: false, names: [{ given: key }] })), sources: [{ key: "S", title: "Legacy relationship evidence" }] });
+  const people = await t.run(ctx => ctx.db.query("persons").collect()); const parent = people.find(row => row.fsId === "P")!; const child = people.find(row => row.fsId === "C")!; const third = people.find(row => row.fsId === "T")!;
+  const made = await t.withIdentity({ subject: OWNER }).mutation(api.vaultMutations.upsertRelationship, { vaultOwnerId: OWNER, type: "ParentChild", childRelationType: "Adopted", person1: parent._id, person2: child._id, familySearchId: "R", importKey: "legacy-R", facts: [{ type: "adoption", description: "Original legacy assertion" }] });
+  return { grant, job, parent, child, third, relationship: (await t.run(ctx => ctx.db.get(made.relationshipId)))! };
+}
+
+test.each(["participants", "type"])("a legacy FamilySearch relationship ID cannot be duplicated with different %s", async change => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const f = await legacyRelationshipFixture(t);
+  const attachment = await send(t, f.grant, f.job.importJobId, 1, { citations: [{ key: "LEGACY-C", sourceKey: "S", extractedText: "Retained legacy evidence", targets: [{ kind: "relationship", key: "R" }] }], notes: [{ key: "LEGACY-N", text: "Retained legacy explanation", subject: { kind: "relationship", key: "R" } }] }); expect(attachment.results.filter((row: any) => row.status === "failed")).toEqual([]);
+  const snapshot = () => t.run(async ctx => ({ relationships: await ctx.db.query("relationships").collect(), citations: await ctx.db.query("citations").collect(), notes: await ctx.db.query("notes").collect(), links: await ctx.db.query("citationLinks").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  expect(before.keys.some(row => row.recordType === "relationship")).toBe(false);
+  const batch: TreeImportBatch = { relationships: [{ key: "R", type: change === "type" ? "Couple" : "ParentChild", lineage: "adopted", person1Key: "P", person2Key: change === "participants" ? "T" : "C", facts: [{ type: "adoption", description: "Must not be attributed to the legacy pair" }] }] };
+  for (const dryRun of [true, false]) { const operation = `legacy-pid-mismatch-${change}-${dryRun}`; const result = await send(t, f.grant, f.job.importJobId, 2, batch, { dryRun }, operation); expect(result.results[0].reason).toContain("LEGACY_IDENTITY_REVIEW_REQUIRED"); expect(await snapshot()).toEqual(before); expect(await send(t, f.grant, f.job.importJobId, 2, batch, { dryRun }, operation)).toEqual(dryRun ? result : { ...result, deduplicated: true }); }
+});
+
+test("matching legacy relationship IDs link once and retain original lineage and annotations", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const f = await legacyRelationshipFixture(t);
+  await send(t, f.grant, f.job.importJobId, 1, { notes: [{ key: "N", text: "Retained legacy note", subject: { kind: "relationship", key: "R" } }] }); const notes = await t.run(ctx => ctx.db.query("notes").collect());
+  const batch: TreeImportBatch = { relationships: [{ key: "R", type: "ParentChild", lineage: "adopted", person1Key: "P", person2Key: "C", facts: [{ type: "adoption", description: "Original legacy assertion" }] }] };
+  const before = await t.run(ctx => ctx.db.query("relationships").collect()); const dry = await send(t, f.grant, f.job.importJobId, 2, batch, { dryRun: true }, "dry-legacy-relationship-link"); expect(await t.run(ctx => ctx.db.query("relationships").collect())).toEqual(before);
+  const real = await send(t, f.grant, f.job.importJobId, 2, batch); expect(dry.counts).toEqual(real.counts); expect(real.counts.relationships.linked).toBe(1);
+  const rows = await t.run(ctx => ctx.db.query("relationships").collect()); expect(rows).toHaveLength(1); expect(rows[0]).toMatchObject({ ...f.relationship, updatedAt: expect.any(Number) }); expect(await t.run(ctx => ctx.db.query("notes").collect())).toEqual(notes);
+  const mapping = (await t.run(ctx => ctx.db.query("mcpRecordKeys").collect())).find(row => row.recordType === "relationship")!; expect(JSON.parse(mapping.lastImportedJson!)._relationshipIdentity).toEqual({ familySearchId: "R" });
+  const repeated = await send(t, f.grant, f.job.importJobId, 3, batch); expect(repeated.counts.relationships.unchanged).toBe(1); expect(await t.run(ctx => ctx.db.query("relationships").collect())).toEqual(rows);
+});
+
+test("owned legacy relationship lookup is not crowded out by foreign records", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  await t.run(async ctx => { const person1 = await ctx.db.insert("persons", { vaultOwnerId: "foreign-relationship-owner", name: { given: "Foreign", surname: "Parent" }, sex: "unknown", living: false, createdAt: 1, updatedAt: 1 }); const person2 = await ctx.db.insert("persons", { vaultOwnerId: "foreign-relationship-owner", name: { given: "Foreign", surname: "Child" }, sex: "unknown", living: false, createdAt: 1, updatedAt: 1 }); for (let i = 0; i < 12; i++) await ctx.db.insert("relationships", { vaultOwnerId: "foreign-relationship-owner", type: "ParentChild", person1, person2, familySearchId: "R", createdAt: 1, updatedAt: 1 }); });
+  const foreign = await t.run(ctx => ctx.db.query("relationships").collect()); const f = await legacyRelationshipFixture(t);
+  const result = await send(t, f.grant, f.job.importJobId, 1, { relationships: [{ key: "R", type: "ParentChild", lineage: "adopted", person1Key: "P", person2Key: "C" }] }); expect(result.counts.relationships.linked).toBe(1);
+  const rows = await t.run(ctx => ctx.db.query("relationships").collect()); expect(rows.filter(row => row.vaultOwnerId === OWNER)).toHaveLength(1); expect(rows.filter(row => row.vaultOwnerId !== OWNER)).toEqual(foreign);
+});
+
+test.each([false, true])("duplicate legacy relationship PIDs refuse imports and references (mapped=%s)", async mapped => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const f = await legacyRelationshipFixture(t);
+  if (mapped) await send(t, f.grant, f.job.importJobId, 1, { relationships: [{ key: "R", type: "ParentChild", lineage: "adopted", person1Key: "P", person2Key: "C" }] });
+  await t.run(ctx => ctx.db.insert("relationships", { vaultOwnerId: OWNER, type: "ParentChild", person1: f.parent._id, person2: f.third._id, familySearchId: "R", childRelationType: "Foster", createdAt: 1, updatedAt: 1 }));
+  const snapshot = () => t.run(async ctx => ({ relationships: await ctx.db.query("relationships").collect(), notes: await ctx.db.query("notes").collect(), citations: await ctx.db.query("citations").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  const batch: TreeImportBatch = { relationships: [{ key: "R", type: "ParentChild", lineage: "adopted", person1Key: "P", person2Key: "C" }], citations: [{ key: "C", sourceKey: "S", targets: [{ kind: "relationship", key: "R" }] }], notes: [{ key: "N", text: "Must not select either identity", subject: { kind: "relationship", key: "R" } }] };
+  for (const dryRun of [true, false]) { const result = await send(t, f.grant, f.job.importJobId, mapped ? 2 : 1, batch, { dryRun }, `duplicate-relationship-pid-${mapped}-${dryRun}`); expect(result.results).toHaveLength(3); expect(result.results.every((row: any) => row.status === "failed" && row.reason.includes("AMBIGUOUS_RELATIONSHIP_IDENTITY"))).toBe(true); expect(await snapshot()).toEqual(before); }
+  await expect(t.withIdentity({ subject: OWNER }).mutation(api.vaultMutations.upsertRelationship, { vaultOwnerId: OWNER, preserveExisting: true, familySearchId: "R", type: "ParentChild", person1: f.parent._id, person2: f.child._id })).rejects.toThrow("AMBIGUOUS_RELATIONSHIP_IDENTITY"); expect(await snapshot()).toEqual(before);
+});
+
+test("corrected relationship PIDs cannot be revived through old mappings or later alias registration", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  await send(t, grant, job.importJobId, 0, { persons: ["P", "C"].map(key => ({ key, living: false, names: [{ given: key }] })), relationships: [{ key: "OLD-R", type: "ParentChild", lineage: "adopted", person1Key: "P", person2Key: "C" }], sources: [{ key: "S", title: "Source" }] });
+  const rel = (await t.run(ctx => ctx.db.query("relationships").collect()))[0];
+  await t.withIdentity({ subject: OWNER }).mutation(api.vaultMutations.upsertRelationship, { vaultOwnerId: OWNER, type: "ParentChild", person1: rel.person1!, person2: rel.person2!, childRelationType: "Adopted", importKey: rel.importKey, familySearchId: "NEW-R" });
+  const snapshot = () => t.run(async ctx => ({ relationships: await ctx.db.query("relationships").collect(), notes: await ctx.db.query("notes").collect(), citations: await ctx.db.query("citations").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const corrected = await snapshot();
+  const oldBatch: TreeImportBatch = { relationships: [{ key: "OLD-R", type: "ParentChild", lineage: "adopted", person1Key: "P", person2Key: "C" }], citations: [{ key: "C", sourceKey: "S", targets: [{ kind: "relationship", key: "OLD-R" }] }], notes: [{ key: "N", text: "Old identity must require review", subject: { kind: "relationship", key: "OLD-R" } }] };
+  const dry = await send(t, grant, job.importJobId, 1, oldBatch, { dryRun: true }, "dry-corrected-relationship-pid"); expect(dry.results.every((row: any) => row.reason.includes("LEGACY_IDENTITY_REVIEW_REQUIRED"))).toBe(true); expect(await snapshot()).toEqual(corrected);
+  const first = await send(t, grant, job.importJobId, 1, oldBatch); expect(first.results.every((row: any) => row.reason.includes("LEGACY_IDENTITY_REVIEW_REQUIRED"))).toBe(true); expect(await snapshot()).toEqual(corrected);
+  const fresh = await send(t, grant, job.importJobId, 2, { relationships: [{ key: "NEW-R", type: "ParentChild", lineage: "adopted", person1Key: "P", person2Key: "C" }] }); expect(fresh.counts.relationships.linked).toBe(1); const after = await snapshot();
+  const retry = await send(t, grant, job.importJobId, 3, oldBatch); expect(retry.results.every((row: any) => row.reason.includes("LEGACY_IDENTITY_REVIEW_REQUIRED"))).toBe(true); expect(await snapshot()).toEqual(after);
+});
+
+test("a new relationship alias retains its observed canonical PID across resume and capture", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const f = await legacyRelationshipFixture(t);
+  const batch: TreeImportBatch = { relationships: [{ key: "ALIAS-R", type: "ParentChild", lineage: "adopted", person1Key: "P", person2Key: "C" }] };
+  const first = await send(t, f.grant, f.job.importJobId, 1, batch); expect(first.counts.relationships.linked).toBe(1);
+  const snapshot = () => t.run(async ctx => ({ relationships: await ctx.db.query("relationships").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  expect(before.relationships[0].familySearchId).toBe("R"); const alias = before.keys.find(row => row.recordType === "relationship")!; expect(JSON.parse(alias.lastImportedJson!)._relationshipIdentity).toEqual({ familySearchId: "R" });
+  const dry = await send(t, f.grant, f.job.importJobId, 2, batch, { dryRun: true }, "dry-canonical-relationship-alias"); expect(await snapshot()).toEqual(before); const repeat = await send(t, f.grant, f.job.importJobId, 2, batch); expect(dry.counts).toEqual(repeat.counts); expect(repeat.counts.relationships.unchanged).toBe(1); expect(await snapshot()).toEqual(before);
+  const capture = await t.withIdentity({ subject: OWNER }).mutation(api.vaultMutations.upsertRelationship, { vaultOwnerId: OWNER, preserveExisting: true, familySearchId: "ALIAS-R", type: "ParentChild", childRelationType: "Biological", person1: f.parent._id, person2: f.child._id, importKey: "another-capture-key" }); expect(capture).toEqual({ relationshipId: f.relationship._id, created: false }); expect(await snapshot()).toEqual(before);
+});

@@ -1,4 +1,4 @@
-import { legacyExternalIdentityIsVerified } from "./importIdentity";
+import { legacyExternalIdentityIsVerified, ownedFamilySearchRelationships, relationshipPidAgrees } from "./importIdentity";
 import { v } from "convex/values";
 import { mutation, type MutationCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
@@ -932,9 +932,30 @@ export const upsertPersonEvent = mutation({
   },
 });
 
+async function resolveCapturedFamilySearchRelationship(ctx: MutationCtx, owner: string, key: string): Promise<Doc<"relationships"> | null> {
+  const mappings = await ctx.db.query("mcpRecordKeys").withIndex("by_owner_type_key", q =>
+    q.eq("vaultOwnerId", owner).eq("recordType", "relationship").eq("recordKey", externalRecordKey("familysearch", "relationship", key)),
+  ).take(2);
+  if (mappings.length > 1) throw new Error("AMBIGUOUS_RELATIONSHIP_IDENTITY: Duplicate relationship mappings require review.");
+  const mapping = mappings[0];
+  if (mapping && mapping.externalKeyVersion !== 2 && (!await legacyExternalIdentityIsVerified(ctx, owner, mapping, "relationships", "familysearch", key) || key.trim().startsWith("relationship:") || key.includes(":relationship:"))) throw new Error("LEGACY_IDENTITY_REVIEW_REQUIRED: The older relationship mapping cannot establish a safe identity.");
+  let mapped: Doc<"relationships"> | null = null;
+  if (mapping) {
+    const id = ctx.db.normalizeId("relationships", mapping.recordId);
+    mapped = id ? await ctx.db.get(id) : null;
+    if (!mapped || !matchesVaultOwner(mapped.vaultOwnerId, owner)) throw new Error("MISSING_TARGET: The mapping has no owned relationship; nothing was changed.");
+    if (!relationshipPidAgrees(mapped, key, mapping.lastImportedJson ? JSON.parse(mapping.lastImportedJson) : null)) throw new Error("LEGACY_IDENTITY_REVIEW_REQUIRED: The mapped relationship's current FamilySearch ID disagrees.");
+  }
+  const identities = new Map((await ownedFamilySearchRelationships(ctx, owner, key)).map(row => [String(row._id), row]));
+  if (mapped) identities.set(String(mapped._id), mapped);
+  if (identities.size > 1) throw new Error("AMBIGUOUS_RELATIONSHIP_IDENTITY: The mapping and legacy PID identify different owned relationships.");
+  return [...identities.values()][0] ?? null;
+}
+
 export const upsertRelationship = mutation({
   args: {
     vaultOwnerId: v.string(),
+    preserveExisting: v.optional(v.boolean()),
     type: v.union(
       v.literal("Couple"),
       v.literal("ParentChild"),
@@ -984,41 +1005,34 @@ export const upsertRelationship = mutation({
         "Relationship fact place",
       );
     }
+    if (args.person1 === args.person2) throw new Error("VALIDATION_ERROR: A person cannot be related to themself.");
     const now = Date.now();
     let existing: Doc<"relationships"> | null = null;
 
-    if (args.familySearchId) {
-      const rows = await ctx.db
-        .query("relationships")
-        .withIndex("by_familySearchId", (q) => q.eq("familySearchId", args.familySearchId))
-        .collect();
-      existing = filterByVaultOwner(rows, vaultOwnerId)[0] ?? null;
-    }
+    if (args.familySearchId) existing = await resolveCapturedFamilySearchRelationship(ctx, vaultOwnerId, args.familySearchId);
 
     if (!existing && args.importKey) {
-      const matches = await ctx.db
-        .query("relationships")
-        .withIndex("by_import_key", (q) => q.eq("importKey", args.importKey))
-        .collect();
-      existing = filterByVaultOwner(matches, vaultOwnerId)[0] ?? null;
+      const matches = await ctx.db.query("relationships").withIndex("by_import_key", q => q.eq("importKey", args.importKey))
+        .filter(q => matchesVaultOwner(undefined, vaultOwnerId) ? q.or(q.eq(q.field("vaultOwnerId"), vaultOwnerId), q.eq(q.field("vaultOwnerId"), undefined)) : q.eq(q.field("vaultOwnerId"), vaultOwnerId)).take(2);
+      if (matches.length > 1) throw new Error("AMBIGUOUS_RELATIONSHIP_IDENTITY: Several owned relationships share this capture key.");
+      existing = matches[0] ?? null;
     }
 
     if (!existing) {
-      const rows = await ctx.db
-        .query("relationships")
-        .withIndex("by_type_person1", (q) => q.eq("type", args.type).eq("person1", args.person1))
-        .collect();
-      existing =
-        filterByVaultOwner(rows, vaultOwnerId).find((relationship) => relationship.person2 === args.person2) || null;
+      const rows = await ctx.db.query("relationships").withIndex("by_type_person1", q => q.eq("type", args.type).eq("person1", args.person1))
+        .filter(q => q.and(q.eq(q.field("person2"), args.person2), matchesVaultOwner(undefined, vaultOwnerId) ? q.or(q.eq(q.field("vaultOwnerId"), vaultOwnerId), q.eq(q.field("vaultOwnerId"), undefined)) : q.eq(q.field("vaultOwnerId"), vaultOwnerId))).take(2);
+      if (rows.length > 1) throw new Error("AMBIGUOUS_RELATIONSHIP_IDENTITY: Several owned relationships share these participants.");
+      existing = rows[0] ?? null;
     }
 
-    const payload = {
-      ...args,
-      vaultOwnerId,
-      updatedAt: now,
-    };
+    const { preserveExisting, ...relationshipFields } = args;
+    const payload = { ...relationshipFields, vaultOwnerId, updatedAt: now };
 
     if (existing) {
+      if (preserveExisting) {
+        if (existing.type !== args.type || existing.person1 !== args.person1 || existing.person2 !== args.person2) throw new Error("CAPTURE_RELATIONSHIP_REVIEW_REQUIRED: The capture key names a different relationship; original participants and evidence were retained.");
+        return { relationshipId: existing._id, created: false };
+      }
       await ctx.db.patch(existing._id, payload);
       return { relationshipId: existing._id, created: false };
     }
