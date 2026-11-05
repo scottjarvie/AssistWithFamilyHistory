@@ -279,7 +279,7 @@ export function eventTypeFor(raw: string): { type: string; customType?: string }
   const compact = normalized.replace(/_/g, "");
   const mapped = FACT_ALIASES[compact] ?? FACT_ALIASES[normalized] ?? normalized;
   if (EVENT_TYPES.has(mapped)) return { type: mapped };
-  return { type: "custom", customType: raw.trim().slice(0, 120) };
+  return { type: "custom", customType: raw.trim() };
 }
 
 const SOURCE_TYPES = new Set([

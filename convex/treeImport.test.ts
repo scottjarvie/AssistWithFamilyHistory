@@ -684,6 +684,7 @@ test("maximum-length fact types keep generated references within the public key 
   expect(result.results.filter((r: any) => r.status === "failed")).toEqual([]);
   const data = await t.run(async ctx => ({ events: await ctx.db.query("events").collect(), links: await ctx.db.query("citationLinks").collect(), notes: await ctx.db.query("notes").collect() }));
   expect(data.events).toHaveLength(1);
+  expect(data.events[0].customType).toBe(fact.type);
   expect(data.links[0].targetId).toBe(data.events[0]._id);
   expect(data.notes[0].subject.id).toBe(data.events[0]._id);
 });
