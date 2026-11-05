@@ -25,3 +25,13 @@ Limits: synthetic component harness is not real backend route acceptance, and th
 Final capture evidence: **12/12 passed**, with no console/page errors, HTTP failures, capability failures or horizontal overflow, using Node 22.23.4, Turbopack dev, installed Chrome and `capture-natural-viewport.mjs`. The accepted report records actual device dimensions and full-page capture without growing the viewport. Earlier webpack runs were not accepted: CDP showed a failed 320 KB generated app/layout.js response while the complete file on disk was 2 MB. Node version, browser and viewport changes alone did not eliminate it; switching the local dev bundler yielded clean capture passes. No production/runtime configuration was changed. The root cause beyond that observed truncation is not claimed.
 
 Final interaction receipt: **17 checks passed**. In addition to the initial 16, the client People table was checked under French locale / Pacific/Auckland time zone with explicit UTC import dates and no hydration errors. The long-name probe now explicitly switches back to Table before checking 320px overflow. Options has an always-visible close control and keyboard Escape returns focus to its summary.
+
+## Exact reviewed head and privacy follow-up
+
+`2bf2eec6998b2f2d16f96c5aa2de21dcc7baef07`: final `pnpm verify` passed **57/57**, Node 22.23.4, 47s; log `/tmp/awf-council-tranche2-final57.log`. Claude Opus 5.5 reviewed that exact Sol-authored head, approved structural Home and found a blocking client-payload issue. Receipt: `reviews/opus-trays-collections-2bf2eec.md`. This is a code/taste review, not formal scoring.
+
+The follow-up adds `projectPeopleCollectionRow` on the server and a minimal client type. `node --import tsx --test scripts/test-people-collection-dto.ts` under Node 22 + nice passed 2/2 in 246ms. The synthetic canary contract excludes private notes, alternate names, unused dates/places, artifact paths/URLs/warnings/metadata, research internals, owner IDs and future unknown fields while keeping every displayed value. It is included in normal test/coverage scripts.
+
+Other small review fixes: natural newest/oldest labels, canonical visible-column order, focus return, aria-sort, partial selection, 44px checkbox targets, local UUID fallback and explicit saved-search persistence copy. Filter form keys prevent a cleared canonical query from retaining an old uncontrolled input value after soft navigation.
+
+Full follow-up verify/captures have **not run yet**: the shared host lease returned exit 75 before starting. The 57/57 and visual receipts above prove the reviewed head, not this newer patch. Do not convert that into current-head acceptance. Compact phone/List row and the wider all-page scope remain work.

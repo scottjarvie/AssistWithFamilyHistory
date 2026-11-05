@@ -43,3 +43,11 @@ Final round-2 tranche captures: 12/12 clean; 17/17 interaction checks pass. Webp
 The phone menu self-audit found the lower Options close control inconvenient when the sheet covered its trigger; Close now stays at the top and Escape restores focus. All options remain. Date formatting in the new client collection is explicitly UTC and includes a machine-readable full timestamp, avoiding server/browser locale drift.
 
 Formal scoring of this wider round is pending further page-family work; the initial Sol score is not reused as round-2 evidence. Exact-head Opus code/taste review of this meaningful tranche is requested separately before reuse across other collections.
+
+### Opus tranche review · head 2bf2eec
+
+Claude Opus 5.5 approved Home structurally and conditionally approved kit reuse. One blocking finding: the new client People component received raw backend rows. The follow-up now projects only displayed fields on the server, with 2/2 passing privacy tests. This removes unused transmission, not visible information or stored data. Other small correctness/a11y fixes are recorded in verification.md. They were fixed by the lead without a new delegate for each small finding; the next meaningful collection tranche will include the combined code in its exact-head review.
+
+Remaining agreed priorities: compact phone/List records before kit reuse (F3); collection-specific facets; configurable default/group order; compact desktop controls and table imagery. Opus's Home refinements: merge the three small inventory trays into a counted ledger, give imports the second wide slot, align summaries with counts, show actual missing-check summaries instead of duplicating gap counts. The suggested “Library” label needs product-truth care because the Library module/page is absent; prefer an honest vault index label while keeping all three domains, descriptions, numbers and destinations. No taste recommendation authorizes deleting information or inventing a route.
+
+The frozen reviewed head passed full verify 57/57. Full follow-up verification is queued, not running, after shared host lease refusal. Captures/gallery remain the exact reviewed visual head until an updated packet is actually produced. Formal round-2 judging remains pending.

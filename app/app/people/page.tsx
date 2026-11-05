@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { projectPeopleCollectionRow } from "@/lib/vault/peopleCollection";
 import { PeopleExplorerView } from "@/components/vault/PeopleExplorerView";
 import { VaultStateCard } from "@/components/vault/VaultStateCard";
 import { createPageMetadata } from "@/lib/seo";
@@ -90,7 +91,7 @@ export default async function PeoplePage({
   return (
     <PeopleExplorerView
       preferenceKey={`awf.collection.people.${vaultOwnerId}`}
-      people={visiblePeople}
+      people={visiblePeople.map(projectPeopleCollectionRow)}
       firstStartEligible={firstStartEligible}
       query={params.q}
       status={params.status}

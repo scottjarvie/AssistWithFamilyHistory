@@ -1,14 +1,13 @@
 "use client";
 
 import { SafeLink as Link } from "@/components/layout/SafeLink";
-import type { FunctionReturnType } from "convex/server";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CollectionWorkspace, type CollectionColumn } from "@/components/collections/CollectionWorkspace";
-import type { api } from "@/convex/_generated/api";
+import type { PeopleCollectionRow } from "@/lib/vault/peopleCollection";
 
-export type PeopleExplorerRow = FunctionReturnType<typeof api.vaultReads.getPeopleExplorer>[number];
+export type PeopleExplorerRow = PeopleCollectionRow;
 const columns: CollectionColumn<PeopleExplorerRow>[] = [
   { key: "name", label: "Name", sortOnly: true, render: (p) => p.displayName, sortValue: (p) => p.displayName },
   { key: "sources", label: "Sources", render: (p) => p.stats.sources, sortValue: (p) => p.stats.sources },
@@ -44,7 +43,7 @@ export function PeopleExplorerView({ people, firstStartEligible, query, status, 
       renderIdentity={(p) => <><span className="block text-base font-semibold leading-snug [overflow-wrap:anywhere]">{p.displayName}</span><span className="mt-1 block text-sm text-muted-foreground">{p.birth?.date?.year || "?"} to {p.death?.date?.year || "?"} · <span className="capitalize">{p.researchStatus.replace(/_/g, " ")}</span></span></>}
       renderDetail={(p) => <div className="mt-1 flex flex-wrap items-center gap-2"><Badge variant="secondary">{p.living ? "Living" : "Deceased"}</Badge>{p.creationProvenance?.evidenceStatus === "unsourced" && <span className="text-sm text-annotation">Starting statement · needs a source</span>}</div>}
       searchControls={<>
-        <form role="search" aria-label="Find people" className="mb-3 grid grid-cols-2 gap-2 lg:grid-cols-[minmax(12rem,1fr)_auto_auto_auto]">
+        <form key={`${query || ""}:${status || ""}`} role="search" aria-label="Find people" className="mb-3 grid grid-cols-2 gap-2 lg:grid-cols-[minmax(12rem,1fr)_auto_auto_auto]">
           <Input name="q" defaultValue={query} aria-label="Search people" placeholder="Search by name, FamilySearch ID, or years" className="col-span-2 h-11 bg-card lg:col-span-1" />
           <select name="status" aria-label="Research state" defaultValue={status || ""} className="h-11 min-w-0 rounded-md border border-border bg-card px-3 text-sm text-foreground"><option value="">All research states</option>{researchStates.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
           <Button type="submit" className="min-h-11">Filter</Button>

@@ -285,7 +285,7 @@
   .collection-table { display: block; }
   .collection-table thead { display: none; }
   .collection-table tbody { display: block; }
-  .collection-table tr { display: grid; grid-template-columns: 2rem minmax(0,1fr) minmax(0,1fr); padding: .75rem; }
+  .collection-table tr { display: grid; grid-template-columns: 2.75rem minmax(0,1fr) minmax(0,1fr); padding: .75rem; }
   .collection-table tr > th { min-width: 0; grid-column: 2 / -1; }
   .collection-table th, .collection-table td { padding: .35rem; }
   .collection-table tr > td:not(:first-child) { min-width: 0; }

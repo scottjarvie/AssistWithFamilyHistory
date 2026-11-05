@@ -28,3 +28,7 @@ This document records the target system and implemented primitives. It does not 
 Saved views/preferences live only in the current browser, with an account-specific key provided by the authenticated route; saving a view explicitly retains its search terms and facets. Record objects and selection IDs are never copied into preferences. Storage denial leaves controls usable for the session. The new kit makes no global-query or server-cursor claim.
 
 The synthetic harness may identify which surface it renders for navigation highlighting. It is development-only, contains invented data and is reachable on a dev server's network interface; never copy real data into it.
+
+### Required client boundary
+
+Every collection's rows must be a minimal server-projected DTO containing only displayed fields. Never pass raw Convex documents, private notes, raw evidence, storage paths, provider metadata or unused relationship/research data to the client kit. People uses `projectPeopleCollectionRow` at the server boundary; the regression contract proves those fields cannot enter the collection payload. The client may arrange records; it does not need their unseen content.
