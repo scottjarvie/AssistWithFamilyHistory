@@ -370,9 +370,11 @@ function mergeImportedValue(current: unknown, incoming: unknown, baseline: unkno
     return { value, baseline: imported, hasBaseline: known, kept };
   }
   if (mergeableObject(current) && mergeableObject(incoming)) {
-    if (typeof current.original === "string" && typeof incoming.original === "string" && current.original !== incoming.original
-      && typeof current.year === "number" && incoming.year === undefined) {
-      fail("FACT_DATE_CONFIRMATION_REQUIRED", "Changed date text would retain a year that the new text does not support.", "Review the existing date and inferred year before replacing them. This record item saved nothing.");
+    const dateFields = ["year", "month", "day", "formal", "range", "approximate"];
+    const changedText = typeof current.original === "string" && typeof incoming.original === "string" && current.original !== incoming.original;
+    if (changedText) {
+      const omitted = dateFields.filter(field => current[field] !== undefined && incoming[field] === undefined);
+      if (omitted.length) fail("FACT_DATE_CONFIRMATION_REQUIRED", `Changed date text requires its retained structured metadata: ${omitted.join(", ")}.`, "Review and resubmit the complete corrected date before replacing it. This record item saved nothing.");
     }
     const value: Record<string, unknown> = { ...current };
     const old: Record<string, unknown> = hasBaseline && mergeableObject(baseline) ? baseline : {};
@@ -385,6 +387,9 @@ function mergeImportedValue(current: unknown, incoming: unknown, baseline: unkno
       value[key] = next.value;
       if (next.hasBaseline) { imported[key] = next.baseline; known = true; }
       kept ||= next.kept;
+    }
+    if (changedText && kept && dateFields.some(field => current[field] !== undefined || incoming[field] !== undefined)) {
+      fail("FACT_DATE_CONFIRMATION_REQUIRED", "Changed date text conflicts with retained manual date metadata.", "Review the complete corrected date before replacing it. This record item saved nothing.");
     }
     return { value, baseline: imported, hasBaseline: known, kept };
   }
@@ -469,6 +474,14 @@ function factDescription(fact: { value?: string; description?: string }) {
   return fact.value || fact.description || fact.value;
 }
 
+function projectFactDate(supplied: any, effective: any) {
+  if (!supplied || !effective) return undefined;
+  const projected = { ...supplied };
+  for (const key of Object.keys(supplied)) projected[key] = effective[key];
+  if (effective.year !== undefined) projected.year = effective.year;
+  return withYear(projected);
+}
+
 async function effectiveFactInput(c: ChunkContext, personKey: string, fact: any) {
   if (typeof fact?.type !== "string" || !fact.type.trim()) return fact;
   const key = factKeyFor(personKey, fact);
@@ -534,7 +547,7 @@ async function importPerson(c: ChunkContext, item: any): Promise<Omit<ItemResult
     const fact = facts.find((row) => eventTypeFor(row?.type ?? "").type === type);
     if (!fact) return undefined;
     return clean({
-      date: withYear(fact.date),
+      date: projectFactDate(fact.date, (effectiveFacts.get(fact) ?? fact).date),
       place: fact.place?.original ? { original: fact.place.original } : undefined,
       description: fact.value !== undefined || fact.description !== undefined ? factDescription(effectiveFacts.get(fact) ?? fact) : undefined,
     });
@@ -625,7 +638,7 @@ async function importFact(c: ChunkContext, personId: string, personKey: string, 
       type: mapped.type,
       customType: mapped.customType,
       importedFact: clean(fact),
-      date: withYear(fact.date),
+      date: projectFactDate(fact.date, effective.date),
       place: fact.place?.original ? { original: fact.place.original } : undefined,
       description: fact.value !== undefined || fact.description !== undefined ? factDescription(effective) : undefined,
       externalIds: fact.key ? [{ system: c.job.system, id: String(fact.key) }] : undefined,
@@ -738,14 +751,28 @@ async function importRelationship(c: ChunkContext, item: any): Promise<Omit<Item
     if (match) { existingId = String(match._id); linked = true; }
   }
   const previous = existingId ? await ownedRow(c, "relationships", existingId) : null;
-  const facts = Array.isArray(item.facts) && item.facts.length
-    ? item.facts.map((fact: any) => clean({
+  const mapKey = externalRecordKey(c.job.system, "relationship", key, c.job.importKey);
+  const mapping = previous && !c.baselines.has(mapKey) ? await c.ctx.db.query("mcpRecordKeys").withIndex("by_owner_type_key", q => q.eq("vaultOwnerId", c.owner).eq("recordType", "relationship").eq("recordKey", mapKey)).unique() : null;
+  const baseline = c.baselines.has(mapKey) ? c.baselines.get(mapKey) : mapping?.lastImportedJson ? JSON.parse(mapping.lastImportedJson) : null;
+  let retainedDate = false;
+  const suppliedFacts = Array.isArray(item.facts) && item.facts.length ? item.facts.map((fact: any) => clean({
       type: String(fact.type).slice(0, 120),
       date: withYear(fact.date),
       place: fact.place?.original ? { original: fact.place.original } : undefined,
       description: fact.description,
-    }))
-    : undefined;
+    })) : undefined;
+  const facts = suppliedFacts?.map((fact: any, index: number) => {
+    const supplied = item.facts[index].date;
+    const matches = previous?.facts?.filter(row => row.type === fact.type) ?? [];
+    const originals = Array.isArray(baseline?.facts) ? baseline.facts.filter((row: any) => row.type === fact.type) : [];
+    if (!supplied || matches.length !== 1 || originals.length > 1) return fact;
+    const date = mergeImportedValue(matches[0].date, supplied, originals[0]?.date, !!originals[0] && Object.hasOwn(originals[0], "date"));
+    if (matches[0].date && matches[0].date.original !== supplied.original && date.kept) {
+      fail("FACT_DATE_CONFIRMATION_REQUIRED", "Changed relationship date text conflicts with retained manual metadata.", "Review and resubmit the complete corrected date. This relationship item saved nothing.");
+    }
+    retainedDate ||= date.kept;
+    return clean({ ...fact, date: projectFactDate(supplied, date.value) });
+  });
   const saved = await upsertRow(c, {
     table: "relationships",
     singular: "relationship",
@@ -763,12 +790,13 @@ async function importRelationship(c: ChunkContext, item: any): Promise<Omit<Item
     },
     createOnly: { importKey: `import:${externalRecordKey(c.job.system, "relationship", key, c.job.importKey)}` },
   });
+  if (retainedDate && !saved.kept?.includes("facts")) saved.kept = [...(saved.kept ?? []), "facts"];
   if (previous) {
     const current = await ownedRow(c, "relationships", saved.id);
     const references = ["type", "person1", "person2"] as const;
     const moved = current && references.some(field => !same(previous[field], current[field]));
     const keptReference = saved.kept?.some(field => references.some(reference => reference === field));
-    if (current && ((moved && current.facts?.length && !same(facts, current.facts)) || (keptReference && !same(previous.facts, current.facts)))) {
+    if (current && ((moved && current.facts?.length && !same(suppliedFacts, current.facts)) || (keptReference && !same(previous.facts, current.facts)))) {
       fail("RELATIONSHIP_FACT_REVIEW_REQUIRED", "Relationship facts cannot acquire different endpoints or a conflicting retained identity without confirmation.",
         "Review the relationship and explicitly resubmit its complete facts with the correct endpoints. This relationship item saved nothing.");
     }

@@ -441,3 +441,12 @@ and unmentioned facts remain, and manual deletions stay protected. Ambiguous
 replacements require review; unchanged full replays remain valid. Retained
 facts must be fully resubmitted before changing relationship endpoints/type,
 and conflicting retained endpoints cannot receive newly changed facts.
+
+Date projections preserve the effective structured year when a partial refresh
+omits year, rather than reinferring from text. Supplied date components use
+the effective protected values; omitted non-year components remain partial.
+Relationship dates are merged and checked before inference. Changed text
+requires every retained year/month/day/formal/range/approximate component,
+including false flags; conflicting manual components refuse atomically.
+Endpoint confirmation compares the supplied facts, not a preview that has
+already retained conflicting manual values.

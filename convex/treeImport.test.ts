@@ -1960,6 +1960,63 @@ test.each([false, true])("retained relationship facts cannot acquire changed or 
   expect((await snapshot()).rows[0].facts![0].description).toBe("Confirmed A-C");
 });
 
+test.each(["birth", "death"])("partial %s dates retain an explicit effective year instead of reinferring", async type => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const person = { key: "P", living: false, names: [{ given: "Synthetic", surname: "Range" }] };
+  const original = "Winter 1899-1900";
+  await send(t, grant, job.importJobId, 0, { persons: [{ ...person, facts: [{ key: "F", type, date: { original, year: 1900 } }] }] });
+  const snapshot = () => t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), events: await ctx.db.query("events").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() }));
+  const before = await snapshot();
+  const batch: TreeImportBatch = { persons: [{ ...person, facts: [{ key: "F", type, date: { original } }] }] };
+  const dry = await send(t, grant, job.importJobId, 1, batch, { dryRun: true }, `dry-effective-year-${type}`);
+  expect(await snapshot()).toEqual(before);
+  const real = await send(t, grant, job.importJobId, 1, batch);
+  expect(dry.counts).toEqual(real.counts); expect(real.counts.persons.unchanged).toBe(1);
+  expect(await snapshot()).toEqual(before);
+  expect((before.people[0] as any)[type].date.year).toBe(1900); expect(before.events[0].date?.year).toBe(1900); expect(before.events[0].importedFact?.date?.year).toBe(1900);
+  if (type === "birth") {
+    expect(await t.run(ctx => ctx.db.query("persons").withIndex("by_owner_surname_birth_year", q => q.eq("vaultOwnerId", OWNER).eq("name.surname", "Range").eq("birth.date.year", 1900)).collect())).toHaveLength(1);
+    expect(await t.run(ctx => ctx.db.query("persons").withIndex("by_owner_surname_birth_year", q => q.eq("vaultOwnerId", OWNER).eq("name.surname", "Range").eq("birth.date.year", 1899)).collect())).toHaveLength(0);
+  }
+  const corrected = await send(t, grant, job.importJobId, 2, { persons: [{ ...person, facts: [{ key: "F", type, date: { original, year: 1899 } }] }] });
+  expect(corrected.results[0].status).toBe("updated");
+  const after = await snapshot(); expect((after.people[0] as any)[type].date.year).toBe(1899); expect(after.events[0].date?.year).toBe(1899); expect(after.events[0].importedFact?.date?.year).toBe(1899);
+});
+
+test.each([false, true])("relationship partial dates preserve effective and manual years (%s)", async manual => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const relation = { key: "R", type: "Couple" as const, person1Key: "A", person2Key: "B" }; const original = "Winter 1899-1900";
+  await send(t, grant, job.importJobId, 0, { persons: ["A", "B"].map(key => ({ key, living: false, names: [{ given: key }] })), relationships: [{ ...relation, facts: [{ type: "marriage", date: { original, year: 1900 }, description: "Original" }] }] });
+  if (manual) await t.run(async ctx => { const r = (await ctx.db.query("relationships").collect())[0]; await ctx.db.patch(r._id, { facts: [{ ...r.facts![0], date: { original, year: 1901 } }] }); });
+  const snapshot = () => t.run(ctx => ctx.db.query("relationships").collect()); const before = await snapshot();
+  const batch: TreeImportBatch = { relationships: [{ ...relation, facts: [{ type: "marriage", date: { original }, description: "Corrected detail" }] }] };
+  const dry = await send(t, grant, job.importJobId, 1, batch, { dryRun: true }, `dry-relation-effective-year-${manual}`);
+  expect(await snapshot()).toEqual(before);
+  const real = await send(t, grant, job.importJobId, 1, batch); expect(dry.counts).toEqual(real.counts);
+  expect(real.results).toEqual([expect.objectContaining({ status: "updated" })]); expect(real.results[0].kept).toBeUndefined();
+  expect((await snapshot())[0].facts![0]).toMatchObject({ date: { original, year: manual ? 1901 : 1900 }, description: "Corrected detail" });
+  const explicit = await send(t, grant, job.importJobId, 2, { relationships: [{ ...relation, facts: [{ type: "marriage", date: { original, year: 1899 } }] }] });
+  expect((await snapshot())[0].facts![0].date?.year).toBe(manual ? 1901 : 1899);
+  if (manual) expect(explicit.results[0].kept).toContain("facts");
+});
+
+test.each(["year", "month", "day", "formal", "range", "approximate"])("relationship date text changes require retained %s before inference", async field => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const relation = { key: "R", type: "Couple" as const, person1Key: "A", person2Key: "B" };
+  const oldDate = { original: "1 January 1900", year: 1900, month: 1, day: 1, formal: "+1900-01-01", range: false, approximate: false };
+  const newDate = { original: "2 February 1901", year: 1901, month: 2, day: 2, formal: "+1901-02-02", range: false, approximate: false };
+  await send(t, grant, job.importJobId, 0, { persons: ["A", "B"].map(key => ({ key, living: false, names: [{ given: key }] })), relationships: [{ ...relation, facts: [{ type: "marriage", date: oldDate, description: "Detail" }] }] });
+  const snapshot = () => t.run(async ctx => ({ relationships: await ctx.db.query("relationships").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  const partial: any = { ...newDate }; delete partial[field];
+  for (const dryRun of [true, false]) {
+    const result = await send(t, grant, job.importJobId, 1, { relationships: [{ ...relation, facts: [{ type: "marriage", date: partial }] }] }, { dryRun }, `relation-date-confirm-${field}-${dryRun}`);
+    expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("FACT_DATE_CONFIRMATION_REQUIRED") })]);
+    expect(await snapshot()).toEqual(before);
+  }
+  const accepted = await send(t, grant, job.importJobId, 2, { relationships: [{ ...relation, facts: [{ type: "marriage", date: newDate }] }] });
+  expect(accepted.results[0].status).toBe("updated"); expect((await snapshot()).relationships[0].facts![0].date).toEqual(newDate);
+});
+
 test("citation link additions report updated, dry planning agrees, repeated targets stay idempotent", async () => {
   const t = convexTest({ schema, modules, transactionLimits: true });
   const grant = await seedGrant(t, { vaultOwnerId: OWNER });
