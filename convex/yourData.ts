@@ -12,6 +12,7 @@ import { action, internalQuery, type QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { authorizeTenantAction, type TrustBoundaryShadowEntry } from "./access";
 import { EXPORT_TABLES, type ExportTable } from "../lib/vault/exportTables";
+import { readConnections } from "./mcpGrants";
 
 const self = (internal as unknown as {
   yourData: {
@@ -53,7 +54,7 @@ async function readYourStats(ctx: QueryCtx, owner: string) {
     ownedRows(ctx, "citations", owner, SMALL_CAP),
     ownedRows(ctx, "stories", owner, SMALL_CAP),
     ownedRows(ctx, "queueItems", owner, SMALL_CAP),
-    ownedRows(ctx, "mcpGrants", owner, 100),
+    readConnections(ctx, owner),
     ownedRows(ctx, "agentActivity", owner, SMALL_CAP, "desc"),
   ]);
   const since = Date.now() - 30 * DAY;
@@ -72,7 +73,7 @@ async function readYourStats(ctx: QueryCtx, owner: string) {
     stories: { count: stories.rows.length, more: stories.more, byStatus: tally(stories.rows, (row) => String(row.status)) },
     queue: { count: queue.rows.length, more: queue.more, byState: tally(queue.rows, (row) => String(row.state)) },
     ai: {
-      activeConnections: grants.rows.filter((row) => row.status === "active").length,
+      activeConnections: grants.connections.filter((row) => row.status === "active").length,
       savesLast30Days: recentAi.length,
       savesCapped: activity.more,
     },
