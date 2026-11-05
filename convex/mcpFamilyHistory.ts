@@ -173,6 +173,7 @@ async function replayReceipt(
   if (row.toolName !== toolName || row.requestHash !== requestHash) {
     machineError("IDEMPOTENCY_CONFLICT", "This operation ID was already used for different Family History work.", "Reuse the original inputs or mint a new operation ID.");
   }
+  if (row.pendingImport) machineError("IDEMPOTENCY_CONFLICT", "This operation ID is reserved by an unfinished tree import.", "Resume the original tree import with its exact inputs.");
   return { ...(JSON.parse(row.resultJson) as Record<string, unknown>), deduplicated: true };
 }
 

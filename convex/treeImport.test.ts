@@ -18,7 +18,7 @@ import schema from "./schema";
 import { internal } from "./_generated/api";
 import { seedGrant } from "../lib/mcp/testSupport";
 import { generateSyntheticTree, packBatches, syntheticPid } from "../lib/treeImport/syntheticTree";
-import { citationKeyFor, externalRecordKey, factKeyFor, factReferenceKeyFor, legacyCitationKeyFor, legacyFactKeyFor, legacyExternalRecordKey, type TreeImportBatch } from "../lib/treeImport/model";
+import { chunkBatch, citationKeyFor, externalRecordKey, factKeyFor, factReferenceKeyFor, legacyCitationKeyFor, legacyFactKeyFor, legacyExternalRecordKey, type TreeImportBatch } from "../lib/treeImport/model";
 
 const modules = import.meta.glob("./**/*.ts");
 const OWNER = "user_tree_import_owner_AAAAAAAA";
@@ -913,11 +913,12 @@ test("oversized receipts keep every conflict retrievable and replay preserves th
   const results = Array.from({ length: 500 }, (_, index) => ({ kind: "persons" as const, index, key: `${index}-` + "K".repeat(180), status: "unchanged" as const, kept: ["name", "importedNames"] }));
   await t.run(async ctx => {
     for (let index = 0; index < 4; index++) await ctx.db.insert("mcpOperations", {
-      vaultOwnerId: OWNER, operationId: `${operationId}#${index}`, toolName: "family_history_import_tree_batch#chunk", requestHash: `hash-${index}`,
+      vaultOwnerId: OWNER, operationId: `${operationId}#${index}`, toolName: "family_history_import_tree_batch#chunk", requestHash: `large-hash#${index}`,
       resultJson: JSON.stringify({ importJobId: job.importJobId, results: results.slice(index * 125, (index + 1) * 125), plannedKeys: [], duplicatesSuggested: 0 }), clientId: principal().clientId, createdAt: Date.now(),
     });
   });
   const args = { principal: principal(), grantId: grant, importJobId: job.importJobId, operationId, requestHash: "large-hash", batchIndex: 0, records: 500, results, duplicatesSuggested: 0, chunkCount: 4, final: false };
+  await t.mutation(internal.treeImport.prepareTreeImportBatch, { principal: principal(), grantId: grant, importJobId: job.importJobId, operationId, requestHash: args.requestHash, batchIndex: 0, dryRun: false });
   const receipt = await t.mutation(internal.treeImport.recordTreeImportBatch, args) as any;
   expect(receipt.results).toEqual([]);
   expect(receipt.resultDetails).toEqual({ operationId, chunkCount: 4 });
@@ -1712,6 +1713,91 @@ test.each([0, 124])("dry default sex baselines survive repeated new people acros
   expect(real.results.filter((row: any) => row.kept || row.status === "failed")).toEqual([]);
   const saved = await t.run(async ctx => (await ctx.db.query("persons").collect()).find(row => row.fsId === "P")!);
   expect(saved.sex).toBe("female");
+});
+
+test.each(["source", "target"])("retained human citation interpretation refuses new attribution (%s)", async mode => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  await send(t, grant, job.importJobId, 0, { sources: [{ key: "S1", title: "Source A" }, { key: "S2", title: "Source B" }], persons: ["A", "B"].map(key => ({ key, living: false, names: [{ given: key }] })), citations: [{ key: "C", sourceKey: "S1", targets: [{ kind: "person", key: "A" }] }] });
+  await t.run(async ctx => { const citation = (await ctx.db.query("citations").collect())[0]; await ctx.db.patch(citation._id, { editedText: "Interpretation about A from S1" }); });
+  const snapshot = () => t.run(async ctx => ({ citations: await ctx.db.query("citations").collect(), links: await ctx.db.query("citationLinks").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() }));
+  const before = await snapshot();
+  const batch: TreeImportBatch = { citations: [{ key: "C", sourceKey: mode === "source" ? "S2" : "S1", targets: [{ kind: "person", key: "A" }, ...(mode === "target" ? [{ kind: "person" as const, key: "B" }] : [])] }] };
+  for (const dryRun of [true, false]) {
+    const result = await send(t, grant, job.importJobId, 1, batch, { dryRun }, `interpretation-${mode}-${dryRun}`);
+    expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("CITATION_INTERPRETATION_REVIEW_REQUIRED") })]);
+    expect(await snapshot()).toEqual(before);
+  }
+  const unchanged = await send(t, grant, job.importJobId, 2, { citations: [{ key: "C", sourceKey: "S1", targets: [{ kind: "person", key: "A" }] }] });
+  expect(unchanged.counts.citations.unchanged).toBe(1);
+  expect(await snapshot()).toEqual(before);
+});
+
+test("an interrupted import reserves its operation across jobs tools chunks and finalization", { timeout: 300_000 }, async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const a = await begin(t, grant, "reservation-A");
+  const b = await begin(t, grant, "reservation-B");
+  const operationId = "reserved-operation";
+  const requestHash = `hash-${operationId}`;
+  const batch: TreeImportBatch = { persons: Array.from({ length: 126 }, (_, i) => ({ key: `P${i}`, living: false, names: [{ given: `Synthetic${i}` }] })) };
+  const preparation = { principal: principal(), grantId: grant, importJobId: a.importJobId, operationId, requestHash, batchIndex: 0, dryRun: false };
+  const chunk = { principal: principal(), grantId: grant, importJobId: a.importJobId, operationId: `${operationId}#0`, batchOperationId: operationId, batchRequestHash: requestHash, batchIndex: 0, chunkIndex: 0, requestHash: `${requestHash}#0`, items: chunkBatch(batch)[0] };
+  await expect(t.mutation(internal.treeImport.applyTreeImportChunk, chunk)).rejects.toThrow(/IDEMPOTENCY_CONFLICT/);
+  await t.mutation(internal.treeImport.prepareTreeImportBatch, preparation);
+  await t.mutation(internal.treeImport.applyTreeImportChunk, chunk);
+  // Model an interruption after chunk commit, before recording the batch.
+  expect(await countRows(t, "persons")).toBe(125);
+  const reservation = await t.run(async ctx => (await ctx.db.query("mcpOperations").collect()).find(row => row.operationId === operationId)!);
+  expect(reservation.pendingImport).toEqual({ importJobId: a.importJobId, batchIndex: 0 });
+  await expect(send(t, grant, b.importJobId, 0, { persons: [{ key: "FOREIGN-JOB", living: false, names: [{ given: "Different job" }] }] }, {}, operationId)).rejects.toThrow(/IDEMPOTENCY_CONFLICT/);
+  await expect(t.mutation(internal.treeImport.prepareTreeImportBatch, { ...preparation, requestHash: "different-hash" })).rejects.toThrow(/IDEMPOTENCY_CONFLICT/);
+  await expect(t.mutation(internal.treeImport.prepareTreeImportBatch, { ...preparation, batchIndex: 1 })).rejects.toThrow(/IDEMPOTENCY_CONFLICT/);
+  await expect(t.mutation(internal.treeImport.applyTreeImportChunk, { ...chunk, importJobId: b.importJobId })).rejects.toThrow(/IDEMPOTENCY_CONFLICT/);
+  await expect(t.mutation(internal.treeImport.recordTreeImportBatch, { principal: principal(), grantId: grant, importJobId: b.importJobId, operationId, requestHash, batchIndex: 0, records: 1, results: [], duplicatesSuggested: 0, final: false })).rejects.toThrow(/IDEMPOTENCY_CONFLICT/);
+  await expect(t.mutation(internal.treeImport.beginTreeImport, { principal: principal(), grantId: grant, operationId, requestHash, input: { importKey: "other-tool", system: "familysearch", label: "Different work" } })).rejects.toThrow(/IDEMPOTENCY_CONFLICT/);
+  expect(await countRows(t, "persons")).toBe(125);
+  const resumed = await send(t, grant, a.importJobId, 0, batch, {}, operationId);
+  expect(resumed.counts.persons.created).toBe(126);
+  expect(await countRows(t, "persons")).toBe(126);
+  const progress = await t.query(internal.treeImport.getTreeImport, { principal: principal(), importJobId: a.importJobId }) as any;
+  expect(progress.import.nextBatchIndex).toBe(1);
+  expect(progress.import.recordsReceived).toBe(126);
+  const receipts = await t.run(async ctx => (await ctx.db.query("mcpOperations").collect()).filter(row => row.operationId === operationId));
+  expect(receipts).toHaveLength(1); expect(receipts[0].pendingImport).toBeUndefined();
+  expect((await send(t, grant, a.importJobId, 0, batch, {}, operationId)).deduplicated).toBe(true);
+  await expect(send(t, grant, b.importJobId, 0, batch, {}, operationId)).rejects.toThrow(/IDEMPOTENCY_CONFLICT/);
+  expect((await t.query(internal.treeImport.getTreeImport, { principal: principal(), importJobId: a.importJobId }) as any).import.recordsReceived).toBe(126);
+});
+
+test.each([false, true])("older unreserved chunk receipts retain their original operation identity (legacy %s)", async legacy => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const a = await begin(t, grant, "orphan-A"); const b = await begin(t, grant, "orphan-B");
+  await send(t, grant, a.importJobId, 0, { sources: [{ key: "S", title: "Committed source" }] });
+  const source = await t.run(async ctx => (await ctx.db.query("sources").collect())[0]);
+  const operationId = `older-orphan-${legacy}`; const requestHash = `hash-${operationId}`;
+  const resultJson = JSON.stringify({ importJobId: a.importJobId, results: [{ kind: "sources", index: 0, key: "S", id: source._id, status: "unchanged" }], plannedKeys: [], duplicatesSuggested: 0 });
+  await t.run(async ctx => {
+    if (legacy) await ctx.db.insert("mcpOperations", { vaultOwnerId: OWNER, operationId: `${operationId}#0`, toolName: "family_history_import_tree_batch#chunk", requestHash: `${requestHash}#0`, resultJson, clientId: principal().clientId, createdAt: 1 });
+    else await ctx.db.insert("treeImportReceipts", { vaultOwnerId: OWNER, importJobId: a.importJobId as any, operationId, chunkIndex: 0, detailIndex: -1, requestHash: `${requestHash}#0`, resultJson, createdAt: 1 });
+  });
+  await expect(send(t, grant, b.importJobId, 0, { sources: [{ key: "B", title: "Different source" }] }, {}, operationId)).rejects.toThrow(/IDEMPOTENCY_CONFLICT/);
+  const resumed = await send(t, grant, a.importJobId, 1, { sources: [{ key: "S", title: "Committed source" }] }, {}, operationId);
+  expect(resumed.counts.sources.unchanged).toBe(1);
+  expect(await countRows(t, "sources")).toBe(1);
+  expect(await t.run(ctx => ctx.db.get(source._id))).toEqual(source);
+});
+
+test("dry imports leave the operation namespace unreserved", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const before = await t.run(ctx => ctx.db.query("mcpOperations").collect());
+  await send(t, grant, job.importJobId, 0, { persons: [{ key: "P", living: false, names: [{ given: "Synthetic" }] }] }, { dryRun: true }, "dry-reservation");
+  expect(await t.run(ctx => ctx.db.query("mcpOperations").collect())).toEqual(before);
+  expect(await countRows(t, "persons")).toBe(0);
+  expect(await countRows(t, "treeImportReceipts")).toBe(0);
 });
 
 test("citation link additions report updated, dry planning agrees, repeated targets stay idempotent", async () => {

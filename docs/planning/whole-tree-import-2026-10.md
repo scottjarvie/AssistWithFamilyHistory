@@ -414,3 +414,12 @@ A newly imported person whose sex is omitted stores unknown in both the record
 and its imported baseline. Later explicit sex can refresh that default, while
 actual manual corrections (including a later change back to unknown) remain
 protected. Existing records do not acquire a new default during partial refresh.
+
+Existing editedText is a human interpretation that the import interface cannot
+confirm. Citations retaining it refuse evidence/source changes and new targets
+atomically; unchanged replays remain valid. Real batches reserve the owner-wide
+operation ID and request hash, job and batch index before the first chunk.
+Every chunk and finalization validates that binding; completion replaces the
+reservation in place. Dry runs never reserve or write. Older orphaned chunk
+receipts are adopted only by their original job/request, preventing another
+job or MCP tool from taking an interrupted operation identity.

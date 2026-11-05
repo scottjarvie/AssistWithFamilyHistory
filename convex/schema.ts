@@ -1308,6 +1308,7 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_owner", ["vaultOwnerId"])
+    .index("by_owner_operation_job", ["vaultOwnerId", "operationId", "importJobId"])
     .index("by_owner_job_operation_chunk_detail", ["vaultOwnerId", "importJobId", "operationId", "chunkIndex", "detailIndex"]),
 
   treeImportBatches: defineTable({
@@ -2166,6 +2167,7 @@ export default defineSchema({
     operationId: v.string(),
     toolName: v.string(),
     requestHash: v.string(),
+    pendingImport: v.optional(v.object({ importJobId: v.id("treeImports"), batchIndex: v.number() })),
     resultJson: v.string(),
     clientId: v.string(),
     createdAt: v.number(),

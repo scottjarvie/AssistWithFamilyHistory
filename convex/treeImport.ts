@@ -833,6 +833,8 @@ async function importCitation(c: ChunkContext, item: any): Promise<Omit<ItemResu
     if (!existingLink) additions.set(JSON.stringify([target.targetType, target.targetId, target.field ?? null]), target);
   }
   if (current && (evidenceChanged || additions.size > 0)) {
+    if (!isEmpty(current.editedText)) fail("CITATION_INTERPRETATION_REVIEW_REQUIRED", "Retained human interpretation cannot acquire new citation attribution through import.",
+      "Review the citation interpretation and its source/targets with the person. The import interface cannot confirm editedText; this citation item saved nothing.");
     const omitted = evidenceFields.filter(field => {
       // "medium" is the importer's unspecified-quality default, not an
       // outside quality assertion. Every substantive retained field needs
@@ -1045,6 +1047,13 @@ export const planTreeImportChunk = internalQuery({
 const CHUNK_RECEIPT_BYTES = 64_000;
 const DETAIL_PAGE_BYTES = 48_000;
 
+function assertBatchBinding(receipt: Doc<"mcpOperations">, args: { requestHash: string; importJobId: string; batchIndex: number }) {
+  const binding = receipt.pendingImport ?? JSON.parse(receipt.resultJson);
+  if (receipt.toolName !== BATCH_TOOL || receipt.requestHash !== args.requestHash || String(binding.importJobId) !== args.importJobId || binding.batchIndex !== args.batchIndex) {
+    machineError("IDEMPOTENCY_CONFLICT", "This operation ID belongs to different Family History work or another import batch.", "Resume the original request exactly, or use a new operationId for different work.");
+  }
+}
+
 async function importReceipt(ctx: QueryCtx | MutationCtx, owner: string, jobId: Id<"treeImports">, operationId: string, chunkIndex: number, detailIndex: number) {
   const receipt = await ctx.db.query("treeImportReceipts").withIndex("by_owner_job_operation_chunk_detail", q =>
     q.eq("vaultOwnerId", owner).eq("importJobId", jobId).eq("operationId", operationId).eq("chunkIndex", chunkIndex).eq("detailIndex", detailIndex)).unique();
@@ -1094,11 +1103,15 @@ async function boundedChunkResult(ctx: MutationCtx, args: { batchOperationId: st
 
 /** One chunk of a real batch: one transaction, replay-safe under its own receipt. */
 export const applyTreeImportChunk = internalMutation({
-  args: { ...chunkArgs, requestHash: v.string(), batchOperationId: v.string(), chunkIndex: v.number() },
+  args: { ...chunkArgs, requestHash: v.string(), batchOperationId: v.string(), batchRequestHash: v.string(), batchIndex: v.number(), chunkIndex: v.number() },
   handler: async (ctx, args) => {
     const owner = ownerFromPrincipal(args.principal);
     await assertGrantPermits(ctx, { owner, grantId: args.grantId, toolName: BATCH_TOOL, input: {} });
     const job = await loadJob(ctx, owner, args.importJobId, false);
+    const operation = await ctx.db.query("mcpOperations").withIndex("by_owner_operation", q => q.eq("vaultOwnerId", owner).eq("operationId", args.batchOperationId)).unique();
+    if (!operation) machineError("IDEMPOTENCY_CONFLICT", "This import operation has no reservation.", "Prepare the original batch before running its chunks.");
+    assertBatchBinding(operation, { requestHash: args.batchRequestHash, importJobId: args.importJobId, batchIndex: args.batchIndex });
+    if (args.requestHash !== `${args.batchRequestHash}#${args.chunkIndex}`) machineError("IDEMPOTENCY_CONFLICT", "The chunk hash does not match its reserved operation.", "Resume the original batch exactly.");
     const receipt = await importReceipt(ctx, owner, job._id, args.batchOperationId, args.chunkIndex, -1);
     if (receipt) {
       if (receipt.requestHash !== args.requestHash) {
@@ -1106,6 +1119,7 @@ export const applyTreeImportChunk = internalMutation({
       }
       return JSON.parse(receipt.resultJson) as { results: ItemResult[]; plannedKeys: string[]; duplicatesSuggested: number };
     }
+    if (!operation.pendingImport) machineError("IDEMPOTENCY_CONFLICT", "This operation already completed and has no matching chunk receipt.", "Use the original completed operation result.");
     if (job.status !== "open") machineError("VALIDATION_ERROR", "That tree import is already marked complete.", "Reopen it with family_history_begin_tree_import.");
     const c: ChunkContext = {
       ctx, w: liveWriter(ctx), owner, job, provenance: importProvenance(args.principal, args.operationId),
@@ -1127,40 +1141,62 @@ export const applyTreeImportChunk = internalMutation({
   },
 });
 
-/** Before any chunk runs: is this a replay, and may this batch be accepted? */
-export const prepareTreeImportBatch = internalQuery({
-  args: {
-    principal: principalValidator,
-    grantId: v.optional(v.string()),
-    importJobId: v.string(),
-    operationId: v.string(),
-    requestHash: v.string(),
-    batchIndex: v.number(),
-    dryRun: v.boolean(),
-  },
-  handler: async (ctx, args) => {
-    const owner = ownerFromPrincipal(args.principal);
-    await assertGrantPermits(ctx, { owner, grantId: args.grantId, toolName: BATCH_TOOL, input: {} });
-    const receipt = await ctx.db
-      .query("mcpOperations")
-      .withIndex("by_owner_operation", (q) => q.eq("vaultOwnerId", owner).eq("operationId", args.operationId))
-      .unique();
-    if (receipt && !args.dryRun) {
-      if (receipt.toolName !== BATCH_TOOL || receipt.requestHash !== args.requestHash) {
-        machineError("IDEMPOTENCY_CONFLICT", "This operation ID was already used for a different batch.", "Reuse the original batch exactly, or mint a new operationId.");
-      }
-      return { replay: { ...(JSON.parse(receipt.resultJson) as Record<string, unknown>), deduplicated: true } };
+const prepareBatchArgs = {
+  principal: principalValidator,
+  grantId: v.optional(v.string()),
+  importJobId: v.string(),
+  operationId: v.string(),
+  requestHash: v.string(),
+  batchIndex: v.number(),
+  dryRun: v.boolean(),
+};
+
+type PrepareBatchInput = { principal: McpPrincipal; grantId?: string; importJobId: string; operationId: string; requestHash: string; batchIndex: number; dryRun: boolean };
+
+async function prepareBatch(ctx: QueryCtx | MutationCtx, args: PrepareBatchInput, reserve: boolean) {
+  const owner = ownerFromPrincipal(args.principal);
+  await assertGrantPermits(ctx, { owner, grantId: args.grantId, toolName: BATCH_TOOL, input: {} });
+  const receipt = await ctx.db.query("mcpOperations")
+    .withIndex("by_owner_operation", q => q.eq("vaultOwnerId", owner).eq("operationId", args.operationId)).unique();
+  if (receipt && !args.dryRun) {
+    assertBatchBinding(receipt, args);
+    if (!receipt.pendingImport) return { replay: { ...(JSON.parse(receipt.resultJson) as Record<string, unknown>), deduplicated: true } };
+  }
+  const job = await loadJob(ctx, owner, args.importJobId, true);
+  if (!Number.isInteger(args.batchIndex) || args.batchIndex < 0 || args.batchIndex > job.nextBatchIndex) {
+    machineError("VALIDATION_ERROR", `This import expects batch ${job.nextBatchIndex} next (or a resend of an earlier one).`,
+      `Send batchIndex ${job.nextBatchIndex}. Call family_history_get_tree_import for saved progress.`);
+  }
+  if (reserve && !args.dryRun && !receipt) {
+    // Adopt an older interrupted operation only for its original job/hash.
+    const earlier = await ctx.db.query("treeImportReceipts").withIndex("by_owner_operation_job", q => q.eq("vaultOwnerId", owner).eq("operationId", args.operationId).lt("importJobId", job._id)).first();
+    const later = await ctx.db.query("treeImportReceipts").withIndex("by_owner_operation_job", q => q.eq("vaultOwnerId", owner).eq("operationId", args.operationId).gt("importJobId", job._id)).first();
+    const original = await ctx.db.query("treeImportReceipts").withIndex("by_owner_operation_job", q => q.eq("vaultOwnerId", owner).eq("operationId", args.operationId).eq("importJobId", job._id)).first();
+    const legacy = await ctx.db.query("mcpOperations").withIndex("by_owner_operation", q => q.eq("vaultOwnerId", owner).eq("operationId", `${args.operationId}#0`)).take(2);
+    const legacyChunks = legacy.filter(row => row.toolName === `${BATCH_TOOL}#chunk`);
+    if (earlier || later || (original && original.requestHash !== `${args.requestHash}#${original.chunkIndex}`)
+      || legacyChunks.some(row => row.requestHash !== `${args.requestHash}#0` || (JSON.parse(row.resultJson).importJobId && JSON.parse(row.resultJson).importJobId !== args.importJobId))) {
+      machineError("IDEMPOTENCY_CONFLICT", "Older committed chunks reserve this operation for different import work.", "Resume the original job with its exact request; use a new operationId for different work.");
     }
-    const job = await loadJob(ctx, owner, args.importJobId, true);
-    if (!Number.isInteger(args.batchIndex) || args.batchIndex < 0 || args.batchIndex > job.nextBatchIndex) {
-      machineError(
-        "VALIDATION_ERROR",
-        `This import expects batch ${job.nextBatchIndex} next (or a resend of an earlier one).`,
-        `Send batchIndex ${job.nextBatchIndex}. Call family_history_get_tree_import to see the saved cursor if you lost your place.`,
-      );
-    }
-    return { replay: null };
-  },
+    if (legacy.length > 1) machineError("IDEMPOTENCY_CONFLICT", "Older operation receipts collide.", "Review the original receipts before resuming; nothing was overwritten.");
+    await (ctx as MutationCtx).db.insert("mcpOperations", {
+      vaultOwnerId: owner, operationId: args.operationId, toolName: BATCH_TOOL, requestHash: args.requestHash,
+      pendingImport: { importJobId: job._id, batchIndex: args.batchIndex }, resultJson: "{}", clientId: args.principal.clientId, createdAt: Date.now(),
+    });
+  }
+  return { replay: null };
+}
+
+/** Dry-run preparation reads only and never reserves caller identities. */
+export const validateTreeImportBatch = internalQuery({
+  args: prepareBatchArgs,
+  handler: (ctx, args) => prepareBatch(ctx, args, false),
+});
+
+/** Real preparation reserves the owner-wide operation before any chunk writes. */
+export const prepareTreeImportBatch = internalMutation({
+  args: prepareBatchArgs,
+  handler: (ctx, args) => prepareBatch(ctx, args, true),
 });
 
 function compactResults(results: ItemResult[]) {
@@ -1194,9 +1230,10 @@ export const recordTreeImportBatch = internalMutation({
       .withIndex("by_owner_operation", (q) => q.eq("vaultOwnerId", owner).eq("operationId", args.operationId))
       .unique();
     if (existing) {
-      if (existing.toolName !== BATCH_TOOL || existing.requestHash !== args.requestHash) machineError("IDEMPOTENCY_CONFLICT", "This operation ID belongs to different input.", "Reuse the original input or a new operationId.");
-      return { ...(JSON.parse(existing.resultJson) as Record<string, unknown>), deduplicated: true };
+      assertBatchBinding(existing, args);
+      if (!existing.pendingImport) return { ...(JSON.parse(existing.resultJson) as Record<string, unknown>), deduplicated: true };
     }
+    if (!existing) machineError("IDEMPOTENCY_CONFLICT", "This import operation has no reservation.", "Prepare the original batch before finalizing it.");
     const job = await loadJob(ctx, owner, args.importJobId, true);
     const results = args.results as ItemResult[];
     const batchCounts = addCounts(emptyCounts(), results);
@@ -1271,15 +1308,7 @@ export const recordTreeImportBatch = internalMutation({
       result.resultsTrimmed = "Full results, including failures and retained conflicts, are available through family_history_get_tree_import using resultDetails.operationId, resultsChunkIndex and resultsOffset.";
       resultJson = JSON.stringify(result);
     }
-    await ctx.db.insert("mcpOperations", {
-      vaultOwnerId: owner,
-      operationId: args.operationId,
-      toolName: BATCH_TOOL,
-      requestHash: args.requestHash,
-      resultJson,
-      clientId: args.principal.clientId,
-      createdAt: now,
-    });
+    await ctx.db.patch(existing._id, { resultJson, pendingImport: undefined });
     return result;
   },
 });
@@ -1309,13 +1338,16 @@ export const importTreeBatch = internalAction({
       grantId: args.grantId,
       importJobId: String(input.importJobId ?? ""),
     };
-    const prep: { replay: BatchResponse | null } = await ctx.runQuery(self.prepareTreeImportBatch, {
+    const preparation = {
       ...base,
       operationId: args.operationId,
       requestHash: args.requestHash,
       batchIndex: input.batchIndex,
       dryRun,
-    });
+    };
+    const prep: { replay: BatchResponse | null } = dryRun
+      ? await ctx.runQuery(self.validateTreeImportBatch, preparation)
+      : await ctx.runMutation(self.prepareTreeImportBatch, preparation);
     if (prep.replay) return prep.replay;
 
     const chunks = chunkBatch(input);
@@ -1331,6 +1363,8 @@ export const importTreeBatch = internalAction({
           ...base,
           operationId: `${args.operationId}#${index}`,
           batchOperationId: args.operationId,
+          batchRequestHash: args.requestHash,
+          batchIndex: input.batchIndex,
           chunkIndex: index,
           requestHash: `${args.requestHash}#${index}`,
           items,
