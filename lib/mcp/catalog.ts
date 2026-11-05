@@ -212,7 +212,7 @@ export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
     writes: false,
     title: "Get Family History context",
     description:
-      "Hydrate one person, story, source, source_content, place, topic, event, relationship, research task, or research finding. A source comes back with its original content (each labelled with who made it), the people as the record names them, its claims and connections; a long text is cut and can be read whole as kind source_content. Living-person notes stay withheld and only reviewed AI-allowed loose context and media metadata are included.",
+      "Hydrate one person, story, source, source_content, place, topic, event, relationship, note, citation, reviewed AI-allowed media metadata, research task, or research finding. Imported subject notes include IDs for direct kind note reads; long note previews flag textTruncated. Direct note/citation/media context requires whole-workspace access; selected-people and Queue grants remain narrow. Notes and new note/citation/media reads are withheld when living-person, private-media, ownership, missing-reference or bounded privacy checks cannot be satisfied. A source comes back with its original content (each labelled with who made it), the people as the record names them, its claims and connections; a long text is cut and can be read whole as kind source_content. Living-person notes stay withheld and only reviewed AI-allowed loose context and media metadata are included.",
     humanSummary: "Opens the full detail of one record you allowed.",
     implementedBy: "convex/mcpFamilyHistory.getRecordContext",
     sunsetNote: ALIAS_SUNSET,

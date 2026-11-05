@@ -886,7 +886,7 @@ export function createFamilyHistoryServer(
 
   registerTool("family_history_get_context", {
     inputSchema: z.object({
-      kind: z.enum(["person", "story", "source", "source_content", "place", "topic", "event", "relationship", "research_task", "research_finding"]),
+      kind: z.enum(["person", "story", "source", "source_content", "place", "topic", "event", "relationship", "note", "citation", "media", "research_task", "research_finding"]),
       id,
     }).strict(),
     annotations: readOnly,
@@ -912,7 +912,7 @@ export function createFamilyHistoryServer(
           actionCtx.runQuery(mcp.getPersonOriginals, { principal, personId: String(workspace.person._id) }),
           actionCtx.runQuery(mcp.getPersonNotes, { principal, personId: String(workspace.person._id) }),
         ]);
-        return { ...workspace, ...originals, notes: noteContext.notes, truncated: workspace.truncated || originals.truncated || noteContext.truncated };
+        return { ...workspace, ...originals, notes: noteContext.notes, notesWithheld: noteContext.notesWithheld, truncated: workspace.truncated || originals.truncated || noteContext.truncated };
       }
       if (input.kind === "story") {
         const bundle = await actionCtx.runQuery(vault.getStoryReview, {

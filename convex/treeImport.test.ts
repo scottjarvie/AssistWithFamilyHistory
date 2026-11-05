@@ -2308,3 +2308,51 @@ test("unattached explicit fact refresh remains available", async () => {
   const result = await send(t, grant, job.importJobId, 1, batch); expect(dry.counts).toEqual(result.counts); expect(result.counts.persons.updated).toBe(1);
   expect((await t.run(ctx => ctx.db.query("events").collect()))[0]).toMatchObject({ _id: before[0]._id, type: "residence", description: "London", importedFact: { key: "F", type: "residence", description: "London" } });
 });
+
+
+test.each(["note", "citation", "both"])("relationship fact refresh protects retained %s attribution", async attachment => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const relation = { key: "R", type: "Couple" as const, person1Key: "A", person2Key: "B", facts: [{ type: "marriage", description: "Ohio" }] };
+  const target = { kind: "relationship" as const, key: "R", field: "marriage" };
+  await send(t, grant, job.importJobId, 0, { persons: ["A", "B"].map(key => ({ key, living: false, names: [{ given: key }] })), sources: [{ key: "S", title: "Ohio source" }], relationships: [relation],
+    ...(attachment !== "note" ? { citations: [{ key: "C", sourceKey: "S", extractedText: "Ohio marriage", targets: [target] }] } : {}),
+    ...(attachment !== "citation" ? { notes: [{ key: "N", text: "Ohio marriage note", subject: { kind: "relationship" as const, key: "R" } }] } : {}),
+  });
+  const snapshot = () => t.run(async ctx => ({ relationships: await ctx.db.query("relationships").collect(), citations: await ctx.db.query("citations").collect(), notes: await ctx.db.query("notes").collect(), links: await ctx.db.query("citationLinks").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  const noop = await send(t, grant, job.importJobId, 1, { relationships: [relation] }); expect(noop.counts.relationships.unchanged).toBe(1); expect(await snapshot()).toEqual(before);
+  for (const dryRun of [true, false]) {
+    const batch: TreeImportBatch = { relationships: [{ ...relation, facts: [{ type: "marriage", description: "Arizona" }] }] };
+    const result = await send(t, grant, job.importJobId, 2, batch, { dryRun }, `relationship-fact-attachments-${attachment}-${dryRun}`);
+    expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("RELATIONSHIP_ATTRIBUTION_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before);
+    expect(await send(t, grant, job.importJobId, 2, batch, { dryRun }, `relationship-fact-attachments-${attachment}-${dryRun}`)).toEqual(result); expect(await snapshot()).toEqual(before);
+  }
+});
+
+test.each(["text", "title", "noteType"])("citation-backed note %s refresh preserves original evidence meaning", async field => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const note = { key: "N", text: "Ohio", title: "Ohio note", noteType: "research" as const, subject: { kind: "person" as const, key: "P" } };
+  await send(t, grant, job.importJobId, 0, { persons: [{ key: "P", living: false, names: [{ given: "Synthetic" }] }], sources: [{ key: "S", title: "Ohio" }], notes: [note] });
+  await send(t, grant, job.importJobId, 1, { citations: [{ key: "C", sourceKey: "S", extractedText: "Evidence supports Ohio", targets: [{ kind: "note", key: "N" }] }] });
+  const snapshot = () => t.run(async ctx => ({ notes: await ctx.db.query("notes").collect(), citations: await ctx.db.query("citations").collect(), links: await ctx.db.query("citationLinks").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  const noop = await send(t, grant, job.importJobId, 2, { notes: [note] }); expect(noop.counts.notes.unchanged).toBe(1); expect(await snapshot()).toEqual(before);
+  const batch: TreeImportBatch = { notes: [{ ...note, ...(field === "text" ? { text: "Arizona" } : field === "title" ? { title: "Arizona note" } : { noteType: "biography" as const }) }] };
+  for (const dryRun of [true, false]) {
+    const result = await send(t, grant, job.importJobId, 3, batch, { dryRun }, `note-citation-attribution-${field}-${dryRun}`);
+    expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("NOTE_ATTRIBUTION_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before);
+    expect(await send(t, grant, job.importJobId, 3, batch, { dryRun }, `note-citation-attribution-${field}-${dryRun}`)).toEqual(result); expect(await snapshot()).toEqual(before);
+  }
+});
+
+test.each(["source", "excerpt", "target"])("explanatory citation notes prevent unreviewed %s attribution changes", async field => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const citation = { key: "C", sourceKey: "S1", page: "1", extractedText: "Ohio", quality: 2, url: "https://example.test/original", accessDate: "2026-01-01", notes: "Original citation metadata", targets: [{ kind: "person" as const, key: "P" }] };
+  await send(t, grant, job.importJobId, 0, { persons: ["P", "Q"].map(key => ({ key, living: false, names: [{ given: key }] })), sources: ["S1", "S2"].map(key => ({ key, title: key })), citations: [citation], notes: [{ key: "N", text: "Explanation of Ohio evidence", subject: { kind: "citation", key: "C", keyOrigin: "explicit" } }] });
+  const snapshot = () => t.run(async ctx => ({ citations: await ctx.db.query("citations").collect(), notes: await ctx.db.query("notes").collect(), links: await ctx.db.query("citationLinks").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  const noop = await send(t, grant, job.importJobId, 1, { citations: [citation] }); expect(noop.counts.citations.unchanged).toBe(1); expect(await snapshot()).toEqual(before);
+  const changed = { ...citation, ...(field === "source" ? { sourceKey: "S2" } : field === "excerpt" ? { extractedText: "Arizona" } : { targets: [...citation.targets, { kind: "person" as const, key: "Q" }] }) };
+  for (const dryRun of [true, false]) {
+    const result = await send(t, grant, job.importJobId, 2, { citations: [changed] }, { dryRun }, `citation-note-attribution-${field}-${dryRun}`);
+    expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("CITATION_NOTE_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before);
+    expect(await send(t, grant, job.importJobId, 2, { citations: [changed] }, { dryRun }, `citation-note-attribution-${field}-${dryRun}`)).toEqual(result); expect(await snapshot()).toEqual(before);
+  }
+});

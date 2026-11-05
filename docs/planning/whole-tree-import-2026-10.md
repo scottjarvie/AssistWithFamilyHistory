@@ -492,3 +492,16 @@ atomically; notes and citation evidence retain their original meaning. A
 fact refusal rolls back its enclosing person item and all import baselines.
 Unchanged replay and unattached refresh remain supported. Existing reviewed
 media restrictions also remain; no attachments are removed or redirected.
+
+Relationship fact changes and citation-backed note content changes now use
+the same attachment refusal. Citation evidence/target changes also refuse
+when explanatory notes would acquire different attribution. No old material
+is deleted or reassigned. Subject contexts now include owner-indexed notes;
+get_context accepts note, citation and reviewed AI-allowed media metadata.
+Note previews give direct full-note IDs. The new direct kinds require the
+existing whole-workspace boundary; selected-people/Queue grants stay narrow.
+A bounded privacy walk withholds notes/new contexts for living, unapproved
+media, restricted rights, missing/foreign references or excessive traversal.
+notesWithheld makes that limit explicit; cycles still check all reachable
+privacy constraints within the bound. Existing source/event/relationship
+representations remain, with owned people filtered in the touched readers.

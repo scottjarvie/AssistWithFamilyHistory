@@ -1262,7 +1262,8 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_owner", ["vaultOwnerId"])
-    .index("by_subject", ["subject.kind", "subject.id"]),
+    .index("by_subject", ["subject.kind", "subject.id"])
+    .index("by_owner_subject", ["vaultOwnerId", "subject.kind", "subject.id"]),
 
   /**
    * TREE IMPORTS

@@ -1304,15 +1304,79 @@ export const search = internalQuery({
   },
 });
 
-async function readPersonNoteContext(ctx: QueryCtx, owner: string, person: Doc<"persons">) {
+const NOTE_CONTEXT_TABLE: Record<string, TableNames> = {
+  person: "persons", relationship: "relationships", event: "events", source: "sources",
+  citation: "citations", media: "media", note: "notes", place: "places",
+};
+
+async function noteContextRow(ctx: QueryCtx, owner: string, kind: string, id: string): Promise<any | null> {
+  const table = NOTE_CONTEXT_TABLE[kind];
+  if (!table) return null;
+  const normalized = ctx.db.normalizeId(table, id);
+  const row = normalized ? await ctx.db.get(normalized) : null;
+  return row && matchesVaultOwner((row as any).vaultOwnerId, owner) ? row : null;
+}
+
+/** A bounded, fail-closed privacy walk; cycles never skip an unchecked record. */
+async function canReadImportedNotes(ctx: QueryCtx, owner: string, kind: string, id: string,
+  state = { seen: new Set<string>(), remaining: FAMILY_HISTORY_MCP_LIMITS.contextRows as number }): Promise<boolean> {
+  const key = `${kind}:${id}`;
+  if (state.seen.has(key)) return true;
+  if (state.seen.size >= FAMILY_HISTORY_MCP_LIMITS.contextRows) return false;
+  const row = await noteContextRow(ctx, owner, kind, id);
+  if (!row) return false;
+  state.seen.add(key);
+  let refs: Array<{ kind: string; id: string }> = [];
+  const limit = state.remaining + 1;
+  if (kind === "person") return row.living === false;
+  if (kind === "place") return true;
+  if (kind === "relationship") refs = [row.person1, row.person2].map(id => ({ kind: "person", id: String(id) }));
+  else if (kind === "event") {
+    const roles = await ctx.db.query("personEvents").withIndex("by_event", q => q.eq("eventId", row._id)).take(limit);
+    if (roles.some(role => !matchesVaultOwner(role.vaultOwnerId, owner))) return false;
+    refs = roles.map(role => ({ kind: "person", id: String(role.personId) }));
+  } else if (kind === "media") {
+    if (row.aiUseAllowed !== true || row.privacyLevel === undefined || row.privacyLevel === "private"
+      || !["reviewed", "redacted"].includes(row.reviewStatus) || row.rightsStatus === "restricted") return false;
+    if (row.sourceId && !await noteContextRow(ctx, owner, "source", String(row.sourceId))) return false;
+    refs = row.personIds.map((id: string) => ({ kind: "person", id: String(id) }));
+  } else if (kind === "source") {
+    const [citations, facts] = await Promise.all([
+      ctx.db.query("citations").withIndex("by_source", q => q.eq("sourceId", row._id)).take(limit),
+      ctx.db.query("sourceFacts").withIndex("by_source", q => q.eq("sourceId", row._id)).take(limit),
+    ]);
+    if ([...citations, ...facts].some(item => !matchesVaultOwner(item.vaultOwnerId, owner))) return false;
+    refs = [...citations.map(item => ({ kind: "citation", id: String(item._id) })), ...facts.map(item => ({ kind: "person", id: String(item.personId) }))];
+  } else if (kind === "citation") {
+    if (!await noteContextRow(ctx, owner, "source", String(row.sourceId))) return false;
+    const links = await ctx.db.query("citationLinks").withIndex("by_citation", q => q.eq("citationId", row._id)).take(limit);
+    if (links.some(link => !matchesVaultOwner(link.vaultOwnerId, owner))) return false;
+    refs = links.map(link => ({ kind: link.targetType, id: link.targetId }));
+  } else if (kind === "note") refs = [row.subject];
+  else return false;
+  if (refs.length > state.remaining) return false;
+  state.remaining -= refs.length;
+  for (const ref of refs) if (!await canReadImportedNotes(ctx, owner, ref.kind, ref.id, state)) return false;
+  return true;
+}
+
+function noteForContext(row: Doc<"notes">, full = false) {
+  const limit = FAMILY_HISTORY_MCP_LIMITS.contentPreviewChars;
+  return { id: row._id, subject: row.subject, noteType: row.noteType, title: row.title ?? null,
+    text: full ? row.text : row.text.slice(0, limit),
+    ...(!full && row.text.length > limit ? { textTruncated: true, nextContextKind: "note" } : {}) };
+}
+
+async function readSubjectNoteContext(ctx: QueryCtx, owner: string, kind: Doc<"notes">["subject"]["kind"], id: string) {
   const max = FAMILY_HISTORY_MCP_LIMITS.contextRows;
-  const rows = person.living ? [] : (await ctx.db.query("notes")
-    .withIndex("by_subject", q => q.eq("subject.kind", "person").eq("subject.id", String(person._id)))
-    .take(max + 1)).filter(row => row.vaultOwnerId === owner);
-  return {
-    notes: rows.slice(0, max).map(row => ({ id: row._id, noteType: row.noteType, title: row.title ?? null, text: row.text })),
-    truncated: rows.length > max,
-  };
+  if (!await canReadImportedNotes(ctx, owner, kind, id)) return { notes: [], truncated: false, notesWithheld: true };
+  const rows = await ctx.db.query("notes").withIndex("by_owner_subject", q => q.eq("vaultOwnerId", owner).eq("subject.kind", kind).eq("subject.id", id)).take(max + 1);
+  return { notes: rows.filter(row => row.vaultOwnerId === owner).slice(0, max).map(row => noteForContext(row)),
+    truncated: rows.length > max, notesWithheld: false };
+}
+
+async function readPersonNoteContext(ctx: QueryCtx, owner: string, person: Doc<"persons">) {
+  return readSubjectNoteContext(ctx, owner, "person", String(person._id));
 }
 
 /** Shared by the actual public person-context caller and the internal reader. */
@@ -1359,6 +1423,7 @@ export const getRecordContext = internalQuery({
       return {
         kind: "person",
         notes: noteContext.notes,
+        notesWithheld: noteContext.notesWithheld,
         person,
         relationships,
         events,
@@ -1399,8 +1464,11 @@ export const getRecordContext = internalQuery({
         connectionsFor(ctx, owner, "source", String(source._id), max),
       ]);
       const ownedContents = contents.filter((row) => row.vaultOwnerId === owner).slice(0, max);
+      const noteContext = await readSubjectNoteContext(ctx, owner, "source", String(source._id));
       return {
         kind: "source",
+        notes: noteContext.notes,
+        notesWithheld: noteContext.notesWithheld,
         source,
         // Original content first and verbatim. Long texts are cut here; read one
         // in full with kind "source_content".
@@ -1410,7 +1478,7 @@ export const getRecordContext = internalQuery({
         citations: citations.slice(0, max),
         links,
         connections: related.connections,
-        truncated: citations.length > max || links.length === max || contents.length > max || personas.length > max || facts.length > max || related.truncated,
+        truncated: noteContext.truncated || citations.length > max || links.length === max || contents.length > max || personas.length > max || facts.length > max || related.truncated,
       };
     }
     if (args.kind === "source_content") {
@@ -1450,16 +1518,33 @@ export const getRecordContext = internalQuery({
       const event = await owned(ctx, "events", args.id, owner, "Event");
       const roles = (await ctx.db.query("personEvents").withIndex("by_event", (q) => q.eq("eventId", event._id)).take(max + 1)).filter((row) => matchesVaultOwner(row.vaultOwnerId, owner));
       const people = await Promise.all(roles.slice(0, max).map((role) => ctx.db.get(role.personId)));
-      return { kind: "event", event, roles: roles.slice(0, max), people: people.filter(Boolean).map((person: any) => ({ id: person._id, name: `${person.name.given} ${person.name.surname}`.trim(), living: person.living })), truncated: roles.length > max };
+      const noteContext = await readSubjectNoteContext(ctx, owner, "event", String(event._id));
+      return { kind: "event", event, roles: roles.slice(0, max), people: people.filter(person => person && matchesVaultOwner(person.vaultOwnerId, owner)).map((person: any) => ({ id: person._id, name: `${person.name.given} ${person.name.surname}`.trim(), living: person.living })), ...noteContext, truncated: noteContext.truncated || roles.length > max };
     }
     if (args.kind === "relationship") {
       const relationship = await owned(ctx, "relationships", args.id, owner, "Relationship");
       const [person1, person2] = await Promise.all([ctx.db.get(relationship.person1), ctx.db.get(relationship.person2)]);
-      return { kind: "relationship", relationship, people: [person1, person2].filter(Boolean).map((person: any) => ({ id: person._id, name: `${person.name.given} ${person.name.surname}`.trim(), living: person.living })) };
+      const noteContext = await readSubjectNoteContext(ctx, owner, "relationship", String(relationship._id));
+      return { kind: "relationship", relationship, people: [person1, person2].filter(person => person && matchesVaultOwner(person.vaultOwnerId, owner)).map((person: any) => ({ id: person._id, name: `${person.name.given} ${person.name.surname}`.trim(), living: person.living })), ...noteContext };
+    }
+    if (args.kind === "note" || args.kind === "citation" || args.kind === "media") {
+      const table = args.kind === "note" ? "notes" : args.kind === "citation" ? "citations" : "media";
+      const record = await owned(ctx, table, args.id, owner, "Record");
+      if (!await canReadImportedNotes(ctx, owner, args.kind, String(record._id))) {
+        return { kind: args.kind, [args.kind]: null, notes: [], notesWithheld: true, truncated: false };
+      }
+      const noteContext = args.kind === "note" ? { notes: [], notesWithheld: false, truncated: false }
+        : await readSubjectNoteContext(ctx, owner, args.kind, String(record._id));
+      if (args.kind === "note") return { kind: "note", note: noteForContext(record as Doc<"notes">, true), ...noteContext };
+      if (args.kind === "citation") return { kind: "citation", citation: record, ...noteContext };
+      const media = record as Doc<"media">;
+      return { kind: "media", media: { id: media._id, type: media.type, title: media.title, description: media.description,
+        url: media.url, date: media.date, personIds: media.personIds, sourceId: media.sourceId,
+        privacyLevel: media.privacyLevel, reviewStatus: media.reviewStatus, rightsStatus: media.rightsStatus, aiUseAllowed: media.aiUseAllowed }, ...noteContext };
     }
     if (args.kind === "research_task") return { kind: args.kind, task: await owned(ctx, "researchTasks", args.id, owner, "Research task") };
     if (args.kind === "research_finding") return { kind: args.kind, finding: await owned(ctx, "researchLog", args.id, owner, "Research finding") };
-    machineError("VALIDATION_ERROR", "Unsupported context kind.", "Use person, story, source, source_content, place, topic, event, relationship, research_task, or research_finding.");
+    machineError("VALIDATION_ERROR", "Unsupported context kind.", "Use person, story, source, source_content, place, topic, event, relationship, note, citation, media, research_task, or research_finding.");
   },
 });
 

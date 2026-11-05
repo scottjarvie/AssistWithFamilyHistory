@@ -327,14 +327,14 @@ async function ownedRow<T extends TableNames>(c: ChunkContext, table: T, id: str
 }
 
 /** Retained attachments describe the current assertion, regardless of review status. */
-async function hasRetainedAttachments(c: ChunkContext, kind: "relationship" | "event" | "media", id: string): Promise<boolean> {
+async function hasRetainedAttachments(c: ChunkContext, kind: "relationship" | "event" | "media" | "note" | "citation", id: string): Promise<boolean> {
   if ([...(c.w.rows?.values() ?? [])].some(row =>
     (row.subject?.kind === kind && row.subject.id === id)
     || (row.targetType === kind && row.targetId === id))) return true;
   if (isPlaceholder(id)) return false;
   const attachments = await Promise.all([
-    c.ctx.db.query("notes").withIndex("by_subject", q => q.eq("subject.kind", kind).eq("subject.id", id)).first(),
-    c.ctx.db.query("citationLinks").withIndex("by_target", q => q.eq("targetType", kind).eq("targetId", id)).first(),
+    kind === "note" ? Promise.resolve(null) : c.ctx.db.query("notes").withIndex("by_subject", q => q.eq("subject.kind", kind).eq("subject.id", id)).first(),
+    kind === "citation" ? Promise.resolve(null) : c.ctx.db.query("citationLinks").withIndex("by_target", q => q.eq("targetType", kind).eq("targetId", id)).first(),
   ]);
   return attachments.some(Boolean);
 }
@@ -865,8 +865,8 @@ async function importRelationship(c: ChunkContext, item: any): Promise<Omit<Item
     const references = ["type", "childRelationType", "person1", "person2"] as const;
     const moved = current && references.some(field => !same(previous[field], current[field]));
     const keptReference = saved.kept?.some(field => references.some(reference => reference === field));
-    if (moved && await hasRetainedAttachments(c, "relationship", saved.id)) {
-      fail("RELATIONSHIP_ATTRIBUTION_REVIEW_REQUIRED", "Relationship identity changes cannot reattribute retained notes or citation evidence.",
+    if (current && (moved || !same(previous.facts, current.facts)) && await hasRetainedAttachments(c, "relationship", saved.id)) {
+      fail("RELATIONSHIP_ATTRIBUTION_REVIEW_REQUIRED", "Relationship assertion changes cannot reattribute retained notes or citation evidence.",
         "Review the relationship and its attached material with the person. This relationship item saved nothing; all attachments were retained.");
     }
     if (current && ((moved && current.facts?.length && !same(suppliedFacts, current.facts)) || (keptReference && !same(previous.facts, current.facts)))) {
@@ -1061,6 +1061,8 @@ async function importCitation(c: ChunkContext, item: any): Promise<Omit<ItemResu
     if (!existingLink) additions.set(JSON.stringify([target.targetType, target.targetId, target.field ?? null]), target);
   }
   if (current && (evidenceChanged || additions.size > 0)) {
+    if (await hasRetainedAttachments(c, "citation", saved.id)) fail("CITATION_NOTE_REVIEW_REQUIRED", "Changed citation evidence or attribution cannot carry retained explanatory notes.",
+      "Review the citation and its notes with the person. This citation item saved nothing; its original evidence, links and notes were retained.");
     if (!isEmpty(current.editedText)) fail("CITATION_INTERPRETATION_REVIEW_REQUIRED", "Retained human interpretation cannot acquire new citation attribution through import.",
       "Review the citation interpretation and its source/targets with the person. The import interface cannot confirm editedText; this citation item saved nothing.");
     const omitted = evidenceFields.filter(field => {
@@ -1127,6 +1129,14 @@ async function importNote(c: ChunkContext, item: any): Promise<Omit<ItemResult, 
       externalIds: externalIdsFor(c, key, undefined),
     },
   });
+  if (previous) {
+    const current = await ownedRow(c, "notes", saved.id);
+    const content = ["noteType", "title", "text"] as const;
+    if (current && content.some(field => !same(previous[field], current[field])) && await hasRetainedAttachments(c, "note", saved.id)) {
+      fail("NOTE_ATTRIBUTION_REVIEW_REQUIRED", "Changed note assertions cannot inherit retained citation evidence.",
+        "Review the note and its supporting citations with the person. This note item saved nothing; the original note and evidence links were retained.");
+    }
+  }
   return { key, status: saved.status, id: saved.id, ...(saved.kept ? { kept: saved.kept } : {}) };
 }
 
