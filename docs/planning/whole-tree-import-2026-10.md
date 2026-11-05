@@ -458,3 +458,12 @@ require complete-date review. Explicitly confirming the same year clears the
 inference marker even without a document change. The marker stays internal to
 import mappings and follows dry planning and resume. Legacy relationship
 createCouple/updateFacts validators also retain imported date range metadata.
+
+Media refresh cannot transfer an earlier privacy, rights or AI-use decision to
+changed content or associations. Such an item refuses atomically with
+MEDIA_REVIEW_REQUIRED, retaining the approved original, its baseline and
+review decision. Unchanged replay stays valid; private/unreviewed references
+remain refreshable and AI-ineligible. Every citation/note target, relationship
+person and media/source association must resolve to an existing owned row,
+including in dry planning. Stale mappings are retained for review, never
+silently removed or redirected to replacement records.

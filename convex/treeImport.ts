@@ -240,8 +240,19 @@ async function rejectLegacyIdentity(c: ChunkContext, singular: string, key: stri
   }
 }
 
-/** A missing origin remains compatible only when exactly one domain resolves. */
+const REFERENCE_TABLE: Record<string, TableNames> = {
+  person: "persons", relationship: "relationships", source: "sources",
+  fact: "events", citation: "citations", note: "notes", media: "media",
+};
+
+/** Mappings retain history after deletion; they do not prove a target exists. */
 async function lookupReference(c: ChunkContext, kind: string, key: string, origin: unknown): Promise<string | null> {
+  const id = await lookupReferenceId(c, kind, key, origin);
+  return id && await ownedRow(c, REFERENCE_TABLE[kind], id) ? id : null;
+}
+
+/** A missing origin remains compatible only when exactly one domain resolves. */
+async function lookupReferenceId(c: ChunkContext, kind: string, key: string, origin: unknown): Promise<string | null> {
   if (origin !== undefined && origin !== "explicit" && origin !== "generated") {
     fail("VALIDATION_ERROR", "Unknown keyOrigin.", "Use explicit or generated for keyOrigin.");
   }
@@ -726,7 +737,7 @@ async function suggestDuplicate(
 async function personFor(c: ChunkContext, key: unknown, label: string): Promise<string> {
   const personKey = requiredKey(key, label);
   const id = (await resolvePersonIdentity(c, personKey, c.job.system)).id;
-  if (!id) fail("MISSING_PERSON", `${label} ${personKey} has not been imported yet.`, "Send that person first, in this batch or an earlier one, then resend this row.");
+  if (!id || !await ownedRow(c, "persons", id)) fail("MISSING_PERSON", `${label} ${personKey} has no existing owned person.`, "Review missing or deleted people before retrying; an old mapping is not a usable target.");
   return id;
 }
 
@@ -889,6 +900,7 @@ async function importMedia(c: ChunkContext, item: any): Promise<Omit<ItemResult,
   const key = requiredKey(item?.key, "key");
   const title = cleanText(item.title, "media title", FAMILY_HISTORY_MCP_LIMITS.shortText, true)!;
   const existingId = await lookup(c, "media", key);
+  const previous = existingId ? await ownedRow(c, "media", existingId) : null;
   let personIds: string[] | undefined;
   if (item.personKeys !== undefined) {
     personIds = [];
@@ -897,7 +909,7 @@ async function importMedia(c: ChunkContext, item: any): Promise<Omit<ItemResult,
   let sourceId: string | undefined;
   if (item.sourceKey) {
     sourceId = (await resolveSourceIdentity(c, requiredKey(item.sourceKey, "sourceKey"))).id ?? undefined;
-    if (!sourceId) fail("MISSING_SOURCE", `Source ${item.sourceKey} has not been imported yet.`, "Send the source first, then resend this row.");
+    if (!sourceId || !await ownedRow(c, "sources", sourceId)) fail("MISSING_SOURCE", `Source ${item.sourceKey} has no existing owned source.`, "Review missing or deleted sources before retrying; an old mapping is not a usable target.");
   }
   const saved = await upsertRow(c, {
     table: "media",
@@ -926,6 +938,18 @@ async function importMedia(c: ChunkContext, item: any): Promise<Omit<ItemResult,
       aiUseAllowed: false,
     },
   });
+  if (previous) {
+    const current = await ownedRow(c, "media", saved.id);
+    const reviewed = previous.reviewedAt !== undefined || previous.aiUseAllowed === true
+      || (previous.reviewStatus !== undefined && previous.reviewStatus !== "unreviewed")
+      || (previous.privacyLevel !== undefined && previous.privacyLevel !== "private")
+      || (previous.rightsStatus !== undefined && previous.rightsStatus !== "unknown");
+    const content = ["type", "title", "description", "url", "mimeType", "date", "personIds", "sourceId", "familySearchUrl"] as const;
+    if (reviewed && current && content.some(field => !same(previous[field], current[field]))) {
+      fail("MEDIA_REVIEW_REQUIRED", "Changed media content or attribution cannot inherit an earlier privacy, rights or AI-use decision.",
+        "Review the replacement with the person before retrying. This media item saved nothing and retained the original review decision.");
+    }
+  }
   return { key, status: saved.status, id: saved.id, ...(saved.kept ? { kept: saved.kept } : {}) };
 }
 
@@ -951,7 +975,7 @@ async function importCitation(c: ChunkContext, item: any): Promise<Omit<ItemResu
   const singular = item.key?.trim() ? "citation" : "citationGenerated";
   await rejectLegacyIdentity(c, singular, key, legacyCitationKeyFor(item), "citation");
   const sourceId = (await resolveSourceIdentity(c, sourceKey)).id;
-  if (!sourceId) fail("MISSING_SOURCE", `Source ${sourceKey} has not been imported yet.`, "Send the source first, then resend this row.");
+  if (!sourceId || !await ownedRow(c, "sources", sourceId)) fail("MISSING_SOURCE", `Source ${sourceKey} has no existing owned source.`, "Review missing or deleted sources before retrying; an old mapping is not a usable target.");
   const targets: Awaited<ReturnType<typeof resolveTarget>>[] = [];
   for (const target of item.targets.slice(0, TREE_IMPORT_LIMITS.targetsPerCitation)) targets.push(await resolveTarget(c, target));
   const existingId = await lookup(c, singular, key);

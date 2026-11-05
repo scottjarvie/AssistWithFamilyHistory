@@ -15,7 +15,8 @@
 import { describe, expect, test } from "vitest";
 import { convexTest } from "convex-test";
 import schema from "./schema";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
+import { isContextPackEligibleMedia } from "./vault";
 import { seedGrant } from "../lib/mcp/testSupport";
 import { generateSyntheticTree, packBatches, syntheticPid } from "../lib/treeImport/syntheticTree";
 import { chunkBatch, citationKeyFor, externalRecordKey, factKeyFor, factReferenceKeyFor, legacyCitationKeyFor, legacyFactKeyFor, legacyExternalRecordKey, type TreeImportBatch } from "../lib/treeImport/model";
@@ -2104,4 +2105,61 @@ test.each([false, true])("legacy relationship writers round-trip imported date r
   const copy = await t.mutation(internal.relationships.createCouple, { person1Id: row.person1, person2Id: row.person2, facts: updated!.facts });
   expect((await t.run(ctx => ctx.db.get(copy)))!.facts).toEqual(updated!.facts);
   // Internal synthetic writer compatibility only, never end-user authorization proof.
+});
+
+
+test.each(["type", "title", "description", "url", "mimeType", "date", "personKeys", "sourceKey"])("reviewed media refuses changed %s without transferring approval", async field => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const media = { key: "M", title: "Original", type: "photo" as const, description: "Original description", url: "https://example.test/a", mimeType: "image/jpeg", date: "1900", personKeys: ["A"], sourceKey: "S1" };
+  await send(t, grant, job.importJobId, 0, { persons: ["A", "B"].map(key => ({ key, living: false, names: [{ given: key }] })), sources: ["S1", "S2"].map(key => ({ key, title: key })), media: [media] });
+  const id = (await t.run(ctx => ctx.db.query("media").collect()))[0]._id;
+  // Synthetic owner identity through the real review writer, never admin/user runtime proof.
+  await t.withIdentity({ subject: OWNER }).mutation(api.vaultMutations.reviewMedia, { vaultOwnerId: OWNER, mediaId: id, reviewStatus: "reviewed", privacyLevel: "family_review", rightsStatus: "owned", aiUseAllowed: true, privacyReviewNote: "Synthetic owner decision for original content only" });
+  const snapshot = () => t.run(async ctx => ({ media: await ctx.db.query("media").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  expect(isContextPackEligibleMedia(before.media[0])).toBe(true);
+  const noop = await send(t, grant, job.importJobId, 1, { media: [media] }); expect(noop.counts.media.unchanged).toBe(1); expect(await snapshot()).toEqual(before);
+  const replacements: Record<string, any> = { type: "document", title: "Replacement", description: "Replacement description", url: "https://example.test/b", mimeType: "application/pdf", date: "1901", personKeys: ["B"], sourceKey: "S2" };
+  const batch: TreeImportBatch = { media: [{ ...media, [field]: replacements[field] }] };
+  for (const dryRun of [true, false]) {
+    const result = await send(t, grant, job.importJobId, 2, batch, { dryRun }, `reviewed-media-${field}-${dryRun}`);
+    expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("MEDIA_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before);
+    expect(await send(t, grant, job.importJobId, 2, batch, { dryRun }, `reviewed-media-${field}-${dryRun}`)).toEqual(result);
+    expect(isContextPackEligibleMedia((await snapshot()).media[0])).toBe(true); // Original approved assertion, unchanged.
+  }
+});
+
+test("unreviewed private media refresh remains ineligible and matches dry planning", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  await send(t, grant, job.importJobId, 0, { media: [{ key: "M", title: "Original", url: "https://example.test/a" }] });
+  const before = await t.run(ctx => ctx.db.query("media").collect());
+  const batch: TreeImportBatch = { media: [{ key: "M", title: "Replacement", url: "https://example.test/b", description: "Unreviewed replacement" }] };
+  const dry = await send(t, grant, job.importJobId, 1, batch, { dryRun: true }, "dry-private-media-refresh"); expect(await t.run(ctx => ctx.db.query("media").collect())).toEqual(before);
+  const real = await send(t, grant, job.importJobId, 1, batch); expect(dry.counts).toEqual(real.counts); expect(real.counts.media.updated).toBe(1);
+  const row = (await t.run(ctx => ctx.db.query("media").collect()))[0]; expect(row).toMatchObject({ title: "Replacement", url: "https://example.test/b", privacyLevel: "private", reviewStatus: "unreviewed", rightsStatus: "unknown", aiUseAllowed: false }); expect(isContextPackEligibleMedia(row)).toBe(false);
+});
+
+test.each(["person", "relationship", "fact", "media", "source", "citation", "note"].flatMap(kind => ["deleted", "foreign"].map(mode => ({ kind, mode }))))("stale $kind mappings cannot authorize $mode targets", async ({ kind, mode }) => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  await send(t, grant, job.importJobId, 0, {
+    persons: [{ key: "A", living: false, names: [{ given: "A" }], facts: [{ key: "F", type: "birth", date: { original: "1900" } }] }, { key: "B", living: false, names: [{ given: "B" }] }],
+    sources: ["S", "T"].map(key => ({ key, title: key })), relationships: [{ key: "R", type: "Couple", person1Key: "A", person2Key: "B" }],
+    media: [{ key: "M", title: "Original", personKeys: ["B"] }], citations: [{ key: "C", sourceKey: "S", targets: [{ kind: "person", key: "B" }] }], notes: [{ key: "N", subject: { kind: "person", key: "B" }, text: "Original" }],
+  });
+  const table: Record<string, string> = { person: "persons", relationship: "relationships", fact: "events", media: "media", source: "sources", citation: "citations", note: "notes" };
+  const targetId: any = await t.run(async ctx => { const rows = await (ctx.db as any).query(table[kind]).collect(); return (kind === "person" ? rows.find((row: any) => row.fsId === "A") : kind === "source" ? rows.find((row: any) => row.fsId === "T") : rows[0])._id; });
+  if (mode === "deleted" && kind === "person") await t.mutation(internal.persons.remove, { id: targetId });
+  else await t.run(async ctx => { if (mode === "deleted") await ctx.db.delete(targetId); else await ctx.db.patch(targetId, { vaultOwnerId: "user_other_synthetic_owner" }); });
+  const snapshot = () => t.run(async ctx => { const saved: Record<string, any> = {}; for (const name of [...Object.values(table), "mcpRecordKeys", "citationLinks", "personEvents"]) saved[name] = await (ctx.db as any).query(name).collect(); return saved; }); const before = await snapshot();
+  const keys: Record<string, string> = { person: "A", relationship: "R", fact: "F", media: "M", source: "T", citation: "C", note: "N" };
+  const target: any = { kind, key: keys[kind], ...(kind === "fact" ? { personKey: "A", keyOrigin: "explicit" } : kind === "citation" ? { keyOrigin: "explicit" } : {}) };
+  const batch: TreeImportBatch = {};
+  if (kind !== "note") batch.notes = [{ key: "N2", subject: target, text: "Must not attach" }];
+  if (kind !== "source" && kind !== "citation") batch.citations = [{ key: "C2", sourceKey: "S", targets: [target] }];
+  if (kind === "person") { batch.relationships = [{ key: "R2", type: "Couple", person1Key: "A", person2Key: "B" }]; batch.media = [{ key: "M2", title: "Must not attach", personKeys: ["A"] }]; }
+  if (kind === "source") { batch.media = [{ key: "M2", title: "Must not attach", sourceKey: "T" }]; batch.citations = [{ key: "C2", sourceKey: "T", targets: [{ kind: "person", key: "B" }] }]; }
+  for (const dryRun of [true, false]) {
+    const result = await send(t, grant, job.importJobId, 1, batch, { dryRun }, `stale-target-${kind}-${mode}-${dryRun}`);
+    expect(result.results.length).toBeGreaterThan(0); expect(result.results.every((row: any) => row.status === "failed" && /MISSING_PERSON|MISSING_TARGET|MISSING_SOURCE|LEGACY_IDENTITY_REVIEW_REQUIRED/.test(row.reason))).toBe(true);
+    expect(await snapshot()).toEqual(before); expect(await send(t, grant, job.importJobId, 1, batch, { dryRun }, `stale-target-${kind}-${mode}-${dryRun}`)).toEqual(result); expect(await snapshot()).toEqual(before);
+  }
 });
