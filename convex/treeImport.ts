@@ -337,11 +337,13 @@ async function ownedRow<T extends TableNames>(c: ChunkContext, table: T, id: str
 async function hasRetainedAttachments(c: ChunkContext, kind: "relationship" | "event" | "media" | "note" | "citation", id: string): Promise<boolean> {
   if ([...(c.w.rows?.values() ?? [])].some(row =>
     (row.subject?.kind === kind && row.subject.id === id)
-    || (row.targetType === kind && row.targetId === id))) return true;
+    || (row.targetType === kind && row.targetId === id)
+    || (kind === "media" && row.fromMediaId === id))) return true;
   if (isPlaceholder(id)) return false;
   const attachments = await Promise.all([
     kind === "note" ? Promise.resolve(null) : c.ctx.db.query("notes").withIndex("by_subject", q => q.eq("subject.kind", kind).eq("subject.id", id)).first(),
     kind === "citation" ? Promise.resolve(null) : c.ctx.db.query("citationLinks").withIndex("by_target", q => q.eq("targetType", kind).eq("targetId", id)).first(),
+    kind === "media" ? c.ctx.db.query("sourceContents").withIndex("by_from_media", q => q.eq("fromMediaId", id as Id<"media">)).first() : Promise.resolve(null),
   ]);
   return attachments.some(Boolean);
 }
@@ -1206,7 +1208,7 @@ async function importMedia(c: ChunkContext, item: any): Promise<Omit<ItemResult,
     if (current && content.some(field => !same(previous[field], current[field]))) {
       if (reviewed) fail("MEDIA_REVIEW_REQUIRED", "Changed media content or attribution cannot inherit an earlier privacy, rights or AI-use decision.",
         "Review the replacement with the person before retrying. This media item saved nothing and retained the original review decision.");
-      if (await hasRetainedAttachments(c, "media", saved.id)) fail("MEDIA_ATTRIBUTION_REVIEW_REQUIRED", "Changed media content or attribution cannot inherit retained notes or citation evidence.",
+      if (await hasRetainedAttachments(c, "media", saved.id)) fail("MEDIA_ATTRIBUTION_REVIEW_REQUIRED", "Changed media content or attribution cannot inherit retained notes, citation evidence or source transcriptions.",
         "Review the media and its attachments with the person. This media item saved nothing; its original content and attachments were retained.");
     }
   }

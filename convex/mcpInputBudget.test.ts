@@ -363,3 +363,47 @@ test.each(["reviewedDeceased", "noMedia", "living", "unreviewed", "privateReview
   }
   expect(await f.t.run(async ctx => ({ source: await ctx.db.get(source._id), note: await ctx.db.get(note._id) }))).toEqual(originals);
 });
+
+test.each(["deceasedAccepted", "unlinked", "livingAccepted", "livingProposed", "livingRejected", "foreignPersona", "foreignPerson", "missingPerson", "boundsLinked", "boundsUnlinked", "laterLiving"])("source notes qualify persona-only associations through public callers (%s)", async mode => {
+  const secret = `PERSONA-ONLY-INLINE-SOURCE-NOTES-${mode}`;
+  const f = await importedNotesFixture(mode.startsWith("living"), secret, false);
+  const source = f.rows.sources[0]; const person = f.rows.people.find(row => row.fsId === "P")!;
+  const note = f.rows.notes.find(row => row.subject.kind === "source")!;
+  await f.t.run(async ctx => {
+    await ctx.db.delete(f.rows.media[0]._id);
+    const count = mode.startsWith("bounds") ? FAMILY_HISTORY_MCP_LIMITS.contextRows + 1 : 1;
+    for (let i = 0; i < count; i++) await ctx.db.insert("recordPersonas", {
+      vaultOwnerId: mode === "foreignPersona" ? "synthetic-foreign-persona-owner" : f.principal.subject,
+      sourceId: source._id, personaKey: `source-persona-${i}`, nameAsWritten: "Record name", fields: [],
+      ...(mode === "unlinked" || mode === "boundsUnlinked" ? {} : { personId: person._id }),
+      linkState: mode === "livingProposed" ? "proposed" : mode === "livingRejected" ? "rejected" : "accepted",
+      linkReason: "Synthetic retained link decision", createdAt: i, updatedAt: i,
+    });
+    if (mode === "laterLiving" || mode === "boundsUnlinked") {
+      const partner = f.rows.people.find(row => row.fsId === "Q")!;
+      await ctx.db.patch(partner._id, { living: true });
+      await ctx.db.insert("recordPersonas", { vaultOwnerId: f.principal.subject, sourceId: source._id, personaKey: "later-living-persona", nameAsWritten: "Living record name", fields: [], personId: partner._id, linkState: "accepted", createdAt: 100, updatedAt: 100 });
+    }
+    if (mode === "foreignPerson") await ctx.db.patch(person._id, { vaultOwnerId: "synthetic-foreign-persona-person-owner" });
+    if (mode === "missingPerson") await ctx.db.delete(person._id);
+    for (const table of ["citations", "sourceFacts", "media"] as const) expect(await ctx.db.query(table).collect()).toEqual([]);
+  });
+  // Synthetic retained human-link shapes, not real-user, provider or runtime proof.
+  const snapshot = () => f.t.run(async ctx => ({ source: await ctx.db.get(source._id), note: await ctx.db.get(note._id), personas: await ctx.db.query("recordPersonas").collect() }));
+  const originals = await snapshot(); const visible = mode === "deceasedAccepted" || mode === "unlinked";
+  const sourceResponse = await f.callContext("source", f.ids.source);
+  const noteResponse = await f.callContext("note", String(note._id));
+  for (const response of [sourceResponse, noteResponse]) {
+    expect(response.result.isError).not.toBe(true); expect(response.result.structuredContent.notesWithheld).toBe(!visible);
+  }
+  if (visible) {
+    expect(sourceResponse.result.structuredContent.source.notes).toBe(secret);
+    expect(sourceResponse.result.structuredContent.notes).toEqual([expect.objectContaining({ text: note.text })]);
+    expect(noteResponse.result.structuredContent.note.text).toBe(note.text);
+  } else {
+    expect(sourceResponse.result.structuredContent.source.notes).toBeUndefined(); expect(sourceResponse.result.structuredContent.notes).toEqual([]);
+    expect(noteResponse.result.structuredContent.note).toBeNull();
+    for (const response of [sourceResponse, noteResponse]) { expect(JSON.stringify(response)).not.toContain(secret); expect(JSON.stringify(response)).not.toContain(note.text); }
+  }
+  expect(await snapshot()).toEqual(originals);
+});

@@ -2281,15 +2281,22 @@ test.each(["type", "customType", "date", "place", "value", "description"].flatMa
   }
 });
 
-test.each(["type", "title", "description", "url", "mimeType", "date", "personKeys", "sourceKey"].flatMap(field => ["note", "citation", "both"].map(attachment => ({ field, attachment }))))("unreviewed media $field changes retain original $attachment attribution", async ({ field, attachment }) => {
+test.each(["type", "title", "description", "url", "mimeType", "date", "personKeys", "sourceKey"].flatMap(field => ["note", "citation", "both", "transcription"].map(attachment => ({ field, attachment }))))("unreviewed media $field changes retain original $attachment attribution", async ({ field, attachment }) => {
   const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
   const media = { key: "M", type: "photo" as const, title: "Original", description: "Original detail", url: "https://example.test/original", mimeType: "image/jpeg", date: "1900", personKeys: ["A"], sourceKey: "S1" };
   const target = { kind: "media" as const, key: "M" };
   await send(t, grant, job.importJobId, 0, { persons: ["A", "B"].map(key => ({ key, living: false, names: [{ given: key }] })), sources: ["S1", "S2"].map(key => ({ key, title: key })), media: [media],
-    ...(attachment !== "note" ? { citations: [{ key: "C", sourceKey: "S1", extractedText: "Evidence for original media", targets: [target] }] } : {}),
-    ...(attachment !== "citation" ? { notes: [{ key: "N", text: "Note about original media", subject: target }] } : {}),
+    ...(["citation", "both"].includes(attachment) ? { citations: [{ key: "C", sourceKey: "S1", extractedText: "Evidence for original media", targets: [target] }] } : {}),
+    ...(["note", "both"].includes(attachment) ? { notes: [{ key: "N", text: "Note about original media", subject: target }] } : {}),
   });
-  const snapshot = () => t.run(async ctx => ({ media: await ctx.db.query("media").collect(), notes: await ctx.db.query("notes").collect(), citations: await ctx.db.query("citations").collect(), links: await ctx.db.query("citationLinks").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  if (attachment === "transcription") {
+    const rows = await t.run(async ctx => ({ source: await ctx.db.query("sources").withIndex("by_owner_fsId", q => q.eq("vaultOwnerId", OWNER).eq("fsId", "S1")).unique(), media: (await ctx.db.query("media").collect())[0] }));
+    await t.mutation(internal.mcpFamilyHistory.addSourceContent, { principal: principal(), grantId: grant, operationId: "media-transcription-add", requestHash: "media-transcription-add", input: {
+      sourceId: String(rows.source!._id), contents: [{ contentKey: "media-transcription", kind: "transcription", text: "Verbatim transcription of the original media", fromMediaId: String(rows.media._id), madeBy: { kind: "person" } }],
+    } });
+  }
+  const snapshot = () => t.run(async ctx => ({ media: await ctx.db.query("media").collect(), notes: await ctx.db.query("notes").collect(), citations: await ctx.db.query("citations").collect(), links: await ctx.db.query("citationLinks").collect(), contents: await ctx.db.query("sourceContents").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  if (attachment === "transcription") { expect(before.notes).toEqual([]); expect(before.links).toEqual([]); expect(before.citations).toEqual([]); expect(before.contents).toEqual([expect.objectContaining({ fromMediaId: before.media[0]._id, text: "Verbatim transcription of the original media" })]); }
   expect(before.media[0]).toMatchObject({ privacyLevel: "private", reviewStatus: "unreviewed", rightsStatus: "unknown", aiUseAllowed: false }); expect(isContextPackEligibleMedia(before.media[0])).toBe(false);
   const noop = await send(t, grant, job.importJobId, 1, { media: [media] }); expect(noop.counts.media.unchanged).toBe(1); expect(await snapshot()).toEqual(before);
   const replacements: Record<string, any> = { type: "document", title: "Replacement", description: "Replacement detail", url: "https://example.test/replacement", mimeType: "application/pdf", date: "1901", personKeys: ["B"], sourceKey: "S2" };

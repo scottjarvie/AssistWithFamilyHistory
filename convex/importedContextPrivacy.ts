@@ -41,15 +41,21 @@ export async function canReadImportedNotes(ctx: QueryCtx, owner: string, kind: s
     if (row.sourceId && !await noteContextRow(ctx, owner, "source", String(row.sourceId))) return false;
     refs = row.personIds.map((id: string) => ({ kind: "person", id: String(id) }));
   } else if (kind === "source") {
-    const [citations, facts, media] = await Promise.all([
+    const [citations, facts, media, personas] = await Promise.all([
       ctx.db.query("citations").withIndex("by_source", q => q.eq("sourceId", row._id)).take(limit),
       ctx.db.query("sourceFacts").withIndex("by_source", q => q.eq("sourceId", row._id)).take(limit),
       ctx.db.query("media").withIndex("by_source", q => q.eq("sourceId", row._id)).take(limit),
+      ctx.db.query("recordPersonas").withIndex("by_source", q => q.eq("sourceId", row._id)).take(limit),
     ]);
-    if ([...citations, ...facts, ...media].some(item => !matchesVaultOwner(item.vaultOwnerId, owner))) return false;
+    if ([...citations, ...facts, ...media, ...personas].some(item => !matchesVaultOwner(item.vaultOwnerId, owner))) return false;
+    // Unlinked personas also consume the bound: a truncated list cannot prove
+    // that a later row has no living-person association.
+    if (citations.length + facts.length + media.length + personas.length > state.remaining) return false;
+    state.remaining -= personas.filter(item => !item.personId).length;
     refs = [...citations.map(item => ({ kind: "citation", id: String(item._id) })),
       ...facts.map(item => ({ kind: "person", id: String(item.personId) })),
-      ...media.map(item => ({ kind: "media", id: String(item._id) }))];
+      ...media.map(item => ({ kind: "media", id: String(item._id) })),
+      ...personas.flatMap(item => item.personId ? [{ kind: "person", id: String(item.personId) }] : [])];
   } else if (kind === "citation") {
     if (!await noteContextRow(ctx, owner, "source", String(row.sourceId))) return false;
     const [links, facts] = await Promise.all([

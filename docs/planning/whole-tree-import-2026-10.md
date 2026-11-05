@@ -716,3 +716,20 @@ or executed tests. Source/whitespace review only; actual775 HOST, exclusive FH
 SITE and a qualified receiver remain required for runtime checks. Convex
 changes in the cumulative candidate require deployment; none is deployed.
 No UI route/layout change, browser/user/provider proof, push or live claim.
+
+2026-11-05 retained transcription/persona privacy repair (local only): media
+refresh now treats sourceContents.fromMediaId as retained attribution, using a
+new by_from_media index and the same refusal/rollback path as notes/citations.
+Dry planning consults the same references. An unchanged media replay remains
+available; changing content cannot silently reassign its retained transcription.
+Source-note privacy also follows recordPersonas.personId, regardless of link
+state, checking ownership/existence/living state within the same shared bound.
+Unlinked persona rows count toward that bound, so truncation cannot prove safety.
+Added eight media-field/transcription cases through the existing content writer
+and eleven persona-only public source/direct-note cases with no citations,
+source facts or media; positives, foreign/stale links, later living rows and
+linked/unlinked bound exhaustion are included. All 19 cases are UNRUN, total490
+authored new cases UNRUN. Synthetic human-shaped provenance is not actual user
+proof. Only source/whitespace checks ran; actual775 admission and Tier2 proof
+remain outstanding. The new Convex index requires deployment; none occurred.
+No UI route/layout, provider/database, push, live or shipping claim is made.

@@ -805,7 +805,8 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_owner", ["vaultOwnerId"])
-    .index("by_source", ["sourceId"]),
+    .index("by_source", ["sourceId"])
+    .index("by_from_media", ["fromMediaId"]),
 
   /**
    * RECORD PERSONAS
