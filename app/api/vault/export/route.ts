@@ -15,6 +15,8 @@ import { EXPORT_TABLES } from "@/lib/vault/exportTables";
 import { getAuthedConvexClient, isConvexConfigured } from "@/lib/convex/server";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
+import { createExportStream } from "@/lib/vault/exportStream";
+
 export const dynamic = "force-dynamic";
 
 export async function GET() {
@@ -26,42 +28,11 @@ export async function GET() {
     return new Response(JSON.stringify({ error: "sign_in_required" }), { status: 401, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
   }
   const client = await getAuthedConvexClient({ requireAuthentication: access.mode === "user" });
-  const encoder = new TextEncoder();
   const exportedAt = new Date().toISOString();
 
-  const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      const write = (text: string) => controller.enqueue(encoder.encode(text));
-      try {
-        write(`{"product":"Assist With Family History","format":"awfh-export-1","exportedAt":${JSON.stringify(exportedAt)},`);
-        write(`"note":"Every record in your private workspace, with who made it and when. Files are listed as records; original files are not included.","tables":{`);
-        for (const [tableIndex, table] of EXPORT_TABLES.entries()) {
-          write(`${tableIndex ? "," : ""}${JSON.stringify(table)}:[`);
-          let cursor: string | null = null;
-          let first = true;
-          do {
-            const page: { rows: unknown[]; cursor: string | null } = await client.action(api.yourData.exportPage, {
-              vaultOwnerId: access.vaultOwnerId,
-              table,
-              cursor,
-            });
-            for (const row of page.rows) {
-              write(`${first ? "" : ","}${JSON.stringify(row)}`);
-              first = false;
-            }
-            cursor = page.cursor;
-          } while (cursor);
-          write("]");
-        }
-        write("}}");
-        controller.close();
-      } catch {
-        // A half-written file must not look complete: end it unparseable.
-        write(`\n{"error":"export_interrupted"}`);
-        controller.close();
-      }
-    },
-  });
+  const stream = createExportStream(EXPORT_TABLES, exportedAt, (table, cursor) =>
+    client.action(api.yourData.exportPage, { vaultOwnerId: access.vaultOwnerId, table, cursor }),
+  );
 
   const day = exportedAt.slice(0, 10);
   return new Response(stream, {

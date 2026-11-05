@@ -8,6 +8,7 @@ import schema from "./schema";
 import { internal } from "./_generated/api";
 import { EXPORT_TABLES } from "../lib/vault/exportTables";
 import { availableLibraryPrompts, LIBRARY_PROMPTS } from "../lib/library/prompts";
+import { seedGrant } from "../lib/mcp/testSupport";
 
 const modules = import.meta.glob("./**/*.ts");
 const OWNER = "user_your_data_owner_AAAAAAAAAA";
@@ -41,6 +42,24 @@ async function seed(t: ReturnType<typeof convexTest>, owner: string, people: num
 }
 
 describe("your data", () => {
+  test("stats share the connection centre's expiry and refusal rules", async () => {
+    const t = convexTest(schema, modules);
+    await seedGrant(t, { vaultOwnerId: OWNER, clientId: "live", expiresAt: null });
+    await seedGrant(t, { vaultOwnerId: OWNER, clientId: "expired", expiresAt: Date.now() - 1 });
+    await seedGrant(t, { vaultOwnerId: OWNER, clientId: "refused", expiresAt: null });
+    await seedGrant(t, { vaultOwnerId: OWNER, clientId: "refused", status: "revoked" });
+    const legacy = await seedGrant(t, { vaultOwnerId: OWNER, clientId: "legacy", status: "expired" });
+    await t.run(async (ctx) => {
+      const issuedAt = Date.now() - 100 * 86_400_000;
+      const expiresAt = issuedAt + 90 * 86_400_000;
+      await ctx.db.patch(legacy as import("./_generated/dataModel").Id<"mcpGrants">, {
+        issuedAt, requestedAt: issuedAt, consentedAt: issuedAt, expiresAt,
+        consentSnapshot: JSON.stringify({ approvedBy: "sign_in", shownAt: issuedAt, expiresAt }),
+      });
+    });
+    const stats = await t.query(internal.yourData.getYourStatsInternal, { vaultOwnerId: OWNER });
+    expect(stats.ai.activeConnections).toBe(2);
+  });
   test("stats count only the owner's records", async () => {
     const t = convexTest(schema, modules);
     await seed(t, OWNER, 3);
