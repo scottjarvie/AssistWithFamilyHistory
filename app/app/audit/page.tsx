@@ -16,5 +16,5 @@ export default async function VaultAuditPage({searchParams}:{searchParams:Promis
   try {audit=await client.action(api.vaultReads.getVaultAudit,{vaultOwnerId});}
   catch(error){const issue=getConvexRuntimeIssue(error);return <div className="p-6 sm:p-8"><VaultStateCard title={issue.title} description={issue.description}/></div>;}
   const params=await searchParams;
-  return <AuditWorkspace summary={projectAuditSummary(audit)} preferenceKey={`awf.collection.audit.${vaultOwnerId}`} initialView={params.view} initialQuery={params.q}/>;
+  return <AuditWorkspace key={vaultOwnerId} summary={projectAuditSummary(audit)} preferenceKey={`awf.collection.audit.${vaultOwnerId}`} initialView={params.view} initialQuery={params.q}/>;
 }

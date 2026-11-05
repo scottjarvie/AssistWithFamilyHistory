@@ -121,3 +121,6 @@ design-council/*/review-refinements/
 # Audit instrument capture tranche.
 design-council/*/audit-instruments/
 design-council/*/audit-baseline/
+
+# Audit refinements after exact-head Opus review.
+design-council/*/audit-review-fixes/

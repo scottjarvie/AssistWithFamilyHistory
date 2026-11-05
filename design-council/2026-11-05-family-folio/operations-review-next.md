@@ -1,6 +1,6 @@
-# Next lead pass after Opus27bee8e
+# Prior lead pass after Opus27bee8e (resolved030963f)
 
-2026-11-05. The complete read-only review is reviews/opus-operations-27bee8e.md. Sol leads/codes, Opus5.5 final AI tastemaker. No new delegate for small findings: implement these, verify/capture/full check, and include them in the next meaningful Audit review. Local only; AWF-0071 doing, whole-Card audit not audited. No formal round2/site-wide acceptance.
+2026-11-05. All required findings below are resolved in Opus030963f. Current next route: audit-review-next.md, then settings-next-route.md. The complete read-only review is reviews/opus-operations-27bee8e.md. Sol leads/codes, Opus5.5 final AI tastemaker. No new delegate for small findings: implement these, verify/capture/full check, and include them in the next meaningful Audit review. Local only; AWF-0071 doing, whole-Card audit not audited. No formal round2/site-wide acceptance.
 
 ## Required before kit reuse
 

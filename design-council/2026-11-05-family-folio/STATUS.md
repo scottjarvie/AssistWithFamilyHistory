@@ -1,4 +1,4 @@
-[Newest-first gallery](gallery.html) · Audit implemented:57/57 full steps,17 browser/controller checks,23 new captures;411-image gallery updated. Frozen-head Opus review next. All-page goal active; local only.
+[Newest-first gallery](gallery.html) · Audit refinements:57/57 full steps,60 browser checks,22 fresh captures pass.433-image gallery rebuild queued. Opus approves preservation/privacy and prior Queue/Operations fixes; next meaningful review with Settings. All-page goal active; local only.
 
 
 
@@ -123,3 +123,9 @@ Pure Audit projection foundation now lives in lib/audit/records.ts, outside Conv
 
 
 Audit instruments tranche: six tests validate actual16-metric count/list parity, minimal owner-safe DTOs, strict new-detail authorization in both legacy modes, pagination and HTTP validation/cache behavior.10 UI +5 intercepted controller +2 Operations fit checks pass;21 candidate/2 reconstructed captures pass. First full run correctly caught missing protected-route registration; added the new read route to the existing middleware/check registry, then57/57 passed on Node22 in51s (`/tmp/awf-audit-full-verify.log`). No configured backend or production data used.411-image portable/inline gallery includes all388 previous images. Exact-head Opus review pending; formal round2/page-wide acceptance and separate audit remain open. AWF-0071 doing, no Cards/WOs completed. All local only.
+
+
+Exact-head Opus review complete at030963f4d1b9bc098846a0ae5553fe1f05fda426: all prior required Queue/Operations/kit/handoff findings resolved. Audit privacy/data path/preservation approved; required smaller drawer, count/noun grammar and instrument visuals. Full receipt reviews/opus-audit-030963f.md. Lead corrections are in progress (audit-review-next.md); no new delegate for small findings. Next meaningful review is Settings matrices with these corrections included. Gallery411 remains the reviewed030963f image set until fresh captures pass.
+
+
+Final lead correction tranche: A-R1–A-R3 and all Audit should-fixes are implemented and verified. Source fixture consistency corrected (two linked citations belong to the synthetic person with two sources), targeted probe/all22 captures repeated, then57/57 full verification passes Node22 in60s.60 browser/controller checks pass, including real Next navigation, same-route saved search, multi-metric save/remove, retry/sign-in,320/390 compact rows and existing collection/Operations regressions.433-image gallery preserves all411 prior images. Full code review of these lead corrections joins the next meaningful Settings batch; no new tiny-fix delegate. AWF-0071 doing, audit not audited, no Cards/WOs complete. No push/PR/merge/deploy.

@@ -10,5 +10,5 @@ export type AuditMetric = keyof typeof auditMetricLabels;
 export const auditMetrics = Object.keys(auditMetricLabels) as AuditMetric[];
 export function isAuditMetric(value:string):value is AuditMetric {return Object.hasOwn(auditMetricLabels,value);}
 export type AuditRecord = {id:string;title:string;kind:string;detail:string;href:string|null;destination:string|null};
-export type AuditRecordPage = {metric:AuditMetric;total:number;rows:AuditRecord[];nextOffset:number|null};
+export type AuditRecordPage = {metric:AuditMetric;total:number;rows:AuditRecord[];nextOffset:number|null;denominator?:{metric:"people";total:number}};
 export const auditRecordPageSize=50;

@@ -49,22 +49,24 @@ export function buildAuditRecordPage(snapshot:AuditRecordSnapshot,peopleInput:Au
   if(!citationDestinations.has(String(fact.citationId)))citationDestinations.set(String(fact.citationId),destination);
  }
  const row=(id:string,title:string,kind:string,detail:string,destination:Destination|null=null):AuditRecord=>({id,title,kind,detail,href:destination?.href||null,destination:destination?.label||null});
- const personRows=(rows:AuditPersonInput[])=>rows.map(p=>row(String(p._id),p.displayName,"Person",`${p.storyWorkflow.replace(/_/g," ")} · ${p.stats.sources} sources · ${p.contextCoverage.count} context · ${p.stats.stories} stories`,{href:`/app/people/${encodeURIComponent(p.routeId)}`,label:`Open ${p.displayName}`}));
+ const plural=(count:number,singular:string,pluralForm=singular+"s")=>`${count} ${count===1?singular:pluralForm}`;
+ const human=(value:string)=>value.replaceAll("_"," ").replace(/^./,letter=>letter.toUpperCase());
+ const personRows=(rows:AuditPersonInput[])=>rows.map(p=>row(String(p._id),p.displayName,"Person",`${human(p.storyWorkflow)} · ${plural(p.stats.sources,"source")} · ${plural(p.contextCoverage.count,"context report")} · ${plural(p.stats.stories,"story","stories")}`,{href:`/app/people/${encodeURIComponent(p.routeId)}`,label:`Open ${p.displayName}`}));
  let rows:AuditRecord[];
  switch(metric){
   case "people":rows=personRows(people);break;
   case "peopleWithoutSources":rows=personRows(people.filter(p=>p.stats.sources===0));break;
   case "peopleWithoutContext":rows=personRows(people.filter(p=>p.contextCoverage.count===0));break;
   case "peopleWithoutStories":rows=personRows(people.filter(p=>p.stats.stories===0));break;
-  case "sources":rows=sources.map(s=>row(String(s._id),s.title,"Source",s.type.replace(/_/g," "),sourceDestinations.get(String(s._id))||null));break;
+  case "sources":rows=sources.map(s=>row(String(s._id),s.title,"Source",human(s.type),sourceDestinations.get(String(s._id))||null));break;
   case "citations":rows=citations.map(c=>row(String(c._id),sourceMap.get(String(c.sourceId))?.title||"Citation · source unavailable","Citation",`${c.isEvidence?"Recorded evidence":"Research conclusion"} · ${c.confidence.replace(/_/g," ")} confidence`,citationDestinations.get(String(c._id))||null));break;
   case "historicalContext":rows=context.map(c=>row(String(c._id),c.title,"Context report",`${c.timePeriod.startYear}–${c.timePeriod.endYear} · ${c.topic.replace(/_/g," ")}`,c.placeId?placeDestination(String(c.placeId),"context"):null));break;
-  case "stories":case "publishedStories":rows=stories.filter(s=>metric==="stories"||s.status==="published").map(s=>row(String(s._id),s.title,"Story",s.status,{href:`/app/stories/${encodeURIComponent(String(s._id))}`,label:"Open private story record"}));break;
+  case "stories":case "publishedStories":rows=stories.filter(s=>metric==="stories"||s.status==="published").map(s=>row(String(s._id),s.title,"Story",human(s.status),{href:`/app/stories/${encodeURIComponent(String(s._id))}`,label:"Open private story record"}));break;
   case "placesWithoutContext":{const covered=new Set(context.filter(c=>c.placeId).map(c=>String(c.placeId)));rows=places.filter(p=>!covered.has(String(p._id))).map(p=>row(String(p._id),p.fullName,"Place","No linked context report",placeDestination(String(p._id),"context")));break;}
-  case "openResearchTasks":rows=tasks.filter(t=>t.status!=="done").map(t=>row(String(t._id),t.title,"Research task",`${t.status.replace(/_/g," ")} · ${t.priority} priority`,t.personId?personDestination(String(t.personId),"research")||{href:"/app/research",label:"Open research collection"}:{href:"/app/research",label:"Open research collection"}));break;
+  case "openResearchTasks":rows=tasks.filter(t=>t.status!=="done").map(t=>row(String(t._id),t.title,"Research task",`${human(t.status)} · ${t.priority} priority`,t.personId?personDestination(String(t.personId),"research")||{href:"/app/research",label:"Open research collection"}:{href:"/app/research",label:"Open research collection"}));break;
   default:rows=personRows(people.filter(p=>p.storyWorkflow===metric.slice("workflow:".length)));
  }
  rows.sort((a,b)=>a.title.localeCompare(b.title,"en",{numeric:true})||a.id.localeCompare(b.id));
  const end=offset+auditRecordPageSize;
- return {metric,total:rows.length,rows:rows.slice(offset,end),nextOffset:end<rows.length?end:null};
+ return {metric,total:rows.length,rows:rows.slice(offset,end),nextOffset:end<rows.length?end:null,...(metric.startsWith("workflow:")||["peopleWithoutSources","peopleWithoutContext","peopleWithoutStories"].includes(metric)?{denominator:{metric:"people" as const,total:people.length}}:{})};
 }

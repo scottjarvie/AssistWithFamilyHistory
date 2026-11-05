@@ -1,6 +1,6 @@
-# Next bounded route: record-backed Audit instruments
+# Audit instrument intake (superseded by implementation030963f)
 
-2026-11-05. Read-only intake, not implementation/acceptance. The direct all-page goal authorizes this work after Operations verification. No new Work Order is a gate; do not wait for Scott overnight.
+2026-11-05. Historical read-only intake. Implemented at030963f; see reviews/opus-audit-030963f.md and audit-review-next.md for current lead corrections. Not site-wide acceptance. The direct all-page goal authorizes this work after Operations verification. No new Work Order is a gate; do not wait for Scott overnight.
 
 ## Existing truth
 

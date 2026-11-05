@@ -20,6 +20,10 @@ export async function GET(request: NextRequest) {
     // Never return the legacy audit object: it includes raw recentContext.
     return NextResponse.json({success:true,page:result.records}, {headers});
   } catch (error) {
+    const message=error instanceof Error?error.message:"";
+    if (/Trust boundary denied|authenticat|Clerk.*configured|Convex token unavailable/i.test(message)) {
+      return NextResponse.json({success:false,error:"Sign in with the vault owner account. Audit record details require an authenticated vault session."}, {status:401,headers});
+    }
     const issue = getConvexRuntimeIssue(error);
     return NextResponse.json({success:false,error:issue.title,details:issue.description}, {status:issue.statusCode,headers});
   }

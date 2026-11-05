@@ -23,7 +23,7 @@ function snapshot():AuditRecordSnapshot {return {
 
 test("Every Audit headline/gap/workflow returns its actual matching owner records and a minimal projection",()=>{
  const expected:Record<AuditMetric,number>={people:2,sources:2,citations:3,historicalContext:2,stories:2,publishedStories:1,peopleWithoutSources:1,peopleWithoutContext:1,peopleWithoutStories:1,placesWithoutContext:1,openResearchTasks:3,"workflow:needs_genealogy_evidence":1,"workflow:needs_context_research":0,"workflow:ready_to_draft":0,"workflow:ready_to_review":1,"workflow:published":0};
- for(const metric of auditMetrics){const page=buildAuditRecordPage(snapshot(),people,owner,metric);assert.equal(page.total,expected[metric],metric);assert.equal(page.rows.length,expected[metric],metric);assert.equal(page.nextOffset,null);assert.doesNotMatch(JSON.stringify(page),/PRIVATE_/);for(const row of page.rows)assert.deepEqual(Object.keys(row),["id","title","kind","detail","href","destination"]);}
+ for(const metric of auditMetrics){const page=buildAuditRecordPage(snapshot(),people,owner,metric);assert.equal(page.total,expected[metric],metric);assert.equal(page.rows.length,expected[metric],metric);assert.equal(page.nextOffset,null);if(metric.startsWith("workflow:")||metric.startsWith("peopleWithout"))assert.deepEqual(page.denominator,{metric:"people",total:2});assert.doesNotMatch(JSON.stringify(page),/PRIVATE_/);for(const row of page.rows)assert.deepEqual(Object.keys(row),["id","title","kind","detail","href","destination"]);}
 });
 
 test("Audit source/citation/context destinations use known owned references and never raw URLs or foreign identities",()=>{
@@ -35,6 +35,7 @@ test("Audit source/citation/context destinations use known owned references and 
  assert.equal(citations.find(r=>r.id==="c3")?.title,"Citation · source unavailable");assert.equal(citations.find(r=>r.id==="c3")?.href,null);
  const contexts=buildAuditRecordPage(input,people,owner,"historicalContext").rows;
  assert.equal(contexts.find(r=>r.id==="hc1")?.href,"/app/places/p1#record-section-context");assert.equal(contexts.find(r=>r.id==="hc2")?.href,null);
+ assert.match(buildAuditRecordPage(input,people,owner,"people").rows.find(r=>r.id==="a2")!.detail,/1 context report · 1 story$/);
  const tasks=buildAuditRecordPage(input,people,owner,"openResearchTasks").rows;
  assert.equal(tasks.find(r=>r.id==="t3")?.href,"/app/research");
  input.events=[];assert.equal(buildAuditRecordPage(input,people,owner,"sources").rows.find(r=>r.id==="s1")?.href,null);
