@@ -1,0 +1,224 @@
+{
+  "baseURL": "http://localhost:3457",
+  "timezone": "America/Phoenix",
+  "defaultVariants": [
+    "desktop-light",
+    "mobile-light"
+  ],
+  "shots": [
+    {
+      "name": "place-record",
+      "path": "/design-council-preview?surface=place-record",
+      "capabilities": [
+        {
+          "can": "retain How To Use This Place",
+          "text": "How To Use This Place"
+        }
+      ]
+    },
+    {
+      "name": "place-record-dark",
+      "path": "/design-council-preview?surface=place-record&theme=dark",
+      "capabilities": [
+        {
+          "can": "retain Evidence stream",
+          "text": "Evidence stream"
+        }
+      ]
+    },
+    {
+      "name": "place-research",
+      "path": "/design-council-preview?surface=place-record#record-section-research",
+      "capabilities": [
+        {
+          "can": "retain Add Context Report",
+          "text": "Add Context Report"
+        }
+      ]
+    },
+    {
+      "name": "place-research-dark",
+      "path": "/design-council-preview?surface=place-record&theme=dark#record-section-research",
+      "capabilities": [
+        {
+          "can": "retain Add Context Report",
+          "text": "Add Context Report"
+        }
+      ]
+    },
+    {
+      "name": "place-context",
+      "path": "/design-council-preview?surface=place-record#record-section-context",
+      "capabilities": [
+        {
+          "can": "retain Historical Context Slots",
+          "text": "Historical Context Slots"
+        }
+      ]
+    },
+    {
+      "name": "place-empty",
+      "path": "/design-council-preview?surface=place-empty",
+      "capabilities": [
+        {
+          "can": "retain No place research entries yet.",
+          "text": "No place research entries yet."
+        }
+      ]
+    },
+    {
+      "name": "story-record",
+      "path": "/design-council-preview?surface=story-record",
+      "capabilities": [
+        {
+          "can": "retain Saved narrative",
+          "text": "Saved narrative"
+        }
+      ]
+    },
+    {
+      "name": "story-record-dark",
+      "path": "/design-council-preview?surface=story-record&theme=dark",
+      "capabilities": [
+        {
+          "can": "retain Saved narrative",
+          "text": "Saved narrative"
+        }
+      ]
+    },
+    {
+      "name": "story-edit",
+      "path": "/design-council-preview?surface=story-record#record-section-draft",
+      "capabilities": [
+        {
+          "can": "retain Editable Markdown Draft",
+          "text": "Editable Markdown Draft"
+        }
+      ]
+    },
+    {
+      "name": "story-review",
+      "path": "/design-council-preview?surface=story-record#record-section-review",
+      "capabilities": [
+        {
+          "can": "retain Publish Gate",
+          "text": "Publish Gate"
+        }
+      ]
+    },
+    {
+      "name": "story-review-dark",
+      "path": "/design-council-preview?surface=story-record&theme=dark#record-section-review",
+      "capabilities": [
+        {
+          "can": "retain Publish Gate",
+          "text": "Publish Gate"
+        }
+      ]
+    },
+    {
+      "name": "story-context",
+      "path": "/design-council-preview?surface=story-record#record-section-context",
+      "capabilities": [
+        {
+          "can": "retain Research Pack Provenance",
+          "text": "Research Pack Provenance"
+        }
+      ]
+    },
+    {
+      "name": "story-evidence",
+      "path": "/design-council-preview?surface=story-record#record-section-sources",
+      "capabilities": [
+        {
+          "can": "retain Grounding Evidence",
+          "text": "Grounding Evidence"
+        }
+      ]
+    },
+    {
+      "name": "story-history",
+      "path": "/design-council-preview?surface=story-record#record-section-history",
+      "capabilities": [
+        {
+          "can": "retain Review History",
+          "text": "Review History"
+        }
+      ]
+    },
+    {
+      "name": "story-unlinked",
+      "path": "/design-council-preview?surface=story-unlinked#record-section-review",
+      "capabilities": [
+        {
+          "can": "retain Publish Gate",
+          "text": "Publish Gate"
+        }
+      ]
+    },
+    {
+      "name": "person",
+      "path": "/design-council-preview?surface=person",
+      "capabilities": [
+        {
+          "can": "open every counted section",
+          "selector": "div[role=\"tablist\"][aria-label=\"Record sections\"]"
+        },
+        {
+          "can": "compare source-backed candidates",
+          "selector": "a[href=\"#record-section-sources\"]"
+        },
+        {
+          "can": "read earlier entries",
+          "text": "earlier entries"
+        },
+        {
+          "can": "export private context pack",
+          "text": "Download Context Pack"
+        }
+      ]
+    },
+    {
+      "name": "person-dark",
+      "path": "/design-council-preview?surface=person&theme=dark"
+    },
+    {
+      "name": "person-research-dark",
+      "path": "/design-council-preview?surface=person&theme=dark",
+      "actions": [
+        {
+          "click": "button[role=\"tab\"]:has-text(\"Research\")"
+        }
+      ]
+    },
+    {
+      "name": "person-memories-dark",
+      "path": "/design-council-preview?surface=person&theme=dark",
+      "actions": [
+        {
+          "click": "button[role=\"tab\"]:has-text(\"Memories\")"
+        }
+      ]
+    },
+    {
+      "name": "story-empty-history-dark",
+      "path": "/design-council-preview?surface=story-unlinked&theme=dark#record-section-history",
+      "capabilities": [
+        {
+          "can": "read the empty history state",
+          "text": "No review activity yet"
+        }
+      ]
+    },
+    {
+      "name": "story-capped",
+      "path": "/design-council-preview?surface=story-capped#record-section-sources",
+      "capabilities": [
+        {
+          "can": "see returned citation caps",
+          "text": "first 3 returned"
+        }
+      ]
+    }
+  ]
+}

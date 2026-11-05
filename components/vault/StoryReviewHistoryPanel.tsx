@@ -31,14 +31,6 @@ const eventLabels: Record<StoryReviewEvent["eventType"], string> = {
   draft_edit: "Draft edit",
 };
 
-const eventTone: Record<StoryReviewEvent["eventType"], string> = {
-  publish_preview: "border-primary/30 bg-primary/5 text-foreground",
-  status_change: "border-border bg-muted text-foreground",
-  publish_confirmation: "border-evidence/30 bg-evidence-surface text-evidence",
-  assignment: "border-annotation/30 bg-annotation-surface text-annotation",
-  draft_edit: "border-border bg-card text-foreground",
-};
-
 function describeEvent(event: StoryReviewEvent) {
   if (event.eventType === "publish_confirmation") return "Public publish confirmed by trusted publisher.";
   if (event.eventType === "publish_preview") return "Publish blockers, warnings, and provenance were captured.";
@@ -100,18 +92,18 @@ export function StoryReviewHistoryPanel({ events, initialLimit }: { events: Stor
         />
       ) : (
         visibleEvents.map((event) => (
-          <div key={String(event._id)} className={`border px-4 py-4 ${eventTone[event.eventType]}`}>
+          <div key={String(event._id)} className="border-b border-border bg-card px-0 py-4 last:border-0">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <p className="font-medium">{eventLabels[event.eventType]}</p>
+                <p className="flex items-center gap-2 text-sm font-semibold"><SectionGlyph kind={event.eventType==="draft_edit"?"draft":"review"}/>{eventLabels[event.eventType]}</p>
                 <p className="mt-1 text-sm opacity-80">{describeEvent(event)}</p>
               </div>
-              <p className="text-xs uppercase tracking-[0.14em] opacity-70">
+              <p className="text-xs text-muted-foreground">
                 {event.createdAt?<UtcDate value={event.createdAt} withTime/>:"Unknown time"}
               </p>
             </div>
             <div className="mt-3 flex flex-wrap gap-2 text-xs opacity-80">
-              <span className="bg-card/70 px-2 py-1">actor: {event.actorName || event.actorRole}</span>
+              <span className="rounded-full border border-border px-2 py-1">Actor: {event.actorName || event.actorRole.replace(/_/g," ")}</span>
               {event.reviewerName ? <span className="bg-card/70 px-2 py-1">reviewer: {event.reviewerName}</span> : null}
               {typeof event.readinessScore === "number" ? <span className="bg-card/70 px-2 py-1">score: {event.readinessScore}%</span> : null}
               {typeof event.blockerCount === "number" ? <span className="bg-card/70 px-2 py-1">blockers: {event.blockerCount}</span> : null}
@@ -134,7 +126,7 @@ export function StoryReviewHistoryPanel({ events, initialLimit }: { events: Stor
           </div>
         ))
       )}
-      {filteredEvents.length>visibleEvents.length&&<Button variant="outline" className="min-h-11" onClick={()=>setShowAll(true)}>{filteredEvents.length-visibleEvents.length} earlier entries · Show all</Button>}
+      {filteredEvents.length>visibleEvents.length&&<Button variant="outline" className="min-h-11" onClick={()=>setShowAll(true)}>{filteredEvents.length-visibleEvents.length} earlier {filteredEvents.length-visibleEvents.length===1?"entry":"entries"} · Show all</Button>}
     </div>
   );
 }

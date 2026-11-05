@@ -104,3 +104,6 @@ design-council/*/.gallery-preview/
 
 # Place/Story record capture tranche, separate from formal scoring.
 design-council/*/place-story-records/
+
+# Lead fixes from Place/Story exact-head review.
+design-council/*/record-review-fixes/

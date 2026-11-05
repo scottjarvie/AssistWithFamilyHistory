@@ -1,22 +1,25 @@
 {
-  "checkedAt": "2026-11-05T11:32:52.988Z",
+  "checkedAt": "2026-11-05T11:54:23.290Z",
   "checks": [
     "Place action opens intake and switching sections preserves an unfinished context report",
     "Place context retains privacy, review, AI-use, category claims and explicit fixture save guard",
     "Place research pointer opens all dated log entries with truthful attribution and actual groups",
     "Place keeps historical dates, full context and linked media separate from the operational stream",
-    "Empty Place sections retain real guidance and zero counts",
-    "Story opens a full saved reading view with authorship, model caution, version truth and readable blocked-publish label",
+    "Empty Place sections retain guidance and honest zero counts without a zero-result link",
+    "Story keeps honest source provenance, attention counts, no fake Edit count and seven fully fitting desktop tabs",
     "Story editing survives section changes; every publish/review safeguard remains reachable and preview writes are disabled",
     "Story keeps source sets, citation counts and provenance distinct from narrative claims",
     "Story context retains attached-versus-available distinction and background-context warning",
     "Story life section retains every relationship, historical event, place and memory module",
     "Story stream shows all earlier events and filters every stored kind including draft edits",
-    "Unlinked Story retains an honest identity and blocked publication",
-    "320px dark place-record: Contents, pinned All, deep links and visible section top; readable controls and no overflow",
-    "320px dark story-record: Contents, pinned All, deep links and visible section top; readable controls and no overflow",
-    "390px dark place-record: Contents, pinned All, deep links and visible section top; readable controls and no overflow",
-    "390px dark story-record: Contents, pinned All, deep links and visible section top; readable controls and no overflow"
+    "Unlinked Story retains an honest identity, unavailable coverage and blocked publication",
+    "Capped Story counts disclose returned limits and mark only source sets matching recorded citation IDs",
+    "320px dark place-record: active tab stays in the scroll viewport, deep links and section top are visible, controls readable",
+    "320px dark story-record: active tab stays in the scroll viewport, deep links and section top are visible, controls readable",
+    "320px phone keeps the whole-draft sources disclosure and an explicit editor preview toggle",
+    "390px dark place-record: active tab stays in the scroll viewport, deep links and section top are visible, controls readable",
+    "390px dark story-record: active tab stays in the scroll viewport, deep links and section top are visible, controls readable",
+    "390px phone keeps the whole-draft sources disclosure and an explicit editor preview toggle"
   ],
   "errors": [],
   "mutations": []

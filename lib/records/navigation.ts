@@ -13,8 +13,10 @@ export function navigateRecord(fragment:string,replace=false) {
   window.history[replace?"replaceState":"pushState"](window.history.state,"",url);
   notify();
 }
-export function recordSectionFromFragment(fragment:string) {
-  if(fragment.startsWith("record-stream")||fragment==="record-context")return "overview";
-  if(fragment.startsWith("record-source-facts"))return "sources";
+export type RecordAlias={fragment:string;section:string;prefix?:boolean};
+export function recordSectionFromFragment(fragment:string,aliases:readonly RecordAlias[]=[]) {
+  if(fragment.startsWith("record-stream"))return "overview";
+  const alias=aliases.find(alias=>alias.prefix?fragment.startsWith(alias.fragment):fragment===alias.fragment);
+  if(alias)return alias.section;
   return fragment.startsWith("record-section-")?fragment.slice("record-section-".length):"overview";
 }

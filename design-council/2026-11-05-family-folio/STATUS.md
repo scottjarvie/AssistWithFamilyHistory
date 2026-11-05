@@ -1,4 +1,4 @@
-[Newest-first gallery](gallery.html) · Place/Story records:16 browser checks,16 Person regressions,30 captures and4 reconstructed comparisons pass. 57/57 full checks passed; exact-head review next, all-page goal active.
+[Newest-first gallery](gallery.html) · Record reader/kit fixes:57/57 full checks,19 Place/Story +16 Person checks,42 captures and248-image gallery checks pass. All-page goal active; local only.
 
 
 
@@ -81,3 +81,7 @@ Final follow-up receipt: **57/57** full steps passed, Node22,51s; final38-captur
 Dossier/sections now cover both existing Place and Story routes. Every original field/action/gate has a destination in record-preservation.md. Story adds the calm saved reading view and keeps complete editing/review/publication/assignment contracts. Place retains full context intake and one dated research stream. Explicit history/status client projections and semantic Prose/form controls retain the privacy boundary.16 new-record checks and16 Person regressions pass;30 candidate captures and4 reconstructed original comparisons pass. Final shared regression, full check and exact-head Opus review are next. Local only, no all-page clearance/audit completion.
 
 Frozen Place/Story receipt: **57/57** full verification passed, Node22,52s (`/tmp/awf-place-story-full-verify.log`);16 Place/Story checks,16 Person regressions and18 cross-page checks passed with zero errors/API writes.30 fresh candidate and4 reconstructed captures pass.206-image gallery lightbox/newest-first/arrows/Escape checks pass, clean HTML preview and inline display completed. Exact-head Opus review next.
+
+Opus0bafa4f confirms all earlier Person fixes and every Place/Story field/action. Required shared-kit and honest source-margin corrections are implemented by the lead, with19 new-record/16 Person checks passing. Fresh42 captures/full follow-up verification and gallery are being finalized. Detailed review and no-removal audit are in reviews/opus-place-story-0bafa4f.md and rounds.md. AWF-0072 is separate backlog intake for pre-existing publish-readiness citation accounting. No site-wide acceptance; AWF-0071 doing, audit not audited; local only.
+
+Final lead-fix receipt: **57/57** full steps passed, Node22,54s (`/tmp/awf-record-reader-review-full-verify.log`).19 Place/Story and16 Person checks,42 captures and248-image gallery navigation pass; HTML preview clean and gallery shown inline. Lead corrections await the next meaningful cross-model review with Queue. Latest work is local only. AWF-0071 doing/audit not audited; AWF-0072 backlog. No Card/Work Order completed, no all-page acceptance.

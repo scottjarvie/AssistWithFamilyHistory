@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Eye, EyeOff, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -43,7 +43,11 @@ export function StoryEditorForm({
   const [content, setContent] = useState(story.content);
   const [tags, setTags] = useState((story.tags || []).join(", "));
   const [saving, setSaving] = useState(false);
-  const [showPreview, setShowPreview] = useState(true);
+  const [previewChoice,setPreviewChoice]=useState<boolean|null>(null);
+  const [wideColumn,setWideColumn]=useState(false);
+  const root=useRef<HTMLDivElement>(null);
+  useEffect(()=>{const node=root.current;if(!node)return;const observer=new ResizeObserver(([entry])=>setWideColumn(entry.contentRect.width>=768));observer.observe(node);return()=>observer.disconnect();},[]);
+  const showPreview=previewChoice??wideColumn;
 
   async function handleSave() {
     if (readonlyPreview) return;
@@ -75,7 +79,7 @@ export function StoryEditorForm({
   }
 
   return (
-    <div className="@container space-y-4">
+    <div ref={root} className="@container space-y-4">
       <div className="grid gap-4 @[40rem]:grid-cols-[minmax(0,1fr)_12rem]">
         <div className="space-y-2">
           <Label htmlFor="story-title">Title</Label>
@@ -115,7 +119,7 @@ export function StoryEditorForm({
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => setShowPreview((value) => !value)}
+            onClick={() => setPreviewChoice(!showPreview)}
             className="text-muted-foreground"
           >
             {showPreview ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}

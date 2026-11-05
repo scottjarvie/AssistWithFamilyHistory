@@ -35,9 +35,9 @@ const statusTone = {
 };
 
 const publishGateTone = {
-  blocker: "border-destructive/30 bg-destructive-surface text-destructive",
-  warning: "border-annotation/30 bg-annotation-surface text-annotation",
-  passed: "border-evidence/30 bg-evidence-surface text-evidence",
+  blocker: "border-l-destructive",
+  warning: "border-l-annotation",
+  passed: "border-l-evidence",
 };
 
 function formatEventDate(event: { date?: { original?: string; year?: number } }) {
@@ -97,13 +97,24 @@ export function StoryReviewView({bundle,readonlyPreview=false}:{bundle:StoryRevi
   // the person currently has typed packs available — those are not provenance.
   const hasRecordedProvenance = attachedContextPackIds.size > 0;
   const availableContextPacks = historicalContext.filter((entry) => entry.packType);
+  const recordedCitations=new Set(story.citationIds.map(String));
+  const recordedSets=evidence.filter(entry=>entry.citations.some(citation=>recordedCitations.has(String(citation._id))));
+  const otherSets=evidence.length-recordedSets.length;
+  const gateOrder={blocker:0,warning:1,passed:2};
+  const orderedGates=publishReadiness.checks.toSorted((a,b)=>gateOrder[a.severity]-gateOrder[b.severity]);
+  const unmatchedWarnings=publishWarnings.filter(warning=>!publishReadiness.checks.some(gate=>gate.key===warning.key));
+  const attentionCount=publishReadiness.blockers.length+publishReadiness.warnings.length;
+  const passedCount=publishReadiness.checks.filter(gate=>gate.severity==="passed").length;
+  const phrase=(count:number,one:string,many=one+"s")=>`${count} ${count===1?one:many}`;
+  const returned=(count:number,cap:number,label:string,many?:string)=>`${phrase(count,label,many)}${count>=cap?` (first ${cap} returned)`:""}`;
+  const humanLabel=(value:string)=>value.toLowerCase().replace(/_/g," ").replace(/^./,letter=>letter.toUpperCase());
   const workflowSteps = [
     { key: "draft", label: "Draft" },
     { key: "review", label: "Review" },
     { key: "published", label: "Published" },
   ] as const;
 
- const panel0=(<Card className={publishReadiness.canPublish ? "border-evidence/30 bg-evidence-surface/40" : "border-destructive/30 bg-destructive-surface/40"}>
+ const panel0=(<Card>
             <CardHeader>
               <CardTitle role="heading" aria-level={2} className="flex items-center gap-2">
                 <ShieldCheck className={publishReadiness.canPublish ? "h-5 w-5 text-evidence" : "h-5 w-5 text-destructive"} />
@@ -129,13 +140,14 @@ export function StoryReviewView({bundle,readonlyPreview=false}:{bundle:StoryRevi
                 </div>
               </div>
               <div className="space-y-2">
-                {publishReadiness.checks.map((gate) => (
-                  <div key={gate.key} className={`border px-3 py-3 ${publishGateTone[gate.severity]}`}>
+                {orderedGates.map((gate) => (
+                  <div key={gate.key} className={`border border-border border-l-2 bg-card px-3 py-3 ${publishGateTone[gate.severity]}`}>
                     <div className="flex items-start justify-between gap-3">
                       <p className="text-sm font-medium">{gate.label}</p>
-                      <span className="text-xs uppercase">{gate.severity}</span>
+                      <span className="text-xs text-muted-foreground">{humanLabel(gate.severity)}</span>
                     </div>
-                    <p className="mt-1 text-sm leading-6 opacity-80">{gate.detail}</p>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">{gate.detail}</p>
+                    {publishWarnings.filter(warning=>warning.key===gate.key).map(warning=><div key={`${warning.key}-${warning.status}`} className="mt-2 text-xs text-annotation"><p>Warning status: {humanLabel(warning.status)}</p>{warning.detail!==gate.detail&&<p className="mt-1 leading-5 text-muted-foreground">{warning.detail}</p>}</div>)}
                   </div>
                 ))}
               </div>
@@ -278,15 +290,15 @@ export function StoryReviewView({bundle,readonlyPreview=false}:{bundle:StoryRevi
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              {publishWarnings.length === 0 ? (
+              {unmatchedWarnings.length === 0 ? (
                 <p className="rounded-md bg-evidence-surface px-3 py-3 text-sm text-evidence">
                   No major publish warnings are currently detected.
                 </p>
               ) : (
-                publishWarnings.map((warning) => (
+                unmatchedWarnings.map((warning) => (
                   <div key={`${warning.key}-${warning.status}`} className="rounded-md border border-annotation/30 bg-card px-3 py-3">
                     <p className="text-sm font-medium text-foreground">{warning.label}</p>
-                    <p className="mt-1 text-xs uppercase tracking-[0.16em] text-annotation">{warning.status}</p>
+                    <p className="mt-1 text-xs uppercase tracking-[0.16em] text-annotation">{humanLabel(warning.status)}</p>
                     <p className="mt-2 text-sm leading-6 text-muted-foreground">{warning.detail}</p>
                   </div>
                 ))
@@ -304,7 +316,7 @@ export function StoryReviewView({bundle,readonlyPreview=false}:{bundle:StoryRevi
               <div className="flex items-end justify-between">
                 <div>
                   <p className="text-4xl font-semibold text-foreground">
-                    {readiness?.completionPercent ?? 0}%
+                    {readiness?`${readiness.completionPercent}%`:"Unavailable"}
                   </p>
                   <p className="text-sm text-muted-foreground">research coverage</p>
                 </div>
@@ -317,13 +329,13 @@ export function StoryReviewView({bundle,readonlyPreview=false}:{bundle:StoryRevi
               <div className="mt-5 space-y-2">
                 {blockers.length === 0 ? (
                   <p className="rounded-md bg-evidence-surface px-3 py-3 text-sm text-evidence">
-                    Required checks are satisfied. Use human review before publishing.
+                    {readiness?"Required checks are satisfied. Use human review before publishing.":"Research coverage is unavailable without a linked person. The Publish Gate still applies."}
                   </p>
                 ) : (
                   blockers.map((check) => (
                     <div key={String("_id" in check ? check._id : check.checkKey)} className="rounded-md bg-muted px-3 py-3">
                       <p className="text-sm font-medium text-foreground">{check.summary || check.checkKey.replace(/_/g, " ")}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">{check.status} · {check.applicability}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{humanLabel(check.status)} · {humanLabel(check.applicability)}</p>
                     </div>
                   ))
                 )}
@@ -367,8 +379,9 @@ export function StoryReviewView({bundle,readonlyPreview=false}:{bundle:StoryRevi
                 evidence.map((entry) => (
                   <div key={String(entry.source._id)} className="border border-border px-3 py-3">
                     <p className="text-sm font-medium text-foreground">{entry.source.title}</p>
+                    <Badge variant="outline" className="mt-2">{entry.citations.some(citation=>recordedCitations.has(String(citation._id)))?"Recorded citation for this draft":"Other person source"}</Badge>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {entry.citations.length} citation{entry.citations.length === 1 ? "" : "s"}
+                      {phrase(entry.citations.length,"citation")}{entry.citations.length>=3?" · first 3 returned":""}
                     </p>
                   </div>
                 ))
@@ -527,14 +540,15 @@ export function StoryReviewView({bundle,readonlyPreview=false}:{bundle:StoryRevi
         </Card>);
 
  const sections:RecordSection[]=[
-  {id:"draft",label:"Edit",count:1,updatedAt:story.updatedAt,content:<Card><CardHeader><CardTitle role="heading" aria-level={2}>Editable Markdown Draft</CardTitle><CardDescription>Title, type, tags and full Markdown. The preview reflects your current edits.</CardDescription></CardHeader><CardContent><StoryEditorForm story={{_id:String(story._id),title:story.title,content:story.content,type:story.type,tags:story.tags}} readonlyPreview={readonlyPreview}/></CardContent></Card>},
-  {id:"review",label:"Review",count:publishReadiness.checks.length,detail:"Publish gate checks; warnings, assignments and research readiness are included",content:<div className="space-y-5">{panel0}{panel3}{panel4}{panel5}</div>},
-  {id:"sources",label:"Evidence",count:evidence.length,detail:"Current person source sets, not per-paragraph citations",content:<div className="space-y-5">{panel1}{panel7}</div>},
-  {id:"context",label:"Context",count:historicalContext.length,detail:"Available reports; attached provenance is explicitly distinguished",content:<div className="space-y-5">{panel2}{panel6}{panel12}</div>},
-  {id:"life",label:"Life",count:linkedRelationships.length+events.length+places.length+media.length,detail:"Linked relationships, events, places and memories",content:<div className="space-y-5">{panel8}{panel9}{panel10}{panel11}</div>},
-  {id:"history",label:"History",count:reviewHistory.length,updatedAt:reviewHistory.reduce((last,event)=>Math.max(last,event.createdAt||0),0)||undefined,content:panel13},
+  {id:"draft",label:"Edit",updatedAt:story.updatedAt,content:<Card><CardHeader><CardTitle role="heading" aria-level={2}>Editable Markdown Draft</CardTitle><CardDescription>Title, type, tags and full Markdown. The preview reflects your current edits.</CardDescription></CardHeader><CardContent><StoryEditorForm story={{_id:String(story._id),title:story.title,content:story.content,type:story.type,tags:story.tags}} readonlyPreview={readonlyPreview}/></CardContent></Card>},
+  {id:"review",label:"Review",count:attentionCount,detail:`${phrase(publishReadiness.blockers.length,"blocker")} · ${phrase(publishReadiness.warnings.length,"warning")} · ${passedCount} passed`,content:<div className="space-y-5">{panel0}{panel3}{unmatchedWarnings.length>0&&panel4}{panel5}</div>},
+  {id:"sources",label:"Evidence",count:evidence.length,detail:`${returned(evidence.length,8,"source set")}; current person evidence, not per-paragraph citations`,content:<div className="space-y-5">{panel1}{panel7}</div>},
+  {id:"context",label:"Context",count:historicalContext.length,detail:`${returned(historicalContext.length,8,"report")}; attached provenance distinguished`,content:<div className="space-y-5">{panel2}{panel6}{panel12}</div>},
+  {id:"life",label:"Life",count:linkedRelationships.length+events.length+places.length+media.length,detail:`${phrase(linkedRelationships.length,"relationship")} · ${returned(events.length,8,"event")} · ${returned(places.length,8,"place")} · ${returned(media.length,6,"memory","memories")}`,content:<div className="space-y-5">{panel8}{panel9}{panel10}{panel11}</div>},
+  {id:"history",label:"History",count:reviewHistory.length,detail:reviewHistory.length>=12?"First 12 returned":undefined,updatedAt:reviewHistory.reduce((last,event)=>Math.max(last,event.createdAt||0),0)||undefined,content:panel13},
  ];
- const aside=<><Link href="/app/stories" className="mb-3 inline-flex min-h-11 items-center text-sm text-muted-foreground">← Story Studio</Link><section className="rounded-lg border border-border bg-card p-4"><div className="flex items-start gap-3"><ArchiveIllustration className="h-16 w-16 shrink-0 rounded bg-muted text-primary"/><div className="min-w-0"><p className="font-mono text-xs uppercase tracking-wider text-annotation">Story dossier</p><Badge className={`mt-2 ${statusTone[story.status]}`}>{story.status}</Badge></div></div><h1 className="mt-4 break-words text-3xl font-semibold leading-tight">{story.title}</h1><p className="mt-2 text-sm text-muted-foreground">{person?`${person.displayName}${person.lifespan?`, ${person.lifespan}`:""}`:"Unlinked story"} · {story.type.replace(/_/g," ")}</p><dl className="mt-4 space-y-3 border-t border-border pt-3 text-xs"><div><dt className="text-muted-foreground">Who wrote this</dt><dd className="mt-1 text-sm">{story.generatedBy==="human"?"Person-written":story.generatedBy==="ai_edited"?"AI-edited":"AI-generated"}</dd></div>{story.modelUsed&&<div><dt className="text-muted-foreground">Recorded model · not verified</dt><dd className="mt-1 break-words">{story.modelUsed}</dd></div>}<div><dt className="text-muted-foreground">Updated</dt><dd className="mt-1"><UtcDate value={story.updatedAt} withTime/></dd></div><div><dt className="text-muted-foreground">Version</dt><dd className="mt-1">Current saved story; no version number recorded</dd></div><div><dt className="text-muted-foreground">Sources and context</dt><dd><SafeAnchor href="#record-section-sources" className="inline-flex min-h-11 items-center text-primary underline">Inspect grounding and provenance</SafeAnchor></dd></div></dl><fieldset disabled={readonlyPreview} className="mt-3 min-w-0"><legend className="sr-only">Story status actions</legend><StoryStatusActions storyId={String(story._id)} publicIdentifier={story.publicSlug} status={story.status} publishReadiness={{canPublish:publishReadiness.canPublish,summary:publishReadiness.summary}}/></fieldset><div className="mt-3 border-t border-border pt-3"><h2 className="font-sans text-sm font-semibold">Connections</h2>{person&&<Link href={`/app/people/${person.routeId}`} className="flex min-h-11 items-center text-sm text-primary">Open source person</Link>}{story.status==="published"&&<Link href={publicStoryPath(story.publicSlug??String(story._id))} target="_blank" className="flex min-h-11 items-center text-sm text-primary">Public page ↗</Link>}<SafeAnchor href="#record-section-draft" className="flex min-h-11 items-center text-sm text-primary">Edit draft</SafeAnchor></div></section></>;
- const overview=<div className="space-y-5"><section className={`rounded-lg border p-4 ${publishReadiness.canPublish?"border-evidence/30 bg-evidence-surface":"border-annotation/30 bg-annotation-surface"}`}><div className="flex items-start gap-3"><ShieldCheck className="mt-1 h-5 w-5 shrink-0 text-annotation"/><div><h2 className="text-xl font-semibold">{publishReadiness.canPublish?"Ready for trusted publisher review":"Review before sharing"}</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">{publishReadiness.summary}</p><SafeAnchor href="#record-section-review" className="inline-flex min-h-11 items-center text-sm text-primary underline">Inspect all publish gates and assignments</SafeAnchor></div></div></section><article className="rounded-lg border border-border bg-card p-4 sm:p-6" aria-label="Saved story reading view"><p className="mb-4 font-mono text-xs uppercase tracking-wider text-muted-foreground">Saved narrative · private workspace</p><Prose markdown={story.content} variant="story"/><footer className="mt-6 border-t border-border pt-4 text-sm leading-6 text-muted-foreground">This reading view shows the last saved draft. Inspect source sets and attached research packs before treating a narrative claim as established.<SafeAnchor href="#record-section-sources" className="ml-1 inline-flex min-h-11 items-center text-primary underline">Open grounding evidence</SafeAnchor></footer></article><section className="rounded-lg border border-border bg-card p-4"><h2 className="text-xl font-semibold">Story workflow</h2><ol className="mt-3 divide-y divide-border">{workflowSteps.map((step,index)=><li key={step.key} className="flex gap-3 py-3 text-sm"><span className="font-mono text-xs text-annotation">0{index+1}</span><div><p className="font-semibold">{step.label}{story.status===step.key&&<Badge variant="secondary" className="ml-2">Current</Badge>}</p><p className="mt-1 leading-6 text-muted-foreground">{step.key==="draft"?"Writer prepares a grounded draft.":step.key==="review"?"Reviewer clears evidence, privacy, and family-graph risks.":"Trusted publisher confirms the public status change."}</p></div></li>)}</ol></section><section className="rounded-lg border border-border bg-card p-4"><h2 className="text-xl font-semibold">Review activity</h2><p className="mt-1 text-sm text-muted-foreground">Dated assignments, previews, edits and status changes, newest first.</p><div className="mt-4"><StoryReviewHistoryPanel events={historyRows} initialLimit={6}/></div></section></div>;
+ const aside=<><Link href="/app/stories" className="mb-3 inline-flex min-h-11 items-center text-sm text-muted-foreground">← Story Studio</Link><section className="rounded-lg border border-border bg-card p-4"><div className="flex items-start gap-3"><ArchiveIllustration className="h-16 w-16 shrink-0 rounded bg-muted text-primary"/><div className="min-w-0"><p className="font-mono text-xs uppercase tracking-wider text-annotation">Story dossier</p><Badge className={`mt-2 ${statusTone[story.status]}`}>{story.status}</Badge></div></div><h1 className="mt-4 break-words text-3xl font-semibold leading-tight">{story.title}</h1><p className="mt-2 text-sm text-muted-foreground">{person?`${person.displayName}${person.lifespan?`, ${person.lifespan}`:""}`:"Unlinked story"} · {story.type.replace(/_/g," ")}</p><dl className="mt-4 grid grid-cols-2 gap-3 border-t border-border pt-3 text-xs lg:grid-cols-1"><div><dt className="text-muted-foreground">Who wrote this</dt><dd className="mt-1 text-sm">{story.generatedBy==="human"?"Person-written":story.generatedBy==="ai_edited"?"AI-edited · which AI not recorded":"AI-generated · which AI not recorded"}</dd></div>{story.modelUsed&&<div><dt className="text-muted-foreground">Recorded model · not verified</dt><dd className="mt-1 break-words">{story.modelUsed}</dd></div>}<div><dt className="text-muted-foreground">Updated</dt><dd className="mt-1"><UtcDate value={story.updatedAt} withTime/></dd></div><div><dt className="text-muted-foreground">Version</dt><dd className="mt-1">Current saved story; no version number recorded</dd></div><div><dt className="text-muted-foreground">Sources and context</dt><dd><SafeAnchor href="#record-section-sources" className="inline-flex min-h-11 items-center text-primary underline">Inspect grounding and provenance</SafeAnchor></dd></div></dl><fieldset disabled={readonlyPreview} className="mt-3 min-w-0"><legend className="sr-only">Story status actions</legend><StoryStatusActions compact storyId={String(story._id)} publicIdentifier={story.publicSlug} status={story.status} publishReadiness={{canPublish:publishReadiness.canPublish,summary:publishReadiness.summary}}/></fieldset><div className="mt-3 border-t border-border pt-3"><h2 className="font-sans text-sm font-semibold">Connections</h2>{person&&<Link href={`/app/people/${person.routeId}`} className="flex min-h-11 items-center text-sm text-primary">Open source person</Link>}{story.status==="published"&&<Link href={publicStoryPath(story.publicSlug??String(story._id))} target="_blank" className="flex min-h-11 items-center text-sm text-primary">Public page ↗</Link>}<SafeAnchor href="#record-section-draft" className="flex min-h-11 items-center text-sm text-primary">Edit draft</SafeAnchor></div></section></>;
+ const draftSources=<section aria-label="Recorded draft sources" className="rounded-lg border border-border bg-card p-4 text-sm"><h2 className="font-sans text-sm font-semibold">Recorded for this draft</h2><p className="mt-1 text-xs leading-5 text-muted-foreground">Whole draft, not per paragraph</p><dl className="mt-3 space-y-2"><div className="flex items-baseline justify-between gap-2"><dt>Recorded citations</dt><dd className="font-mono">{story.citationIds.length}</dd></div><div className="flex items-baseline justify-between gap-2"><dt>Recorded source facts</dt><dd className="font-mono">{story.sourceFactIds?.length||0}</dd></div><div className="flex items-baseline justify-between gap-2"><dt>Recorded packs</dt><dd className="font-mono">{attachedContextPackIds.size}</dd></div></dl>{attachedContextPacks.length>0&&<ul className="mt-3 space-y-2 border-t border-border pt-3">{attachedContextPacks.map(entry=><li key={String(entry._id)}><SafeAnchor href="#record-section-context" className="inline-flex min-h-11 items-center text-primary underline">{entry.title}</SafeAnchor></li>)}</ul>}{attachedContextPackIds.size>attachedContextPacks.length&&<p className="mt-3 text-xs leading-5 text-muted-foreground">{attachedContextPackIds.size-attachedContextPacks.length} recorded pack(s) are not in the returned context list.</p>}<p className="mt-3 border-t border-border pt-3 text-xs leading-5 text-muted-foreground"><SafeAnchor href="#record-section-sources" className="inline-flex min-h-11 items-center text-primary underline">Other sources linked to {person?.displayName||"this person"} · {otherSets}</SafeAnchor>{evidence.length>=8&&<span className="block">Only the first 8 source sets are returned.</span>}</p><p className="mt-2 text-xs leading-5 text-muted-foreground">Recorded IDs establish draft provenance; they do not resolve paragraph support or an unresolved claim.</p></section>;
+ const overview=<div className="space-y-5"><section className={`rounded-lg border p-4 ${publishReadiness.canPublish?"border-evidence/30 bg-evidence-surface":"border-annotation/30 bg-annotation-surface"}`}><div className="flex items-start gap-3"><ShieldCheck className="mt-1 h-5 w-5 shrink-0 text-annotation"/><div><h2 className="text-xl font-semibold">{publishReadiness.canPublish?"Ready for trusted publisher review":"Review before sharing"}</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">{publishReadiness.summary}</p><SafeAnchor href="#record-section-review" className="inline-flex min-h-11 items-center text-sm text-primary underline">Inspect all publish gates and assignments</SafeAnchor></div></div></section><div className="grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_11rem] 2xl:grid-cols-[minmax(0,1fr)_13rem]"><article className="rounded-lg border border-border bg-card p-4 sm:p-6" aria-label="Saved story reading view"><p className="mb-4 font-mono text-xs uppercase tracking-wider text-muted-foreground">Saved narrative · private workspace</p><Prose markdown={story.content} variant="story" className="mx-auto max-w-[68ch]"/><footer className="mt-6 border-t border-border pt-4 text-sm leading-6 text-muted-foreground">This reading view shows the last saved draft. Inspect source sets and attached research packs before treating a narrative claim as established.<SafeAnchor href="#record-section-sources" className="ml-1 inline-flex min-h-11 items-center text-primary underline">Open grounding evidence</SafeAnchor></footer></article><aside className="hidden min-w-0 xl:block">{draftSources}</aside><details className="rounded-lg border border-border bg-card xl:hidden"><summary className="flex min-h-11 cursor-pointer items-center px-4 text-sm font-semibold">Draft sources · {phrase(story.citationIds.length,"citation")}</summary><div className="px-3 pb-3">{draftSources}</div></details></div><section className="rounded-lg border border-border bg-card p-4"><h2 className="text-xl font-semibold">Story workflow</h2><ol className="mt-3 divide-y divide-border">{workflowSteps.map((step,index)=><li key={step.key} className="flex gap-3 py-3 text-sm"><span className="font-mono text-xs text-annotation">0{index+1}</span><div><p className="font-semibold">{step.label}{story.status===step.key&&<Badge variant="secondary" className="ml-2">Current</Badge>}</p><p className="mt-1 leading-6 text-muted-foreground">{step.key==="draft"?"Writer prepares a grounded draft.":step.key==="review"?"Reviewer clears evidence, privacy, and family-graph risks.":"Trusted publisher confirms the public status change."}</p></div></li>)}</ol></section><section className="rounded-lg border border-border bg-card p-4"><h2 className="text-xl font-semibold">Review activity</h2><p className="mt-1 text-sm text-muted-foreground">Dated assignments, previews, edits and status changes, newest first.</p><div className="mt-4"><StoryReviewHistoryPanel events={historyRows} initialLimit={6}/></div></section></div>;
  return <div className="p-4 sm:p-8"><RecordSections aside={aside} overview={overview} sections={sections}/>{readonlyPreview&&<p className="mt-4 text-xs text-annotation">Synthetic preview: saving, assignment and status mutations are disabled.</p>}</div>;
 }

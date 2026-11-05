@@ -4,17 +4,18 @@ from datetime import datetime, timezone
 import html, json, base64, re, os, subprocess
 run=Path(__file__).resolve().parent
 rounds=sorted([p for p in run.glob('round-*') if re.fullmatch(r'round-\d+',p.name) and (p/'ours').exists()],key=lambda p:int(p.name.split('-')[1]),reverse=True)
-sections=[('Place and Story records',run/'place-story-records'),('Record review refinements',run/'record-stream/current'),('Person dossier and evidence stream',run/'record-stream/reviewed-c187b04'),('Activity, facets and Home refinements',run/'activity-facets'),('Collection review fixes',run/'collection-fixes')]+[(p.name,p/'ours') for p in rounds]+[('Starting collections · reconstructed now',run/'baseline-reconstructed'),('Starting page · now',run/'baseline')]
+sections=[('Record reader review refinements',run/'record-review-fixes'),('Place and Story records',run/'place-story-records'),('Record review refinements',run/'record-stream/current'),('Person dossier and evidence stream',run/'record-stream/reviewed-c187b04'),('Activity, facets and Home refinements',run/'activity-facets'),('Collection review fixes',run/'collection-fixes')]+[(p.name,p/'ours') for p in rounds]+[('Starting collections · reconstructed now',run/'baseline-reconstructed'),('Starting page · now',run/'baseline')]
 images=[]; blocks=[]
 score_file=run/'scores.json'
 score_data=json.loads(score_file.read_text()) if score_file.exists() else {}
 params=json.loads((run/'params.json').read_text())
 weights={c['key']:c.get('weight',1) for c in params.get('categories',[])}
 def score_line(title):
- if title=='Place and Story records': return 'Newest local record-family tranche · exact-head cross-model review pending; no formal score'
- if title=='Record review refinements': return 'Newest lead review fixes · checks/captures recorded, next meaningful cross-model review pending; no formal score'
+ if title=='Record reader review refinements': return 'Newest lead fixes from Opus review · verification recorded separately, next meaningful cross-model review pending; no formal score'
+ if title=='Place and Story records': return 'Reviewed at 0bafa4f · Opus conditional approval; original reviewed images retained, no formal score'
+ if title=='Record review refinements': return 'Person lead fixes included in Opus0bafa4f review · all earlier findings resolved, no formal score'
  if title=='Person dossier and evidence stream': return 'Reviewed at c187b04 · Opus conditional approval; original reviewed images retained, no formal score'
- if title=='Activity, facets and Home refinements': return 'Newest local capture tranche · exact-head review pending; no formal score claimed'
+ if title=='Activity, facets and Home refinements': return 'Reviewed at 7f1ab4f · Opus conditional approval, original reviewed images retained; no formal score'
  if title=='Collection review fixes': return 'Lead fixes from Opus review · checks and fresh images recorded; next cross-model review pending'
  if 'reconstructed' in title: return 'Original page JSX from 99980b5, invented data under the current shared shell/runtime · reconstructed comparison, not a frozen original capture'
  if title.startswith('Starting'): return 'Starting snapshot · now'

@@ -48,9 +48,10 @@ export default async function DesignPreview({searchParams}:{searchParams:Promise
  const baseline=surface.startsWith("baseline-");
  const displaySurface=baseline?surface.slice(9):surface;
  const isPlace=["place-record","place-empty"].includes(surface);
- const isStory=["story-record","story-unlinked"].includes(surface);
+ const isStory=["story-record","story-unlinked","story-capped"].includes(surface);
  const placeFixture=surface==="place-empty"?{...placeWorkspace,events:[],people:[],sources:[],citations:[],contextEntries:[],media:[],researchLog:[]}:placeWorkspace;
- const storyFixture=surface==="story-unlinked"?unlinkedStory:storyReview;
+ const cappedStory={...storyReview,evidence:Array.from({length:8},(_,index)=>({...storyReview.evidence[0],source:{...storyReview.evidence[0].source,_id:`sources:capped-${index}`,title:`Invented capped source ${index+1}`},citations:Array.from({length:3},(_,citationIndex)=>({...storyReview.evidence[0].citations[0],_id:index===0&&citationIndex===0?storyReview.evidence[0].citations[0]._id:`citations:capped-${index}-${citationIndex}`}))})),events:Array.from({length:8},(_,index)=>({...storyReview.events[0],_id:`events:capped-${index}`})),places:Array.from({length:8},(_,index)=>({...storyReview.places[0],_id:`places:capped-${index}`})),media:Array.from({length:6},(_,index)=>({...storyReview.media[0],_id:`media:capped-${index}`}))};
+ const storyFixture=surface==="story-unlinked"?unlinkedStory:surface==="story-capped"?cappedStory:storyReview;
  const isPerson=["person","person-no-imports","person-no-media","person-documents-error"].includes(surface);
  const recordFixture=surface==="person-no-imports"?{...personWorkspace,importRuns:[],stats:{...personWorkspace.stats,imports:0}}:surface==="person-no-media"?{...personWorkspace,media:[],stats:{...personWorkspace.stats,memories:0}}:personWorkspace;
  const isPeople=["people","people-more","people-long","people-no-imports"].includes(surface);
