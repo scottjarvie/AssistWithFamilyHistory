@@ -6,6 +6,7 @@ import {
   BookOpen,
   Bot,
   ClipboardList,
+  Database,
   ExternalLink,
   FileUp,
   FlaskConical,
@@ -13,10 +14,12 @@ import {
   Inbox,
   KeyRound,
   LayoutDashboard,
+  Library,
   MapPinned,
   PenTool,
   PlugZap,
   TableProperties,
+  UserRound,
   Users,
   Clock,
 } from "lucide-react";
@@ -32,6 +35,7 @@ const expectedSections = [
     items: [
       { href: "/app", label: "Dashboard", icon: LayoutDashboard, exact: true },
       { href: "/app/queue", label: "Your Queue", icon: Inbox },
+      { href: "/app/library", label: "Library", icon: Library },
     ],
   },
   {
@@ -78,6 +82,13 @@ const expectedSections = [
       // isNavItemActive("/app/api/admin", "/app/api") assertion below has always
       // anticipated this entry.
       { href: "/app/api", label: "API Center", icon: KeyRound },
+    ],
+  },
+  {
+    label: "You",
+    items: [
+      { href: "/app/me", label: "Your stats", icon: UserRound },
+      { href: "/app/settings/data", label: "Your data", icon: Database },
     ],
   },
   {
