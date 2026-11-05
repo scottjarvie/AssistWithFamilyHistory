@@ -447,6 +447,52 @@ function restoresRelationshipClearing(current: unknown, incoming: unknown, prior
   });
 }
 
+/** Presence witnesses protect later clearing without storing refresh authority. */
+function observeUnownedValue(current: unknown, baseline: unknown, known: boolean, facts = false): unknown {
+  if (isEmpty(current)) return undefined;
+  if (facts && Array.isArray(current)) {
+    const old = Array.isArray(baseline) ? baseline : [];
+    const observed = current.flatMap(fact => {
+      if (!fact || typeof fact.type !== "string") return [];
+      const originals = old.filter(row => row?.type === fact.type);
+      const fields = observeUnownedValue(fact, originals[0], known && originals.length === 1);
+      if (!fields || typeof fields !== "object") return [];
+      const value = { ...(fields as Record<string, unknown>) }; delete value.type;
+      return Object.keys(value).length ? [{ ...value, type: fact.type }] : [];
+    });
+    return observed.length ? observed : undefined;
+  }
+  if (current && typeof current === "object" && !Array.isArray(current)) {
+    const old = baseline && typeof baseline === "object" && !Array.isArray(baseline) ? baseline as Record<string, unknown> : {};
+    const observed: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(current)) {
+      const witness = observeUnownedValue(value, old[key], known && Object.hasOwn(old, key));
+      if (witness !== undefined) observed[key] = witness;
+    }
+    return Object.keys(observed).length ? observed : undefined;
+  }
+  return known ? undefined : true;
+}
+
+function mergeObservations(previous: any, observed: any, facts = false): any {
+  if (observed === undefined) return previous;
+  if (facts && Array.isArray(observed)) {
+    const result = Array.isArray(previous) ? [...previous] : [];
+    for (const fact of observed) {
+      const index = result.findIndex(row => row.type === fact.type);
+      const value = { ...mergeObservations(index >= 0 ? result[index] : undefined, fact), type: fact.type };
+      if (index >= 0) result[index] = value; else result.push(value);
+    }
+    return result;
+  }
+  if (observed && typeof observed === "object" && !Array.isArray(observed)) {
+    const result = previous && typeof previous === "object" && !Array.isArray(previous) ? { ...previous } : {};
+    for (const [key, value] of Object.entries(observed)) result[key] = mergeObservations(result[key], value);
+    return result;
+  }
+  return previous ?? observed;
+}
+
 /** Supplied leaves refresh independently; omitted leaves and manual edits stay. */
 function mergeImportedValue(current: unknown, incoming: unknown, baseline: unknown, hasBaseline: boolean, mergeFacts = false): { value: unknown; baseline: unknown; hasBaseline: boolean; kept: boolean } {
   if (same(current, incoming)) return { value: current, baseline, hasBaseline, kept: false };
@@ -552,9 +598,9 @@ async function upsertRow(
   if (args.table === "persons" || args.table === "relationships") {
     const recordType = args.table === "persons" ? "person" : "relationship";
     const wouldFill = (prior: Record<string, unknown>) => Object.entries(args.doc).some(([field, value]) => field !== "externalIds"
-      && (recordType === "relationship" && field === "facts"
-        ? restoresRelationshipClearing((row as any)[field], value, prior[field], baseline?.[field])
-        : restoresUntrackedClearing((row as any)[field], value, prior[field], baseline?.[field], !!baseline && Object.hasOwn(baseline, field))));
+      && [prior[field], (prior._observedFields as Record<string, unknown> | undefined)?.[field]].some(witness => recordType === "relationship" && field === "facts"
+        ? restoresRelationshipClearing((row as any)[field], value, witness, baseline?.[field])
+        : restoresUntrackedClearing((row as any)[field], value, witness, baseline?.[field], !!baseline && Object.hasOwn(baseline, field))));
     if (wouldFill(args.doc)) {
       const max = FAMILY_HISTORY_MCP_LIMITS.contextRows;
       const mappings = isPlaceholder(args.existingId) ? [] : await c.ctx.db.query("mcpRecordKeys")
@@ -572,6 +618,7 @@ async function upsertRow(
   // Creation provenance is historical, never permission to replace later edits.
   // Legacy rows without a baseline conservatively retain populated fields.
   const imported: Record<string, unknown> = { ...(baseline ?? {}) };
+  const observedFields: Record<string, unknown> = { ...(baseline?._observedFields ?? {}) };
   for (const [field, value] of Object.entries(args.doc)) {
     if (value === undefined) continue;
     const current = (row as any)[field];
@@ -613,6 +660,14 @@ async function upsertRow(
       if (merged.kept) kept.push("externalIds");
       continue;
     }
+    const facts = args.table === "relationships" && field === "facts";
+    const known = !!baseline && Object.hasOwn(baseline, field);
+    const witness = observedFields[field];
+    const restoration = facts ? restoresRelationshipClearing(current, value, witness, baseline?.[field])
+      : restoresUntrackedClearing(current, value, witness, baseline?.[field], known);
+    observedFields[field] = mergeObservations(witness, observeUnownedValue(current, baseline?.[field], known, facts), facts);
+    if (observedFields[field] === undefined) delete observedFields[field];
+    if (restoration) { kept.push(field); continue; }
     const next = mergeImportedValue(current, value, baseline?.[field], !!baseline && Object.hasOwn(baseline, field), args.table === "relationships" && field === "facts");
     if (!same(current, next.value)) {
       patch[field] = next.value;
@@ -620,6 +675,7 @@ async function upsertRow(
     }
     if (next.kept) kept.push(field);
   }
+  if (Object.keys(observedFields).length) imported._observedFields = observedFields;
   Object.assign(imported, args.baselineMetadata);
   const baselineChanged = Object.keys(patch).length > 0 || !same(baseline, imported);
   // Only supplied leaves actually filled/refreshed above enter this baseline;
@@ -1314,9 +1370,10 @@ async function importCitation(c: ChunkContext, item: any): Promise<Omit<ItemResu
     // There is no reverse array index: bound the owner scan and refuse when
     // absence cannot be established, rather than silently changing its basis.
     const storyLimit = FAMILY_HISTORY_MCP_LIMITS.contextRows;
-    const stories = isPlaceholder(saved.id) ? [] : await c.ctx.db.query("stories")
-      .withIndex("by_owner", q => q.eq("vaultOwnerId", c.owner)).take(storyLimit + 1);
-    const virtualStory = [...(c.w.rows?.values() ?? [])].some(row => row.vaultOwnerId === c.owner && Array.isArray(row.citationIds) && row.citationIds.includes(saved.id));
+    const storyOwners = matchesVaultOwner(undefined, c.owner) ? [c.owner, undefined] : [c.owner];
+    const stories = isPlaceholder(saved.id) ? [] : (await Promise.all(storyOwners.map(vaultOwnerId => c.ctx.db.query("stories")
+      .withIndex("by_owner", q => q.eq("vaultOwnerId", vaultOwnerId)).take(storyLimit + 1)))).flat();
+    const virtualStory = [...(c.w.rows?.values() ?? [])].some(row => matchesVaultOwner(row.vaultOwnerId, c.owner) && Array.isArray(row.citationIds) && row.citationIds.includes(saved.id));
     if (stories.length > storyLimit || virtualStory || stories.some(story => story.citationIds.includes(saved.id as Id<"citations">))) {
       fail("CITATION_STORY_REVIEW_REQUIRED", "Changed citation evidence cannot replace the basis of retained stories or exceed the bounded story-reference check.",
         "Review the citation and its stories with the person. This citation item saved nothing; original evidence, stories and review history were retained.");

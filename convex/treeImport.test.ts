@@ -3262,3 +3262,75 @@ test("local GEDCOM aliases resolve an ownerless FamilySearch person without losi
   const next = await f.batch(1, input); expect(next.counts.persons.unchanged).toBe(1); expect(next.results[0].id).toBe(String(f.personId)); expect(await countRows(f.t, "persons")).toBe(1);
   const captured = await f.t.withIdentity({ subject: f.owner }).mutation(api.vaultMutations.upsertPerson, { vaultOwnerId: f.owner, preserveExisting: true, fsId: "P", name: { given: "Captured", surname: "Changed" }, sex: "unknown", living: false }); expect(captured.personId).toBe(f.personId);
 });
+
+test.each(["samePrimary", "newAlias"])("observed legacy names retain manual clearing through %s without granting refresh authority", async mode => {
+  const f = await legacyLocalImportFixture();
+  const person = { key: "P", living: false, names: [{ given: "Original", surname: "Person" }] };
+  await f.batch(0, { persons: [person] });
+  const mapping = await f.t.run(ctx => ctx.db.query("mcpRecordKeys").withIndex("by_owner_type_key", q => q.eq("vaultOwnerId", f.owner).eq("recordType", "person").eq("recordKey", externalRecordKey("familysearch", "person", "P"))).unique());
+  const baseline = JSON.parse(mapping!.lastImportedJson!); expect(baseline.name).toBeUndefined(); expect(baseline._observedFields.name).toMatchObject({ given: true, surname: true });
+  await f.t.withIdentity({ subject: f.owner }).mutation(api.persons.update, { id: f.personId, name: { given: "", surname: "Person" } });
+  const snapshot = () => f.t.run(async ctx => ({ person: await ctx.db.get(f.personId), keys: await ctx.db.query("mcpRecordKeys").collect() })); const cleared = await snapshot();
+  const input: TreeImportBatch = { persons: [mode === "samePrimary" ? person : { ...person, key: "NEW", otherIds: [{ system: "familysearch", id: "P" }] }] };
+  for (const dryRun of [true, false]) {
+    const operationId = `observed-name-${mode}-${dryRun}`; const result = await f.batch(1, input, dryRun, operationId);
+    if (mode === "samePrimary") expect(result.results[0]).toMatchObject({ status: "unchanged", kept: expect.arrayContaining(["name"]) });
+    else expect(result.results[0].reason).toContain("PERSON_ALIAS_CLEARING_REVIEW_REQUIRED");
+    expect(await snapshot()).toEqual(cleared); expect(await f.batch(1, input, dryRun, operationId)).toEqual(dryRun ? result : { ...result, deduplicated: true });
+  }
+});
+
+test("observed legacy source fields preserve corrections and clearing without adopting their values", async () => {
+  const f = await legacyLocalImportFixture(); const originalUrl = "https://example.test/original-source";
+  await f.t.run(ctx => ctx.db.patch(f.sourceId, { url: originalUrl }));
+  const source = { key: "S", title: "Original source", type: "book", url: originalUrl };
+  await f.batch(0, { sources: [source] });
+  const mapping = await f.t.run(ctx => ctx.db.query("mcpRecordKeys").withIndex("by_owner_type_key", q => q.eq("vaultOwnerId", f.owner).eq("recordType", "source").eq("recordKey", externalRecordKey("familysearch", "source", "S"))).unique());
+  const baseline = JSON.parse(mapping!.lastImportedJson!); expect(baseline.url).toBeUndefined(); expect(baseline._observedFields.url).toBe(true);
+  for (const url of ["https://example.test/manual-correction", ""]) {
+    await f.t.run(ctx => ctx.db.patch(f.sourceId, { url }));
+    for (const dryRun of [true, false]) {
+      const result = await f.batch(1, { sources: [source] }, dryRun, `observed-source-${url.length}-${dryRun}`);
+      expect(result.results[0].kept).toContain("url"); expect((await f.t.run(ctx => ctx.db.get(f.sourceId)))!.url).toBe(url);
+    }
+  }
+});
+
+test("observations leave genuinely blank legacy fields fillable and imported leaves refreshable", async () => {
+  const f = await legacyLocalImportFixture(); await f.t.run(ctx => ctx.db.patch(f.personId, { name: { given: "", surname: "Person" } }));
+  await f.batch(0, { persons: [{ key: "P", living: false, names: [{ given: "Pat", surname: "Person" }] }] });
+  const result = await f.batch(1, { persons: [{ key: "P", living: false, names: [{ given: "Patricia", surname: "Person" }] }] });
+  expect(result.counts.persons.updated).toBe(1); expect((await f.t.run(ctx => ctx.db.get(f.personId)))!.name).toEqual({ given: "Patricia", surname: "Person" });
+});
+
+test.each(["wholeList", "nestedDescription"])("observed legacy relationship facts preserve later %s clearing", async mode => {
+  const f = await legacyLocalImportFixture();
+  const relationshipId = await f.t.run(async ctx => { const partner = await ctx.db.insert("persons", { fsId: "Q", name: { given: "Partner", surname: "Person" }, living: false, sex: "unknown", createdAt: 1, updatedAt: 1 }); return ctx.db.insert("relationships", { type: "Couple", person1: f.personId, person2: partner, facts: [{ type: "Marriage", description: "Ohio" }], createdAt: 1, updatedAt: 1 }); });
+  const relationship = { key: "R", type: "Couple" as const, person1Key: "P", person2Key: "Q", facts: [{ type: "Marriage", description: "Ohio" }] };
+  await f.batch(0, { relationships: [relationship] });
+  await f.t.mutation(internal.relationships.updateFacts, { id: relationshipId, facts: mode === "wholeList" ? [] : [{ type: "Marriage", description: "" }] });
+  const before = await f.t.run(ctx => ctx.db.get(relationshipId));
+  for (const dryRun of [true, false]) { const result = await f.batch(1, { relationships: [relationship] }, dryRun); expect(result.results[0].kept).toContain("facts"); expect(await f.t.run(ctx => ctx.db.get(relationshipId))).toEqual(before); }
+});
+
+test.each(["referenced", "ownerlessBound", "mixedBound", "foreign"])("citation refresh qualifies legacy story references within the combined owner bound (%s)", async mode => {
+  const f = await legacyLocalImportFixture(mode === "foreign" ? OWNER : "local-dev");
+  const citation = { key: "C", sourceKey: "S", extractedText: "Original evidence", targets: [{ kind: "person" as const, key: "P" }] };
+  await f.batch(0, { persons: [{ key: "P", living: false, names: [{ given: "Original", surname: "Person" }] }], sources: [{ key: "S", title: "Original source", type: "book" }], citations: [citation] });
+  const citationId = await f.t.run(async ctx => (await ctx.db.query("citations").collect())[0]._id);
+  const storyId = await f.t.run(async ctx => {
+    let first;
+    for (let i = 0; i < (mode === "referenced" ? 1 : 51); i++) {
+      const id = await ctx.db.insert("stories", { ...(mode === "mixedBound" && i < 26 ? { vaultOwnerId: f.owner } : {}), type: "biography", title: "Legacy story", content: "Retained original story", citationIds: [], status: "draft", generatedBy: "human", createdAt: 1, updatedAt: 1 }); first ??= id;
+    }
+    return first!;
+  });
+  if (mode === "referenced") await f.t.mutation(internal.mcpFamilyHistory.saveStoryWork, { principal: principal(f.owner), grantId: f.grantId, operationId: "attach-legacy-story", requestHash: "attach-legacy-story", input: { mode: "update", storyId: String(storyId), expectedUpdatedAt: 1, citationIds: [String(citationId)] } });
+  const snapshot = () => f.t.run(async ctx => ({ citations: await ctx.db.query("citations").collect(), stories: await ctx.db.query("stories").collect(), links: await ctx.db.query("citationLinks").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  expect(before.stories[0].vaultOwnerId).toBe(mode === "mixedBound" ? f.owner : undefined);
+  for (const dryRun of [true, false]) {
+    const result = await f.batch(1, { citations: [{ ...citation, extractedText: "Replacement evidence" }] }, dryRun);
+    if (mode === "foreign") { expect(result.counts.citations.updated).toBe(1); if (dryRun) expect(await snapshot()).toEqual(before); }
+    else { expect(result.results[0].reason).toContain("CITATION_STORY_REVIEW_REQUIRED"); expect(await snapshot()).toEqual(before); }
+  }
+});

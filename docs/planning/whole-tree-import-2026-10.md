@@ -749,3 +749,21 @@ new authored cases UNRUN. Synthetic local-dev fixtures are not actual-user or
 Tier2 proof and do not establish production occurrence. Only source/whitespace
 checks ran; actual775 HOST/SITE/qualified receiver admission remains required.
 Cumulative Convex changes remain undeployed. No UI, push, provider or live claim.
+
+2026-11-05 legacy field observations/story repair (local only): mappings now
+retain sparse presence witnesses for populated legacy fields outside import
+refresh authority. These contain no copied field text; relationship facts keep
+their type discriminator. Observed clearing is retained/reported on the same
+key and considered by alias-clearing checks. Truly blank fields still fill,
+and actual imported leaves still refresh. Observations never become baseline
+values or permission to replace original/manual content. Source fields and
+nested relationship facts use the same protection.
+Citation evidence refresh includes ownerless stories only for their supported
+local vault and combines both owner forms under the existing reference limit.
+Added ten synthetic cases for same/new person keys, source correction/clearing,
+blank-field authority, whole/nested relationship fact clearing, a legacy story
+attached through save_story_work, both bound forms, and foreign-vault isolation.
+All ten are UNRUN, total507 new authored cases UNRUN; no test discovery/execution
+or user/provider/Tier2 proof is claimed. Actual775 admission remains outstanding.
+Only source/whitespace checks ran; cumulative Convex changes are undeployed.
+No UI, push, merge, deployment or live-product claim.
