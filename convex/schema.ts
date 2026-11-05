@@ -2175,6 +2175,7 @@ export default defineSchema({
       v.literal("note"),
       v.literal("media"),
     ),
+    externalKeyVersion: v.optional(v.number()), // Tree import tuple encoding; absent legacy keys stay reviewable.
     recordKey: v.string(),
     recordId: v.string(),
     // Last values actually written by a tree import; detects later human edits.

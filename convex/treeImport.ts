@@ -40,6 +40,7 @@ import {
   emptyCounts,
   eventTypeFor,
   externalRecordKey,
+  legacyExternalRecordKey,
   factKeyFor,
   factTargetKey,
   legacyFactKeyFor,
@@ -195,12 +196,18 @@ async function lookup(c: ChunkContext, singular: string, key: string, system: st
   const local = c.local.get(mapKey);
   if (local) return local;
   if (c.planned.has(mapKey)) return `planned:${mapKey}`;
-  const row = await c.ctx.db
-    .query("mcpRecordKeys")
-    .withIndex("by_owner_type_key", (q) =>
-      q.eq("vaultOwnerId", c.owner).eq("recordType", RECORD_TYPE[singular]).eq("recordKey", mapKey),
-    )
-    .unique();
+  const find = (recordKey: string) => c.ctx.db.query("mcpRecordKeys").withIndex("by_owner_type_key", q =>
+    q.eq("vaultOwnerId", c.owner).eq("recordType", RECORD_TYPE[singular]).eq("recordKey", recordKey),
+  ).unique();
+  const legacyKey = legacyExternalRecordKey(system, singular, key, c.job.importKey);
+  if (legacyKey !== mapKey) {
+    const legacy = await find(legacyKey);
+    if (legacy && legacy.externalKeyVersion !== 2) fail("LEGACY_IDENTITY_REVIEW_REQUIRED", "An older external-system key is ambiguous; its original record was retained.", "Have the person review the legacy mapping before retrying; do not rekey it automatically.");
+  }
+  const row = await find(mapKey);
+  if (row && row.externalKeyVersion !== 2 && (legacyKey !== mapKey || key.startsWith(`${singular}:`) || key.includes(`:${singular}:`))) {
+    fail("LEGACY_IDENTITY_REVIEW_REQUIRED", "This older mapping could have been built from different external-system components.", "Review the original mapping before linking; nothing was rekeyed.");
+  }
   return row?.recordId ?? null;
 }
 
@@ -261,6 +268,7 @@ async function remember(c: ChunkContext, singular: string, key: string, recordId
     vaultOwnerId: c.owner,
     recordType: RECORD_TYPE[singular],
     recordKey: mapKey,
+    externalKeyVersion: 2,
     recordId,
     ...(imported ? { lastImportedJson: JSON.stringify(clean(imported)) } : {}),
     createdAt: now,
@@ -595,7 +603,7 @@ async function importRelationship(c: ChunkContext, item: any): Promise<Omit<Item
       .query("relationships")
       .withIndex("by_type_person1", (q) => q.eq("type", item.type).eq("person1", person1 as Id<"persons">))
       .take(50);
-    const match = rows.find((row) => row.person2 === person2 && matchesVaultOwner(row.vaultOwnerId, c.owner));
+    const match = rows.map(row => c.w.rows?.get(String(row._id)) ?? row).find(row => row.type === item.type && row.person1 === person1 && row.person2 === person2 && matchesVaultOwner(row.vaultOwnerId, c.owner));
     if (match) {
       existingId = String(match._id);
       linked = true;
@@ -755,19 +763,17 @@ async function importCitation(c: ChunkContext, item: any): Promise<Omit<ItemResu
     },
     createOnly: { isEvidence: true, importKey: `import:${externalRecordKey(c.job.system, singular, key, c.job.importKey)}` },
   });
-  if (!isPlaceholder(saved.id)) {
-    for (const target of targets) {
-      if (isPlaceholder(target.targetId)) continue;
-      const rows = await c.ctx.db
-        .query("citationLinks")
-        .withIndex("by_citation_and_target", (q) =>
-          q.eq("citationId", saved.id as Id<"citations">).eq("targetType", target.targetType).eq("targetId", target.targetId),
-        )
-        .filter(q => q.eq(q.field("field"), target.field))
-        .take(1);
-      if (rows.length === 0) {
-        await c.w.insert("citationLinks", { vaultOwnerId: c.owner, citationId: saved.id, ...target, createdAt: Date.now() });
-      }
+  for (const target of targets) {
+    const virtualLink = [...(c.w.rows?.values() ?? [])].some(row => row.citationId === saved.id && row.targetType === target.targetType && row.targetId === target.targetId && row.field === target.field && row.vaultOwnerId === c.owner);
+    let existingLink = virtualLink;
+    if (!existingLink && !isPlaceholder(saved.id) && !isPlaceholder(target.targetId)) {
+      existingLink = (await c.ctx.db.query("citationLinks").withIndex("by_citation_and_target", q =>
+        q.eq("citationId", saved.id as Id<"citations">).eq("targetType", target.targetType).eq("targetId", target.targetId),
+      ).filter(q => q.eq(q.field("field"), target.field)).take(1)).length > 0;
+    }
+    if (!existingLink) {
+      await c.w.insert("citationLinks", { vaultOwnerId: c.owner, citationId: saved.id, ...target, createdAt: Date.now() });
+      if (saved.status === "unchanged") saved.status = "updated";
     }
   }
   return { key, keyOrigin: singular === "citationGenerated" ? "generated" : "explicit", status: saved.status, id: saved.id, ...(saved.kept ? { kept: saved.kept } : {}) };

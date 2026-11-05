@@ -340,3 +340,10 @@ Virtual media and citations retain planned person/source IDs in their documents
 and baselines. Duplicate suggestions use effective planned person values plus a
 bounded persisted scan, including planned index moves. Large index adjustments
 refuse the dry run explicitly rather than increasing scan cost without bound.
+
+External-system labels are encoded as their own identity component. New import
+mappings carry an optional encoding-version marker; ambiguous unversioned
+system/key combinations refuse for review without linking or rekeying originals.
+Safe existing mappings keep their keys. Dry relationship matching applies the
+virtual overlay before accepting a stored candidate. New citation links count as
+an updated outcome, and planned links participate in repeat detection.

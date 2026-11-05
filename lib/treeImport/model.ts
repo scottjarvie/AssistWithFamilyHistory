@@ -182,12 +182,18 @@ export function isGedcomSystem(system: string): boolean {
 }
 
 /** The durable lookup key for one outside record, namespaced by kind. */
-export function externalRecordKey(system: string, singularKind: string, key: string, fileScope?: string): string {
+export function legacyExternalRecordKey(system: string, singularKind: string, key: string, fileScope?: string): string {
   if (isGedcomSystem(system)) {
     if (!fileScope) throw new Error("GEDCOM record keys require an import file scope.");
     return `ext:gedcom:${encodeURIComponent(fileScope)}:${singularKind}:${key.trim()}`;
   }
   return `ext:${system.trim().toLowerCase()}:${singularKind}:${key.trim()}`;
+}
+
+/** System is a tuple component too; delimiters in aliases must not shift it. */
+export function externalRecordKey(system: string, singularKind: string, key: string, fileScope?: string): string {
+  if (isGedcomSystem(system)) return legacyExternalRecordKey(system, singularKind, key, fileScope);
+  return `ext:${encodeURIComponent(system.trim().toLowerCase())}:${singularKind}:${key.trim()}`;
 }
 
 /** Facts are keyed under their person, so "birth" on two people never collide. */
