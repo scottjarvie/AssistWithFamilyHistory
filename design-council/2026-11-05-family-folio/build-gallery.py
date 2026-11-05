@@ -4,13 +4,15 @@ from datetime import datetime, timezone
 import html, json, base64, re, os, subprocess
 run=Path(__file__).resolve().parent
 rounds=sorted([p for p in run.glob('round-*') if re.fullmatch(r'round-\d+',p.name) and (p/'ours').exists()],key=lambda p:int(p.name.split('-')[1]),reverse=True)
-sections=[('Audit lead refinements',run/'audit-review-fixes'),('Audit instruments',run/'audit-instruments'),('Audit original · reconstructed now',run/'audit-baseline'),('Shared collection and Queue refinements',run/'review-refinements'),('Research Operations collection',run/'operations-records'),('Queue navigation and review fixes',run/'queue-review-fixes'),('Personal Queue views and thread',run/'queue-records'),('Record reader review refinements',run/'record-review-fixes'),('Place and Story records',run/'place-story-records'),('Record review refinements',run/'record-stream/current'),('Person dossier and evidence stream',run/'record-stream/reviewed-c187b04'),('Activity, facets and Home refinements',run/'activity-facets'),('Collection review fixes',run/'collection-fixes')]+[(p.name,p/'ours') for p in rounds]+[('Starting collections · reconstructed now',run/'baseline-reconstructed'),('Starting page · now',run/'baseline')]
+sections=[('Settings matrices and key ledgers',run/'settings-matrices'),('Settings originals · reconstructed now',run/'settings-baseline'),('Audit lead refinements',run/'audit-review-fixes'),('Audit instruments',run/'audit-instruments'),('Audit original · reconstructed now',run/'audit-baseline'),('Shared collection and Queue refinements',run/'review-refinements'),('Research Operations collection',run/'operations-records'),('Queue navigation and review fixes',run/'queue-review-fixes'),('Personal Queue views and thread',run/'queue-records'),('Record reader review refinements',run/'record-review-fixes'),('Place and Story records',run/'place-story-records'),('Record review refinements',run/'record-stream/current'),('Person dossier and evidence stream',run/'record-stream/reviewed-c187b04'),('Activity, facets and Home refinements',run/'activity-facets'),('Collection review fixes',run/'collection-fixes')]+[(p.name,p/'ours') for p in rounds]+[('Starting collections · reconstructed now',run/'baseline-reconstructed'),('Starting page · now',run/'baseline')]
 images=[]; blocks=[]
 score_file=run/'scores.json'
 score_data=json.loads(score_file.read_text()) if score_file.exists() else {}
 params=json.loads((run/'params.json').read_text())
 weights={c['key']:c.get('weight',1) for c in params.get('categories',[])}
 def score_line(title):
+ if title=='Settings matrices and key ledgers': return 'Newest Settings batch · all original grant/provider/key operations retained; intercepted synthetic acceptance only, independent exact-head review pending; no formal score'
+ if title=='Settings originals · reconstructed now': return 'Original Settings route/client JSX with invented records under current shared runtime · reconstructed comparison, not historical production captures'
  if title=='Audit lead refinements': return 'Newest lead fixes from Opus030963f · compact drawer, count units, coverage ratios, real Next navigation and retry verified; next meaningful review with Settings; no formal score'
  if title=='Audit instruments': return 'Reviewed at030963f · preservation/privacy/data path accepted; required instrument/drawer refinements in newest tranche, original reviewed images retained'
  if title=='Audit original · reconstructed now': return 'Original Audit route JSX with invented data/current shared runtime · reconstructed comparison, not a historical frozen capture'
@@ -44,6 +46,9 @@ for title,folder in sections:
  cards=[]
  score=score_line(title)
  ordered=sorted(folder.glob('*.png'))
+ if title=='Settings matrices and key ledgers':
+  first=['ai-permissions--desktop-light.png','ai-permissions--mobile-light.png','preferences-data--desktop-light.png','preferences-data--mobile-light.png','developer-keys--desktop-light.png','developer-keys--mobile-light.png','operator-ledger--desktop-light.png','operator-ledger--mobile-light.png']
+  ordered=sorted(ordered,key=lambda image:(first.index(image.name) if image.name in first else len(first),image.name))
  if title in ['Audit lead refinements','Audit instruments']:
   first=['audit-instruments--desktop-light.png','audit-instruments--mobile-light.png']
   ordered=sorted(ordered,key=lambda image:(first.index(image.name) if image.name in first else len(first),image.name))
@@ -52,10 +57,10 @@ for title,folder in sections:
   if os.environ.get('COUNCIL_INLINE_PREVIEW'):
    # Keep the portable gallery at original PNG quality. The inline renderer has
    # a 25 MiB attachment limit, so its adapter uses compressed viewing copies.
-   cache=run/'.gallery-preview'/'compact-v2'/image.relative_to(run).with_suffix('.jpg')
+   cache=run/'.gallery-preview'/'compact-v3'/image.relative_to(run).with_suffix('.jpg')
    if not cache.exists() or cache.stat().st_mtime < image.stat().st_mtime:
     cache.parent.mkdir(parents=True,exist_ok=True)
-    subprocess.run(['nice','-n','10','sips','-s','format','jpeg','-s','formatOptions','40','-Z','1200',str(image),'--out',str(cache)],check=True,stdout=subprocess.DEVNULL)
+    subprocess.run(['nice','-n','10','sips','-s','format','jpeg','-s','formatOptions','35','-Z','1100',str(image),'--out',str(cache)],check=True,stdout=subprocess.DEVNULL)
    source=str(cache)
   else:
    source='data:image/png;base64,'+base64.b64encode(image.read_bytes()).decode('ascii')

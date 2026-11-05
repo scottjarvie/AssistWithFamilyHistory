@@ -35,5 +35,5 @@ try {
  }
  pass('Dashboard, full-height record sheet and nested Save view fit1440/1280/390/320px in light and dark');
  assert.deepEqual(report.errors,[]);assert.deepEqual(report.unexpectedAPIs,[]);await context.close();
-} finally {await browser.close();writeFileSync(new URL('./audit-acceptance.json',import.meta.url),JSON.stringify({...report,note:'Invented data only. No API request allowed through; not backend acceptance.'},null,2)+'\n');}
+} finally {await browser.close();writeFileSync(new URL(process.argv[2]||'./audit-acceptance.json',import.meta.url),JSON.stringify({...report,note:'Invented data only. No API request allowed through; not backend acceptance.'},null,2)+'\n');}
 console.log(`${report.checks.length} Audit UI checks passed.`);

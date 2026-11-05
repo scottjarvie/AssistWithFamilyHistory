@@ -1,3 +1,5 @@
+[Newest-first gallery](gallery.html) · Settings batch:57/57 full steps,17 intercepted browser groups +11 Audit regressions,45 new candidate images and8 reconstructed originals.486-image gallery interactions pass; inline display and exact-head review pending admission. All-page goal active; local only.
+
 [Newest-first gallery](gallery.html) · Audit refinements committed atb5058bb:57/57 full steps,60 browser checks,22 fresh captures;433-image gallery checks/preview/display pass. Opus accepts preservation/privacy and prior Queue/Operations fixes; next meaningful review with Settings. All-page goal active; local only.
 
 

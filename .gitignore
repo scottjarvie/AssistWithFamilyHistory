@@ -124,3 +124,12 @@ design-council/*/audit-baseline/
 
 # Audit refinements after exact-head Opus review.
 design-council/*/audit-review-fixes/
+
+# Settings matrix council captures.
+design-council/*/settings-baseline/
+design-council/*/settings-matrices/
+
+# Retained nonaccepted capture attempts (theme label mismatch)
+design-council/*/settings-capture-attempt*/
+
+design-council/*/settings-capture-before-focus/
