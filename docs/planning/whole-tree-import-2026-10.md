@@ -287,3 +287,11 @@ the same bounded owner-filtered helper as the internal reader. Living-person
 notes remain withheld. Dry-run planning also restores local and cross-chunk
 planned identities when one item fails, matching the real nested transaction's
 rollback boundary; dependent rows cannot succeed against a failed phantom row.
+
+Dry-run chunk handoff carries a key-to-record-identity map, preserving aliases
+and distinct new records across chunk boundaries. Chunk-scoped placeholder IDs
+do not collide with placeholders from earlier chunks. Older keys-only internal
+handoffs are refused if they lack identity mappings; restart the dry run instead
+of guessing. Resending an already processed batch refreshes its records but
+keeps the forward cursor and next batch index. Exact operation receipt replays
+remain inert.

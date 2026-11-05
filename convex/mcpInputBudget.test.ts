@@ -75,7 +75,7 @@ test("public MCP person context returns imported notes only for the owning decea
   const owner = "synthetic-import-notes-owner";
   const principal = { issuer: "https://notes.example.test", subject: owner, clientId: "synthetic-notes-ai", scopes: [] };
   const grantId = await seedGrant(t, { vaultOwnerId: owner });
-  const job = await t.mutation(internal.treeImport.beginTreeImport, { principal, grantId, operationId: "notes-begin", requestHash: "notes-begin", input: { importKey: "notes-tree", system: "familysearch" } }) as any;
+  const job = await t.mutation(internal.treeImport.beginTreeImport, { principal, grantId, operationId: "notes-begin", requestHash: "notes-begin", input: { importKey: "notes-tree", system: "familysearch", label: "Synthetic notes tree" } }) as any;
   const result = await t.action(internal.treeImport.importTreeBatch, { principal, grantId, operationId: "notes-import", requestHash: "notes-import", input: {
     importJobId: job.importJobId, batchIndex: 0,
     persons: [{ key: "D", living: false, names: [{ given: "Deceased" }] }, { key: "L", living: true, names: [{ given: "Living" }] }],

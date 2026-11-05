@@ -711,7 +711,7 @@ test("failed dry-run items roll back planned identities so dependents match real
   });
   expect(initialPlan.plannedKeys).toEqual([externalRecordKey("familysearch", "source", "s")]);
   const dependentPlan = await t.query(internal.treeImport.planTreeImportChunk, {
-    principal: principal(), grantId: grant, importJobId: job.importJobId, operationId: "plan-next", plannedKeys: initialPlan.plannedKeys,
+    principal: principal(), grantId: grant, importJobId: job.importJobId, operationId: "plan-next", plannedKeys: initialPlan.plannedKeys, plannedRecords: initialPlan.plannedRecords,
     items: [{ kind: "relationships", index: 0, item: batch.relationships![0] }, { kind: "citations", index: 0, item: batch.citations![0] }, { kind: "notes", index: 0, item: batch.notes![0] }],
   });
   expect(dependentPlan.results.every(row => row.status === "failed")).toBe(true);
@@ -729,4 +729,49 @@ test("failed dry-run items roll back planned identities so dependents match real
   expect(await countRows(t, "relationships")).toBe(0);
   expect(await countRows(t, "citations")).toBe(0);
   expect(await countRows(t, "notes")).toBe(0);
+});
+
+
+test("dry-run chunks retain aliases and keep unrelated new placeholders distinct", { timeout: 300_000 }, async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  const people: NonNullable<TreeImportBatch["persons"]> = Array.from({ length: 125 }, (_, i) => ({
+    key: i === 0 ? "A" : `P${i}`, living: false, names: [{ given: `Synthetic${i}` }],
+    ...(i === 0 ? { otherIds: [{ system: "familysearch", id: "B" }] } : {}),
+  }));
+  people.push({ key: "X", living: false, names: [{ given: "Later chunk" }] });
+  const batch: TreeImportBatch = { persons: people, relationships: [
+    { key: "self-alias", type: "Couple", person1Key: "A", person2Key: "B" },
+    { key: "distinct", type: "Couple", person1Key: "A", person2Key: "X" },
+  ] };
+  const dry = await send(t, grant, job.importJobId, 0, batch, { dryRun: true }, "dry-aliases");
+  expect(await countRows(t, "persons")).toBe(0);
+  const real = await send(t, grant, job.importJobId, 0, batch, {}, "real-aliases");
+  const status = (r: any) => r.results.filter((row: any) => row.kind === "relationships").map((row: any) => ({ key: row.key, status: row.status }));
+  expect(status(dry)).toEqual(status(real));
+  expect(status(real)).toEqual([{ key: "self-alias", status: "failed" }, { key: "distinct", status: "created" }]);
+  expect(await countRows(t, "persons")).toBe(126);
+  expect(await countRows(t, "relationships")).toBe(1);
+});
+
+test("older batch resends preserve the forward cursor and exact receipt replays are inert", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  const batch: TreeImportBatch = { persons: [{ key: "P", living: false, names: [{ given: "Synthetic" }] }] };
+  await send(t, grant, job.importJobId, 0, batch, { cursor: "position-0" }, "cursor-batch-0");
+  await send(t, grant, job.importJobId, 1, batch, { cursor: "position-1" }, "cursor-batch-1");
+  const resend = await send(t, grant, job.importJobId, 0, batch, { cursor: "position-0" }, "resend-old-0");
+  expect(resend.nextBatchIndex).toBe(2);
+  expect(resend.cursor).toBe("position-1");
+  const beforeReplay = await t.query(internal.treeImport.getTreeImport, { principal: principal(), importJobId: job.importJobId }) as any;
+  const replay = await send(t, grant, job.importJobId, 0, batch, { cursor: "position-0" }, "resend-old-0");
+  expect(replay.deduplicated).toBe(true);
+  const afterReplay = await t.query(internal.treeImport.getTreeImport, { principal: principal(), importJobId: job.importJobId }) as any;
+  expect(afterReplay).toEqual(beforeReplay);
+  expect((await begin(t, grant)).nextBatchIndex).toBe(2);
+  const forward = await send(t, grant, job.importJobId, 2, batch, { cursor: "position-2" }, "cursor-batch-2");
+  expect(forward.cursor).toBe("position-2");
+  expect(forward.nextBatchIndex).toBe(3);
 });

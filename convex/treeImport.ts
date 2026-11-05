@@ -93,11 +93,11 @@ function liveWriter(ctx: MutationCtx): Writer {
   };
 }
 
-function dryWriter(): Writer {
+function dryWriter(scope: string): Writer {
   let counter = 0;
   return {
     dryRun: true,
-    insert: async (table) => `dry:${table}:${(counter += 1)}`,
+    insert: async (table) => `dry:${encodeURIComponent(scope)}:${table}:${(counter += 1)}`,
     patch: async () => {},
   };
 }
@@ -877,18 +877,22 @@ export const applyTreeImportItem = internalMutation({
 
 /** A dry run of one chunk. Reads only; the writer changes nothing. */
 export const planTreeImportChunk = internalQuery({
-  args: { ...chunkArgs, plannedKeys: v.array(v.string()) },
+  args: { ...chunkArgs, plannedKeys: v.array(v.string()), plannedRecords: v.optional(v.array(v.object({ key: v.string(), recordId: v.string() }))) },
   handler: async (ctx, args) => {
     const owner = ownerFromPrincipal(args.principal);
     await assertGrantPermits(ctx, { owner, grantId: args.grantId, toolName: BATCH_TOOL, input: {} });
     const job = await loadJob(ctx, owner, args.importJobId, true);
+    const local = new Map((args.plannedRecords ?? []).map(row => [row.key, row.recordId]));
+    if (args.plannedKeys.some(key => !local.has(key))) {
+      machineError("VALIDATION_ERROR", "Dry-run keys need their original identity mappings.", "Restart the dry run and carry plannedRecords alongside plannedKeys between chunks.");
+    }
     const c: ChunkContext = {
-      ctx, w: dryWriter(), owner, job, provenance: importProvenance(args.principal, args.operationId),
-      local: new Map(), planned: new Set(args.plannedKeys), plannedNow: [], duplicatesSuggested: 0,
+      ctx, w: dryWriter(args.operationId), owner, job, provenance: importProvenance(args.principal, args.operationId),
+      local, planned: new Set(args.plannedKeys), plannedNow: [], duplicatesSuggested: 0,
     };
     const results = await runChunk(c, args.items as TreeImportItem[]);
     const suggested = results.reduce((total, row) => total + (row.possibleDuplicates?.length ?? 0), 0);
-    return { results, plannedKeys: c.plannedNow, duplicatesSuggested: suggested };
+    return { results, plannedKeys: c.plannedNow, plannedRecords: [...c.local].map(([key, recordId]) => ({ key, recordId })), duplicatesSuggested: suggested };
   },
 });
 
@@ -1004,7 +1008,8 @@ export const recordTreeImportBatch = internalMutation({
       .map((row) => ({ kind: row.kind, key: row.key.slice(0, TREE_IMPORT_LIMITS.key), reason: (row.reason ?? "failed").slice(0, 300) }));
     const now = Date.now();
     const nextBatchIndex = Math.max(job.nextBatchIndex, args.batchIndex + 1);
-    const cursor = cleanText(args.cursor, "cursor", TREE_IMPORT_LIMITS.cursor) ?? job.cursor;
+    const submittedCursor = cleanText(args.cursor, "cursor", TREE_IMPORT_LIMITS.cursor);
+    const cursor = args.batchIndex >= job.nextBatchIndex ? submittedCursor ?? job.cursor : job.cursor;
     await ctx.db.patch(job._id, {
       counts,
       nextBatchIndex,
@@ -1116,10 +1121,11 @@ export const importTreeBatch = internalAction({
     const chunks = chunkBatch(input);
     const results: ItemResult[] = [];
     const planned: string[] = [];
+    let plannedRecords: { key: string; recordId: string }[] = [];
     let duplicatesSuggested = 0;
     for (const [index, items] of chunks.entries()) {
-      const chunk: { results: ItemResult[]; plannedKeys: string[]; duplicatesSuggested: number } = dryRun
-        ? await ctx.runQuery(self.planTreeImportChunk, { ...base, operationId: args.operationId, items, plannedKeys: planned })
+      const chunk: { results: ItemResult[]; plannedKeys: string[]; plannedRecords?: { key: string; recordId: string }[]; duplicatesSuggested: number } = dryRun
+        ? await ctx.runQuery(self.planTreeImportChunk, { ...base, operationId: `${args.operationId}#${index}`, items, plannedKeys: planned, plannedRecords })
         : await ctx.runMutation(self.applyTreeImportChunk, {
           ...base,
           operationId: `${args.operationId}#${index}`,
@@ -1128,6 +1134,7 @@ export const importTreeBatch = internalAction({
         });
       results.push(...chunk.results);
       planned.push(...chunk.plannedKeys);
+      plannedRecords = chunk.plannedRecords ?? plannedRecords;
       duplicatesSuggested += chunk.duplicatesSuggested;
     }
 
