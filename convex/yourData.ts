@@ -31,11 +31,20 @@ const SMALL_CAP = 1_000;
 const DAY = 24 * 60 * 60 * 1000;
 
 async function ownedRows(ctx: QueryCtx, table: TableNames, owner: string, cap: number, order: "asc" | "desc" = "asc") {
-  // Every table read here declares a by_owner index (scripts/check-owned-tables-parity.ts).
+  // Iterate so large story/source documents cannot exhaust the query byte budget.
+  // Each table reads at most its cap, or 250 KB plus one document.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rows = await (ctx.db.query(table) as any).withIndex("by_owner", (q: any) => q.eq("vaultOwnerId", owner)).order(order).take(cap + 1);
+  const query = (ctx.db.query(table) as any).withIndex("by_owner", (q: any) => q.eq("vaultOwnerId", owner)).order(order);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return { rows: rows.slice(0, cap) as any[], more: rows.length > cap };
+  const rows: any[] = [];
+  let bytes = 0;
+  const encoder = new TextEncoder();
+  for await (const row of query) {
+    rows.push(row);
+    bytes += encoder.encode(JSON.stringify(row)).byteLength;
+    if (rows.length >= cap || bytes >= 250_000) return { rows, more: true };
+  }
+  return { rows, more: false };
 }
 
 function tally<T>(rows: T[], key: (row: T) => string) {
@@ -147,7 +156,8 @@ export const exportPageInternal = internalQuery({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const page = await (ctx.db.query(args.table as ExportTable) as any)
       .withIndex("by_owner", (q: any) => q.eq("vaultOwnerId", args.vaultOwnerId)) // eslint-disable-line @typescript-eslint/no-explicit-any
-      .paginate({ numItems: 200, cursor: args.cursor });
+      // Bound full source text pages by bytes as well as record count.
+      .paginate({ numItems: 200, maximumBytesRead: 1_000_000, cursor: args.cursor });
     return { rows: page.page as unknown[], cursor: page.isDone ? null : (page.continueCursor as string) };
   },
 });
