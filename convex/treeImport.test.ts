@@ -1667,6 +1667,53 @@ test.each([0, 245])("dry partial refreshes retain planned associations and types
   expect(stored.source.type).toBe("census"); expect(stored.media.type).toBe("photo"); expect(stored.media.personIds).toHaveLength(1); expect(stored.media.sourceId).toBe(stored.source._id); expect(stored.note.noteType).toBe("biography");
 });
 
+test.each([false, true])("imported default sex refreshes while actual manual edits remain protected (%s)", async manual => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  const person = { key: "P", living: false, names: [{ given: "Pat" }] };
+  await send(t, grant, job.importJobId, 0, { persons: [person] });
+  const id = await t.run(async ctx => {
+    const row = (await ctx.db.query("persons").collect())[0];
+    const mapping = (await ctx.db.query("mcpRecordKeys").collect()).find(key => key.recordType === "person")!;
+    expect(row.sex).toBe("unknown");
+    expect(JSON.parse(mapping.lastImportedJson!).sex).toBe("unknown");
+    if (manual) await ctx.db.patch(row._id, { sex: "male" });
+    return row._id;
+  });
+  const before = await t.run(ctx => ctx.db.get(id));
+  const batch: TreeImportBatch = { persons: [{ ...person, sex: "female" }] };
+  const dry = await send(t, grant, job.importJobId, 1, batch, { dryRun: true }, `dry-default-sex-${manual}`);
+  expect(await t.run(ctx => ctx.db.get(id))).toEqual(before);
+  const real = await send(t, grant, job.importJobId, 1, batch);
+  expect(dry.counts).toEqual(real.counts);
+  expect((await t.run(ctx => ctx.db.get(id)))?.sex).toBe(manual ? "male" : "female");
+  expect(real.results).toEqual([expect.objectContaining(manual ? { status: "unchanged", kept: ["sex"] } : { status: "updated" })]);
+  if (!manual) {
+    await t.run(ctx => ctx.db.patch(id, { sex: "unknown" }));
+    const corrected = await send(t, grant, job.importJobId, 2, { persons: [{ ...person, sex: "male" }] });
+    expect(corrected.results).toEqual([expect.objectContaining({ status: "unchanged", kept: ["sex"] })]);
+    expect((await t.run(ctx => ctx.db.get(id)))?.sex).toBe("unknown");
+  }
+});
+
+test.each([0, 124])("dry default sex baselines survive repeated new people across chunks (padding %i)", { timeout: 300_000 }, async padding => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  const person = { key: "P", living: false, names: [{ given: "Pat" }] };
+  const batch: TreeImportBatch = { persons: [person, ...Array.from({ length: padding }, (_, i) => ({ key: `padding-${i}`, living: false, names: [{ given: `Padding${i}` }] })), { ...person, sex: "female" }] };
+  const dry = await send(t, grant, job.importJobId, 0, batch, { dryRun: true }, `dry-planned-sex-${padding}`);
+  expect(await countRows(t, "persons")).toBe(0);
+  const real = await send(t, grant, job.importJobId, 0, batch);
+  expect(dry.counts).toEqual(real.counts);
+  expect(real.counts.persons.created).toBe(padding + 1);
+  expect(real.counts.persons.updated).toBe(1);
+  expect(real.results.filter((row: any) => row.kept || row.status === "failed")).toEqual([]);
+  const saved = await t.run(async ctx => (await ctx.db.query("persons").collect()).find(row => row.fsId === "P")!);
+  expect(saved.sex).toBe("female");
+});
+
 test("citation link additions report updated, dry planning agrees, repeated targets stay idempotent", async () => {
   const t = convexTest({ schema, modules, transactionLimits: true });
   const grant = await seedGrant(t, { vaultOwnerId: OWNER });

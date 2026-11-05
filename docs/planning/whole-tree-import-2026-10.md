@@ -409,3 +409,8 @@ to manual-edit preservation. Creation defaults remain part of the import
 baseline so later explicit values can refresh them. Import person/relationship
 fact dates accept the model range flag through public validation and storage,
 including embedded birth/death dates; unrelated public date schemas stay strict.
+
+A newly imported person whose sex is omitted stores unknown in both the record
+and its imported baseline. Later explicit sex can refresh that default, while
+actual manual corrections (including a later change back to unknown) remain
+protected. Existing records do not acquire a new default during partial refresh.

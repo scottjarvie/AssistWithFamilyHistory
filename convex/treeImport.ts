@@ -466,7 +466,8 @@ async function importPerson(c: ChunkContext, item: any): Promise<Omit<ItemResult
     importedNames: clean(item.names),
     name,
     alternateNames: alternateNames.length ? alternateNames : undefined,
-    sex: item.sex,
+    // Include the effective creation value in the imported refresh baseline.
+    sex: item.sex ?? (existingId ? undefined : "unknown"),
     living: item.living,
     birth: embedded("birth"),
     death: embedded("death"),
@@ -483,7 +484,7 @@ async function importPerson(c: ChunkContext, item: any): Promise<Omit<ItemResult
     existingId,
     linked,
     doc,
-    createOnly: { researchStatus: "basic", sex: item.sex ?? "unknown" },
+    createOnly: { researchStatus: "basic" },
   });
   if (saved.status === "created") {
     for (const candidate of duplicates) await suggestDuplicate(c, saved.id, candidate, name, yearOf(doc.birth?.date));
