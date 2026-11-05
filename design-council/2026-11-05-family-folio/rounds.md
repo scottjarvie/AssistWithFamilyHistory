@@ -15,3 +15,9 @@ Builder look-check: desktop/phone Home, empty phone, dark Home and dark People i
 External references: FamilySearch returned an Access Denied page despite HTTP 200; Library of Congress returned a security verification wall. Both excluded, no bypass attempted. GitHub Issues is a valid dense reference. National Archives alternatives being captured.
 
 Next: cross-model code/taste review; build collection kit, dossier/stream, counted sections and permissions matrices before claiming site-wide improvement. Every remaining page stays pending in the inventory.
+
+### Initial Sol judgement
+
+Fresh blinded Codex gpt-6.1-sol: candidate **6.8**, baseline **5.4**, lift **+1.4**, best reference **8.2**. Twenty visible-element probes passed. Capability score improved to 8; AI visibility and running-cost score 4.5. **Below target; fix, not accepted.** No Opus scoring round requested yet under the skill's cheap-first gate; separate exact-head Opus code/taste review is underway.
+
+Priorities: selected navigation/heading orientation in the fixture and real shell; align people metadata; prioritize lookup on phone; preserve the illustration slot but keep rows compact; reconcile synthetic inventory/feed mismatch; expose existing AI handoff affordances and real attribution without inventing work. The cost score used development payload weight; production bundle evidence should calibrate that category rather than assuming a dev payload is production cost. Shared hard-coded navigation surfaces and larger page families remain to build.

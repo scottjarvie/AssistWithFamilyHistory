@@ -1,0 +1,182 @@
+{
+  "runId": "2026-11-05-family-folio",
+  "site": "Assist With Family History",
+  "params": {
+    "target": 8,
+    "minLift": 1.5,
+    "maxRounds": 4,
+    "beatReferences": false,
+    "judges": [
+      {
+        "key": "sol",
+        "label": "Codex gpt-6.1-sol",
+        "providerInstanceId": "codex",
+        "model": "gpt-6.1-sol",
+        "options": {
+          "reasoningEffort": "high"
+        }
+      },
+      {
+        "key": "opus",
+        "label": "Claude Opus 5.5",
+        "providerInstanceId": "claudeAgent",
+        "model": "claude-opus-5-5",
+        "options": {
+          "effort": "high"
+        }
+      }
+    ]
+  },
+  "categories": [
+    "findability",
+    "density",
+    "capability",
+    "aiwork",
+    "hierarchy",
+    "typography",
+    "iconography",
+    "spacing",
+    "colour",
+    "consistency",
+    "fit",
+    "cost"
+  ],
+  "rounds": [
+    {
+      "round": 1,
+      "sameAsBaseline": false,
+      "explore": false,
+      "categories": [
+        "findability",
+        "density",
+        "capability",
+        "aiwork",
+        "hierarchy",
+        "typography",
+        "iconography",
+        "spacing",
+        "colour",
+        "consistency",
+        "fit",
+        "cost"
+      ],
+      "categoryNote": null,
+      "capabilityProbes": {
+        "passed": 20,
+        "failed": []
+      },
+      "referenceNames": {
+        "R1": "GitHub Issues · dense research/work list",
+        "R2": "US National Archives · genealogist resources",
+        "R3": "UK National Archives · census research guide"
+      },
+      "judges": [
+        {
+          "judge": "sol",
+          "model": "gpt-6.1-sol",
+          "seconds": null,
+          "subjects": {
+            "candidate": {
+              "findability": 7,
+              "density": 6.5,
+              "capability": 8,
+              "aiwork": 4.5,
+              "hierarchy": 7,
+              "typography": 7.5,
+              "iconography": 7,
+              "spacing": 7,
+              "colour": 7.5,
+              "consistency": 7,
+              "fit": 7.5,
+              "cost": 4.5
+            },
+            "baseline": {
+              "findability": 5.5,
+              "density": 6.5,
+              "capability": 6.5,
+              "aiwork": 3.5,
+              "hierarchy": 5.5,
+              "typography": 6,
+              "iconography": 6.5,
+              "spacing": 7,
+              "colour": 3,
+              "consistency": 4,
+              "fit": 5.5,
+              "cost": 4.5
+            },
+            "ref:github-issues": {
+              "findability": 8.5,
+              "density": 9,
+              "capability": 9,
+              "aiwork": 5,
+              "hierarchy": 8,
+              "typography": 8,
+              "iconography": 8.5,
+              "spacing": 8.5,
+              "colour": 8,
+              "consistency": 9,
+              "fit": 9,
+              "cost": 7.5
+            },
+            "ref:national-archives": {
+              "findability": 7.5,
+              "density": 7.5,
+              "capability": 8,
+              "aiwork": 5,
+              "hierarchy": 6.5,
+              "typography": 6,
+              "iconography": 4.5,
+              "spacing": 6.5,
+              "colour": 5.5,
+              "consistency": 5.5,
+              "fit": 7,
+              "cost": 7
+            },
+            "ref:uk-archives": {
+              "findability": 8,
+              "density": 7.5,
+              "capability": 8.5,
+              "aiwork": 5,
+              "hierarchy": 7,
+              "typography": 6.5,
+              "iconography": 6.5,
+              "spacing": 6.5,
+              "colour": 7.5,
+              "consistency": 7.5,
+              "fit": 8,
+              "cost": 7.5
+            }
+          },
+          "bestRef": {
+            "findability": 8.5,
+            "density": 9,
+            "capability": 9,
+            "aiwork": 5,
+            "hierarchy": 8,
+            "typography": 8,
+            "iconography": 8.5,
+            "spacing": 8.5,
+            "colour": 8,
+            "consistency": 9,
+            "fit": 9,
+            "cost": 7.5
+          },
+          "summary": {
+            "candidateAvg": 6.836734693877551,
+            "baselineAvg": 5.3979591836734695,
+            "lift": 1.4387755102040813,
+            "minCategory": 4.5,
+            "bestRefAvg": 8.23469387755102,
+            "beatsRefs": false,
+            "blockedBy": [],
+            "pass": false
+          }
+        }
+      ]
+    }
+  ],
+  "decision": {
+    "action": "fix",
+    "why": "round 1: sol below target (min 4.5, lift 1.4). Fix and start round 2"
+  }
+}
