@@ -1876,6 +1876,90 @@ test("changed date text requires compatible retained structured metadata", async
   expect(after.people[0].birth?.date).toEqual(complete); expect(after.events[0].date).toEqual(complete); expect(after.events[0].importedFact?.date).toEqual(complete);
 });
 
+test("unparseable date corrections cannot retain an old inferred birth year", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const person = { key: "P", living: false, names: [{ given: "Synthetic" }] };
+  await send(t, grant, job.importJobId, 0, { persons: [{ ...person, facts: [{ key: "B", type: "birth", date: { original: "1900" } }] }] });
+  const snapshot = () => t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), events: await ctx.db.query("events").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() }));
+  const before = await snapshot();
+  for (const dryRun of [true, false]) {
+    const result = await send(t, grant, job.importJobId, 1, { persons: [{ ...person, facts: [{ key: "B", type: "birth", date: { original: "unknown" } }] }] }, { dryRun }, `unknown-date-${dryRun}`);
+    expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("FACT_DATE_CONFIRMATION_REQUIRED") })]);
+    expect(await snapshot()).toEqual(before);
+  }
+  const corrected = await send(t, grant, job.importJobId, 2, { persons: [{ ...person, facts: [{ key: "B", type: "birth", date: { original: "1901" } }] }] });
+  expect(corrected.results[0].status).toBe("updated");
+  const after = await snapshot();
+  expect(after.people[0].birth?.date).toEqual({ original: "1901", year: 1901 }); expect(after.events[0].date).toEqual({ original: "1901", year: 1901 }); expect(after.events[0].importedFact?.date).toEqual({ original: "1901" });
+});
+
+test.each([false, true])("partial relationship facts retain omitted fields and unmentioned facts (%s)", async manual => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const relation = { key: "R", type: "Couple" as const, person1Key: "A", person2Key: "B" };
+  await send(t, grant, job.importJobId, 0, { persons: ["A", "B"].map(key => ({ key, living: false, names: [{ given: key }] })), relationships: [{ ...relation, facts: [{ type: "marriage", date: { original: "1900" }, place: { original: "London" }, description: "Original detail" }, { type: "divorce", date: { original: "1950" }, description: "Original divorce" }] }] });
+  if (manual) await t.run(async ctx => { const row = (await ctx.db.query("relationships").collect())[0]; await ctx.db.patch(row._id, { facts: row.facts!.map(fact => fact.type === "marriage" ? { ...fact, place: { original: "Owner place" } } : fact) }); });
+  const snapshot = () => t.run(async ctx => ({ rows: await ctx.db.query("relationships").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() }));
+  const before = await snapshot();
+  const batch: TreeImportBatch = { relationships: [{ ...relation, facts: [{ type: "marriage", description: "Corrected detail" }] }] };
+  const dry = await send(t, grant, job.importJobId, 1, batch, { dryRun: true }, `dry-partial-relation-${manual}`);
+  expect(await snapshot()).toEqual(before);
+  const real = await send(t, grant, job.importJobId, 1, batch);
+  expect(dry.counts).toEqual(real.counts); expect(real.results).toEqual([expect.objectContaining({ status: "updated" })]);
+  let stored = (await snapshot()).rows[0];
+  expect(stored.facts).toHaveLength(2);
+  expect(stored.facts![0]).toMatchObject({ type: "marriage", date: { original: "1900", year: 1900 }, place: { original: manual ? "Owner place" : "London" }, description: "Corrected detail" });
+  expect(stored.facts![1]).toEqual(before.rows[0].facts![1]);
+  const next = await send(t, grant, job.importJobId, 2, { relationships: [{ ...relation, facts: [{ type: "marriage", place: { original: "Paris" } }] }] });
+  stored = (await snapshot()).rows[0];
+  expect(stored.facts![0].place?.original).toBe(manual ? "Owner place" : "Paris");
+  expect(stored.facts![0].date?.original).toBe("1900");
+  if (manual) expect(next.results[0].kept).toContain("facts");
+});
+
+test("ambiguous relationship fact types refuse partial replacement and allow exact replay", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const relation = { key: "R", type: "Couple" as const, person1Key: "A", person2Key: "B" };
+  const facts = ["1900", "1910"].map(original => ({ type: "marriage", date: { original }, place: { original: "London" }, description: original }));
+  await send(t, grant, job.importJobId, 0, { persons: ["A", "B"].map(key => ({ key, living: false, names: [{ given: key }] })), relationships: [{ ...relation, facts }] });
+  const before = await t.run(ctx => ctx.db.query("relationships").collect());
+  for (const dryRun of [true, false]) {
+    const result = await send(t, grant, job.importJobId, 1, { relationships: [{ ...relation, facts: [{ type: "marriage", description: "Which marriage?" }] }] }, { dryRun }, `ambiguous-relation-${dryRun}`);
+    expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("RELATIONSHIP_FACT_REVIEW_REQUIRED") })]);
+    expect(await t.run(ctx => ctx.db.query("relationships").collect())).toEqual(before);
+  }
+  const repeat = await send(t, grant, job.importJobId, 2, { relationships: [{ ...relation, facts }] });
+  expect(repeat.counts.relationships.unchanged).toBe(1);
+});
+
+test("partial relationship refresh does not restore a manually deleted fact", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const relation = { key: "R", type: "Couple" as const, person1Key: "A", person2Key: "B", facts: [{ type: "marriage", date: { original: "1900" }, description: "Original" }] };
+  await send(t, grant, job.importJobId, 0, { persons: ["A", "B"].map(key => ({ key, living: false, names: [{ given: key }] })), relationships: [relation] });
+  await t.run(async ctx => { const row = (await ctx.db.query("relationships").collect())[0]; await ctx.db.patch(row._id, { facts: [] }); });
+  const result = await send(t, grant, job.importJobId, 1, { relationships: [relation] });
+  expect(result.results).toEqual([expect.objectContaining({ status: "unchanged", kept: ["facts"] })]);
+  expect((await t.run(ctx => ctx.db.query("relationships").collect()))[0].facts).toEqual([]);
+});
+
+test.each([false, true])("retained relationship facts cannot acquire changed or conflicting endpoints (%s)", async manual => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const relation = { key: "R", type: "Couple" as const, person1Key: "A", person2Key: "B" };
+  const facts = [{ type: "marriage", date: { original: "1900" }, place: { original: "London" }, description: "Original A-B" }];
+  await send(t, grant, job.importJobId, 0, { persons: ["A", "B", "C"].map(key => ({ key, living: false, names: [{ given: key }] })), relationships: [{ ...relation, facts }] });
+  if (manual) await t.run(async ctx => { const row = (await ctx.db.query("relationships").collect())[0]; const c = (await ctx.db.query("persons").collect()).find(p => p.fsId === "C")!; await ctx.db.patch(row._id, { person2: c._id }); });
+  const snapshot = () => t.run(async ctx => ({ rows: await ctx.db.query("relationships").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() }));
+  const before = await snapshot();
+  const partial = { ...relation, person2Key: manual ? "B" : "C", facts: [{ type: "marriage", description: "Changed relationship" }] };
+  for (const dryRun of [true, false]) {
+    const result = await send(t, grant, job.importJobId, 1, { relationships: [partial] }, { dryRun }, `relation-attribution-${manual}-${dryRun}`);
+    expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("RELATIONSHIP_FACT_REVIEW_REQUIRED") })]);
+    expect(await snapshot()).toEqual(before);
+  }
+  const confirmed = await send(t, grant, job.importJobId, 2, { relationships: [{ ...relation, person2Key: "C", facts: [{ ...facts[0], description: "Confirmed A-C" }] }] });
+  expect(confirmed.results[0].status).toBe("updated");
+  expect((await snapshot()).rows[0].facts![0].description).toBe("Confirmed A-C");
+});
+
 test("citation link additions report updated, dry planning agrees, repeated targets stay idempotent", async () => {
   const t = convexTest({ schema, modules, transactionLimits: true });
   const grant = await seedGrant(t, { vaultOwnerId: OWNER });

@@ -339,9 +339,41 @@ function mergeableObject(value: unknown): value is Record<string, unknown> {
 }
 
 /** Supplied leaves refresh independently; omitted leaves and manual edits stay. */
-function mergeImportedValue(current: unknown, incoming: unknown, baseline: unknown, hasBaseline: boolean): { value: unknown; baseline: unknown; hasBaseline: boolean; kept: boolean } {
+function mergeImportedValue(current: unknown, incoming: unknown, baseline: unknown, hasBaseline: boolean, mergeFacts = false): { value: unknown; baseline: unknown; hasBaseline: boolean; kept: boolean } {
   if (same(current, incoming)) return { value: current, baseline, hasBaseline, kept: false };
+  if (mergeFacts && Array.isArray(current) && Array.isArray(incoming)) {
+    const value = [...current];
+    const imported: any[] = hasBaseline && Array.isArray(baseline) ? [...baseline] : [];
+    const suppliedTypes = new Set<string>();
+    let kept = false;
+    let known = hasBaseline;
+    for (const fact of incoming) {
+      const type = fact?.type;
+      const matches = value.map((row, index) => row?.type === type ? index : -1).filter(index => index >= 0);
+      const originals = imported.map((row, index) => row?.type === type ? index : -1).filter(index => index >= 0);
+      if (typeof type !== "string" || suppliedTypes.has(type) || matches.length > 1 || originals.length > 1) {
+        fail("RELATIONSHIP_FACT_REVIEW_REQUIRED", "Relationship facts cannot be matched unambiguously by type.", "Review the original fact list with the person before replacing it; this relationship item saved nothing.");
+      }
+      suppliedTypes.add(type);
+      if (!matches.length && originals.length) { kept = true; continue; } // Retain a manual deletion.
+      const next = mergeImportedValue(matches.length ? value[matches[0]] : undefined, fact, originals.length ? imported[originals[0]] : undefined, originals.length > 0);
+      if (matches.length) value[matches[0]] = next.value;
+      else value.push(next.value);
+      if (next.hasBaseline) {
+        const entry = { type, ...(next.baseline as Record<string, unknown>) };
+        if (originals.length) imported[originals[0]] = entry;
+        else imported.push(entry);
+        known = true;
+      }
+      kept ||= next.kept;
+    }
+    return { value, baseline: imported, hasBaseline: known, kept };
+  }
   if (mergeableObject(current) && mergeableObject(incoming)) {
+    if (typeof current.original === "string" && typeof incoming.original === "string" && current.original !== incoming.original
+      && typeof current.year === "number" && incoming.year === undefined) {
+      fail("FACT_DATE_CONFIRMATION_REQUIRED", "Changed date text would retain a year that the new text does not support.", "Review the existing date and inferred year before replacing them. This record item saved nothing.");
+    }
     const value: Record<string, unknown> = { ...current };
     const old: Record<string, unknown> = hasBaseline && mergeableObject(baseline) ? baseline : {};
     const imported: Record<string, unknown> = { ...old };
@@ -411,7 +443,7 @@ async function upsertRow(
       if (!same(merged, current)) patch.externalIds = merged;
       continue;
     }
-    const next = mergeImportedValue(current, value, baseline?.[field], !!baseline && Object.hasOwn(baseline, field));
+    const next = mergeImportedValue(current, value, baseline?.[field], !!baseline && Object.hasOwn(baseline, field), args.table === "relationships" && field === "facts");
     if (!same(current, next.value)) {
       patch[field] = next.value;
       if (next.hasBaseline) imported[field] = next.baseline;
@@ -705,6 +737,7 @@ async function importRelationship(c: ChunkContext, item: any): Promise<Omit<Item
       .find(row => row.person2 === person2 && matchesVaultOwner(row.vaultOwnerId, c.owner));
     if (match) { existingId = String(match._id); linked = true; }
   }
+  const previous = existingId ? await ownedRow(c, "relationships", existingId) : null;
   const facts = Array.isArray(item.facts) && item.facts.length
     ? item.facts.map((fact: any) => clean({
       type: String(fact.type).slice(0, 120),
@@ -730,6 +763,16 @@ async function importRelationship(c: ChunkContext, item: any): Promise<Omit<Item
     },
     createOnly: { importKey: `import:${externalRecordKey(c.job.system, "relationship", key, c.job.importKey)}` },
   });
+  if (previous) {
+    const current = await ownedRow(c, "relationships", saved.id);
+    const references = ["type", "person1", "person2"] as const;
+    const moved = current && references.some(field => !same(previous[field], current[field]));
+    const keptReference = saved.kept?.some(field => references.some(reference => reference === field));
+    if (current && ((moved && current.facts?.length && !same(facts, current.facts)) || (keptReference && !same(previous.facts, current.facts)))) {
+      fail("RELATIONSHIP_FACT_REVIEW_REQUIRED", "Relationship facts cannot acquire different endpoints or a conflicting retained identity without confirmation.",
+        "Review the relationship and explicitly resubmit its complete facts with the correct endpoints. This relationship item saved nothing.");
+    }
+  }
   return { key, status: saved.status, id: saved.id, ...(saved.kept ? { kept: saved.kept } : {}) };
 }
 

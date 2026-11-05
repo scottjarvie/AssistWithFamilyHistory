@@ -433,3 +433,11 @@ without manual conflicts. Conflicting duplicate fact identities within one
 person refuse atomically; identical duplicates are idempotent. Public person
 and relationship writers plus legacy Convex date/name validators preserve
 imported range dates and alternate nicknames. Authorization is unchanged.
+
+A date-text correction that cannot supply a replacement year refuses rather
+than retaining an old inferred display/index year. Relationship facts merge
+by exact type only when that identity is unambiguous: omitted nested details
+and unmentioned facts remain, and manual deletions stay protected. Ambiguous
+replacements require review; unchanged full replays remain valid. Retained
+facts must be fully resubmitted before changing relationship endpoints/type,
+and conflicting retained endpoints cannot receive newly changed facts.
