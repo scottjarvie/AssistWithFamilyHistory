@@ -31,3 +31,10 @@
 ## Receipts already established
 
 Frozen27bee8e:57/57 full steps49s,13 Queue UI/11 intercepted Queue,9 Operations UI/4 intercepted Operations,18 People/18 cross-page/19 Place-Story.32 Queue-reader +12 Operations captures,2 reconstructed original comparisons,326-image gallery checks/clean inline preview/display. Opus accepts preservation/privacy/contracts and reader reuse, conditionally Queue/Operations/kit as above. No backend acceptance, final score, complete Card/WO or production action.
+
+
+## Lead receipt after this plan
+
+Required QN1/QN2, O-R1/O-R2/O-R3 and K1 are implemented/tested; recommended quiet reload, stale-command/row-page handling, short phone header, honest state counts, scoped metrics, exact-check labels and minimal projection are also in.109 browser checks,62 captures,57 full steps pass. Back/Forward entry provenance is stored in the existing history state without records; rendered-order IDs come from the collection callback. Col percentages replace ignored calc() widths. O-R4 current computed visibility/captures confirm Table details hidden; no unproved cached-image explanation claimed. Minor Coverage header/noun wrap at1280 can be polished alongside Audit. Next work is the Audit route below, not another delegate for this small fix batch.
+
+Audit pure helper was moved from convex/auditRecords.ts to lib/audit/records.ts so it is not registered as a Convex function module; its3 tests are now part of normal verification. The handoff parity parser is verified with this tranche. No new Audit backend/API/UI yet; legacy ordinary callers and grants remain untouched.

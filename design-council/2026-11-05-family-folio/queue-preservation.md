@@ -28,3 +28,6 @@ Verification plan: backend-free read-only UI fixture checks; all six command pat
 
 
 Opus76b04ba lead-fix note: priority remains explicitly loaded-only in this tranche. Although the API accepts priority, the existing list query indexes do not correctly combine every state/priority pairing; sending it during this visual pass would silently change result semantics. No invented server-wide priority count is shown. Source inspection, not a request for Scott to answer overnight.
+
+
+27bee8e follow-up: modal close uses entry provenance with browser Back for an opened sheet and replace for direct links; Back/Forward is tested. Next follows current rendered group/sort/selection order, closing focuses the viewed row. Quiet updates retain earlier activity; targeted conflict reloads preserve loaded pages2+ and private drafts. Commands no longer applicable after refresh hide without clearing their draft. All original request bodies/confirmations/owner keys remain unchanged.

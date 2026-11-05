@@ -1,4 +1,4 @@
-[Newest-first gallery](gallery.html) · Local27bee8e:57/57 full checks,92 browser/controller checks,44 fresh captures +2 reconstructed comparisons. Opus confirms preservation/privacy; Queue/Operations/kit follow-ups required before reuse. All-page goal active; local only.
+[Newest-first gallery](gallery.html) · Lead refinements:57/57 full steps,109 browser/controller checks,62 final captures and388-image gallery pass. Required27bee8e fixes implemented; next meaningful Opus review with Audit. All-page goal active; local only.
 
 
 
@@ -109,3 +109,14 @@ Frozen batch full receipt: **57/57 passed**, Node22,49s. Latest code is ready fo
 ## Opus27bee8e and next lead pass
 
 Full receipt is reviews/opus-operations-27bee8e.md. Reader family approved; Queue requires clean history/visible-order navigation; Operations requires desktop next-action visibility, truthful sort-vs-filter behavior and shared staged Apply filters. Kit needs current People/Research desktop fit evidence. No removed capability/privacy/owner-boundary regression. No formal score/site-wide or whole-Card audit clearance. Required follow-ups/verification route and newer uncommitted handoff/Audit foundations are in operations-review-next.md. The latest committed verified source is27bee8e; later work is local WIP, not represented by that full-check or review receipt.8 focused query/projection tests and3 unwired Audit projection tests pass. No server/heavy process remains active for this thread.
+
+
+## Shared collection / Queue lead refinements · current verified tranche
+
+Implemented the required27bee8e follow-ups: history provenance survives Back/Forward without duplicate list entries; Previous/Next follows the actual group/sort/selection order and returns to the viewed row. Quiet refresh retains/de-duplicates earlier activity; conflicts reload the affected row without dropping pages2+, hide newly invalid commands and keep private drafts. Phone header is one row with handwritten SVG arrows; state options outside the server load say Not loaded.
+
+Shared filters stage several values, retain typed search and Cancel focus, then issue one GET. Sorting is distinct from filtering and preserves honest empty-vault guidance. All columns fit Operations/People/Research at1440 and1280 with actual weighted percentages, one head and one tbody per group. Full Operations facts remain in a concise phone disclosure and respond to column choices; exact first-check action labels, canonical-person average scope and cap-based pagination wording are explicit. Removed unused projected timestamps. The existing handoff-export workflow-filter omission is fixed through the shared typed parser, with whole-matching-load scope stated.
+
+**57/57 full steps pass**, Node22,52s (`/tmp/awf-review-kit-full-verify.log`).109 browser/controller checks pass;62 fresh captures (including1440/1280,320/390 checks, dark, expanded actions/details) and388-image gallery checks/clean preview/display pass. All data invented, no API request reached a backend. Earlier equal-column calc() and expanded-button overflow were caught by stronger width/real-click checks and corrected; no failed attempt is counted as final evidence. Minor Coverage heading/noun wrapping at1280 remains visual polish for the Audit pass. Whole-site acceptance/audit/formal round2 remain pending.
+
+Pure Audit projection foundation now lives in lib/audit/records.ts, outside Convex's function-module directory;3 privacy/predicate/reference/pagination tests are in the normal test/coverage commands. No Audit backend/API/UI is wired yet. The next meaningful Audit review must cover these lead changes; no delegate per small fix. Latest work is local only; no Card/WO completed.

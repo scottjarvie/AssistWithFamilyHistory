@@ -19,3 +19,11 @@ Desktop: dense hairline instrument grid, modest heading, original actions; right
 ## Verification
 
 Meaningful tests for exact metric predicates/count parity and minimal projection (including deliberately injected private fields), owner normalization/authorization unchanged, bounded pagination, unknown metric validation, and linked/unlinked source/citation/context destinations. Browser acceptance: every displayed metric opens its matching list; zero/unknown/error states; load more; Open as a view and owner-isolated Save; priority links; keyboard close/focus return;320/390px light/dark; no console errors; synthetic isolated reads only. Capture desktop/phone dashboard and selected detail views, a reconstructed original, and update newest-first gallery. Full57 verification steps before local commit; next meaningful Opus review covers the frozen Operations/Queue fixes if not already reviewed. No push/PR/merge/deploy.
+
+
+## Verified adjacent intake while reviewing27bee8e
+
+The existing `/api/operations/queue` parsed every page facet except `storyWorkflow`, despite the export URL carrying that value. This pre-existing mismatch can export more rows than the chosen workflow. Lead fixes page/export argument parity with one typed parser, retaining whole-matching-vault export scope and explaining that it extends beyond the loaded page. First duplicate query-key semantics and invalid enum defaults receive a focused regression. This follow-up is after frozen27bee8e; that review must not be misreported as acceptance of it. New check/captures/full verification are pending with the Audit tranche.
+
+
+Current entry: pure projection/predicate/reference/pagination groundwork is lib/audit/records.ts with3 normal-suite tests. Server/API/UI not yet wired. Before exposing drilldown details, require a matched authenticated owner even when legacy tenant checks run in shadow mode; retain ordinary getVaultAudit callers unchanged and do not change production mode/binding/grant defaults. Re-review/update the existing record-only wrapper hash if its source changes; no snapshot/native state regeneration. Shared kit/handoff corrections now pass57 full steps/109 browser checks/62 captures; include them in the next meaningful Audit review.

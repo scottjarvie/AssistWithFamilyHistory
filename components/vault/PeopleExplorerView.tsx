@@ -15,8 +15,8 @@ const columns: CollectionColumn<PeopleExplorerRow>[] = [
   { key: "sources", numeric: true, compactLabel: p => p.stats.sources === 1 ? "source" : "sources", label: "Sources", render: (p) => p.stats.sources, sortValue: (p) => p.stats.sources },
   { key: "imports", numeric: true, compactLabel: p => p.stats.imports === 1 ? "import" : "imports", label: "Imports", render: (p) => p.stats.imports, sortValue: (p) => p.stats.imports },
   { key: "memories", numeric: true, compactLabel: p => p.stats.memories === 1 ? "memory" : "memories", label: "Memories", render: (p) => p.stats.memories, sortValue: (p) => p.stats.memories },
-  { key: "documents", numeric: true, compactLabel: p => p.stats.documents === 1 ? "doc" : "docs", label: "Documents", render: (p) => p.stats.documents, sortValue: (p) => p.stats.documents },
-  { key: "stories", numeric: true, compactLabel: p => p.stats.stories === 1 ? "story" : "stories", label: "Story outputs", render: (p) => p.stats.stories, sortValue: (p) => p.stats.stories },
+  { key: "documents", numeric: true, compactLabel: p => p.stats.documents === 1 ? "doc" : "docs", label: "Documents", headerLabel: "Docs", render: (p) => p.stats.documents, sortValue: (p) => p.stats.documents },
+  { key: "stories", numeric: true, compactLabel: p => p.stats.stories === 1 ? "story" : "stories", label: "Story outputs", headerLabel: "Stories", render: (p) => p.stats.stories, sortValue: (p) => p.stats.stories },
   { key: "lastImport", fact: p => p.latestImport ? "prefix" : "bare", compactLabel: "Imported", label: "Last import (UTC)", render: (p) => p.latestImport ? <UtcDate value={p.latestImport.importedAt}/> : "Never imported", sortValue: (p) => p.latestImport?.importedAt || 0 },
 ];
 const researchStates = [["not_started", "Not started"], ["basic", "Basic"], ["in_progress", "In progress"], ["thorough", "Thorough"], ["complete", "Complete"]];

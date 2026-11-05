@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-11-05T13:35:38.268Z",
+  "checkedAt": "2026-11-05T14:51:43.720Z",
   "checks": [
     "Handoff retains its full private packet and manual-copy fallback",
     "Check updates retain the exact first-missing-check, status and completion-source contract",

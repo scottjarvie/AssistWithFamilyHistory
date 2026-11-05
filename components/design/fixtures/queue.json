@@ -3,7 +3,7 @@
     {
       "_id": "synthetic-queue-needs-you",
       "directive": "Compare the two invented census households and retain the conflicting birth dates. Do not turn a proposed relationship into a settled fact.",
-      "summary": "Compare Eleanor\u2019s two census households",
+      "summary": "Compare Eleanor’s two census households",
       "requestedOutcome": "A source-aware comparison, with remaining uncertainty clearly stated.",
       "state": "needs_you",
       "condition": "awaiting_user",
@@ -34,9 +34,9 @@
       "requiredAction": "Which invented household should remain the working hypothesis? Keep the other as an unresolved candidate.",
       "retryCount": 0,
       "maxRetries": 3,
-      "submittedAt": 1793798987641,
-      "createdAt": 1793798987641,
-      "updatedAt": 1793885387641,
+      "submittedAt": 1793804093393,
+      "createdAt": 1793804093393,
+      "updatedAt": 1793890493393,
       "version": 4
     },
     {
@@ -72,14 +72,14 @@
       "leftForActorKind": "chosen_ai",
       "retryCount": 0,
       "maxRetries": 3,
-      "submittedAt": 1793798987641,
-      "createdAt": 1793798987641,
-      "updatedAt": 1793881787641,
+      "submittedAt": 1793804093393,
+      "createdAt": 1793804093393,
+      "updatedAt": 1793886893393,
       "version": 4,
       "activeActorKind": "user",
       "activeActorId": "synthetic-design-only",
       "nextStep": "Compare the handwritten date with both indexed candidates.",
-      "leaseExpiresAt": 1793887187641
+      "leaseExpiresAt": 1793892293393
     },
     {
       "_id": "synthetic-queue-ai",
@@ -114,14 +114,14 @@
       "leftForActorKind": "chosen_ai",
       "retryCount": 0,
       "maxRetries": 3,
-      "submittedAt": 1793798987641,
-      "createdAt": 1793798987641,
-      "updatedAt": 1793878187641,
+      "submittedAt": 1793804093393,
+      "createdAt": 1793804093393,
+      "updatedAt": 1793883293393,
       "version": 4,
       "activeActorKind": "chosen_ai",
       "activeActorId": "synthetic-connection",
       "nextStep": "Separate background context from person-specific source claims.",
-      "leaseExpiresAt": 1793887187641
+      "leaseExpiresAt": 1793892293393
     },
     {
       "_id": "synthetic-queue-waiting",
@@ -156,9 +156,9 @@
       "leftForActorKind": "chosen_ai",
       "retryCount": 0,
       "maxRetries": 3,
-      "submittedAt": 1793798987641,
-      "createdAt": 1793798987641,
-      "updatedAt": 1793874587641,
+      "submittedAt": 1793804093393,
+      "createdAt": 1793804093393,
+      "updatedAt": 1793879693393,
       "version": 4
     },
     {
@@ -194,9 +194,9 @@
       "leftForActorKind": "chosen_ai",
       "retryCount": 0,
       "maxRetries": 3,
-      "submittedAt": 1793788187641,
-      "createdAt": 1793788187641,
-      "updatedAt": 1793798987641,
+      "submittedAt": 1793793293393,
+      "createdAt": 1793793293393,
+      "updatedAt": 1793804093393,
       "version": 4,
       "resultSummary": "The synthetic directory and census describe similar work, but neither establishes who owned the workshop. The original source discrepancy remains open.",
       "resultRefs": [
@@ -204,7 +204,7 @@
         "https://example.invalid/untrusted-reference",
         "legacy:synthetic-note"
       ],
-      "completedAt": 1793798987641,
+      "completedAt": 1793804093393,
       "lastUserResponse": "Retain both candidates until the image is reviewed."
     },
     {
@@ -241,13 +241,13 @@
       "requiredAction": "Choose whether to continue this expired handoff or record a cancellation.",
       "retryCount": 0,
       "maxRetries": 3,
-      "submittedAt": 1793626187641,
-      "createdAt": 1793626187641,
-      "updatedAt": 1793798987641,
+      "submittedAt": 1793631293393,
+      "createdAt": 1793631293393,
+      "updatedAt": 1793804093393,
       "version": 4,
       "failureCode": "handoff_expired",
       "failureSummary": "The invented handoff reached its recorded end date.",
-      "handoffExpiresAt": 1793798987641
+      "handoffExpiresAt": 1793804093393
     },
     {
       "_id": "synthetic-queue-old",
@@ -282,12 +282,12 @@
       "leftForActorKind": "chosen_ai",
       "retryCount": 0,
       "maxRetries": 3,
-      "submittedAt": 1792664987641,
-      "createdAt": 1792664987641,
-      "updatedAt": 1792675787641,
+      "submittedAt": 1792670093393,
+      "createdAt": 1792670093393,
+      "updatedAt": 1792680893393,
       "version": 4,
       "canceledReason": "Superseded by the newer source comparison.",
-      "canceledAt": 1792675787641
+      "canceledAt": 1792680893393
     }
   ],
   "activity": {
@@ -302,7 +302,7 @@
         "summary": "Synthetic answer requested.",
         "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
         "itemVersion": 4,
-        "createdAt": 1793885387641
+        "createdAt": 1793890493393
       },
       {
         "_id": "synthetic-queue-needs-you-event-1",
@@ -314,7 +314,7 @@
         "summary": "Synthetic comparison checkpoint saved.",
         "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
         "itemVersion": 3,
-        "createdAt": 1793881787641
+        "createdAt": 1793886893393
       },
       {
         "_id": "synthetic-queue-needs-you-event-2",
@@ -326,7 +326,7 @@
         "summary": "Synthetic handoff picked up.",
         "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
         "itemVersion": 2,
-        "createdAt": 1793878187641
+        "createdAt": 1793883293393
       },
       {
         "_id": "synthetic-queue-needs-you-event-3",
@@ -337,7 +337,7 @@
         "summary": "Synthetic directive created.",
         "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
         "itemVersion": 1,
-        "createdAt": 1793798987641
+        "createdAt": 1793804093393
       }
     ],
     "synthetic-queue-working": [
@@ -351,7 +351,7 @@
         "summary": "Synthetic current step recorded.",
         "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
         "itemVersion": 4,
-        "createdAt": 1793881787641
+        "createdAt": 1793886893393
       },
       {
         "_id": "synthetic-queue-working-event-1",
@@ -363,7 +363,7 @@
         "summary": "Synthetic comparison checkpoint saved.",
         "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
         "itemVersion": 3,
-        "createdAt": 1793878187641
+        "createdAt": 1793883293393
       },
       {
         "_id": "synthetic-queue-working-event-2",
@@ -375,7 +375,7 @@
         "summary": "Synthetic handoff picked up.",
         "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
         "itemVersion": 2,
-        "createdAt": 1793874587641
+        "createdAt": 1793879693393
       },
       {
         "_id": "synthetic-queue-working-event-3",
@@ -386,7 +386,7 @@
         "summary": "Synthetic directive created.",
         "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
         "itemVersion": 1,
-        "createdAt": 1793798987641
+        "createdAt": 1793804093393
       }
     ],
     "synthetic-queue-ai": [
@@ -400,7 +400,7 @@
         "summary": "Synthetic current step recorded.",
         "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
         "itemVersion": 4,
-        "createdAt": 1793878187641
+        "createdAt": 1793883293393
       },
       {
         "_id": "synthetic-queue-ai-event-1",
@@ -412,7 +412,7 @@
         "summary": "Synthetic comparison checkpoint saved.",
         "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
         "itemVersion": 3,
-        "createdAt": 1793874587641
+        "createdAt": 1793879693393
       },
       {
         "_id": "synthetic-queue-ai-event-2",
@@ -424,7 +424,7 @@
         "summary": "Synthetic handoff picked up.",
         "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
         "itemVersion": 2,
-        "createdAt": 1793870987641
+        "createdAt": 1793876093393
       },
       {
         "_id": "synthetic-queue-ai-event-3",
@@ -435,7 +435,7 @@
         "summary": "Synthetic directive created.",
         "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
         "itemVersion": 1,
-        "createdAt": 1793798987641
+        "createdAt": 1793804093393
       }
     ],
     "synthetic-queue-waiting": [
@@ -449,7 +449,7 @@
         "summary": "Synthetic handoff returned to Waiting.",
         "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
         "itemVersion": 4,
-        "createdAt": 1793874587641
+        "createdAt": 1793879693393
       },
       {
         "_id": "synthetic-queue-waiting-event-1",
@@ -461,7 +461,7 @@
         "summary": "Synthetic comparison checkpoint saved.",
         "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
         "itemVersion": 3,
-        "createdAt": 1793870987641
+        "createdAt": 1793876093393
       },
       {
         "_id": "synthetic-queue-waiting-event-2",
@@ -473,7 +473,7 @@
         "summary": "Synthetic handoff picked up.",
         "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
         "itemVersion": 2,
-        "createdAt": 1793867387641
+        "createdAt": 1793872493393
       },
       {
         "_id": "synthetic-queue-waiting-event-3",
@@ -484,7 +484,7 @@
         "summary": "Synthetic directive created.",
         "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
         "itemVersion": 1,
-        "createdAt": 1793798987641
+        "createdAt": 1793804093393
       }
     ],
     "synthetic-queue-done": [
@@ -498,7 +498,7 @@
         "summary": "Synthetic result recorded.",
         "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
         "itemVersion": 4,
-        "createdAt": 1793798987641
+        "createdAt": 1793804093393
       },
       {
         "_id": "synthetic-queue-done-event-1",
@@ -510,7 +510,7 @@
         "summary": "Synthetic comparison checkpoint saved.",
         "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
         "itemVersion": 3,
-        "createdAt": 1793795387641
+        "createdAt": 1793800493393
       },
       {
         "_id": "synthetic-queue-done-event-2",
@@ -522,7 +522,7 @@
         "summary": "Synthetic handoff picked up.",
         "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
         "itemVersion": 2,
-        "createdAt": 1793791787641
+        "createdAt": 1793796893393
       },
       {
         "_id": "synthetic-queue-done-event-3",
@@ -533,7 +533,7 @@
         "summary": "Synthetic directive created.",
         "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
         "itemVersion": 1,
-        "createdAt": 1793788187641
+        "createdAt": 1793793293393
       }
     ],
     "synthetic-queue-expired": [
@@ -547,7 +547,7 @@
         "summary": "Synthetic handoff expired.",
         "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
         "itemVersion": 4,
-        "createdAt": 1793798987641
+        "createdAt": 1793804093393
       },
       {
         "_id": "synthetic-queue-expired-event-1",
@@ -559,7 +559,7 @@
         "summary": "Synthetic comparison checkpoint saved.",
         "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
         "itemVersion": 3,
-        "createdAt": 1793795387641
+        "createdAt": 1793800493393
       },
       {
         "_id": "synthetic-queue-expired-event-2",
@@ -571,7 +571,7 @@
         "summary": "Synthetic handoff picked up.",
         "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
         "itemVersion": 2,
-        "createdAt": 1793791787641
+        "createdAt": 1793796893393
       },
       {
         "_id": "synthetic-queue-expired-event-3",
@@ -582,7 +582,7 @@
         "summary": "Synthetic directive created.",
         "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
         "itemVersion": 1,
-        "createdAt": 1793626187641
+        "createdAt": 1793631293393
       }
     ],
     "synthetic-queue-old": [
@@ -596,7 +596,7 @@
         "summary": "Synthetic result recorded.",
         "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
         "itemVersion": 4,
-        "createdAt": 1792675787641
+        "createdAt": 1792680893393
       },
       {
         "_id": "synthetic-queue-old-event-1",
@@ -608,7 +608,7 @@
         "summary": "Synthetic comparison checkpoint saved.",
         "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
         "itemVersion": 3,
-        "createdAt": 1792672187641
+        "createdAt": 1792677293393
       },
       {
         "_id": "synthetic-queue-old-event-2",
@@ -620,7 +620,7 @@
         "summary": "Synthetic handoff picked up.",
         "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
         "itemVersion": 2,
-        "createdAt": 1792668587641
+        "createdAt": 1792673693393
       },
       {
         "_id": "synthetic-queue-old-event-3",
@@ -631,9 +631,9 @@
         "summary": "Synthetic directive created.",
         "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
         "itemVersion": 1,
-        "createdAt": 1792664987641
+        "createdAt": 1792670093393
       }
     ]
   },
-  "now": 1793885387641
+  "now": 1793890493393
 }

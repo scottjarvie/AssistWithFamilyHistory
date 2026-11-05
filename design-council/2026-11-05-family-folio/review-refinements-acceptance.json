@@ -1,0 +1,20 @@
+{
+  "checkedAt": "2026-11-05T14:51:20.680Z",
+  "checks": [
+    "1440px operations keeps every selected field inside one aligned, readable-width table",
+    "1440px people keeps every selected field inside one aligned, readable-width table",
+    "1440px research keeps every selected field inside one aligned, readable-width table",
+    "1280px operations keeps every selected field inside one aligned, readable-width table",
+    "1280px people keeps every selected field inside one aligned, readable-width table",
+    "1280px research keeps every selected field inside one aligned, readable-width table",
+    "Shared filter sheet cancels cleanly, retains typed search and applies four staged values with one GET",
+    "Ordering never turns an empty vault into a filtered-empty claim and both defaults have real names",
+    "Sorted/grouped Queue arrows follow visible rows; close returns to the viewed row and triage adds no duplicate Back entries, even after Forward",
+    "A direct item link closes with URL replacement rather than leaving the page",
+    "320px dark phone has a one-row Queue header, honest loaded-state facets and concise Operations with every fact still reachable",
+    "390px dark phone has a one-row Queue header, honest loaded-state facets and concise Operations with every fact still reachable"
+  ],
+  "errors": [],
+  "unexpectedAPIs": [],
+  "mockWrites": []
+}

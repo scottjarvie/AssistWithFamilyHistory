@@ -105,3 +105,12 @@ The small lead fixes have no new cross-model receipt yet: they will be included 
 -AWF-0071 doing; whole-Card audit not audited. AWF-0072 remains separate backlog intake. No completed Work Order, backend acceptance, final formal round2/site-wide clearance, push, PR, merge or deploy.
 
 Final frozen rerun: **57/57 steps passed**, Node22,49s, `/tmp/awf-operations-queue-full-verify-final.log`. Includes the new Operations projection privacy regression, current Queue guards, every contract and production build. No remaining failed check. Reviewed-source commit next; next meaningful cross-model review remains pending.
+
+
+## Frozen shared-kit/Queue lead refinements ·2026-11-05
+
+-**57/57 full verification**, Node22,52s: /tmp/awf-review-kit-full-verify.log. Includes current binding freshness/typecheck/lint/test/contracts/build and the3 new Audit projection plus2 retained-activity/command-availability regressions.
+-**109 browser/controller checks:**12 new council refinements (/tmp/awf-weighted-refinements.log),4 intercepted conflict/pagination/quiet-refresh cases (/tmp/awf-review-queue-reload.log),1 Operations column-visibility check (/tmp/awf-review-operations-columns.log); existing13 Queue UI/11 Queue controller,9 Operations UI/4 Operations controller,18 People/18 cross-page/19 Place-Story pass. Final weighted table and real action runs are /tmp/awf-weighted-{queue,operations-api,people,cross}.log; the unchanged record family is /tmp/awf-review-records.log. All API requests invented/browser-fulfilled, no backend acceptance.
+-Actual scrollWidth/clientWidth/cell bounds, relative identity width, ordinary-name word fit, expanded action bounds and pointer clicks at1440/1280 are checked.320/390 dark header/filter/disclosure/focus and owner-scoped view/draft cases pass.
+-**62/62 final captures** (/tmp/awf-review-final-captures.log), unique review-refinements folder. Old equal-width attempts excluded from final acceptance.388-image portable/inline gallery, keyboard/lightbox/newest-first checks, clean preview and inline display pass (/tmp/awf-review-gallery-check.log).
+-Audit projection module lib/audit/records.ts is tested but not wired to a new server/API/UI. Core authorization/grants/records untouched; handoff workflow filtering is a read-only correction to an existing export. Coverage heading/noun wrap at1280 is a minor next-family visual polish item, not an all-page acceptance claim.

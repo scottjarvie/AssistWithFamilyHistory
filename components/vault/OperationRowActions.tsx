@@ -295,7 +295,7 @@ export function OperationRowActions({
 
     return (
       <>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid min-w-0 grid-cols-1 gap-2 [&_button]:h-auto [&_button]:min-h-11 [&_button]:max-w-full [&_button]:whitespace-normal [&_a]:h-auto [&_a]:min-h-11 [&_a]:max-w-full [&_a]:whitespace-normal">
           <Button size="sm" variant="outline" onClick={() => void copyHandoff()} disabled={busy}>
             <Copy className="mr-2 h-4 w-4" />
             Handoff
@@ -458,7 +458,7 @@ export function OperationRowActions({
 
   return (
     <>
-      <div className="flex flex-wrap gap-2">
+      <div className="grid min-w-0 grid-cols-1 gap-2 [&_button]:h-auto [&_button]:min-h-11 [&_button]:max-w-full [&_button]:whitespace-normal [&_a]:h-auto [&_a]:min-h-11 [&_a]:max-w-full [&_a]:whitespace-normal">
         <Button size="sm" variant="outline" onClick={() => void copyHandoff()} disabled={isPending}>
           <Copy className="mr-2 h-4 w-4" />
           Handoff
@@ -476,11 +476,11 @@ export function OperationRowActions({
         {personIdentifier&&readonlyPreview&&<Button size="sm" variant="outline" disabled>Context Pack</Button>}
         {missingCritical.length > 0 ? (
           <>
-            <Button size="sm" onClick={() => updateCheck("complete")} disabled={readonlyPreview || isPending}>
-              Mark Done
+            <Button size="sm" className="h-auto min-h-11 whitespace-normal text-left" onClick={() => updateCheck("complete")} disabled={readonlyPreview || isPending}>
+              Mark {missingCritical[0].replace(/_/g," ")} done
             </Button>
-            <Button size="sm" variant="outline" onClick={() => updateCheck("not_applicable")} disabled={readonlyPreview || isPending}>
-              Not Applicable
+            <Button size="sm" variant="outline" className="h-auto min-h-11 whitespace-normal text-left" onClick={() => updateCheck("not_applicable")} disabled={readonlyPreview || isPending}>
+              Mark {missingCritical[0].replace(/_/g," ")} not applicable
             </Button>
           </>
         ) : null}

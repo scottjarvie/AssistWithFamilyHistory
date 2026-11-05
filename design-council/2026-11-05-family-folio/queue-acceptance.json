@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-11-05T13:35:40.817Z",
+  "checkedAt": "2026-11-05T14:51:33.458Z",
   "checks": [
     "Queue opens no thread until requested and shows seven invented records grouped by actual state with all original fields and UTC dates",
     "Thread sheet preserves the collection, navigates loaded items and Escape restores the originating row and scroll",

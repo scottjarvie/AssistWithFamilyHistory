@@ -1,3 +1,4 @@
+import { operationQueryArguments } from "@/lib/operations/query";
 import type { Metadata } from "next";
 import { OperationsView } from "@/components/operations/OperationsView";
 import { projectOperationRow, normalizeOperationFilters } from "@/lib/vault/operationsRows";
@@ -54,32 +55,7 @@ export default async function OperationsPage({ searchParams }: { searchParams: S
   try {
     queue = await client.action(api.vaultReads.getOperationsQueue, {
       vaultOwnerId,
-      search: params.q || undefined,
-      rowType: params.type === "person" || params.type === "provisional" ? params.type : undefined,
-      storyStatus:
-        params.storyStatus === "has_story" || params.storyStatus === "no_story"
-          ? params.storyStatus
-          : undefined,
-      storyWorkflow:
-        params.storyWorkflow === "needs_genealogy_evidence" ||
-        params.storyWorkflow === "needs_context_research" ||
-        params.storyWorkflow === "ready_to_draft" ||
-        params.storyWorkflow === "ready_to_review" ||
-        params.storyWorkflow === "published"
-          ? params.storyWorkflow
-          : undefined,
-      staleOnly: params.staleOnly === "true" ? true : undefined,
-      sortBy:
-        params.sortBy === "completion" ||
-        params.sortBy === "lastTouched" ||
-        params.sortBy === "sourceCount" ||
-        params.sortBy === "storyReadiness" ||
-        params.sortBy === "newestImport" ||
-        params.sortBy === "missingCritical"
-          ? params.sortBy
-          : "missingCritical",
-      sortDirection: params.sortDirection === "asc" || params.sortDirection === "desc" ? params.sortDirection : "desc",
-      missingCheck: params.missingCheck || undefined,
+      ...operationQueryArguments(normalizeOperationFilters(params)),
       limit: visibleCount,
     });
   } catch (error) {

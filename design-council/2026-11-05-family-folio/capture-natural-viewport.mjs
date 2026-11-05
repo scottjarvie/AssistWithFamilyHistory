@@ -10,12 +10,12 @@ const config=JSON.parse(readFileSync(process.argv[3] || path.join(run,'../shots.
 const round=process.argv[2] || '2';if(!/^\d+$/.test(round))throw new Error('Round must be a number');
 const out=process.argv[4] ? path.resolve(process.argv[4]) : path.join(run,`round-${round}/ours`);mkdirSync(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome'});
-const report={capturedAt:new Date().toISOString(),baseURL:config.baseURL,set:'shots',method:'Installed Chrome, actual 1440×900 / 390×844 device viewports, fullPage screenshot with no viewport growth; named viewportOnly shots keep the actual viewport and optional focus target. Console errors, page errors, HTTP errors, failed capability probes or page overflow block acceptance.',shots:[]};
+const report={capturedAt:new Date().toISOString(),baseURL:config.baseURL,set:'shots',method:'Installed Chrome, actual 1440×900 (or explicitly named1280×900) / 390×844 device viewports, fullPage screenshot with no viewport growth; named viewportOnly shots keep the actual viewport and optional focus target. Console errors, page errors, HTTP errors, failed capability probes or page overflow block acceptance.',shots:[]};
 try {
  for(const item of config.shots){
   for(const variant of item.variants || config.defaultVariants){
    const [device,scheme]=variant.split('-');const mobile=device==='mobile';
-   const context=await browser.newContext({viewport:{width:mobile?390:1440,height:mobile?844:900},deviceScaleFactor:mobile?2:1,isMobile:mobile,hasTouch:mobile,colorScheme:scheme==='dark'?'dark':'light',reducedMotion:'reduce',locale:'en-US',timezoneId:config.timezone});
+   const context=await browser.newContext({viewport:{width:mobile?390:(item.desktopWidth||1440),height:mobile?844:900},deviceScaleFactor:mobile?2:1,isMobile:mobile,hasTouch:mobile,colorScheme:scheme==='dark'?'dark':'light',reducedMotion:'reduce',locale:'en-US',timezoneId:config.timezone});
    const page=await context.newPage();
    const entry={name:item.name,variant,file:path.relative(process.cwd(),path.join(out,`${item.name}--${variant}.png`)),consoleErrors:[],pageErrors:[],capabilities:[],requestCount:0};
    page.on('pageerror',error=>entry.pageErrors.push(error.stack || String(error)));

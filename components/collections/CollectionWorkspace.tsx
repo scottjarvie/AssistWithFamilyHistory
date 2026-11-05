@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { SafeLink } from "@/components/layout/SafeLink";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,11 +16,11 @@ import { useCollectionPreferences, type CollectionView } from "./useCollectionPr
  * Never pass raw Convex documents here: the entire rows prop is serialized to the browser.
  * Sorting/grouping/selection cover loaded rows, never imply whole-vault operations.
  */
-export function CollectionWorkspace<Row>({ rows, columns, groups = [], rowKey, rowTitle, rowHref, renderIdentity, renderDetail, renderActions, imageSlot, primaryColumn, searchControls, preferenceKey, query = "", status = "", loadMoreHref, noun = "records", identityLabel = "Record", naturalOrderLabel = "Recently touched", defaultGroup = "", defaultView = "auto", columnVersion = 1, naturalLabels, filters, builtInViews = [], onApplyFilters, emptyState }: {
+export function CollectionWorkspace<Row>({ rows, columns, groups = [], rowKey, rowTitle, rowHref, renderIdentity, renderDetail, renderActions, imageSlot, primaryColumn, searchControls, preferenceKey, query = "", status = "", loadMoreHref, noun = "records", identityLabel = "Record", naturalOrderLabel = "Recently touched", defaultGroup = "", defaultView = "auto", columnVersion = 1, naturalLabels, filters, builtInViews = [], onApplyFilters, onRenderedOrderChange, emptyState }: {
   rows: Row[]; columns: CollectionColumn<Row>[]; groups?: CollectionGroup<Row>[];
   rowKey: (row: Row) => string; rowTitle: (row: Row) => string; rowHref: (row: Row) => string | null;
-  renderIdentity: (row: Row) => ReactNode; renderDetail?: (row: Row) => ReactNode; renderActions?: (row: Row) => ReactNode; imageSlot?: (row: Row) => ReactNode; primaryColumn?: string; searchControls: ReactNode;
-  preferenceKey: string; query?: string; status?: string; loadMoreHref: string | null; noun?: string; identityLabel?: string; naturalOrderLabel?: string; defaultGroup?: string; defaultView?: CollectionView; columnVersion?: number; naturalLabels?: {forward:string;reverse:string}; filters?: Record<string, string>; builtInViews?: BuiltInCollectionView[]; onApplyFilters?:(filters:Record<string,string>)=>void; emptyState: ReactNode;
+  renderIdentity: (row: Row) => ReactNode; renderDetail?: (row: Row, visibleColumnKeys: string[]) => ReactNode; renderActions?: (row: Row) => ReactNode; imageSlot?: (row: Row) => ReactNode; primaryColumn?: string; searchControls: ReactNode;
+  preferenceKey: string; query?: string; status?: string; loadMoreHref: string | null; noun?: string; identityLabel?: string; naturalOrderLabel?: string; defaultGroup?: string; defaultView?: CollectionView; columnVersion?: number; naturalLabels?: {forward:string;reverse:string}; filters?: Record<string, string>; builtInViews?: BuiltInCollectionView[]; onApplyFilters?:(filters:Record<string,string>)=>void; onRenderedOrderChange?:(ids:string[])=>void; emptyState: ReactNode;
 }) {
   const [settings, saveSettings] = useCollectionPreferences(preferenceKey);
   const [selected, setSelected] = useState<string[]>([]);
@@ -61,6 +61,10 @@ export function CollectionWorkspace<Row>({ rows, columns, groups = [], rowKey, r
   const directionLabel = sort ? (settings.descending ? "Descending ↓" : "Ascending ↑") : settings.descending ? naturalText.reverse : naturalText.forward;
   const grouped = new Map<string, Row[]>();
   for (const row of visibleRows) { const name = group ? group.value(row) : ""; grouped.set(name, [...(grouped.get(name) || []), row]); }
+  const orderedGroups=[...grouped].sort(([a],[b])=>group?.order?.(a,b)||0);
+  // The caller receives only loaded IDs, in the exact visible group/sort/selection order.
+  // Equality guarding belongs to its state setter; no dependency on transient row objects.
+  useEffect(()=>{onRenderedOrderChange?.(orderedGroups.flatMap(([,groupRows])=>groupRows.map(rowKey)));});
   const allSelected = rows.length > 0 && rows.every((row) => selected.includes(rowKey(row)));
   const toggle = (row: Row) => setSelected((previous) => previous.includes(rowKey(row)) ? previous.filter((key) => key !== rowKey(row)) : [...previous, rowKey(row)]);
   const select = (row: Row) => <label className="flex min-h-11 w-11 items-center justify-center"><input type="checkbox" checked={selected.includes(rowKey(row))} onChange={() => toggle(row)} aria-label={`Select ${rowTitle(row)}`} className="h-4 w-4 accent-primary" /></label>;
@@ -98,9 +102,9 @@ export function CollectionWorkspace<Row>({ rows, columns, groups = [], rowKey, r
       <span className="text-xs">Loaded records only</span>
     </div>
     {message && <p role="status" className="mb-3 text-sm text-annotation">{message}</p>}
-    {rows.length === 0 ? emptyState : visibleRows.length === 0 ? <p className="rounded-lg border border-dashed border-border bg-card p-6 text-sm">No selected {noun} in this page. <Button variant="link" onClick={() => setOnlySelected(false)}>Show all loaded</Button></p> : <CollectionRecords grouped={[...grouped].sort(([a],[b]) => group?.order?.(a,b) || 0)} columns={visibleColumns} view={view} compact={compact} rowKey={rowKey} rowHref={rowHref} renderIdentity={renderIdentity} renderDetail={renderDetail} renderActions={renderActions} imageSlot={imageSlot} primaryColumn={primaryColumn} select={select} identityLabel={identityLabel} sortKey={sort?.key} descending={Boolean(settings.descending)} onSort={(key) => update({sort:key,descending:sort?.key === key ? !settings.descending : false})} />}
+    {rows.length === 0 ? emptyState : visibleRows.length === 0 ? <p className="rounded-lg border border-dashed border-border bg-card p-6 text-sm">No selected {noun} in this page. <Button variant="link" onClick={() => setOnlySelected(false)}>Show all loaded</Button></p> : <CollectionRecords grouped={orderedGroups} columns={visibleColumns} view={view} compact={compact} rowKey={rowKey} rowHref={rowHref} renderIdentity={renderIdentity} renderDetail={renderDetail} renderActions={renderActions} imageSlot={imageSlot} primaryColumn={primaryColumn} select={select} identityLabel={identityLabel} sortKey={sort?.key} descending={Boolean(settings.descending)} onSort={(key) => update({sort:key,descending:sort?.key === key ? !settings.descending : false})} />}
     <p className="mt-4 text-sm text-muted-foreground">Group, sort and selection apply to loaded {noun}{loadMoreHref ? "; load more to include the next page." : "."}</p>
-    <p className="mt-2 text-sm text-muted-foreground" aria-live="polite">{visibleRows.length} of {rows.length} loaded {noun} shown{onlySelected ? ` · ${rows.length - visibleRows.length} hidden by selection` : ""}{loadMoreHref ? " · more records available" : ""}.</p>
+    <p className="mt-2 text-sm text-muted-foreground" aria-live="polite">{visibleRows.length} of {rows.length} loaded {noun} shown{onlySelected ? ` · ${rows.length - visibleRows.length} hidden by selection` : ""}{loadMoreHref ? " · more records may be available" : ""}.</p>
     {loadMoreHref && <div className="mt-4"><Button asChild variant="outline" className="min-h-11"><SafeLink href={loadMoreHref}>Load more {noun}</SafeLink></Button></div>}
     <Dialog open={saveOpen} onOpenChange={setSaveOpen}><DialogContent><DialogHeader><DialogTitle>Save a view</DialogTitle><DialogDescription>Remember these filters and presentation in this browser, for this account. Saved search text stays here after sign-out until you remove the view. No record objects are copied.</DialogDescription></DialogHeader>
       <form onSubmit={(e) => { e.preventDefault(); if (!newName.trim()) return; const value = { ...current, columnVersion, id: globalThis.crypto?.randomUUID?.() || `view-${Date.now()}-${Math.random().toString(36).slice(2)}`, name: newName.trim() }; const persisted = saveSettings({ ...settings, activeViewId: value.id, saved: [...saved, value] }); setSaveOpen(false); setMessage(persisted ? `Saved view “${value.name}” in this browser.` : "View available for this session only. Browser storage is unavailable; it will not survive reload."); }} className="space-y-4">

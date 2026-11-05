@@ -1,5 +1,8 @@
 import type {ComponentProps} from "react";
 const paths={
+ up:"M8 14V2 M3 7l5-5 5 5",
+ downArrow:"M8 2v12 M3 9l5 5 5-5",
+ leftArrow:"M14 8H2 M7 3 2 8l5 5",
  archive:"M2 3h12v3H2z M3 6v8h10V6 M6 9h4",
  arrow:"M2 8h12 M9 3l5 5-5 5",
  external:"M9 2h5v5 M14 2 8 8 M7 3H2v11h11V9",
@@ -24,3 +27,5 @@ const paths={
 function glyph(kind:keyof typeof paths){return function QueueGlyph(props:ComponentProps<"svg">){return <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}><path d={paths[kind]}/></svg>;};}
 /** Codex-written glyphs; all actions retain visible text and accessible names. */
 export const Archive=glyph("archive"),ArrowRight=glyph("arrow"),ArrowUpRight=glyph("external"),Bot=glyph("bot"),Check=glyph("check"),ChevronDown=glyph("down"),ChevronRight=glyph("right"),CircleAlert=glyph("warning"),Clock3=glyph("clock"),FileClock=glyph("file"),History=glyph("history"),LoaderCircle=glyph("loading"),Plus=glyph("plus"),RefreshCw=glyph("refresh"),RotateCcw=glyph("back"),Search=glyph("search"),ShieldCheck=glyph("shield"),Trash2=glyph("trash"),UserRound=glyph("person"),X=glyph("close");
+
+export const ArrowUp=glyph("up"),ArrowDown=glyph("downArrow"),ArrowLeft=glyph("leftArrow");

@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-11-05T13:41:01.553Z",
+  "checkedAt": "2026-11-05T14:33:15.454Z",
   "checks": [
     "Operations retains four research rows, six loaded metrics and all evidence columns",
     "Every missing check/next action is visible, and synthetic check/export writes are blocked",

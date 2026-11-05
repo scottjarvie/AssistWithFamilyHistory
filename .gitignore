@@ -114,3 +114,6 @@ design-council/*/queue-records/
 # Operations and Queue review refinements, separate from formal scoring packets.
 design-council/*/operations-records/
 design-council/*/queue-review-fixes/
+
+# Shared collection / Queue corrections after Opus27bee8e.
+design-council/*/review-refinements/

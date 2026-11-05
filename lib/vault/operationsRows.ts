@@ -11,7 +11,6 @@ export function projectOperationRow(row: OperationsQueue["rows"][number]) {
     documents: row.documentCount, context: row.contextReportCount, stories: row.storyCount,
     workflow: row.storyWorkflow, missing: row.missingCritical, nextActions: row.nextActions,
     stale: row.staleChecksCount, anchor: row.anchorPersonIdentifier || null, badge: row.badge,
-    lastTouched: row.lastTouched, latestImportAt: row.latestImportAt,
   };
 }
 export type OperationCollectionRow = ReturnType<typeof projectOperationRow>;
@@ -23,5 +22,7 @@ export const operationWorkflowLabels: Record<string, string> = {
 export const operationFilterKeys = ["q", "type", "storyStatus", "storyWorkflow", "staleOnly", "sortBy", "sortDirection", "missingCheck"] as const;
 export type OperationFilters = Record<typeof operationFilterKeys[number], string>;
 export function normalizeOperationFilters(input: Record<string, string | string[] | undefined>): OperationFilters {
-  return Object.fromEntries(operationFilterKeys.map(key => [key, typeof input[key] === "string" ? input[key] : Array.isArray(input[key]) ? input[key][0] || "" : ""])) as OperationFilters;
+  const filters=Object.fromEntries(operationFilterKeys.map(key => [key, typeof input[key] === "string" ? input[key] : Array.isArray(input[key]) ? input[key][0] || "" : ""])) as OperationFilters;
+  filters.staleOnly=filters.staleOnly==="true"?"true":"";
+  return filters;
 }

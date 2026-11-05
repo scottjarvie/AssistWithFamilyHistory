@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-11-05T13:48:52.482Z",
+  "checkedAt": "2026-11-05T14:33:09.193Z",
   "checks": [
     "Initial list loads no selected-item detail until a thread is opened",
     "Claim keeps lease, expected version and idempotency fields and updates the selected thread",
@@ -22,7 +22,7 @@
         "leaseMs": 1800000,
         "nextStep": "Synthetic claim plan",
         "expectedVersion": 4,
-        "idempotencyKey": "58fd4295-e6c5-493e-853e-817909f53330"
+        "idempotencyKey": "d77310bd-d012-4fdd-8e59-97d771c11e57"
       }
     },
     {
@@ -33,7 +33,7 @@
         "leaseMs": 1800000,
         "nextStep": "Synthetic next step",
         "expectedVersion": 5,
-        "idempotencyKey": "3c9f0a10-bd32-48c7-a66c-21ada0f8d420"
+        "idempotencyKey": "f2d63624-a170-46ee-bb15-d497aab7be38"
       }
     },
     {
@@ -44,7 +44,7 @@
         "leaseMs": 1800000,
         "nextStep": "Synthetic next step",
         "expectedVersion": 6,
-        "idempotencyKey": "7fcf7090-3ae3-4ef2-9a86-f039763c29ea"
+        "idempotencyKey": "bd389c67-f23f-476c-a4a0-2a73146da76a"
       }
     },
     {
@@ -54,7 +54,7 @@
         "command": "complete",
         "resultSummary": "Synthetic completed comparison with uncertainty retained",
         "expectedVersion": 7,
-        "idempotencyKey": "bc782075-c969-4b32-b0c3-e629a3abba45"
+        "idempotencyKey": "51755217-9c73-49ca-93a7-6fbb3472815d"
       }
     },
     {
@@ -64,7 +64,7 @@
         "command": "reopen",
         "reason": "Synthetic reason to compare another source",
         "expectedVersion": 8,
-        "idempotencyKey": "c9942024-9dd9-4b90-829d-823642c524be"
+        "idempotencyKey": "be8346c1-a7f6-48d8-9c65-b2240e39b531"
       }
     },
     {
@@ -74,7 +74,7 @@
         "command": "cancel",
         "reason": "Synthetic superseding question",
         "expectedVersion": 9,
-        "idempotencyKey": "ff154e99-ffb0-4a4f-a988-1a41c8a88811"
+        "idempotencyKey": "d6a8f921-5a23-4b6d-b4ef-b7af99a656d2"
       }
     },
     {
@@ -84,7 +84,7 @@
         "command": "complete",
         "resultSummary": "Synthetic delayed result while another handoff is opened",
         "expectedVersion": 4,
-        "idempotencyKey": "74dd32cc-886f-45f4-8c8c-dc2d410f3391"
+        "idempotencyKey": "f719dc3d-3401-4a5f-95b7-1a89fc73544f"
       }
     },
     {
@@ -94,7 +94,7 @@
         "command": "resume",
         "answerSummary": "Synthetic answer while keeping the source conflict",
         "expectedVersion": 4,
-        "idempotencyKey": "42d0f2c6-b600-49e7-9d18-72a3eb59c6b3"
+        "idempotencyKey": "600f137d-26cc-4ba5-bd6e-852a292d5ab9"
       }
     },
     {
@@ -104,7 +104,7 @@
         "command": "resume",
         "answerSummary": "Synthetic answer while keeping the source conflict",
         "expectedVersion": 5,
-        "idempotencyKey": "0073fa54-9b7a-460a-887b-098306e44dbc"
+        "idempotencyKey": "66c5594e-6ae0-48af-aac1-c2a1566931dc"
       }
     },
     {
@@ -116,7 +116,7 @@
         "priority": "high",
         "priorityReason": "Synthetic priority reason",
         "chosenAiId": "oauth-chosen-ai",
-        "idempotencyKey": "96a0ca43-4f71-44f4-a429-6a083079123c"
+        "idempotencyKey": "48f3ef6d-2e6c-4da5-85ca-0472478162f1"
       }
     },
     {
@@ -144,7 +144,6 @@
     "/api/queue/synthetic-queue-expired",
     "/api/queue",
     "/api/queue/synthetic-queue-expired",
-    "/api/queue",
     "/api/queue",
     "/api/queue/synthetic-created-1",
     "/api/queue/synthetic-queue-needs-you"

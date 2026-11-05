@@ -262,9 +262,9 @@
 @media (max-width: 639px) { .research-desk { padding: 1.25rem .5rem; } }
 
 @layer components {
-  .collection-table th, .collection-table td { padding: .75rem; }
+  .collection-table th, .collection-table td { padding: .65rem .5rem; }
   .collection-table.is-compact th, .collection-table.is-compact td { padding: .4rem .6rem; }
-  .collection-table thead th { font-weight: 600; white-space: nowrap; }
+  .collection-table thead th { font-size: .75rem; line-height: 1.5; font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
 }
 /* Table becomes a labelled record on phones; every chosen column stays visible. */
 @media (max-width: 639px) {

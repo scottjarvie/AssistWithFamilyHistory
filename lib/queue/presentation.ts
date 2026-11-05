@@ -226,3 +226,12 @@ export function formatQueueDate(value?: number): string {
     timeZoneName:"short",
   }).format(new Date(value));
 }
+
+/** Availability mirrors the person's visible commands; the backend remains authoritative. */
+export function canPersonRunQueueCommand(item:QueueItemRecord,command:"claim"|"checkpoint"|"resume"|"complete"|"cancel"|"reopen") {
+ switch(command){case "claim":return canPersonClaim(item);case "checkpoint":case "complete":return canPersonContinue(item);case "resume":return item.state==="needs_you";case "reopen":return item.state==="done";case "cancel":return item.state!=="done";}
+}
+/** Refreshes can overlap retained older pages; one stored activity ID is shown once. */
+export function mergeQueueActivity(existing:QueueActivityRecord[],incoming:QueueActivityRecord[]) {
+ const rows=new Map(existing.map(row=>[row._id,row]));for(const row of incoming)rows.set(row._id,row);return [...rows.values()];
+}
