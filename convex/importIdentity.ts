@@ -1,4 +1,4 @@
-import type { Doc, TableNames } from "./_generated/dataModel";
+import type { Doc, Id, TableNames } from "./_generated/dataModel";
 import type { QueryCtx, MutationCtx } from "./_generated/server";
 import { isGedcomSystem } from "../lib/treeImport/model";
 import { matchesVaultOwner } from "./vaultCore";
@@ -52,4 +52,11 @@ export function relationshipPidAgrees(row: Doc<"relationships">, key: string, ba
   // An older primary mapping can still be verified directly. An older alias
   // without a canonical-ID witness is deliberately left for identity review.
   return row.familySearchId === key;
+}
+
+/** Match the complete owned pair before applying the ambiguity bound. */
+export async function ownedRelationshipsForPair(ctx: QueryCtx | MutationCtx, owner: string, type: Doc<"relationships">["type"], person1: Id<"persons">, person2: Id<"persons">, limit = 2) {
+  const owners = matchesVaultOwner(undefined, owner) ? [owner, undefined] : [owner];
+  return (await Promise.all(owners.map(vaultOwnerId => ctx.db.query("relationships")
+    .withIndex("by_owner_type_pair", q => q.eq("vaultOwnerId", vaultOwnerId).eq("type", type).eq("person1", person1).eq("person2", person2)).take(limit)))).flat();
 }

@@ -1,4 +1,4 @@
-import { legacyExternalIdentityIsVerified, ownedFamilySearchRelationships, relationshipPidAgrees } from "./importIdentity";
+import { legacyExternalIdentityIsVerified, ownedFamilySearchRelationships, ownedRelationshipsForPair, relationshipPidAgrees } from "./importIdentity";
 import { v } from "convex/values";
 import { mutation, type MutationCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
@@ -1019,8 +1019,7 @@ export const upsertRelationship = mutation({
     }
 
     if (!existing) {
-      const rows = await ctx.db.query("relationships").withIndex("by_type_person1", q => q.eq("type", args.type).eq("person1", args.person1))
-        .filter(q => q.and(q.eq(q.field("person2"), args.person2), matchesVaultOwner(undefined, vaultOwnerId) ? q.or(q.eq(q.field("vaultOwnerId"), vaultOwnerId), q.eq(q.field("vaultOwnerId"), undefined)) : q.eq(q.field("vaultOwnerId"), vaultOwnerId))).take(2);
+      const rows = await ownedRelationshipsForPair(ctx, vaultOwnerId, args.type, args.person1, args.person2);
       if (rows.length > 1) throw new Error("AMBIGUOUS_RELATIONSHIP_IDENTITY: Several owned relationships share these participants.");
       existing = rows[0] ?? null;
     }

@@ -680,3 +680,24 @@ Added 17 synthetic cases across actual capture flows, legacy mismatches and
 references, owner isolation, canonical correction, aliases and positive resume.
 All remain UNRUN; no browser or actual user/Tier2 proof is claimed. No UI
 route/layout edits, real provider/database writes, or deployment occurred.
+
+
+External-ID URL metadata and complete relationship pairs (2026-11-05):
+Known external IDs now fill missing URL metadata and refresh URLs actually
+written by import. Corrected/cleared URLs and removed entries remain, with
+externalIds reported as retained. Private history records observed presence
+and URL presence without granting write authority; bounded record-level
+history protects clearing across provider aliases. Existing strings/entries
+are not rekeyed or deleted. Equivalent system casing matches the same metadata
+identity. Incoming duplicate URL values coalesce; contradictory URLs for the
+same identity refuse explicitly. Omitting a URL never clears it.
+Relationship equivalence now queries an owner/type/person1/person2 index before
+applying the duplicate bound, including default-local legacy ownership. No
+sibling cutoff proves absence. Dry planning overlays complete pairs and allows
+for rows moved out of that pair before considering moved-in virtual rows.
+Capture shares the indexed pair query. The new index requires Convex deployment.
+Added 14 synthetic cases for URL refresh, manual changes/removal, aliases and
+legacy observation, duplicate metadata, bounded history, 51st-row ParentChild
+and Couple matches, hidden ambiguity and multi-move dry/live parity. All are
+UNRUN. No actual user, browser, provider or Tier2 runtime proof is claimed.
+No UI route/layout changes, production writes or deployment occurred.

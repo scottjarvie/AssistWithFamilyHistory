@@ -1,4 +1,4 @@
-import { legacyExternalIdentityIsVerified, ownedFamilySearchRelationships, relationshipPidAgrees } from "./importIdentity";
+import { legacyExternalIdentityIsVerified, ownedFamilySearchRelationships, ownedRelationshipsForPair, relationshipPidAgrees } from "./importIdentity";
 /* eslint-disable @typescript-eslint/no-explicit-any -- Batch items are validated by the public MCP Zod schemas before dispatch. */
 /**
  * Whole-tree import over MCP.
@@ -85,7 +85,7 @@ type Writer = {
   dryRun: boolean;
   rows?: Map<string, any>;
   personIndexes?: Map<string, { surname: string; year: number | null; fsId?: string }>;
-  relationshipIndexes?: Map<string, { type: string; person1: string | null; familySearchId?: string }>;
+  relationshipIndexes?: Map<string, { type: string; person1: string | null; person2: string | null; familySearchId?: string }>;
   insert<T extends TableNames>(table: T, doc: any): Promise<string>;
   patch(id: string, doc: Record<string, unknown>): Promise<void>;
 };
@@ -98,7 +98,7 @@ function liveWriter(ctx: MutationCtx): Writer {
   };
 }
 
-function dryWriter(scope: string, rows: Map<string, any>, personIndexes: Map<string, { surname: string; year: number | null; fsId?: string }>, relationshipIndexes: Map<string, { type: string; person1: string | null; familySearchId?: string }>): Writer {
+function dryWriter(scope: string, rows: Map<string, any>, personIndexes: Map<string, { surname: string; year: number | null; fsId?: string }>, relationshipIndexes: Map<string, { type: string; person1: string | null; person2: string | null; familySearchId?: string }>): Writer {
   let counter = 0;
   return {
     dryRun: true,
@@ -328,7 +328,7 @@ async function ownedRow<T extends TableNames>(c: ChunkContext, table: T, id: str
   if (c.w.rows) {
     c.w.rows.set(id, clean(row));
     if (table === "persons") c.w.personIndexes?.set(id, { surname: (row as Doc<"persons">).name.surname, year: (row as Doc<"persons">).birth?.date?.year ?? null, fsId: (row as Doc<"persons">).fsId });
-    if (table === "relationships") c.w.relationshipIndexes?.set(id, { type: (row as Doc<"relationships">).type, person1: (row as Doc<"relationships">).person1 ?? null, familySearchId: (row as Doc<"relationships">).familySearchId });
+    if (table === "relationships") c.w.relationshipIndexes?.set(id, { type: (row as Doc<"relationships">).type, person1: (row as Doc<"relationships">).person1 ?? null, person2: (row as Doc<"relationships">).person2 ?? null, familySearchId: (row as Doc<"relationships">).familySearchId });
   }
   return row as Doc<T>;
 }
@@ -349,17 +349,60 @@ async function hasRetainedAttachments(c: ChunkContext, kind: "relationship" | "e
 function externalIdsFor(c: ChunkContext, key: string, otherIds: ExternalId[] | undefined, url?: string): ExternalId[] {
   const ids: ExternalId[] = [{ system: c.job.system, id: key, ...(url ? { url } : {}) }];
   for (const other of otherIds ?? []) {
-    if (!ids.some((existing) => existing.system === other.system && existing.id === other.id)) ids.push(other);
+    const existing = ids.find(id => sameExternalId(id, other));
+    if (!existing) ids.push({ ...other });
+    else if (other.url !== undefined) {
+      if (existing.url !== undefined && existing.url !== other.url) fail("AMBIGUOUS_EXTERNAL_ID_METADATA", "One outside identity has conflicting URLs in this item.", "Resubmit one canonical URL for that identity; this item saved nothing.");
+      existing.url = other.url;
+    }
   }
   return ids;
 }
 
-function mergeExternalIds(existing: ExternalId[] | undefined, incoming: ExternalId[]): ExternalId[] {
-  const merged = [...(existing ?? [])];
-  for (const id of incoming) {
-    if (!merged.some((row) => row.system === id.system && row.id === id.id)) merged.push(id);
+type ExternalIdHistory = { system: string; id: string; hadUrl: boolean };
+function sameExternalId(a: ExternalId, b: ExternalId) { return a.system.trim().toLowerCase() === b.system.trim().toLowerCase() && a.id.trim() === b.id.trim(); }
+function externalIdHistory(...groups: unknown[]): ExternalIdHistory[] {
+  const result: ExternalIdHistory[] = [];
+  for (const group of groups) for (const value of Array.isArray(group) ? group : []) {
+    if (!value || typeof value.system !== "string" || typeof value.id !== "string") continue;
+    const existing = result.find(id => sameExternalId(id, value));
+    const hadUrl = value.hadUrl === true || (typeof value.url === "string" && value.url !== "");
+    if (existing) existing.hadUrl ||= hadUrl;
+    else result.push({ system: value.system, id: value.id, hadUrl });
   }
-  return merged;
+  return result;
+}
+
+/** Tuple identity is append-only; URL authority is tracked independently. */
+function mergeExternalIds(existing: ExternalId[], incoming: ExternalId[], baseline: ExternalId[], history: ExternalIdHistory[]) {
+  const merged = existing.map(id => ({ ...id }));
+  const imported = baseline.map(id => ({ ...id }));
+  let kept = false;
+  for (const id of incoming) {
+    const matches = merged.filter(row => sameExternalId(row, id));
+    const originals = imported.filter(row => sameExternalId(row, id));
+    const observed = history.find(row => sameExternalId(row, id));
+    if (!matches.length) {
+      if (originals.length || observed) { kept = true; continue; } // Manual removal.
+      merged.push({ ...id }); imported.push({ ...id }); continue;
+    }
+    if (id.url === undefined) continue; // Omission never clears metadata.
+    if (matches.length > 1 || originals.length > 1) {
+      if (matches.some(row => row.url !== id.url)) kept = true;
+      continue;
+    }
+    const current = matches[0]; const original = originals[0];
+    const known = !!original && Object.hasOwn(original, "url");
+    if (isEmpty(current.url) && observed?.hadUrl && (!known || isEmpty(original?.url))) { kept = true; continue; }
+    const next = mergeImportedValue(current.url, id.url, original?.url, known);
+    if (!same(current.url, next.value)) {
+      current.url = next.value as string;
+      if (original) original.url = next.baseline as string;
+      else imported.push({ system: id.system, id: id.id, url: next.baseline as string });
+    }
+    kept ||= next.kept;
+  }
+  return { value: merged, baseline: imported, history: externalIdHistory(history, merged.filter(id => incoming.some(item => sameExternalId(item, id)))), kept };
 }
 
 type UpsertOutcome = { id: string; status: ItemResult["status"]; kept?: string[]; importedBaseline: Record<string, unknown> };
@@ -531,8 +574,41 @@ async function upsertRow(
     if (value === undefined) continue;
     const current = (row as any)[field];
     if (field === "externalIds") {
-      const merged = mergeExternalIds(current, value as ExternalId[]);
-      if (!same(merged, current)) patch.externalIds = merged;
+      const existing: ExternalId[] = Array.isArray(current) ? current : [];
+      const incoming = value as ExternalId[];
+      const old: ExternalId[] = Array.isArray(baseline?.externalIds) ? baseline.externalIds : [];
+      let history = externalIdHistory(baseline?._externalIdHistory, old, existing.filter(id => incoming.some(item => sameExternalId(item, id))));
+      const needsHistory = incoming.some(id => {
+        const present = existing.filter(row => sameExternalId(row, id));
+        const observed = history.find(row => sameExternalId(row, id));
+        const original = old.find(row => sameExternalId(row, id));
+        if (!present.length) return !observed;
+        return id.url !== undefined && present.length === 1 && isEmpty(present[0].url)
+          && !(original && Object.hasOwn(original, "url")) && !observed?.hadUrl;
+      });
+      if (needsHistory) {
+        const max = FAMILY_HISTORY_MCP_LIMITS.contextRows;
+        const mappings = isPlaceholder(args.existingId) ? [] : await c.ctx.db.query("mcpRecordKeys")
+          .withIndex("by_owner_type_record", q => q.eq("vaultOwnerId", c.owner).eq("recordType", RECORD_TYPE[args.singular]).eq("recordId", args.existingId!)).take(max + 1);
+        if (mappings.length > max) fail("EXTERNAL_ID_METADATA_REVIEW_REQUIRED", "Outside-ID metadata history exceeds the bounded lookup.", "Review the record before restoring metadata; this item saved nothing.");
+        const priors = new Map<string, Record<string, unknown> | null>();
+        for (const prior of mappings) priors.set(prior.recordKey, c.baselines.has(prior.recordKey) ? c.baselines.get(prior.recordKey)! : prior.lastImportedJson ? JSON.parse(prior.lastImportedJson) : null);
+        for (const [key, prior] of c.baselines) if (c.local.get(key) === args.existingId) priors.set(key, prior);
+        for (const prior of priors.values()) history = externalIdHistory(history, prior?.externalIds, prior?._externalIdHistory);
+      }
+      const merged = mergeExternalIds(existing, incoming, old, history);
+      if (!same(merged.value, current)) patch.externalIds = merged.value;
+      if (merged.baseline.length || Array.isArray(baseline?.externalIds)) imported.externalIds = merged.baseline;
+      // Observation protects removals/clearing, but never authorizes URL writes.
+      const implied = externalIdHistory(merged.baseline);
+      const observedOnly = merged.history.filter(id => {
+        const previouslyObserved = Array.isArray(baseline?._externalIdHistory) && baseline._externalIdHistory.some((old: ExternalIdHistory) => sameExternalId(old, id));
+        if (!previouslyObserved && !incoming.some(item => sameExternalId(item, id))) return false;
+        const owned = implied.find(item => sameExternalId(item, id));
+        return !owned || (id.hadUrl && !owned.hadUrl);
+      });
+      if (observedOnly.length || Array.isArray(baseline?._externalIdHistory)) imported._externalIdHistory = observedOnly;
+      if (merged.kept) kept.push("externalIds");
       continue;
     }
     const next = mergeImportedValue(current, value, baseline?.[field], !!baseline && Object.hasOwn(baseline, field), args.table === "relationships" && field === "facts");
@@ -543,7 +619,7 @@ async function upsertRow(
     if (next.kept) kept.push(field);
   }
   Object.assign(imported, args.baselineMetadata);
-  const baselineChanged = Object.keys(patch).length > 0 || (args.baselineMetadata !== undefined && !same(baseline, imported));
+  const baselineChanged = Object.keys(patch).length > 0 || !same(baseline, imported);
   // Only supplied leaves actually filled/refreshed above enter this baseline;
   // retained legacy fields remain outside the importer's refresh authority.
   if (args.linked) await remember(c, args.singular, args.key, String(row._id), c.job.system, imported);
@@ -896,19 +972,17 @@ async function importRelationship(c: ChunkContext, item: any): Promise<Omit<Item
     }
   }
   if (!existingId) {
-    const inIndex = (row: any) => row?.type === item.type && row.person1 === person1;
-    const movedOut = [...(c.w.relationshipIndexes ?? [])].filter(([id, original]) => original.type === item.type && original.person1 === person1 && !inIndex(c.w.rows?.get(id))).length;
-    if (movedOut > 50) fail("DRY_RUN_PLAN_LIMIT", "Too many planned relationship index moves for a bounded scan.", "Use smaller dry-run batches; nothing was saved.");
-    const persisted = isPlaceholder(person1) ? [] : await c.ctx.db.query("relationships")
-      .withIndex("by_type_person1", q => q.eq("type", item.type).eq("person1", person1 as Id<"persons">)).take(50 + movedOut);
+    const inIndex = (row: any) => row && matchesVaultOwner(row.vaultOwnerId, c.owner) && row.type === item.type && row.person1 === person1 && row.person2 === person2;
+    const movedOut = [...(c.w.relationshipIndexes ?? [])].filter(([id, original]) => original.type === item.type && original.person1 === person1 && original.person2 === person2 && !inIndex(c.w.rows?.get(id))).length;
+    if (movedOut > FAMILY_HISTORY_MCP_LIMITS.contextRows) fail("DRY_RUN_PLAN_LIMIT", "Too many planned relationship pair index moves.", "Use smaller dry-run batches; nothing was saved.");
+    const persisted = isPlaceholder(person1) || isPlaceholder(person2) ? [] : await ownedRelationshipsForPair(c.ctx, c.owner, item.type, person1 as Id<"persons">, person2 as Id<"persons">, 2 + movedOut);
     const effective = new Map<string, any>();
     for (const row of persisted) {
       const current = c.w.rows?.get(String(row._id)) ?? row;
       if (inIndex(current)) effective.set(String(row._id), current);
     }
     for (const row of c.w.rows?.values() ?? []) if (inIndex(row)) effective.set(String(row._id), row);
-    const candidates = [...effective.values()].sort((a, b) => (a._creationTime ?? a.createdAt) - (b._creationTime ?? b.createdAt)).slice(0, 50)
-      .filter(row => row.person2 === person2 && matchesVaultOwner(row.vaultOwnerId, c.owner));
+    const candidates = [...effective.values()];
     if (candidates.length > 1) fail("AMBIGUOUS_RELATIONSHIP_IDENTITY", "Several owned relationships have these participants and type.", "Review their identities before adding another alias; nothing was merged.");
     if (candidates[0]) { existingId = String(candidates[0]._id); linked = true; }
   }
@@ -1441,7 +1515,7 @@ export const planTreeImportChunk = internalQuery({
       machineError("VALIDATION_ERROR", "Dry-run keys need their original identity mappings.", "Restart the dry run and carry plannedRecords alongside plannedKeys between chunks.");
     }
     const c: ChunkContext = {
-      ctx, w: dryWriter(args.operationId, new Map<string, any>(args.plannedState?.rows ?? []), new Map<string, { surname: string; year: number | null; fsId?: string }>(args.plannedState?.personIndexes ?? []), new Map<string, { type: string; person1: string | null; familySearchId?: string }>(args.plannedState?.relationshipIndexes ?? [])), owner, job, provenance: importProvenance(args.principal, args.operationId),
+      ctx, w: dryWriter(args.operationId, new Map<string, any>(args.plannedState?.rows ?? []), new Map<string, { surname: string; year: number | null; fsId?: string }>(args.plannedState?.personIndexes ?? []), new Map<string, { type: string; person1: string | null; person2: string | null; familySearchId?: string }>(args.plannedState?.relationshipIndexes ?? [])), owner, job, provenance: importProvenance(args.principal, args.operationId),
       local, planned: new Set(args.plannedKeys), plannedNow: [], baselines: new Map<string, Record<string, unknown> | null>(args.plannedState?.baselines ?? []), duplicatesSuggested: 0,
     };
     const results = await runChunk(c, args.items as TreeImportItem[]);

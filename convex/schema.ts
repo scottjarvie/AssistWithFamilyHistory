@@ -323,7 +323,8 @@ export default defineSchema({
     .index("by_type_person2", ["type", "person2"])    // Find all relationships of a type for person2
     .index("by_import_key", ["importKey"])
     .index("by_familySearchId", ["familySearchId"])
-    .index("by_owner_familySearchId", ["vaultOwnerId", "familySearchId"]),
+    .index("by_owner_familySearchId", ["vaultOwnerId", "familySearchId"])
+    .index("by_owner_type_pair", ["vaultOwnerId", "type", "person1", "person2"]),
 
   /**
    * EVENTS
