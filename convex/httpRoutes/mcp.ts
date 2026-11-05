@@ -1147,6 +1147,9 @@ export function createFamilyHistoryServer(
     inputSchema: z.object({
       importJobId: id.optional(),
       suggestionsCursor: z.string().max(500).nullable().optional(),
+      resultsOperationId: z.string().max(200).optional(),
+      resultsChunkIndex: z.number().int().min(0).max(500).optional(),
+      resultsOffset: z.number().int().min(0).max(100000).optional(),
     }).strict(),
     annotations: readOnly,
   }, async (input: any) => {

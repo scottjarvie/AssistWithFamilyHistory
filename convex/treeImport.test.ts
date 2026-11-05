@@ -863,3 +863,77 @@ test("dry planning keeps virtual refresh baselines and manual corrections across
   const after = await t.run(async ctx => ctx.db.query("sources").collect());
   expect(after.map(r => r.title).sort()).toEqual(["Owner correction", "Third"]);
 });
+
+
+test("custom fact namespaces and accepted value/description/name fields survive losslessly", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  const facts = [
+    { type: "https://a.example/CustomEvent", value: "", description: "Teacher" },
+    { type: "https://b.example/CustomEvent", value: "", description: "Teacher" },
+    { type: "occupation", value: "Farmer", description: "and miller" },
+  ];
+  expect(factReferenceKeyFor(facts[0])).not.toBe(factReferenceKeyFor(facts[1]));
+  const names = [{ given: "Synthetic", surname: "Person", type: "MarriedName", preferred: true }, { given: "Alternate", surname: "Person", type: "Nickname", nickname: "Nicky" }];
+  const first = await send(t, grant, job.importJobId, 0, { persons: [{ key: "P", living: false, names, facts }] });
+  expect(first.results.filter((r: any) => r.status === "failed")).toEqual([]);
+  const data = await t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), events: await ctx.db.query("events").collect() }));
+  expect(data.people[0].importedNames).toEqual(names);
+  expect(data.people[0].alternateNames?.[0].nickname).toBe("Nicky");
+  expect(data.events).toHaveLength(3);
+  for (const fact of facts) expect(data.events.find(e => e.importedFact?.type === fact.type)?.importedFact).toEqual(fact);
+  expect(data.events.filter(e => e.type === "custom").map(e => e.customType).sort()).toEqual(["https://a.example/CustomEvent", "https://b.example/CustomEvent"]);
+  expect(data.events.filter(e => e.type === "custom").every(e => e.description === "Teacher")).toBe(true);
+});
+
+test.each([0, 249])("dry relationship equivalence includes virtual aliases across chunks (padding %i)", async padding => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  const relationships: NonNullable<TreeImportBatch["relationships"]> = [
+    { key: "R1", type: "ParentChild", person1Key: "P1", person2Key: "P2", lineage: "biological", facts: [{ type: "note", description: "First" }] },
+    ...Array.from({ length: padding }, (_, i) => ({ key: `pad-${i}`, type: "Couple" as const, person1Key: "P1", person2Key: "P3" })),
+    { key: "R2", type: "ParentChild", person1Key: "P1", person2Key: "P2", lineage: "adopted", facts: [{ type: "note", description: "Second" }] },
+  ];
+  const batch: TreeImportBatch = { persons: ["P1", "P2", "P3"].map(key => ({ key, living: false, names: [{ given: key }] })), relationships };
+  const dry = await send(t, grant, job.importJobId, 0, batch, { dryRun: true }, `dry-rel-alias-${padding}`);
+  expect(await countRows(t, "relationships")).toBe(0);
+  const real = await send(t, grant, job.importJobId, 0, batch, {}, `real-rel-alias-${padding}`);
+  const outcomes = (r: any) => r.results.filter((row: any) => row.key === "R1" || row.key === "R2").map((row: any) => ({ key: row.key, status: row.status, kept: row.kept ?? [] }));
+  expect(outcomes(dry)).toEqual(outcomes(real));
+  expect(outcomes(real)[1]).toMatchObject({ key: "R2", status: "linked", kept: expect.arrayContaining(["childRelationType", "facts"]) });
+});
+
+test("oversized receipts keep every conflict retrievable and replay preserves the page pointer", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  const operationId = "large-conflict-receipt";
+  const results = Array.from({ length: 500 }, (_, index) => ({ kind: "persons" as const, index, key: `${index}-` + "K".repeat(180), status: "unchanged" as const, kept: ["name", "importedNames"] }));
+  await t.run(async ctx => {
+    for (let index = 0; index < 4; index++) await ctx.db.insert("mcpOperations", {
+      vaultOwnerId: OWNER, operationId: `${operationId}#${index}`, toolName: "family_history_import_tree_batch#chunk", requestHash: `hash-${index}`,
+      resultJson: JSON.stringify({ importJobId: job.importJobId, results: results.slice(index * 125, (index + 1) * 125), plannedKeys: [], duplicatesSuggested: 0 }), clientId: principal().clientId, createdAt: Date.now(),
+    });
+  });
+  const args = { principal: principal(), grantId: grant, importJobId: job.importJobId, operationId, requestHash: "large-hash", batchIndex: 0, records: 500, results, duplicatesSuggested: 0, chunkCount: 4, final: false };
+  const receipt = await t.mutation(internal.treeImport.recordTreeImportBatch, args) as any;
+  expect(receipt.results).toEqual([]);
+  expect(receipt.resultDetails).toEqual({ operationId, chunkCount: 4 });
+  expect(receipt.resultsTrimmed).toContain("retained conflicts");
+  const found: string[] = [];
+  let cursor: { resultsChunkIndex: number; resultsOffset: number } | null = { resultsChunkIndex: 0, resultsOffset: 0 };
+  while (cursor) {
+    const page = await t.query(internal.treeImport.getTreeImport, { principal: principal(), importJobId: job.importJobId, resultsOperationId: operationId, ...cursor }) as any;
+    expect(page.results.length).toBeLessThanOrEqual(10);
+    found.push(...page.results.map((row: any) => `${row.index}:${row.kept}`));
+    cursor = page.next;
+  }
+  expect(found).toEqual(results.flatMap(row => row.kept.map(field => `${row.index}:${field}`)));
+  const replay = await t.mutation(internal.treeImport.recordTreeImportBatch, args) as any;
+  expect(replay.deduplicated).toBe(true);
+  expect(replay.resultDetails).toEqual(receipt.resultDetails);
+  const other = await begin(t, grant, "other-import");
+  await expect(t.query(internal.treeImport.getTreeImport, { principal: principal(), importJobId: other.importJobId, resultsOperationId: operationId })).rejects.toThrow(/NOT_FOUND/);
+});

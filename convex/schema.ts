@@ -103,6 +103,11 @@ export default defineSchema({
     fsId: v.optional(v.string()),              // FamilySearch Person ID (e.g., "KWCJ-RN4")
     qualityScore: v.optional(v.string()),      // FamilySearch quality score
     
+    // Original accepted names, including preferred classification and nicknames.
+    importedNames: v.optional(v.array(v.object({
+      type: v.optional(v.string()), given: v.optional(v.string()), surname: v.optional(v.string()),
+      prefix: v.optional(v.string()), suffix: v.optional(v.string()), nickname: v.optional(v.string()), preferred: v.optional(v.boolean()),
+    }))),
     // Name structure (primary name)
     name: v.object({
       given: v.string(),
@@ -121,6 +126,7 @@ export default defineSchema({
           surname: v.string(),
           suffix: v.optional(v.string()),
           prefix: v.optional(v.string()),
+          nickname: v.optional(v.string()),
         })
       )
     ),
@@ -354,6 +360,12 @@ export default defineSchema({
       v.literal("cremation"),
       v.literal("custom")
     ),
+    // Lossless imported assertion; display description may combine these fields.
+    importedFact: v.optional(v.object({
+      key: v.optional(v.string()), type: v.string(), value: v.optional(v.string()), description: v.optional(v.string()),
+      date: v.optional(v.object({ original: v.string(), formal: v.optional(v.string()), year: v.optional(v.number()), month: v.optional(v.number()), day: v.optional(v.number()), approximate: v.optional(v.boolean()), range: v.optional(v.boolean()) })),
+      place: v.optional(v.object({ original: v.string() })),
+    })),
     customType: v.optional(v.string()),
     
     // Date information

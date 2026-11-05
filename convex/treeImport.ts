@@ -370,7 +370,7 @@ async function upsertRow(
 
 function factDescription(fact: { value?: string; description?: string }) {
   if (fact.value && fact.description) return `${fact.value}. ${fact.description}`;
-  return fact.value ?? fact.description;
+  return fact.value || fact.description || fact.value;
 }
 
 async function importPerson(c: ChunkContext, item: any): Promise<Omit<ItemResult, "kind" | "index">> {
@@ -416,6 +416,7 @@ async function importPerson(c: ChunkContext, item: any): Promise<Omit<ItemResult
   }
 
   const doc = {
+    importedNames: clean(item.names),
     name,
     alternateNames: alternateNames.length ? alternateNames : undefined,
     sex: item.sex,
@@ -482,6 +483,7 @@ async function importFact(c: ChunkContext, personId: string, personKey: string, 
     doc: {
       type: mapped.type,
       customType: mapped.customType,
+      importedFact: clean(fact),
       date: withYear(fact.date),
       place: fact.place?.original ? { original: fact.place.original } : undefined,
       description: factDescription(fact),
@@ -569,6 +571,10 @@ async function importRelationship(c: ChunkContext, item: any): Promise<Omit<Item
   if (person1 === person2) fail("VALIDATION_ERROR", "A person cannot be related to themself.", "Check the two person keys.");
   let existingId = await lookup(c, "relationship", key);
   let linked = false;
+  if (!existingId && c.w.rows) {
+    const match = [...c.w.rows.values()].find(row => row.type === item.type && row.person1 === person1 && row.person2 === person2 && matchesVaultOwner(row.vaultOwnerId, c.owner));
+    if (match) { existingId = String(match._id); linked = true; }
+  }
   if (!existingId && !isPlaceholder(person1) && !isPlaceholder(person2)) {
     // A relationship the person already entered by hand is the same one.
     const rows = await c.ctx.db
@@ -948,7 +954,7 @@ export const applyTreeImportChunk = internalMutation({
       local: new Map(), planned: new Set(), plannedNow: [], baselines: new Map(), duplicatesSuggested: 0,
     };
     const results = await runChunk(c, args.items as TreeImportItem[]);
-    const result = { results, plannedKeys: [], duplicatesSuggested: c.duplicatesSuggested };
+    const result = { importJobId: String(job._id), results, plannedKeys: [], duplicatesSuggested: c.duplicatesSuggested };
     await ctx.db.insert("mcpOperations", {
       vaultOwnerId: owner,
       operationId: args.operationId,
@@ -1018,6 +1024,7 @@ export const recordTreeImportBatch = internalMutation({
     records: v.number(),
     results: v.any(),
     duplicatesSuggested: v.number(),
+    chunkCount: v.optional(v.number()),
     summary: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -1094,11 +1101,12 @@ export const recordTreeImportBatch = internalMutation({
         : "Every row in this batch was saved.",
       operationId: args.operationId,
       deduplicated: false,
+      resultDetails: { operationId: args.operationId, chunkCount: args.chunkCount ?? 0 },
     };
     let resultJson = JSON.stringify(result);
     if (resultJson.length > FAMILY_HISTORY_MCP_LIMITS.resultJson) {
-      result.results = results.filter((row) => row.status === "failed");
-      result.resultsTrimmed = "Only failed rows are listed; every other row saved and is counted above.";
+      result.results = [];
+      result.resultsTrimmed = "Full results, including failures and retained conflicts, are available through family_history_get_tree_import using resultDetails.operationId, resultsChunkIndex and resultsOffset.";
       resultJson = JSON.stringify(result);
     }
     await ctx.db.insert("mcpOperations", {
@@ -1191,6 +1199,7 @@ export const importTreeBatch = internalAction({
       records: total,
       results,
       duplicatesSuggested,
+      chunkCount: chunks.length,
     });
   },
 });
@@ -1281,9 +1290,13 @@ export const getTreeImport = internalQuery({
     principal: principalValidator,
     importJobId: v.optional(v.string()),
     suggestionsCursor: v.optional(v.union(v.string(), v.null())),
+    resultsOperationId: v.optional(v.string()),
+    resultsChunkIndex: v.optional(v.number()),
+    resultsOffset: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const owner = ownerFromPrincipal(args.principal);
+    if (args.resultsOperationId && !args.importJobId) machineError("VALIDATION_ERROR", "Result pages need an importJobId.", "Supply the import whose receipt you are reading.");
     if (!args.importJobId) {
       const jobs = await ctx.db
         .query("treeImports")
@@ -1293,6 +1306,25 @@ export const getTreeImport = internalQuery({
       return { imports: jobs.map(jobSummary) };
     }
     const job = await loadJob(ctx, owner, args.importJobId, false);
+    if (args.resultsOperationId) {
+      const chunkIndex = args.resultsChunkIndex ?? 0;
+      const offset = args.resultsOffset ?? 0;
+      if (!Number.isInteger(chunkIndex) || chunkIndex < 0 || !Number.isInteger(offset) || offset < 0) machineError("VALIDATION_ERROR", "Invalid result page.", "Use nonnegative integer chunk and offset values.");
+      const receipt = await ctx.db.query("mcpOperations").withIndex("by_owner_operation", q => q.eq("vaultOwnerId", owner).eq("operationId", args.resultsOperationId!)).unique();
+      const summary = receipt?.toolName === BATCH_TOOL ? JSON.parse(receipt.resultJson) : null;
+      if (!summary || summary.importJobId !== String(job._id) || chunkIndex >= (summary.resultDetails?.chunkCount ?? 0)) machineError("NOT_FOUND", "That result page is not available for this import.", "Use the operationId and chunk count returned by the batch.");
+      const chunk = await ctx.db.query("mcpOperations").withIndex("by_owner_operation", q => q.eq("vaultOwnerId", owner).eq("operationId", `${args.resultsOperationId}#${chunkIndex}`)).unique();
+      const data = chunk?.toolName === `${BATCH_TOOL}#chunk` ? JSON.parse(chunk.resultJson) : null;
+      if (!data || data.importJobId !== String(job._id)) machineError("NOT_FOUND", "The detailed chunk receipt is not available.", "Use a batch with retrievable resultDetails.");
+      // Expand kept fields so one very large conflict row can still be paged.
+      const entries = (data.results as ItemResult[]).flatMap<Record<string, unknown>>(row => row.kept?.length
+        ? row.kept.map(field => ({ kind: row.kind, index: row.index, key: row.key, status: row.status, id: row.id ?? null, kept: field }))
+        : [{ kind: row.kind, index: row.index, key: row.key, status: row.status, id: row.id ?? null, reason: row.reason ?? null, whatToDo: row.whatToDo ?? null }]);
+      const nextOffset = offset + 10;
+      const next = nextOffset < entries.length ? { resultsChunkIndex: chunkIndex, resultsOffset: nextOffset }
+        : chunkIndex + 1 < summary.resultDetails.chunkCount ? { resultsChunkIndex: chunkIndex + 1, resultsOffset: 0 } : null;
+      return { importJobId: String(job._id), resultsOperationId: args.resultsOperationId, resultsChunkIndex: chunkIndex, resultsOffset: offset, results: entries.slice(offset, nextOffset), next };
+    }
     const batches = await ctx.db
       .query("treeImportBatches")
       .withIndex("by_job_batch", (q) => q.eq("importJobId", job._id))

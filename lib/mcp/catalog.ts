@@ -373,7 +373,7 @@ export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
     writes: false,
     title: "Get whole-tree import progress",
     description:
-      "WHOLE-TREE IMPORT, RESUME. Without importJobId: the ten most recent imports. With it: progress per record kind, nextBatchIndex, your saved cursor, the last 20 batches with their failed rows, and a page of possible-duplicate suggestions (follow possibleDuplicatesCursor). Call this first when resuming an interrupted import.",
+      "WHOLE-TREE IMPORT, RESUME. Without importJobId: the ten most recent imports. With it: progress per record kind, nextBatchIndex, your saved cursor, the last 20 batches with their failed rows, and a page of possible-duplicate suggestions (follow possibleDuplicatesCursor). Call this first when resuming an interrupted import. If a batch returns resultDetails, supply its importJobId and resultsOperationId (resultDetails.operationId), with resultsChunkIndex and resultsOffset, to page full per-item outcomes and each retained conflict; follow next until null.",
     humanSummary: "Shows how far a family tree import has got and which people might be duplicates.",
     implementedBy: "convex/treeImport.getTreeImport",
   },

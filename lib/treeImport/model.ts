@@ -57,6 +57,7 @@ export type DateInput = {
   month?: number;
   day?: number;
   approximate?: boolean;
+  range?: boolean;
 };
 
 export type PlaceInput = { original: string };
@@ -217,7 +218,7 @@ export function factTargetKey(personKey: string, key: string): string {
 /** A bounded local reference key, even for the longest allowed outside type. */
 export function factReferenceKeyFor(fact: FactInput): string {
   return fact.key?.trim() || `fact~${stableHash(canonicalJson([
-    normalizeFactType(fact.type), fact.date ?? null, fact.place ?? null, fact.value ?? null, fact.description ?? null,
+    fact.type, fact.date ?? null, fact.place ?? null, fact.value ?? null, fact.description ?? null,
   ]))}`;
 }
 
@@ -346,6 +347,7 @@ export function splitNames(names: NameInput[]) {
         surname: (name.surname ?? "").trim(),
         ...(name.prefix ? { prefix: name.prefix.trim() } : {}),
         ...(name.suffix ? { suffix: name.suffix.trim() } : {}),
+        ...(name.nickname !== undefined ? { nickname: name.nickname } : {}),
       })),
   };
 }

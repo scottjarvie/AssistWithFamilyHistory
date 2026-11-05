@@ -308,3 +308,23 @@ prior planned version, with failed-item rollback restoring that state. This plan
 is private internal state; only ordinary results are returned to the MCP caller.
 A plan above the bounded byte budget refuses with `DRY_RUN_PLAN_LIMIT` and asks
 for smaller dry-run batches, without saving records.
+
+Generated fact identity keeps the original type string, including custom URI
+namespaces and punctuation. Events also retain `importedFact` with the accepted
+structured assertion, preserving empty values separately from descriptions.
+People retain `importedNames`, including the preferred name classification,
+and alternate nicknames remain in `alternateNames` as well.
+
+When the compact batch receipt would exceed its size budget, it returns an
+explicit `resultsTrimmed` notice and `resultDetails`, rather than dropping kept
+conflicts silently. Pass `importJobId`, `resultsOperationId` from
+`resultDetails.operationId`, `resultsChunkIndex` (initially 0) and `resultsOffset`
+(initially 0) to `family_history_get_tree_import`. Each page returns at most ten
+entries, expanding a row's retained conflicts one field per entry. Follow `next`
+until null. Owner- and import-bound chunk receipts hold the original results;
+replaying the batch returns the same retrieval pointer. Legacy receipts without
+those details are explicitly unavailable, never fabricated.
+
+Dry-run relationship equivalence consults planned relationships in addition to
+stored relationships, so aliases link to one relationship and report retained
+lineage/facts even when the people themselves are only planned.
