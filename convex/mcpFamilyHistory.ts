@@ -444,7 +444,10 @@ async function saveEventRecord(ctx: MutationCtx, owner: string, input: any) {
       .withIndex("by_person_and_event", (q) => q.eq("personId", role.personId).eq("eventId", eventId))
       .collect();
     const existing = matches.find((row) => matchesVaultOwner(row.vaultOwnerId, owner));
-    if (existing) await ctx.db.patch(existing._id, { role: role.role });
+    if (existing && existing.role !== role.role) {
+      machineError("FORBIDDEN", "An AI cannot overwrite an existing person-event role.", "Record the proposed role correction as a research finding for the person to review.");
+    }
+    if (existing) continue;
     else await ctx.db.insert("personEvents", { vaultOwnerId: owner, personId: role.personId, eventId, role: role.role, createdAt: now });
   }
   return { id: eventId, created, updatedAt: now, createKey };
