@@ -102,7 +102,7 @@ if (deletionPage.includes("have your workspace deleted") ||
 for (const rel of [
   "app/delete-account/page.tsx",
   "app/app/settings/data/page.tsx",
-  "app/api/vault/export/route.ts",
+  "lib/vault/exportStream.ts",
 ]) {
   const text = readFileSync(rel, "utf8").replace(/\s+/g, " ");
   if (/open each one from its person or source to download it|download (?:each )?originals? from each record/i.test(text)) {
