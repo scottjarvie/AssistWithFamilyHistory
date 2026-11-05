@@ -1552,6 +1552,48 @@ test.each([false, true])("ambiguous legacy sources and conflicting mappings refu
   }
 });
 
+test.each(["page", "extractedText", "confidence", "url", "accessDate", "notes"].flatMap(field => ["addTarget", "source"].map(mode => ({ field, mode }))))("citation attribution requires omitted evidence confirmation ($field/$mode)", async ({ field, mode }) => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  const initial: NonNullable<TreeImportBatch["citations"]>[number] = {
+    key: "C", sourceKey: "S1", page: "12", extractedText: "About A", quality: 1, url: "https://example.test/original", accessDate: "2026-01-01", notes: "Original A notes", targets: [{ kind: "person", key: "A" }],
+  };
+  await send(t, grant, job.importJobId, 0, {
+    sources: [{ key: "S1", title: "Source A" }, { key: "S2", title: "Source B" }], persons: ["A", "B"].map(key => ({ key, living: false, names: [{ given: key }] })), citations: [initial],
+  });
+  const corrections: Record<string, unknown> = { page: "Corrected page A", extractedText: "Corrected evidence about A", confidence: "very_high", url: "https://example.test/corrected", accessDate: "2026-02-01", notes: "Corrected notes about A" };
+  if (mode === "addTarget") await t.run(async ctx => { const citation = (await ctx.db.query("citations").collect())[0]; await ctx.db.patch(citation._id, { [field]: corrections[field] }); });
+  const snapshot = () => t.run(async ctx => ({ citations: await ctx.db.query("citations").collect(), links: await ctx.db.query("citationLinks").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() }));
+  const before = await snapshot();
+  const inputKey = field === "confidence" ? "quality" : field;
+  const partial: any = { ...initial, sourceKey: mode === "source" ? "S2" : "S1", targets: [{ kind: "person", key: mode === "addTarget" ? "B" : "A" }] };
+  delete partial[inputKey];
+  const dry = await send(t, grant, job.importJobId, 1, { citations: [partial] }, { dryRun: true }, `dry-omitted-evidence-${field}-${mode}`);
+  expect(await snapshot()).toEqual(before);
+  const real = await send(t, grant, job.importJobId, 1, { citations: [partial] });
+  for (const result of [dry, real]) {
+    expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("CITATION_EVIDENCE_CONFIRMATION_REQUIRED") })]);
+    expect(result.results[0].reason).toContain(field);
+  }
+  expect(dry.counts).toEqual(real.counts);
+  expect(await snapshot()).toEqual(before);
+  expect((await send(t, grant, job.importJobId, 1, { citations: [partial] })).deduplicated).toBe(true);
+  expect(await snapshot()).toEqual(before);
+  // The same partial record is still a valid replay of existing attribution.
+  const repeat = await send(t, grant, job.importJobId, 2, { citations: [{ ...partial, sourceKey: "S1", targets: [{ kind: "person", key: "A" }] }] });
+  expect(repeat.counts.citations.unchanged).toBe(1);
+  expect(await snapshot()).toEqual(before);
+  const confirmed: any = { ...initial, sourceKey: mode === "source" ? "S2" : "S1", targets: [{ kind: "person", key: "A" }, { kind: "person", key: "B" }, { kind: "person", key: "B" }] };
+  if (mode === "addTarget") confirmed[inputKey] = field === "confidence" ? 3 : corrections[field];
+  const accepted = await send(t, grant, job.importJobId, 3, { citations: [confirmed] });
+  expect(accepted.results).toEqual([expect.objectContaining({ status: "updated" })]);
+  const after = await snapshot();
+  expect((after.citations[0] as any)[field]).toBe((before.citations[0] as any)[field]);
+  expect(after.links).toHaveLength(2);
+  expect(after.links).toEqual(expect.arrayContaining(before.links));
+});
+
 test("citation link additions report updated, dry planning agrees, repeated targets stay idempotent", async () => {
   const t = convexTest({ schema, modules, transactionLimits: true });
   const grant = await seedGrant(t, { vaultOwnerId: OWNER });

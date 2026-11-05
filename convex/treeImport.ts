@@ -779,24 +779,28 @@ async function importCitation(c: ChunkContext, item: any): Promise<Omit<ItemResu
   await rejectLegacyIdentity(c, singular, key, legacyCitationKeyFor(item), "citation");
   const sourceId = (await resolveSourceIdentity(c, sourceKey)).id;
   if (!sourceId) fail("MISSING_SOURCE", `Source ${sourceKey} has not been imported yet.`, "Send the source first, then resend this row.");
-  const targets = [];
+  const targets: Awaited<ReturnType<typeof resolveTarget>>[] = [];
   for (const target of item.targets.slice(0, TREE_IMPORT_LIMITS.targetsPerCitation)) targets.push(await resolveTarget(c, target));
   const existingId = await lookup(c, singular, key);
   if (singular === "citation") await assertExplicitIdentity(c, "citations", existingId, key);
   const previous = existingId ? await ownedRow(c, "citations", existingId) : null;
+  const evidence = {
+    sourceId,
+    page: item.page,
+    // An omitted quality is a partial refresh, not a reset of a known rating.
+    confidence: item.quality === undefined && existingId ? undefined : confidenceForQuality(item.quality),
+    extractedText: cleanText(item.extractedText, "citation extractedText", FAMILY_HISTORY_MCP_LIMITS.notes),
+    url: item.url,
+    accessDate: item.accessDate,
+    notes: cleanText(item.notes, "citation notes", FAMILY_HISTORY_MCP_LIMITS.notes),
+  };
   const saved = await upsertRow(c, {
     table: "citations",
     singular,
     key,
     existingId,
     doc: {
-      sourceId,
-      page: item.page,
-      confidence: confidenceForQuality(item.quality),
-      extractedText: cleanText(item.extractedText, "citation extractedText", FAMILY_HISTORY_MCP_LIMITS.notes),
-      url: item.url,
-      accessDate: item.accessDate,
-      notes: cleanText(item.notes, "citation notes", FAMILY_HISTORY_MCP_LIMITS.notes),
+      ...evidence,
       externalIds: item.key ? [{ system: c.job.system, id: String(item.key) }] : undefined,
     },
     createOnly: { isEvidence: true, importKey: `import:${externalRecordKey(c.job.system, singular, key, c.job.importKey)}` },
@@ -810,7 +814,31 @@ async function importCitation(c: ChunkContext, item: any): Promise<Omit<ItemResu
   }
   const current = previous ? await ownedRow(c, "citations", saved.id) : null;
   const evidenceFields = ["sourceId", "page", "confidence", "extractedText", "url", "accessDate", "notes"] as const;
-  if (previous && current && evidenceFields.some(field => !same(previous[field], current[field]))) {
+  const evidenceChanged = !!previous && !!current && evidenceFields.some(field => !same(previous[field], current[field]));
+  // Resolve additions before writing any link, including repeated input targets.
+  const additions = new Map<string, (typeof targets)[number]>();
+  for (const target of targets) {
+    const virtualLink = [...(c.w.rows?.values() ?? [])].some(row => row.citationId === saved.id && row.targetType === target.targetType && row.targetId === target.targetId && row.field === target.field && row.vaultOwnerId === c.owner);
+    let existingLink = virtualLink;
+    if (!existingLink && !isPlaceholder(saved.id) && !isPlaceholder(target.targetId)) {
+      existingLink = (await c.ctx.db.query("citationLinks").withIndex("by_citation_and_target", q =>
+        q.eq("citationId", saved.id as Id<"citations">).eq("targetType", target.targetType).eq("targetId", target.targetId),
+      ).filter(q => q.eq(q.field("field"), target.field)).take(1)).length > 0;
+    }
+    if (!existingLink) additions.set(JSON.stringify([target.targetType, target.targetId, target.field ?? null]), target);
+  }
+  if (current && (evidenceChanged || additions.size > 0)) {
+    const omitted = evidenceFields.filter(field => {
+      // "medium" is the importer's unspecified-quality default, not an
+      // outside quality assertion. Every substantive retained field needs
+      // its actual value resubmitted before changing attribution.
+      if (field === "confidence" && current.confidence === "medium") return false;
+      return !isEmpty(current[field]) && evidence[field] === undefined;
+    });
+    if (omitted.length) fail("CITATION_EVIDENCE_CONFIRMATION_REQUIRED", `Changing citation attribution requires the retained evidence: ${omitted.join(", ")}.`,
+      "Read the corrected citation and explicitly resubmit its evidence before adding targets or refreshing evidence. This citation item saved nothing.");
+  }
+  if (evidenceChanged) {
     const persisted = isPlaceholder(saved.id) ? [] : await c.ctx.db.query("citationLinks")
       .withIndex("by_citation", q => q.eq("citationId", saved.id as Id<"citations">)).take(TREE_IMPORT_LIMITS.targetsPerCitation + 1);
     const virtual = [...(c.w.rows?.values() ?? [])].filter(row => row.citationId === saved.id && row.targetType);
@@ -820,18 +848,9 @@ async function importCitation(c: ChunkContext, item: any): Promise<Omit<ItemResu
         "Review the citation and all its existing targets with the person. No original links were deleted and this citation item saved nothing.");
     }
   }
-  for (const target of targets) {
-    const virtualLink = [...(c.w.rows?.values() ?? [])].some(row => row.citationId === saved.id && row.targetType === target.targetType && row.targetId === target.targetId && row.field === target.field && row.vaultOwnerId === c.owner);
-    let existingLink = virtualLink;
-    if (!existingLink && !isPlaceholder(saved.id) && !isPlaceholder(target.targetId)) {
-      existingLink = (await c.ctx.db.query("citationLinks").withIndex("by_citation_and_target", q =>
-        q.eq("citationId", saved.id as Id<"citations">).eq("targetType", target.targetType).eq("targetId", target.targetId),
-      ).filter(q => q.eq(q.field("field"), target.field)).take(1)).length > 0;
-    }
-    if (!existingLink) {
-      await c.w.insert("citationLinks", { vaultOwnerId: c.owner, citationId: saved.id, ...target, createdAt: Date.now() });
-      if (saved.status === "unchanged") saved.status = "updated";
-    }
+  for (const target of additions.values()) {
+    await c.w.insert("citationLinks", { vaultOwnerId: c.owner, citationId: saved.id, ...target, createdAt: Date.now() });
+    if (saved.status === "unchanged") saved.status = "updated";
   }
   return { key, keyOrigin: singular === "citationGenerated" ? "generated" : "explicit", status: saved.status, id: saved.id, ...(saved.kept ? { kept: saved.kept } : {}) };
 }

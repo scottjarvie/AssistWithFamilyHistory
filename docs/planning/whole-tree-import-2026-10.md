@@ -393,3 +393,11 @@ targets. This check includes virtual links across dry-run chunks and uses a
 bounded stored-link scan. FamilySearch source lookup and references use the
 owner/PID index; conflicting mappings or duplicate owned identities refuse
 without selecting, merging or rekeying an original.
+
+Before adding citation links or refreshing evidence, the incoming record must
+explicitly resubmit every substantive field retained in the stored citation.
+Omitted excerpt, page, notes, URL, access date or known quality refuses the item
+atomically. The default medium confidence means unspecified quality rather than
+an outside quality assertion. Omitted quality preserves an existing rating.
+Partial replays that change neither evidence nor links remain valid. New target
+links are planned and deduplicated before any insertion or attribution change.
