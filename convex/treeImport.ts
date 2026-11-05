@@ -411,6 +411,8 @@ async function upsertRow(
     linked?: boolean;
     doc: Record<string, unknown>;
     createOnly?: Record<string, unknown>;
+    // Import-only provenance lives in the mapping baseline, never the record.
+    baselineMetadata?: Record<string, unknown>;
   },
 ): Promise<UpsertOutcome> {
   const now = Date.now();
@@ -424,7 +426,7 @@ async function upsertRow(
       createdAt: now,
       updatedAt: now,
     });
-    await remember(c, args.singular, args.key, id, c.job.system, args.doc);
+    await remember(c, args.singular, args.key, id, c.job.system, { ...args.doc, ...args.baselineMetadata });
     return { id, status: "created" };
   }
   const row = await ownedRow(c, args.table, args.existingId);
@@ -455,12 +457,14 @@ async function upsertRow(
     }
     if (next.kept) kept.push(field);
   }
-  if (args.linked) await remember(c, args.singular, args.key, String(row._id));
+  Object.assign(imported, args.baselineMetadata);
+  const baselineChanged = Object.keys(patch).length > 0 || (args.baselineMetadata !== undefined && !same(baseline, imported));
+  if (args.linked) await remember(c, args.singular, args.key, String(row._id), c.job.system, args.baselineMetadata ? imported : undefined);
   if (Object.keys(patch).length > 0) {
     await c.w.patch(String(row._id), { ...clean(patch), updatedAt: now });
   }
-  if (c.w.dryRun && (plannedBaseline || mapping) && Object.keys(patch).length > 0) c.baselines.set(mapKey, clean(imported));
-  if (mapping && !c.w.dryRun && Object.keys(patch).length > 0) {
+  if (c.w.dryRun && (plannedBaseline || mapping) && baselineChanged) c.baselines.set(mapKey, clean(imported));
+  if (mapping && !c.w.dryRun && baselineChanged) {
     await c.w.patch(String(mapping._id), { lastImportedJson: JSON.stringify(clean(imported)) });
   }
   const status: ItemResult["status"] = args.linked ? "linked" : Object.keys(patch).length > 0 ? "updated" : "unchanged";
@@ -755,6 +759,17 @@ async function importRelationship(c: ChunkContext, item: any): Promise<Omit<Item
   const mapping = previous && !c.baselines.has(mapKey) ? await c.ctx.db.query("mcpRecordKeys").withIndex("by_owner_type_key", q => q.eq("vaultOwnerId", c.owner).eq("recordType", "relationship").eq("recordKey", mapKey)).unique() : null;
   const baseline = c.baselines.has(mapKey) ? c.baselines.get(mapKey) : mapping?.lastImportedJson ? JSON.parse(mapping.lastImportedJson) : null;
   let retainedDate = false;
+  // Explicit and inferred years have the same display shape. Remember only
+  // proven inference in the import baseline; unmarked legacy dates stay cautious.
+  type InferredYear = { type: string; original: string; year: number };
+  const inferredYears: InferredYear[] = Array.isArray(baseline?._relationshipInferredYears)
+    ? baseline._relationshipInferredYears.filter((entry: InferredYear) => {
+      const current = previous?.facts?.filter(row => row.type === entry.type) ?? [];
+      const original = baseline.facts?.filter((row: any) => row.type === entry.type) ?? [];
+      return current.length === 1 && original.length === 1
+        && current[0].date?.original === entry.original && current[0].date?.year === entry.year
+        && original[0].date?.original === entry.original && original[0].date?.year === entry.year;
+    }) : [];
   const suppliedFacts = Array.isArray(item.facts) && item.facts.length ? item.facts.map((fact: any) => clean({
       type: String(fact.type).slice(0, 120),
       date: withYear(fact.date),
@@ -765,13 +780,28 @@ async function importRelationship(c: ChunkContext, item: any): Promise<Omit<Item
     const supplied = item.facts[index].date;
     const matches = previous?.facts?.filter(row => row.type === fact.type) ?? [];
     const originals = Array.isArray(baseline?.facts) ? baseline.facts.filter((row: any) => row.type === fact.type) : [];
-    if (!supplied || matches.length !== 1 || originals.length > 1) return fact;
-    const date = mergeImportedValue(matches[0].date, supplied, originals[0]?.date, !!originals[0] && Object.hasOwn(originals[0], "date"));
+    if (!supplied) return fact;
+    const inference = inferredYears.find(entry => entry.type === fact.type);
+    const incoming = inference && matches.length === 1 && supplied.year === undefined && supplied.original !== matches[0].date?.original
+      ? clean({ ...supplied, year: withYear(supplied)?.year }) : supplied;
+    const rememberInference = (date: any) => {
+      const position = inferredYears.findIndex(entry => entry.type === fact.type);
+      if (position >= 0) inferredYears.splice(position, 1);
+      const unique = (suppliedFacts ?? []).filter((row: any) => row.type === fact.type).length === 1;
+      if (unique && originals.length <= 1 && matches.length <= 1 && supplied.year === undefined
+        && (!matches[0]?.date || inference) && date?.year !== undefined && date.year === withYear(supplied)?.year) {
+        inferredYears.push({ type: fact.type, original: date.original, year: date.year });
+      }
+    };
+    if (matches.length !== 1 || originals.length > 1) { rememberInference(fact.date); return fact; }
+    const date = mergeImportedValue(matches[0].date, incoming, originals[0]?.date, !!originals[0] && Object.hasOwn(originals[0], "date"));
     if (matches[0].date && matches[0].date.original !== supplied.original && date.kept) {
       fail("FACT_DATE_CONFIRMATION_REQUIRED", "Changed relationship date text conflicts with retained manual metadata.", "Review and resubmit the complete corrected date. This relationship item saved nothing.");
     }
     retainedDate ||= date.kept;
-    return clean({ ...fact, date: projectFactDate(supplied, date.value) });
+    const projected = projectFactDate(incoming, date.value);
+    rememberInference(projected);
+    return clean({ ...fact, date: projected });
   });
   const saved = await upsertRow(c, {
     table: "relationships",
@@ -789,6 +819,7 @@ async function importRelationship(c: ChunkContext, item: any): Promise<Omit<Item
       externalIds: externalIdsFor(c, key, item.otherIds),
     },
     createOnly: { importKey: `import:${externalRecordKey(c.job.system, "relationship", key, c.job.importKey)}` },
+    baselineMetadata: { _relationshipInferredYears: inferredYears },
   });
   if (retainedDate && !saved.kept?.includes("facts")) saved.kept = [...(saved.kept ?? []), "facts"];
   if (previous) {

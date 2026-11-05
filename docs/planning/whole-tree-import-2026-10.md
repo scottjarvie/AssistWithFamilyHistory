@@ -450,3 +450,11 @@ requires every retained year/month/day/formal/range/approximate component,
 including false flags; conflicting manual components refuse atomically.
 Endpoint confirmation compares the supplied facts, not a preview that has
 already retained conflicting manual values.
+
+Relationship import baselines now distinguish proven inferred years from
+explicit or unmarked legacy metadata. Text-only corrections can advance a
+proven inferred year; manual, explicit, legacy and unparseable conflicts still
+require complete-date review. Explicitly confirming the same year clears the
+inference marker even without a document change. The marker stays internal to
+import mappings and follows dry planning and resume. Legacy relationship
+createCouple/updateFacts validators also retain imported date range metadata.

@@ -2039,3 +2039,69 @@ test("citation link additions report updated, dry planning agrees, repeated targ
   expect(again.results).toEqual([]);
   expect(await countRows(t, "citationLinks")).toBe(2);
 });
+
+
+test("relationship inferred years follow ordinary text-only corrections and resume", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const relation = { key: "R", type: "Couple" as const, person1Key: "A", person2Key: "B" };
+  await send(t, grant, job.importJobId, 0, { persons: ["A", "B"].map(key => ({ key, living: false, names: [{ given: key }] })), relationships: [{ ...relation, facts: [{ type: "marriage", date: { original: "1900" } }] }] });
+  const snapshot = () => t.run(async ctx => ({ rows: await ctx.db.query("relationships").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() }));
+  for (const [index, original] of ["1901", "1902"].entries()) {
+    const before = await snapshot(); const batch: TreeImportBatch = { relationships: [{ ...relation, facts: [{ type: "marriage", date: { original } }] }] };
+    const dry = await send(t, grant, job.importJobId, index + 1, batch, { dryRun: true }, `dry-inferred-relation-${original}`);
+    expect(await snapshot()).toEqual(before);
+    const result = await send(t, grant, job.importJobId, index + 1, batch);
+    expect(dry.counts).toEqual(result.counts); expect(result.results).toEqual([expect.objectContaining({ status: "updated" })]); expect(result.results[0].kept).toBeUndefined();
+    const after = await snapshot(); expect(after.rows[0].facts![0].date).toEqual({ original, year: Number(original) });
+    const mapping = after.keys.find(row => row.recordType === "relationship")!;
+    expect(JSON.parse(mapping.lastImportedJson!)._relationshipInferredYears).toEqual([{ type: "marriage", original, year: Number(original) }]);
+    expect(await send(t, grant, job.importJobId, index + 1, batch)).toEqual(result); expect(await snapshot()).toEqual(after);
+  }
+  const before = await snapshot();
+  for (const dryRun of [true, false]) {
+    const refused = await send(t, grant, job.importJobId, 3, { relationships: [{ ...relation, facts: [{ type: "marriage", date: { original: "unknown" } }] }] }, { dryRun }, `unparseable-relation-${dryRun}`);
+    expect(refused.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("FACT_DATE_CONFIRMATION_REQUIRED") })]); expect(await snapshot()).toEqual(before);
+  }
+});
+
+test("relationship inferred-year provenance survives planning chunks", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  await send(t, grant, job.importJobId, 0, { persons: ["A", "B"].map(key => ({ key, living: false, names: [{ given: key }] })) });
+  const batch: TreeImportBatch = { relationships: Array.from({ length: 126 }, (_, i) => ({ key: "R", type: "Couple", person1Key: "A", person2Key: "B", facts: [{ type: "marriage", date: { original: String(1900 + i) } }] })) };
+  expect(chunkBatch(batch)).toHaveLength(2);
+  const dry = await send(t, grant, job.importJobId, 1, batch, { dryRun: true }, "dry-inferred-relation-chunks");
+  expect(await countRows(t, "relationships")).toBe(0);
+  const result = await send(t, grant, job.importJobId, 1, batch);
+  expect(dry.counts).toEqual(result.counts); expect(result.counts.relationships).toMatchObject({ created: 1, updated: 125, failed: 0 });
+  expect((await t.run(ctx => ctx.db.query("relationships").collect()))[0].facts![0].date).toEqual({ original: "2025", year: 2025 });
+});
+
+test.each(["explicit", "manual", "legacy", "confirmed"])("relationship text-only corrections protect %s years", async mode => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const relation = { key: "R", type: "Couple" as const, person1Key: "A", person2Key: "B" };
+  await send(t, grant, job.importJobId, 0, { persons: ["A", "B"].map(key => ({ key, living: false, names: [{ given: key }] })), relationships: [{ ...relation, facts: [{ type: "marriage", date: { original: "1900", ...(mode === "explicit" ? { year: 1900 } : {}) } }] }] });
+  if (mode === "manual") await t.run(async ctx => { const row = (await ctx.db.query("relationships").collect())[0]; await ctx.db.patch(row._id, { facts: [{ ...row.facts![0], date: { original: "1900", year: 1899 } }] }); });
+  if (mode === "legacy") await t.run(async ctx => { const mapping = (await ctx.db.query("mcpRecordKeys").collect()).find(row => row.recordType === "relationship")!; const baseline = JSON.parse(mapping.lastImportedJson!); delete baseline._relationshipInferredYears; await ctx.db.patch(mapping._id, { lastImportedJson: JSON.stringify(baseline) }); });
+  if (mode === "confirmed") {
+    const confirmed = await send(t, grant, job.importJobId, 1, { relationships: [{ ...relation, facts: [{ type: "marriage", date: { original: "1900", year: 1900 } }] }] });
+    expect(confirmed.counts.relationships.unchanged).toBe(1);
+    const mapping = (await t.run(ctx => ctx.db.query("mcpRecordKeys").collect())).find(row => row.recordType === "relationship")!;
+    expect(JSON.parse(mapping.lastImportedJson!)._relationshipInferredYears).toEqual([]);
+  }
+  const snapshot = () => t.run(async ctx => ({ rows: await ctx.db.query("relationships").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  for (const dryRun of [true, false]) {
+    const result = await send(t, grant, job.importJobId, 2, { relationships: [{ ...relation, facts: [{ type: "marriage", date: { original: "1901" } }] }] }, { dryRun }, `protected-relation-year-${mode}-${dryRun}`);
+    expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("FACT_DATE_CONFIRMATION_REQUIRED") })]); expect(await snapshot()).toEqual(before);
+  }
+});
+
+test.each([false, true])("legacy relationship writers round-trip imported date range %s", async range => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  await send(t, grant, job.importJobId, 0, { persons: ["A", "B"].map(key => ({ key, living: false, names: [{ given: key }] })), relationships: [{ key: "R", type: "Couple", person1Key: "A", person2Key: "B", facts: [{ type: "marriage", date: { original: "between 1900 and 1905", range }, description: "Original" }] }] });
+  const row = (await t.run(ctx => ctx.db.query("relationships").collect()))[0];
+  await t.mutation(internal.relationships.updateFacts, { id: row._id, facts: row.facts!.map(fact => ({ ...fact, description: "Corrected detail" })) });
+  const updated = await t.run(ctx => ctx.db.get(row._id)); expect(updated!.facts![0]).toEqual({ ...row.facts![0], description: "Corrected detail" });
+  const copy = await t.mutation(internal.relationships.createCouple, { person1Id: row.person1, person2Id: row.person2, facts: updated!.facts });
+  expect((await t.run(ctx => ctx.db.get(copy)))!.facts).toEqual(updated!.facts);
+  // Internal synthetic writer compatibility only, never end-user authorization proof.
+});
