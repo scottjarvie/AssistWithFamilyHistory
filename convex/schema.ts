@@ -563,6 +563,9 @@ export default defineSchema({
       v.literal("other")
     ),
     
+    // Original classification supplied by tree import; display type stays normalized.
+    importedType: v.optional(v.string()),
+
     // Source details
     repository: v.optional(v.string()),
     url: v.optional(v.string()),

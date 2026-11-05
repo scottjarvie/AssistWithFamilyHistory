@@ -968,6 +968,7 @@ async function importSource(c: ChunkContext, item: any): Promise<Omit<ItemResult
     doc: {
       title,
       type: item.type === undefined && existingId ? undefined : sourceTypeFor(item.type),
+      importedType: item.type,
       repository: item.repository,
       url: item.url,
       author: item.author,
@@ -984,7 +985,13 @@ async function importSource(c: ChunkContext, item: any): Promise<Omit<ItemResult
   if (previous) {
     const current = await ownedRow(c, "sources", saved.id);
     const material = ["title", "type", "repository", "url", "author", "publicationDate", "citationText", "recordDate", "recordPlace", "notes"] as const;
-    if (current && material.some(field => !same(previous[field], current[field]))) {
+    // Backfill provenance for an unchanged known legacy classification without
+    // treating it as replacement material. An unknown former "other" cannot
+    // establish that a new custom classification describes the same assertion.
+    const confirmsLegacyType = previous.importedType === undefined && current?.importedType !== undefined
+      && (current.importedType === previous.type || (previous.type !== "other" && sourceTypeFor(current.importedType) === previous.type));
+    const classificationChanged = current && !same(previous.importedType, current.importedType) && !confirmsLegacyType;
+    if (current && (classificationChanged || material.some(field => !same(previous[field], current[field])))) {
       const virtual = [...(c.w.rows?.values() ?? [])].some(row => row.sourceId === saved.id
         || (row.subject?.kind === "source" && row.subject.id === saved.id)
         || (row.from?.kind === "source" && row.from.id === saved.id) || (row.to?.kind === "source" && row.to.id === saved.id));

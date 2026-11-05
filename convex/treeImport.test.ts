@@ -17,6 +17,8 @@ import { convexTest } from "convex-test";
 import schema from "./schema";
 import { api, internal } from "./_generated/api";
 import { isContextPackEligibleMedia } from "./vault";
+import { importCapturePackageToConvex } from "../lib/familysearch/importer";
+import { CapturePackageSchema } from "../lib/familysearch/capture";
 import { seedGrant } from "../lib/mcp/testSupport";
 import { generateSyntheticTree, packBatches, syntheticPid } from "../lib/treeImport/syntheticTree";
 import { chunkBatch, citationKeyFor, externalRecordKey, factKeyFor, factReferenceKeyFor, legacyCitationKeyFor, legacyFactKeyFor, legacyExternalRecordKey, type TreeImportBatch } from "../lib/treeImport/model";
@@ -2577,4 +2579,97 @@ test("empty legacy inline event notes do not prevent unattached fact refresh", a
   const dry = await send(t, grant, job.importJobId, 1, { persons: [changed] }, { dryRun: true }, "dry-empty-event-note"); expect(await t.run(ctx => ctx.db.query("events").collect())).toEqual(before);
   const real = await send(t, grant, job.importJobId, 1, { persons: [changed] }); expect(dry.counts).toEqual(real.counts); expect(real.counts.persons.updated).toBe(1);
   expect((await t.run(ctx => ctx.db.query("events").collect()))[0]).toMatchObject({ _id: event._id, description: "Teacher", notes: "", importedFact: { type: "occupation", value: "Teacher" } });
+});
+
+
+test("actual capture caller reuses a GEDCOM FamilySearch alias despite changed names", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const gedcom = await t.mutation(internal.treeImport.beginTreeImport, { principal: principal(), grantId: grant, operationId: "begin-capture-alias", requestHash: "begin-capture-alias", input: { importKey: "capture-alias-file", system: "gedcom7", label: "Synthetic GEDCOM" } }) as any;
+  await send(t, grant, gedcom.importJobId, 0, { persons: [{ key: "@I1@", living: false, names: [{ given: "Liz", surname: "Smith" }], otherIds: [{ system: "familysearch", id: "PID-A" }] }] });
+  const original = (await t.run(ctx => ctx.db.query("persons").collect()))[0]; const mappings = await t.run(ctx => ctx.db.query("mcpRecordKeys").collect());
+  await t.run(async ctx => { const foreign = await ctx.db.insert("persons", { vaultOwnerId: "foreign-capture-owner", fsId: "PID-A", name: { given: "Foreign", surname: "Person" }, sex: "unknown", living: false, createdAt: 1, updatedAt: 1 }); await ctx.db.insert("mcpRecordKeys", { vaultOwnerId: "foreign-capture-owner", recordType: "person", recordKey: externalRecordKey("familysearch", "person", "PID-A"), recordId: String(foreign), externalKeyVersion: 2, createdAt: 1, updatedAt: 1 }); });
+  const capture = CapturePackageSchema.parse({ schemaVersion: "2.0", captureId: "synthetic-capture-alias", capturedAt: "2026-01-01T00:00:00Z", extractorVersion: "synthetic-test", extractionDurationMs: 0, pageType: "person", pageUrl: "https://example.test/capture/PID-A", pageTitle: "Synthetic person", uiLocale: "en", person: { familySearchId: "PID-A", name: "Elizabeth Jones", deathDate: "2000" }, sources: [], memories: [], diagnostics: { mode: "standard", warnings: [], errors: [] } });
+  // Execute the actual caller through in-memory owner-authorized mutations.
+  // This adapter never contacts FamilySearch, a network backend or a real user.
+  const owner = t.withIdentity({ subject: OWNER });
+  const client = { mutation: (ref: any, args: any) => owner.mutation(ref, args) } as unknown as Parameters<typeof importCapturePackageToConvex>[0]["client"];
+  const captured = await importCapturePackageToConvex({ client, vaultOwnerId: OWNER, capture, compatibilityMode: false, artifactPaths: {} });
+  expect(captured.personId).toBe(String(original._id));
+  const afterCapture = await t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), mappings: await ctx.db.query("mcpRecordKeys").collect() }));
+  expect(afterCapture.people.filter(row => row.vaultOwnerId === OWNER)).toHaveLength(1);
+  expect(afterCapture.people.find(row => row._id === original._id)).toMatchObject({ fsId: "PID-A", name: { given: "Elizabeth", surname: "Jones" }, importedNames: original.importedNames });
+  expect(afterCapture.mappings.filter(row => row.vaultOwnerId === OWNER)).toEqual(mappings);
+  const job = await begin(t, grant);
+  const result = await send(t, grant, job.importJobId, 0, { persons: [{ key: "PID-A", living: false, names: [{ given: "Elizabeth", surname: "Jones" }], facts: [{ key: "F", type: "occupation", value: "Teacher" }] }] });
+  expect(result.results.filter((row: any) => row.status === "failed")).toEqual([]);
+  expect((await t.run(ctx => ctx.db.query("personEvents").collect()))[0].personId).toBe(original._id);
+  expect((await t.run(ctx => ctx.db.query("persons").collect())).filter(row => row.vaultOwnerId === OWNER)).toHaveLength(1);
+});
+
+test.each(["splitPID", "duplicatePID", "deleted", "foreign", "correctedPID", "duplicateMapping", "ambiguousLegacy"])("capture refuses conflicting or stale FamilySearch identities (%s)", async mode => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const pid = mode === "ambiguousLegacy" ? "person:PID-A" : "PID-A";
+  await send(t, grant, job.importJobId, 0, { persons: [{ key: pid, living: false, names: [{ given: "Original", surname: "Person" }] }] });
+  const original = (await t.run(ctx => ctx.db.query("persons").collect()))[0];
+  await t.run(async ctx => {
+    const mapping = (await ctx.db.query("mcpRecordKeys").collect())[0];
+    if (mode === "splitPID" || mode === "duplicatePID") await ctx.db.insert("persons", { vaultOwnerId: OWNER, fsId: pid, name: { given: "Other", surname: "Person" }, sex: "unknown", living: false, createdAt: 1, updatedAt: 1 });
+    if (mode === "duplicatePID") await ctx.db.delete(mapping._id);
+    if (mode === "splitPID") await ctx.db.patch(original._id, { fsId: undefined });
+    if (mode === "foreign") await ctx.db.patch(original._id, { vaultOwnerId: "different-owner" });
+    if (mode === "correctedPID") await ctx.db.patch(original._id, { fsId: "PID-B" });
+    if (mode === "duplicateMapping") await ctx.db.insert("mcpRecordKeys", { vaultOwnerId: OWNER, recordType: "person", recordKey: mapping.recordKey, recordId: mapping.recordId, externalKeyVersion: 2, createdAt: 1, updatedAt: 1 });
+    if (mode === "ambiguousLegacy") await ctx.db.patch(mapping._id, { externalKeyVersion: undefined });
+  });
+  if (mode === "deleted") await t.mutation(internal.persons.remove, { id: original._id });
+  const snapshot = () => t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), mappings: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  const code = ["splitPID", "duplicatePID", "duplicateMapping"].includes(mode) ? "AMBIGUOUS_PERSON_IDENTITY" : ["deleted", "foreign"].includes(mode) ? "MISSING_TARGET" : "LEGACY_IDENTITY_REVIEW_REQUIRED";
+  await expect(t.withIdentity({ subject: OWNER }).mutation(api.vaultMutations.upsertPerson, { vaultOwnerId: OWNER, fsId: pid, name: { given: "Replacement", surname: "Capture" }, sex: "unknown", living: false })).rejects.toThrow(code);
+  expect(await snapshot()).toEqual(before);
+});
+
+test.each(["legacyPID", "safeLegacyMapping", "noPIDName", "differentPIDName"])("capture preserves explicit identity and no-PID compatibility (%s)", async mode => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const original = await t.run(ctx => ctx.db.insert("persons", { vaultOwnerId: OWNER, ...(mode !== "noPIDName" ? { fsId: "PID-A" } : {}), name: { given: "Same", surname: "Name" }, sex: "unknown", living: false, createdAt: 1, updatedAt: 1 }));
+  if (mode === "safeLegacyMapping") await t.run(ctx => ctx.db.insert("mcpRecordKeys", { vaultOwnerId: OWNER, recordType: "person", recordKey: externalRecordKey("familysearch", "person", "PID-A"), recordId: String(original), createdAt: 1, updatedAt: 1 }));
+  const result = await t.withIdentity({ subject: OWNER }).mutation(api.vaultMutations.upsertPerson, { vaultOwnerId: OWNER, ...(mode !== "noPIDName" ? { fsId: mode === "differentPIDName" ? "PID-B" : "PID-A" } : {}), name: { given: "Same", surname: "Name" }, sex: "unknown", living: false });
+  expect(result.created).toBe(mode === "differentPIDName");
+  if (mode === "differentPIDName") { expect(result.personId).not.toBe(original); expect((await t.run(ctx => ctx.db.get(original)))?.fsId).toBe("PID-A"); }
+  else expect(result.personId).toBe(original);
+  expect(await countRows(t, "persons")).toBe(mode === "differentPIDName" ? 2 : 1);
+});
+
+test.each([{ raw: "parish_register", display: "other" }, { raw: "Census", display: "census" }, { raw: "https://a.example/ParishRegister", display: "other" }, { raw: "", display: "other" }])("source classification $raw survives normalization, omission and context retrieval", async ({ raw, display }) => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const first = await send(t, grant, job.importJobId, 0, { sources: [{ key: "S", title: "Register", type: raw }] }); expect(first.counts.sources.created).toBe(1);
+  const snapshot = () => t.run(async ctx => ({ sources: await ctx.db.query("sources").collect(), mappings: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  expect(before.sources[0]).toMatchObject({ type: display, importedType: raw }); expect(JSON.parse(before.mappings[0].lastImportedJson!).importedType).toBe(raw);
+  const noop = await send(t, grant, job.importJobId, 1, { sources: [{ key: "S", title: "Register" }] }); expect(noop.counts.sources.unchanged).toBe(1); expect(await snapshot()).toEqual(before);
+  const context = await t.query(internal.mcpFamilyHistory.getRecordContext, { principal: principal(), kind: "source", id: String(before.sources[0]._id) }) as any;
+  expect(context.source.importedType).toBe(raw);
+  const batch = { sources: [{ key: "S", title: "Corrected register" }] }; const dry = await send(t, grant, job.importJobId, 2, batch, { dryRun: true }, `dry-original-source-type-${display}-${raw.length}`); expect(await snapshot()).toEqual(before);
+  const real = await send(t, grant, job.importJobId, 2, batch); expect(dry.counts).toEqual(real.counts); expect(real.counts.sources.updated).toBe(1); expect((await snapshot()).sources[0]).toMatchObject({ type: display, importedType: raw });
+});
+
+test.each(["unattached", "citation", "note"])("custom source classification refresh respects %s attribution", async material => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  await send(t, grant, job.importJobId, 0, { persons: [{ key: "P", living: false, names: [{ given: "P" }] }], sources: [{ key: "S", title: "Register", type: "parish_register" }], ...(material === "citation" ? { citations: [{ key: "C", sourceKey: "S", targets: [{ kind: "person" as const, key: "P" }] }] } : {}), ...(material === "note" ? { notes: [{ key: "N", text: "Explanation of parish records", subject: { kind: "source" as const, key: "S" } }] } : {}) });
+  const snapshot = () => t.run(async ctx => ({ sources: await ctx.db.query("sources").collect(), mappings: await ctx.db.query("mcpRecordKeys").collect(), notes: await ctx.db.query("notes").collect(), citations: await ctx.db.query("citations").collect() })); const before = await snapshot();
+  const batch = { sources: [{ key: "S", title: "Register", type: "court_register" }] }; const dry = await send(t, grant, job.importJobId, 1, batch, { dryRun: true }, `dry-custom-classification-${material}`); expect(await snapshot()).toEqual(before);
+  const real = await send(t, grant, job.importJobId, 1, batch); expect(dry.counts).toEqual(real.counts);
+  if (material === "unattached") { expect(real.counts.sources.updated).toBe(1); expect((await snapshot()).sources[0]).toMatchObject({ type: "other", importedType: "court_register" }); }
+  else { expect(real.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("SOURCE_ATTRIBUTION_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before); }
+  expect(await send(t, grant, job.importJobId, 1, batch)).toEqual({ ...real, deduplicated: true });
+});
+
+
+test.each(["census", "parish_register"])("legacy source classification provenance refresh is conservative (%s)", async type => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  await send(t, grant, job.importJobId, 0, { persons: [{ key: "P", living: false, names: [{ given: "P" }] }], sources: [{ key: "S", title: "Legacy", type }], citations: [{ key: "C", sourceKey: "S", targets: [{ kind: "person", key: "P" }] }] });
+  await t.run(async ctx => { const source = (await ctx.db.query("sources").collect())[0]; await ctx.db.patch(source._id, { importedType: undefined }); const key = (await ctx.db.query("mcpRecordKeys").collect()).find(row => row.recordType === "source")!; const baseline = JSON.parse(key.lastImportedJson!); delete baseline.importedType; await ctx.db.patch(key._id, { lastImportedJson: JSON.stringify(baseline) }); });
+  const snapshot = () => t.run(async ctx => ({ sources: await ctx.db.query("sources").collect(), mappings: await ctx.db.query("mcpRecordKeys").collect(), citations: await ctx.db.query("citations").collect(), links: await ctx.db.query("citationLinks").collect() })); const before = await snapshot();
+  const batch = { sources: [{ key: "S", title: "Legacy", type }] }; const dry = await send(t, grant, job.importJobId, 1, batch, { dryRun: true }, `dry-legacy-classification-${type}`); expect(await snapshot()).toEqual(before);
+  const real = await send(t, grant, job.importJobId, 1, batch); expect(dry.counts).toEqual(real.counts);
+  if (type === "census") { expect(real.counts.sources.updated).toBe(1); expect((await snapshot()).sources[0].importedType).toBe(type); const noop = await send(t, grant, job.importJobId, 2, batch); expect(noop.counts.sources.unchanged).toBe(1); }
+  else { expect(real.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("SOURCE_ATTRIBUTION_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before); }
 });

@@ -557,3 +557,22 @@ for story states/source and excerpt refresh, bounded scans, owner isolation,
 legacy event writer, replay, rollback and permitted refreshes. All remain UNRUN;
 fixture review/publication metadata is in-memory setup, not real user proof.
 No UI route/layout changes, provider calls, real database writes or deployment.
+
+
+Capture alias and source-classification compatibility (2026-11-05):
+The existing capture person writer now resolves a supplied FamilySearch PID
+against the owned import mapping and existing owned PID records before writing.
+Conflicting identities, stale/foreign targets and ambiguous unversioned mappings
+refuse without rekeying or changing originals. A supplied PID no longer falls
+back to matching names; the existing no-PID name path remains. Default-local
+legacy ownership retains its existing normalization. No provider access added.
+Sources retain the submitted classification in importedType alongside their
+normalized display type and imported baseline. Omission preserves it. Changes
+to retained custom classifications use the source attribution guard. Adding
+provenance for an unchanged known legacy type is allowed; an old unknown other
+classification with attached material requires review before adopting a custom
+classification. Added 21 synthetic regression cases, including the actual
+capture caller with in-memory owner mutations, identity refusals, legacy paths,
+source context retrieval, dry parity, rollback, replay and classification
+compatibility. All remain UNRUN; synthetic actors are not user/Tier2 proof.
+Convex schema deployment is required and has not occurred. No UI changes.

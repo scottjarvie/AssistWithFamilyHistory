@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, type MutationCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
+import { externalRecordKey } from "../lib/treeImport/model";
 import { buildStoryPublicSlug } from "../lib/stories/slug";
 import { redactPublicText } from "../lib/privacy/publicTextRedaction";
 import {
@@ -307,6 +308,34 @@ async function enforceStoryPolicyViolation(
   throw new Error(`Story publishing policy denied: ${reason}`);
 }
 
+/** Capture and tree import must agree on a registered FamilySearch identity. */
+async function resolveCapturedFamilySearchPerson(ctx: MutationCtx, owner: string, pid: string): Promise<Doc<"persons"> | null> {
+  const recordKey = externalRecordKey("familysearch", "person", pid);
+  const mappings = await ctx.db.query("mcpRecordKeys").withIndex("by_owner_type_key", q =>
+    q.eq("vaultOwnerId", owner).eq("recordType", "person").eq("recordKey", recordKey),
+  ).take(2);
+  if (mappings.length > 1) throw new Error("AMBIGUOUS_PERSON_IDENTITY: Duplicate FamilySearch mappings require review; no person was changed.");
+  const mapping = mappings[0];
+  if (mapping && mapping.externalKeyVersion !== 2 && (pid.trim().startsWith("person:") || pid.includes(":person:"))) {
+    throw new Error("LEGACY_IDENTITY_REVIEW_REQUIRED: The unversioned FamilySearch mapping is ambiguous; its original was retained.");
+  }
+  let mapped: Doc<"persons"> | null = null;
+  if (mapping) {
+    const id = ctx.db.normalizeId("persons", mapping.recordId);
+    mapped = id ? await ctx.db.get(id) : null;
+    if (!mapped || !matchesVaultOwner(mapped.vaultOwnerId, owner)) throw new Error("MISSING_TARGET: The FamilySearch mapping has no owned person; no record was changed.");
+  }
+  // Include unowned legacy rows only for their existing default-local owner.
+  const owners = matchesVaultOwner(undefined, owner) ? [owner, undefined] : [owner];
+  const legacy = (await Promise.all(owners.map(vaultOwnerId => ctx.db.query("persons")
+    .withIndex("by_owner_fsId", q => q.eq("vaultOwnerId", vaultOwnerId).eq("fsId", pid)).take(2)))).flat();
+  const identities = new Map(legacy.map(row => [String(row._id), row]));
+  if (mapped) identities.set(String(mapped._id), mapped);
+  if (identities.size > 1) throw new Error("AMBIGUOUS_PERSON_IDENTITY: The mapping and existing FamilySearch PID identify different people; all originals were retained.");
+  if (mapped?.fsId && mapped.fsId !== pid) throw new Error("LEGACY_IDENTITY_REVIEW_REQUIRED: The mapped person's current FamilySearch PID disagrees; no identity was reassigned.");
+  return [...identities.values()][0] ?? null;
+}
+
 export const upsertPerson = mutation({
   args: {
     vaultOwnerId: v.string(),
@@ -344,15 +373,11 @@ export const upsertPerson = mutation({
     const now = Date.now();
     let existing: Doc<"persons"> | null = null;
 
-    if (args.fsId) {
-      const fsMatches = await ctx.db
-        .query("persons")
-        .withIndex("by_fsId", (q) => q.eq("fsId", args.fsId))
-        .collect();
-      existing = filterByVaultOwner(fsMatches, vaultOwnerId)[0] ?? null;
-    }
+    if (args.fsId) existing = await resolveCapturedFamilySearchPerson(ctx, vaultOwnerId, args.fsId);
 
-    if (!existing) {
+    // A supplied outside identity is authoritative; names can change and are
+    // not proof that two different PIDs identify the same person.
+    if (!existing && !args.fsId) {
       const candidates = await ctx.db
         .query("persons")
         .withIndex("by_surname", (q) => q.eq("name.surname", args.name.surname))
