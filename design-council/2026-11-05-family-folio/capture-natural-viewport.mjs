@@ -6,9 +6,9 @@ import { chromium } from '@playwright/test';
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 const run=path.dirname(new URL(import.meta.url).pathname);
-const config=JSON.parse(readFileSync(path.join(run,'../shots.json'),'utf8'));
+const config=JSON.parse(readFileSync(process.argv[3] || path.join(run,'../shots.json'),'utf8'));
 const round=process.argv[2] || '2';if(!/^\d+$/.test(round))throw new Error('Round must be a number');
-const out=path.join(run,`round-${round}/ours`);mkdirSync(out,{recursive:true});
+const out=process.argv[4] ? path.resolve(process.argv[4]) : path.join(run,`round-${round}/ours`);mkdirSync(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome'});
 const report={capturedAt:new Date().toISOString(),baseURL:config.baseURL,set:'shots',method:'Installed Chrome, actual 1440×900 / 390×844 device viewports, fullPage screenshot with no viewport growth. Console errors, page errors, HTTP errors, failed capability probes or page overflow block acceptance.',shots:[]};
 try {

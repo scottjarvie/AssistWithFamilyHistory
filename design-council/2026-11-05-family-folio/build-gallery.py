@@ -4,13 +4,14 @@ from datetime import datetime, timezone
 import html, json, base64, re, os
 run=Path(__file__).resolve().parent
 rounds=sorted([p for p in run.glob('round-*') if re.fullmatch(r'round-\d+',p.name) and (p/'ours').exists()],key=lambda p:int(p.name.split('-')[1]),reverse=True)
-sections=[(p.name,p/'ours') for p in rounds]+[('Starting page · now',run/'baseline')]
+sections=[(p.name,p/'ours') for p in rounds]+[('Starting collections · reconstructed now',run/'baseline-reconstructed'),('Starting page · now',run/'baseline')]
 images=[]; blocks=[]
 score_file=run/'scores.json'
 score_data=json.loads(score_file.read_text()) if score_file.exists() else {}
 params=json.loads((run/'params.json').read_text())
 weights={c['key']:c.get('weight',1) for c in params.get('categories',[])}
 def score_line(title):
+ if 'reconstructed' in title: return 'Original page JSX from 99980b5, invented data under the current shared shell/runtime · reconstructed comparison, not a frozen original capture'
  if title.startswith('Starting'): return 'Starting snapshot · now'
  number=int(title.split('-')[1])
  record=next((r for r in score_data.get('rounds',[]) if r['round']==number),None)

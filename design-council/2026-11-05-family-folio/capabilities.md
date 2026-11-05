@@ -14,3 +14,11 @@ Automated visible-element probes are in ../shots.json. They supplement interacti
 ## No-removal audit rule
 
 Per round, inspect each changed node for text becoming icon-only, hover-only, hidden or deeper; list it in rounds.md. Do not clamp text or silently collapse facts. Existing public and specialist pages remain on the inventory until built and captured; shared token adoption alone does not complete a page.
+
+## Expanded collection tranche
+
+- Places: original search and every place link, kind, event/citation/media count; same server query. Adds saved search/presentation, grouping/sort/selection and SVG map slot.
+- Stories: original All/Draft/Review/Published counts and links, all five workflow quick links and every workflow option, title/person/kind/state, source/place/context/readiness/warning counts, original four-line narrative preview, review and published-only public links. Adds full-text search, expandable narrative and saved q/status/workflow together.
+- Writing launcher: original 24-candidate server limit/query, workflow/readiness/source/context and each person writing session; adds lifespan and collection arrangements.
+- Research: original titles, descriptions, priority, people, all returned task states and full log summaries/kinds/person links. Global tasks get no invented record destination. Adds dated log/recorded provenance, explicit unverified model-hint labels, author/period/kind/range filters and a real entry-kind SVG chart; date inputs provide the keyboard alternative to dragging.
+- Shared default is responsive: Table on desktop, compact recognition List on phones. Every chosen count/field stays in the wrapped row; explicit view and column choices persist. Older People column selections automatically regain lifespan/state moved from identity; new explicit hides remain respected.

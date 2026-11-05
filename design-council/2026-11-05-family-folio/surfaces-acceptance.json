@@ -1,0 +1,18 @@
+{
+  "checkedAt": "2026-11-05T09:39:19.826Z",
+  "checks": [
+    "Places keeps kind and every event/citation/media count",
+    "Place search and a saved query restore across full navigation",
+    "Stories preserves each review link and published-only public link",
+    "Narrative is expandable without dropping the original four-line preview",
+    "Saved Stories view restores q, status and workflow together",
+    "Writing launcher retains source/context/readiness/workflow and each person session",
+    "Global research tasks remain readable and never get a fake detail link",
+    "AI provenance and self-reported model hints remain distinct",
+    "Date-range selection and clear filter the real activity entries",
+    "Dragging the activity date axis selects actual log entries",
+    "Only recorded activity kinds appear and filter the dated list",
+    "All five collection surfaces preserve visible records and avoid overflow at 320px"
+  ],
+  "errors": []
+}

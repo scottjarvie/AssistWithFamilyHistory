@@ -31,16 +31,16 @@ All 45 existing `app/**/page.tsx` files are represented below. “Pending” mea
 | `/app/people/[personId]/contextualized` | Learning-reader (reexport) | Source-docs contextualized page | Structured AI dossier, copy/download, back navigation | Pending |
 | `/app/people/[personId]/ai` | Site-specific evidence-processing workbench (reexport) | Source-docs AI page | Living-person warning, redacted/original choice, privacy controls, normalize/cluster/synthesize stages | Pending |
 | `/app/people/[personId]/story-writer` | Site-specific focused writing session | StoryWriterStudio | Context/readiness inputs, generate draft, copy prompt, manual editing, save, saved-story link, return to person | Pending |
-| `/app/places` | Collection | Inline page | Place search, linked-person/event/source/context counts, place links | Pending |
+| `/app/places` | Collection | Inline page | Place search, linked-person/event/source/context counts, place links | Built local tranche 3; captures/checks pass, Opus pending |
 | `/app/places/[placeId]` | Record + sections | Inline page + ContextReportForm | Place identity, people/events/sources, context slots, research activity, place media, add context report | Pending |
 | `/app/imports` | Site-specific capture intake + collection | Inline client page | JSON paste, preview, warnings/privacy review, merge confirmation/recovery, backend status, latest warnings and recent imports | Pending |
 | `/app/operations` | Collection — research operations, distinct from personal Queue | Inline page + OperationRowActions | Search, row type, story state/readiness, missing check, freshness, sort/direction, row actions, handoff links, progress and operating explanations | Pending |
-| `/app/research` | Collection + activity | Inline page | Open task title/person/priority/description; research-log summary/activity kind/person | Pending |
+| `/app/research` | Collection + activity | Inline page | Open task title/person/priority/description; research-log summary/activity kind/person | Built local tranche 3; captures/checks pass, Opus pending |
 | `/app/audit` | Stats — instrument panel | Inline page | Coverage/readiness totals, workflow distribution, priority people, evidence/research links | Pending |
 | `/app/queue` | Queue list + embedded Queue item | QueueWorkspace | State filters, loaded search, pagination, directive/outcome/priority/reason creation, selected detail, context/result links, history, claim/checkpoint/resume/complete/cancel/reopen, supported archive/restore/delete flows | Pending |
-| `/app/stories` | Collection | Inline page | Saved stories, status/workflow/readiness summaries, person/story/public links | Pending |
+| `/app/stories` | Collection | Inline page | Saved stories, status/workflow/readiness summaries, person/story/public links | Built local tranche 3; captures/checks pass, Opus pending |
 | `/app/stories/[storyId]` | Record + learning-reader/editor | StoryEditorForm, StoryReviewAssignmentForm, StoryReviewHistoryPanel, StoryStatusActions | Edit, assignment, review history, readiness/context/grounding evidence, research-pack provenance, publication safeguards | Pending |
-| `/app/story-writer` | Collection / writing-session launcher | Inline page | Eligible person list/readiness and person-specific writing links | Pending |
+| `/app/story-writer` | Collection / writing-session launcher | Inline page | Eligible person list/readiness and person-specific writing links | Built local tranche 3; captures/checks pass, Opus pending |
 | `/app/settings/ai` | Settings-AI matrix | AiConnectionCenter | Scopes/boundaries, labels, end dates, pending/active/revoked/expired distinctions, audit, decline/revoke reason and confirmation; never imply AI can widen grants | Pending |
 | `/app/settings` | Site-specific legacy provider settings | Inline client page | OpenRouter key, model, privacy, Admin Mode; retain despite planned retirement | Pending |
 | `/app/api` | Settings-AI / legacy developer key matrix | ApiKeyManager | OAuth/MCP guidance, existing mint/scopes/rotate/revoke/suspend tooling and first-success path | Pending |

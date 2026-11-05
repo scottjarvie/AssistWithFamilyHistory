@@ -39,3 +39,14 @@ Full follow-up verify/captures have **not run yet**: the shared host lease retur
 ### Follow-up full check completed
 
 Code head `89496a6`: **57/57 passed** on Node 22.23.4, 53 seconds. Log `/tmp/awf-council-dto-verify.log`. The test-step log explicitly includes both “People discovery…” privacy contracts (`/tmp/awf-verify-test.log`, tests 46 and 47). Build, typecheck, lint and every contract passed. The earlier lease refusal is historical, no longer a verification blocker. Visual captures and cross-model receipt remain tied to `2bf2eec`; full check is not a substitute for the next updated visual/interaction packet.
+
+## Expanded collection tranche · 5 November
+
+- Node 22 focused row/facet/migration regression: **3/3 passed**, including private canary exclusions for every new projection, all declared saved facets and older People column-choice migration.
+- **18/18 People interaction checks** passed; **12/12 cross-page interactions** passed. Covers actual sorting/grouping/view/column/selection behavior, saved q/status/workflow through full navigation, narrative expansion, real public/person destinations, global tasks without fake links, author/kind/date/drag activity filters, 320px overflow and record visibility. Both JSON receipts have zero errors.
+- **20/20 current candidate captures** and **8/8 reconstructed archive captures** passed with no page/console errors, failed probes or overflow. Installed Chrome, actual 1440×900 / 390×844 viewports, Node 22 Turbopack dev, no backend/private records. Initial source look-check fixed a stretched phone image-slot background; final images were recaptured. Explicit column version metadata was accidentally also added to a group definition; the full check caught it and it was removed. This unused metadata had no rendered behavior; the captures represent the resulting UI.
+- Reconstructed comparisons use original collection JSX from 99980b5 under current shared runtime/shell and invented DTOs. They are labelled separately and are not claimed as frozen original-stack captures.
+- A saved-view test initially expected the unedited label after changing search; corrected to expect the real edited state. The test then found a real SVG title hydration mismatch, fixed by rendering one complete text value. No erroneous capture accepted.
+- Full frozen-source verification rerun is pending after the TypeScript correction. Shared host and site leases and nice 10 apply; own dev server stopped before full verification. No push/PR/merge/deploy, no site-wide acceptance.
+
+Final frozen-source rerun: **57/57 passed**, Node 22.23.4, 47 seconds, log `/tmp/awf-collections3-final-verify.log`. Includes typecheck, lint, all tests/contracts, generated tracker parity and production build. The corrected option was the only source change after the accepted captures; it is unused by rendering. Full backend/authenticated route and formal council acceptance remain separate.

@@ -86,3 +86,6 @@ design-council/*/gallery.html
 
 # Small local-path adapter for the inline HTML renderer; portable gallery remains separate.
 design-council/*/gallery-inline.html
+
+# Reconstructed archive JSX captures (current shared runtime; original route source).
+design-council/*/baseline-reconstructed/

@@ -1,4 +1,5 @@
-[Newest-first gallery](gallery.html) · Home approved structurally by Opus; People privacy follow-up passes full verification. Wider council work active. Site-wide redesign remains active.
+[Newest-first gallery](gallery.html) · Five collection surfaces built locally; 57/57 checks and 20 captures pass; Opus tranche review next. All-page goal remains active.
+
 
 Last updated: 2026-11-05 America/Phoenix.
 
@@ -32,3 +33,11 @@ Last updated: 2026-11-05 America/Phoenix.
 - Code head `89496a6`: **57/57 full verification steps passed**, Node 22.23.4, 53 seconds (`/tmp/awf-council-dto-verify.log`), including build and both new privacy-projection tests in the normal test suite. The host lease became available and the previously queued run completed successfully.
 - Gallery/17-interaction/12-capture/30-probe receipts still represent reviewed visual head `2bf2eec`; updated captures will accompany the compact phone/List and remaining collection tranche. No current-head visual/council clearance is implied by the full code check.
 - Next safe work: compact records, general collection facets and configured grouping, then remaining collections/record/Queue/settings/readers/specialist exploration. Preserve the minimal client-row boundary everywhere.
+
+## Expanded collections · newest local tranche
+
+- Built Places, Stories, writing candidates and Research with the shared kit; compact responsive People rows and separate sortable lifespan/state. All original content, facets and destinations preserved. Research has real dated activity lanes and honest provenance labels.
+- **57/57 full checks**, **18 People + 12 cross-page interactions**, **20 candidate + 8 reconstructed comparison captures** pass. No console/page errors or overflow. Reconstructed originals are labelled; fixtures prove presentation, not authenticated backend operation.
+- Newest gallery section is `round-3`; this is a capture tranche, **not a third formal scoring round**. Formal round 2 remains pending wider page-family work. Last formal score remains Sol 6.8, below target.
+- Opus exact-head review is next; no new acceptance claimed yet. AWF-0071 stays doing, separate audit not audited, no completed Cards/Work Orders.
+- Next long route: record dossier/evidence stream and counted sections; then Queue, settings/permission matrices, readers and specialist prototypes. Home taste refinements remain recorded in the previous Opus receipt.

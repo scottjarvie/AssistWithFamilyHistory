@@ -33,7 +33,7 @@
     },
     {
       "name": "people",
-      "path": "/design-council-preview?page=people",
+      "path": "/design-council-preview?surface=people",
       "capabilities": [
         {
           "can": "search",
@@ -75,7 +75,7 @@
     },
     {
       "name": "empty",
-      "path": "/design-council-preview?page=empty",
+      "path": "/design-council-preview?surface=empty",
       "capabilities": [
         {
           "can": "create first connection",
@@ -93,11 +93,11 @@
     },
     {
       "name": "people-dark",
-      "path": "/design-council-preview?page=people&theme=dark"
+      "path": "/design-council-preview?surface=people&theme=dark"
     },
     {
       "name": "people-grid",
-      "path": "/design-council-preview?page=people",
+      "path": "/design-council-preview?surface=people",
       "variants": [
         "desktop-light"
       ],
@@ -109,13 +109,89 @@
     },
     {
       "name": "people-options",
-      "path": "/design-council-preview?page=people",
+      "path": "/design-council-preview?surface=people",
       "variants": [
         "mobile-light"
       ],
       "actions": [
         {
           "click": "summary:has-text(\"Options\")"
+        }
+      ]
+    },
+    {
+      "name": "places",
+      "path": "/design-council-preview?surface=places",
+      "capabilities": [
+        {
+          "can": "search places",
+          "selector": "input[name=q]"
+        },
+        {
+          "can": "open a place",
+          "selector": "a[href=\"/app/places/place-1\"]"
+        },
+        {
+          "can": "see media counts",
+          "selector": "td[data-label=\"Media\"]"
+        }
+      ]
+    },
+    {
+      "name": "stories",
+      "path": "/design-council-preview?surface=stories",
+      "capabilities": [
+        {
+          "can": "filter publication state",
+          "selector": "select[name=status]"
+        },
+        {
+          "can": "filter workflow",
+          "selector": "select[name=workflow]"
+        },
+        {
+          "can": "review a story",
+          "selector": "a[href=\"/app/stories/story-1\"]"
+        },
+        {
+          "can": "open published story",
+          "text": "Open published story"
+        },
+        {
+          "can": "read full narrative preview",
+          "text": "Read full preview"
+        }
+      ]
+    },
+    {
+      "name": "research",
+      "path": "/design-council-preview?surface=research",
+      "capabilities": [
+        {
+          "can": "read original task description",
+          "text": "Compare the indexed entry"
+        },
+        {
+          "can": "filter activity by author",
+          "selector": "select[aria-label=\"Activity author\"]"
+        },
+        {
+          "can": "see source attribution uncertainty",
+          "text": "Self-reported model hint"
+        }
+      ]
+    },
+    {
+      "name": "writing",
+      "path": "/design-council-preview?surface=writing",
+      "capabilities": [
+        {
+          "can": "open person writing session",
+          "selector": "a[href=\"/app/people/synthetic-0/story-writer\"]"
+        },
+        {
+          "can": "see readiness",
+          "text": "Ready"
         }
       ]
     }

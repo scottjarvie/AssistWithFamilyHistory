@@ -3,6 +3,7 @@ import type { FunctionReturnType } from "convex/server";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArchiveIllustration } from "@/components/design/ArchiveIllustration";
+import { UtcDate } from "@/components/design/UtcDate";
 import { FolioTray } from "@/components/design/FolioTray";
 import type { api } from "@/convex/_generated/api";
 
@@ -83,7 +84,7 @@ export function DashboardView({ summary }: { summary: DashboardSummary }) {
           <p className="px-4 pb-3 text-sm text-muted-foreground">Latest FamilySearch captures merged into the vault.</p>
           {summary.recentImports.length ? <ul className="divide-y divide-border">{summary.recentImports.map((run) => <li key={String(run._id)}>
             <Link href={run.personRouteId ? `/app/people/${run.personRouteId}` : "/app/imports"} className="flex items-start justify-between gap-2 px-4 py-3 hover:bg-muted/50">
-              <div className="min-w-0 break-words [overflow-wrap:anywhere]"><p className="font-medium">{run.personName}</p><p className="mt-1 text-sm text-muted-foreground">{run.pageTypes.join(" + ")} import · {new Date(run.importedAt).toLocaleString()}</p></div>
+              <div className="min-w-0 break-words [overflow-wrap:anywhere]"><p className="font-medium">{run.personName}</p><p className="mt-1 text-sm text-muted-foreground">{run.pageTypes.join(" + ")} import · <UtcDate value={run.importedAt} withTime/></p></div>
               <Badge variant={run.mergeStatus === "partial" ? "destructive" : "secondary"}>{run.mergeStatus}</Badge>
             </Link>
           </li>)}</ul> : <p className="px-4 pb-4 text-sm text-muted-foreground">{summary.counts.imports ? "No recent imports to show." : "No imports yet."} Start with a reviewed FamilySearch capture in the Imports workspace.</p>}

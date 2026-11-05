@@ -1,0 +1,37 @@
+"use client";
+import { useState } from "react";
+import { SafeLink } from "@/components/layout/SafeLink";
+import { CollectionPage } from "@/components/collections/CollectionPage";
+import { CollectionWorkspace, type CollectionColumn } from "@/components/collections/CollectionWorkspace";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import type { StoryCollectionRow } from "@/lib/vault/collectionRows";
+const workflows = [["needs_genealogy_evidence","Needs genealogy"],["needs_context_research","Needs context"],["ready_to_draft","Ready to draft"],["ready_to_review","Ready to review"],["published","Published"]];
+const columns:CollectionColumn<StoryCollectionRow>[] = [
+  {key:"title",label:"Title",sortOnly:true,render:r=>r.title,sortValue:r=>r.title},
+  {key:"person",label:"Person",render:r=>r.person,sortValue:r=>r.person},
+  {key:"kind",label:"Kind",render:r=>r.kind.replace(/_/g," "),sortValue:r=>r.kind},
+  {key:"status",label:"Status",render:r=><Badge variant="secondary">{r.status}</Badge>,sortValue:r=>r.status},
+  ...(["sources","places","context","ready","warnings"] as const).map(key=>({key,label:key==="ready"?"Ready":key==="warnings"?"Publish warnings":key[0].toUpperCase()+key.slice(1),numeric:true,render:(r:StoryCollectionRow)=>key==="ready"?`${r[key]}%`:r[key],sortValue:(r:StoryCollectionRow)=>r[key]})),
+];
+function NarrativePreview({content}:{content:string}) {
+  const [expanded,setExpanded]=useState(false);
+  return <div className="mt-2"><p className={`${expanded?"":"line-clamp-4"} whitespace-pre-wrap text-sm leading-6 text-muted-foreground`}>{content}</p><button className="min-h-11 text-sm text-primary underline underline-offset-4" aria-expanded={expanded} onClick={()=>setExpanded(!expanded)}>{expanded?"Collapse preview":"Read full preview"}</button></div>;
+}
+export function StoriesCollectionView({stories,query="",status:requestedStatus="",workflow:requestedWorkflow="",preferenceKey}:{stories:StoryCollectionRow[];query?:string;status?:string;workflow?:string;preferenceKey:string}) {
+  const status=["draft","review","published"].includes(requestedStatus)?requestedStatus:"";
+  const workflow=workflows.some(([key])=>key===requestedWorkflow)?requestedWorkflow:"";
+  const visible=stories.filter(r=>(!status||r.status===status)&&(!workflow||r.workflow===workflow)&&(!query||`${r.title} ${r.person} ${r.content}`.toLowerCase().includes(query.toLowerCase())));
+  const href=(nextStatus:string)=>`/app/stories?${new URLSearchParams({q:query,status:nextStatus,workflow}).toString()}`;
+  return <CollectionPage title="Saved stories moving from draft to public memory." eyebrow="Story Studio" description="Review ancestor narratives, check their evidence foundation, and explicitly publish the ones ready to be shared." action={<Button asChild className="min-h-11"><SafeLink href="/app/story-writer">Open Story Writer</SafeLink></Button>}>
+    <CollectionWorkspace rows={visible} columns={columns} preferenceKey={preferenceKey} filters={{q:query,status,workflow}} noun="stories" identityLabel="Story" primaryColumn="sources" loadMoreHref={null}
+      builtInViews={[{label:"All stories",count:stories.length,href:"/app/stories",active:!status&&!workflow&&!query},...["draft","review","published"].map(s=>({label:s[0].toUpperCase()+s.slice(1),count:stories.filter(r=>r.status===s).length,href:href(s),active:status===s}))]}
+      groups={[{key:"status",label:"Status",value:r=>r.status},{key:"workflow",label:"Research workflow",value:r=>workflows.find(([key])=>key===r.workflow)?.[1]||r.workflow}]}
+      rowKey={r=>r.id} rowTitle={r=>r.title} rowHref={r=>`/app/stories/${r.id}`} renderIdentity={r=><span className="block font-semibold [overflow-wrap:anywhere]">{r.title}</span>}
+      renderDetail={r=><><NarrativePreview content={r.content}/>{r.warnings>0&&<p className="my-2 text-sm text-annotation">{r.warnings} publish warning{r.warnings===1?"":"s"} before sharing.</p>}</>}
+      renderActions={r=><div className="mt-2 flex flex-wrap gap-2"><Button asChild variant="outline" className="min-h-11"><SafeLink href={`/app/stories/${r.id}`}>Review story</SafeLink></Button>{r.publicHref&&<Button asChild variant="outline" className="min-h-11"><SafeLink href={r.publicHref} target="_blank" rel="noopener noreferrer">Open published story ↗</SafeLink></Button>}</div>}
+      searchControls={<><form key={`${query}:${status}:${workflow}`} role="search" aria-label="Find stories" className="mb-3 flex flex-wrap gap-2"><Input name="q" defaultValue={query} aria-label="Search stories" placeholder="Search titles, people, or story text" className="h-11 min-w-48 flex-1 bg-card"/><select name="status" defaultValue={status} aria-label="Story status" className="h-11 rounded-md border bg-card px-3 text-sm"><option value="">All statuses</option>{["draft","review","published"].map(s=><option key={s} value={s}>{s}</option>)}</select><select name="workflow" defaultValue={workflow} aria-label="Story workflow" className="h-11 rounded-md border bg-card px-3 text-sm"><option value="">All workflows</option>{workflows.map(([key,label])=><option key={key} value={key}>{label}</option>)}</select><Button type="submit" className="min-h-11">Filter</Button></form><div className="mb-3 flex flex-wrap gap-2">{workflows.map(([key,label])=><SafeLink key={key} href={`/app/stories?${new URLSearchParams({q:query,status,workflow:key})}`} className={`inline-flex min-h-11 items-center rounded-full border px-3 text-sm ${workflow===key?"bg-secondary":"bg-card text-primary"}`}>{label}</SafeLink>)}{(query||status||workflow)&&<SafeLink href="/app/stories" className="inline-flex min-h-11 items-center text-sm text-primary underline">Clear all</SafeLink>}</div></>}
+      emptyState={<div className="rounded-lg border border-dashed border-border bg-card p-6 text-sm text-muted-foreground">{stories.length?"No stories match this filter.":<><p className="font-medium text-foreground">No saved stories yet</p><p className="mt-2">Start with a person context pack in Story Writer. Saved drafts will appear here for review and publishing.</p></>}</div>}/>
+  </CollectionPage>;
+}

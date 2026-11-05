@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-11-05T08:44:28.157Z",
+  "checkedAt": "2026-11-05T09:40:58.702Z",
   "checks": [
     "Table keeps all four identities and all six evidence/date columns",
     "Numeric sort and direction change actual order",
@@ -12,6 +12,7 @@
     "Preferences do not copy records or selection IDs",
     "Removing a named view leaves all records intact",
     "Bounded result retains its next-page destination",
+    "Default phone List retains evidence fields in a compact recognition row",
     "320px table becomes labelled records without page overflow",
     "Phone Group and Sort sheets keep all choices within 320px",
     "Phone Options exposes full view controls and Grid stays within 320px",

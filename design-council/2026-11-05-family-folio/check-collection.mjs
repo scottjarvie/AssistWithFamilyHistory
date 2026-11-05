@@ -25,9 +25,9 @@ try {
   assert.equal(await page.locator('tbody').count(),4);check('Grouping retains every record');
   await page.getByRole('button',{name:'grid',exact:true}).click();
   await page.getByRole('table').waitFor({state:'hidden'});
-  assert.equal(await page.locator('a[href^="/app/people/synthetic-"]').count(),4);
+  assert.equal(await page.locator('a[href^="/app/people/synthetic-"]:visible').count(),4);
   await page.getByRole('button',{name:'list',exact:true}).click();
-  assert.equal(await page.locator('a[href^="/app/people/synthetic-"]').count(),4);check('Grid and List retain every record link and all chosen fields');
+  assert.equal(await page.locator('a[href^="/app/people/synthetic-"]:visible').count(),4);check('Grid and List retain every record link and all chosen fields');
   await page.getByRole('button',{name:'table',exact:true}).click();
   await page.locator('summary').filter({hasText:'Options'}).click();
   await page.getByRole('checkbox',{name:'Documents',exact:true}).uncheck();
@@ -54,7 +54,7 @@ try {
   assert.equal(await page.getByLabel('Group records').inputValue(),'state');check('Named view, edited indicator, discard and reload persistence work');
   await open('/design-council-preview?page=people&fixtureOwner=other');
   assert.equal(await page.getByRole('button',{name:'Source comparison',exact:true}).count(),0);
-  assert.equal(await page.getByLabel('Group records').inputValue(),'living');
+  assert.equal(await page.getByLabel('Group records').inputValue(),'');
   await open();await page.getByRole('button',{name:'Source comparison',exact:true}).waitFor();check('Saved views are isolated between two fixture account preference keys');
   const raw = await page.evaluate(()=>localStorage.getItem('awf.collection.people.design-fixture'));
   assert.ok(raw.includes('Source comparison'));
@@ -73,7 +73,10 @@ try {
   mobile.on('pageerror',error=>report.errors.push(String(error)));
   await mobile.goto(baseURL+'/design-council-preview?page=people');
   await mobile.getByRole('heading',{name:'People',exact:true}).waitFor();
-  assert.equal(await mobile.locator('td[data-label="Documents"]').count(),4);
+  assert.equal(await mobile.locator('li[data-row]:visible').count(),4);
+  const firstCompact=mobile.locator('li[data-row]:visible').first();
+  assert.ok((await firstCompact.innerText()).includes('Documents'));
+  assert.ok((await firstCompact.boundingBox()).height<240);check('Default phone List retains evidence fields in a compact recognition row');
   assert.ok(await mobile.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));check('320px table becomes labelled records without page overflow');
   await mobile.locator('summary').filter({hasText:'Group'}).click();
   await mobile.getByRole('radio',{name:'Research state',exact:true}).check();
@@ -86,7 +89,7 @@ try {
   await mobile.locator('summary').filter({hasText:'Options'}).click();
   await mobile.getByRole('radio',{name:'grid',exact:true}).check();
   await mobile.getByRole('button',{name:'Close options',exact:true}).click();
-  assert.equal(await mobile.locator('a[href^="/app/people/synthetic-"]').count(),4);
+  assert.equal(await mobile.locator('a[href^="/app/people/synthetic-"]:visible').count(),4);
   assert.ok(await mobile.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));check('Phone Options exposes full view controls and Grid stays within 320px');
   await mobile.locator('summary').filter({hasText:'Options'}).click();
   await mobile.getByRole('radio',{name:'table',exact:true}).check();
@@ -101,7 +104,7 @@ try {
   const fallback = await limited.newPage();await fallback.goto(baseURL+'/design-council-preview?page=people');
   await fallback.getByRole('button',{name:'grid',exact:true}).click();
   await fallback.getByRole('table').waitFor({state:'hidden'});
-  assert.equal(await fallback.locator('a[href^="/app/people/synthetic-"]').count(),4);check('Presentation still works when browser storage is blocked');
+  assert.equal(await fallback.locator('a[href^="/app/people/synthetic-"]:visible').count(),4);check('Presentation still works when browser storage is blocked');
   await limited.close();
   const international=await browser.newContext({viewport:{width:1280,height:900},locale:'fr-FR',timezoneId:'Pacific/Auckland'});
   const internationalPage=await international.newPage();
@@ -109,7 +112,7 @@ try {
   internationalPage.on('console',message=>{if(message.type()==='error')report.errors.push(message.text());});
   await internationalPage.goto(baseURL+'/design-council-preview?page=people');
   await internationalPage.getByRole('heading',{name:'People',exact:true}).waitFor();
-  assert.equal(await internationalPage.locator('time[datetime="2026-11-04T16:00:00.000Z"]').count(),4);check('Client-rendered import dates keep explicit UTC meaning across locale/timezone without hydration errors');
+  assert.equal(await internationalPage.locator('time[datetime="2026-11-04T16:00:00.000Z"]:visible').count(),4);check('Client-rendered import dates keep explicit UTC meaning across locale/timezone without hydration errors');
   await international.close();
   assert.deepEqual(report.errors,[]);
 } finally {

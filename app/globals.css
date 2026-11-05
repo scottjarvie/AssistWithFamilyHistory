@@ -293,3 +293,9 @@
   .collection-table tr > td:nth-child(2n + 3) { grid-column: 2; }
   .collection-table tr > td:nth-child(2n + 4) { grid-column: 3; }
 }
+
+@media (min-width: 1280px) { .collection-toolbar { display:flex; align-items:flex-start; flex-wrap:wrap; gap:.5rem; } .collection-toolbar > :first-child { min-width: 20rem; } }
+@media (min-width: 768px) and (pointer: fine) {
+ .collection-workspace button, .collection-workspace select, .collection-workspace summary { min-height:36px; }
+ .collection-workspace input:not([type=checkbox]):not([type=radio]), .collection-workspace select { height:36px; }
+}

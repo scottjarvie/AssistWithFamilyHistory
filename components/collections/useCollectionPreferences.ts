@@ -3,16 +3,16 @@
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { z } from "zod";
 
-export type CollectionView = "table" | "list" | "grid";
+export type CollectionView = "auto" | "table" | "list" | "grid";
 export type CollectionPreferences = {
-  activeViewId?: string | null; view?: CollectionView; compact?: boolean; columns?: string[]; group?: string; sort?: string; descending?: boolean;
-  saved?: { id: string; name: string; view: CollectionView; compact: boolean; columns: string[]; group: string; sort: string; descending: boolean; query: string; status: string }[];
+  activeViewId?: string | null; view?: CollectionView; compact?: boolean; columns?: string[]; columnVersion?: number; group?: string; sort?: string; descending?: boolean;
+  saved?: { id: string; name: string; view: CollectionView; compact: boolean; columns: string[]; columnVersion?: number; group: string; sort: string; descending: boolean; query: string; status: string; filters?: Record<string, string> }[];
 };
 const eventName = "awf-collection-preferences";
 const emptySnapshot = () => "";
 const memory = new Map<string, string>();
-const savedSchema = z.object({ id: z.string(), name: z.string(), view: z.enum(["table", "list", "grid"]), compact: z.boolean(), columns: z.array(z.string()), group: z.string(), sort: z.string(), descending: z.boolean(), query: z.string(), status: z.string() });
-const preferenceSchema = z.object({ activeViewId: z.string().nullable().optional(), view: z.enum(["table", "list", "grid"]).optional(), compact: z.boolean().optional(), columns: z.array(z.string()).optional(), group: z.string().optional(), sort: z.string().optional(), descending: z.boolean().optional(), saved: z.array(savedSchema).optional() });
+const savedSchema = z.object({ id: z.string(), name: z.string(), view: z.enum(["auto", "table", "list", "grid"]), compact: z.boolean(), columns: z.array(z.string()), columnVersion: z.number().optional(), group: z.string(), sort: z.string(), descending: z.boolean(), query: z.string(), status: z.string(), filters: z.record(z.string(), z.string()).optional() });
+const preferenceSchema = z.object({ activeViewId: z.string().nullable().optional(), view: z.enum(["auto", "table", "list", "grid"]).optional(), compact: z.boolean().optional(), columns: z.array(z.string()).optional(), columnVersion: z.number().optional(), group: z.string().optional(), sort: z.string().optional(), descending: z.boolean().optional(), saved: z.array(savedSchema).optional() });
 
 /** Browser-local, owner-scoped preferences. Search terms persist only when a person saves a view; no record objects are copied. */
 export function useCollectionPreferences(key: string) {
