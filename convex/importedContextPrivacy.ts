@@ -75,9 +75,31 @@ export async function filterMcpCitationRows<T extends Doc<"citations">>(ctx: Que
     withheld: citations.length !== rows.length, truncated: rows.length > max };
 }
 
+export function withoutInlineSourceNotes(source: Doc<"sources">): Doc<"sources"> {
+  const result = { ...source };
+  delete result.notes;
+  return result;
+}
+
+export async function filterMcpSourceRows(ctx: QueryCtx, owner: string, rows: Doc<"sources">[]) {
+  const sources: Doc<"sources">[] = [];
+  const decisions = new Map<string, boolean>();
+  let withheld = false;
+  for (const source of rows.slice(0, FAMILY_HISTORY_MCP_LIMITS.contextRows)) {
+    if (!matchesVaultOwner(source.vaultOwnerId, owner)) { withheld = true; continue; }
+    const id = String(source._id);
+    if (source.notes !== undefined && !decisions.has(id)) decisions.set(id, await canReadImportedNotes(ctx, owner, "source", id));
+    if (source.notes !== undefined && decisions.get(id) === false) {
+      sources.push(withoutInlineSourceNotes(source));
+      withheld = true;
+    } else sources.push(source);
+  }
+  return { sources, withheld, truncated: rows.length > FAMILY_HISTORY_MCP_LIMITS.contextRows };
+}
+
 /** MCP views are filtered before derived groups/claims are built; stored records stay intact. */
 export async function filterMcpCitationSnapshot<T extends {
-  citations: Doc<"citations">[]; citationLinks: Doc<"citationLinks">[]; sourceFacts: Doc<"sourceFacts">[]; stories: Doc<"stories">[];
+  citations: Doc<"citations">[]; citationLinks: Doc<"citationLinks">[]; sourceFacts: Doc<"sourceFacts">[]; stories: Doc<"stories">[]; sources: Doc<"sources">[];
 }>(ctx: QueryCtx, owner: string, snapshot: T) {
   const result = await filterMcpCitationRows(ctx, owner, snapshot.citations);
   const checked = new Set(snapshot.citations.slice(0, FAMILY_HISTORY_MCP_LIMITS.contextRows).map(row => String(row._id)));
@@ -89,10 +111,13 @@ export async function filterMcpCitationSnapshot<T extends {
   const sourceFacts = snapshot.sourceFacts.filter(row => result.allowedIds.has(String(row.citationId)));
   const citationLinks = snapshot.citationLinks.filter(row => result.allowedIds.has(String(row.citationId)));
   const factIds = new Set(sourceFacts.map(row => String(row._id)));
+  const sourceIds = new Set([...result.citations.map(row => String(row.sourceId)), ...sourceFacts.map(row => String(row.sourceId))]);
+  const sourceView = await filterMcpSourceRows(ctx, owner, snapshot.sources.filter(row => sourceIds.has(String(row._id))));
   return { snapshot: { ...snapshot, citations: result.citations,
-    citationLinks, sourceFacts,
+    citationLinks, sourceFacts, sources: sourceView.sources,
     stories: snapshot.stories.map(row => ({ ...row, citationIds: row.citationIds.filter(id => result.allowedIds.has(String(id))),
       ...(row.sourceFactIds ? { sourceFactIds: row.sourceFactIds.filter(id => factIds.has(String(id))) } : {}) })),
   }, citationsWithheld: result.withheld || sourceFacts.length !== snapshot.sourceFacts.length || citationLinks.length !== snapshot.citationLinks.length,
-    citationReadTruncated: result.truncated || additional.length > remaining };
+    citationReadTruncated: result.truncated || additional.length > remaining,
+    sourceNotesWithheld: sourceView.withheld, sourceReadTruncated: sourceView.truncated };
 }

@@ -517,3 +517,12 @@ Person assertion refresh checks retained person-field citations before
 changing cited name/sex/living/birth/death fields. Unknown/unscoped fields
 require review; explicitly unrelated fields may refresh. The entire person
 item refuses atomically, preserving events, links and import baselines.
+
+Source inline notes follow the same privacy decision as separate subject
+notes. Unsafe inline text is omitted from source reads and nested source
+objects in MCP person/story views, with explicit withholding flags; stored
+notes and ordinary owner review remain intact. Repeated source IDs share
+one privacy decision within an aggregate read. Source material changes
+also refuse atomically when retained citations, notes, captured content,
+claims, personas, media or typed connections would gain different attribution.
+Unchanged replay and unattached refresh remain available.

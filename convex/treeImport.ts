@@ -924,6 +924,7 @@ async function importSource(c: ChunkContext, item: any): Promise<Omit<ItemResult
   const identity = await resolveSourceIdentity(c, key);
   const existingId = identity.id;
   const linked = !identity.mapped && !!existingId;
+  const previous = existingId ? await ownedRow(c, "sources", existingId) : null;
   const saved = await upsertRow(c, {
     table: "sources",
     singular: "source",
@@ -946,6 +947,27 @@ async function importSource(c: ChunkContext, item: any): Promise<Omit<ItemResult
     },
     createOnly: { importKey: `import:${externalRecordKey(c.job.system, "source", key, c.job.importKey)}` },
   });
+  if (previous) {
+    const current = await ownedRow(c, "sources", saved.id);
+    const material = ["title", "type", "repository", "url", "author", "publicationDate", "citationText", "recordDate", "recordPlace", "notes"] as const;
+    if (current && material.some(field => !same(previous[field], current[field]))) {
+      const virtual = [...(c.w.rows?.values() ?? [])].some(row => row.sourceId === saved.id
+        || (row.subject?.kind === "source" && row.subject.id === saved.id)
+        || (row.from?.kind === "source" && row.from.id === saved.id) || (row.to?.kind === "source" && row.to.id === saved.id));
+      const retained = isPlaceholder(saved.id) ? [] : await Promise.all([
+        c.ctx.db.query("citations").withIndex("by_source", q => q.eq("sourceId", previous._id)).first(),
+        c.ctx.db.query("notes").withIndex("by_subject", q => q.eq("subject.kind", "source").eq("subject.id", saved.id)).first(),
+        c.ctx.db.query("sourceContents").withIndex("by_source", q => q.eq("sourceId", previous._id)).first(),
+        c.ctx.db.query("sourceFacts").withIndex("by_source", q => q.eq("sourceId", previous._id)).first(),
+        c.ctx.db.query("recordPersonas").withIndex("by_source", q => q.eq("sourceId", previous._id)).first(),
+        c.ctx.db.query("media").withIndex("by_source", q => q.eq("sourceId", previous._id)).first(),
+        c.ctx.db.query("connections").withIndex("by_from", q => q.eq("from.kind", "source").eq("from.id", saved.id)).first(),
+        c.ctx.db.query("connections").withIndex("by_to", q => q.eq("to.kind", "source").eq("to.id", saved.id)).first(),
+      ]);
+      if (virtual || retained.some(Boolean)) fail("SOURCE_ATTRIBUTION_REVIEW_REQUIRED", "Changed source material cannot inherit retained evidence, notes or captured content.",
+        "Review the source and its retained material with the person. This source item saved nothing; its original fields, content and links were retained.");
+    }
+  }
   return { key, status: saved.status, id: saved.id, ...(saved.kept ? { kept: saved.kept } : {}) };
 }
 

@@ -1539,7 +1539,7 @@ export const getPersonWorkspace = internalQuery({
       if (!snapshot) return null;
       const filtered = await filterMcpCitationSnapshot(ctx, owner, snapshot);
       const workspace = assemblePersonWorkspaceFromSnapshot(filtered.snapshot, args.personIdentifier);
-      return workspace ? { ...workspace, citationsWithheld: filtered.citationsWithheld, citationReadTruncated: filtered.citationReadTruncated } : null;
+      return workspace ? { ...workspace, citationsWithheld: filtered.citationsWithheld, citationReadTruncated: filtered.citationReadTruncated, sourceNotesWithheld: filtered.sourceNotesWithheld, sourceReadTruncated: filtered.sourceReadTruncated } : null;
     }
     return assemblePersonWorkspaceScoped(
       ctx,
@@ -1665,7 +1665,7 @@ export const getStoryReview = internalQuery({
     if (args.mcpCitationPrivacy) {
       const filtered = await filterMcpCitationSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId), snapshot);
       const story = filtered.snapshot.stories.find((entry) => entry._id === args.storyId);
-      return story ? { ...buildStoryBundle(filtered.snapshot, story), citationsWithheld: filtered.citationsWithheld, citationReadTruncated: filtered.citationReadTruncated } : null;
+      return story ? { ...buildStoryBundle(filtered.snapshot, story), citationsWithheld: filtered.citationsWithheld, citationReadTruncated: filtered.citationReadTruncated, sourceNotesWithheld: filtered.sourceNotesWithheld, sourceReadTruncated: filtered.sourceReadTruncated } : null;
     }
     const story = snapshot.stories.find((entry) => entry._id === args.storyId);
     return story ? buildStoryBundle(snapshot, story) : null;

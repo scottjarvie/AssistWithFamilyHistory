@@ -166,7 +166,7 @@ test("public tree import preserves date ranges through birth death events and re
 });
 
 
-async function importedNotesFixture(living = false) {
+async function importedNotesFixture(living = false, sourceNotes?: string) {
   const t = convexTest({ schema, modules: import.meta.glob("./**/*.ts"), transactionLimits: true });
   const principal = { issuer: "https://notes-context.example.test", subject: "synthetic-nonperson-note-owner", clientId: "synthetic-nonperson-note-client", scopes: [] };
   const grantId = await seedGrant(t, { vaultOwnerId: principal.subject, issuer: principal.issuer, clientId: principal.clientId });
@@ -174,7 +174,7 @@ async function importedNotesFixture(living = false) {
   const batch = (operationId: string, batchIndex: number, input: any) => t.action(internal.treeImport.importTreeBatch, { principal, grantId, operationId, requestHash: operationId, input: { importJobId: job.importJobId, batchIndex, ...input } });
   const imported = await batch("nonperson-note-import", 0, {
     persons: [{ key: "P", living, names: [{ given: "Synthetic" }], facts: [{ key: "F", type: "birth", date: { original: "1900" } }] }, { key: "Q", living: false, names: [{ given: "Partner" }] }],
-    sources: [{ key: "S", title: "Original" }], relationships: [{ key: "R", type: "Couple", person1Key: "P", person2Key: "Q" }], media: [{ key: "M", title: "Original", personKeys: ["P"], sourceKey: "S" }], citations: [{ key: "C", sourceKey: "S", targets: [{ kind: "person", key: "P" }] }],
+    sources: [{ key: "S", title: "Original", notes: sourceNotes }], relationships: [{ key: "R", type: "Couple", person1Key: "P", person2Key: "Q" }], media: [{ key: "M", title: "Original", personKeys: ["P"], sourceKey: "S" }], citations: [{ key: "C", sourceKey: "S", targets: [{ kind: "person", key: "P" }] }],
     notes: [{ key: "NF", text: "Fact note text", subject: { kind: "fact", personKey: "P", key: "F", keyOrigin: "explicit" } }, { key: "NR", text: "Relationship note text", subject: { kind: "relationship", key: "R" } }, { key: "NS", text: "Source note text", subject: { kind: "source", key: "S" } }, { key: "NC", text: "Citation note text", subject: { kind: "citation", key: "C", keyOrigin: "explicit" } }, { key: "NM", text: "Media note text", subject: { kind: "media", key: "M" } }],
   }) as any;
   expect(imported.results.filter((row: any) => row.status === "failed")).toEqual([]);
@@ -295,4 +295,23 @@ test.each(["privateMedia", "living", "foreign", "missing", "bounds", "sourceFact
     await f.reviewMedia();
     for (const [kind, id] of [["citation", bad.id], ["source", f.ids.source], ["person", String(person._id)], ["story", String(created.storyId)]]) expect(JSON.stringify(await f.callContext(kind, id))).toContain(secret);
   }
+});
+
+
+test.each(["living", "privateMedia", "bounds"])("inline source notes follow source privacy across MCP aggregates (%s)", async mode => {
+  const secret = `PRIVATE-INLINE-SOURCE-NOTES-${mode}`;
+  const f = await importedNotesFixture(mode === "living", secret); const person = f.rows.people.find(row => row.fsId === "P")!;
+  if (mode === "privateMedia") await f.batch("inline-source-private-citation", 1, { citations: [{ key: "PRIVATE", sourceKey: "S", targets: [{ kind: "person", key: "P" }, { kind: "media", key: "M" }] }] });
+  const storyId = await f.t.run(async ctx => {
+    if (mode === "bounds") for (let i = 0; i < 50; i++) { const id = await ctx.db.insert("citations", { vaultOwnerId: f.principal.subject, sourceId: f.rows.sources[0]._id, isEvidence: true, confidence: "medium", createdAt: i, updatedAt: i }); await ctx.db.insert("citationLinks", { vaultOwnerId: f.principal.subject, citationId: id, targetType: "person", targetId: String(person._id), createdAt: i }); }
+    return ctx.db.insert("stories", { vaultOwnerId: f.principal.subject, personId: person._id, type: "biography", title: "Synthetic story", content: "No inline source quotation in body.", citationIds: [f.rows.citations[0]._id], status: "draft", generatedBy: "human", createdAt: 1, updatedAt: 1 });
+  });
+  const source = await f.callContext("source", f.ids.source); expect(source.result.structuredContent.notesWithheld).toBe(true); expect(source.result.structuredContent.source.notes).toBeUndefined(); expect(JSON.stringify(source)).not.toContain(secret);
+  for (const [kind, id] of [["source", f.ids.source], ["person", String(person._id)], ["story", String(storyId)]]) {
+    expect(JSON.stringify(await f.callContext(kind, id))).not.toContain(secret);
+    expect(JSON.stringify(await f.t.query(internal.mcpFamilyHistory.getRecordContext, { principal: f.principal, kind, id }))).not.toContain(secret);
+  }
+  expect((await f.t.run(ctx => ctx.db.get(f.rows.sources[0]._id)))!.notes).toBe(secret);
+  expect(JSON.stringify(await f.t.query(internal.vault.getPersonWorkspace, { vaultOwnerId: f.principal.subject, personIdentifier: String(person._id) }))).toContain(secret);
+  if (mode === "privateMedia") { await f.reviewMedia(); for (const [kind, id] of [["source", f.ids.source], ["person", String(person._id)], ["story", String(storyId)]]) expect(JSON.stringify(await f.callContext(kind, id))).toContain(secret); }
 });

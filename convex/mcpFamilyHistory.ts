@@ -6,7 +6,7 @@ import { internalMutation, internalQuery } from "./_generated/server";
 import { anyApi } from "convex/server";
 import { FAMILY_HISTORY_MCP_LIMITS } from "../lib/mcp/contract";
 import { matchesVaultOwner } from "./vaultCore";
-import { canReadImportedNotes, filterMcpCitationRows } from "./importedContextPrivacy";
+import { canReadImportedNotes, filterMcpCitationRows, filterMcpSourceRows, withoutInlineSourceNotes } from "./importedContextPrivacy";
 import { assertGrantPermits } from "./mcpGrants";
 
 export const principalValidator = v.object({
@@ -1365,6 +1365,7 @@ export const getRecordContext = internalQuery({
       const visible = await filterMcpCitationRows(ctx, owner, citations);
       const sources = (await Promise.all(visible.citations.map((citation) => ctx.db.get(citation.sourceId))))
         .filter((row): row is Doc<"sources"> => Boolean(row && matchesVaultOwner(row.vaultOwnerId, owner)));
+      const sourceView = await filterMcpSourceRows(ctx, owner, sources);
       const noteContext = await readPersonNoteContext(ctx, owner, person);
       return {
         kind: "person",
@@ -1374,8 +1375,9 @@ export const getRecordContext = internalQuery({
         relationships,
         events,
         eventRoles: roles,
-        evidence: { citations: visible.citations, links: citationLinks.filter(link => visible.allowedIds.has(String(link.citationId))).slice(0, max), sources },
+        evidence: { citations: visible.citations, links: citationLinks.filter(link => visible.allowedIds.has(String(link.citationId))).slice(0, max), sources: sourceView.sources },
         citationsWithheld: visible.withheld,
+        sourceNotesWithheld: sourceView.withheld,
         stories: stories.filter((row) => matchesVaultOwner(row.vaultOwnerId, owner)).slice(0, max),
         researchTasks: tasks.filter((row) => matchesVaultOwner(row.vaultOwnerId, owner)).slice(0, max),
         researchFindings: findings.filter((row) => matchesVaultOwner(row.vaultOwnerId, owner)).slice(0, max),
@@ -1419,7 +1421,7 @@ export const getRecordContext = internalQuery({
         kind: "source",
         notes: noteContext.notes,
         notesWithheld: noteContext.notesWithheld,
-        source,
+        source: noteContext.notesWithheld ? withoutInlineSourceNotes(source) : source,
         // Original content first and verbatim. Long texts are cut here; read one
         // in full with kind "source_content".
         contents: ownedContents.map((row) => contentForRead(row, FAMILY_HISTORY_MCP_LIMITS.contentPreviewChars)),

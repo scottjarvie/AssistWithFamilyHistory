@@ -2394,3 +2394,31 @@ test("unrelated person fields can refresh while birth citations retain their ass
   const dry = await send(t, grant, job.importJobId, 1, batch, { dryRun: true }, "dry-unrelated-person-field"); const real = await send(t, grant, job.importJobId, 1, batch); expect(dry.counts).toEqual(real.counts); expect(real.counts.persons.updated).toBe(1);
   const row = (await t.run(ctx => ctx.db.query("persons").collect()))[0]; expect(row.sex).toBe("female"); expect(row.birth?.date?.year).toBe(1900); expect(await t.run(ctx => ctx.db.query("citationLinks").collect())).toEqual(before);
 });
+
+
+test.each(["citation", "note", "content"].flatMap(material => ["url", "citationText", "notes"].map(field => ({ material, field }))))("source $field refresh preserves retained $material attribution", async ({ material, field }) => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const source = { key: "S", title: "Record A", url: "https://example.test/record-a", citationText: "Citation for record A", notes: "Original inline notes about A" };
+  await send(t, grant, job.importJobId, 0, { sources: [source], persons: [{ key: "P", living: false, names: [{ given: "Synthetic" }] }],
+    ...(material === "citation" ? { citations: [{ key: "C", sourceKey: "S", extractedText: "Original record A evidence", targets: [{ kind: "person" as const, key: "P" }] }] } : {}),
+    ...(material === "note" ? { notes: [{ key: "N", text: "Annotation about record A", subject: { kind: "source" as const, key: "S" } }] } : {}),
+  });
+  if (material === "content") await t.run(async ctx => { const row = (await ctx.db.query("sources").collect())[0]; await ctx.db.insert("sourceContents", { vaultOwnerId: OWNER, sourceId: row._id, kind: "transcription", text: "Verbatim original record A", madeBy: { kind: "record_creator" }, createdAt: 1 }); });
+  const snapshot = () => t.run(async ctx => ({ sources: await ctx.db.query("sources").collect(), contents: await ctx.db.query("sourceContents").collect(), notes: await ctx.db.query("notes").collect(), citations: await ctx.db.query("citations").collect(), links: await ctx.db.query("citationLinks").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  const noop = await send(t, grant, job.importJobId, 1, { sources: [source] }); expect(noop.counts.sources.unchanged).toBe(1); expect(await snapshot()).toEqual(before);
+  const changed = { ...source, ...(field === "url" ? { url: "https://example.test/record-b" } : field === "citationText" ? { citationText: "Citation for different record B" } : { notes: "Replacement notes about B" }) };
+  for (const dryRun of [true, false]) {
+    const result = await send(t, grant, job.importJobId, 2, { sources: [changed] }, { dryRun }, `source-attribution-${material}-${field}-${dryRun}`);
+    expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("SOURCE_ATTRIBUTION_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before);
+    expect(await send(t, grant, job.importJobId, 2, { sources: [changed] }, { dryRun }, `source-attribution-${material}-${field}-${dryRun}`)).toEqual(result); expect(await snapshot()).toEqual(before);
+  }
+});
+
+test("unattached source refresh remains available", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  await send(t, grant, job.importJobId, 0, { sources: [{ key: "S", title: "Original", url: "https://example.test/a" }] }); const before = await t.run(ctx => ctx.db.query("sources").collect());
+  const batch: TreeImportBatch = { sources: [{ key: "S", title: "Corrected", url: "https://example.test/b" }] };
+  const dry = await send(t, grant, job.importJobId, 1, batch, { dryRun: true }, "dry-unattached-source"); expect(await t.run(ctx => ctx.db.query("sources").collect())).toEqual(before);
+  const real = await send(t, grant, job.importJobId, 1, batch); expect(dry.counts).toEqual(real.counts); expect(real.counts.sources.updated).toBe(1);
+  expect((await t.run(ctx => ctx.db.query("sources").collect()))[0]).toMatchObject({ _id: before[0]._id, title: "Corrected", url: "https://example.test/b" });
+});

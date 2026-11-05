@@ -453,9 +453,11 @@ function compactPersonWorkspace(workspace: any) {
     operations: workspace.operations,
     citationsWithheld: workspace.citationsWithheld ?? false,
     citationReadTruncated: workspace.citationReadTruncated ?? false,
+    sourceNotesWithheld: workspace.sourceNotesWithheld ?? false,
+    sourceReadTruncated: workspace.sourceReadTruncated ?? false,
     stats: workspace.stats,
     privacyNote: living ? "Living-person notes are withheld from this context response. Reviewed AI-allowed context and media remain eligible." : "Private owner-scoped context. Only reviewed AI-allowed loose context and media are included.",
-    truncated: workspace.citationReadTruncated === true || ["relationships", "events", "sources", "citations", "sourceFacts", "researchTasks", "researchLog", "stories", "places"].some((key) => (workspace[key]?.length ?? 0) > cap),
+    truncated: workspace.citationReadTruncated === true || workspace.sourceReadTruncated === true || ["relationships", "events", "sources", "citations", "sourceFacts", "researchTasks", "researchLog", "stories", "places"].some((key) => (workspace[key]?.length ?? 0) > cap),
   };
 }
 
