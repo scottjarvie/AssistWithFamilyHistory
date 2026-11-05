@@ -42,6 +42,19 @@ async function seed(t: ReturnType<typeof convexTest>, owner: string, people: num
 }
 
 describe("your data", () => {
+  test("stats stop reading large documents and report a capped sample", async () => {
+    const t = convexTest(schema, modules);
+    await seed(t, OWNER, 10);
+    await t.run(async (ctx) => {
+      for (const person of await ctx.db.query("persons").collect()) {
+        await ctx.db.patch(person._id, { notes: "x".repeat(100_000) });
+      }
+    });
+    const stats = await t.query(internal.yourData.getYourStatsInternal, { vaultOwnerId: OWNER });
+    expect(stats.people.more).toBe(true);
+    expect(stats.people.count).toBeLessThan(10);
+    expect(stats.people.count).toBeGreaterThan(0);
+  });
   test("stats share the connection centre's expiry and refusal rules", async () => {
     const t = convexTest(schema, modules);
     await seedGrant(t, { vaultOwnerId: OWNER, clientId: "live", expiresAt: null });
