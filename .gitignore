@@ -80,3 +80,6 @@ design-council/*/round-*/packet/
 design-council/*/round-*/manifest.json
 design-council/*/round-*/judge-brief.md
 design-council/*/round-*/judges/*.raw.md
+
+# Self-contained generated council gallery embeds the ignored capture assets.
+design-council/*/gallery.html
