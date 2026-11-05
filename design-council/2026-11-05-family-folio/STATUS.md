@@ -1,4 +1,4 @@
-[Newest-first gallery](gallery.html) · Operations + Queue lead fixes:13 Queue UI/11 intercepted,9 Operations UI/4 intercepted,55 broader regressions,44 fresh captures/2 reconstructed comparisons and326-image gallery pass. 57/57 full steps passed; local only, all-page goal active.
+[Newest-first gallery](gallery.html) · Local27bee8e:57/57 full checks,92 browser/controller checks,44 fresh captures +2 reconstructed comparisons. Opus confirms preservation/privacy; Queue/Operations/kit follow-ups required before reuse. All-page goal active; local only.
 
 
 
@@ -104,3 +104,8 @@ The first full run passed53/57 in55s: typecheck/build rejected a stray column-wi
 
 
 Frozen batch full receipt: **57/57 passed**, Node22,49s. Latest code is ready for a local commit and exact-head Opus review.92 browser/controller checks and46 capture comparisons/current images are separate presentation/wiring evidence, not authenticated backend acceptance. All-page work and whole-Card audit remain unfinished.
+
+
+## Opus27bee8e and next lead pass
+
+Full receipt is reviews/opus-operations-27bee8e.md. Reader family approved; Queue requires clean history/visible-order navigation; Operations requires desktop next-action visibility, truthful sort-vs-filter behavior and shared staged Apply filters. Kit needs current People/Research desktop fit evidence. No removed capability/privacy/owner-boundary regression. No formal score/site-wide or whole-Card audit clearance. Required follow-ups/verification route and newer uncommitted handoff/Audit foundations are in operations-review-next.md. The latest committed verified source is27bee8e; later work is local WIP, not represented by that full-check or review receipt.8 focused query/projection tests and3 unwired Audit projection tests pass. No server/heavy process remains active for this thread.

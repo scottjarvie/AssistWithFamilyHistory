@@ -29,3 +29,5 @@ Current branch only: design/assistwithfamilyhistory-council-2026-11-05. Local co
 Scott's decided screenshots in ~/.claude/skills/design-council/references/patterns are the primary pattern references. Domain references to capture: FamilySearch public research guidance and Library of Congress archive records. Data-dense reference: GitHub Issues. No reference captures or ratings claimed until actually inspected.
 
 Queue assumption (2026-11-05): the playbook's attention-flag destination conflicts with the current stored `needs_you` state and existing four-state command contract. Preserve that backend contract during the visual pass, expose the genuine Needs you view and inline answer, and do not advertise a persisted cross-state flag. Any model migration is separate scope; this is a recorded constraint, not an invented implementation or permission stop.
+
+Overnight naming question after Opus27bee8e: navigation says Research Queue while the route/page says Operations; personal Queue remains distinct. Preserve existing names/routes as aliases until a cohesive naming pass, rather than treating the unanswered question as a blocker or fabricating a new page.
