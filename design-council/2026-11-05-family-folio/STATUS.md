@@ -1,4 +1,4 @@
-[Newest-first gallery](gallery.html) · Record reader/kit fixes:57/57 full checks,19 Place/Story +16 Person checks,42 captures and248-image gallery checks pass. All-page goal active; local only.
+[Newest-first gallery](gallery.html) · Queue:57/57 full checks,11 UI +8 intercepted controller checks,30 captures/2 reconstructed comparisons and280-image gallery checks pass. Opus review next; all-page goal active, local only.
 
 
 
@@ -85,3 +85,9 @@ Frozen Place/Story receipt: **57/57** full verification passed, Node22,52s (`/tm
 Opus0bafa4f confirms all earlier Person fixes and every Place/Story field/action. Required shared-kit and honest source-margin corrections are implemented by the lead, with19 new-record/16 Person checks passing. Fresh42 captures/full follow-up verification and gallery are being finalized. Detailed review and no-removal audit are in reviews/opus-place-story-0bafa4f.md and rounds.md. AWF-0072 is separate backlog intake for pre-existing publish-readiness citation accounting. No site-wide acceptance; AWF-0071 doing, audit not audited; local only.
 
 Final lead-fix receipt: **57/57** full steps passed, Node22,54s (`/tmp/awf-record-reader-review-full-verify.log`).19 Place/Story and16 Person checks,42 captures and248-image gallery navigation pass; HTML preview clean and gallery shown inline. Lead corrections await the next meaningful cross-model review with Queue. Latest work is local only. AWF-0071 doing/audit not audited; AWF-0072 backlog. No Card/Work Order completed, no all-page acceptance.
+
+## Personal Queue · active local tranche
+
+Full-width grouped Table/List/Grid, owner-scoped browser-local saved views and URL facets preserve private in-memory directives and inline replies. Desktop thread keeps the original ask first; phone detail places the actual answer/question first. Existing six commands/create/delete/409 conflict wiring pass8 fully intercepted synthetic API checks; no request reaches a backend.10 read-only fixture UI checks pass, including320/390px dark filters and viewport visibility after opening/reloading a thread. First30 captures passed; final offset-corrected images and full check are being recorded. Exact-head Opus review will also cover cf9ef0e lead corrections. No backend acceptance or cross-state attention flag is claimed.
+
+Frozen Queue full check: **57/57 passed**, Node22,45s (`/tmp/awf-queue-full-verify-fixed.log`). The first run passed55 application/contracts/test steps but failed typecheck/build on a baseline-only mock Response shape; the reconstructed fixture now uses a real in-memory Response, with no visual/product behavior change.11 Queue UI,8 fully intercepted controller,19 Place/Story,18 People and18 cross-page regressions pass.30 final captures include four actual item viewport shots;2 reconstructed originals and280-image gallery interactions pass. Exact-head Opus review follows local commit and covers cf9ef0e lead corrections. No backend or site-wide acceptance, no completed Card/Work Order, no push/PR/merge/deploy.

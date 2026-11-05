@@ -4,4 +4,4 @@ export type CollectionColumn<Row> = {
   render: (row: Row) => ReactNode; sortValue?: (row: Row) => string | number; sortOnly?: boolean;
 };
 export type CollectionGroup<Row> = { key: string; label: string; value: (row: Row) => string; order?: (a: string, b: string) => number };
-export type BuiltInCollectionView = { label: string; href: string; count?: number; active?: boolean };
+export type BuiltInCollectionView = { label: string; href: string; count?: number; active?: boolean; onSelect?:()=>void };

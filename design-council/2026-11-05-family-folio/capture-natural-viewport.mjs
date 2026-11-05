@@ -10,7 +10,7 @@ const config=JSON.parse(readFileSync(process.argv[3] || path.join(run,'../shots.
 const round=process.argv[2] || '2';if(!/^\d+$/.test(round))throw new Error('Round must be a number');
 const out=process.argv[4] ? path.resolve(process.argv[4]) : path.join(run,`round-${round}/ours`);mkdirSync(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome'});
-const report={capturedAt:new Date().toISOString(),baseURL:config.baseURL,set:'shots',method:'Installed Chrome, actual 1440×900 / 390×844 device viewports, fullPage screenshot with no viewport growth. Console errors, page errors, HTTP errors, failed capability probes or page overflow block acceptance.',shots:[]};
+const report={capturedAt:new Date().toISOString(),baseURL:config.baseURL,set:'shots',method:'Installed Chrome, actual 1440×900 / 390×844 device viewports, fullPage screenshot with no viewport growth; named viewportOnly shots keep the actual viewport and optional focus target. Console errors, page errors, HTTP errors, failed capability probes or page overflow block acceptance.',shots:[]};
 try {
  for(const item of config.shots){
   for(const variant of item.variants || config.defaultVariants){
@@ -42,7 +42,9 @@ try {
     }
     const dimensions=await page.evaluate(()=>({width:innerWidth,scrollWidth:document.documentElement.scrollWidth,height:document.documentElement.scrollHeight}));
     entry.dimensions=dimensions;entry.horizontalOverflow=dimensions.scrollWidth>dimensions.width+1;
-    await page.screenshot({path:path.join(out,`${item.name}--${variant}.png`),fullPage:true});
+    if(item.focus)await page.locator(item.focus).first().evaluate(node=>node.scrollIntoView({block:"start"}));
+    entry.viewportOnly=Boolean(item.viewportOnly);entry.focus=item.focus||null;
+    await page.screenshot({path:path.join(out,`${item.name}--${variant}.png`),fullPage:!item.viewportOnly});
     entry.ok=entry.status<400&&!entry.pageErrors.length&&!entry.consoleErrors.length&&!entry.horizontalOverflow&&entry.capabilities.every(p=>p.ok);
    } catch(error){entry.error=error.stack || String(error);entry.ok=false;}
    report.shots.push(entry);console.log(`${entry.ok?'ok':'FAIL'} ${item.name}--${variant}`);

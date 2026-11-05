@@ -1,3 +1,4 @@
+import {normalizeQueueFilters,queueMatchesView,startOfQueueWeekUTC} from "../lib/queue/viewFilters";
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
@@ -162,4 +163,22 @@ test("person-side controls respect the active actor boundary", () => {
     true,
   );
   assert.equal(queueFocusLabel(presentationFixture({ state: "needs_you", condition: "awaiting_user" })), "What needs you");
+});
+
+
+test("Queue AI working view never attributes a person's claim or stale waiting actor to an AI",()=>{
+ const filters=normalizeQueueFilters({state:"working",actor:"ai"}),now=Date.parse("2026-11-05T12:00:00Z");
+ assert.equal(queueMatchesView(presentationFixture({state:"working",condition:"active",activeActorKind:"user"}),filters,now),false);
+ assert.equal(queueMatchesView(presentationFixture({state:"working",condition:"active",activeActorKind:"chosen_ai"}),filters,now),true);
+ assert.equal(queueMatchesView(presentationFixture({state:"working",condition:"active",activeActorKind:"first_party_ai"}),filters,now),true);
+ assert.equal(queueMatchesView(presentationFixture({state:"waiting_for_your_ai",activeActorKind:"chosen_ai"}),filters,now),false);
+});
+test("Queue closed-this-week uses recorded closing dates and UTC boundaries rather than a recent edit",()=>{
+ const now=Date.parse("2026-11-02T00:00:00Z"),filters=normalizeQueueFilters({view:"done-week"});
+ assert.equal(startOfQueueWeekUTC(now-1),Date.parse("2026-10-26T00:00:00Z"));
+ assert.equal(startOfQueueWeekUTC(now),now);
+ assert.equal(queueMatchesView(presentationFixture({state:"done",condition:"completed",completedAt:now-1,updatedAt:now}),filters,now),false);
+ assert.equal(queueMatchesView(presentationFixture({state:"done",condition:"completed",completedAt:undefined,canceledAt:undefined,updatedAt:now}),filters,now),false);
+ assert.equal(queueMatchesView(presentationFixture({state:"done",condition:"canceled",completedAt:undefined,canceledAt:now}),filters,now),true);
+ assert.equal(queueMatchesView(presentationFixture({state:"done",condition:"completed",completedAt:now+7*86400000}),filters,now),false);
 });

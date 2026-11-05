@@ -1,0 +1,639 @@
+{
+  "items": [
+    {
+      "_id": "synthetic-queue-needs-you",
+      "directive": "Compare the two invented census households and retain the conflicting birth dates. Do not turn a proposed relationship into a settled fact.",
+      "summary": "Compare Eleanor’s two census households",
+      "requestedOutcome": "A source-aware comparison, with remaining uncertainty clearly stated.",
+      "state": "needs_you",
+      "condition": "awaiting_user",
+      "priority": "high",
+      "priorityReason": "Resolve the discrepancy before using this draft in a story.",
+      "context": [
+        {
+          "kind": "person",
+          "refId": "synthetic-eleanor"
+        },
+        {
+          "kind": "source",
+          "refId": "synthetic-register"
+        }
+      ],
+      "authority": {
+        "actorKind": "user",
+        "actorId": "synthetic-design-only",
+        "operations": [
+          "queue:read",
+          "queue:claim",
+          "queue:update",
+          "queue:complete"
+        ],
+        "scopeNote": "Queue continuity only. Publication, identity changes and access decisions remain separate."
+      },
+      "leftForActorKind": "chosen_ai",
+      "requiredAction": "Which invented household should remain the working hypothesis? Keep the other as an unresolved candidate.",
+      "retryCount": 0,
+      "maxRetries": 3,
+      "submittedAt": 1793795892631,
+      "createdAt": 1793795892631,
+      "updatedAt": 1793882292631,
+      "version": 4
+    },
+    {
+      "_id": "synthetic-queue-working",
+      "directive": "Compare the two invented census households and retain the conflicting birth dates. Do not turn a proposed relationship into a settled fact.",
+      "summary": "Review the invented parish image",
+      "requestedOutcome": "A source-aware comparison, with remaining uncertainty clearly stated.",
+      "state": "working",
+      "condition": "active",
+      "priority": "normal",
+      "priorityReason": "Resolve the discrepancy before using this draft in a story.",
+      "context": [
+        {
+          "kind": "person",
+          "refId": "synthetic-eleanor"
+        },
+        {
+          "kind": "source",
+          "refId": "synthetic-register"
+        }
+      ],
+      "authority": {
+        "actorKind": "user",
+        "actorId": "synthetic-design-only",
+        "operations": [
+          "queue:read",
+          "queue:claim",
+          "queue:update",
+          "queue:complete"
+        ],
+        "scopeNote": "Queue continuity only. Publication, identity changes and access decisions remain separate."
+      },
+      "leftForActorKind": "chosen_ai",
+      "retryCount": 0,
+      "maxRetries": 3,
+      "submittedAt": 1793795892631,
+      "createdAt": 1793795892631,
+      "updatedAt": 1793878692631,
+      "version": 4,
+      "activeActorKind": "user",
+      "activeActorId": "synthetic-design-only",
+      "nextStep": "Compare the handwritten date with both indexed candidates.",
+      "leaseExpiresAt": 1793884092631
+    },
+    {
+      "_id": "synthetic-queue-ai",
+      "directive": "Compare the two invented census households and retain the conflicting birth dates. Do not turn a proposed relationship into a settled fact.",
+      "summary": "Prepare an invented locality comparison",
+      "requestedOutcome": "A source-aware comparison, with remaining uncertainty clearly stated.",
+      "state": "working",
+      "condition": "active",
+      "priority": "normal",
+      "priorityReason": "Resolve the discrepancy before using this draft in a story.",
+      "context": [
+        {
+          "kind": "person",
+          "refId": "synthetic-eleanor"
+        },
+        {
+          "kind": "source",
+          "refId": "synthetic-register"
+        }
+      ],
+      "authority": {
+        "actorKind": "user",
+        "actorId": "synthetic-design-only",
+        "operations": [
+          "queue:read",
+          "queue:claim",
+          "queue:update",
+          "queue:complete"
+        ],
+        "scopeNote": "Queue continuity only. Publication, identity changes and access decisions remain separate."
+      },
+      "leftForActorKind": "chosen_ai",
+      "retryCount": 0,
+      "maxRetries": 3,
+      "submittedAt": 1793795892631,
+      "createdAt": 1793795892631,
+      "updatedAt": 1793875092631,
+      "version": 4,
+      "activeActorKind": "chosen_ai",
+      "activeActorId": "synthetic-connection",
+      "nextStep": "Separate background context from person-specific source claims.",
+      "leaseExpiresAt": 1793884092631
+    },
+    {
+      "_id": "synthetic-queue-waiting",
+      "directive": "Compare the two invented census households and retain the conflicting birth dates. Do not turn a proposed relationship into a settled fact.",
+      "summary": "Look for an invented trade-directory entry",
+      "requestedOutcome": "A source-aware comparison, with remaining uncertainty clearly stated.",
+      "state": "waiting_for_your_ai",
+      "condition": "disconnected",
+      "priority": "low",
+      "priorityReason": "Resolve the discrepancy before using this draft in a story.",
+      "context": [
+        {
+          "kind": "person",
+          "refId": "synthetic-eleanor"
+        },
+        {
+          "kind": "source",
+          "refId": "synthetic-register"
+        }
+      ],
+      "authority": {
+        "actorKind": "user",
+        "actorId": "synthetic-design-only",
+        "operations": [
+          "queue:read",
+          "queue:claim",
+          "queue:update",
+          "queue:complete"
+        ],
+        "scopeNote": "Queue continuity only. Publication, identity changes and access decisions remain separate."
+      },
+      "leftForActorKind": "chosen_ai",
+      "retryCount": 0,
+      "maxRetries": 3,
+      "submittedAt": 1793795892631,
+      "createdAt": 1793795892631,
+      "updatedAt": 1793871492631,
+      "version": 4
+    },
+    {
+      "_id": "synthetic-queue-done",
+      "directive": "Compare the two invented census households and retain the conflicting birth dates. Do not turn a proposed relationship into a settled fact.",
+      "summary": "An invented workshop comparison is recorded",
+      "requestedOutcome": "A source-aware comparison, with remaining uncertainty clearly stated.",
+      "state": "done",
+      "condition": "completed",
+      "priority": "normal",
+      "priorityReason": "Resolve the discrepancy before using this draft in a story.",
+      "context": [
+        {
+          "kind": "person",
+          "refId": "synthetic-eleanor"
+        },
+        {
+          "kind": "source",
+          "refId": "synthetic-register"
+        }
+      ],
+      "authority": {
+        "actorKind": "user",
+        "actorId": "synthetic-design-only",
+        "operations": [
+          "queue:read",
+          "queue:claim",
+          "queue:update",
+          "queue:complete"
+        ],
+        "scopeNote": "Queue continuity only. Publication, identity changes and access decisions remain separate."
+      },
+      "leftForActorKind": "chosen_ai",
+      "retryCount": 0,
+      "maxRetries": 3,
+      "submittedAt": 1793795892631,
+      "createdAt": 1793795892631,
+      "updatedAt": 1793795892631,
+      "version": 4,
+      "resultSummary": "The synthetic directory and census describe similar work, but neither establishes who owned the workshop. The original source discrepancy remains open.",
+      "resultRefs": [
+        "/app/people/synthetic-eleanor",
+        "https://example.invalid/untrusted-reference",
+        "legacy:synthetic-note"
+      ],
+      "completedAt": 1793795892631,
+      "lastUserResponse": "Retain both candidates until the image is reviewed."
+    },
+    {
+      "_id": "synthetic-queue-expired",
+      "directive": "Compare the two invented census households and retain the conflicting birth dates. Do not turn a proposed relationship into a settled fact.",
+      "summary": "Renew an expired invented handoff",
+      "requestedOutcome": "A source-aware comparison, with remaining uncertainty clearly stated.",
+      "state": "needs_you",
+      "condition": "expired",
+      "priority": "high",
+      "priorityReason": "Resolve the discrepancy before using this draft in a story.",
+      "context": [
+        {
+          "kind": "person",
+          "refId": "synthetic-eleanor"
+        },
+        {
+          "kind": "source",
+          "refId": "synthetic-register"
+        }
+      ],
+      "authority": {
+        "actorKind": "user",
+        "actorId": "synthetic-design-only",
+        "operations": [
+          "queue:read",
+          "queue:claim",
+          "queue:update",
+          "queue:complete"
+        ],
+        "scopeNote": "Queue continuity only. Publication, identity changes and access decisions remain separate."
+      },
+      "leftForActorKind": "chosen_ai",
+      "requiredAction": "Choose whether to continue this expired handoff or record a cancellation.",
+      "retryCount": 0,
+      "maxRetries": 3,
+      "submittedAt": 1793795892631,
+      "createdAt": 1793795892631,
+      "updatedAt": 1793709492631,
+      "version": 4,
+      "failureCode": "handoff_expired",
+      "failureSummary": "The invented handoff reached its recorded end date.",
+      "handoffExpiresAt": 1793795892631
+    },
+    {
+      "_id": "synthetic-queue-old",
+      "directive": "Compare the two invented census households and retain the conflicting birth dates. Do not turn a proposed relationship into a settled fact.",
+      "summary": "An older invented cancellation",
+      "requestedOutcome": "A source-aware comparison, with remaining uncertainty clearly stated.",
+      "state": "done",
+      "condition": "canceled",
+      "priority": "low",
+      "priorityReason": "Resolve the discrepancy before using this draft in a story.",
+      "context": [
+        {
+          "kind": "person",
+          "refId": "synthetic-eleanor"
+        },
+        {
+          "kind": "source",
+          "refId": "synthetic-register"
+        }
+      ],
+      "authority": {
+        "actorKind": "user",
+        "actorId": "synthetic-design-only",
+        "operations": [
+          "queue:read",
+          "queue:claim",
+          "queue:update",
+          "queue:complete"
+        ],
+        "scopeNote": "Queue continuity only. Publication, identity changes and access decisions remain separate."
+      },
+      "leftForActorKind": "chosen_ai",
+      "retryCount": 0,
+      "maxRetries": 3,
+      "submittedAt": 1793795892631,
+      "createdAt": 1793795892631,
+      "updatedAt": 1792672692631,
+      "version": 4,
+      "canceledReason": "Superseded by the newer source comparison.",
+      "canceledAt": 1792672692631
+    }
+  ],
+  "activity": {
+    "synthetic-queue-needs-you": [
+      {
+        "_id": "synthetic-queue-needs-you-event-0",
+        "eventType": "requested_user_action",
+        "fromState": "working",
+        "toState": "needs_you",
+        "actorKind": "chosen_ai",
+        "actorId": "synthetic-connection",
+        "summary": "Synthetic answer requested.",
+        "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
+        "itemVersion": 4,
+        "createdAt": 1793882292631
+      },
+      {
+        "_id": "synthetic-queue-needs-you-event-1",
+        "eventType": "checkpoint",
+        "fromState": "working",
+        "toState": "working",
+        "actorKind": "chosen_ai",
+        "actorId": "synthetic-connection",
+        "summary": "Synthetic comparison checkpoint saved.",
+        "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
+        "itemVersion": 3,
+        "createdAt": 1793878692631
+      },
+      {
+        "_id": "synthetic-queue-needs-you-event-2",
+        "eventType": "claimed",
+        "fromState": "waiting_for_your_ai",
+        "toState": "working",
+        "actorKind": "chosen_ai",
+        "actorId": "synthetic-connection",
+        "summary": "Synthetic handoff picked up.",
+        "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
+        "itemVersion": 2,
+        "createdAt": 1793875092631
+      },
+      {
+        "_id": "synthetic-queue-needs-you-event-3",
+        "eventType": "created",
+        "toState": "waiting_for_your_ai",
+        "actorKind": "user",
+        "actorId": "synthetic-design-only",
+        "summary": "Synthetic directive created.",
+        "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
+        "itemVersion": 1,
+        "createdAt": 1793871492631
+      }
+    ],
+    "synthetic-queue-working": [
+      {
+        "_id": "synthetic-queue-working-event-0",
+        "eventType": "checkpoint",
+        "fromState": "working",
+        "toState": "working",
+        "actorKind": "user",
+        "actorId": "synthetic-design-only",
+        "summary": "Synthetic current step recorded.",
+        "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
+        "itemVersion": 4,
+        "createdAt": 1793882292631
+      },
+      {
+        "_id": "synthetic-queue-working-event-1",
+        "eventType": "checkpoint",
+        "fromState": "working",
+        "toState": "working",
+        "actorKind": "user",
+        "actorId": "synthetic-design-only",
+        "summary": "Synthetic comparison checkpoint saved.",
+        "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
+        "itemVersion": 3,
+        "createdAt": 1793878692631
+      },
+      {
+        "_id": "synthetic-queue-working-event-2",
+        "eventType": "claimed",
+        "fromState": "waiting_for_your_ai",
+        "toState": "working",
+        "actorKind": "user",
+        "actorId": "synthetic-design-only",
+        "summary": "Synthetic handoff picked up.",
+        "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
+        "itemVersion": 2,
+        "createdAt": 1793875092631
+      },
+      {
+        "_id": "synthetic-queue-working-event-3",
+        "eventType": "created",
+        "toState": "waiting_for_your_ai",
+        "actorKind": "user",
+        "actorId": "synthetic-design-only",
+        "summary": "Synthetic directive created.",
+        "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
+        "itemVersion": 1,
+        "createdAt": 1793871492631
+      }
+    ],
+    "synthetic-queue-ai": [
+      {
+        "_id": "synthetic-queue-ai-event-0",
+        "eventType": "checkpoint",
+        "fromState": "working",
+        "toState": "working",
+        "actorKind": "chosen_ai",
+        "actorId": "synthetic-connection",
+        "summary": "Synthetic current step recorded.",
+        "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
+        "itemVersion": 4,
+        "createdAt": 1793882292631
+      },
+      {
+        "_id": "synthetic-queue-ai-event-1",
+        "eventType": "checkpoint",
+        "fromState": "working",
+        "toState": "working",
+        "actorKind": "chosen_ai",
+        "actorId": "synthetic-connection",
+        "summary": "Synthetic comparison checkpoint saved.",
+        "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
+        "itemVersion": 3,
+        "createdAt": 1793878692631
+      },
+      {
+        "_id": "synthetic-queue-ai-event-2",
+        "eventType": "claimed",
+        "fromState": "waiting_for_your_ai",
+        "toState": "working",
+        "actorKind": "chosen_ai",
+        "actorId": "synthetic-connection",
+        "summary": "Synthetic handoff picked up.",
+        "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
+        "itemVersion": 2,
+        "createdAt": 1793875092631
+      },
+      {
+        "_id": "synthetic-queue-ai-event-3",
+        "eventType": "created",
+        "toState": "waiting_for_your_ai",
+        "actorKind": "user",
+        "actorId": "synthetic-design-only",
+        "summary": "Synthetic directive created.",
+        "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
+        "itemVersion": 1,
+        "createdAt": 1793871492631
+      }
+    ],
+    "synthetic-queue-waiting": [
+      {
+        "_id": "synthetic-queue-waiting-event-0",
+        "eventType": "released",
+        "fromState": "working",
+        "toState": "waiting_for_your_ai",
+        "actorKind": "chosen_ai",
+        "actorId": "synthetic-connection",
+        "summary": "Synthetic handoff returned to Waiting.",
+        "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
+        "itemVersion": 4,
+        "createdAt": 1793882292631
+      },
+      {
+        "_id": "synthetic-queue-waiting-event-1",
+        "eventType": "checkpoint",
+        "fromState": "working",
+        "toState": "working",
+        "actorKind": "chosen_ai",
+        "actorId": "synthetic-connection",
+        "summary": "Synthetic comparison checkpoint saved.",
+        "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
+        "itemVersion": 3,
+        "createdAt": 1793878692631
+      },
+      {
+        "_id": "synthetic-queue-waiting-event-2",
+        "eventType": "claimed",
+        "fromState": "waiting_for_your_ai",
+        "toState": "working",
+        "actorKind": "chosen_ai",
+        "actorId": "synthetic-connection",
+        "summary": "Synthetic handoff picked up.",
+        "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
+        "itemVersion": 2,
+        "createdAt": 1793875092631
+      },
+      {
+        "_id": "synthetic-queue-waiting-event-3",
+        "eventType": "created",
+        "toState": "waiting_for_your_ai",
+        "actorKind": "user",
+        "actorId": "synthetic-design-only",
+        "summary": "Synthetic directive created.",
+        "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
+        "itemVersion": 1,
+        "createdAt": 1793871492631
+      }
+    ],
+    "synthetic-queue-done": [
+      {
+        "_id": "synthetic-queue-done-event-0",
+        "eventType": "completed",
+        "fromState": "working",
+        "toState": "done",
+        "actorKind": "chosen_ai",
+        "actorId": "synthetic-connection",
+        "summary": "Synthetic result recorded.",
+        "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
+        "itemVersion": 4,
+        "createdAt": 1793882292631
+      },
+      {
+        "_id": "synthetic-queue-done-event-1",
+        "eventType": "checkpoint",
+        "fromState": "working",
+        "toState": "working",
+        "actorKind": "chosen_ai",
+        "actorId": "synthetic-connection",
+        "summary": "Synthetic comparison checkpoint saved.",
+        "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
+        "itemVersion": 3,
+        "createdAt": 1793878692631
+      },
+      {
+        "_id": "synthetic-queue-done-event-2",
+        "eventType": "claimed",
+        "fromState": "waiting_for_your_ai",
+        "toState": "working",
+        "actorKind": "chosen_ai",
+        "actorId": "synthetic-connection",
+        "summary": "Synthetic handoff picked up.",
+        "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
+        "itemVersion": 2,
+        "createdAt": 1793875092631
+      },
+      {
+        "_id": "synthetic-queue-done-event-3",
+        "eventType": "created",
+        "toState": "waiting_for_your_ai",
+        "actorKind": "user",
+        "actorId": "synthetic-design-only",
+        "summary": "Synthetic directive created.",
+        "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
+        "itemVersion": 1,
+        "createdAt": 1793871492631
+      }
+    ],
+    "synthetic-queue-expired": [
+      {
+        "_id": "synthetic-queue-expired-event-0",
+        "eventType": "expired",
+        "fromState": "working",
+        "toState": "needs_you",
+        "actorKind": "system",
+        "actorId": "synthetic-connection",
+        "summary": "Synthetic handoff expired.",
+        "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
+        "itemVersion": 4,
+        "createdAt": 1793882292631
+      },
+      {
+        "_id": "synthetic-queue-expired-event-1",
+        "eventType": "checkpoint",
+        "fromState": "working",
+        "toState": "working",
+        "actorKind": "chosen_ai",
+        "actorId": "synthetic-connection",
+        "summary": "Synthetic comparison checkpoint saved.",
+        "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
+        "itemVersion": 3,
+        "createdAt": 1793878692631
+      },
+      {
+        "_id": "synthetic-queue-expired-event-2",
+        "eventType": "claimed",
+        "fromState": "waiting_for_your_ai",
+        "toState": "working",
+        "actorKind": "chosen_ai",
+        "actorId": "synthetic-connection",
+        "summary": "Synthetic handoff picked up.",
+        "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
+        "itemVersion": 2,
+        "createdAt": 1793875092631
+      },
+      {
+        "_id": "synthetic-queue-expired-event-3",
+        "eventType": "created",
+        "toState": "waiting_for_your_ai",
+        "actorKind": "user",
+        "actorId": "synthetic-design-only",
+        "summary": "Synthetic directive created.",
+        "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
+        "itemVersion": 1,
+        "createdAt": 1793871492631
+      }
+    ],
+    "synthetic-queue-old": [
+      {
+        "_id": "synthetic-queue-old-event-0",
+        "eventType": "completed",
+        "fromState": "working",
+        "toState": "done",
+        "actorKind": "chosen_ai",
+        "actorId": "synthetic-connection",
+        "summary": "Synthetic result recorded.",
+        "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
+        "itemVersion": 4,
+        "createdAt": 1793882292631
+      },
+      {
+        "_id": "synthetic-queue-old-event-1",
+        "eventType": "checkpoint",
+        "fromState": "working",
+        "toState": "working",
+        "actorKind": "chosen_ai",
+        "actorId": "synthetic-connection",
+        "summary": "Synthetic comparison checkpoint saved.",
+        "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
+        "itemVersion": 3,
+        "createdAt": 1793878692631
+      },
+      {
+        "_id": "synthetic-queue-old-event-2",
+        "eventType": "claimed",
+        "fromState": "waiting_for_your_ai",
+        "toState": "working",
+        "actorKind": "chosen_ai",
+        "actorId": "synthetic-connection",
+        "summary": "Synthetic handoff picked up.",
+        "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
+        "itemVersion": 2,
+        "createdAt": 1793875092631
+      },
+      {
+        "_id": "synthetic-queue-old-event-3",
+        "eventType": "created",
+        "toState": "waiting_for_your_ai",
+        "actorKind": "user",
+        "actorId": "synthetic-design-only",
+        "summary": "Synthetic directive created.",
+        "detail": "Invented continuity detail, with uncertainty retained and no real family information.",
+        "itemVersion": 1,
+        "createdAt": 1793871492631
+      }
+    ]
+  },
+  "now": 1793882292631
+}
