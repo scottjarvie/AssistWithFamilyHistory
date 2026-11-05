@@ -701,3 +701,18 @@ legacy observation, duplicate metadata, bounded history, 51st-row ParentChild
 and Couple matches, hidden ambiguity and multi-move dry/live parity. All are
 UNRUN. No actual user, browser, provider or Tier2 runtime proof is claimed.
 No UI route/layout changes, production writes or deployment occurred.
+
+2026-11-05 source-note media privacy repair (local only): source-note privacy
+now includes media.by_source references in the existing bounded owner-checked
+walk. Private/unreviewed, restricted, AI-disallowed, living-associated, stale,
+foreign or over-budget media graphs withhold both inline source notes and
+imported source-subject notes through the actual MCP context callers. Reads
+preserve stored originals. Reviewed deceased-only associations remain readable.
+Added 12 synthetic public-caller cases with no citations or source facts;
+fixtures also cover no media, a later unsafe media row and bound exhaustion.
+The existing cycle fixture explicitly reviews its media before expecting notes.
+All 12 cases are UNRUN; total authored new cases are 471 UNRUN, not discovered
+or executed tests. Source/whitespace review only; actual775 HOST, exclusive FH
+SITE and a qualified receiver remain required for runtime checks. Convex
+changes in the cumulative candidate require deployment; none is deployed.
+No UI route/layout change, browser/user/provider proof, push or live claim.
