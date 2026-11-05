@@ -92,3 +92,16 @@ The small lead fixes have no new cross-model receipt yet: they will be included 
 -19 Place/Story,18 People and18 cross-page regressions pass after the shared saved-view callback and development-theme improvements. Person16 receipt remains historical atcf9ef0e, whose application code is unchanged in this tranche.
 -30 final Queue captures pass, including four explicitly viewport-only item views;2 reconstructed original Queue comparisons pass. They use original JSX/current shared runtime and invented data, with all mutations disabled. The recorder now records viewportOnly/focus metadata, retaining normal full-page capture behavior for other shots.
 -280-image newest-first gallery arrows/Escape/lightbox check passes. Exact-head Opus review next, including cf9ef0e lead fixes. All work local, no site-wide audit/score/target acceptance.
+
+
+## Operations and Queue review refinements ·2026-11-05
+
+-13 Queue UI checks and11 fully intercepted real-controller checks pass, `/tmp/awf-queue-sheet-ui.log` and `/tmp/awf-queue-sheet-race-api.log`. All six commands/create/delete/conflict reload and delayed row/detail/delete completions covered; no API network calls.
+-9 Operations UI +4 intercepted actions pass, `/tmp/awf-operations-final-ui.log` and `/tmp/awf-operations-api.log`;320/390px dark recognition rows under500px, full work disclosed, owner-keyed views, all original facets/notes/confirmations.
+-18 People,18 cross-page and19 Place/Story regressions pass, `/tmp/awf-ops-{people,cross,story}-regression.log`; one aligned table head across real groups and capped-source honesty checked.
+-32 Queue/reader +12 Operations actual-device captures pass;2 honest reconstructed original Operations comparisons.44 current captures, no console/page errors or overflow. Final callback guard changes no pixels.
+-326-image gallery lightbox/arrows/Escape/newest-first passes, `/tmp/awf-ops-gallery-check.log`; HTML preview clean and inline display complete. Portable original-PNG gallery remains local/ignored.
+-First full verification53/57 in55s, `/tmp/awf-operations-queue-full-verify.log`: typecheck/build failed on stray group-width metadata, unit/Queue contract check failed on frozen label. Both fixed without changing approved pixels, full frozen rerun queued at `/tmp/awf-operations-queue-full-verify-final.log`. No full current acceptance yet.
+-AWF-0071 doing; whole-Card audit not audited. AWF-0072 remains separate backlog intake. No completed Work Order, backend acceptance, final formal round2/site-wide clearance, push, PR, merge or deploy.
+
+Final frozen rerun: **57/57 steps passed**, Node22,49s, `/tmp/awf-operations-queue-full-verify-final.log`. Includes the new Operations projection privacy regression, current Queue guards, every contract and production build. No remaining failed check. Reviewed-source commit next; next meaningful cross-model review remains pending.

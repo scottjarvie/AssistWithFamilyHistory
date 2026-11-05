@@ -28,6 +28,8 @@ try {
      if(step.click)await page.locator(step.click).first().click();
      if(step.fill)await page.locator(step.fill).first().fill(step.value || '');
      if(step.press)await page.keyboard.press(step.press);
+     if(step.scrollIntoView)await page.locator(step.scrollIntoView).first().evaluate(node=>node.scrollIntoView({block:"center"}));
+     if(step.scrollBottom)await page.locator(step.scrollBottom).first().evaluate(node=>node.scrollTop=node.scrollHeight);
      if(step.waitMs)await page.waitForTimeout(step.waitMs);
     }
     await page.addStyleTag({content:'*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}nextjs-portal{display:none!important}'});

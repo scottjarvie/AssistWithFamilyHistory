@@ -58,3 +58,12 @@ test("Facet counts share one engine and apply search plus every other active fac
 test("Shared activity wording distinguishes first-party and chosen AI without inventing unknown authors",()=>{
  assert.equal(activityAuthorLabel("first_party_ai"),"Family History AI");assert.equal(activityAuthorLabel("chosen_ai"),"Your AI");assert.equal(activityAuthorLabel(null),"Not attributed");assert.equal(activityKindLabel("tier2_sources"),"Sources");
 });
+
+
+test("Operations browser rows exclude raw research-check notes and authorization internals",async()=>{
+ const {projectOperationRow}=await import("../lib/vault/operationsRows");
+ const row={id:"synthetic",rowType:"person",personIdentifier:"synthetic",displayName:"Invented person",lifespan:"1842 to 1913",keyPlaces:[],completionPercent:62,sourceCount:12,memoryCount:3,documentCount:2,contextReportCount:1,storyCount:0,storyWorkflow:"needs_genealogy_evidence",missingCritical:["identity_review"],nextActions:["Compare the invented source."],staleChecksCount:2,anchorPersonIdentifier:"synthetic",badge:"in_progress",lastTouched:10,latestImportAt:null,researchChecks:[{notes:"PRIVATE_check_note",completedBy:"PRIVATE_identity"}],vaultOwnerId:"PRIVATE_owner",authority:{token:"PRIVATE_token"}};
+ const visible=projectOperationRow(row as unknown as Parameters<typeof projectOperationRow>[0]);
+ assert.equal(visible.name,"Invented person");assert.deepEqual(visible.missing,["identity_review"]);assert.equal(visible.lastTouched,10);
+ assert.ok(!JSON.stringify(visible).includes("PRIVATE_"));assert.ok(!("researchChecks" in visible));
+});

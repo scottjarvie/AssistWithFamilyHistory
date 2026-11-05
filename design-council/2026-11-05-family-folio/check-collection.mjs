@@ -22,7 +22,7 @@ try {
   await page.getByRole('button',{name:'Reverse sort direction'}).click();
   assert.equal((await names())[0],'Samuel Finch');check('Numeric sort and direction change actual order');
   await page.getByLabel('Group records').selectOption('state');
-  assert.equal(await page.locator('tbody').count(),4);check('Grouping retains every record');
+  assert.equal(await page.locator('th[scope=rowgroup]').count(),4);assert.equal(await page.locator('table thead').count(),1);assert.equal((await names()).length,4);check('Grouping retains every record under one aligned table head');
   await page.getByRole('button',{name:'grid',exact:true}).click();
   await page.getByRole('table').waitFor({state:'hidden'});
   assert.equal(await page.locator('a[href^="/app/people/synthetic-"]:visible').count(),4);

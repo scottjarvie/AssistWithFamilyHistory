@@ -106,7 +106,7 @@ export function StoryStatusActions({
   const pending = pendingAction !== null;
 
   return (
-    <div className={compact?"grid grid-cols-3 items-stretch gap-1 [&_button]:h-auto [&_button]:min-h-11 [&_button]:whitespace-normal [&_button]:px-2 [&_button]:text-xs [&_svg]:hidden lg:flex lg:flex-wrap lg:gap-2 lg:[&_svg]:block":"flex flex-wrap gap-3"}>
+    <div className={compact?"grid grid-cols-3 items-stretch gap-1 [&_button]:h-auto [&_button]:min-h-11 [&_button]:whitespace-normal [&_button]:px-2 [&_button]:text-xs [&_svg:not(.animate-spin)]:hidden lg:flex lg:flex-wrap lg:gap-2 lg:[&_svg]:block":"flex flex-wrap gap-3"}>
       {status === "draft" ? (
         <Button aria-label="Mark ready for review" onClick={() => updateStatus("review")} disabled={pending} className="min-h-11 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100">
           {pendingAction === "review" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}

@@ -2,8 +2,9 @@
 
 import { SafeLink as Link } from "@/components/layout/SafeLink";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
-import { Copy, Loader2, Search, ShieldAlert } from "lucide-react";
+import { useEffect, useId, useMemo, useState, useTransition } from "react";
+import { LoaderCircle as Loader2, Search, CircleAlert as ShieldAlert } from "@/components/queue/QueueGlyph";
+import { CopyGlyph as Copy } from "@/components/operations/OperationsGlyph";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
 interface OperationRowActionsProps {
+  readonlyPreview?: boolean;
   rowType: "person" | "provisional";
   personIdentifier: string | null;
   provisionalId?: string;
@@ -41,6 +43,7 @@ interface MergeCandidate {
 }
 
 export function OperationRowActions({
+  readonlyPreview = false,
   rowType,
   personIdentifier,
   provisionalId,
@@ -56,6 +59,7 @@ export function OperationRowActions({
   staleChecksCount,
 }: OperationRowActionsProps) {
   const router = useRouter();
+  const noteId = useId();
   const [isPending, startTransition] = useTransition();
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
@@ -67,7 +71,7 @@ export function OperationRowActions({
   const [reviewNote, setReviewNote] = useState("");
 
   useEffect(() => {
-    if (!mergeDialogOpen || mergeCandidates.length > 0) return;
+    if (readonlyPreview || !mergeDialogOpen || mergeCandidates.length > 0) return;
 
     let cancelled = false;
 
@@ -101,7 +105,7 @@ export function OperationRowActions({
     return () => {
       cancelled = true;
     };
-  }, [mergeDialogOpen, mergeCandidates.length]);
+  }, [readonlyPreview, mergeDialogOpen, mergeCandidates.length]);
 
   const filteredCandidates = useMemo(() => {
     const query = candidateQuery.trim().toLowerCase();
@@ -170,6 +174,7 @@ export function OperationRowActions({
   const reviewNoteReady = trimmedReviewNote.length >= 20;
 
   async function updateCheck(status: "complete" | "not_applicable") {
+    if (readonlyPreview) return;
     const checkKey = missingCritical[0];
     if (!personIdentifier || !checkKey) return;
 
@@ -195,7 +200,7 @@ export function OperationRowActions({
   }
 
   async function promoteProvisional() {
-    if (!provisionalId) return;
+    if (readonlyPreview || !provisionalId) return;
     if (!reviewNoteReady) {
       toast.error("Add a review note of at least 20 characters.");
       return;
@@ -224,7 +229,7 @@ export function OperationRowActions({
   }
 
   async function mergeProvisional(target: MergeCandidate) {
-    if (!provisionalId) return;
+    if (readonlyPreview || !provisionalId) return;
     if (!reviewNoteReady) {
       toast.error("Add a review note of at least 20 characters.");
       return;
@@ -324,8 +329,8 @@ export function OperationRowActions({
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-3">
-              <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-                <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+              <div className="flex gap-3 rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-foreground">
+                <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
                 <div>
                   <p className="font-medium">Human review required</p>
                   <p className="mt-1">
@@ -333,13 +338,14 @@ export function OperationRowActions({
                   </p>
                 </div>
               </div>
-              <Textarea
+              <label htmlFor={`${noteId}-promote`} className="block text-sm font-medium">Review note</label>
+              <Textarea id={`${noteId}-promote`}
                 value={reviewNote}
                 onChange={(event) => setReviewNote(event.target.value)}
                 placeholder="Reviewed source title, relationship evidence, anchor person, and identity risk..."
                 className="min-h-[120px]"
               />
-              <p className="text-xs text-stone-500">
+              <p className="text-xs text-muted-foreground">
                 Minimum 20 characters. This note is written to the research log.
               </p>
             </div>
@@ -347,7 +353,7 @@ export function OperationRowActions({
               <Button variant="outline" onClick={() => setPromoteDialogOpen(false)} disabled={busy}>
                 Cancel
               </Button>
-              <Button onClick={() => void promoteProvisional()} disabled={busy || !reviewNoteReady}>
+              <Button onClick={() => void promoteProvisional()} disabled={readonlyPreview || busy || !reviewNoteReady}>
                 {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Promote
               </Button>
@@ -374,8 +380,8 @@ export function OperationRowActions({
             </DialogHeader>
 
             <div className="space-y-3">
-              <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-                <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+              <div className="flex gap-3 rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-foreground">
+                <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
                 <div>
                   <p className="font-medium">Identity graph change</p>
                   <p className="mt-1">
@@ -384,7 +390,7 @@ export function OperationRowActions({
                 </div>
               </div>
               <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={candidateQuery}
                   onChange={(event) => setCandidateQuery(event.target.value)}
@@ -392,25 +398,26 @@ export function OperationRowActions({
                   className="pl-9"
                 />
               </div>
-              <Textarea
+              <label htmlFor={`${noteId}-merge`} className="block text-sm font-medium">Review note</label>
+              <Textarea id={`${noteId}-merge`}
                 value={reviewNote}
                 onChange={(event) => setReviewNote(event.target.value)}
                 placeholder="Reviewed provisional evidence, target identity, FamilySearch ID match if present, and anchor-person risk..."
                 className="min-h-[110px]"
               />
-              <p className="text-xs text-stone-500">
+              <p className="text-xs text-muted-foreground">
                 Minimum 20 characters. This note is written to the research log with the merge.
               </p>
 
               <div className="max-h-[320px] space-y-2 overflow-y-auto">
                 {loadingCandidates ? (
-                  <div className="flex items-center justify-center rounded-2xl border border-dashed border-stone-200 px-4 py-10 text-sm text-stone-500">
+                  <div className="flex items-center justify-center rounded-2xl border border-dashed border-border px-4 py-10 text-sm text-muted-foreground">
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Loading canonical people
                   </div>
                 ) : filteredCandidates.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-stone-200 px-4 py-10 text-center text-sm text-stone-500">
-                    No canonical people match this search.
+                  <div className="rounded-2xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
+                    {readonlyPreview ? "Synthetic preview: canonical people lookup is disconnected." : "No canonical people match this search."}
                   </div>
                 ) : (
                   filteredCandidates.map((candidate) => (
@@ -418,19 +425,19 @@ export function OperationRowActions({
                       key={candidate._id}
                       type="button"
                       onClick={() => void mergeProvisional(candidate)}
-                      disabled={mergingTargetId !== null || !reviewNoteReady}
-                      className="flex w-full items-center justify-between rounded-2xl border border-stone-200 px-4 py-4 text-left transition hover:border-amber-300 hover:bg-amber-50/40 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={readonlyPreview || mergingTargetId !== null || !reviewNoteReady}
+                      className="flex w-full items-center justify-between rounded-2xl border border-border px-4 py-4 text-left transition hover:border-primary hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <div>
-                        <p className="font-medium text-stone-900">{candidate.displayName}</p>
-                        <p className="mt-1 text-sm text-stone-500">
+                        <p className="font-medium text-foreground">{candidate.displayName}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">
                           {candidate.fsId || candidate.routeId}
                         </p>
                       </div>
                       {mergingTargetId === candidate.routeId ? (
-                        <Loader2 className="h-4 w-4 animate-spin text-amber-700" />
+                        <Loader2 className="h-4 w-4 animate-spin text-warning" />
                       ) : (
-                        <span className="text-sm font-medium text-amber-700">Merge</span>
+                        <span className="text-sm font-medium text-warning">Merge</span>
                       )}
                     </button>
                   ))
@@ -461,17 +468,18 @@ export function OperationRowActions({
             <Link href={`/app/people/${personIdentifier}`}>Open Person</Link>
           </Button>
         ) : null}
-        {personIdentifier ? (
+        {personIdentifier && !readonlyPreview ? (
           <Button asChild size="sm" variant="outline">
             <a href={`/api/people/${personIdentifier}/context-pack?format=markdown`}>Context Pack</a>
           </Button>
         ) : null}
+        {personIdentifier&&readonlyPreview&&<Button size="sm" variant="outline" disabled>Context Pack</Button>}
         {missingCritical.length > 0 ? (
           <>
-            <Button size="sm" onClick={() => updateCheck("complete")} disabled={isPending}>
+            <Button size="sm" onClick={() => updateCheck("complete")} disabled={readonlyPreview || isPending}>
               Mark Done
             </Button>
-            <Button size="sm" variant="outline" onClick={() => updateCheck("not_applicable")} disabled={isPending}>
+            <Button size="sm" variant="outline" onClick={() => updateCheck("not_applicable")} disabled={readonlyPreview || isPending}>
               Not Applicable
             </Button>
           </>

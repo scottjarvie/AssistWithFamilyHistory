@@ -1,0 +1,53 @@
+{
+  "checkedAt": "2026-11-05T13:35:38.268Z",
+  "checks": [
+    "Handoff retains its full private packet and manual-copy fallback",
+    "Check updates retain the exact first-missing-check, status and completion-source contract",
+    "Promote requires a human review note and retains the explicit confirmation payload",
+    "Merge excludes the anchor and retains target identity, review note and confirmation"
+  ],
+  "mockWrites": [
+    {
+      "path": "/api/operations/checks",
+      "body": {
+        "personIdentifier": "synthetic-eleanor",
+        "checkKey": "birth_record",
+        "status": "complete",
+        "completionSource": "user"
+      }
+    },
+    {
+      "path": "/api/operations/checks",
+      "body": {
+        "personIdentifier": "synthetic-eleanor",
+        "checkKey": "birth_record",
+        "status": "not_applicable",
+        "completionSource": "user"
+      }
+    },
+    {
+      "path": "/api/operations/provisional",
+      "body": {
+        "provisionalId": "synthetic-provisional",
+        "action": "promote",
+        "humanReviewConfirmed": true,
+        "humanReviewNote": "Reviewed invented evidence and retained all uncertainty."
+      }
+    },
+    {
+      "path": "/api/operations/provisional",
+      "body": {
+        "provisionalId": "synthetic-provisional",
+        "action": "merge",
+        "targetPersonIdentifier": "synthetic-target",
+        "anchorPersonIdentifier": "synthetic-eleanor",
+        "humanReviewConfirmed": true,
+        "humanReviewNote": "Reviewed target identity, source image and anchor risk."
+      }
+    }
+  ],
+  "errors": [],
+  "unexpectedAPIs": [],
+  "networkAPIRequests": 0,
+  "note": "All API calls fulfilled with invented records in browser interception. Client wiring only, no backend acceptance."
+}

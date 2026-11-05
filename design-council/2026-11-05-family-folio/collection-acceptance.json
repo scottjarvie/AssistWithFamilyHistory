@@ -1,9 +1,9 @@
 {
-  "checkedAt": "2026-11-05T12:56:36.665Z",
+  "checkedAt": "2026-11-05T13:36:40.933Z",
   "checks": [
     "Table keeps all four identities and all six evidence/date columns",
     "Numeric sort and direction change actual order",
-    "Grouping retains every record",
+    "Grouping retains every record under one aligned table head",
     "Grid and List retain every record link and all chosen fields",
     "Columns can be hidden explicitly and restored",
     "Bulk selection changes the visible subset without losing records",

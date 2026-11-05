@@ -110,3 +110,7 @@ design-council/*/record-review-fixes/
 
 # Queue list/thread capture tranche.
 design-council/*/queue-records/
+
+# Operations and Queue review refinements, separate from formal scoring packets.
+design-council/*/operations-records/
+design-council/*/queue-review-fixes/

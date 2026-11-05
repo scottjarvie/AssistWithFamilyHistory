@@ -1,4 +1,4 @@
-[Newest-first gallery](gallery.html) · Queue:57/57 full checks,11 UI +8 intercepted controller checks,30 captures/2 reconstructed comparisons and280-image gallery checks pass. Opus review next; all-page goal active, local only.
+[Newest-first gallery](gallery.html) · Operations + Queue lead fixes:13 Queue UI/11 intercepted,9 Operations UI/4 intercepted,55 broader regressions,44 fresh captures/2 reconstructed comparisons and326-image gallery pass. 57/57 full steps passed; local only, all-page goal active.
 
 
 
@@ -91,3 +91,16 @@ Final lead-fix receipt: **57/57** full steps passed, Node22,54s (`/tmp/awf-recor
 Full-width grouped Table/List/Grid, owner-scoped browser-local saved views and URL facets preserve private in-memory directives and inline replies. Desktop thread keeps the original ask first; phone detail places the actual answer/question first. Existing six commands/create/delete/409 conflict wiring pass8 fully intercepted synthetic API checks; no request reaches a backend.10 read-only fixture UI checks pass, including320/390px dark filters and viewport visibility after opening/reloading a thread. First30 captures passed; final offset-corrected images and full check are being recorded. Exact-head Opus review will also cover cf9ef0e lead corrections. No backend acceptance or cross-state attention flag is claimed.
 
 Frozen Queue full check: **57/57 passed**, Node22,45s (`/tmp/awf-queue-full-verify-fixed.log`). The first run passed55 application/contracts/test steps but failed typecheck/build on a baseline-only mock Response shape; the reconstructed fixture now uses a real in-memory Response, with no visual/product behavior change.11 Queue UI,8 fully intercepted controller,19 Place/Story,18 People and18 cross-page regressions pass.30 final captures include four actual item viewport shots;2 reconstructed originals and280-image gallery interactions pass. Exact-head Opus review follows local commit and covers cf9ef0e lead corrections. No backend or site-wide acceptance, no completed Card/Work Order, no push/PR/merge/deploy.
+
+
+## Queue review and Operations · current work
+
+Opus accepts all cf9 record/reader fixes and Queue privacy/preservation. It requires correction of cross-row completion and long-scroll navigation before Queue template reuse. Lead fixes and Operations collection are now implemented, with verification/captures pending. Full receipt: reviews/opus-queue-76b04ba.md. All-page/audit not complete; no completed Work Order, push, PR, merge or deploy. Next long route: record-backed Audit instruments, then settings matrices/readers/public/specialists.
+
+
+Current batch receipt:13 Queue UI,11 fully intercepted Queue controller checks (including delayed row/detail/delete completion after navigation),9 Operations UI,4 intercepted Operations actions,18 People/18 cross-page/19 Place-Story regressions pass.32 Queue/reader +12 Operations captures and2 reconstructed Operations originals pass;326-image gallery navigation passes and clean HTML preview/inline display completed. Phone Operations recognition rows stay below500px at320/390px while the full work remains in one disclosure. No real API request or mutation reached a backend.
+
+The first full run passed53/57 in55s: typecheck/build rejected a stray column-width property on a grouping option; unit/Queue-foundation checks rejected a changed frozen contract label. Both are corrected, keeping sentence case only in presentation. The frozen rerun passed57/57 in49s on Node22 (`/tmp/awf-operations-queue-full-verify-final.log`). Final callback-only race hardening has no visual change, so the current captures remain accurate. Next meaningful Opus review covers this Operations tranche and all76b lead corrections. No completed Card/WO, whole-page audit or site-wide target clearance. Audit next route is ready in audit-next-route.md.
+
+
+Frozen batch full receipt: **57/57 passed**, Node22,49s. Latest code is ready for a local commit and exact-head Opus review.92 browser/controller checks and46 capture comparisons/current images are separate presentation/wiring evidence, not authenticated backend acceptance. All-page work and whole-Card audit remain unfinished.

@@ -1,5 +1,5 @@
 "use client";
-import {useTransition} from "react";
+import {useState,useTransition} from "react";
 import {toast} from "sonner";
 import {Button} from "@/components/ui/button";
 import {Textarea} from "@/components/ui/textarea";
@@ -16,6 +16,7 @@ export function QueueActionForm({
   submitLabel,
   onDone,
   onCancel,
+  onReload,
 }: {
   item: QueueItemRecord;
   command: QueueCommand;
@@ -25,9 +26,12 @@ export function QueueActionForm({
   submitLabel: string;
   onDone: (item: QueueItemRecord) => void;
   onCancel: () => void;
+  onReload: () => Promise<boolean|void>;
 }) {
   const [value, setValue] = useQueueDraft(`${item._id}:${command}`);
   const readonlyPreview=useQueuePreview();
+  const [conflict,setConflict]=useState(false);
+  const [isReloading,setIsReloading]=useState(false);
   const [isPending, startTransition] = useTransition();
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -55,10 +59,11 @@ export function QueueActionForm({
         });
         const payload = (await response.json()) as { item?: QueueItemRecord; error?: string; details?: string };
         if (!response.ok || !payload.item) {
-          if (response.status === 409) throw new Error("This item changed elsewhere. Reload it before trying again.");
+          if (response.status === 409) {setConflict(true);throw new Error("This item changed elsewhere. Reload it before trying again.");}
           throw new Error(payload.details || payload.error || "Queue command failed");
         }
         toast.success(`${label} recorded`);
+        setConflict(false);
         setValue("");
         onDone(payload.item);
       } catch (error) {
@@ -88,7 +93,8 @@ export function QueueActionForm({
         placeholder={placeholder}
         className="mt-3 resize-y border-border bg-card"
       />
-      <Button type="submit" disabled={readonlyPreview || isPending || !value.trim()} size="sm" className="mt-3 bg-primary text-primary-foreground hover:bg-primary/90">
+      {conflict&&<div role="alert" className="mt-3 text-sm text-warning"><p>This item changed elsewhere. Reload it before trying again. Your draft stays here.</p><Button type="button" variant="outline" className="mt-2 min-h-11" disabled={isReloading} onClick={async()=>{setIsReloading(true);try{const fresh=await onReload();if(fresh!==false)setConflict(false);}finally{setIsReloading(false);}}}>{isReloading?"Reloading…":"Reload this item"}</Button></div>}
+      <Button type="submit" disabled={readonlyPreview || isPending || isReloading || conflict || !value.trim()} size="sm" className="mt-3 bg-primary text-primary-foreground hover:bg-primary/90">
         {isPending ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <ArrowRight aria-hidden="true" />}
         {submitLabel}
       </Button>

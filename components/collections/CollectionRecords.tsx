@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode, type CSSProperties } from "react";
 import { SafeLink } from "@/components/layout/SafeLink";
 import { ArchiveIllustration } from "@/components/design/ArchiveIllustration";
 import type { CollectionColumn } from "./types";
@@ -17,26 +17,27 @@ export function CollectionRecords<Row>({ grouped, columns, view, compact, rowKey
 }) {
   const picture = (row: Row, grid = false) => <div className={`${grid ? "h-20 w-20" : "h-8 w-8"} text-primary`}>{imageSlot?.(row) || <ArchiveIllustration className="h-full w-full"/>}</div>;
   const labelFor = (column:CollectionColumn<Row>,row:Row) => typeof column.compactLabel === "function" ? column.compactLabel(row) : column.compactLabel ?? column.label;
-  const facts = (row: Row, selected: CollectionColumn<Row>[]) => <p className="text-[13px] leading-6 text-muted-foreground [overflow-wrap:anywhere]">{selected.map((column, index) => {
+  const facts = (row: Row, selected: CollectionColumn<Row>[]) => <div className="text-[13px] leading-6 text-muted-foreground [overflow-wrap:anywhere]">{selected.map((column, index) => {
     const mode = (typeof column.fact === "function" ? column.fact(row) : column.fact) || (column.numeric ? "suffix" : "bare");
     const label = labelFor(column,row);
-    return <span key={column.key} title={column.label} className={column.numeric || mode === "prefix" ? "inline-block whitespace-nowrap" : "inline"}>{index > 0 && <span aria-hidden="true"> · </span>}{mode === "prefix" && `${label} `}<span className="text-foreground tabular-nums">{column.render(row)}</span>{mode === "suffix" && ` ${label}`}</span>;
-  })}</p>;
+    return <span key={column.key} title={column.label} className="inline">{index > 0 && <span aria-hidden="true"> · </span>}{mode === "prefix" && `${label} `}<span className="text-foreground tabular-nums">{column.compactRender?column.compactRender(row):column.render(row)}</span>{mode === "suffix" && ` ${label}`}</span>;
+  })}</div>;
   const primary = columns.find((column) => column.key === primaryColumn);
-  return <div className="space-y-5">{grouped.map(([name, rows]) => <section key={name} aria-label={name || "Loaded records"}>
-    {name && <h2 className="mb-2 flex items-center gap-2 font-sans text-sm font-semibold capitalize">{name}<span className="rounded-full bg-secondary px-2 py-1 font-mono text-xs">{rows.length}</span></h2>}
-    {(view === "auto" || view === "table") && <div className={`${view === "auto" ? "hidden sm:block" : ""} overflow-x-auto rounded-lg border border-border bg-card`} tabIndex={0} aria-label="Record comparison table">
-      <table className={`collection-table w-full text-left text-sm ${compact ? "is-compact" : ""}`}>
-        <caption className="sr-only">{name || "Loaded records"} · comparison of loaded fields</caption>
+  return <div className="space-y-5">    {(view === "auto" || view === "table") && <div className={`${view === "auto" ? "hidden sm:block" : ""} overflow-x-auto rounded-lg border border-border bg-card`} tabIndex={0} aria-label="Record comparison table">
+      <table style={{"--collection-width":`${344+columns.reduce((sum,column)=>sum+(column.width||(column.numeric?96:144)),0)}px`} as CSSProperties} className={`collection-table w-full table-fixed sm:min-w-[var(--collection-width)] text-left text-sm ${compact ? "is-compact" : ""}`}>
+        <colgroup className="hidden sm:table-column-group"><col style={{width:44}}/><col style={{width:300}}/>{columns.map(column=><col key={column.key} style={{width:column.width||(column.numeric?96:144)}}/>)}</colgroup>
+        <caption className="sr-only">Loaded records · comparison of loaded fields</caption>
         <thead className="bg-muted/60"><tr><th scope="col" className="w-11"><span className="sr-only">Select</span></th><th scope="col">{identityLabel}</th>{columns.map((column) => <th key={column.key} scope="col" className={column.numeric ? "text-right" : ""} aria-sort={sortKey === column.key ? descending ? "descending" : "ascending" : undefined}>
           {column.sortValue ? <button className="min-h-11 text-inherit md:pointer-fine:min-h-9" onClick={() => onSort(column.key)}>{column.label}{sortKey === column.key ? descending ? " ↓" : " ↑" : ""}</button> : column.label}
         </th>)}</tr></thead>
-        <tbody>{rows.map((row) => <tr data-row={rowKey(row)} key={rowKey(row)} className="border-t border-border align-top hover:bg-muted/30">
+        <tbody>{grouped.map(([name,rows])=><Fragment key={name}>{name&&<tr className="border-t border-border bg-secondary/60"><th scope="rowgroup" colSpan={columns.length+2}><h2 className="py-1 font-sans text-sm font-semibold">{name}<span className="ml-2 font-mono text-xs">{rows.length}</span></h2></th></tr>}{rows.map((row) => <tr data-row={rowKey(row)} key={rowKey(row)} className="border-t border-border align-top hover:bg-muted/30">
           <td>{select(row)}</td><th scope="row" className="min-w-52 font-normal"><div className="flex items-start gap-2"><div className="shrink-0 rounded bg-muted p-1">{picture(row)}</div><div className="min-w-0 flex-1"><RecordLink href={rowHref(row)} className="block min-h-9 text-primary underline-offset-4 hover:underline">{renderIdentity(row)}</RecordLink>{renderDetail?.(row)}{renderActions?.(row)}</div></div></th>
           {columns.map((column) => <td key={column.key} data-label={column.label} className={column.numeric ? "text-right font-mono tabular-nums" : ""}><span className="text-muted-foreground sm:hidden">{column.label}</span><span>{column.render(row)}</span></td>)}
-        </tr>)}</tbody>
+        </tr>)}</Fragment>)}</tbody>
       </table>
     </div>}
+{grouped.map(([name, rows]) => <section key={name} aria-label={name || "Loaded records"} className={view==="table"?"hidden":view==="auto"?"sm:hidden":""}>
+    {name && <h2 className="mb-2 flex items-center gap-2 font-sans text-sm font-semibold">{name}<span className="rounded-full bg-secondary px-2 py-1 font-mono text-xs">{rows.length}</span></h2>}
     {(view === "auto" || view === "list") && <ul className={`${view === "auto" ? "sm:hidden" : ""} divide-y divide-border rounded-lg border border-border bg-card`}>
       {rows.map((row) => <li data-row={rowKey(row)} key={rowKey(row)} className={`flex items-start gap-1 ${compact ? "px-2 py-2" : "px-3 py-3"}`}>
         {select(row)}<div className="min-w-0 flex-1"><RecordLink href={rowHref(row)} className="block min-h-11 text-primary underline-offset-4 hover:underline">

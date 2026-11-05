@@ -20,10 +20,11 @@ import {
   UserRound,
   X,
 } from "./QueueGlyph";
-import { useCallback, useEffect, useMemo, useState, useTransition, useRef, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition, useRef, useSyncExternalStore, useLayoutEffect } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {Dialog,DialogContent,DialogTitle,DialogDescription} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -279,6 +280,7 @@ function QueueDetail({
   onLoadMoreActivity,
   onChanged,
   onDeleted,
+  onReload,
 }: {
   item: QueueItemRecord;
   activity: QueueActivityRecord[];
@@ -286,7 +288,8 @@ function QueueDetail({
   activityLoading: boolean;
   onLoadMoreActivity: () => void;
   onChanged: (item: QueueItemRecord) => void;
-  onDeleted: () => void;
+  onDeleted: (id:string) => void;
+  onReload: () => Promise<boolean|void>;
 }) {
   const readonlyPreview=useQueuePreview();
   const [action, setAction] = useState<QueueCommand | "delete" | null>(null);
@@ -304,7 +307,11 @@ function QueueDetail({
     [item.resultRefs],
   );
 
-  useEffect(() => setAction(null), [item._id, item.version]);
+  useEffect(() => setAction(null), [item._id]);
+  const historyList=useRef<HTMLOListElement>(null);
+  const historyAnchor=useRef<{element:HTMLElement;top:number}|null>(null);
+  useLayoutEffect(()=>{if(activityLoading||!historyAnchor.current)return;const {element,top}=historyAnchor.current;const scroller=element.closest<HTMLElement>("[data-queue-scroll]");if(scroller)scroller.scrollTop+=element.getBoundingClientRect().top-top;historyAnchor.current=null;},[activity,activityLoading]);
+  const actionDone=(next:QueueItemRecord)=>{setAction(null);onChanged(next);};
 
   function deleteItem() {
     if(readonlyPreview)return;
@@ -318,7 +325,7 @@ function QueueDetail({
         const payload = (await response.json()) as { success?: boolean; error?: string; details?: string };
         if (!response.ok) throw new Error(payload.details || payload.error || "Could not delete Queue item");
         toast.success("Queue item and activity deleted");
-        onDeleted();
+        onDeleted(item._id);
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Could not delete Queue item");
       }
@@ -340,20 +347,13 @@ function QueueDetail({
         <h2 id="queue-detail-title" className="mt-5 text-3xl font-semibold leading-tight text-foreground sm:text-4xl">{item.summary}</h2>
       </header>
 
-      <div className="grid min-w-0 gap-0 lg:grid-cols-[minmax(0,1fr)_15rem]">
-        <div className="flex min-w-0 flex-col"><section aria-label="Original directive" className="order-2 border-b border-border px-5 py-5 sm:px-8 lg:order-1"><p className="mb-3 font-mono text-xs uppercase tracking-wider text-annotation">You asked</p>        <p className="mt-4 whitespace-pre-wrap text-[15px] leading-7 text-foreground">{item.directive}</p>
-        {item.requestedOutcome ? (
-          <div className="mt-5 border-l-2 border-annotation pl-4">
-            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-annotation">Useful result</p>
-            <p className="mt-1 text-sm leading-6 text-foreground">{item.requestedOutcome}</p>
-          </div>
-        ) : null}
-      </section><section aria-label="Current answer and actions" className="order-1 px-5 py-6 sm:px-8 lg:order-2">
+      <div className="grid min-w-0 gap-0 xl:grid-cols-[minmax(0,1fr)_13rem]">
+        <div className="flex min-w-0 flex-col"><section aria-label="Current answer and actions" className="order-1 px-5 py-6 sm:px-8 lg:order-2">
           <section className="rounded-lg border border-border bg-muted/72 p-5" aria-labelledby="queue-focus-heading">
             <p id="queue-focus-heading" className="font-mono text-[10px] uppercase tracking-[0.2em] text-annotation">{queueFocusLabel(item)}</p>
             <p className="mt-2 text-lg font-semibold leading-7 text-foreground">{queueFocusText(item)}</p>
             <p className="mt-3 flex gap-2 text-sm leading-6 text-muted-foreground">
-              {item.state === "working" && item.activeActorKind === "user" ? <UserRound className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /> : <Bot className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />}
+              {<FileClock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />}
               {queueHandoffCopy(item)}
             </p>
             {resultLinks.length > 0 ? (
@@ -409,25 +409,32 @@ function QueueDetail({
           </div>
 
           {action === "claim" ? (
-            <div className="mt-4"><InlineAction item={item} command="claim" label="Work on this yourself" prompt="Record the first concrete step. Your claim lasts up to 30 minutes and can be renewed with a progress update." placeholder="Compare the household names and dates against the cited census page." submitLabel="Start working" onDone={onChanged} onCancel={() => setAction(null)} /></div>
+            <div className="mt-4"><InlineAction item={item} command="claim" label="Work on this yourself" prompt="Record the first concrete step. Your claim lasts up to 30 minutes and can be renewed with a progress update." placeholder="Compare the household names and dates against the cited census page." submitLabel="Start working" onDone={actionDone} onReload={onReload} onCancel={() => setAction(null)} /></div>
           ) : null}
           {action === "checkpoint" ? (
-            <div className="mt-4"><InlineAction item={item} command="checkpoint" label="Update the current step" prompt="Leave a readable next step so the thread survives this session." placeholder="Check the neighboring census page for the missing surname variation." submitLabel="Save progress" onDone={onChanged} onCancel={() => setAction(null)} /></div>
+            <div className="mt-4"><InlineAction item={item} command="checkpoint" label="Update the current step" prompt="Leave a readable next step so the thread survives this session." placeholder="Check the neighboring census page for the missing surname variation." submitLabel="Save progress" onDone={actionDone} onReload={onReload} onCancel={() => setAction(null)} /></div>
           ) : null}
           {action === "resume" ? (
-            <div className="mt-4"><InlineAction item={item} command="resume" label="Answer and resume" prompt="Record the answer or decision that unblocks the handoff. It returns to Waiting for your AI; nothing runs automatically." placeholder="Use the 1880 household as the working family group, but retain the date conflict." submitLabel="Return to Waiting" onDone={onChanged} onCancel={() => setAction(null)} /></div>
+            <div className="mt-4"><InlineAction item={item} command="resume" label="Answer and resume" prompt="Record the answer or decision that unblocks the handoff. It returns to Waiting for your AI; nothing runs automatically." placeholder="Use the 1880 household as the working family group, but retain the date conflict." submitLabel="Return to Waiting" onDone={actionDone} onReload={onReload} onCancel={() => setAction(null)} /></div>
           ) : null}
           {action === "complete" ? (
-            <div className="mt-4"><InlineAction item={item} command="complete" label="Record the result" prompt="Summarize what was learned, what evidence supports it, and any uncertainty that remains." placeholder="The two households are probably the same family because… Remaining uncertainty…" submitLabel="Mark Done" onDone={onChanged} onCancel={() => setAction(null)} /></div>
+            <div className="mt-4"><InlineAction item={item} command="complete" label="Record the result" prompt="Summarize what was learned, what evidence supports it, and any uncertainty that remains." placeholder="The two households are probably the same family because… Remaining uncertainty…" submitLabel="Mark Done" onDone={actionDone} onReload={onReload} onCancel={() => setAction(null)} /></div>
           ) : null}
           {action === "cancel" ? (
-            <div className="mt-4"><InlineAction item={item} command="cancel" label="Cancel this handoff" prompt="Canceling moves it to Done and keeps the reason and activity trail." placeholder="This question was superseded by the newer source comparison." submitLabel="Record cancellation" onDone={onChanged} onCancel={() => setAction(null)} /></div>
+            <div className="mt-4"><InlineAction item={item} command="cancel" label="Cancel this handoff" prompt="Canceling moves it to Done and keeps the reason and activity trail." placeholder="This question was superseded by the newer source comparison." submitLabel="Record cancellation" onDone={actionDone} onReload={onReload} onCancel={() => setAction(null)} /></div>
           ) : null}
           {action === "reopen" ? (
-            <div className="mt-4"><InlineAction item={item} command="reopen" label="Reopen this handoff" prompt="Explain why the result needs another pass. It returns to Waiting for your AI; nothing runs automatically." placeholder="A new source changes the household interpretation." submitLabel="Reopen in Waiting" onDone={onChanged} onCancel={() => setAction(null)} /></div>
+            <div className="mt-4"><InlineAction item={item} command="reopen" label="Reopen this handoff" prompt="Explain why the result needs another pass. It returns to Waiting for your AI; nothing runs automatically." placeholder="A new source changes the household interpretation." submitLabel="Reopen in Waiting" onDone={actionDone} onReload={onReload} onCancel={() => setAction(null)} /></div>
           ) : null}
 
-          </section><section className="order-3 border-t border-border px-5 py-6 sm:px-8" aria-labelledby="queue-activity-heading">
+          </section><section aria-label="Original directive" className="order-2 border-b border-border px-5 py-5 sm:px-8 lg:order-1"><p className="mb-3 font-mono text-xs uppercase tracking-wider text-annotation">You asked</p>        <p className="mt-4 whitespace-pre-wrap text-[15px] leading-7 text-foreground">{item.directive}</p>
+        {item.requestedOutcome ? (
+          <div className="mt-5 border-l-2 border-annotation pl-4">
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-annotation">Useful result</p>
+            <p className="mt-1 text-sm leading-6 text-foreground">{item.requestedOutcome}</p>
+          </div>
+        ) : null}
+      </section><section className="order-3 border-t border-border px-5 py-6 sm:px-8" aria-labelledby="queue-activity-heading">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-annotation">Attributable history</p>
@@ -435,7 +442,13 @@ function QueueDetail({
               </div>
               <History className="h-5 w-5 text-annotation" aria-hidden="true" />
             </div>
-            <ol className="mt-5 space-y-0">
+            {!activityDone ? (
+              <Button variant="outline" size="sm" onClick={()=>{const element=historyList.current?.firstElementChild as HTMLElement|null;if(element)historyAnchor.current={element,top:element.getBoundingClientRect().top};onLoadMoreActivity();}} disabled={activityLoading} className="mt-4 border-border bg-card">
+                {activityLoading ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <ChevronDown aria-hidden="true" />}
+                Older activity
+              </Button>
+            ) : null}
+            <ol ref={historyList} className="mt-5 space-y-0">
               {activity.toSorted((a,b)=>a.createdAt-b.createdAt||a._id.localeCompare(b._id)).map((entry, index) => (
                 <li key={entry._id} className="relative grid grid-cols-[1.25rem_1fr] gap-3 pb-5">
                   {index < activity.length - 1 ? <span className="absolute left-[0.57rem] top-4 h-full w-px bg-border" aria-hidden="true" /> : null}
@@ -451,16 +464,11 @@ function QueueDetail({
                 </li>
               ))}
             </ol>
-            {!activityDone ? (
-              <Button variant="outline" size="sm" onClick={onLoadMoreActivity} disabled={activityLoading} className="border-border bg-card">
-                {activityLoading ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <ChevronDown aria-hidden="true" />}
-                Older activity
-              </Button>
-            ) : null}
+
           </section>
         </div>
 
-        <aside className="min-w-0 border-t border-border bg-muted/60 px-5 py-6 lg:border-l lg:border-t-0" aria-label="Queue item details">
+        <aside className="min-w-0 border-t border-border bg-muted/60 px-5 py-6 xl:border-l xl:border-t-0" aria-label="Queue item details">
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-annotation">Handoff ledger</p>
           <dl className="mt-4 space-y-4 text-sm">
             <div><dt className="text-xs text-muted-foreground">Submitted</dt><dd className="mt-1 font-medium text-foreground">{formatQueueDate(item.submittedAt)}</dd></div>
@@ -525,15 +533,16 @@ function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspac
   const snapshot=useSyncExternalStore(subscribeQueueURL,queueSnapshot,()=>initialQueueSnapshot(initialFilters));
   const filters=useMemo(()=>JSON.parse(snapshot) as QueueFilters,[snapshot]);
   const stateFilter=(filters.state||"all") as "all"|QueueState;
-  const [fallbackSelection,setFallbackSelection]=useState<string|null>(null);
-  const listRequest=useRef(0),detailRequest=useRef(0),wantsFocus=useRef(Boolean(initialFilters.item));
-  const selectedPanel=useRef<HTMLElement>(null),collection=useRef<HTMLDivElement>(null);
-  const setSelectedId=(id:string|null)=>{setFallbackSelection(id);navigateQueue({item:id||""});};
+  const listRequest=useRef(0),detailRequest=useRef(0);
+  const collection=useRef<HTMLDivElement>(null);
+  const origin=useRef<HTMLElement|null>(null);
+  const threadScroll=useRef<HTMLDivElement>(null);
+  const setSelectedId=(id:string|null)=>navigateQueue({item:id||""});
   const applyFilters=(next:Record<string,string>)=>{const normalized=normalizeQueueFilters(next);navigateQueue({...normalized,item:normalized.state!==filters.state?"":filters.item});};
-  const selectItem=(item:QueueItemRecord)=>{wantsFocus.current=true;navigateQueue({item:item._id},false);if(!detailLoading&&detail?.item._id===item._id){wantsFocus.current=false;requestAnimationFrame(()=>{selectedPanel.current?.scrollIntoView({block:"start",behavior:"auto"});selectedPanel.current?.focus({preventScroll:true});});}};
+  const selectItem=(item:QueueItemRecord)=>{if(!filters.item)origin.current=document.activeElement instanceof HTMLElement?document.activeElement:null;navigateQueue({item:item._id},false);};
   const [items, setItems] = useState<QueueItemRecord[]>([]);
   const visibleItems=useMemo(()=>items.filter(item=>queueMatchesView(item,filters,preview?.now??Date.now())),[items,filters,preview?.now]);
-  const selectedId=filters.item||(visibleItems.some(item=>item._id===fallbackSelection)?fallbackSelection:visibleItems[0]?._id||null);
+  const selectedId=filters.item||null;
   const [detail, setDetail] = useState<QueueDetailResponse | null>(null);
   const [problem, setProblem] = useState<QueueProblem | null>(null);
   const [detailProblem, setDetailProblem] = useState<QueueProblem | null>(null);
@@ -556,7 +565,6 @@ function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspac
         const matching=preview.items.filter(item=>stateFilter==="all"||item.state===stateFilter);
         const start=Number(cursor||0),end=start+(preview.pageSize||25),page=matching.slice(start,end);
         setItems(current=>append?[...current,...page]:page);setListCursor(end<matching.length?String(end):null);setListDone(end>=matching.length);
-        if(!append)setFallbackSelection(current=>page.some(item=>item._id===current)?current:page[0]?._id||null);
         return;
       }
       const params = new URLSearchParams({ limit: "25" });
@@ -569,9 +577,7 @@ function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspac
       setItems((current) => append ? [...current, ...payload.page] : payload.page);
       setListCursor(payload.continueCursor || null);
       setListDone(payload.isDone);
-      if (!append) {
-        setFallbackSelection((current) => payload.page.some((item) => item._id === current) ? current : payload.page[0]?._id || null);
-      }
+
     } catch (error) {
       if(request!==listRequest.current)return;
       const nextProblem = error && typeof error === "object" && "surfaceState" in error
@@ -584,11 +590,11 @@ function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspac
     }
   }, [stateFilter,preview]);
 
-  const loadDetail = useCallback(async (id: string, appendActivity = false, cursor?: string | null) => {
+  const loadDetail = useCallback(async (id: string, appendActivity = false, cursor?: string | null, quiet = false) => {
     const request=++detailRequest.current;
     if (appendActivity) setActivityLoading(true);
     else {
-      setDetailLoading(true);
+      if(!quiet)setDetailLoading(true);
       setDetailProblem(null);
     }
     try {
@@ -609,6 +615,7 @@ function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspac
       setDetail((current) => appendActivity && current
         ? { ...payload, activity: { ...payload.activity, page: [...current.activity.page, ...payload.activity.page] } }
         : payload);
+      return true;
     } catch (error) {
       if(request!==detailRequest.current)return;
       const nextProblem = error && typeof error === "object" && "surfaceState" in error
@@ -616,6 +623,7 @@ function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspac
         : { title: "Queue item unavailable", detail: "This item could not be loaded. Refresh the Queue and try again.", surfaceState: "error" };
       if (!appendActivity) setDetailProblem(nextProblem);
       toast.error(nextProblem.detail);
+      return false;
     } finally {
       if(request===detailRequest.current){setDetailLoading(false);setActivityLoading(false);}
     }
@@ -624,7 +632,7 @@ function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspac
   useEffect(() => { void loadItems(); }, [loadItems]);
   useEffect(() => {
     if (selectedId) void loadDetail(selectedId);
-    else setDetail(null);
+    else {++detailRequest.current;setDetail(null);setDetailLoading(false);setActivityLoading(false);}
   }, [selectedId, loadDetail]);
 
   const counts = useMemo(() => {
@@ -633,19 +641,13 @@ function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspac
     return result;
   }, [items]);
 
-  useEffect(()=>{if(wantsFocus.current&&!detailLoading&&(detailProblem||detail?.item._id===selectedId)){wantsFocus.current=false;selectedPanel.current?.scrollIntoView({block:"start",behavior:"auto"});selectedPanel.current?.focus({preventScroll:true});}},[detailLoading,detail,detailProblem,selectedId]);
-
+  useEffect(()=>{threadScroll.current?.scrollTo({top:0});},[selectedId]);
   function replaceItem(item: QueueItemRecord) {
-    if (stateFilter !== "all" && stateFilter !== item.state) {
-      setItems((current) => current.filter((entry) => entry._id !== item._id));
-      setSelectedId(null);
-      setDetail(null);
-      void loadItems();
-      return;
-    }
-    setItems((current) => current.map((entry) => entry._id === item._id ? item : entry));
-    setDetail((current) => current ? { ...current, item } : current);
-    void loadDetail(item._id);
+    const leavesState=stateFilter!=="all"&&stateFilter!==item.state;
+    setItems(current=>leavesState?current.filter(entry=>entry._id!==item._id):current.map(entry=>entry._id===item._id?item:entry));
+    // An in-row reply may finish while a different thread is open.
+    if(item._id===selectedId){setDetail(current=>current?{...current,item}:current);void loadDetail(item._id);}
+    if(leavesState)void loadItems();
   }
 
   function handleCreated(item: QueueItemRecord) {
@@ -655,28 +657,37 @@ function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspac
     setSelectedId(item._id);
   }
 
-  function handleDeleted() {
-    const deletedId=selectedId;
-    const nextSelection=visibleItems.find(item=>item._id!==deletedId)?._id||null;
+  function handleDeleted(deletedId:string) {
     setItems(current=>current.filter(item=>item._id!==deletedId));
-    setSelectedId(nextSelection);
-    setDetail(null);
+    if(selectedId===deletedId){setSelectedId(null);setDetail(null);}
   }
+  // Async form submissions can outlive the selection/filter render that started them.
+  const latestHandlers=useRef({changed:replaceItem,deleted:handleDeleted});
+  useLayoutEffect(()=>{latestHandlers.current={changed:replaceItem,deleted:handleDeleted};});
+  const itemChanged=useCallback((item:QueueItemRecord)=>latestHandlers.current.changed(item),[]);
+  const itemDeleted=useCallback((id:string)=>latestHandlers.current.deleted(id),[]);
 
   return <div className="min-w-0 p-4 sm:p-8">
     <header className="mb-5 flex flex-wrap items-end justify-between gap-4">
       <div><p className="font-mono text-xs uppercase tracking-[.14em] text-annotation">Private continuity ledger</p><h1 className="mt-2 text-4xl font-semibold sm:text-5xl">Your Queue</h1><p className="mt-2 text-xl">Keep the research thread.</p><p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Your Queue preserves directives, handoffs, next steps, and results across sessions. It is not the Research Queue and it does not run research on its own.</p></div>
       <Button className="min-h-11" onClick={()=>setShowNew(true)}><Plus/>Leave a directive</Button>
     </header>
-    <p className="mb-5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm leading-6 text-muted-foreground"><Bot className="h-4 w-4 text-primary"/>A compatible AI can connect through MCP and OAuth.<SafeLink href="/ai" className="inline-flex min-h-11 items-center text-primary underline">See setup</SafeLink>Nothing runs until it deliberately claims a directive.</p>
+    <p className="mb-5 max-w-3xl text-sm leading-6 text-muted-foreground"><Bot className="mr-2 inline h-4 w-4 text-primary"/>A compatible AI can connect through MCP and OAuth. <SafeLink href="/ai" className="text-primary underline">See setup</SafeLink>. Nothing runs until it deliberately claims a directive.</p>
 
     {showNew&&<div className="mb-5"><NewDirectiveForm onCreated={handleCreated} onClose={()=>setShowNew(false)}/></div>}
     {preview&&<p className="mb-4 text-xs text-annotation">Synthetic preview: all writes are disabled; no backend connected.</p>}
-    {loading?<QueueLoading/>:problem?<QueueProblemCard problem={problem} onRetry={()=>void loadItems()}/>:<>
+    {loading&&!items.length?<QueueLoading/>:problem?<QueueProblemCard problem={problem} onRetry={()=>void loadItems()}/>:<>
       {items.length===0&&<section className="mb-5 rounded-lg border border-dashed border-border bg-card p-6"><h2 className="text-2xl font-semibold">Nothing needs carrying forward.</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">Leave a directive when a research question, review, or story thread should survive this session.</p><Button onClick={()=>setShowNew(true)} className="mt-3 min-h-11"><Plus/>Leave the first directive</Button></section>}
-      <div ref={collection} tabIndex={-1} aria-label="Queue items" className="min-w-0 scroll-mt-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><QueueCollection items={visibleItems} filters={filters} selectedId={selectedId} preferenceKey={preferenceKey} onFilters={applyFilters} onSelect={selectItem} onChanged={replaceItem}/>{!listDone&&<Button variant="outline" className="mt-4 min-h-11" onClick={()=>void loadItems(true,listCursor)} disabled={loadingMore}>{loadingMore?<LoaderCircle className="animate-spin"/>:<ChevronDown/>}Load more handoffs</Button>}</div>
-      {selectedId&&<section id="queue-selected" ref={selectedPanel} tabIndex={-1} aria-label="Selected Queue item" className="mt-8 min-w-0 scroll-mt-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><div className="mb-3 flex flex-wrap items-center justify-between gap-3"><h2 className="font-sans text-sm font-semibold">Selected thread{filters.item&&!visibleItems.some(item=>item._id===selectedId)?" · outside this loaded view":""}</h2><Button variant="ghost" className="min-h-11 text-primary" onClick={()=>{collection.current?.scrollIntoView({block:"start"});collection.current?.focus({preventScroll:true});}}>Back to loaded handoffs</Button></div>{detailProblem?<QueueProblemCard problem={detailProblem} onRetry={()=>void loadDetail(selectedId)}/>:detailLoading||!detail||detail.item._id!==selectedId?<div className="h-80 animate-pulse rounded-lg border border-border bg-muted" aria-label="Loading selected Queue item"/>:<QueueDetail key={detail.item._id} item={detail.item} activity={detail.activity.page} activityDone={detail.activity.isDone} activityLoading={activityLoading} onLoadMoreActivity={()=>void loadDetail(detail.item._id,true,detail.activity.continueCursor)} onChanged={replaceItem} onDeleted={handleDeleted}/>}</section>}
+      <div ref={collection} tabIndex={-1} aria-label="Queue items" className="min-w-0 scroll-mt-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><QueueCollection items={visibleItems} loadedItems={items} filters={filters} selectedId={selectedId} preferenceKey={preferenceKey} onFilters={applyFilters} onSelect={selectItem} onChanged={itemChanged} onReload={()=>loadItems()}/>{loading&&<p role="status" className="text-sm text-muted-foreground">Loading matching handoffs…</p>}{!listDone&&<Button variant="outline" className="mt-4 min-h-11" onClick={()=>void loadItems(true,listCursor)} disabled={loadingMore}>{loadingMore?<LoaderCircle className="animate-spin"/>:<ChevronDown/>}Load more handoffs</Button>}</div>
+
     </>}
+    <Dialog open={Boolean(selectedId)} onOpenChange={open=>{if(!open)setSelectedId(null);}}><DialogContent ref={threadScroll} data-queue-scroll showCloseButton={false} onOpenAutoFocus={event=>{event.preventDefault();threadScroll.current?.focus();}} onCloseAutoFocus={event=>{event.preventDefault();if(origin.current?.isConnected)origin.current.focus({preventScroll:true});else collection.current?.focus({preventScroll:true});}} tabIndex={-1} id="queue-selected" className="left-0 top-0 block h-[100dvh] max-w-none translate-x-0 translate-y-0 overflow-y-auto rounded-none border-0 p-0 sm:max-w-none lg:left-auto lg:right-0 lg:w-[48rem] lg:max-w-[calc(100vw-3rem)] lg:border-l">
+      <div className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-2 border-b border-border bg-background px-4 py-2">
+        <div><DialogTitle className="font-sans text-sm">Selected thread</DialogTitle><DialogDescription className="mt-1 text-xs">{visibleItems.some(item=>item._id===selectedId)?"Previous/Next follow loaded order":"Outside this loaded view"}</DialogDescription></div>
+        <div className="flex gap-1"><Button variant="ghost" className="min-h-11 px-2" disabled={visibleItems.findIndex(item=>item._id===selectedId)<=0} onClick={()=>{const i=visibleItems.findIndex(item=>item._id===selectedId);if(i>0)navigateQueue({item:visibleItems[i-1]._id});}} aria-label="Previous loaded handoff">↑ Previous</Button><Button variant="ghost" className="min-h-11 px-2" disabled={visibleItems.findIndex(item=>item._id===selectedId)<0||visibleItems.findIndex(item=>item._id===selectedId)>=visibleItems.length-1} onClick={()=>{const i=visibleItems.findIndex(item=>item._id===selectedId);if(i>=0&&i<visibleItems.length-1)navigateQueue({item:visibleItems[i+1]._id});}} aria-label="Next loaded handoff">Next ↓</Button><Button variant="outline" className="min-h-11" onClick={()=>setSelectedId(null)}>Back to loaded handoffs</Button></div>
+      </div>
+      {selectedId&&(detailProblem?<QueueProblemCard problem={detailProblem} onRetry={()=>void loadDetail(selectedId)}/>:detailLoading||!detail||detail.item._id!==selectedId?<div className="h-80 animate-pulse border border-border bg-muted" aria-label="Loading selected Queue item"/>:<QueueDetail key={detail.item._id} item={detail.item} activity={detail.activity.page} activityDone={detail.activity.isDone} activityLoading={activityLoading} onLoadMoreActivity={()=>void loadDetail(detail.item._id,true,detail.activity.continueCursor)} onChanged={itemChanged} onDeleted={itemDeleted} onReload={()=>loadDetail(selectedId,false,null,true)}/>)}
+    </DialogContent></Dialog>
     <section className="mt-6 rounded-lg border border-border bg-card px-4 py-2" aria-label="Queue state summary"><p className="mt-2 text-xs text-muted-foreground">State meanings · counts in the current load</p><dl className="grid gap-x-6 sm:grid-cols-2">{QUEUE_STATES.map(state=><div key={state} className="border-b border-border py-2 last:border-0"><dt><button type="button" aria-pressed={stateFilter===state} onClick={()=>applyFilters({...filters,state:stateFilter===state?"":state,view:"",actor:""})} className="flex min-h-11 w-full items-center justify-between gap-3 text-left text-sm font-semibold text-primary"><span className="flex items-center gap-2">{stateIcons[state]({className:"h-4 w-4"})}{QUEUE_STATE_PRESENTATION[state].label}</span><span className="font-mono text-xs text-muted-foreground">{problem?"Unavailable":stateFilter==="all"||stateFilter===state?counts[state]:"Not in this load"}</span></button></dt><dd className="pb-2 text-xs leading-5 text-muted-foreground">{QUEUE_STATE_PRESENTATION[state].short}</dd></div>)}</dl></section>
     <footer className="mt-8 flex flex-wrap justify-between gap-3 border-t border-border py-5 text-xs leading-5 text-muted-foreground"><p className="flex items-start gap-2"><ShieldCheck className="mt-1 h-4 w-4 shrink-0 text-evidence"/>Queue directives and activity stay private to this vault and share the item&apos;s deletion lifecycle.</p><p className="font-mono">Four states · no autonomous runner</p></footer>
   </div>;

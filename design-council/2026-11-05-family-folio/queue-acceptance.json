@@ -1,12 +1,14 @@
 {
-  "checkedAt": "2026-11-05T12:56:23.850Z",
+  "checkedAt": "2026-11-05T13:35:40.817Z",
   "checks": [
-    "Queue shows seven invented records grouped by actual state with all original fields and UTC dates",
+    "Queue opens no thread until requested and shows seven invented records grouped by actual state with all original fields and UTC dates",
+    "Thread sheet preserves the collection, navigates loaded items and Escape restores the originating row and scroll",
     "AI working filters actual active AI claims, preserves the unsaved directive and does not reload",
     "An answer can be written directly in the row and survives List/Grid changes in private memory",
     "Named views restore filters without reloading; private directive/reply drafts never enter browser storage",
     "Done this week uses recorded completion dates; saved-record links are safe and opaque/external refs remain text",
     "Reopen and permanent-delete confirmations remain reachable and all synthetic writes stay disabled",
+    "Repeated URL facets use the first value on server and client without hydration drift",
     "List and history pagination retain every loaded record",
     "Empty, permission-denied, list-error and detail-error states remain truthful and readable",
     "A different synthetic owner has separate saved views and an empty private draft",

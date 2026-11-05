@@ -107,7 +107,7 @@ export const QUEUE_STATE_PRESENTATION: Record<
   { label: string; short: string; accent: string; wash: string }
 > = {
   needs_you: {
-    label: QUEUE_STATE_LABELS.needs_you,
+    label: "Needs you",
     short: "Paused for one answer or action from you.",
     accent: "var(--annotation)",
     wash: "var(--annotation-surface)",

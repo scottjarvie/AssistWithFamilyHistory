@@ -1,12 +1,15 @@
 {
-  "checkedAt": "2026-11-05T12:53:50.832Z",
+  "checkedAt": "2026-11-05T13:48:52.482Z",
   "checks": [
+    "Initial list loads no selected-item detail until a thread is opened",
     "Claim keeps lease, expected version and idempotency fields and updates the selected thread",
     "A version conflict retains the unfinished checkpoint; successful retry clears it",
     "Complete records the supplied result without a publication or identity action",
     "Reopen records the reason and returns to Waiting without running work",
     "Cancel retains its reason and closes the same handoff",
-    "Inline row answer sends the existing resume command and preserves the answer in the returned record",
+    "A delayed detail command completing after Next preserves the newly opened thread",
+    "An in-row answer finishing with another thread open preserves that thread in Everything",
+    "An in-row answer finishing with another thread open preserves that thread in Needs you",
     "Create preserves directive, desired outcome, required high-priority reason and chosen-AI handoff fields",
     "Permanent deletion keeps explicit confirmation and removes only the selected invented record"
   ],
@@ -19,7 +22,7 @@
         "leaseMs": 1800000,
         "nextStep": "Synthetic claim plan",
         "expectedVersion": 4,
-        "idempotencyKey": "b7f3bb60-9fd6-4bbc-b508-02e99ee229e6"
+        "idempotencyKey": "58fd4295-e6c5-493e-853e-817909f53330"
       }
     },
     {
@@ -30,7 +33,7 @@
         "leaseMs": 1800000,
         "nextStep": "Synthetic next step",
         "expectedVersion": 5,
-        "idempotencyKey": "d124edff-2f47-420d-a440-951947fd4e6d"
+        "idempotencyKey": "3c9f0a10-bd32-48c7-a66c-21ada0f8d420"
       }
     },
     {
@@ -40,8 +43,8 @@
         "command": "checkpoint",
         "leaseMs": 1800000,
         "nextStep": "Synthetic next step",
-        "expectedVersion": 5,
-        "idempotencyKey": "7d7eedf7-a818-43f2-b557-6aa4f316e2b7"
+        "expectedVersion": 6,
+        "idempotencyKey": "7fcf7090-3ae3-4ef2-9a86-f039763c29ea"
       }
     },
     {
@@ -50,8 +53,8 @@
       "body": {
         "command": "complete",
         "resultSummary": "Synthetic completed comparison with uncertainty retained",
-        "expectedVersion": 6,
-        "idempotencyKey": "45a2fd72-a508-4308-b689-1c96380198ea"
+        "expectedVersion": 7,
+        "idempotencyKey": "bc782075-c969-4b32-b0c3-e629a3abba45"
       }
     },
     {
@@ -60,8 +63,8 @@
       "body": {
         "command": "reopen",
         "reason": "Synthetic reason to compare another source",
-        "expectedVersion": 7,
-        "idempotencyKey": "ae7852b3-0dfb-4f04-af0a-43c5fb96af4f"
+        "expectedVersion": 8,
+        "idempotencyKey": "c9942024-9dd9-4b90-829d-823642c524be"
       }
     },
     {
@@ -70,8 +73,18 @@
       "body": {
         "command": "cancel",
         "reason": "Synthetic superseding question",
-        "expectedVersion": 8,
-        "idempotencyKey": "2beaa712-3da3-4935-abf7-8b5bdd42b7df"
+        "expectedVersion": 9,
+        "idempotencyKey": "ff154e99-ffb0-4a4f-a988-1a41c8a88811"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/queue/synthetic-queue-working",
+      "body": {
+        "command": "complete",
+        "resultSummary": "Synthetic delayed result while another handoff is opened",
+        "expectedVersion": 4,
+        "idempotencyKey": "74dd32cc-886f-45f4-8c8c-dc2d410f3391"
       }
     },
     {
@@ -81,7 +94,17 @@
         "command": "resume",
         "answerSummary": "Synthetic answer while keeping the source conflict",
         "expectedVersion": 4,
-        "idempotencyKey": "d32466f5-f29b-4870-82d6-539067daf881"
+        "idempotencyKey": "42d0f2c6-b600-49e7-9d18-72a3eb59c6b3"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/queue/synthetic-queue-needs-you",
+      "body": {
+        "command": "resume",
+        "answerSummary": "Synthetic answer while keeping the source conflict",
+        "expectedVersion": 5,
+        "idempotencyKey": "0073fa54-9b7a-460a-887b-098306e44dbc"
       }
     },
     {
@@ -93,7 +116,7 @@
         "priority": "high",
         "priorityReason": "Synthetic priority reason",
         "chosenAiId": "oauth-chosen-ai",
-        "idempotencyKey": "8b9061b0-3842-429c-987a-0391d605023a"
+        "idempotencyKey": "96a0ca43-4f71-44f4-a429-6a083079123c"
       }
     },
     {
@@ -103,6 +126,28 @@
         "confirmation": "delete_queue_item_and_history"
       }
     }
+  ],
+  "mockReads": [
+    "/api/queue",
+    "/api/queue",
+    "/api/queue/synthetic-queue-waiting",
+    "/api/queue/synthetic-queue-waiting",
+    "/api/queue/synthetic-queue-waiting",
+    "/api/queue/synthetic-queue-waiting",
+    "/api/queue/synthetic-queue-waiting",
+    "/api/queue/synthetic-queue-waiting",
+    "/api/queue/synthetic-queue-waiting",
+    "/api/queue/synthetic-queue-working",
+    "/api/queue/synthetic-queue-ai",
+    "/api/queue",
+    "/api/queue",
+    "/api/queue/synthetic-queue-expired",
+    "/api/queue",
+    "/api/queue/synthetic-queue-expired",
+    "/api/queue",
+    "/api/queue",
+    "/api/queue/synthetic-created-1",
+    "/api/queue/synthetic-queue-needs-you"
   ],
   "unexpectedAPIs": [],
   "errors": [],

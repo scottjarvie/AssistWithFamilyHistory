@@ -285,3 +285,6 @@
  .collection-workspace button, .collection-workspace select, .collection-workspace summary { min-height:36px; }
  .collection-workspace input:not([type=checkbox]):not([type=radio]), .collection-workspace select { height:36px; }
 }
+
+/* Research comparison keeps full cells; List/Grid disclose their detailed work. */
+.collection-table .operation-details { display: none; }
