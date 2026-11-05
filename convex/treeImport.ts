@@ -41,6 +41,9 @@ import {
   eventTypeFor,
   externalRecordKey,
   factKeyFor,
+  factTargetKey,
+  legacyFactKeyFor,
+  legacyCitationKeyFor,
   isGedcomSystem,
   sourceTypeFor,
   splitNames,
@@ -184,6 +187,14 @@ async function lookup(c: ChunkContext, singular: string, key: string, system: st
     )
     .unique();
   return row?.recordId ?? null;
+}
+
+/** Never guess which record an old ambiguous composite identified. */
+async function rejectLegacyIdentity(c: ChunkContext, singular: string, key: string, legacyKey: string) {
+  if (key !== legacyKey && await lookup(c, singular, legacyKey)) {
+    fail("LEGACY_IDENTITY_REVIEW_REQUIRED", "An older import used an ambiguous record key. The original record has been retained.",
+      "Have the person review the original import mapping before retrying; do not rename outside IDs to bypass this check.");
+  }
 }
 
 async function remember(c: ChunkContext, singular: string, key: string, recordId: string, system: string = c.job.system, imported?: Record<string, unknown>) {
@@ -400,6 +411,7 @@ async function importPerson(c: ChunkContext, item: any): Promise<Omit<ItemResult
 async function importFact(c: ChunkContext, personId: string, personKey: string, fact: any) {
   if (typeof fact?.type !== "string" || !fact.type.trim()) return;
   const factKey = factKeyFor(personKey, fact);
+  await rejectLegacyIdentity(c, "fact", factKey, legacyFactKeyFor(personKey, fact));
   const mapped = eventTypeFor(fact.type);
   const existingId = await lookup(c, "fact", factKey);
   const saved = await upsertRow(c, {
@@ -626,7 +638,8 @@ async function resolveTarget(c: ChunkContext, target: TargetInput): Promise<{ ta
   const key = requiredKey(target?.key, "target key");
   const singular = target.kind === "fact" ? "fact" : target.kind;
   if (!(target.kind in TARGET_TABLE)) fail("VALIDATION_ERROR", `Unknown target kind ${String(target.kind)}.`, "Use person, relationship, fact, note or media.");
-  const lookupKey = target.kind === "fact" ? `${requiredKey(target.personKey, "target personKey")}/${key}` : key;
+  const lookupKey = target.kind === "fact" ? factTargetKey(requiredKey(target.personKey, "target personKey"), key) : key;
+  if (target.kind === "fact") await rejectLegacyIdentity(c, "fact", lookupKey, `${target.personKey!.trim()}/${key}`);
   const id = await lookup(c, singular, lookupKey);
   if (!id) fail("MISSING_TARGET", `The ${target.kind} ${lookupKey} has not been imported yet.`, "Send what the citation supports first, then resend this row.");
   return { targetType: TARGET_TABLE[target.kind], targetId: id, ...(target.field ? { field: target.field.slice(0, 80) } : {}) };
@@ -636,6 +649,7 @@ async function importCitation(c: ChunkContext, item: any): Promise<Omit<ItemResu
   const sourceKey = requiredKey(item?.sourceKey, "sourceKey");
   if (!Array.isArray(item.targets) || item.targets.length === 0) fail("VALIDATION_ERROR", "A citation must support at least one record.", "Add targets: the person, fact or relationship this source supports.");
   const key = requiredKey(citationKeyFor(item), "key");
+  await rejectLegacyIdentity(c, "citation", key, legacyCitationKeyFor(item));
   const sourceId = await lookup(c, "source", sourceKey);
   if (!sourceId) fail("MISSING_SOURCE", `Source ${sourceKey} has not been imported yet.`, "Send the source first, then resend this row.");
   const targets = [];
@@ -684,7 +698,8 @@ async function importNote(c: ChunkContext, item: any): Promise<Omit<ItemResult, 
   const subject = item.subject ?? {};
   const kind = NOTE_SUBJECT_KIND[subject.kind as keyof typeof NOTE_SUBJECT_KIND];
   if (!kind) fail("VALIDATION_ERROR", "A note needs a subject.", "Say which person, relationship, fact, source, citation or media the note belongs to.");
-  const subjectKey = subject.kind === "fact" ? `${requiredKey(subject.personKey, "subject personKey")}/${requiredKey(subject.key, "subject key")}` : requiredKey(subject.key, "subject key");
+  const subjectKey = subject.kind === "fact" ? factTargetKey(requiredKey(subject.personKey, "subject personKey"), requiredKey(subject.key, "subject key")) : requiredKey(subject.key, "subject key");
+  if (subject.kind === "fact") await rejectLegacyIdentity(c, "fact", subjectKey, `${subject.personKey.trim()}/${subject.key.trim()}`);
   const subjectId = await lookup(c, subject.kind === "fact" ? "fact" : subject.kind, subjectKey);
   if (!subjectId) fail("MISSING_TARGET", `The ${subject.kind} ${subjectKey} has not been imported yet.`, "Send the record the note belongs to first, then resend this row.");
   const saved = await upsertRow(c, {

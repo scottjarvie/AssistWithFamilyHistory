@@ -184,7 +184,7 @@ export function externalRecordKey(system: string, singularKind: string, key: str
 }
 
 /** Facts are keyed under their person, so "birth" on two people never collide. */
-export function factKeyFor(personKey: string, fact: FactInput): string {
+export function legacyFactKeyFor(personKey: string, fact: FactInput): string {
   if (fact.key?.trim()) return `${personKey.trim()}/${fact.key.trim()}`;
   return `${personKey.trim()}/${normalizeFactType(fact.type)}~${stableHash([
     fact.date?.original ?? "",
@@ -194,13 +194,34 @@ export function factKeyFor(personKey: string, fact: FactInput): string {
 }
 
 /** A citation without its own outside id is keyed by what it says and points at. */
-export function citationKeyFor(citation: CitationInput): string {
+export function legacyCitationKeyFor(citation: CitationInput): string {
   if (citation.key?.trim()) return citation.key.trim();
   const targets = [...citation.targets]
     .map((target) => `${target.kind}:${target.personKey ?? ""}:${target.key}:${target.field ?? ""}`)
     .sort()
     .join(",");
   return `${citation.sourceKey.trim()}#${stableHash(`${citation.page ?? ""}|${targets}`)}`;
+}
+
+/** Escape each component independently; an outside slash is never a separator. */
+export function factTargetKey(personKey: string, key: string): string {
+  return `${encodeURIComponent(personKey.trim())}/${encodeURIComponent(key.trim())}`;
+}
+
+export function factKeyFor(personKey: string, fact: FactInput): string {
+  const key = fact.key?.trim() || `${normalizeFactType(fact.type)}~${stableHash(JSON.stringify([
+    fact.date?.original ?? "", fact.place?.original ?? "", fact.value ?? "",
+  ]))}`;
+  return factTargetKey(personKey, key);
+}
+
+/** Structured tuples keep delimiters inside a target from changing its identity. */
+export function citationKeyFor(citation: CitationInput): string {
+  if (citation.key?.trim()) return citation.key.trim();
+  const targets = citation.targets.map(target => JSON.stringify([
+    target.kind, target.personKey?.trim() ?? "", target.key.trim(), target.field ?? "",
+  ])).sort();
+  return `${citation.sourceKey.trim()}#${stableHash(JSON.stringify([citation.page ?? "", targets]))}`;
 }
 
 /** FNV-1a 64-bit, hex. Deterministic, synchronous and fine for record keys. */

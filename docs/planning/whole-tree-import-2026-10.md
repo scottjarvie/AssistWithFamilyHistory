@@ -245,3 +245,21 @@ Verification: application tests, Convex tests (including the 300-person import),
 typecheck, lint, production build, and all remaining verification contracts
 passed locally. The optional 5,000-person stress test and authenticated/live
 provider flows were not run. No screen changes, merge of this PR, or deployment.
+
+## Import identity repair — 5 November 2026
+
+Person/fact components are escaped independently in durable fact keys. Citation
+and note fact targets use the same encoder. Fallback fact values and citation
+targets are serialized as structured tuples before hashing, so delimiters in
+outside IDs, places or text cannot impersonate tuple boundaries.
+
+Ordinary explicit IDs retain their existing mapping when encoding is unchanged.
+If the old composite differs and already exists, the importer returns
+`LEGACY_IDENTITY_REVIEW_REQUIRED`. It keeps the original records and mappings;
+it neither guesses a match nor silently rekeys, duplicates or deletes them.
+This also applies in dry runs. Such a mapping needs owner review and a deliberate
+repair before that row can resume; changing outside IDs to evade the refusal
+would lose the original identity and is not a supported recovery. Other batch
+rows can continue and operation replay remains unchanged.
+
+This is source behavior, not a claim of deployed or provider-tested capability.
