@@ -596,3 +596,25 @@ record kinds, unrelated originals and the existing mapping bound. The earlier
 actual-capture regression now checks refusal for differing names plus reuse
 when assertions match. All cases remain UNRUN; this is not runtime or user
 proof. No provider calls, production data changes, UI changes or deployment.
+
+
+Legacy writer authority and relationship deletion history (2026-11-05):
+MCP identity updates now require genuine chosen-AI MCP proposal provenance
+and no later import mapping. Import creation stamps remain truthful history;
+they do not authorize legacy MCP identity replacement. A bounded owner/record
+mapping check also protects proposals subsequently linked by import; more than
+50 mappings requires owner review. Research metadata updates stay available.
+Relationship aliases use the existing bounded cross-mapping clearing check,
+including deleted typed facts and cleared nested fact fields. No alternate
+mapping baseline is adopted as overwrite authority. Legitimately blank legacy
+facts remain fillable when no prior imported deletion is known.
+Capture source upsert now checks owned mappings and owned FamilySearch PIDs,
+refusing conflicts and missing/foreign targets. It refuses material changes
+on import-mapped sources or sources with retained evidence, notes, originals
+or related material. Omitted optional fields and original import keys remain.
+The existing capture caller performs multiple mutations: a new person may be
+saved before a source refusal. This protects the source item and its evidence;
+it does not claim rollback of the whole capture. Whole-tree item rollback is
+unchanged. Added 20 synthetic cases for these paths and positive compatibility;
+all remain UNRUN, with no actual provider, user or database exercise. No UI
+changes or deployment. Native Tier2 proof still requires actual admission.

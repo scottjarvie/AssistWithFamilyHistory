@@ -561,6 +561,29 @@ export const startPrivateWorkspace = mutation({
   },
 });
 
+async function resolveCapturedFamilySearchSource(ctx: MutationCtx, owner: string, key: string): Promise<Doc<"sources"> | null> {
+  const mappings = await ctx.db.query("mcpRecordKeys").withIndex("by_owner_type_key", q =>
+    q.eq("vaultOwnerId", owner).eq("recordType", "source").eq("recordKey", externalRecordKey("familysearch", "source", key)),
+  ).take(2);
+  if (mappings.length > 1) throw new Error("AMBIGUOUS_SOURCE_IDENTITY: Duplicate source mappings require review; all originals were retained.");
+  const mapping = mappings[0];
+  if (mapping && mapping.externalKeyVersion !== 2 && (key.trim().startsWith("source:") || key.includes(":source:"))) throw new Error("LEGACY_IDENTITY_REVIEW_REQUIRED: The older source mapping is ambiguous.");
+  let mapped: Doc<"sources"> | null = null;
+  if (mapping) {
+    const id = ctx.db.normalizeId("sources", mapping.recordId);
+    mapped = id ? await ctx.db.get(id) : null;
+    if (!mapped || !matchesVaultOwner(mapped.vaultOwnerId, owner)) throw new Error("MISSING_TARGET: The source mapping has no owned source; nothing was changed.");
+  }
+  const owners = matchesVaultOwner(undefined, owner) ? [owner, undefined] : [owner];
+  const legacy = (await Promise.all(owners.map(vaultOwnerId => ctx.db.query("sources")
+    .withIndex("by_owner_fsId", q => q.eq("vaultOwnerId", vaultOwnerId).eq("fsId", key)).take(2)))).flat();
+  const identities = new Map(legacy.map(row => [String(row._id), row]));
+  if (mapped) identities.set(String(mapped._id), mapped);
+  if (identities.size > 1) throw new Error("AMBIGUOUS_SOURCE_IDENTITY: The source mapping and owned PID records disagree; nothing was merged.");
+  if (mapped?.fsId && mapped.fsId !== key) throw new Error("LEGACY_IDENTITY_REVIEW_REQUIRED: The mapped source's current PID disagrees; no identity was reassigned.");
+  return [...identities.values()][0] ?? null;
+}
+
 export const upsertSource = mutation({
   args: {
     vaultOwnerId: v.string(),
@@ -598,13 +621,7 @@ export const upsertSource = mutation({
     const now = Date.now();
     let existing: Doc<"sources"> | null = null;
 
-    if (args.fsId) {
-      const matches = await ctx.db
-        .query("sources")
-        .withIndex("by_fsId", (q) => q.eq("fsId", args.fsId))
-        .collect();
-      existing = filterByVaultOwner(matches, vaultOwnerId)[0] ?? null;
-    }
+    if (args.fsId) existing = await resolveCapturedFamilySearchSource(ctx, vaultOwnerId, args.fsId);
 
     if (!existing && args.importKey) {
       const matches = await ctx.db
@@ -623,10 +640,39 @@ export const upsertSource = mutation({
     const payload = {
       ...args,
       vaultOwnerId,
+      repository: args.repository ?? existing?.repository,
+      url: args.url ?? existing?.url,
+      fsId: args.fsId ?? existing?.fsId,
+      importKey: existing?.importKey ?? args.importKey,
+      author: args.author ?? existing?.author,
+      publicationDate: args.publicationDate ?? existing?.publicationDate,
+      notes: args.notes ?? existing?.notes,
       updatedAt: now,
     };
 
     if (existing) {
+      const currentSource = existing;
+      if (args.fsId && currentSource.fsId && args.fsId !== currentSource.fsId) throw new Error("LEGACY_IDENTITY_REVIEW_REQUIRED: The selected source has a different FamilySearch identity; nothing was changed.");
+      const imported = await ctx.db.query("mcpRecordKeys").withIndex("by_owner_type_record", q =>
+        q.eq("vaultOwnerId", vaultOwnerId).eq("recordType", "source").eq("recordId", String(currentSource._id)),
+      ).first();
+      const fields = ["title", "type", "repository", "url", "author", "publicationDate", "notes"] as const;
+      const changed = fields.filter(field => args[field] !== undefined && canonicalJson(currentSource[field] ?? null) !== canonicalJson(args[field]));
+      if (changed.length) {
+        const retained = imported ? [] : await Promise.all([
+          ctx.db.query("citations").withIndex("by_source", q => q.eq("sourceId", currentSource._id)).first(),
+          ctx.db.query("notes").withIndex("by_subject", q => q.eq("subject.kind", "source").eq("subject.id", String(currentSource._id))).first(),
+          ctx.db.query("sourceContents").withIndex("by_source", q => q.eq("sourceId", currentSource._id)).first(),
+          ctx.db.query("sourceFacts").withIndex("by_source", q => q.eq("sourceId", currentSource._id)).first(),
+          ctx.db.query("recordPersonas").withIndex("by_source", q => q.eq("sourceId", currentSource._id)).first(),
+          ctx.db.query("media").withIndex("by_source", q => q.eq("sourceId", currentSource._id)).first(),
+          ctx.db.query("connections").withIndex("by_from", q => q.eq("from.kind", "source").eq("from.id", String(currentSource._id))).first(),
+          ctx.db.query("connections").withIndex("by_to", q => q.eq("to.kind", "source").eq("to.id", String(currentSource._id))).first(),
+        ]);
+        if (imported || retained.some(Boolean)) throw new Error(`CAPTURE_SOURCE_REVIEW_REQUIRED: Changes to ${changed.join(", ")} cannot replace imported source material or inherit retained evidence; all originals were retained.`);
+      }
+      // A capture for another person cannot rekey this shared imported source.
+      if (imported) payload.importKey = currentSource.importKey;
       await ctx.db.patch(existing._id, payload);
       return { sourceId: existing._id, created: false };
     }

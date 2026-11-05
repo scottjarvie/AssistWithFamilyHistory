@@ -2711,3 +2711,118 @@ test("capture without a PID cannot overwrite an imported person's corrected fiel
   await expect(t.withIdentity({ subject: OWNER }).mutation(api.vaultMutations.upsertPerson, { vaultOwnerId: OWNER, name: { given: "Same", surname: "Name" }, sex: "unknown", living: false, notes: "Incoming boilerplate" })).rejects.toThrow("CAPTURE_PERSON_REVIEW_REQUIRED");
   expect(await t.run(ctx => ctx.db.query("persons").collect())).toEqual(before);
 });
+
+
+test.each(["importCreated", "proposalThenImported"])("imported identities retain proposal-only MCP authority boundaries (%s)", async origin => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grantId = await seedGrant(t, { vaultOwnerId: OWNER });
+  if (origin === "proposalThenImported") {
+    const ids = [];
+    for (const key of ["P", "Q", "T"]) {
+      const saved = await t.mutation(internal.mcpFamilyHistory.savePerson, { principal: principal(), grantId, operationId: `proposal-create-${key}`, requestHash: `proposal-create-${key}`, input: { mode: "create", createKey: `proposal-${key}`, fsId: key, name: { given: key, surname: "Person" }, sex: "unknown", living: false } }); ids.push(saved.person.id);
+    }
+    await t.mutation(internal.mcpFamilyHistory.saveRelationship, { principal: principal(), grantId, operationId: "proposal-create-rel", requestHash: "proposal-create-rel", input: { mode: "create", createKey: "proposal-rel", type: "Couple", person1: ids[0], person2: ids[1], facts: [{ type: "marriage", description: "Ohio" }] } });
+  }
+  const job = await begin(t, grantId);
+  await send(t, grantId, job.importJobId, 0, { persons: ["P", "Q", "T"].map(key => ({ key, living: false, names: [{ given: key, surname: "Person" }] })), relationships: [{ key: "R", type: "Couple", person1Key: "P", person2Key: "Q", facts: [{ type: "marriage", description: "Ohio" }] }], sources: [{ key: "S", title: "Original relationship source" }], citations: [{ key: "C", sourceKey: "S", extractedText: "Ohio evidence", targets: [{ kind: "relationship", key: "R" }] }] });
+  const people = await t.run(ctx => ctx.db.query("persons").collect()); const p = people.find(row => row.fsId === "P")!; const third = people.find(row => row.fsId === "T")!;
+  await t.mutation(internal.persons.update, { id: p._id, name: { given: "Owner correction", surname: "Person" } });
+  const snapshot = () => t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), relationships: await ctx.db.query("relationships").collect(), citations: await ctx.db.query("citations").collect(), links: await ctx.db.query("citationLinks").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot(); const person = before.people.find(row => row._id === p._id)!; const rel = before.relationships[0];
+  expect(person.creationProvenance?.method).toBe(origin === "proposalThenImported" ? "mcp" : "import");
+  const changes = [{ name: { given: "Rewritten", surname: "Person" } }, { alternateNames: [{ given: "Replacement", surname: "Person" }] }, { sex: "female" }, { living: true }, { birth: { date: { original: "1901" } } }, { death: { date: { original: "2001" } } }];
+  for (const [index, change] of changes.entries()) {
+    await expect(t.mutation(internal.mcpFamilyHistory.savePerson, { principal: principal(), grantId, operationId: `forbid-import-person-${index}`, requestHash: `forbid-import-person-${index}`, input: { mode: "update", personId: String(person._id), expectedUpdatedAt: person.updatedAt, ...change } })).rejects.toThrow("FORBIDDEN"); expect(await snapshot()).toEqual(before);
+  }
+  for (const [index, change] of [{ person2: String(third._id) }, { type: "ParentChild" }, { facts: [{ type: "marriage", description: "Arizona" }] }].entries()) {
+    await expect(t.mutation(internal.mcpFamilyHistory.saveRelationship, { principal: principal(), grantId, operationId: `forbid-import-rel-${index}`, requestHash: `forbid-import-rel-${index}`, input: { mode: "update", relationshipId: String(rel._id), expectedUpdatedAt: rel.updatedAt, ...change } })).rejects.toThrow("FORBIDDEN"); expect(await snapshot()).toEqual(before);
+  }
+  await expect(t.mutation(internal.mcpFamilyHistory.saveRecords, { principal: principal(), grantId, operationId: "forbid-import-batch", requestHash: "forbid-import-batch", input: { summary: "Refused synthetic overwrite", people: [{ mode: "update", personId: String(person._id), expectedUpdatedAt: person.updatedAt, name: { given: "Rewritten", surname: "Person" } }], relationships: [{ mode: "update", relationshipId: String(rel._id), expectedUpdatedAt: rel.updatedAt, facts: [{ type: "marriage", description: "Arizona" }] }] } })).rejects.toThrow("FORBIDDEN"); expect(await snapshot()).toEqual(before);
+  await expect(t.mutation(internal.mcpFamilyHistory.saveRecords, { principal: principal(), grantId, operationId: "forbid-import-rel-batch", requestHash: "forbid-import-rel-batch", input: { summary: "Refused relationship overwrite", relationships: [{ mode: "update", relationshipId: String(rel._id), expectedUpdatedAt: rel.updatedAt, facts: [{ type: "marriage", description: "Arizona" }] }] } })).rejects.toThrow("FORBIDDEN"); expect(await snapshot()).toEqual(before);
+  await t.mutation(internal.mcpFamilyHistory.savePerson, { principal: principal(), grantId, operationId: "allowed-import-research", requestHash: "allowed-import-research", input: { mode: "update", personId: String(person._id), expectedUpdatedAt: person.updatedAt, researchStatus: "in_progress" } });
+  expect(await t.run(ctx => ctx.db.get(person._id))).toMatchObject({ name: person.name, researchStatus: "in_progress" });
+});
+
+test("genuine MCP proposals remain editable within the bounded import-history check", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grantId = await seedGrant(t, { vaultOwnerId: OWNER }); const ids = [];
+  for (const key of ["A", "B"]) { const saved = await t.mutation(internal.mcpFamilyHistory.savePerson, { principal: principal(), grantId, operationId: `pure-proposal-${key}`, requestHash: `pure-proposal-${key}`, input: { mode: "create", createKey: `pure-${key}`, name: { given: key, surname: "Proposal" }, sex: "unknown", living: false } }); ids.push(saved.person.id); }
+  const first = await t.run(ctx => ctx.db.get(ctx.db.normalizeId("persons", ids[0])!));
+  await t.mutation(internal.mcpFamilyHistory.savePerson, { principal: principal(), grantId, operationId: "pure-person-update", requestHash: "pure-person-update", input: { mode: "update", personId: ids[0], expectedUpdatedAt: first!.updatedAt, name: { given: "Aileen", surname: "Proposal" } } });
+  const rel = await t.mutation(internal.mcpFamilyHistory.saveRelationship, { principal: principal(), grantId, operationId: "pure-rel-create", requestHash: "pure-rel-create", input: { mode: "create", createKey: "pure-rel", type: "Couple", person1: ids[0], person2: ids[1] } });
+  await t.mutation(internal.mcpFamilyHistory.saveRelationship, { principal: principal(), grantId, operationId: "pure-rel-update", requestHash: "pure-rel-update", input: { mode: "update", relationshipId: rel.relationship.id, expectedUpdatedAt: rel.relationship.updatedAt, facts: [{ type: "marriage", description: "Proposed detail" }] } });
+  const person = await t.run(ctx => ctx.db.get(ctx.db.normalizeId("persons", ids[0])!)); expect(person?.name.given).toBe("Aileen");
+  expect((await t.run(ctx => ctx.db.query("relationships").collect()))[0].facts).toEqual([{ type: "marriage", description: "Proposed detail" }]);
+  await t.run(async ctx => { for (let i = 0; i < 50; i++) await ctx.db.insert("mcpRecordKeys", { vaultOwnerId: OWNER, recordType: "person", recordKey: `pure-extra-${i}`, recordId: String(person!._id), createdAt: 1, updatedAt: 1 }); });
+  await expect(t.mutation(internal.mcpFamilyHistory.savePerson, { principal: principal(), grantId, operationId: "bounded-proposal-refusal", requestHash: "bounded-proposal-refusal", input: { mode: "update", personId: ids[0], expectedUpdatedAt: person!.updatedAt, living: true } })).rejects.toThrow("FORBIDDEN"); expect(await t.run(ctx => ctx.db.get(person!._id))).toEqual(person);
+});
+
+test.each(["all", "one", "nested", "existingAlias"])("relationship alias cannot restore a manual fact clearing (%s)", async mode => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const facts = [{ type: "marriage", date: { original: "1900", year: 1900 }, description: "Original marriage" }, { type: "divorce", description: "Original divorce" }];
+  const relationship = { key: "R1", type: "Couple" as const, person1Key: "P", person2Key: "Q", facts };
+  await send(t, grant, job.importJobId, 0, { persons: ["P", "Q"].map(key => ({ key, living: false, names: [{ given: key }] })), relationships: [relationship] });
+  if (mode === "existingAlias") await send(t, grant, job.importJobId, 1, { relationships: [{ ...relationship, key: "R2", facts: undefined }] });
+  const rel = (await t.run(ctx => ctx.db.query("relationships").collect()))[0];
+  const cleared = mode === "one" ? [facts[1]] : mode === "nested" ? [{ ...facts[0], description: "" }, facts[1]] : [];
+  await t.mutation(internal.relationships.updateFacts, { id: rel._id, facts: cleared });
+  const snapshot = () => t.run(async ctx => ({ relationships: await ctx.db.query("relationships").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  const batch = { relationships: [{ ...relationship, key: "R2" }] }; const index = mode === "existingAlias" ? 2 : 1;
+  for (const dryRun of [true, false]) { const operation = `relationship-clearing-${mode}-${dryRun}`; const result = await send(t, grant, job.importJobId, index, batch, { dryRun }, operation); expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("RELATIONSHIP_ALIAS_CLEARING_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before); expect(await send(t, grant, job.importJobId, index, batch, { dryRun }, operation)).toEqual(dryRun ? result : { ...result, deduplicated: true }); }
+});
+
+test("a genuinely blank legacy relationship can still gain an imported fact", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  await send(t, grant, job.importJobId, 0, { persons: ["P", "Q"].map(key => ({ key, living: false, names: [{ given: key }] })) });
+  const ids = await t.run(async ctx => { const people = await ctx.db.query("persons").collect(); return ctx.db.insert("relationships", { vaultOwnerId: OWNER, type: "Couple", person1: people.find(row => row.fsId === "P")!._id, person2: people.find(row => row.fsId === "Q")!._id, facts: [], createdAt: 1, updatedAt: 1 }); });
+  const batch = { relationships: [{ key: "R", type: "Couple" as const, person1Key: "P", person2Key: "Q", facts: [{ type: "marriage", description: "New supplied detail" }] }] };
+  const dry = await send(t, grant, job.importJobId, 1, batch, { dryRun: true }, "dry-blank-relationship"); const real = await send(t, grant, job.importJobId, 1, batch); expect(dry.counts).toEqual(real.counts); expect(real.counts.relationships.linked).toBe(1); expect((await t.run(ctx => ctx.db.get(ids)))?.facts).toEqual(batch.relationships[0].facts);
+});
+
+test("relationship clearing history remains bounded before a new alias fill", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  await send(t, grant, job.importJobId, 0, { persons: ["P", "Q"].map(key => ({ key, living: false, names: [{ given: key }] })), relationships: [{ key: "R1", type: "Couple", person1Key: "P", person2Key: "Q" }] });
+  await t.run(async ctx => { const rel = (await ctx.db.query("relationships").collect())[0]; for (let i = 0; i < 50; i++) await ctx.db.insert("mcpRecordKeys", { vaultOwnerId: OWNER, recordType: "relationship", recordKey: `extra-rel-${i}`, recordId: String(rel._id), lastImportedJson: "{}", externalKeyVersion: 2, createdAt: 1, updatedAt: 1 }); });
+  const before = await t.run(ctx => ctx.db.query("relationships").collect()); const batch = { relationships: [{ key: "R2", type: "Couple" as const, person1Key: "P", person2Key: "Q", facts: [{ type: "marriage", description: "Unproven new detail" }] }] };
+  for (const dryRun of [true, false]) { const result = await send(t, grant, job.importJobId, 1, batch, { dryRun }, `rel-history-bound-${dryRun}`); expect(result.results[0].reason).toContain("RELATIONSHIP_ALIAS_CLEARING_REVIEW_REQUIRED"); expect(await t.run(ctx => ctx.db.query("relationships").collect())).toEqual(before); }
+});
+
+
+test.each(["title", "type", "url", "notes"])("capture cannot replace imported source %s beneath retained evidence", async field => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const source = { key: "S", title: "Original census", type: "census", repository: "FamilySearch", url: "https://example.test/original", notes: "Original private source note" };
+  await send(t, grant, job.importJobId, 0, { persons: [{ key: "P", living: false, names: [{ given: "Original" }] }], sources: [source], citations: [{ key: "C", sourceKey: "S", extractedText: "Evidence about original material", targets: [{ kind: "person", key: "P" }] }], notes: [{ key: "N", text: "Explanation of the original record", subject: { kind: "source", key: "S" } }] });
+  const snapshot = () => t.run(async ctx => ({ sources: await ctx.db.query("sources").collect(), citations: await ctx.db.query("citations").collect(), notes: await ctx.db.query("notes").collect(), links: await ctx.db.query("citationLinks").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  const args = { vaultOwnerId: OWNER, fsId: "S", importKey: "fs-source:DIFFERENT-PERSON:CAPTURE", title: source.title, type: "census" as const, repository: source.repository, url: source.url, notes: source.notes };
+  const changed = { ...args, ...(field === "title" ? { title: "Replacement title" } : field === "type" ? { type: "website" as const } : field === "url" ? { url: "https://example.test/replacement" } : { notes: "Replacement note" }) };
+  const owner = t.withIdentity({ subject: OWNER }); await expect(owner.mutation(api.vaultMutations.upsertSource, changed)).rejects.toThrow("CAPTURE_SOURCE_REVIEW_REQUIRED"); expect(await snapshot()).toEqual(before);
+  const same = await owner.mutation(api.vaultMutations.upsertSource, { vaultOwnerId: OWNER, fsId: "S", importKey: args.importKey, title: args.title, type: args.type });
+  expect(same).toEqual({ sourceId: before.sources[0]._id, created: false }); const after = await snapshot(); expect(after.sources[0]).toMatchObject({ ...before.sources[0], updatedAt: expect.any(Number) }); expect(after.keys).toEqual(before.keys); expect(after.citations).toEqual(before.citations); expect(after.links).toEqual(before.links); expect(after.notes).toEqual(before.notes);
+  await expect(owner.mutation(api.vaultMutations.upsertSource, changed)).rejects.toThrow("CAPTURE_SOURCE_REVIEW_REQUIRED"); expect(await snapshot()).toEqual(after);
+});
+
+test.each(["splitPID", "correctedPID", "deleted", "foreign"])("capture source identity cannot select a conflicting or stale original (%s)", async mode => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  await send(t, grant, job.importJobId, 0, { sources: [{ key: "S", title: "Original", type: "census" }] });
+  await t.run(async ctx => { const source = (await ctx.db.query("sources").collect())[0]; if (mode === "splitPID") { await ctx.db.patch(source._id, { fsId: undefined }); await ctx.db.insert("sources", { vaultOwnerId: OWNER, fsId: "S", title: "Other", type: "census", createdAt: 1, updatedAt: 1 }); } else if (mode === "correctedPID") await ctx.db.patch(source._id, { fsId: "T" }); else if (mode === "deleted") await ctx.db.delete(source._id); else await ctx.db.patch(source._id, { vaultOwnerId: "foreign-source-owner" }); });
+  const snapshot = () => t.run(async ctx => ({ sources: await ctx.db.query("sources").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  const code = mode === "splitPID" ? "AMBIGUOUS_SOURCE_IDENTITY" : mode === "correctedPID" ? "LEGACY_IDENTITY_REVIEW_REQUIRED" : "MISSING_TARGET";
+  await expect(t.withIdentity({ subject: OWNER }).mutation(api.vaultMutations.upsertSource, { vaultOwnerId: OWNER, fsId: "S", title: "Captured", type: "census" })).rejects.toThrow(code); expect(await snapshot()).toEqual(before);
+});
+
+test("actual capture of another person cannot replace an imported source's retained material", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  await send(t, grant, job.importJobId, 0, { persons: [{ key: "P", living: false, names: [{ given: "Original", surname: "Person" }] }], sources: [{ key: "S", title: "Original census", type: "census", repository: "FamilySearch", url: "https://example.test/original", notes: "Original private source note" }], citations: [{ key: "C", sourceKey: "S", extractedText: "Original record assertion", targets: [{ kind: "person", key: "P" }] }] });
+  const snapshot = () => t.run(async ctx => ({ sources: await ctx.db.query("sources").collect(), citations: await ctx.db.query("citations").collect(), links: await ctx.db.query("citationLinks").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  const capture = CapturePackageSchema.parse({ schemaVersion: "2.0", captureId: "synthetic-other-person-source", capturedAt: "2026-01-01T00:00:00Z", extractorVersion: "synthetic-test", extractionDurationMs: 0, pageType: "sources", pageUrl: "https://example.test/capture/Q", pageTitle: "Other person's sources", uiLocale: "en", person: { familySearchId: "Q", name: "Unmapped Person", deathDate: "2000" }, sources: [{ id: "S", orderIndex: 0, sourceKey: "captured-S", sourceType: "record", title: "Replacement census", webPageUrl: "https://example.test/replacement", citation: "Replacement assertion", tags: [], indexed: { fields: [], textBlocks: [] }, rawText: "Replacement source text", expanded: true, expansionAttempts: 1, expansionSucceeded: true }], memories: [], diagnostics: { mode: "standard", warnings: [], errors: [] } });
+  const owner = t.withIdentity({ subject: OWNER }); const client = { mutation: (ref: any, args: any) => owner.mutation(ref, args) } as unknown as Parameters<typeof importCapturePackageToConvex>[0]["client"];
+  await expect(importCapturePackageToConvex({ client, vaultOwnerId: OWNER, capture, compatibilityMode: false, artifactPaths: {} })).rejects.toThrow("CAPTURE_SOURCE_REVIEW_REQUIRED"); expect(await snapshot()).toEqual(before);
+  // Capture is an existing multi-mutation flow: the new Q may precede refusal.
+  // Claim only source-item preservation, not rollback of the entire capture.
+  const people = await t.run(ctx => ctx.db.query("persons").collect()); expect(people).toHaveLength(2); expect(people.find(row => row.fsId === "P")?.name).toEqual({ given: "Original", surname: "Person" }); expect(people.some(row => row.fsId === "Q")).toBe(true);
+});
+
+test.each([true, false])("capture respects retained legacy source material without import mappings (%s)", async attached => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const id = await t.run(async ctx => { const sourceId = await ctx.db.insert("sources", { vaultOwnerId: OWNER, fsId: "S", title: "Original", type: "census", importKey: "legacy-original", notes: "Legacy original note", createdAt: 1, updatedAt: 1 }); if (attached) await ctx.db.insert("notes", { vaultOwnerId: OWNER, subject: { kind: "source", id: String(sourceId) }, noteType: "research", text: "Retained explanation", createdAt: 1, updatedAt: 1 }); return sourceId; });
+  const before = await t.run(ctx => ctx.db.get(id)); const call = t.withIdentity({ subject: OWNER }).mutation(api.vaultMutations.upsertSource, { vaultOwnerId: OWNER, fsId: "S", importKey: "new-capture-key", title: "Changed", type: "census", notes: "New captured text" });
+  if (attached) { await expect(call).rejects.toThrow("CAPTURE_SOURCE_REVIEW_REQUIRED"); expect(await t.run(ctx => ctx.db.get(id))).toEqual(before); }
+  else { expect(await call).toEqual({ sourceId: id, created: false }); expect(await t.run(ctx => ctx.db.get(id))).toMatchObject({ title: "Changed", notes: "New captured text", importKey: "legacy-original" }); }
+});

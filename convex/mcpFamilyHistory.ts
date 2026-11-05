@@ -293,6 +293,16 @@ export async function operation(
   return finishOperation(ctx, { ...args, owner, operationId, ...completed });
 }
 
+/** Creation stamps are history; later import mappings also restrict authority. */
+async function canUpdateMcpProposal(ctx: MutationCtx, owner: string, recordType: "person" | "relationship", row: Doc<"persons"> | Doc<"relationships">): Promise<boolean> {
+  if (row.creationProvenance?.actorKind !== "chosen_ai" || row.creationProvenance.method !== "mcp" || row.importJobId) return false;
+  const max = FAMILY_HISTORY_MCP_LIMITS.contextRows;
+  const mappings = await ctx.db.query("mcpRecordKeys").withIndex("by_owner_type_record", q =>
+    q.eq("vaultOwnerId", owner).eq("recordType", recordType).eq("recordId", String(row._id)),
+  ).take(max + 1);
+  return mappings.length <= max && !mappings.some(mapping => mapping.externalKeyVersion === 2 || mapping.lastImportedJson !== undefined || mapping.recordKey.startsWith("ext:"));
+}
+
 async function savePersonRecord(ctx: MutationCtx, owner: string, input: any, provenance: McpProvenance) {
   const now = Date.now();
   await assertOwnedPlaceRefs(ctx, owner, input, "Person place");
@@ -337,7 +347,7 @@ async function savePersonRecord(ctx: MutationCtx, owner: string, input: any, pro
   // this is. An AI proposes a different name, sex, living state or date as a
   // candidate source fact; it does not rewrite the person's record.
   const identityChanges = PERSON_IDENTITY_FIELDS.filter((field) => input[field] !== undefined);
-  if (identityChanges.length > 0 && row.creationProvenance?.actorKind !== "chosen_ai") {
+  if (identityChanges.length > 0 && !await canUpdateMcpProposal(ctx, owner, "person", row)) {
     machineError(
       "FORBIDDEN",
       `Only the person can change ${identityChanges.join(", ")} on a person they entered or imported.`,
@@ -385,7 +395,7 @@ async function saveRelationshipRecord(ctx: MutationCtx, owner: string, input: an
   }
   const row = await owned(ctx, "relationships", input.relationshipId, owner, "Relationship");
   assertFresh(row, input.expectedUpdatedAt, "Relationship");
-  if (row.creationProvenance?.actorKind !== "chosen_ai") {
+  if (!await canUpdateMcpProposal(ctx, owner, "relationship", row)) {
     machineError("FORBIDDEN", "Only the person can change a relationship they entered or imported.", "Propose the correction as a candidate source fact or research finding.");
   }
   if (input.person1) await owned(ctx, "persons", input.person1, owner, "Relationship person");
