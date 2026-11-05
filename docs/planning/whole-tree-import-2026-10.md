@@ -475,3 +475,12 @@ old mappings nor the corrected person are silently rekeyed. First-linked
 records and new person aliases retain baselines only for import-written
 fields; populated original fields remain outside refresh authority. Later
 manual clearing of those imported fields stays protected across providers.
+
+Relationship endpoints, type and lineage cannot refresh to different
+attribution while any notes or citation links remain attached. The item
+refuses atomically, including without embedded relationship facts; unchanged
+replay and unattached identity refresh remain available. Attachment reads use
+bounded subject/target indexes and include effective planning rows.
+Joined-acceptance cleanup now includes notes in its existing bounded owner
+scan and refuses when a note references the marked graph. It never deletes
+notes or expands cleanup authority; inspect uses the same refusal.

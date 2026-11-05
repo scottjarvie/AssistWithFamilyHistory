@@ -2228,3 +2228,32 @@ test.each([false, true])("new person aliases retain only safe import baselines a
   const result = await send(t, grant, next.importJobId, 0, refresh); expect(preview.counts).toEqual(result.counts); expect(result.results[0].kept).toContain("name");
   const retained = await t.run(ctx => ctx.db.get(row._id)); expect(retained!.name).toEqual({ given: "", surname: legacy ? "Original surname" : "Incoming surname" }); expect(await countRows(t, "persons")).toBe(1);
 });
+
+
+test.each(["person1", "person2", "type", "lineage"].flatMap(change => ["note", "citation", "both"].map(attachment => ({ change, attachment }))))("relationship $change changes cannot reattribute retained $attachment attachments", async ({ change, attachment }) => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const relation: NonNullable<TreeImportBatch["relationships"]>[number] = { key: "R", type: change === "lineage" ? "ParentChild" : "Couple", person1Key: "A", person2Key: "B", ...(change === "lineage" ? { lineage: "biological" } : {}) };
+  await send(t, grant, job.importJobId, 0, { persons: ["A", "B", "C"].map(key => ({ key, living: false, names: [{ given: key }] })), sources: [{ key: "S", title: "Original A-B source" }], relationships: [relation],
+    ...(attachment !== "note" ? { citations: [{ key: "CITE", sourceKey: "S", extractedText: "Evidence about original A-B", targets: [{ kind: "relationship" as const, key: "R" }] }] } : {}),
+    ...(attachment !== "citation" ? { notes: [{ key: "NOTE", text: "Private note about original A-B", subject: { kind: "relationship" as const, key: "R" } }] } : {}),
+  });
+  const snapshot = () => t.run(async ctx => ({ relationships: await ctx.db.query("relationships").collect(), notes: await ctx.db.query("notes").collect(), citations: await ctx.db.query("citations").collect(), links: await ctx.db.query("citationLinks").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  expect(before.relationships[0].facts).toBeUndefined();
+  const noop = await send(t, grant, job.importJobId, 1, { relationships: [relation] }); expect(noop.counts.relationships.unchanged).toBe(1); expect(await snapshot()).toEqual(before);
+  const changed: NonNullable<TreeImportBatch["relationships"]>[number] = { ...relation, ...(change === "person1" ? { person1Key: "C" } : change === "person2" ? { person2Key: "C" } : change === "type" ? { type: "ParentChild" as const } : { lineage: "adopted" }) };
+  for (const dryRun of [true, false]) {
+    const result = await send(t, grant, job.importJobId, 2, { relationships: [changed] }, { dryRun }, `relation-attachments-${change}-${attachment}-${dryRun}`);
+    expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("RELATIONSHIP_ATTRIBUTION_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before);
+    expect(await send(t, grant, job.importJobId, 2, { relationships: [changed] }, { dryRun }, `relation-attachments-${change}-${attachment}-${dryRun}`)).toEqual(result); expect(await snapshot()).toEqual(before);
+  }
+});
+
+test("unattached relationship identity refresh remains available", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const relation = { key: "R", type: "Couple" as const, person1Key: "A", person2Key: "B" };
+  await send(t, grant, job.importJobId, 0, { persons: ["A", "B", "C"].map(key => ({ key, living: false, names: [{ given: key }] })), relationships: [relation] });
+  const batch: TreeImportBatch = { relationships: [{ ...relation, person2Key: "C" }] };
+  const before = await t.run(ctx => ctx.db.query("relationships").collect()); const dry = await send(t, grant, job.importJobId, 1, batch, { dryRun: true }, "dry-unattached-relationship"); expect(await t.run(ctx => ctx.db.query("relationships").collect())).toEqual(before);
+  const result = await send(t, grant, job.importJobId, 1, batch); expect(dry.counts).toEqual(result.counts); expect(result.counts.relationships.updated).toBe(1);
+  const c = (await t.run(ctx => ctx.db.query("persons").collect())).find(row => row.fsId === "C")!; expect((await t.run(ctx => ctx.db.query("relationships").collect()))[0].person2).toBe(c._id);
+});

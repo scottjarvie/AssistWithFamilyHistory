@@ -86,7 +86,7 @@ function assertRunKey(value: string) {
   return runKey;
 }
 
-async function boundedOwnerRows<T extends "persons" | "relationships" | "events" | "personEvents" | "sources" | "citations" | "citationLinks" | "sourceFacts" | "researchTasks" | "researchLog" | "queueItems" | "stories" | "storyReviewEvents" | "agentActivity" | "mcpOperations" | "mcpRecordKeys" | "media" | "documents" | "mcpGrants">(
+async function boundedOwnerRows<T extends "persons" | "relationships" | "events" | "personEvents" | "sources" | "citations" | "citationLinks" | "sourceFacts" | "researchTasks" | "researchLog" | "queueItems" | "stories" | "storyReviewEvents" | "agentActivity" | "mcpOperations" | "mcpRecordKeys" | "media" | "documents" | "mcpGrants" | "notes">(
   ctx: FixtureCtx,
   table: T,
   owner: string,
@@ -139,7 +139,7 @@ async function fixtureGraph(ctx: FixtureCtx, runKeyInput: string) {
   const owner = assertAcceptanceDeployment();
   const runKey = assertRunKey(runKeyInput);
   const graph = await mappedRows(ctx, runKey, owner);
-  const [queueRows, operations, activity, personEvents, citationLinks, reviewEvents, allRelationships, allSourceFacts, allResearchTasks, allResearchLog, allStories, allMedia, allDocuments, allGrants] = await Promise.all([
+  const [queueRows, operations, activity, personEvents, citationLinks, reviewEvents, allRelationships, allSourceFacts, allResearchTasks, allResearchLog, allStories, allMedia, allDocuments, allGrants, allNotes] = await Promise.all([
     boundedOwnerRows(ctx, "queueItems", owner),
     boundedOwnerRows(ctx, "mcpOperations", owner),
     boundedOwnerRows(ctx, "agentActivity", owner),
@@ -154,6 +154,7 @@ async function fixtureGraph(ctx: FixtureCtx, runKeyInput: string) {
     boundedOwnerRows(ctx, "media", owner),
     boundedOwnerRows(ctx, "documents", owner),
     boundedOwnerRows(ctx, "mcpGrants", owner),
+    boundedOwnerRows(ctx, "notes", owner),
   ]);
   if (graph.mappings.length > 20) {
     throw new Error("Refusing cleanup because the marked MCP record graph exceeded its safety ceiling.");
@@ -217,6 +218,7 @@ async function fixtureGraph(ctx: FixtureCtx, runKeyInput: string) {
     ) && !storyIds.has(String(row._id))) ||
     allMedia.some((row) => row.personIds.some((id) => personIds.has(String(id))) || (row.sourceId ? sourceIds.has(String(row.sourceId)) : false)) ||
     allDocuments.some((row) => personIds.has(String(row.personId))) ||
+    allNotes.some((row) => fixtureIds.has(row.subject.id)) ||
     queueRows.some((row) => !queueIds.has(String(row._id)) && row.context.some((ref) => fixtureIds.has(String(ref.refId))));
   if (externalReference) {
     throw new Error("Refusing cleanup because an unmarked record references the marked acceptance graph.");

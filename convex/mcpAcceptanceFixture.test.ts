@@ -398,3 +398,38 @@ describe("Family History joined MCP acceptance cleanup", () => {
     })).rejects.toThrow("a marked connection lacks its visible synthetic acceptance marker");
   });
 });
+
+
+test("joined cleanup refuses an independently imported note on its marked person", async () => {
+  // In-memory fixture deployment/identity only; never a real provider or user-proof claim.
+  vi.stubEnv("CONVEX_CLOUD_URL", "https://accomplished-dodo-308.convex.cloud"); vi.stubEnv("TRUST_BOUNDARY_MODE", "enforce");
+  const t = convexTest({ schema, modules, transactionLimits: true }); await saveJoinedFixture(t);
+  const person = (await t.run(ctx => ctx.db.query("persons").collect()))[0]; await t.mutation(internal.persons.update, { id: person._id, fsId: "NOTE-PID" });
+  const clientId = "synthetic-independent-note-import";
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER, clientId, issuer: mcpPrincipal().issuer }); const principal = { ...mcpPrincipal(), clientId };
+  const job = await t.mutation(internal.treeImport.beginTreeImport, { principal, grantId: grant, operationId: "independent-note-begin", requestHash: "independent-note-begin-hash", input: { system: "familysearch", importKey: "independent-note-import", label: "Unmarked synthetic import" } }) as { importJobId: string };
+  const result = await t.action(internal.treeImport.importTreeBatch, { principal, grantId: grant, operationId: "independent-note-batch", requestHash: "independent-note-batch-hash", input: { importJobId: job.importJobId, batchIndex: 0, persons: [{ key: "NOTE-PID", living: false, names: [{ given: "Synthetic", surname: "Newcomer" }] }], notes: [{ key: "N", text: "Unmarked note must survive cleanup", subject: { kind: "person", key: "NOTE-PID" } }] } }) as { counts: { notes: { created: number }; persons: { linked: number } } };
+  expect(result.counts.notes.created).toBe(1); expect(result.counts.persons.linked).toBe(1);
+  const snapshot = () => t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), notes: await ctx.db.query("notes").collect(), keys: await ctx.db.query("mcpRecordKeys").collect(), queue: await ctx.db.query("queueItems").collect(), stories: await ctx.db.query("stories").collect() })); const before = await snapshot();
+  expect(before.notes[0].subject).toEqual({ kind: "person", id: String(person._id) });
+  const owner = t.withIdentity({ subject: OWNER });
+  await expect(owner.action(api.mcpAcceptanceFixture.inspect, { vaultOwnerId: OWNER, runKey: RUN_KEY })).rejects.toThrow("an unmarked record references the marked acceptance graph");
+  await expect(owner.mutation(api.mcpAcceptanceFixture.clear, { vaultOwnerId: OWNER, runKey: RUN_KEY, confirmation: FAMILY_HISTORY_ACCEPTANCE_CONFIRMATION })).rejects.toThrow("an unmarked record references the marked acceptance graph"); expect(await snapshot()).toEqual(before);
+});
+
+test.each(["event", "source", "citation", "story"] as const)("joined cleanup retains unmarked notes on fixture %s records", async kind => {
+  vi.stubEnv("CONVEX_CLOUD_URL", "https://accomplished-dodo-308.convex.cloud"); vi.stubEnv("TRUST_BOUNDARY_MODE", "enforce");
+  const t = convexTest({ schema, modules, transactionLimits: true }); await saveJoinedFixture(t);
+  const tables = { event: "events", source: "sources", citation: "citations", story: "stories" } as const;
+  const noteId = await t.run(async ctx => { const target = (await ctx.db.query(tables[kind]).collect())[0]; return ctx.db.insert("notes", { vaultOwnerId: OWNER, subject: { kind, id: String(target._id) }, noteType: "general", text: "Unmarked original note", createdAt: 1, updatedAt: 1 }); });
+  const note = await t.run(ctx => ctx.db.get(noteId));
+  await expect(t.withIdentity({ subject: OWNER }).mutation(api.mcpAcceptanceFixture.clear, { vaultOwnerId: OWNER, runKey: RUN_KEY, confirmation: FAMILY_HISTORY_ACCEPTANCE_CONFIRMATION })).rejects.toThrow("an unmarked record references the marked acceptance graph"); expect(await t.run(ctx => ctx.db.get(noteId))).toEqual(note);
+  expect(await t.run(async ctx => { const targetId = ctx.db.normalizeId(tables[kind], note!.subject.id); return targetId ? await ctx.db.get(targetId) : null; })).not.toBeNull();
+});
+
+test("joined cleanup keeps the existing scan ceiling for notes", async () => {
+  vi.stubEnv("CONVEX_CLOUD_URL", "https://accomplished-dodo-308.convex.cloud"); vi.stubEnv("TRUST_BOUNDARY_MODE", "enforce");
+  const t = convexTest({ schema, modules, transactionLimits: true }); await saveJoinedFixture(t);
+  await t.run(async ctx => { const person = (await ctx.db.query("persons").collect())[0]; for (let i = 0; i < 101; i++) await ctx.db.insert("notes", { vaultOwnerId: OWNER, subject: { kind: "person", id: String(person._id) }, noteType: "general", text: `Original ${i}`, createdAt: i, updatedAt: i }); });
+  await expect(t.withIdentity({ subject: OWNER }).mutation(api.mcpAcceptanceFixture.clear, { vaultOwnerId: OWNER, runKey: RUN_KEY, confirmation: FAMILY_HISTORY_ACCEPTANCE_CONFIRMATION })).rejects.toThrow("notes exceeded its bounded scan ceiling"); expect(await t.run(ctx => ctx.db.query("notes").collect())).toHaveLength(101);
+});

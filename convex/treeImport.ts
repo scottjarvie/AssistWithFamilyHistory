@@ -840,9 +840,22 @@ async function importRelationship(c: ChunkContext, item: any): Promise<Omit<Item
   if (retainedDate && !saved.kept?.includes("facts")) saved.kept = [...(saved.kept ?? []), "facts"];
   if (previous) {
     const current = await ownedRow(c, "relationships", saved.id);
-    const references = ["type", "person1", "person2"] as const;
+    const references = ["type", "childRelationType", "person1", "person2"] as const;
     const moved = current && references.some(field => !same(previous[field], current[field]));
     const keptReference = saved.kept?.some(field => references.some(reference => reference === field));
+    if (moved) {
+      const virtualAttachment = [...(c.w.rows?.values() ?? [])].some(row =>
+        (row.subject?.kind === "relationship" && row.subject.id === saved.id)
+        || (row.targetType === "relationship" && row.targetId === saved.id));
+      const persistedAttachments = isPlaceholder(saved.id) ? [] : await Promise.all([
+        c.ctx.db.query("notes").withIndex("by_subject", q => q.eq("subject.kind", "relationship").eq("subject.id", saved.id)).first(),
+        c.ctx.db.query("citationLinks").withIndex("by_target", q => q.eq("targetType", "relationship").eq("targetId", saved.id)).first(),
+      ]);
+      if (virtualAttachment || persistedAttachments.some(Boolean)) {
+        fail("RELATIONSHIP_ATTRIBUTION_REVIEW_REQUIRED", "Relationship identity changes cannot reattribute retained notes or citation evidence.",
+          "Review the relationship and its attached material with the person. This relationship item saved nothing; all attachments were retained.");
+      }
+    }
     if (current && ((moved && current.facts?.length && !same(suppliedFacts, current.facts)) || (keptReference && !same(previous.facts, current.facts)))) {
       fail("RELATIONSHIP_FACT_REVIEW_REQUIRED", "Relationship facts cannot acquire different endpoints or a conflicting retained identity without confirmation.",
         "Review the relationship and explicitly resubmit its complete facts with the correct endpoints. This relationship item saved nothing.");
