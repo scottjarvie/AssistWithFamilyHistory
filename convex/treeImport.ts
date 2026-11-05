@@ -81,6 +81,7 @@ const self = (internal as any).treeImport;
  */
 type Writer = {
   dryRun: boolean;
+  rows?: Map<string, any>;
   insert<T extends TableNames>(table: T, doc: any): Promise<string>;
   patch(id: string, doc: Record<string, unknown>): Promise<void>;
 };
@@ -93,12 +94,21 @@ function liveWriter(ctx: MutationCtx): Writer {
   };
 }
 
-function dryWriter(scope: string): Writer {
+function dryWriter(scope: string, rows: Map<string, any>): Writer {
   let counter = 0;
   return {
     dryRun: true,
-    insert: async (table) => `dry:${encodeURIComponent(scope)}:${table}:${(counter += 1)}`,
-    patch: async () => {},
+    rows,
+    insert: async (table, doc) => {
+      const id = `dry:${encodeURIComponent(scope)}:${table}:${(counter += 1)}`;
+      rows.set(id, { ...clean(doc), _id: id });
+      return id;
+    },
+    patch: async (id, doc) => {
+      const row = rows.get(id);
+      if (!row) throw new Error("Dry planning attempted to patch an unloaded record.");
+      rows.set(id, { ...row, ...clean(doc) });
+    },
   };
 }
 
@@ -124,6 +134,7 @@ type ChunkContext = {
   /** Keys a dry run planned to create in earlier chunks of the same batch. */
   planned: Set<string>;
   plannedNow: string[];
+  baselines: Map<string, Record<string, unknown> | null>;
   duplicatesSuggested: number;
 };
 
@@ -239,6 +250,7 @@ async function remember(c: ChunkContext, singular: string, key: string, recordId
   const mapKey = externalRecordKey(system, singular, key, c.job.importKey);
   c.local.set(mapKey, recordId);
   if (c.w.dryRun) {
+    c.baselines.set(mapKey, imported ? clean(imported) : null);
     c.plannedNow.push(mapKey);
     return;
   }
@@ -255,11 +267,14 @@ async function remember(c: ChunkContext, singular: string, key: string, recordId
 }
 
 async function ownedRow<T extends TableNames>(c: ChunkContext, table: T, id: string): Promise<Doc<T> | null> {
+  const virtual = c.w.rows?.get(id);
+  if (virtual) return matchesVaultOwner(virtual.vaultOwnerId, c.owner) ? virtual as Doc<T> : null;
   if (isPlaceholder(id)) return null;
   const normalized = c.ctx.db.normalizeId(table, id);
   if (!normalized) return null;
   const row = await c.ctx.db.get(normalized as Id<T>);
   if (!row || !matchesVaultOwner((row as any).vaultOwnerId, c.owner)) return null;
+  if (c.w.rows) c.w.rows.set(id, clean(row));
   return row as Doc<T>;
 }
 
@@ -311,15 +326,16 @@ async function upsertRow(
     await remember(c, args.singular, args.key, id, c.job.system, args.doc);
     return { id, status: "created" };
   }
-  if (isPlaceholder(args.existingId)) return { id: args.existingId, status: "unchanged" };
   const row = await ownedRow(c, args.table, args.existingId);
   if (!row) fail("NOT_FOUND", "The record this outside id pointed to is gone.", "Send the record again under a new key, or ask the person what happened to it.");
   const patch: Record<string, unknown> = {};
   const kept: string[] = [];
-  const mapping = await c.ctx.db.query("mcpRecordKeys").withIndex("by_owner_type_key", q =>
-    q.eq("vaultOwnerId", c.owner).eq("recordType", RECORD_TYPE[args.singular]).eq("recordKey", externalRecordKey(c.job.system, args.singular, args.key, c.job.importKey)),
+  const mapKey = externalRecordKey(c.job.system, args.singular, args.key, c.job.importKey);
+  const plannedBaseline = c.baselines.has(mapKey);
+  const mapping = plannedBaseline ? null : await c.ctx.db.query("mcpRecordKeys").withIndex("by_owner_type_key", q =>
+    q.eq("vaultOwnerId", c.owner).eq("recordType", RECORD_TYPE[args.singular]).eq("recordKey", mapKey),
   ).unique();
-  const baseline = mapping?.lastImportedJson ? JSON.parse(mapping.lastImportedJson) : null;
+  const baseline = plannedBaseline ? c.baselines.get(mapKey) : mapping?.lastImportedJson ? JSON.parse(mapping.lastImportedJson) : null;
   // Creation provenance is historical, never permission to replace later edits.
   // Legacy rows without a baseline conservatively retain populated fields.
   const imported: Record<string, unknown> = { ...(baseline ?? {}) };
@@ -342,6 +358,7 @@ async function upsertRow(
   if (Object.keys(patch).length > 0) {
     await c.w.patch(String(row._id), { ...clean(patch), updatedAt: now });
   }
+  if (c.w.dryRun && (plannedBaseline || mapping) && Object.keys(patch).length > 0) c.baselines.set(mapKey, clean(imported));
   if (mapping && !c.w.dryRun && Object.keys(patch).length > 0) {
     await c.w.patch(String(mapping._id), { lastImportedJson: JSON.stringify(clean(imported)) });
   }
@@ -435,7 +452,10 @@ async function importPerson(c: ChunkContext, item: any): Promise<Omit<ItemResult
   }
 
   for (const fact of facts.slice(0, TREE_IMPORT_LIMITS.factsPerPerson)) {
-    await importFact(c, saved.id, key, fact);
+    const outcome = await importFact(c, saved.id, key, fact);
+    if (!outcome) continue;
+    if (saved.status === "unchanged" && outcome.status !== "unchanged") saved.status = "updated";
+    if (outcome.kept?.length) saved.kept = [...(saved.kept ?? []), ...outcome.kept.map(field => `facts:${factKeyFor(key, fact)}:${field}`)];
   }
   return {
     key,
@@ -478,6 +498,7 @@ async function importFact(c: ChunkContext, personId: string, personKey: string, 
       createdAt: Date.now(),
     });
   }
+  return saved;
 }
 
 async function duplicateCandidates(c: ChunkContext, name: { given: string; surname: string }, birthYear: number | undefined) {
@@ -787,7 +808,7 @@ async function runChunk(c: ChunkContext, items: TreeImportItem[]): Promise<ItemR
   for (const item of items) {
     const importer = IMPORTERS[item.kind];
     // Match a real item's nested mutation rollback boundary for dry planning.
-    const before = c.w.dryRun ? { local: new Map(c.local), plannedNow: c.plannedNow.length, duplicatesSuggested: c.duplicatesSuggested } : null;
+    const before = c.w.dryRun ? { local: new Map(c.local), plannedNow: c.plannedNow.length, duplicatesSuggested: c.duplicatesSuggested, rows: new Map(c.w.rows), baselines: new Map(c.baselines) } : null;
     try {
       const saved = c.w.dryRun
         ? await importer(c, item.item)
@@ -802,6 +823,11 @@ async function runChunk(c: ChunkContext, items: TreeImportItem[]): Promise<ItemR
         for (const [key, id] of before.local) c.local.set(key, id);
         c.plannedNow.length = before.plannedNow;
         c.duplicatesSuggested = before.duplicatesSuggested;
+        c.baselines = before.baselines;
+        if (c.w.rows) {
+          c.w.rows.clear();
+          for (const [id, row] of before.rows) c.w.rows.set(id, row);
+        }
       }
       if (error instanceof ItemFailure) {
         results.push({ kind: item.kind, index: item.index, key: keyOf(item), status: "failed", reason: `${error.code}: ${error.message}`, whatToDo: error.whatToDo });
@@ -863,7 +889,7 @@ export const applyTreeImportItem = internalMutation({
   handler: async (ctx, args): Promise<Omit<ItemResult, "kind" | "index">> => {
     const c: ChunkContext = {
       ctx, w: liveWriter(ctx), owner: args.owner, job: args.job, provenance: args.provenance,
-      local: new Map(), planned: new Set(), plannedNow: [], duplicatesSuggested: 0,
+      local: new Map(), planned: new Set(), plannedNow: [], baselines: new Map(), duplicatesSuggested: 0,
     };
     const item = args.item as TreeImportItem;
     try {
@@ -877,7 +903,7 @@ export const applyTreeImportItem = internalMutation({
 
 /** A dry run of one chunk. Reads only; the writer changes nothing. */
 export const planTreeImportChunk = internalQuery({
-  args: { ...chunkArgs, plannedKeys: v.array(v.string()), plannedRecords: v.optional(v.array(v.object({ key: v.string(), recordId: v.string() }))) },
+  args: { ...chunkArgs, plannedKeys: v.array(v.string()), plannedRecords: v.optional(v.array(v.object({ key: v.string(), recordId: v.string() }))), plannedState: v.optional(v.any()) },
   handler: async (ctx, args) => {
     const owner = ownerFromPrincipal(args.principal);
     await assertGrantPermits(ctx, { owner, grantId: args.grantId, toolName: BATCH_TOOL, input: {} });
@@ -887,12 +913,16 @@ export const planTreeImportChunk = internalQuery({
       machineError("VALIDATION_ERROR", "Dry-run keys need their original identity mappings.", "Restart the dry run and carry plannedRecords alongside plannedKeys between chunks.");
     }
     const c: ChunkContext = {
-      ctx, w: dryWriter(args.operationId), owner, job, provenance: importProvenance(args.principal, args.operationId),
-      local, planned: new Set(args.plannedKeys), plannedNow: [], duplicatesSuggested: 0,
+      ctx, w: dryWriter(args.operationId, new Map<string, any>(args.plannedState?.rows ?? [])), owner, job, provenance: importProvenance(args.principal, args.operationId),
+      local, planned: new Set(args.plannedKeys), plannedNow: [], baselines: new Map<string, Record<string, unknown> | null>(args.plannedState?.baselines ?? []), duplicatesSuggested: 0,
     };
     const results = await runChunk(c, args.items as TreeImportItem[]);
     const suggested = results.reduce((total, row) => total + (row.possibleDuplicates?.length ?? 0), 0);
-    return { results, plannedKeys: c.plannedNow, plannedRecords: [...c.local].map(([key, recordId]) => ({ key, recordId })), duplicatesSuggested: suggested };
+    const plannedState = { rows: [...(c.w.rows ?? [])], baselines: [...c.baselines] };
+    if (new TextEncoder().encode(JSON.stringify(plannedState)).byteLength > FAMILY_HISTORY_MCP_LIMITS.requestBytes) {
+      machineError("DRY_RUN_PLAN_LIMIT", "This dry-run document plan exceeds its memory budget.", "Use smaller dry-run batches; no records were saved.");
+    }
+    return { results, plannedState, plannedKeys: c.plannedNow, plannedRecords: [...c.local].map(([key, recordId]) => ({ key, recordId })), duplicatesSuggested: suggested };
   },
 });
 
@@ -915,7 +945,7 @@ export const applyTreeImportChunk = internalMutation({
     const job = await loadJob(ctx, owner, args.importJobId, true);
     const c: ChunkContext = {
       ctx, w: liveWriter(ctx), owner, job, provenance: importProvenance(args.principal, args.operationId),
-      local: new Map(), planned: new Set(), plannedNow: [], duplicatesSuggested: 0,
+      local: new Map(), planned: new Set(), plannedNow: [], baselines: new Map(), duplicatesSuggested: 0,
     };
     const results = await runChunk(c, args.items as TreeImportItem[]);
     const result = { results, plannedKeys: [], duplicatesSuggested: c.duplicatesSuggested };
@@ -971,7 +1001,7 @@ export const prepareTreeImportBatch = internalQuery({
 function compactResults(results: ItemResult[]) {
   // Unchanged rows need no id to act on; leaving them as counts keeps a
   // 500-row receipt well inside its size budget.
-  return results.filter((row) => row.status !== "unchanged");
+  return results.filter((row) => row.status !== "unchanged" || row.kept?.length);
 }
 
 /** After every chunk: the batch's one activity entry, progress, and receipt. */
@@ -1122,10 +1152,11 @@ export const importTreeBatch = internalAction({
     const results: ItemResult[] = [];
     const planned: string[] = [];
     let plannedRecords: { key: string; recordId: string }[] = [];
+    let plannedState: unknown = undefined;
     let duplicatesSuggested = 0;
     for (const [index, items] of chunks.entries()) {
-      const chunk: { results: ItemResult[]; plannedKeys: string[]; plannedRecords?: { key: string; recordId: string }[]; duplicatesSuggested: number } = dryRun
-        ? await ctx.runQuery(self.planTreeImportChunk, { ...base, operationId: `${args.operationId}#${index}`, items, plannedKeys: planned, plannedRecords })
+      const chunk: { results: ItemResult[]; plannedKeys: string[]; plannedRecords?: { key: string; recordId: string }[]; plannedState?: unknown; duplicatesSuggested: number } = dryRun
+        ? await ctx.runQuery(self.planTreeImportChunk, { ...base, operationId: `${args.operationId}#${index}`, items, plannedKeys: planned, plannedRecords, ...(plannedState ? { plannedState } : {}) })
         : await ctx.runMutation(self.applyTreeImportChunk, {
           ...base,
           operationId: `${args.operationId}#${index}`,
@@ -1135,6 +1166,7 @@ export const importTreeBatch = internalAction({
       results.push(...chunk.results);
       planned.push(...chunk.plannedKeys);
       plannedRecords = chunk.plannedRecords ?? plannedRecords;
+      plannedState = chunk.plannedState ?? plannedState;
       duplicatesSuggested += chunk.duplicatesSuggested;
     }
 
@@ -1145,7 +1177,7 @@ export const importTreeBatch = internalAction({
         batchIndex: input.batchIndex,
         counts: addCounts(emptyCounts(), results),
         possibleDuplicates: duplicatesSuggested,
-        results: results.filter((row) => row.status !== "unchanged"),
+        results: results.filter((row) => row.status !== "unchanged" || row.kept?.length),
         note: "Nothing was saved. Statuses say what a real send of this batch would do. Rows that would fail say why; fix them before sending for real.",
       };
     }

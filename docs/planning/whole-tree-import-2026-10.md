@@ -295,3 +295,16 @@ handoffs are refused if they lack identity mappings; restart the dry run instead
 of guessing. Resending an already processed batch refreshes its records but
 keeps the forward cursor and next batch index. Exact operation receipt replays
 remain inert.
+
+Generated fact identity includes the full structured date and place, value and
+description as well as its type. Two keyless occupation descriptions or different
+structured dates therefore remain separate assertions. Reimporting an explicit
+fact reports its change or retained manual correction on the parent person row;
+receipts keep unchanged rows when they carry `kept` conflicts.
+
+Dry planning carries virtual documents and imported baselines as well as identity
+maps between chunks. Repeated new or existing records are compared against the
+prior planned version, with failed-item rollback restoring that state. This plan
+is private internal state; only ordinary results are returned to the MCP caller.
+A plan above the bounded byte budget refuses with `DRY_RUN_PLAN_LIMIT` and asks
+for smaller dry-run batches, without saving records.

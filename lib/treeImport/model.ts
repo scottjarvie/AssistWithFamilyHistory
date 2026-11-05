@@ -1,3 +1,5 @@
+import { canonicalJson } from "../mcp/contract";
+
 /**
  * Whole-tree import: the pure parts.
  *
@@ -214,8 +216,8 @@ export function factTargetKey(personKey: string, key: string): string {
 
 /** A bounded local reference key, even for the longest allowed outside type. */
 export function factReferenceKeyFor(fact: FactInput): string {
-  return fact.key?.trim() || `fact~${stableHash(JSON.stringify([
-    normalizeFactType(fact.type), fact.date?.original ?? "", fact.place?.original ?? "", fact.value ?? "",
+  return fact.key?.trim() || `fact~${stableHash(canonicalJson([
+    normalizeFactType(fact.type), fact.date ?? null, fact.place ?? null, fact.value ?? null, fact.description ?? null,
   ]))}`;
 }
 

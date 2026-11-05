@@ -711,7 +711,7 @@ test("failed dry-run items roll back planned identities so dependents match real
   });
   expect(initialPlan.plannedKeys).toEqual([externalRecordKey("familysearch", "source", "s")]);
   const dependentPlan = await t.query(internal.treeImport.planTreeImportChunk, {
-    principal: principal(), grantId: grant, importJobId: job.importJobId, operationId: "plan-next", plannedKeys: initialPlan.plannedKeys, plannedRecords: initialPlan.plannedRecords,
+    principal: principal(), grantId: grant, importJobId: job.importJobId, operationId: "plan-next", plannedKeys: initialPlan.plannedKeys, plannedRecords: initialPlan.plannedRecords, plannedState: initialPlan.plannedState,
     items: [{ kind: "relationships", index: 0, item: batch.relationships![0] }, { kind: "citations", index: 0, item: batch.citations![0] }, { kind: "notes", index: 0, item: batch.notes![0] }],
   });
   expect(dependentPlan.results.every(row => row.status === "failed")).toBe(true);
@@ -774,4 +774,91 @@ test("older batch resends preserve the forward cursor and exact receipt replays 
   const forward = await send(t, grant, job.importJobId, 2, batch, { cursor: "position-2" }, "cursor-batch-2");
   expect(forward.cursor).toBe("position-2");
   expect(forward.nextBatchIndex).toBe(3);
+});
+
+
+test("generated facts preserve descriptions and complete structured dates as distinct assertions", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  const facts = [
+    { type: "occupation", description: "Farmer" },
+    { type: "occupation", description: "Teacher" },
+    { type: "residence", date: { original: "about 1900", year: 1900, month: 1, day: 1, approximate: true, formal: "+1900-01-01" } },
+    { type: "residence", date: { original: "about 1900", year: 1901, month: 2, day: 2, approximate: false, formal: "+1901-02-02" } },
+  ];
+  expect(new Set(facts.map(f => factReferenceKeyFor(f))).size).toBe(4);
+  const dateFact = facts[2];
+  expect(factReferenceKeyFor(dateFact)).toBe(factReferenceKeyFor({ type: "residence", date: { formal: "+1900-01-01", approximate: true, day: 1, month: 1, year: 1900, original: "about 1900" } }));
+  const batch: TreeImportBatch = { persons: [{ key: "P", living: false, names: [{ given: "Synthetic" }], facts }] };
+  const first = await send(t, grant, job.importJobId, 0, batch);
+  expect(first.results.filter((r: any) => r.status === "failed")).toEqual([]);
+  const before = await t.run(async ctx => ctx.db.query("events").collect());
+  expect(before).toHaveLength(4);
+  expect(before.filter(e => e.type === "occupation").map(e => e.description).sort()).toEqual(["Farmer", "Teacher"]);
+  expect(before.filter(e => e.type === "residence").map(e => e.date?.year).sort()).toEqual([1900, 1901]);
+  await send(t, grant, job.importJobId, 1, batch);
+  expect(await t.run(async ctx => ctx.db.query("events").collect())).toEqual(before);
+});
+
+test("person results expose changed facts and retained manual fact corrections", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  const batch: TreeImportBatch = { persons: [{ key: "P", living: false, names: [{ given: "Synthetic" }], facts: [{ key: "occupation", type: "occupation", description: "Farmer" }] }] };
+  await send(t, grant, job.importJobId, 0, batch);
+  batch.persons![0].facts![0].description = "Teacher";
+  const changed = await send(t, grant, job.importJobId, 1, batch);
+  expect(changed.results).toEqual([expect.objectContaining({ kind: "persons", key: "P", status: "updated" })]);
+  await t.run(async ctx => { const event = (await ctx.db.query("events").collect())[0]; expect(event.description).toBe("Teacher"); await ctx.db.patch(event._id, { description: "Owner correction" }); });
+  batch.persons![0].facts![0].description = "Nurse";
+  const kept = await send(t, grant, job.importJobId, 2, batch);
+  expect(kept.results).toEqual([expect.objectContaining({ kind: "persons", key: "P", status: "unchanged", kept: expect.arrayContaining(["facts:P/occupation:description"]) })]);
+  expect((await t.run(async ctx => ctx.db.query("events").collect()))[0].description).toBe("Owner correction");
+  const replay = await send(t, grant, job.importJobId, 2, batch);
+  expect(replay.deduplicated).toBe(true);
+  expect(replay.results).toEqual(kept.results);
+});
+
+test.each([0, 249])("dry planning models repeated new documents across chunks (padding %i)", async padding => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  const sources = [{ key: "S", title: "First" }, ...Array.from({ length: padding }, (_, i) => ({ key: `pad-${i}`, title: "Padding" })), { key: "S", title: "Corrected" }];
+  const batch: TreeImportBatch = { sources };
+  const before = await countRows(t, "sources");
+  const dry = await send(t, grant, job.importJobId, 0, batch, { dryRun: true }, `dry-docs-${padding}`);
+  expect(await countRows(t, "sources")).toBe(before);
+  const real = await send(t, grant, job.importJobId, 0, batch, {}, `real-docs-${padding}`);
+  const statuses = (r: any) => r.results.filter((row: any) => row.key === "S").map((row: any) => row.status);
+  expect(statuses(dry)).toEqual(["created", "updated"]);
+  expect(statuses(dry)).toEqual(statuses(real));
+  const stored = await t.run(async ctx => ctx.db.query("sources").collect());
+  expect(stored.filter(row => row.title === "Corrected")).toHaveLength(1);
+  expect(stored.filter(row => row.title === "First")).toHaveLength(0);
+});
+
+
+test("dry planning keeps virtual refresh baselines and manual corrections across repeated existing rows", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  await send(t, grant, job.importJobId, 0, { sources: [{ key: "S", title: "Original" }, { key: "Manual", title: "Original manual" }] });
+  await t.run(async ctx => { const row = (await ctx.db.query("sources").collect()).find(r => r.title === "Original manual")!; await ctx.db.patch(row._id, { title: "Owner correction" }); });
+  const batch: TreeImportBatch = { sources: [
+    { key: "S", title: "Second" }, { key: "S", title: "Third" },
+    { key: "Manual", title: "Incoming second" }, { key: "Manual", title: "Incoming third" },
+  ] };
+  const before = await t.run(async ctx => ctx.db.query("sources").collect());
+  const dry = await send(t, grant, job.importJobId, 1, batch, { dryRun: true }, "dry-existing-versions");
+  expect(await t.run(async ctx => ctx.db.query("sources").collect())).toEqual(before);
+  const real = await send(t, grant, job.importJobId, 1, batch, {}, "real-existing-versions");
+  const outcomes = (r: any) => r.results.map((row: any) => ({ key: row.key, status: row.status, kept: row.kept ?? [] }));
+  expect(outcomes(dry)).toEqual(outcomes(real));
+  expect(outcomes(real)).toEqual([
+    { key: "S", status: "updated", kept: [] }, { key: "S", status: "updated", kept: [] },
+    { key: "Manual", status: "unchanged", kept: ["title"] }, { key: "Manual", status: "unchanged", kept: ["title"] },
+  ]);
+  const after = await t.run(async ctx => ctx.db.query("sources").collect());
+  expect(after.map(r => r.title).sort()).toEqual(["Owner correction", "Third"]);
 });
