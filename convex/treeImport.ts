@@ -791,6 +791,13 @@ async function importCitation(c: ChunkContext, item: any): Promise<Omit<ItemResu
     },
     createOnly: { isEvidence: true, importKey: `import:${externalRecordKey(c.job.system, singular, key, c.job.importKey)}` },
   });
+  if (saved.kept?.length) {
+    // Retaining corrected evidence cannot authorize links from a different
+    // incoming assertion. The item's mutation/planning boundary rolls back
+    // any partial refresh and its baseline before this failure is returned.
+    fail("CITATION_EVIDENCE_CONFLICT", `Corrected citation fields conflict with the incoming evidence: ${saved.kept.join(", ")}.`,
+      "Review the corrected citation with the person, then resend matching evidence and targets. This citation item saved nothing.");
+  }
   for (const target of targets) {
     const virtualLink = [...(c.w.rows?.values() ?? [])].some(row => row.citationId === saved.id && row.targetType === target.targetType && row.targetId === target.targetId && row.field === target.field && row.vaultOwnerId === c.owner);
     let existingLink = virtualLink;
@@ -821,19 +828,26 @@ async function importNote(c: ChunkContext, item: any): Promise<Omit<ItemResult, 
   if (subject.kind === "fact") await rejectLegacyIdentity(c, "fact", subjectKey, `${subject.personKey.trim()}/${subject.key.trim()}`);
   const subjectId = await lookupReference(c, subject.kind === "fact" ? "fact" : subject.kind, subjectKey, subject.keyOrigin);
   if (!subjectId) fail("MISSING_TARGET", `The ${subject.kind} ${subjectKey} has not been imported yet.`, "Send the record the note belongs to first, then resend this row.");
+  const existingId = await lookup(c, "note", key);
+  const previous = existingId ? await ownedRow(c, "notes", existingId) : null;
+  const nextSubject = { kind, id: subjectId };
   const saved = await upsertRow(c, {
     table: "notes",
     singular: "note",
     key,
-    existingId: await lookup(c, "note", key),
+    existingId,
     doc: {
-      subject: { kind, id: subjectId },
+      subject: nextSubject,
       noteType: item.noteType ?? "general",
       title: cleanText(item.title, "note title", FAMILY_HISTORY_MCP_LIMITS.shortText),
       text,
       externalIds: externalIdsFor(c, key, undefined),
     },
   });
+  if (previous && !same(previous.subject, nextSubject) && saved.kept?.length) {
+    fail("NOTE_SUBJECT_CONFLICT", `Retained note fields cannot be combined with a different subject: ${saved.kept.join(", ")}.`,
+      "Review the note and its subject with the person before retrying. This note item saved nothing.");
+  }
   return { key, status: saved.status, id: saved.id, ...(saved.kept ? { kept: saved.kept } : {}) };
 }
 

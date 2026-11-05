@@ -1350,6 +1350,82 @@ test.each(["gedcom7", "gedcom-5.5.1"])("GEDCOM canonical primary aliases stay un
   expect(await countRows(t, "relationships")).toBe(2);
 });
 
+test.each(["sourceId", "page", "extractedText", "confidence", "url", "accessDate", "notes"])("citation evidence conflicts roll back the assertion and new links (%s)", async field => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  const original: NonNullable<TreeImportBatch["citations"]>[number] = {
+    key: "C", sourceKey: "S1", page: "12", extractedText: "Original excerpt", quality: 1,
+    url: "https://example.test/original", accessDate: "2026-01-01", notes: "Original note", targets: [{ kind: "person", key: "P1" }],
+  };
+  await send(t, grant, job.importJobId, 0, {
+    sources: [{ key: "S1", title: "Submitted source" }, { key: "S2", title: "Corrected source" }],
+    persons: ["P1", "P2"].map(key => ({ key, living: false, names: [{ given: key }] })), citations: [original],
+  });
+  await t.run(async ctx => {
+    const citation = (await ctx.db.query("citations").collect())[0];
+    const correctedSource = (await ctx.db.query("sources").collect()).find(row => row.title === "Corrected source")!;
+    const corrections: Record<string, unknown> = { sourceId: correctedSource._id, page: "Owner corrected page", extractedText: "Owner corrected excerpt", confidence: "very_high", url: "https://example.test/corrected", accessDate: "2026-02-01", notes: "Owner corrected note" };
+    await ctx.db.patch(citation._id, { [field]: corrections[field] });
+  });
+  const snapshot = () => t.run(async ctx => ({ citations: await ctx.db.query("citations").collect(), links: await ctx.db.query("citationLinks").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() }));
+  const before = await snapshot();
+  const batch: TreeImportBatch = { citations: [{ ...original, page: "13", notes: "Incoming new note", targets: [{ kind: "person", key: "P2" }] }] };
+  const dry = await send(t, grant, job.importJobId, 1, batch, { dryRun: true }, `dry-evidence-conflict-${field}`);
+  expect(await snapshot()).toEqual(before);
+  const real = await send(t, grant, job.importJobId, 1, batch);
+  for (const result of [dry, real]) {
+    expect(result.results).toEqual([expect.objectContaining({ key: "C", status: "failed", reason: expect.stringContaining("CITATION_EVIDENCE_CONFLICT"), whatToDo: expect.stringContaining("saved nothing") })]);
+    expect(result.results[0].reason).toContain(field);
+  }
+  expect(dry.counts).toEqual(real.counts);
+  expect(await snapshot()).toEqual(before);
+  const replay = await send(t, grant, job.importJobId, 1, batch);
+  expect(replay.deduplicated).toBe(true);
+  expect(replay.results).toEqual(real.results);
+  expect(await snapshot()).toEqual(before);
+  const corrected = {
+    ...original, ...(field === "sourceId" ? { sourceKey: "S2" } : {}), ...(field === "page" ? { page: "Owner corrected page" } : {}),
+    ...(field === "extractedText" ? { extractedText: "Owner corrected excerpt" } : {}), ...(field === "confidence" ? { quality: 3 as const } : {}),
+    ...(field === "url" ? { url: "https://example.test/corrected" } : {}), ...(field === "accessDate" ? { accessDate: "2026-02-01" } : {}),
+    ...(field === "notes" ? { notes: "Owner corrected note" } : {}), targets: [{ kind: "person" as const, key: "P2" }],
+  };
+  const accepted = await send(t, grant, job.importJobId, 2, { citations: [corrected] });
+  expect(accepted.results).toEqual([expect.objectContaining({ key: "C", status: "updated" })]);
+  const after = await snapshot();
+  expect(after.citations).toEqual(before.citations);
+  expect(after.keys).toEqual(before.keys);
+  expect(after.links).toHaveLength(2);
+  expect(after.links).toEqual(expect.arrayContaining(before.links));
+});
+
+test.each(["subject", "text"])("note conflicts cannot move living-person content to another subject (%s)", async correction => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  const original: NonNullable<TreeImportBatch["notes"]>[number] = { key: "N", text: "Original neutral note", noteType: "biography", subject: { kind: "person", key: "A" } };
+  await send(t, grant, job.importJobId, 0, {
+    persons: [{ key: "A", living: true, names: [{ given: "Living A" }] }, { key: "B", living: false, names: [{ given: "Deceased B" }] }], notes: [original],
+  });
+  const b = await t.run(async ctx => {
+    const deceased = (await ctx.db.query("persons").collect()).find(row => !row.living)!;
+    const note = (await ctx.db.query("notes").collect())[0];
+    await ctx.db.patch(note._id, correction === "subject" ? { subject: { kind: "person", id: String(deceased._id) } } : { text: "Owner private living correction" });
+    return deceased._id;
+  });
+  const snapshot = () => t.run(async ctx => ({ notes: await ctx.db.query("notes").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() }));
+  const before = await snapshot();
+  const batch: TreeImportBatch = { notes: [{ ...original, text: "Incoming private living text", subject: { kind: "person", key: correction === "subject" ? "A" : "B" } }] };
+  for (const dryRun of [true, false]) {
+    const result = await send(t, grant, job.importJobId, 1, batch, { dryRun }, `note-association-${correction}-${dryRun}`);
+    expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("NOTE_SUBJECT_CONFLICT") })]);
+    expect(await snapshot()).toEqual(before);
+  }
+  const context = await t.query(internal.mcpFamilyHistory.getPersonNotes, { principal: principal(), personId: String(b) });
+  expect(JSON.stringify(context)).not.toContain("Incoming private living text");
+  expect(JSON.stringify(context)).not.toContain("Owner private living correction");
+});
+
 test("citation link additions report updated, dry planning agrees, repeated targets stay idempotent", async () => {
   const t = convexTest({ schema, modules, transactionLimits: true });
   const grant = await seedGrant(t, { vaultOwnerId: OWNER });

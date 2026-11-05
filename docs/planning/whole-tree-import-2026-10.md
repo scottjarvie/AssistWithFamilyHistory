@@ -379,3 +379,9 @@ PID index positions across chunks, so planned changes do not hide disagreements.
 Person aliases deduplicate against the primary canonical mapping key before
 registration. Equivalent GEDCOM-prefixed system labels therefore create one
 file-scoped mapping, preserving repeated imports and references.
+
+Citation evidence conflicts fail the entire citation item before new links are
+added. Partial refreshes and import baselines roll back with that item, retaining
+original corrected evidence and links. Notes also refuse subject changes that
+would combine retained content with a different subject. Both failures name
+the conflict for user review; neither changes an original identity.
