@@ -99,8 +99,8 @@ async function boundedOwnerRows<T extends "persons" | "relationships" | "events"
 }
 
 async function mappedRows(ctx: FixtureCtx, runKey: string, owner: string) {
-  const mappings = (await boundedOwnerRows(ctx, "mcpRecordKeys", owner))
-    .filter((row) => row.recordKey.startsWith(`${runKey}:`));
+  const allMappings = await boundedOwnerRows(ctx, "mcpRecordKeys", owner);
+  const mappings = allMappings.filter((row) => row.recordKey.startsWith(`${runKey}:`));
   const getRows = async <T extends "persons" | "relationships" | "events" | "sources" | "citations" | "sourceFacts" | "researchTasks" | "researchLog" | "stories">(
     table: T,
     recordType: Doc<"mcpRecordKeys">["recordType"],
@@ -119,6 +119,7 @@ async function mappedRows(ctx: FixtureCtx, runKey: string, owner: string) {
 
   return {
     mappings,
+    outsideMappings: allMappings.filter(row => !row.recordKey.startsWith(`${runKey}:`)),
     persons: await getRows("persons", "person"),
     relationships: await getRows("relationships", "relationship"),
     events: await getRows("events", "event"),
@@ -207,6 +208,7 @@ async function fixtureGraph(ctx: FixtureCtx, runKeyInput: string) {
   const relatedCitationLinks = citationLinks.filter((row) => citationIds.has(String(row.citationId)) || fixtureIds.has(row.targetId));
   const relatedReviewEvents = reviewEvents.filter((row) => storyIds.has(String(row.storyId)) || (row.personId ? personIds.has(String(row.personId)) : false));
   const externalReference =
+    graph.outsideMappings.some(row => fixtureIds.has(row.recordId)) ||
     allRelationships.some((row) => (personIds.has(String(row.person1)) || personIds.has(String(row.person2))) && !relationshipIds.has(String(row._id))) ||
     allSourceFacts.some((row) => (personIds.has(String(row.personId)) || sourceIds.has(String(row.sourceId)) || citationIds.has(String(row.citationId))) && !sourceFactIds.has(String(row._id))) ||
     allResearchTasks.some((row) => row.personId && personIds.has(String(row.personId)) && !researchTaskIds.has(String(row._id))) ||

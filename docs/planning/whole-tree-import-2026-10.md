@@ -576,3 +576,23 @@ capture caller with in-memory owner mutations, identity refusals, legacy paths,
 source context retrieval, dry parity, rollback, replay and classification
 compatibility. All remain UNRUN; synthetic actors are not user/Tier2 proof.
 Convex schema deployment is required and has not occurred. No UI changes.
+
+
+Capture overwrite authority and cleanup mapping references (2026-11-05):
+Resolving an existing import-mapped person in the capture writer now permits
+reuse, not replacement of name, sex, living status, life facts or notes. Any
+difference in those effective fields refuses CAPTURE_PERSON_REVIEW_REQUIRED
+before patching, including cleared fields and the no-PID name fallback. A
+matching capture can reuse the identity; original mappings/baselines remain.
+This deliberately requires review even for a change that might be a refresh:
+identity evidence alone cannot establish overwrite authority.
+Acceptance inspect/cleanup retains unmarked mappings from the already bounded
+owner scan and refuses deletion if one points into the marked graph. It does
+not delete those mappings, imports or receipts, broaden cleanup authority, or
+raise the scan ceiling. Unrelated mappings remain outside the deletion set.
+Added 16 synthetic cases for person corrections and clearing, repeated capture,
+no-PID fallback, a real in-memory unmarked import without notes, other mapped
+record kinds, unrelated originals and the existing mapping bound. The earlier
+actual-capture regression now checks refusal for differing names plus reuse
+when assertions match. All cases remain UNRUN; this is not runtime or user
+proof. No provider calls, production data changes, UI changes or deployment.

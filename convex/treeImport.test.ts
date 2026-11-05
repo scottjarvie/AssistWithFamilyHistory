@@ -2582,25 +2582,30 @@ test("empty legacy inline event notes do not prevent unattached fact refresh", a
 });
 
 
-test("actual capture caller reuses a GEDCOM FamilySearch alias despite changed names", async () => {
+test("actual capture caller resolves an alias without replacing differing original assertions", async () => {
   const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER });
   const gedcom = await t.mutation(internal.treeImport.beginTreeImport, { principal: principal(), grantId: grant, operationId: "begin-capture-alias", requestHash: "begin-capture-alias", input: { importKey: "capture-alias-file", system: "gedcom7", label: "Synthetic GEDCOM" } }) as any;
-  await send(t, grant, gedcom.importJobId, 0, { persons: [{ key: "@I1@", living: false, names: [{ given: "Liz", surname: "Smith" }], otherIds: [{ system: "familysearch", id: "PID-A" }] }] });
+  await send(t, grant, gedcom.importJobId, 0, { persons: [{ key: "@I1@", living: true, names: [{ given: "Liz", surname: "Smith" }], otherIds: [{ system: "familysearch", id: "PID-A" }] }] });
+  const firstPerson = (await t.run(ctx => ctx.db.query("persons").collect()))[0];
+  await t.mutation(internal.persons.update, { id: firstPerson._id, notes: "Imported from FamilySearch person capture." });
   const original = (await t.run(ctx => ctx.db.query("persons").collect()))[0]; const mappings = await t.run(ctx => ctx.db.query("mcpRecordKeys").collect());
   await t.run(async ctx => { const foreign = await ctx.db.insert("persons", { vaultOwnerId: "foreign-capture-owner", fsId: "PID-A", name: { given: "Foreign", surname: "Person" }, sex: "unknown", living: false, createdAt: 1, updatedAt: 1 }); await ctx.db.insert("mcpRecordKeys", { vaultOwnerId: "foreign-capture-owner", recordType: "person", recordKey: externalRecordKey("familysearch", "person", "PID-A"), recordId: String(foreign), externalKeyVersion: 2, createdAt: 1, updatedAt: 1 }); });
-  const capture = CapturePackageSchema.parse({ schemaVersion: "2.0", captureId: "synthetic-capture-alias", capturedAt: "2026-01-01T00:00:00Z", extractorVersion: "synthetic-test", extractionDurationMs: 0, pageType: "person", pageUrl: "https://example.test/capture/PID-A", pageTitle: "Synthetic person", uiLocale: "en", person: { familySearchId: "PID-A", name: "Elizabeth Jones", deathDate: "2000" }, sources: [], memories: [], diagnostics: { mode: "standard", warnings: [], errors: [] } });
+  const capture = CapturePackageSchema.parse({ schemaVersion: "2.0", captureId: "synthetic-capture-alias", capturedAt: "2026-01-01T00:00:00Z", extractorVersion: "synthetic-test", extractionDurationMs: 0, pageType: "person", pageUrl: "https://example.test/capture/PID-A", pageTitle: "Synthetic person", uiLocale: "en", person: { familySearchId: "PID-A", name: "Elizabeth Jones" }, sources: [], memories: [], diagnostics: { mode: "standard", warnings: [], errors: [] } });
   // Execute the actual caller through in-memory owner-authorized mutations.
   // This adapter never contacts FamilySearch, a network backend or a real user.
   const owner = t.withIdentity({ subject: OWNER });
   const client = { mutation: (ref: any, args: any) => owner.mutation(ref, args) } as unknown as Parameters<typeof importCapturePackageToConvex>[0]["client"];
-  const captured = await importCapturePackageToConvex({ client, vaultOwnerId: OWNER, capture, compatibilityMode: false, artifactPaths: {} });
+  const snapshot = () => t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), mappings: await ctx.db.query("mcpRecordKeys").collect(), logs: await ctx.db.query("researchLog").collect(), runs: await ctx.db.query("importRuns").collect() })); const before = await snapshot();
+  await expect(importCapturePackageToConvex({ client, vaultOwnerId: OWNER, capture, compatibilityMode: false, artifactPaths: {} })).rejects.toThrow("CAPTURE_PERSON_REVIEW_REQUIRED"); expect(await snapshot()).toEqual(before);
+  const matching = { ...capture, person: { ...capture.person, name: "Liz Smith" } };
+  const captured = await importCapturePackageToConvex({ client, vaultOwnerId: OWNER, capture: matching, compatibilityMode: false, artifactPaths: {} });
   expect(captured.personId).toBe(String(original._id));
   const afterCapture = await t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), mappings: await ctx.db.query("mcpRecordKeys").collect() }));
   expect(afterCapture.people.filter(row => row.vaultOwnerId === OWNER)).toHaveLength(1);
-  expect(afterCapture.people.find(row => row._id === original._id)).toMatchObject({ fsId: "PID-A", name: { given: "Elizabeth", surname: "Jones" }, importedNames: original.importedNames });
+  expect(afterCapture.people.find(row => row._id === original._id)).toMatchObject({ fsId: "PID-A", name: { given: "Liz", surname: "Smith" }, importedNames: original.importedNames });
   expect(afterCapture.mappings.filter(row => row.vaultOwnerId === OWNER)).toEqual(mappings);
   const job = await begin(t, grant);
-  const result = await send(t, grant, job.importJobId, 0, { persons: [{ key: "PID-A", living: false, names: [{ given: "Elizabeth", surname: "Jones" }], facts: [{ key: "F", type: "occupation", value: "Teacher" }] }] });
+  const result = await send(t, grant, job.importJobId, 0, { persons: [{ key: "PID-A", living: true, names: [{ given: "Liz", surname: "Smith" }], facts: [{ key: "F", type: "occupation", value: "Teacher" }] }] });
   expect(result.results.filter((row: any) => row.status === "failed")).toEqual([]);
   expect((await t.run(ctx => ctx.db.query("personEvents").collect()))[0].personId).toBe(original._id);
   expect((await t.run(ctx => ctx.db.query("persons").collect())).filter(row => row.vaultOwnerId === OWNER)).toHaveLength(1);
@@ -2672,4 +2677,37 @@ test.each(["census", "parish_register"])("legacy source classification provenanc
   const real = await send(t, grant, job.importJobId, 1, batch); expect(dry.counts).toEqual(real.counts);
   if (type === "census") { expect(real.counts.sources.updated).toBe(1); expect((await snapshot()).sources[0].importedType).toBe(type); const noop = await send(t, grant, job.importJobId, 2, batch); expect(noop.counts.sources.unchanged).toBe(1); }
   else { expect(real.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("SOURCE_ATTRIBUTION_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before); }
+});
+
+
+test.each(["name", "sex", "living", "birth", "death", "notes", "clearedNickname", "clearedNotes"])("capture alias reuse preserves manual %s corrections", async field => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await t.mutation(internal.treeImport.beginTreeImport, { principal: principal(), grantId: grant, operationId: `begin-capture-correction-${field}`, requestHash: `begin-capture-correction-${field}`, input: { importKey: `capture-correction-${field}`, system: "gedcom7", label: "Synthetic correction fixture" } }) as { importJobId: string };
+  await send(t, grant, job.importJobId, 0, { persons: [{ key: "@I1@", living: false, sex: "unknown", names: [{ given: "Liz", surname: "Smith", nickname: "Bill" }], facts: [{ key: "B", type: "birth", date: { original: "1900", year: 1900 } }, { key: "D", type: "death", date: { original: "2000", year: 2000 } }], otherIds: [{ system: "familysearch", id: "PID-A" }] }] });
+  const first = (await t.run(ctx => ctx.db.query("persons").collect()))[0];
+  await t.mutation(internal.persons.update, { id: first._id, notes: "Original person note" });
+  const original = (await t.run(ctx => ctx.db.query("persons").collect()))[0];
+  const incoming = { vaultOwnerId: OWNER, fsId: "PID-A", name: original.name, sex: original.sex, living: original.living, birth: original.birth, death: original.death, notes: original.notes };
+  // Exercise the existing person writer under a synthetic owner fixture only.
+  const update: any = field === "name" ? { name: { ...original.name, given: "Corrected name" } } : field === "sex" ? { sex: "female" } : field === "living" ? { living: true } : field === "birth" ? { birth: { date: { original: "1901", year: 1901 } } } : field === "death" ? { death: { date: { original: "2001", year: 2001 } } } : field === "notes" ? { notes: "Manually corrected private note" } : field === "clearedNickname" ? { name: { given: original.name.given, surname: original.name.surname } } : { notes: "" };
+  await t.mutation(internal.persons.update, { id: original._id, ...update });
+  const snapshot = () => t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), keys: await ctx.db.query("mcpRecordKeys").collect(), events: await ctx.db.query("events").collect(), roles: await ctx.db.query("personEvents").collect() })); const before = await snapshot();
+  const owner = t.withIdentity({ subject: OWNER });
+  await expect(owner.mutation(api.vaultMutations.upsertPerson, incoming)).rejects.toThrow("CAPTURE_PERSON_REVIEW_REQUIRED"); expect(await snapshot()).toEqual(before);
+  const corrected = before.people[0];
+  const matching = { ...incoming, name: corrected.name, sex: corrected.sex, living: corrected.living, birth: corrected.birth, death: corrected.death, notes: corrected.notes };
+  const reused = await owner.mutation(api.vaultMutations.upsertPerson, matching); expect(reused).toEqual({ personId: original._id, created: false });
+  const after = await snapshot(); expect(after.people).toHaveLength(1); expect(after.keys).toEqual(before.keys); expect(after.events).toEqual(before.events); expect(after.roles).toEqual(before.roles);
+  expect(after.people[0]).toMatchObject({ ...corrected, fsId: "PID-A", updatedAt: expect.any(Number) });
+  // A previous safe capture does not grant authority for a later overwrite.
+  await expect(owner.mutation(api.vaultMutations.upsertPerson, incoming)).rejects.toThrow("CAPTURE_PERSON_REVIEW_REQUIRED"); expect(await snapshot()).toEqual(after);
+});
+
+test("capture without a PID cannot overwrite an imported person's corrected fields via name fallback", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  await send(t, grant, job.importJobId, 0, { persons: [{ key: "P", names: [{ given: "Same", surname: "Name" }], living: false, sex: "unknown" }] });
+  const person = (await t.run(ctx => ctx.db.query("persons").collect()))[0]; await t.mutation(internal.persons.update, { id: person._id, sex: "female", notes: "Retained correction" });
+  const before = await t.run(ctx => ctx.db.query("persons").collect());
+  await expect(t.withIdentity({ subject: OWNER }).mutation(api.vaultMutations.upsertPerson, { vaultOwnerId: OWNER, name: { given: "Same", surname: "Name" }, sex: "unknown", living: false, notes: "Incoming boilerplate" })).rejects.toThrow("CAPTURE_PERSON_REVIEW_REQUIRED");
+  expect(await t.run(ctx => ctx.db.query("persons").collect())).toEqual(before);
 });

@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, type MutationCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { externalRecordKey } from "../lib/treeImport/model";
+import { canonicalJson } from "../lib/mcp/contract";
 import { buildStoryPublicSlug } from "../lib/stories/slug";
 import { redactPublicText } from "../lib/privacy/publicTextRedaction";
 import {
@@ -416,6 +417,18 @@ export const upsertPerson = mutation({
     };
 
     if (existing) {
+      const currentPerson = existing;
+      const imported = await ctx.db.query("mcpRecordKeys").withIndex("by_owner_type_record", q =>
+        q.eq("vaultOwnerId", vaultOwnerId).eq("recordType", "person").eq("recordId", String(currentPerson._id)),
+      ).first();
+      if (imported) {
+        // Identity evidence permits reuse, not replacement of imported or
+        // manually corrected research. Even cleared fields require review;
+        // do not infer overwrite authority from a missing baseline or alias.
+        const fields = ["name", "sex", "living", "birth", "death", "notes"] as const;
+        const changed = fields.filter(field => canonicalJson(currentPerson[field] ?? null) !== canonicalJson(payload[field] ?? null));
+        if (changed.length) throw new Error(`CAPTURE_PERSON_REVIEW_REQUIRED: Capture changes to ${changed.join(", ")} require review; original person fields and mappings were retained.`);
+      }
       await ctx.db.patch(existing._id, payload);
       return { personId: existing._id, created: false };
     }
