@@ -35,6 +35,19 @@ export async function legacyExternalIdentityIsVerified(
   return importOrigin || !!row.externalIds?.some(external => external.system.trim().toLowerCase() === normalizedSystem && external.id.trim() === key.trim());
 }
 
+/** Include ownerless legacy records only for their existing default-local vault. */
+export async function ownedFamilySearchPeople(ctx: QueryCtx | MutationCtx, owner: string, key: string, limit = 2) {
+  const owners = matchesVaultOwner(undefined, owner) ? [owner, undefined] : [owner];
+  return (await Promise.all(owners.map(vaultOwnerId => ctx.db.query("persons")
+    .withIndex("by_owner_fsId", q => q.eq("vaultOwnerId", vaultOwnerId).eq("fsId", key)).take(limit)))).flat();
+}
+
+export async function ownedFamilySearchSources(ctx: QueryCtx | MutationCtx, owner: string, key: string, limit = 2) {
+  const owners = matchesVaultOwner(undefined, owner) ? [owner, undefined] : [owner];
+  return (await Promise.all(owners.map(vaultOwnerId => ctx.db.query("sources")
+    .withIndex("by_owner_fsId", q => q.eq("vaultOwnerId", vaultOwnerId).eq("fsId", key)).take(limit)))).flat();
+}
+
 /** Scope legacy relationship PID lookups before applying the duplicate bound. */
 export async function ownedFamilySearchRelationships(ctx: QueryCtx | MutationCtx, owner: string, key: string, limit = 2) {
   const owners = matchesVaultOwner(undefined, owner) ? [owner, undefined] : [owner];

@@ -1,4 +1,4 @@
-import { legacyExternalIdentityIsVerified, ownedFamilySearchRelationships, ownedRelationshipsForPair, relationshipPidAgrees } from "./importIdentity";
+import { legacyExternalIdentityIsVerified, ownedFamilySearchPeople, ownedFamilySearchSources, ownedFamilySearchRelationships, ownedRelationshipsForPair, relationshipPidAgrees } from "./importIdentity";
 /* eslint-disable @typescript-eslint/no-explicit-any -- Batch items are validated by the public MCP Zod schemas before dispatch. */
 /**
  * Whole-tree import over MCP.
@@ -678,10 +678,10 @@ async function resolvePersonIdentity(c: ChunkContext, key: string, system: strin
   const identities = new Set<string>(mapped ? [mapped] : []);
   if (system.trim().toLowerCase() === "familysearch") {
     const row = mapped ? await ownedRow(c, "persons", mapped) : null;
-    const matches = (row: any) => row?.vaultOwnerId === c.owner && typeof row.living === "boolean" && !!row.name && row.fsId === key;
+    const matches = (row: any) => !!row && matchesVaultOwner(row.vaultOwnerId, c.owner) && typeof row.living === "boolean" && !!row.name && row.fsId === key;
     const movedOut = [...(c.w.personIndexes ?? [])].filter(([id, index]) => index.fsId === key && !matches(c.w.rows?.get(id))).length;
     if (movedOut > TREE_IMPORT_LIMITS.duplicateScanPerPerson) fail("DRY_RUN_PLAN_LIMIT", "Too many planned PID index moves for a bounded identity lookup.", "Use smaller dry-run batches; nothing was saved.");
-    const legacy = await c.ctx.db.query("persons").withIndex("by_owner_fsId", q => q.eq("vaultOwnerId", c.owner).eq("fsId", key)).take(2 + movedOut);
+    const legacy = await ownedFamilySearchPeople(c.ctx, c.owner, key, 2 + movedOut);
     for (const row of legacy) if (matches(c.w.rows?.get(String(row._id)) ?? row)) identities.add(String(row._id));
     for (const row of c.w.rows?.values() ?? []) if (matches(row)) identities.add(String(row._id));
     if (identities.size === 1 && row?.fsId && row.fsId !== key) fail("LEGACY_IDENTITY_REVIEW_REQUIRED", "The person mapping disagrees with its current FamilySearch identity.", "Review the original person and mapping before importing more material; neither identity was changed.");
@@ -1085,10 +1085,10 @@ async function resolveSourceIdentity(c: ChunkContext, key: string) {
   if (c.job.system === "familysearch") {
     const row = mapped ? await ownedRow(c, "sources", mapped) : null;
     if (mapped && (!row || (row.fsId && row.fsId !== key))) fail("LEGACY_IDENTITY_REVIEW_REQUIRED", "The source mapping disagrees with its owned FamilySearch identity.", "Review the original source and mapping; neither was changed.");
-    const legacy = await c.ctx.db.query("sources").withIndex("by_owner_fsId", q => q.eq("vaultOwnerId", c.owner).eq("fsId", key)).take(2);
+    const legacy = await ownedFamilySearchSources(c.ctx, c.owner, key);
     for (const source of legacy) identities.add(String(source._id));
     // Source PIDs are never reassigned, so stored matches cannot move away.
-    for (const source of c.w.rows?.values() ?? []) if (source.vaultOwnerId === c.owner && source.fsId === key && typeof source.title === "string") identities.add(String(source._id));
+    for (const source of c.w.rows?.values() ?? []) if (matchesVaultOwner(source.vaultOwnerId, c.owner) && source.fsId === key && typeof source.title === "string") identities.add(String(source._id));
   }
   if (identities.size > 1) fail("AMBIGUOUS_SOURCE_IDENTITY", "This outside source ID identifies different owned sources.", "Review the original sources before retrying; nothing was merged or rekeyed.");
   return { mapped, id: [...identities][0] ?? null };

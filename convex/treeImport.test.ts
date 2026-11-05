@@ -3194,3 +3194,71 @@ test("complete pair lookup overlays multiple planned moves out and a move into a
   expect(real.results.find((row: any) => row.key === "NEW-B").id).toBe(String(target));
   const first = before.relationships.find(row => row.familySearchId === "R1")!; expect(real.results.find((row: any) => row.key === "NEW-C").id).toBe(String(first._id)); expect(await countRows(t, "relationships")).toBe(4);
 });
+
+async function legacyLocalImportFixture(owner = "local-dev", system = "familysearch") {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grantId = await seedGrant(t, { vaultOwnerId: owner });
+  const job = await t.mutation(internal.treeImport.beginTreeImport, { principal: principal(owner), grantId, operationId: "legacy-local-begin", requestHash: "legacy-local-begin", input: { importKey: "legacy-local-tree", system, label: "Synthetic legacy local vault" } }) as any;
+  const batch = (index: number, input: TreeImportBatch, dryRun = false, operationId = `legacy-local-${index}-${dryRun}`) => t.action(internal.treeImport.importTreeBatch, {
+    principal: principal(owner), grantId, operationId, requestHash: operationId, input: { importJobId: job.importJobId, batchIndex: index, ...input, dryRun },
+  }) as Promise<any>;
+  const rows = await t.run(async ctx => ({
+    personId: await ctx.db.insert("persons", { fsId: "P", name: { given: "Original", surname: "Person" }, sex: "unknown", living: false, notes: "Retained original person notes", createdAt: 1, updatedAt: 1 }),
+    sourceId: await ctx.db.insert("sources", { fsId: "S", title: "Original source", type: "book", notes: "Retained original source notes", createdAt: 1, updatedAt: 1 }),
+  }));
+  return { t, owner, grantId, job, batch, ...rows };
+}
+
+test("local-vault imports link ownerless people and sources while retaining attachments and capture compatibility", async () => {
+  const f = await legacyLocalImportFixture();
+  await f.t.run(async ctx => {
+    await ctx.db.insert("notes", { vaultOwnerId: f.owner, subject: { kind: "person", id: String(f.personId) }, noteType: "general", text: "Retained person attachment", createdAt: 1, updatedAt: 1 });
+    await ctx.db.insert("sourceContents", { vaultOwnerId: f.owner, sourceId: f.sourceId, kind: "transcription", text: "Retained source original", madeBy: { kind: "record_creator" }, createdAt: 1 });
+  });
+  const snapshot = () => f.t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), sources: await ctx.db.query("sources").collect(), notes: await ctx.db.query("notes").collect(), contents: await ctx.db.query("sourceContents").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() }));
+  const before = await snapshot();
+  const person = { key: "P", names: [{ given: "Original", surname: "Person" }], living: false };
+  const source = { key: "S", title: "Original source", type: "book" };
+  const input: TreeImportBatch = { persons: [person, person], sources: [source, source], citations: [{ key: "C", sourceKey: "S", targets: [{ kind: "person", key: "P" }] }] };
+  const dry = await f.batch(0, input, true); expect(await snapshot()).toEqual(before);
+  const result = await f.batch(0, input); expect(result.counts).toEqual(dry.counts); expect(result.results.filter((row: any) => row.status === "failed")).toEqual([]);
+  expect(result.counts.persons.linked).toBe(1); expect(result.counts.persons.unchanged).toBe(1); expect(result.counts.sources.linked).toBe(1); expect(result.counts.sources.unchanged).toBe(1);
+  for (const row of result.results) if (row.kind === "persons" || row.kind === "sources") expect(row.id).toBe(String(row.kind === "persons" ? f.personId : f.sourceId));
+  const after = await snapshot(); expect(after.people).toHaveLength(1); expect(after.sources).toHaveLength(1); expect(after.notes).toEqual(before.notes); expect(after.contents).toEqual(before.contents);
+  expect(after.people[0]).toMatchObject({ _id: f.personId, notes: "Retained original person notes" }); expect(after.people[0].vaultOwnerId).toBeUndefined(); expect(after.sources[0].vaultOwnerId).toBeUndefined();
+  await f.t.run(async ctx => { const citation = (await ctx.db.query("citations").collect())[0]; const link = (await ctx.db.query("citationLinks").collect())[0]; expect(citation.sourceId).toBe(f.sourceId); expect(link.targetId).toBe(String(f.personId)); });
+  expect(await f.batch(0, input)).toEqual({ ...result, deduplicated: true }); expect(await snapshot()).toEqual(after);
+  const next = await f.batch(1, input); expect(next.counts.persons.unchanged).toBe(2); expect(next.counts.sources.unchanged).toBe(2); expect(await snapshot()).toEqual(after);
+  const capturePerson = await f.t.withIdentity({ subject: f.owner }).mutation(api.vaultMutations.upsertPerson, { vaultOwnerId: f.owner, preserveExisting: true, fsId: "P", name: { given: "Captured", surname: "Changed" }, sex: "unknown", living: false, notes: "Capture bookkeeping" });
+  const captureSource = await f.t.withIdentity({ subject: f.owner }).mutation(api.vaultMutations.upsertSource, { vaultOwnerId: f.owner, fsId: "S", title: "Original source", type: "book" });
+  expect(capturePerson.personId).toBe(f.personId); expect(captureSource.sourceId).toBe(f.sourceId); expect(await countRows(f.t, "persons")).toBe(1); expect(await countRows(f.t, "sources")).toBe(1);
+});
+
+test.each(["person", "source"].flatMap(kind => ["mixedOwners", "bothOwnerless"].map(form => ({ kind, form }))))("local-vault $kind ambiguity across $form retains originals without binding a key", async ({ kind, form }) => {
+  const f = await legacyLocalImportFixture();
+  await f.t.run(async ctx => {
+    const owner = form === "mixedOwners" ? { vaultOwnerId: f.owner } : {};
+    if (kind === "person") await ctx.db.insert("persons", { ...owner, fsId: "P", name: { given: "Different", surname: "Person" }, sex: "unknown", living: false, createdAt: 2, updatedAt: 2 });
+    else await ctx.db.insert("sources", { ...owner, fsId: "S", title: "Different source", type: "book", createdAt: 2, updatedAt: 2 });
+  });
+  const snapshot = () => f.t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), sources: await ctx.db.query("sources").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  const input: TreeImportBatch = kind === "person" ? { persons: [{ key: "P", names: [{ given: "Original", surname: "Person" }], living: false }] } : { sources: [{ key: "S", title: "Original source", type: "book" }] };
+  for (const dryRun of [true, false]) { const result = await f.batch(0, input, dryRun); expect(result.results[0].reason).toContain(kind === "person" ? "AMBIGUOUS_PERSON_IDENTITY" : "AMBIGUOUS_SOURCE_IDENTITY"); expect(await snapshot()).toEqual(before); }
+});
+
+test("nonlocal imports cannot adopt another vault's ownerless legacy records", async () => {
+  const f = await legacyLocalImportFixture(OWNER);
+  const input: TreeImportBatch = { persons: [{ key: "P", names: [{ given: "Separate", surname: "Vault" }], living: false }], sources: [{ key: "S", title: "Separate vault source", type: "book" }] };
+  const originals = await f.t.run(async ctx => ({ person: await ctx.db.get(f.personId), source: await ctx.db.get(f.sourceId) }));
+  const dry = await f.batch(0, input, true); const result = await f.batch(0, input); expect(result.counts).toEqual(dry.counts); expect(result.counts.persons.created).toBe(1); expect(result.counts.sources.created).toBe(1);
+  expect(result.results.find((row: any) => row.kind === "persons").id).not.toBe(String(f.personId)); expect(result.results.find((row: any) => row.kind === "sources").id).not.toBe(String(f.sourceId));
+  expect(await f.t.run(async ctx => ({ person: await ctx.db.get(f.personId), source: await ctx.db.get(f.sourceId) }))).toEqual(originals);
+});
+
+test("local GEDCOM aliases resolve an ownerless FamilySearch person without losing its identity on resume", async () => {
+  const f = await legacyLocalImportFixture("local-dev", "gedcom7");
+  const input: TreeImportBatch = { persons: [{ key: "@I1@", names: [{ given: "Original", surname: "Person" }], living: false, otherIds: [{ system: "familysearch", id: "P" }] }] };
+  const dry = await f.batch(0, input, true); const result = await f.batch(0, input); expect(result.counts).toEqual(dry.counts); expect(result.counts.persons.linked).toBe(1); expect(result.results[0].id).toBe(String(f.personId));
+  const next = await f.batch(1, input); expect(next.counts.persons.unchanged).toBe(1); expect(next.results[0].id).toBe(String(f.personId)); expect(await countRows(f.t, "persons")).toBe(1);
+  const captured = await f.t.withIdentity({ subject: f.owner }).mutation(api.vaultMutations.upsertPerson, { vaultOwnerId: f.owner, preserveExisting: true, fsId: "P", name: { given: "Captured", surname: "Changed" }, sex: "unknown", living: false }); expect(captured.personId).toBe(f.personId);
+});

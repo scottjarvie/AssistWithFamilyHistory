@@ -1,4 +1,4 @@
-import { legacyExternalIdentityIsVerified, ownedFamilySearchRelationships, ownedRelationshipsForPair, relationshipPidAgrees } from "./importIdentity";
+import { legacyExternalIdentityIsVerified, ownedFamilySearchPeople, ownedFamilySearchSources, ownedFamilySearchRelationships, ownedRelationshipsForPair, relationshipPidAgrees } from "./importIdentity";
 import { v } from "convex/values";
 import { mutation, type MutationCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
@@ -328,10 +328,7 @@ async function resolveCapturedFamilySearchPerson(ctx: MutationCtx, owner: string
     mapped = id ? await ctx.db.get(id) : null;
     if (!mapped || !matchesVaultOwner(mapped.vaultOwnerId, owner)) throw new Error("MISSING_TARGET: The FamilySearch mapping has no owned person; no record was changed.");
   }
-  // Include unowned legacy rows only for their existing default-local owner.
-  const owners = matchesVaultOwner(undefined, owner) ? [owner, undefined] : [owner];
-  const legacy = (await Promise.all(owners.map(vaultOwnerId => ctx.db.query("persons")
-    .withIndex("by_owner_fsId", q => q.eq("vaultOwnerId", vaultOwnerId).eq("fsId", pid)).take(2)))).flat();
+  const legacy = await ownedFamilySearchPeople(ctx, owner, pid);
   const identities = new Map(legacy.map(row => [String(row._id), row]));
   if (mapped) identities.set(String(mapped._id), mapped);
   if (identities.size > 1) throw new Error("AMBIGUOUS_PERSON_IDENTITY: The mapping and existing FamilySearch PID identify different people; all originals were retained.");
@@ -580,9 +577,7 @@ async function resolveCapturedFamilySearchSource(ctx: MutationCtx, owner: string
     mapped = id ? await ctx.db.get(id) : null;
     if (!mapped || !matchesVaultOwner(mapped.vaultOwnerId, owner)) throw new Error("MISSING_TARGET: The source mapping has no owned source; nothing was changed.");
   }
-  const owners = matchesVaultOwner(undefined, owner) ? [owner, undefined] : [owner];
-  const legacy = (await Promise.all(owners.map(vaultOwnerId => ctx.db.query("sources")
-    .withIndex("by_owner_fsId", q => q.eq("vaultOwnerId", vaultOwnerId).eq("fsId", key)).take(2)))).flat();
+  const legacy = await ownedFamilySearchSources(ctx, owner, key);
   const identities = new Map(legacy.map(row => [String(row._id), row]));
   if (mapped) identities.set(String(mapped._id), mapped);
   if (identities.size > 1) throw new Error("AMBIGUOUS_SOURCE_IDENTITY: The source mapping and owned PID records disagree; nothing was merged.");

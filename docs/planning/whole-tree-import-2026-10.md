@@ -733,3 +733,19 @@ authored new cases UNRUN. Synthetic human-shaped provenance is not actual user
 proof. Only source/whitespace checks ran; actual775 admission and Tier2 proof
 remain outstanding. The new Convex index requires deployment; none occurred.
 No UI route/layout, provider/database, push, live or shipping claim is made.
+
+2026-11-05 legacy local-owner identity repair (local only): people and source
+FamilySearch lookup now shares capture's owner-scoped helpers. The supported
+local-dev vault includes both explicitly owned and ownerless legacy rows before
+applying ambiguity limits. Other vaults never adopt those ownerless records.
+Dry planning uses normalized ownership for effective virtual rows too. Existing
+record IDs and attachment targets are retained; competing identities refuse
+without binding a mapping. Capture behavior uses the same helpers unchanged.
+Added seven synthetic cases: combined person/source linking with attachments,
+repeated identities, dry/live parity, replay/resume and capture compatibility;
+four person/source ambiguity cases across mixed or ownerless owners; nonlocal
+isolation; and GEDCOM alias resolution/resume. All seven are UNRUN, total497
+new authored cases UNRUN. Synthetic local-dev fixtures are not actual-user or
+Tier2 proof and do not establish production occurrence. Only source/whitespace
+checks ran; actual775 HOST/SITE/qualified receiver admission remains required.
+Cumulative Convex changes remain undeployed. No UI, push, provider or live claim.
