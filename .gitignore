@@ -92,3 +92,6 @@ design-council/*/baseline-reconstructed/
 
 # Follow-up to the reviewed collection capture tranche.
 design-council/*/collection-fixes/
+
+# Activity/facet capture tranche; formal judging is recorded separately.
+design-council/*/activity-facets/

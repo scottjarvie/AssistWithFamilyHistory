@@ -1,4 +1,5 @@
-[Newest-first gallery](gallery.html) · Five collection surfaces built locally; 57/57 checks and 20 captures pass; Opus conditionally approves; lead fixes pass 57/57 checks and 20 fresh captures. All-page goal remains active.
+[Newest-first gallery](gallery.html) · Activity ledger, shared filter sheets and five-tray Home built locally; 15 browser checks / 20 captures pass. 57/57 full checks pass; Opus exact-head review next.
+
 
 
 Last updated: 2026-11-05 America/Phoenix.
@@ -49,3 +50,11 @@ Opus reviewed exact head `0ec9ea7` (Sol author, Opus 5.5 reviewer). No blocking 
 Taste remains unfinished: one control per facet with phone filter sheets, Stories reading presentation, a tighter People phone list, a dated/month-grouped Activity ledger and phone lane switcher, custom date-range validation/precedence, and the earlier Home refinements. These belong to active AWF-0071; no all-page audit or formal target clearance claimed. The next meaningful code review will include these lead fixes; no delegate is commissioned per small finding.
 
 Final follow-up receipt: **57/57 full steps**, **13/13 cross-page interactions**, **20/20 fresh captures** passed. Newest gallery section “Collection review fixes” contains this source's visuals, with the reviewed `0ec9ea7` images retained under round-3. The fixes await the next meaningful cross-model review; no formal score or all-page acceptance inferred. Latest code is a local commit only. All-page scope/AWF-0071 still active; audit not audited. Next route starts with the remaining collection/Activity taste refinements and then the record dossier/stream family.
+
+## Activity, shared facets and Home · current tranche
+
+Implemented the latest Opus taste calls across the existing collection family and Home: dated monthly Research ledger/axis/counts, phone lanes, custom date-range validation; one facet picker with direct removable chips; Stories List default and wrapping built-in tabs; compact full-width List facts; five Home trays with a counted vault index, actual missing-check labels and wide Recent imports.
+
+Four focused privacy/facet/migration/date-window tests pass; 18 People interactions and 15 expanded cross-page checks pass, including 320px phone sheet selection/chip removal. Twenty current captures pass, no console/page errors or overflow. Full check, exact-head cross-model review and newest gallery update are next. Formal round 2 remains pending; no all-page target clearance. AWF-0071 stays doing; audit not audited. All code local, no push/PR/merge/deploy.
+
+Frozen-tranche full check passed **57/57**, Node22,49s. Current captures are `activity-facets`; the gallery puts this named capture tranche first without counting it as a formal council round. Exact-head Opus review follows the local code commit. No Card/Work Order completion or all-page clearance claimed.

@@ -75,7 +75,7 @@ try {
   await mobile.getByRole('heading',{name:'People',exact:true}).waitFor();
   assert.equal(await mobile.locator('li[data-row]:visible').count(),4);
   const firstCompact=mobile.locator('li[data-row]:visible').first();
-  assert.ok((await firstCompact.innerText()).includes('Documents'));
+  assert.ok((await firstCompact.innerText()).includes('docs'));
   assert.ok((await firstCompact.boundingBox()).height<240);check('Default phone List retains evidence fields in a compact recognition row');
   assert.ok(await mobile.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));check('320px table becomes labelled records without page overflow');
   await mobile.locator('summary').filter({hasText:'Group'}).click();

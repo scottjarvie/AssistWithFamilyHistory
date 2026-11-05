@@ -24,7 +24,7 @@ export function projectStoryRow(s: Story) {
 export type StoryCollectionRow = ReturnType<typeof projectStoryRow>;
 
 export function projectWritingCandidate(p: Candidate) {
-  return { id: String(p._id), routeId: p.routeId, name: p.displayName, lifespan: p.lifespan, workflow: p.storyWorkflow, sources: p.sourceCount, context: p.contextReportCount, ready: p.completionPercent };
+  return { id: String(p._id), routeId: p.routeId, name: p.displayName, lifespan: p.lifespan.replace(/ to /g,"–"), workflow: p.storyWorkflow, sources: p.sourceCount, context: p.contextReportCount, ready: p.completionPercent };
 }
 export type WritingCandidateRow = ReturnType<typeof projectWritingCandidate>;
 

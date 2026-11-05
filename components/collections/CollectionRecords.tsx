@@ -26,7 +26,7 @@ export function CollectionRecords<Row>({ grouped, columns, view, compact, rowKey
     {name && <h2 className="mb-2 flex items-center gap-2 font-sans text-sm font-semibold capitalize">{name}<span className="rounded-full bg-secondary px-2 py-1 font-mono text-xs">{rows.length}</span></h2>}
     {(view === "auto" || view === "table") && <div className={`${view === "auto" ? "hidden sm:block" : ""} overflow-x-auto rounded-lg border border-border bg-card`} tabIndex={0} aria-label="Record comparison table">
       <table className={`collection-table w-full text-left text-sm ${compact ? "is-compact" : ""}`}>
-        <caption className="sr-only">{name || "Loaded records"} · all details remain on each record</caption>
+        <caption className="sr-only">{name || "Loaded records"} · comparison of loaded fields</caption>
         <thead className="bg-muted/60"><tr><th scope="col" className="w-11"><span className="sr-only">Select</span></th><th scope="col">{identityLabel}</th>{columns.map((column) => <th key={column.key} scope="col" className={column.numeric ? "text-right" : ""} aria-sort={sortKey === column.key ? descending ? "descending" : "ascending" : undefined}>
           {column.sortValue ? <button className="min-h-11 text-inherit md:pointer-fine:min-h-9" onClick={() => onSort(column.key)}>{column.label}{sortKey === column.key ? descending ? " ↓" : " ↑" : ""}</button> : column.label}
         </th>)}</tr></thead>
@@ -38,8 +38,8 @@ export function CollectionRecords<Row>({ grouped, columns, view, compact, rowKey
     </div>}
     {(view === "auto" || view === "list") && <ul className={`${view === "auto" ? "sm:hidden" : ""} divide-y divide-border rounded-lg border border-border bg-card`}>
       {rows.map((row) => <li data-row={rowKey(row)} key={rowKey(row)} className={`flex items-start gap-1 ${compact ? "px-2 py-2" : "px-3 py-3"}`}>
-        {select(row)}<div className="min-w-0 flex-1"><RecordLink href={rowHref(row)} className="flex min-h-11 gap-3 text-primary underline-offset-4 hover:underline">
-          <div className="mt-1 shrink-0 self-start rounded bg-muted p-1">{picture(row)}</div><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-3"><div className="min-w-0">{renderIdentity(row)}</div>{primary && <p className="shrink-0 text-right font-mono text-sm tabular-nums">{primary.render(row)}<span className="block font-sans text-xs text-muted-foreground">{primary.compactLabel || primary.label}</span></p>}</div>{facts(row, columns.filter((column) => column !== primary))}</div>
+        {select(row)}<div className="min-w-0 flex-1"><RecordLink href={rowHref(row)} className="block min-h-11 text-primary underline-offset-4 hover:underline">
+          <div className="flex items-start gap-3"><div className="mt-1 shrink-0 self-start rounded bg-muted p-1">{picture(row)}</div><div className="min-w-0 flex-1">{renderIdentity(row)}</div>{primary && <p className="shrink-0 text-right font-mono text-sm tabular-nums">{primary.render(row)}<span className="block font-sans text-xs text-muted-foreground">{primary.compactLabel || primary.label}</span></p>}</div><div className="mt-1">{facts(row, columns.filter((column) => column !== primary))}</div>
         </RecordLink>{renderDetail?.(row)}{renderActions?.(row)}</div>
       </li>)}
     </ul>}

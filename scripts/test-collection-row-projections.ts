@@ -2,6 +2,7 @@ import {test} from "node:test";
 import assert from "node:assert/strict";
 import {projectPlaceRow,projectStoryRow,projectWritingCandidate,projectResearchTask,projectResearchLog} from "../lib/vault/collectionRows";
 import {canonicalFilters,applyCollectionFilters} from "../lib/collections/viewFilters";
+import {activityWindow, activityDay} from "../lib/activity/window";
 import {resolveCollectionColumns} from "../lib/collections/columnPreferences";
 
 test("Older saved People views retain lifespan/state moved out of identity, while new explicit hides remain respected",()=>{
@@ -31,4 +32,15 @@ test("Saved collection views retain every declared facet and cannot inject unrel
  assert.equal(url.searchParams.get("q"),"new search");assert.equal(url.searchParams.get("status"),"review");assert.equal(url.searchParams.get("workflow"),"ready_to_review");
  assert.equal(url.searchParams.get("navigation"),"side");assert.equal(url.searchParams.has("page"),false);assert.equal(url.searchParams.has("next"),false);
  assert.deepEqual(canonicalFilters({workflow:"ready",q:"name",status:""}),canonicalFilters({status:"",q:"name",workflow:"ready"}));
+});
+
+
+test("Custom activity dates replace a preset; open bounds survive and inverted dates are explicit",()=>{
+ const first=Date.parse("2020-01-01T12:00Z"), latest=Date.parse("2026-11-05T12:00Z");
+ const preset=activityWindow("quarter",{start:"",end:""},first,latest);
+ assert.equal(preset.start,latest-90*activityDay);
+ const custom=activityWindow("custom",{start:"2020-01-01",end:"2020-01-02"},first,latest);
+ assert.equal(custom.start,Date.parse("2020-01-01T00:00Z"));assert.equal(custom.end,Date.parse("2020-01-03T00:00Z")-1);assert.equal(custom.invalid,false);
+ const openStart=activityWindow("custom",{start:"",end:"2020-01-02"},first,latest);assert.equal(openStart.start,-Infinity);assert.equal(openStart.end,custom.end);
+ assert.equal(activityWindow("custom",{start:"2026-11-05",end:"2026-11-01"},first,latest).invalid,true);
 });

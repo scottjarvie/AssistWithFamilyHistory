@@ -42,3 +42,11 @@ Collections declare their own URL facet keys and built-in views. Named views sav
 ### Identity links and compact facts
 
 `rowHref` must open the record named by the row identity. Tasks without a real task-detail route keep static titles; their Person field links explicitly to that person. List facts put numeric labels after counts, text bare, and ambiguous dates behind a short prefix such as Updated or Imported. Full field labels remain in table headers and fact titles.
+
+### Shared facets and activity ledger
+
+CollectionFilters owns declared URL facets in a single-level picker and direct removable chips; current choices survive search submissions. Counts are loaded-collection counts, omitted when a filtered server result cannot prove other values' totals. Stories reads as List by default without overriding an explicit choice. Built-in state links clear named-view identity and selection subset, retaining presentation preferences; named views restore presentation and facets together. Wrapped view tabs leave every built-in visible on phones.
+
+ActivityLedger is a dated, monthly ledger of stored updates. Only recorded kinds get lanes; unknown authors stay Not attributed. Phone lane pills and desktop lane labels drive the same filter. Custom range replaces the preset, optional bounds work independently, and invalid order pauses date filtering with an explanation. Dates and copy explicitly mean updates in UTC. Connection display names require server evidence and are not inferred from self-reported model text.
+
+Home now has five trays: recently touched, research gaps, recent imports, AI guidance and a counted vault index. The index retains all Stories/Places/Documents text and exact destinations rather than inventing a missing Library route.

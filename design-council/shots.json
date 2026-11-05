@@ -41,7 +41,7 @@
         },
         {
           "can": "filter research state",
-          "selector": "select[name=status]"
+          "selector": "button[aria-label=\"Filter people\"]"
         },
         {
           "can": "open a person",
@@ -143,11 +143,11 @@
       "capabilities": [
         {
           "can": "filter publication state",
-          "selector": "select[name=status]"
+          "selector": "button[aria-label=\"Filter stories\"]"
         },
         {
           "can": "filter workflow",
-          "selector": "select[name=workflow]"
+          "selector": "button[aria-label=\"Filter stories\"]"
         },
         {
           "can": "review a story",
@@ -173,7 +173,7 @@
         },
         {
           "can": "filter activity by author",
-          "selector": "select[aria-label=\"Activity author\"]"
+          "selector": "div[role=\"group\"][aria-label=\"Activity author\"]"
         },
         {
           "can": "see source attribution uncertainty",

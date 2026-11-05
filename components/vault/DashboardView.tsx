@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArchiveIllustration } from "@/components/design/ArchiveIllustration";
 import { UtcDate } from "@/components/design/UtcDate";
+import { RESEARCH_CHECK_DEFINITIONS } from "@/convex/vaultCore";
 import { FolioTray } from "@/components/design/FolioTray";
 import type { api } from "@/convex/_generated/api";
 
@@ -50,8 +51,7 @@ export function DashboardView({ summary }: { summary: DashboardSummary }) {
       </header>
 
       <div className="research-desk mt-8 grid gap-6 lg:grid-cols-3">
-        <FolioTray id="recent-people-title" title="Recently touched" count={summary.counts.people} countLabel="people" href="/app/people" linkLabel="All people" className="lg:col-span-2">
-          <p className="px-4 pb-3 text-sm text-muted-foreground">Pick up where you left off. People and the evidence around them.</p>
+        <FolioTray id="recent-people-title" title="Recently touched" count={summary.counts.people} countLabel="people" summary="Pick up where you left off. People and the evidence around them." href="/app/people" linkLabel="All people" className="lg:col-span-2">
           {summary.recentPeople.length ? <ul className="divide-y divide-border">
             {summary.recentPeople.map((person) => <li key={String(person._id)}>
               <Link href={`/app/people/${person.routeId}`} className="flex min-h-16 items-center gap-3 px-4 py-3 hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-primary">
@@ -66,22 +66,15 @@ export function DashboardView({ summary }: { summary: DashboardSummary }) {
           </ul> : <p className="px-4 pb-5 text-sm text-muted-foreground">No people yet. <Link href="/app/people/new" className="text-primary underline">Add a person</Link> or bring in a capture from Imports.</p>}
         </FolioTray>
 
-        <FolioTray id="research-tray-title" title="Research gaps" count={summary.counts.openTasks} countLabel="open tasks" href="/app/operations" linkLabel="Work the Research Queue">
-          <p className="px-4 pb-3 text-sm text-muted-foreground">Source-backed research before the next story. These people have critical gaps.</p>
+        <FolioTray id="research-tray-title" title="Research gaps" count={summary.counts.openTasks} countLabel="open tasks" summary="Source-backed research before the next story. These people have critical gaps; the count opens all tasks." href="/app/operations" linkLabel="Work the Research Queue">
           {gaps.length ? <ul className="divide-y divide-border">{gaps.map((person) => <li key={String(person._id)}>
-            <Link href={`/app/people/${person.routeId}`} className="block px-4 py-3 hover:bg-muted/50"><span className="block break-words font-medium">{person.displayName}</span><span className="mt-1 block text-sm text-annotation">{person.operations.requiredMissingCount} critical {person.operations.requiredMissingCount === 1 ? "gap" : "gaps"}</span></Link>
+            <Link href={`/app/people/${person.routeId}`} className="block px-4 py-3 hover:bg-muted/50"><span className="block break-words font-medium">{person.displayName}</span><span className="mt-1 block text-sm leading-6 text-annotation">{person.operations.criticalMissing.slice(0,2).map(key => RESEARCH_CHECK_DEFINITIONS.find(check => check.key === key)?.label || key.replace(/_/g," ")).join(" · ") || `${person.operations.requiredMissingCount} critical gaps`}{person.operations.criticalMissing.length > 2 ? ` · +${person.operations.criticalMissing.length-2} more checks` : ""}</span></Link>
           </li>)}</ul> : <p className="px-4 pb-4 text-sm text-muted-foreground">No critical gaps in the current highlights. The full queue keeps every research check.</p>}
           <Link href="/app/research" className="mx-4 mb-4 inline-flex min-h-11 items-center text-sm text-primary underline underline-offset-4">Open tasks and research log</Link>
           {summary.counts.provisionalRelatives > 0 && <p className="mx-4 mb-4 border-l-2 border-annotation pl-3 text-sm text-annotation">{summary.counts.provisionalRelatives} provisional relatives await review in Research Queue. Connections remain provisional until reviewed.</p>}
         </FolioTray>
 
-        <FolioTray id="ai-tray-title" title="With your AI" href="/app/queue" linkLabel="Open your Queue" className="lg:col-span-2">
-          <p className="px-4 pb-4 text-sm leading-6 text-muted-foreground"><strong className="text-foreground">AI context packs.</strong> Every person page can export a Markdown or JSON context pack built from sources, memories, places, relationships, and open research gaps, ready for story-writing or research agents. The staged AI analysis flow stays available inside each person.</p>
-          <p className="px-4 pb-4 text-sm text-muted-foreground">Your Queue keeps the handoff visible. <Link href="/app/settings/ai" className="text-primary underline underline-offset-4">Inspect AI connections and permissions</Link>.</p>
-        </FolioTray>
-
-        <FolioTray id="recent-imports-title" title="Recent imports" count={summary.counts.imports} countLabel="imports stored" href="/app/imports" linkLabel="Imports workspace">
-          <p className="px-4 pb-3 text-sm text-muted-foreground">Latest FamilySearch captures merged into the vault.</p>
+        <FolioTray id="recent-imports-title" title="Recent imports" count={summary.counts.imports} countLabel="imports stored" summary="Latest FamilySearch captures merged into the vault." className="lg:col-span-2" href="/app/imports" linkLabel="Imports workspace">
           {summary.recentImports.length ? <ul className="divide-y divide-border">{summary.recentImports.map((run) => <li key={String(run._id)}>
             <Link href={run.personRouteId ? `/app/people/${run.personRouteId}` : "/app/imports"} className="flex items-start justify-between gap-2 px-4 py-3 hover:bg-muted/50">
               <div className="min-w-0 break-words [overflow-wrap:anywhere]"><p className="font-medium">{run.personName}</p><p className="mt-1 text-sm text-muted-foreground">{run.pageTypes.join(" + ")} import · <UtcDate value={run.importedAt} withTime/></p></div>
@@ -90,15 +83,18 @@ export function DashboardView({ summary }: { summary: DashboardSummary }) {
           </li>)}</ul> : <p className="px-4 pb-4 text-sm text-muted-foreground">{summary.counts.imports ? "No recent imports to show." : "No imports yet."} Start with a reviewed FamilySearch capture in the Imports workspace.</p>}
         </FolioTray>
 
-        <FolioTray id="stories-tray-title" title="Stories" count={summary.counts.stories} countLabel="stories" href="/app/stories" linkLabel="Open Story Studio">
-          <p className="px-4 pb-4 text-sm leading-6 text-muted-foreground">Review drafts, publish intentionally, and keep the narrative tied to its supporting data.</p>
+        <FolioTray id="ai-tray-title" title="With your AI" href="/app/queue" linkLabel="Open your Queue">
+          <p className="px-4 pb-4 text-sm leading-6 text-muted-foreground"><strong className="text-foreground">AI context packs.</strong> Every person page can export a Markdown or JSON context pack built from sources, memories, places, relationships, and open research gaps, ready for story-writing or research agents. The staged AI analysis flow stays available inside each person.</p>
+          <p className="px-4 pb-4 text-sm text-muted-foreground">Your Queue keeps the handoff visible. <Link href="/app/settings/ai" className="text-primary underline underline-offset-4">Inspect AI connections and permissions</Link>.</p>
+        </FolioTray>
+
+        <FolioTray id="vault-index-title" title="Vault index" summary="Stories, places and preserved documents, with their existing workspaces." href="/app/people" linkLabel="Browse the family vault" className="lg:col-span-3">
+          <dl className="divide-y divide-border">{[
+            {title:"Stories",count:summary.counts.stories,description:"Review drafts, publish intentionally, and keep the narrative tied to its supporting data.",href:"/app/stories",link:"Open Story Studio"},
+            {title:"Places",count:summary.counts.places,description:"Follow the places connected to people, events, sources, and historical context.",href:"/app/places",link:"Explore places"},
+            {title:"Documents",count:summary.counts.documents,description:"Documents live with their people. Open a person’s Documents section to inspect the preserved material and its context.",href:"/app/people",link:"Browse document counts by person"},
+          ].map(row => <div key={row.title} className="grid grid-cols-1 gap-x-4 gap-y-1 px-4 py-3 sm:grid-cols-[8rem_minmax(0,1fr)_auto]"><dt><Link href={row.href} className="inline-flex min-h-11 items-center gap-2 font-semibold text-primary">{row.title} <span className="font-mono">{row.count}</span></Link></dt><dd className="text-sm leading-6 text-muted-foreground sm:self-center">{row.description}</dd><dd className="self-center"><Link href={row.href} className="inline-flex min-h-11 items-center text-sm text-primary underline">{row.link} →</Link></dd></div>)}</dl>
           <Link href="/app/story-writer" className="mx-4 mb-4 inline-flex min-h-11 items-center text-sm text-primary underline underline-offset-4">Choose a person for Story Writer</Link>
-        </FolioTray>
-        <FolioTray id="places-tray-title" title="Places" count={summary.counts.places} countLabel="places" href="/app/places" linkLabel="Explore places">
-          <p className="px-4 pb-4 text-sm leading-6 text-muted-foreground">Follow the places connected to people, events, sources, and historical context.</p>
-        </FolioTray>
-        <FolioTray id="documents-tray-title" title="Documents" count={summary.counts.documents} countLabel="documents" href="/app/people" linkLabel="Browse document counts by person">
-          <p className="px-4 pb-4 text-sm leading-6 text-muted-foreground">Documents live with their people. Open a person’s Documents section to inspect the preserved material and its context.</p>
         </FolioTray>
       </div>
     </>}

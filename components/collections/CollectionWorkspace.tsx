@@ -16,11 +16,11 @@ import { useCollectionPreferences, type CollectionView } from "./useCollectionPr
  * Never pass raw Convex documents here: the entire rows prop is serialized to the browser.
  * Sorting/grouping/selection cover loaded rows, never imply whole-vault operations.
  */
-export function CollectionWorkspace<Row>({ rows, columns, groups = [], rowKey, rowTitle, rowHref, renderIdentity, renderDetail, renderActions, imageSlot, primaryColumn, searchControls, preferenceKey, query = "", status = "", loadMoreHref, noun = "records", identityLabel = "Record", naturalOrderLabel = "Recently touched", defaultGroup = "", columnVersion = 1, naturalLabels, filters, builtInViews = [], emptyState }: {
+export function CollectionWorkspace<Row>({ rows, columns, groups = [], rowKey, rowTitle, rowHref, renderIdentity, renderDetail, renderActions, imageSlot, primaryColumn, searchControls, preferenceKey, query = "", status = "", loadMoreHref, noun = "records", identityLabel = "Record", naturalOrderLabel = "Recently touched", defaultGroup = "", defaultView = "auto", columnVersion = 1, naturalLabels, filters, builtInViews = [], emptyState }: {
   rows: Row[]; columns: CollectionColumn<Row>[]; groups?: CollectionGroup<Row>[];
   rowKey: (row: Row) => string; rowTitle: (row: Row) => string; rowHref: (row: Row) => string | null;
   renderIdentity: (row: Row) => ReactNode; renderDetail?: (row: Row) => ReactNode; renderActions?: (row: Row) => ReactNode; imageSlot?: (row: Row) => ReactNode; primaryColumn?: string; searchControls: ReactNode;
-  preferenceKey: string; query?: string; status?: string; loadMoreHref: string | null; noun?: string; identityLabel?: string; naturalOrderLabel?: string; defaultGroup?: string; columnVersion?: number; naturalLabels?: {forward:string;reverse:string}; filters?: Record<string, string>; builtInViews?: BuiltInCollectionView[]; emptyState: ReactNode;
+  preferenceKey: string; query?: string; status?: string; loadMoreHref: string | null; noun?: string; identityLabel?: string; naturalOrderLabel?: string; defaultGroup?: string; defaultView?: CollectionView; columnVersion?: number; naturalLabels?: {forward:string;reverse:string}; filters?: Record<string, string>; builtInViews?: BuiltInCollectionView[]; emptyState: ReactNode;
 }) {
   const [settings, saveSettings] = useCollectionPreferences(preferenceKey);
   const [selected, setSelected] = useState<string[]>([]);
@@ -32,7 +32,7 @@ export function CollectionWorkspace<Row>({ rows, columns, groups = [], rowKey, r
   const activeView = settings.activeViewId || null;
   const setActiveView = (activeViewId: string | null) => update({ activeViewId });
   const id = useId();
-  const view: CollectionView = settings.view || "auto";
+  const view: CollectionView = settings.view || defaultView;
   const compact = Boolean(settings.compact);
   const availableColumns = columns.filter((c) => !c.sortOnly);
   const visibleKeys = resolveCollectionColumns(availableColumns, settings.columns, settings.columnVersion);
@@ -66,9 +66,9 @@ export function CollectionWorkspace<Row>({ rows, columns, groups = [], rowKey, r
   const select = (row: Row) => <label className="flex min-h-11 w-11 items-center justify-center"><input type="checkbox" checked={selected.includes(rowKey(row))} onChange={() => toggle(row)} aria-label={`Select ${rowTitle(row)}`} className="h-4 w-4 accent-primary" /></label>;
   const control = "min-h-11 max-w-full rounded-md border border-border bg-card px-3 text-sm text-foreground";
   return <div className="collection-workspace min-w-0">
-    <div aria-label="Saved views" className="mb-3 flex items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-border pb-2">
-      <Button variant={activeView ? "ghost" : "secondary"} className="min-h-11" onClick={() => { setActiveView(null); setOnlySelected(false); }}>{builtInViews.length ? "This result" : `All loaded ${noun}`} <span className="font-mono">{rows.length}</span></Button>
-      {builtInViews.map(value => <SafeLink key={value.href} href={value.href} aria-current={value.active ? "page" : undefined} className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-md px-3 text-sm ${value.active ? "bg-secondary font-semibold" : "text-primary"}`}>{value.label}{value.count !== undefined && <span className="font-mono">{value.count}</span>}</SafeLink>)}
+    <div aria-label="Saved views" className="mb-3 flex flex-wrap items-center gap-2 border-b border-border pb-2">
+      {(!builtInViews.length || (activeView && edited)) && <Button variant={activeView ? "ghost" : "secondary"} className="min-h-11" onClick={() => { setActiveView(null); setOnlySelected(false); }}>{builtInViews.length ? "Unsaved arrangement" : `All loaded ${noun}`} <span className="font-mono">{rows.length}</span></Button>}
+      {builtInViews.map(value => <SafeLink key={value.href} href={value.href} onClick={() => { setActiveView(null); setOnlySelected(false); }} aria-current={value.active ? "page" : undefined} className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-md px-3 text-sm ${value.active ? "bg-secondary font-semibold" : "text-primary"}`}>{value.label}{value.count !== undefined && <span className="font-mono">{value.count}</span>}</SafeLink>)}
       {saved.map((value) => <Button key={value.id} variant={activeView === value.id ? "secondary" : "ghost"} className="min-h-11" onClick={() => applyView(value)}>{value.name}{activeView === value.id && edited ? " · edited" : ""}</Button>)}
       <Button variant="ghost" className="min-h-11 text-primary" onClick={() => { setNewName(""); setSaveOpen(true); }}>+ New view</Button>
       <Button variant="ghost" className="hidden min-h-11 sm:inline-flex" onClick={() => setManageOpen(true)}>Manage views</Button>
