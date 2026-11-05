@@ -2257,3 +2257,54 @@ test("unattached relationship identity refresh remains available", async () => {
   const result = await send(t, grant, job.importJobId, 1, batch); expect(dry.counts).toEqual(result.counts); expect(result.counts.relationships.updated).toBe(1);
   const c = (await t.run(ctx => ctx.db.query("persons").collect())).find(row => row.fsId === "C")!; expect((await t.run(ctx => ctx.db.query("relationships").collect()))[0].person2).toBe(c._id);
 });
+
+
+test.each(["type", "customType", "date", "place", "value", "description"].flatMap(field => ["note", "citation", "both"].map(attachment => ({ field, attachment }))))("attached fact $field refresh requires attribution review ($attachment)", async ({ field, attachment }) => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const fact = { key: "F", type: field === "customType" ? "https://a.example/CustomEvent" : "birth", date: { original: "1900", year: 1900 }, place: { original: "London" }, value: "Original value", description: "Original detail" };
+  const person = { key: "P", living: false, names: [{ given: "Original", surname: "Person" }], facts: [fact] };
+  const target = { kind: "fact" as const, personKey: "P", key: "F", keyOrigin: "explicit" as const };
+  await send(t, grant, job.importJobId, 0, { persons: [person], sources: [{ key: "S", title: "Original fact source" }],
+    ...(attachment !== "note" ? { citations: [{ key: "C", sourceKey: "S", extractedText: "Evidence for original fact", targets: [target] }] } : {}),
+    ...(attachment !== "citation" ? { notes: [{ key: "N", text: "Note about original fact", subject: target }] } : {}),
+  });
+  const snapshot = () => t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), events: await ctx.db.query("events").collect(), personEvents: await ctx.db.query("personEvents").collect(), notes: await ctx.db.query("notes").collect(), citations: await ctx.db.query("citations").collect(), links: await ctx.db.query("citationLinks").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  const noop = await send(t, grant, job.importJobId, 1, { persons: [person] }); expect(noop.counts.persons.unchanged).toBe(1); expect(await snapshot()).toEqual(before);
+  const replacement = { ...fact, ...(field === "type" ? { type: "death" } : field === "customType" ? { type: "https://b.example/CustomEvent" } : field === "date" ? { date: { original: "1901", year: 1901 } } : field === "place" ? { place: { original: "Paris" } } : field === "value" ? { value: "Replacement value" } : { description: "Replacement detail" }) };
+  const batch: TreeImportBatch = { persons: [{ ...person, names: [{ given: "Must roll back", surname: "Person" }], facts: [replacement] }] };
+  for (const dryRun of [true, false]) {
+    const result = await send(t, grant, job.importJobId, 2, batch, { dryRun }, `fact-attribution-${field}-${attachment}-${dryRun}`);
+    expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("FACT_ATTRIBUTION_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before);
+    expect(await send(t, grant, job.importJobId, 2, batch, { dryRun }, `fact-attribution-${field}-${attachment}-${dryRun}`)).toEqual(result); expect(await snapshot()).toEqual(before);
+  }
+});
+
+test.each(["type", "title", "description", "url", "mimeType", "date", "personKeys", "sourceKey"].flatMap(field => ["note", "citation", "both"].map(attachment => ({ field, attachment }))))("unreviewed media $field changes retain original $attachment attribution", async ({ field, attachment }) => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const media = { key: "M", type: "photo" as const, title: "Original", description: "Original detail", url: "https://example.test/original", mimeType: "image/jpeg", date: "1900", personKeys: ["A"], sourceKey: "S1" };
+  const target = { kind: "media" as const, key: "M" };
+  await send(t, grant, job.importJobId, 0, { persons: ["A", "B"].map(key => ({ key, living: false, names: [{ given: key }] })), sources: ["S1", "S2"].map(key => ({ key, title: key })), media: [media],
+    ...(attachment !== "note" ? { citations: [{ key: "C", sourceKey: "S1", extractedText: "Evidence for original media", targets: [target] }] } : {}),
+    ...(attachment !== "citation" ? { notes: [{ key: "N", text: "Note about original media", subject: target }] } : {}),
+  });
+  const snapshot = () => t.run(async ctx => ({ media: await ctx.db.query("media").collect(), notes: await ctx.db.query("notes").collect(), citations: await ctx.db.query("citations").collect(), links: await ctx.db.query("citationLinks").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  expect(before.media[0]).toMatchObject({ privacyLevel: "private", reviewStatus: "unreviewed", rightsStatus: "unknown", aiUseAllowed: false }); expect(isContextPackEligibleMedia(before.media[0])).toBe(false);
+  const noop = await send(t, grant, job.importJobId, 1, { media: [media] }); expect(noop.counts.media.unchanged).toBe(1); expect(await snapshot()).toEqual(before);
+  const replacements: Record<string, any> = { type: "document", title: "Replacement", description: "Replacement detail", url: "https://example.test/replacement", mimeType: "application/pdf", date: "1901", personKeys: ["B"], sourceKey: "S2" };
+  const batch: TreeImportBatch = { media: [{ ...media, [field]: replacements[field] }] };
+  for (const dryRun of [true, false]) {
+    const result = await send(t, grant, job.importJobId, 2, batch, { dryRun }, `media-attribution-${field}-${attachment}-${dryRun}`);
+    expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("MEDIA_ATTRIBUTION_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before);
+    expect(await send(t, grant, job.importJobId, 2, batch, { dryRun }, `media-attribution-${field}-${attachment}-${dryRun}`)).toEqual(result); expect(await snapshot()).toEqual(before);
+  }
+});
+
+test("unattached explicit fact refresh remains available", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const person = { key: "P", living: false, names: [{ given: "Synthetic" }], facts: [{ key: "F", type: "occupation", description: "Farmer" }] };
+  await send(t, grant, job.importJobId, 0, { persons: [person] }); const before = await t.run(ctx => ctx.db.query("events").collect());
+  const batch: TreeImportBatch = { persons: [{ ...person, facts: [{ key: "F", type: "residence", description: "London" }] }] };
+  const dry = await send(t, grant, job.importJobId, 1, batch, { dryRun: true }, "dry-unattached-fact"); expect(await t.run(ctx => ctx.db.query("events").collect())).toEqual(before);
+  const result = await send(t, grant, job.importJobId, 1, batch); expect(dry.counts).toEqual(result.counts); expect(result.counts.persons.updated).toBe(1);
+  expect((await t.run(ctx => ctx.db.query("events").collect()))[0]).toMatchObject({ _id: before[0]._id, type: "residence", description: "London", importedFact: { key: "F", type: "residence", description: "London" } });
+});

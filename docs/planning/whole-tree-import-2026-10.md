@@ -484,3 +484,11 @@ bounded subject/target indexes and include effective planning rows.
 Joined-acceptance cleanup now includes notes in its existing bounded owner
 scan and refuses when a note references the marked graph. It never deletes
 notes or expands cleanup authority; inspect uses the same refusal.
+
+The same bounded attachment guard now covers event assertions and media
+content/associations independently of media review status. Refreshing an
+attached explicit fact or replacing attached unreviewed media refuses
+atomically; notes and citation evidence retain their original meaning. A
+fact refusal rolls back its enclosing person item and all import baselines.
+Unchanged replay and unattached refresh remain supported. Existing reviewed
+media restrictions also remain; no attachments are removed or redirected.

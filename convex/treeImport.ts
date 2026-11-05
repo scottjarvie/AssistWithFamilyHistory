@@ -326,6 +326,19 @@ async function ownedRow<T extends TableNames>(c: ChunkContext, table: T, id: str
   return row as Doc<T>;
 }
 
+/** Retained attachments describe the current assertion, regardless of review status. */
+async function hasRetainedAttachments(c: ChunkContext, kind: "relationship" | "event" | "media", id: string): Promise<boolean> {
+  if ([...(c.w.rows?.values() ?? [])].some(row =>
+    (row.subject?.kind === kind && row.subject.id === id)
+    || (row.targetType === kind && row.targetId === id))) return true;
+  if (isPlaceholder(id)) return false;
+  const attachments = await Promise.all([
+    c.ctx.db.query("notes").withIndex("by_subject", q => q.eq("subject.kind", kind).eq("subject.id", id)).first(),
+    c.ctx.db.query("citationLinks").withIndex("by_target", q => q.eq("targetType", kind).eq("targetId", id)).first(),
+  ]);
+  return attachments.some(Boolean);
+}
+
 function externalIdsFor(c: ChunkContext, key: string, otherIds: ExternalId[] | undefined, url?: string): ExternalId[] {
   const ids: ExternalId[] = [{ system: c.job.system, id: key, ...(url ? { url } : {}) }];
   for (const other of otherIds ?? []) {
@@ -648,6 +661,7 @@ async function importFact(c: ChunkContext, personId: string, personKey: string, 
   const mapped = eventTypeFor(fact.type);
   const existingId = await lookup(c, singular, factKey);
   if (singular === "fact") await assertExplicitIdentity(c, "events", existingId, fact.key);
+  const previous = existingId ? await ownedRow(c, "events", existingId) : null;
   const effective = await effectiveFactInput(c, personKey, fact);
   const saved = await upsertRow(c, {
     table: "events",
@@ -665,6 +679,14 @@ async function importFact(c: ChunkContext, personId: string, personKey: string, 
     },
     createOnly: { importKey: `import:${externalRecordKey(c.job.system, singular, factKey, c.job.importKey)}` },
   });
+  if (previous) {
+    const current = await ownedRow(c, "events", saved.id);
+    const assertion = ["type", "customType", "importedFact", "date", "place", "description"] as const;
+    if (current && assertion.some(field => !same(previous[field], current[field])) && await hasRetainedAttachments(c, "event", saved.id)) {
+      fail("FACT_ATTRIBUTION_REVIEW_REQUIRED", "Changed fact assertions cannot inherit retained notes or citation evidence.",
+        "Review the fact and its attachments with the person. This person/fact item saved nothing; its original assertions and attachments were retained.");
+    }
+  }
   if (saved.status === "created") {
     await c.w.insert("personEvents", {
       vaultOwnerId: c.owner,
@@ -843,18 +865,9 @@ async function importRelationship(c: ChunkContext, item: any): Promise<Omit<Item
     const references = ["type", "childRelationType", "person1", "person2"] as const;
     const moved = current && references.some(field => !same(previous[field], current[field]));
     const keptReference = saved.kept?.some(field => references.some(reference => reference === field));
-    if (moved) {
-      const virtualAttachment = [...(c.w.rows?.values() ?? [])].some(row =>
-        (row.subject?.kind === "relationship" && row.subject.id === saved.id)
-        || (row.targetType === "relationship" && row.targetId === saved.id));
-      const persistedAttachments = isPlaceholder(saved.id) ? [] : await Promise.all([
-        c.ctx.db.query("notes").withIndex("by_subject", q => q.eq("subject.kind", "relationship").eq("subject.id", saved.id)).first(),
-        c.ctx.db.query("citationLinks").withIndex("by_target", q => q.eq("targetType", "relationship").eq("targetId", saved.id)).first(),
-      ]);
-      if (virtualAttachment || persistedAttachments.some(Boolean)) {
-        fail("RELATIONSHIP_ATTRIBUTION_REVIEW_REQUIRED", "Relationship identity changes cannot reattribute retained notes or citation evidence.",
-          "Review the relationship and its attached material with the person. This relationship item saved nothing; all attachments were retained.");
-      }
+    if (moved && await hasRetainedAttachments(c, "relationship", saved.id)) {
+      fail("RELATIONSHIP_ATTRIBUTION_REVIEW_REQUIRED", "Relationship identity changes cannot reattribute retained notes or citation evidence.",
+        "Review the relationship and its attached material with the person. This relationship item saved nothing; all attachments were retained.");
     }
     if (current && ((moved && current.facts?.length && !same(suppliedFacts, current.facts)) || (keptReference && !same(previous.facts, current.facts)))) {
       fail("RELATIONSHIP_FACT_REVIEW_REQUIRED", "Relationship facts cannot acquire different endpoints or a conflicting retained identity without confirmation.",
@@ -963,9 +976,11 @@ async function importMedia(c: ChunkContext, item: any): Promise<Omit<ItemResult,
       || (previous.privacyLevel !== undefined && previous.privacyLevel !== "private")
       || (previous.rightsStatus !== undefined && previous.rightsStatus !== "unknown");
     const content = ["type", "title", "description", "url", "mimeType", "date", "personIds", "sourceId", "familySearchUrl"] as const;
-    if (reviewed && current && content.some(field => !same(previous[field], current[field]))) {
-      fail("MEDIA_REVIEW_REQUIRED", "Changed media content or attribution cannot inherit an earlier privacy, rights or AI-use decision.",
+    if (current && content.some(field => !same(previous[field], current[field]))) {
+      if (reviewed) fail("MEDIA_REVIEW_REQUIRED", "Changed media content or attribution cannot inherit an earlier privacy, rights or AI-use decision.",
         "Review the replacement with the person before retrying. This media item saved nothing and retained the original review decision.");
+      if (await hasRetainedAttachments(c, "media", saved.id)) fail("MEDIA_ATTRIBUTION_REVIEW_REQUIRED", "Changed media content or attribution cannot inherit retained notes or citation evidence.",
+        "Review the media and its attachments with the person. This media item saved nothing; its original content and attachments were retained.");
     }
   }
   return { key, status: saved.status, id: saved.id, ...(saved.kept ? { kept: saved.kept } : {}) };
