@@ -95,7 +95,10 @@ links), so `@I1@` in two files cannot silently identify the same person.
   FamilySearch fact id, or a stable name like `birth`, if a citation or note
   needs to point at the fact. A fact without a key gets one derived from its
   type, date, place and value.
-- A citation without its own id is keyed by its source, page and targets.
+- A citation without its own id is keyed by its source, page, targets and all
+  accepted evidence fields (excerpt, URL, notes, quality and access date).
+  Changed keyless evidence creates another citation; use an explicit key for
+  intentional corrections to one existing citation.
 - Globally stable `otherIds` on a person (such as FamilySearch or Ancestry
   ids) are remembered in their own namespace. GEDCOM xrefs are file-local;
   they cannot establish a cross-file identity. To link a GEDCOM person to an
@@ -275,8 +278,9 @@ bounded `fact~` hash returned by `factReferenceKeyFor` (without a person
 prefix). Supplying an explicit fact ID avoids needing to compute that fallback.
 When `keyOrigin` is omitted, lookup succeeds only when the key resolves in one
 domain; two different matches return `AMBIGUOUS_TARGET`, without guessing.
-Generated citation keys hash the source ID, page and sorted structured target
-tuples into a fixed-length key, so maximum-length source IDs remain supported.
+Generated citation keys hash the source ID, page, all accepted evidence fields
+and sorted structured target tuples into a fixed-length key, so maximum-length
+source IDs remain supported.
 Field-specific links retain separate entries for each supported field, including
 a whole-record link without a field. Repeating a batch adds no duplicate links.
 Older rows without matching outside-ID evidence cannot be refreshed as explicit
@@ -371,3 +375,7 @@ FamilySearch primary IDs, aliases and person references resolve importer mapping
 and owner-scoped captured PIDs together. Neither source outranks a conflicting
 identity. Dry planning applies the virtual person overlay and carries original
 PID index positions across chunks, so planned changes do not hide disagreements.
+
+Person aliases deduplicate against the primary canonical mapping key before
+registration. Equivalent GEDCOM-prefixed system labels therefore create one
+file-scoped mapping, preserving repeated imports and references.

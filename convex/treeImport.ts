@@ -443,6 +443,7 @@ async function importPerson(c: ChunkContext, item: any): Promise<Omit<ItemResult
   };
 
   const primary = await resolvePersonIdentity(c, key, c.job.system);
+  const primaryMappingKey = externalRecordKey(c.job.system, "person", key, c.job.importKey);
   const candidates = new Set<string>(primary.id ? [primary.id] : []);
   const otherIds: ExternalId[] = Array.isArray(item.otherIds) ? item.otherIds : [];
   const aliases = new Map<string, { system: string; id: string; mapped: string | null }>();
@@ -451,7 +452,7 @@ async function importPerson(c: ChunkContext, item: any): Promise<Omit<ItemResult
     const system = other.system.trim().toLowerCase();
     const id = requiredKey(other.id, "otherIds.id");
     const aliasKey = externalRecordKey(system, "person", id, c.job.importKey);
-    if (aliases.has(aliasKey)) continue;
+    if (aliasKey === primaryMappingKey || aliases.has(aliasKey)) continue;
     const identity = await resolvePersonIdentity(c, id, system);
     aliases.set(aliasKey, { system, id, mapped: identity.mapped });
     if (identity.id) candidates.add(identity.id);
@@ -489,7 +490,6 @@ async function importPerson(c: ChunkContext, item: any): Promise<Omit<ItemResult
   // Remember the person's ids on other sites too, so an import from there
   // lands on this same person instead of making a second one.
   for (const other of aliases.values()) {
-    if (other.system === c.job.system && other.id === key) continue;
     if (!other.mapped) await remember(c, "person", other.id, saved.id, other.system);
   }
 

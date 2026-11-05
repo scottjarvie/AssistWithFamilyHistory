@@ -232,13 +232,18 @@ export function factKeyFor(personKey: string, fact: FactInput): string {
   return factTargetKey(personKey, factReferenceKeyFor(fact));
 }
 
-/** Structured tuples keep delimiters inside a target from changing its identity. */
+/** Keyless evidence is immutable by identity; explicit IDs opt into refreshes. */
 export function citationKeyFor(citation: CitationInput): string {
   if (citation.key?.trim()) return citation.key.trim();
   const targets = citation.targets.map(target => JSON.stringify([
     target.kind, target.personKey?.trim() ?? "", target.key.trim(), target.field ?? "", target.keyOrigin ?? null,
   ])).sort();
-  return stableHash(JSON.stringify([citation.sourceKey.trim(), citation.page ?? "", targets]));
+  return stableHash(canonicalJson({
+    sourceKey: citation.sourceKey.trim(), page: citation.page ?? null, targets,
+    extractedText: citation.extractedText ?? null, url: citation.url ?? null,
+    notes: citation.notes ?? null, quality: citation.quality ?? null,
+    accessDate: citation.accessDate ?? null,
+  }));
 }
 
 /** FNV-1a 64-bit, hex. Deterministic, synchronous and fine for record keys. */

@@ -1282,6 +1282,74 @@ test("duplicate owned captured FamilySearch aliases refuse without choosing a ro
   expect(await countRows(t, "mcpRecordKeys")).toBe(0);
 });
 
+test.each(["extractedText", "url", "notes", "quality", "accessDate"])("generated citation evidence retains distinct %s and stable replay", async field => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  const first: NonNullable<TreeImportBatch["citations"]>[number] = {
+    sourceKey: "S", page: "12", extractedText: "Original excerpt", url: "https://example.test/original", notes: "Original note", quality: 1, accessDate: "2026-01-01",
+    targets: [{ kind: "person", key: "P", field: "name" }, { kind: "person", key: "P", field: "birth" }],
+  };
+  const changed: Record<string, unknown> = { extractedText: "Another excerpt", url: "https://example.test/another", notes: "Another note", quality: 3, accessDate: "2026-02-01" };
+  const second = { ...first, [field]: changed[field] };
+  expect(citationKeyFor(first)).not.toBe(citationKeyFor(second));
+  expect(citationKeyFor(first)).toBe(citationKeyFor({ ...first, targets: [...first.targets].reverse() }));
+  const citations = [first, second];
+  const batch: TreeImportBatch = {
+    sources: [{ key: "S", title: "Synthetic source" }], persons: [{ key: "P", living: false, names: [{ given: "Synthetic" }] }], citations,
+    notes: citations.map((citation, i) => ({ key: `N${i}`, text: `Synthetic evidence ${i}`, subject: { kind: "citation", key: citationKeyFor(citation), keyOrigin: "generated" } })),
+  };
+  const dry = await send(t, grant, job.importJobId, 0, batch, { dryRun: true }, `dry-citation-evidence-${field}`);
+  expect(await countRows(t, "citations")).toBe(0);
+  const real = await send(t, grant, job.importJobId, 0, batch);
+  expect(dry.counts).toEqual(real.counts);
+  expect(real.counts.citations.created).toBe(2);
+  expect(real.results.filter((row: any) => row.status === "failed")).toEqual([]);
+  const stored = await t.run(ctx => ctx.db.query("citations").collect());
+  expect(stored).toHaveLength(2);
+  for (const [i, input] of citations.entries()) {
+    const result = real.results.find((row: any) => row.kind === "citations" && row.key === citationKeyFor(input));
+    const citation = stored.find(row => String(row._id) === result.id)!;
+    expect(citation).toMatchObject({ extractedText: input.extractedText, url: input.url, notes: input.notes, accessDate: input.accessDate, confidence: input.quality === 1 ? "low" : "very_high" });
+    const note = await t.run(async ctx => (await ctx.db.query("notes").collect()).find(row => row.text === `Synthetic evidence ${i}`));
+    expect(note?.subject.id).toBe(String(citation._id));
+  }
+  expect(await countRows(t, "citationLinks")).toBe(4);
+  expect((await send(t, grant, job.importJobId, 0, batch)).deduplicated).toBe(true);
+  const repeat = await send(t, grant, job.importJobId, 1, { citations: citations.map(citation => ({ ...citation, targets: [...citation.targets].reverse() })) });
+  expect(repeat.counts.citations.unchanged).toBe(2);
+  expect(await t.run(ctx => ctx.db.query("citations").collect())).toEqual(stored);
+  expect(await countRows(t, "citationLinks")).toBe(4);
+});
+
+test.each(["gedcom7", "gedcom-5.5.1"])("GEDCOM canonical primary aliases stay unique across files and resume (%s)", async system => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  for (const file of ["file-a", "file-b"]) {
+    const beginArgs = { principal: principal(), grantId: grant, operationId: `begin-canonical-${file}`, requestHash: file, input: { importKey: file, system, label: file } };
+    const job = await t.mutation(internal.treeImport.beginTreeImport, beginArgs) as { importJobId: string };
+    const batch: TreeImportBatch = {
+      persons: ["@I1@", "@I2@"].map(key => ({ key, living: false, names: [{ given: `${file}-${key}` }], otherIds: ["gedcom", "GEDCOM7", "gedcom-5.5.1"].map(alias => ({ system: alias, id: key })) })),
+      relationships: [{ key: "R", type: "Couple", person1Key: "@I1@", person2Key: "@I2@" }],
+    };
+    const dry = await send(t, grant, job.importJobId, 0, batch, { dryRun: true }, `dry-canonical-${file}`);
+    const real = await send(t, grant, job.importJobId, 0, batch);
+    expect(real.results.filter((row: any) => row.status === "failed")).toEqual([]);
+    expect(dry.counts).toEqual(real.counts);
+    expect((await send(t, grant, job.importJobId, 0, batch)).deduplicated).toBe(true);
+    const resumed = await t.mutation(internal.treeImport.beginTreeImport, { ...beginArgs, operationId: `resume-canonical-${file}` }) as { importJobId: string };
+    expect(resumed.importJobId).toBe(job.importJobId);
+    const repeat = await send(t, grant, job.importJobId, 1, batch);
+    expect(repeat.counts.persons.unchanged).toBe(2);
+    expect(repeat.counts.relationships.unchanged).toBe(1);
+  }
+  const mappings = await t.run(ctx => ctx.db.query("mcpRecordKeys").collect());
+  expect(new Set(mappings.map(row => row.recordKey)).size).toBe(mappings.length);
+  expect(mappings.filter(row => row.recordType === "person")).toHaveLength(4);
+  expect(await countRows(t, "persons")).toBe(4);
+  expect(await countRows(t, "relationships")).toBe(2);
+});
+
 test("citation link additions report updated, dry planning agrees, repeated targets stay idempotent", async () => {
   const t = convexTest({ schema, modules, transactionLimits: true });
   const grant = await seedGrant(t, { vaultOwnerId: OWNER });
