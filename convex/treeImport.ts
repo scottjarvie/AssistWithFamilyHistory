@@ -342,7 +342,7 @@ function mergeExternalIds(existing: ExternalId[] | undefined, incoming: External
   return merged;
 }
 
-type UpsertOutcome = { id: string; status: ItemResult["status"]; kept?: string[] };
+type UpsertOutcome = { id: string; status: ItemResult["status"]; kept?: string[]; importedBaseline: Record<string, unknown> };
 
 function mergeableObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value)
@@ -437,8 +437,9 @@ async function upsertRow(
       createdAt: now,
       updatedAt: now,
     });
-    await remember(c, args.singular, args.key, id, c.job.system, { ...args.doc, ...args.baselineMetadata });
-    return { id, status: "created" };
+    const importedBaseline = clean({ ...args.doc, ...args.baselineMetadata });
+    await remember(c, args.singular, args.key, id, c.job.system, importedBaseline);
+    return { id, status: "created", importedBaseline };
   }
   const row = await ownedRow(c, args.table, args.existingId);
   if (!row) fail("NOT_FOUND", "The record this outside id pointed to is gone.", "Send the record again under a new key, or ask the person what happened to it.");
@@ -470,7 +471,9 @@ async function upsertRow(
   }
   Object.assign(imported, args.baselineMetadata);
   const baselineChanged = Object.keys(patch).length > 0 || (args.baselineMetadata !== undefined && !same(baseline, imported));
-  if (args.linked) await remember(c, args.singular, args.key, String(row._id), c.job.system, args.baselineMetadata ? imported : undefined);
+  // Only supplied leaves actually filled/refreshed above enter this baseline;
+  // retained legacy fields remain outside the importer's refresh authority.
+  if (args.linked) await remember(c, args.singular, args.key, String(row._id), c.job.system, imported);
   if (Object.keys(patch).length > 0) {
     await c.w.patch(String(row._id), { ...clean(patch), updatedAt: now });
   }
@@ -479,7 +482,7 @@ async function upsertRow(
     await c.w.patch(String(mapping._id), { lastImportedJson: JSON.stringify(clean(imported)) });
   }
   const status: ItemResult["status"] = args.linked ? "linked" : Object.keys(patch).length > 0 ? "updated" : "unchanged";
-  return { id: String(row._id), status, ...(kept.length ? { kept } : {}) };
+  return { id: String(row._id), status, importedBaseline: imported, ...(kept.length ? { kept } : {}) };
 }
 
 /* ----------------------------------------------------------------- persons */
@@ -523,12 +526,14 @@ async function resolvePersonIdentity(c: ChunkContext, key: string, system: strin
   const mapped = await lookup(c, "person", key, system);
   const identities = new Set<string>(mapped ? [mapped] : []);
   if (system.trim().toLowerCase() === "familysearch") {
+    const row = mapped ? await ownedRow(c, "persons", mapped) : null;
     const matches = (row: any) => row?.vaultOwnerId === c.owner && typeof row.living === "boolean" && !!row.name && row.fsId === key;
     const movedOut = [...(c.w.personIndexes ?? [])].filter(([id, index]) => index.fsId === key && !matches(c.w.rows?.get(id))).length;
     if (movedOut > TREE_IMPORT_LIMITS.duplicateScanPerPerson) fail("DRY_RUN_PLAN_LIMIT", "Too many planned PID index moves for a bounded identity lookup.", "Use smaller dry-run batches; nothing was saved.");
     const legacy = await c.ctx.db.query("persons").withIndex("by_owner_fsId", q => q.eq("vaultOwnerId", c.owner).eq("fsId", key)).take(2 + movedOut);
     for (const row of legacy) if (matches(c.w.rows?.get(String(row._id)) ?? row)) identities.add(String(row._id));
     for (const row of c.w.rows?.values() ?? []) if (matches(row)) identities.add(String(row._id));
+    if (identities.size === 1 && row?.fsId && row.fsId !== key) fail("LEGACY_IDENTITY_REVIEW_REQUIRED", "The person mapping disagrees with its current FamilySearch identity.", "Review the original person and mapping before importing more material; neither identity was changed.");
   }
   if (identities.size > 1) fail("AMBIGUOUS_PERSON_IDENTITY", "This outside ID identifies different existing people; no identity was selected.", "Have the person resolve the mapping and legacy PID disagreement before retrying; all originals were retained.");
   return { mapped, id: [...identities][0] ?? null };
@@ -617,7 +622,7 @@ async function importPerson(c: ChunkContext, item: any): Promise<Omit<ItemResult
   // Remember the person's ids on other sites too, so an import from there
   // lands on this same person instead of making a second one.
   for (const other of aliases.values()) {
-    if (!other.mapped) await remember(c, "person", other.id, saved.id, other.system);
+    if (!other.mapped) await remember(c, "person", other.id, saved.id, other.system, saved.importedBaseline);
   }
 
   for (const fact of facts.slice(0, TREE_IMPORT_LIMITS.factsPerPerson)) {
@@ -962,7 +967,10 @@ async function resolveTarget(c: ChunkContext, target: TargetInput): Promise<{ ta
   const singular = target.kind === "fact" ? "fact" : target.kind;
   if (!(target.kind in TARGET_TABLE)) fail("VALIDATION_ERROR", `Unknown target kind ${String(target.kind)}.`, "Use person, relationship, fact, note or media.");
   const lookupKey = target.kind === "fact" ? factTargetKey(requiredKey(target.personKey, "target personKey"), key) : key;
-  if (target.kind === "fact") await rejectLegacyIdentity(c, "fact", lookupKey, `${target.personKey!.trim()}/${key}`);
+  if (target.kind === "fact") {
+    await personFor(c, target.personKey, "target personKey");
+    await rejectLegacyIdentity(c, "fact", lookupKey, `${target.personKey!.trim()}/${key}`);
+  }
   const id = await lookupReference(c, singular, lookupKey, target.keyOrigin);
   if (!id) fail("MISSING_TARGET", `The ${target.kind} ${lookupKey} has not been imported yet.`, "Send what the citation supports first, then resend this row.");
   return { targetType: TARGET_TABLE[target.kind], targetId: id, ...(target.field ? { field: target.field.slice(0, 80) } : {}) };
@@ -1065,7 +1073,10 @@ async function importNote(c: ChunkContext, item: any): Promise<Omit<ItemResult, 
   const kind = NOTE_SUBJECT_KIND[subject.kind as keyof typeof NOTE_SUBJECT_KIND];
   if (!kind) fail("VALIDATION_ERROR", "A note needs a subject.", "Say which person, relationship, fact, source, citation or media the note belongs to.");
   const subjectKey = subject.kind === "fact" ? factTargetKey(requiredKey(subject.personKey, "subject personKey"), requiredKey(subject.key, "subject key")) : requiredKey(subject.key, "subject key");
-  if (subject.kind === "fact") await rejectLegacyIdentity(c, "fact", subjectKey, `${subject.personKey.trim()}/${subject.key.trim()}`);
+  if (subject.kind === "fact") {
+    await personFor(c, subject.personKey, "subject personKey");
+    await rejectLegacyIdentity(c, "fact", subjectKey, `${subject.personKey.trim()}/${subject.key.trim()}`);
+  }
   const subjectId = await lookupReference(c, subject.kind === "fact" ? "fact" : subject.kind, subjectKey, subject.keyOrigin);
   if (!subjectId) fail("MISSING_TARGET", `The ${subject.kind} ${subjectKey} has not been imported yet.`, "Send the record the note belongs to first, then resend this row.");
   const existingId = await lookup(c, "note", key);

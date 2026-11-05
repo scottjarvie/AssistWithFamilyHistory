@@ -2163,3 +2163,68 @@ test.each(["person", "relationship", "fact", "media", "source", "citation", "not
     expect(await snapshot()).toEqual(before); expect(await send(t, grant, job.importJobId, 1, batch, { dryRun }, `stale-target-${kind}-${mode}-${dryRun}`)).toEqual(result); expect(await snapshot()).toEqual(before);
   }
 });
+
+
+test.each(["primary", "alias", "relationship", "media", "citation", "note", "factCitation", "factNote"])("corrected FamilySearch PID cannot receive old-PID material through %s", async route => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  await send(t, grant, job.importJobId, 0, { persons: [{ key: "A", living: false, names: [{ given: "Original A" }], facts: [{ key: "F", type: "occupation", description: "Original assertion" }] }, { key: "OTHER", living: false, names: [{ given: "Other" }] }], sources: [{ key: "S", title: "Original source" }] });
+  const person = (await t.run(ctx => ctx.db.query("persons").collect())).find(row => row.fsId === "A")!;
+  await t.mutation(internal.persons.update, { id: person._id, fsId: "B" }); // Synthetic existing writer, not live user proof.
+  const snapshot = () => t.run(async ctx => { const saved: Record<string, any> = {}; for (const table of ["persons", "events", "personEvents", "mcpRecordKeys", "relationships", "media", "citations", "citationLinks", "notes"]) saved[table] = await (ctx.db as any).query(table).collect(); return saved; }); const before = await snapshot();
+  const target: any = route.startsWith("fact") ? { kind: "fact", personKey: "A", key: "F", keyOrigin: "explicit" } : { kind: "person", key: "A" };
+  const batch: TreeImportBatch = route === "primary" || route === "alias" ? { persons: [{ key: route === "primary" ? "A" : "NEW", living: false, names: [{ given: "Incoming" }], ...(route === "alias" ? { otherIds: [{ system: "familysearch", id: "A" }] } : {}), facts: [{ key: "NEW-F", type: "occupation", description: "Must not attach" }] }] }
+    : route === "relationship" ? { relationships: [{ key: "R", type: "Couple", person1Key: "A", person2Key: "OTHER" }] }
+    : route === "media" ? { media: [{ key: "M", title: "Must not attach", personKeys: ["A"] }] }
+    : route === "citation" || route === "factCitation" ? { citations: [{ key: "C", sourceKey: "S", targets: [target] }] }
+    : { notes: [{ key: "N", text: "Must not attach", subject: target }] };
+  for (const dryRun of [true, false]) {
+    const result = await send(t, grant, job.importJobId, 1, batch, { dryRun }, `corrected-pid-${route}-${dryRun}`);
+    expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("LEGACY_IDENTITY_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before);
+    expect(await send(t, grant, job.importJobId, 1, batch, { dryRun }, `corrected-pid-${route}-${dryRun}`)).toEqual(result); expect(await snapshot()).toEqual(before);
+  }
+  const correct = await send(t, grant, job.importJobId, 2, { persons: [{ key: "B", living: false, names: [{ given: "Original A" }], facts: [{ key: "B-F", type: "occupation", description: "Confirmed assertion for B" }] }] });
+  expect(correct.results[0]).toMatchObject({ id: String(person._id), status: "linked" });
+  expect((await t.run(ctx => ctx.db.query("persons").collect())).find(row => row._id === person._id)!.fsId).toBe("B");
+});
+
+test.each(["person", "source"])("first-linked %s baselines preserve later manual clearing and retained originals", async kind => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const id: any = await t.run(ctx => kind === "person"
+    ? ctx.db.insert("persons", { vaultOwnerId: OWNER, fsId: "A", name: { given: "", surname: "Original surname" }, living: false, sex: "unknown", researchStatus: "basic", createdAt: 1, updatedAt: 1 })
+    : ctx.db.insert("sources", { vaultOwnerId: OWNER, fsId: "A", title: "Original source title", type: "other", repository: "", createdAt: 1, updatedAt: 1 }));
+  const batch: TreeImportBatch = kind === "person" ? { persons: [{ key: "A", living: false, names: [{ given: "John", surname: "Incoming surname" }] }] } : { sources: [{ key: "A", title: "Incoming source title", repository: "Incoming repository" }] };
+  const snapshot = () => t.run(async ctx => ({ row: await ctx.db.get(id), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  const dry = await send(t, grant, job.importJobId, 0, batch, { dryRun: true }, `dry-first-linked-${kind}`); expect(await snapshot()).toEqual(before);
+  const linked = await send(t, grant, job.importJobId, 0, batch); expect(dry.counts).toEqual(linked.counts); expect(linked.results[0]).toMatchObject({ status: "linked", id: String(id) });
+  const imported: any = (await snapshot()).row;
+  if (kind === "person") { expect(imported.name).toEqual({ given: "John", surname: "Original surname" }); await t.mutation(internal.persons.update, { id, name: { given: "", surname: "Original surname" } }); }
+  else { expect(imported.title).toBe("Original source title"); expect(imported.repository).toBe("Incoming repository"); await t.mutation(internal.sources.update, { id, repository: "" }); }
+  const cleared = await snapshot(); const baseline = JSON.parse(cleared.keys[0].lastImportedJson!);
+  if (kind === "person") { expect(baseline.name).toEqual({ given: "John" }); expect(baseline.name.surname).toBeUndefined(); }
+  else { expect(baseline.repository).toBe("Incoming repository"); expect(baseline.title).toBeUndefined(); }
+  for (const dryRun of [true, false]) {
+    const result = await send(t, grant, job.importJobId, 1, batch, { dryRun }, `manual-cleared-link-${kind}-${dryRun}`);
+    expect(result.results).toEqual([expect.objectContaining({ status: "unchanged", kept: expect.arrayContaining([kind === "person" ? "name" : "repository"]) })]); expect(await snapshot()).toEqual(cleared);
+    expect(await send(t, grant, job.importJobId, 1, batch, { dryRun }, `manual-cleared-link-${kind}-${dryRun}`)).toEqual(result);
+  }
+});
+
+
+test.each([false, true])("new person aliases retain only safe import baselines across providers (legacy=%s)", async legacy => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  if (legacy) await t.run(ctx => ctx.db.insert("persons", { vaultOwnerId: OWNER, fsId: "A", name: { given: "", surname: "Original surname" }, living: false, sex: "unknown", researchStatus: "basic", createdAt: 1, updatedAt: 1 }));
+  const initial: any = await t.mutation(internal.treeImport.beginTreeImport, { principal: principal(), grantId: grant, operationId: `begin-alias-baseline-${legacy}`, requestHash: `hash-alias-baseline-${legacy}`, input: { system: "ancestry", importKey: `alias-baseline-${legacy}`, label: "Synthetic cross-provider tree" } });
+  const batch: TreeImportBatch = { persons: [{ key: "X", living: false, names: [{ given: "John", surname: "Incoming surname" }], otherIds: [{ system: "familysearch", id: "A" }] }] };
+  const dry = await send(t, grant, initial.importJobId, 0, batch, { dryRun: true }, `dry-alias-baseline-${legacy}`);
+  const real = await send(t, grant, initial.importJobId, 0, batch); expect(dry.counts).toEqual(real.counts);
+  const row = (await t.run(ctx => ctx.db.query("persons").collect()))[0];
+  const alias = (await t.run(ctx => ctx.db.query("mcpRecordKeys").collect())).find(key => key.recordKey === externalRecordKey("familysearch", "person", "A"))!;
+  const baseline = JSON.parse(alias.lastImportedJson!); expect(baseline.name.given).toBe("John"); if (legacy) expect(baseline.name.surname).toBeUndefined();
+  await t.mutation(internal.persons.update, { id: row._id, name: { ...row.name, given: "" } });
+  const next = await begin(t, grant, `alias-familysearch-${legacy}`);
+  const refresh: TreeImportBatch = { persons: [{ key: "A", living: false, names: [{ given: "John", surname: "Incoming surname" }] }] };
+  const before = await t.run(ctx => ctx.db.query("persons").collect());
+  const preview = await send(t, grant, next.importJobId, 0, refresh, { dryRun: true }, `dry-alias-clearing-${legacy}`); expect(await t.run(ctx => ctx.db.query("persons").collect())).toEqual(before);
+  const result = await send(t, grant, next.importJobId, 0, refresh); expect(preview.counts).toEqual(result.counts); expect(result.results[0].kept).toContain("name");
+  const retained = await t.run(ctx => ctx.db.get(row._id)); expect(retained!.name).toEqual({ given: "", surname: legacy ? "Original surname" : "Incoming surname" }); expect(await countRows(t, "persons")).toBe(1);
+});

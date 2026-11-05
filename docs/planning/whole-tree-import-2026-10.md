@@ -467,3 +467,11 @@ remain refreshable and AI-ineligible. Every citation/note target, relationship
 person and media/source association must resolve to an existing owned row,
 including in dry planning. Stale mappings are retained for review, never
 silently removed or redirected to replacement records.
+
+A mapped FamilySearch person whose populated current PID contradicts the
+requested PID requires identity review before importing or linking more
+material, including fact-scoped citations/notes and external aliases. Neither
+old mappings nor the corrected person are silently rekeyed. First-linked
+records and new person aliases retain baselines only for import-written
+fields; populated original fields remain outside refresh authority. Later
+manual clearing of those imported fields stays protected across providers.
