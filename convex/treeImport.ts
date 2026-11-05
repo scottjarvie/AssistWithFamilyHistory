@@ -697,7 +697,7 @@ async function importSource(c: ChunkContext, item: any): Promise<Omit<ItemResult
     linked,
     doc: {
       title,
-      type: sourceTypeFor(item.type),
+      type: item.type === undefined && existingId ? undefined : sourceTypeFor(item.type),
       repository: item.repository,
       url: item.url,
       author: item.author,
@@ -719,8 +719,12 @@ async function importSource(c: ChunkContext, item: any): Promise<Omit<ItemResult
 async function importMedia(c: ChunkContext, item: any): Promise<Omit<ItemResult, "kind" | "index">> {
   const key = requiredKey(item?.key, "key");
   const title = cleanText(item.title, "media title", FAMILY_HISTORY_MCP_LIMITS.shortText, true)!;
-  const personIds: string[] = [];
-  for (const personKey of item.personKeys ?? []) personIds.push(await personFor(c, personKey, "personKeys"));
+  const existingId = await lookup(c, "media", key);
+  let personIds: string[] | undefined;
+  if (item.personKeys !== undefined) {
+    personIds = [];
+    for (const personKey of item.personKeys) personIds.push(await personFor(c, personKey, "personKeys"));
+  } else if (!existingId) personIds = [];
   let sourceId: string | undefined;
   if (item.sourceKey) {
     sourceId = (await resolveSourceIdentity(c, requiredKey(item.sourceKey, "sourceKey"))).id ?? undefined;
@@ -730,9 +734,9 @@ async function importMedia(c: ChunkContext, item: any): Promise<Omit<ItemResult,
     table: "media",
     singular: "media",
     key,
-    existingId: await lookup(c, "media", key),
+    existingId,
     doc: {
-      type: item.type ?? "other",
+      type: item.type ?? (existingId ? undefined : "other"),
       title,
       description: cleanText(item.description, "media description", FAMILY_HISTORY_MCP_LIMITS.notes),
       // A reference only. No bytes travel with an import; the link is the
@@ -883,7 +887,7 @@ async function importNote(c: ChunkContext, item: any): Promise<Omit<ItemResult, 
     existingId,
     doc: {
       subject: nextSubject,
-      noteType: item.noteType ?? "general",
+      noteType: item.noteType ?? (existingId ? undefined : "general"),
       title: cleanText(item.title, "note title", FAMILY_HISTORY_MCP_LIMITS.shortText),
       text,
       externalIds: externalIdsFor(c, key, undefined),

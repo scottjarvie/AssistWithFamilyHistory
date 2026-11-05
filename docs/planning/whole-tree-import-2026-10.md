@@ -401,3 +401,11 @@ atomically. The default medium confidence means unspecified quality rather than
 an outside quality assertion. Omitted quality preserves an existing rating.
 Partial replays that change neither evidence nor links remain valid. New target
 links are planned and deduplicated before any insertion or attribution change.
+
+Creation defaults do not act as refresh values: omitted media personKeys/type,
+source type and note noteType retain stored values and associations. Explicit
+empty media personKeys still requests clearing imported associations, subject
+to manual-edit preservation. Creation defaults remain part of the import
+baseline so later explicit values can refresh them. Import person/relationship
+fact dates accept the model range flag through public validation and storage,
+including embedded birth/death dates; unrelated public date schemas stay strict.

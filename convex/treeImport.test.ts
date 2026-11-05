@@ -1594,6 +1594,79 @@ test.each(["page", "extractedText", "confidence", "url", "accessDate", "notes"].
   expect(after.links).toEqual(expect.arrayContaining(before.links));
 });
 
+test.each([false, true])("partial source media and note refreshes preserve omitted fields (manual %s)", async manual => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  await send(t, grant, job.importJobId, 0, {
+    sources: [{ key: "S", title: "Original source", type: "census" }], persons: ["P1", "P2"].map(key => ({ key, living: false, names: [{ given: key }] })),
+    media: [{ key: "M", title: "Portrait", type: "photo", personKeys: ["P1"], sourceKey: "S" }],
+    notes: [{ key: "N", text: "Original biography", noteType: "biography", subject: { kind: "person", key: "P1" } }],
+  });
+  if (manual) await t.run(async ctx => {
+    const person = (await ctx.db.query("persons").collect()).find(row => row.fsId === "P2")!;
+    const source = (await ctx.db.query("sources").collect())[0];
+    const media = (await ctx.db.query("media").collect())[0];
+    const note = (await ctx.db.query("notes").collect())[0];
+    await ctx.db.patch(source._id, { type: "book" });
+    await ctx.db.patch(media._id, { type: "scan", personIds: [person._id] });
+    await ctx.db.patch(note._id, { noteType: "research" });
+  });
+  const snapshot = () => t.run(async ctx => ({ sources: await ctx.db.query("sources").collect(), media: await ctx.db.query("media").collect(), notes: await ctx.db.query("notes").collect() }));
+  const before = await snapshot();
+  const batch: TreeImportBatch = { sources: [{ key: "S", title: "Corrected source title" }], media: [{ key: "M", title: "Corrected portrait title" }], notes: [{ key: "N", text: "Corrected biography text", subject: { kind: "person", key: "P1" } }] };
+  const dry = await send(t, grant, job.importJobId, 1, batch, { dryRun: true }, `dry-omitted-defaults-${manual}`);
+  expect(await snapshot()).toEqual(before);
+  const real = await send(t, grant, job.importJobId, 1, batch);
+  expect(dry.counts).toEqual(real.counts);
+  expect(real.results.every((row: any) => row.status === "updated" && !row.kept)).toBe(true);
+  const after = await snapshot();
+  expect(after.sources[0].type).toBe(before.sources[0].type);
+  expect(after.media[0].type).toBe(before.media[0].type);
+  expect(after.media[0].personIds).toEqual(before.media[0].personIds);
+  expect(after.media[0].sourceId).toBe(before.media[0].sourceId);
+  expect(after.media[0].privacyLevel).toBe("private");
+  expect(after.notes[0].noteType).toBe(before.notes[0].noteType);
+  if (!manual) {
+    await send(t, grant, job.importJobId, 2, { media: [{ key: "M", title: "Corrected portrait title", type: "other", personKeys: [] }] });
+    const cleared = (await snapshot()).media[0];
+    expect(cleared.personIds).toEqual([]);
+    expect(cleared.type).toBe("other");
+    expect(cleared.sourceId).toBe(before.media[0].sourceId);
+  }
+});
+
+test("creation defaults remain refreshable when later supplied explicitly", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  await send(t, grant, job.importJobId, 0, { sources: [{ key: "S", title: "Source" }], persons: [{ key: "P", living: false, names: [{ given: "Synthetic" }] }], media: [{ key: "M", title: "Media" }], notes: [{ key: "N", text: "Note", subject: { kind: "person", key: "P" } }] });
+  const initial = await t.run(async ctx => ({ source: (await ctx.db.query("sources").collect())[0], media: (await ctx.db.query("media").collect())[0], note: (await ctx.db.query("notes").collect())[0] }));
+  expect(initial.source.type).toBe("other"); expect(initial.media.type).toBe("other"); expect(initial.media.personIds).toEqual([]); expect(initial.note.noteType).toBe("general");
+  const result = await send(t, grant, job.importJobId, 1, { sources: [{ key: "S", title: "Source", type: "book" }], media: [{ key: "M", title: "Media", type: "photo", personKeys: ["P"] }], notes: [{ key: "N", text: "Note", noteType: "biography", subject: { kind: "person", key: "P" } }] });
+  expect(result.results.every((row: any) => row.status === "updated" && !row.kept)).toBe(true);
+  const after = await t.run(async ctx => ({ source: (await ctx.db.query("sources").collect())[0], media: (await ctx.db.query("media").collect())[0], note: (await ctx.db.query("notes").collect())[0] }));
+  expect(after.source.type).toBe("book"); expect(after.media.type).toBe("photo"); expect(after.media.personIds).toHaveLength(1); expect(after.note.noteType).toBe("biography");
+});
+
+test.each([0, 245])("dry partial refreshes retain planned associations and types across chunks (padding %i)", { timeout: 300_000 }, async padding => {
+  const t = convexTest({ schema, modules, transactionLimits: true });
+  const grant = await seedGrant(t, { vaultOwnerId: OWNER });
+  const job = await begin(t, grant);
+  const batch: TreeImportBatch = {
+    sources: [{ key: "S", title: "Source", type: "census" }, { key: "S", title: "Corrected source" }], persons: [{ key: "P", living: false, names: [{ given: "Synthetic" }] }],
+    media: [...Array.from({ length: padding }, (_, i) => ({ key: `padding-${i}`, title: `Padding ${i}` })), { key: "M", title: "Portrait", type: "photo", personKeys: ["P"], sourceKey: "S" }, { key: "M", title: "Corrected portrait" }],
+    notes: [{ key: "N", text: "Original", noteType: "biography", subject: { kind: "person", key: "P" } }, { key: "N", text: "Corrected", subject: { kind: "person", key: "P" } }],
+  };
+  const dry = await send(t, grant, job.importJobId, 0, batch, { dryRun: true }, `dry-planned-defaults-${padding}`);
+  expect(await countRows(t, "media")).toBe(0);
+  const real = await send(t, grant, job.importJobId, 0, batch);
+  expect(dry.counts).toEqual(real.counts);
+  expect(real.results.filter((row: any) => row.status === "failed")).toEqual([]);
+  const stored = await t.run(async ctx => ({ source: (await ctx.db.query("sources").collect())[0], media: (await ctx.db.query("media").collect()).find(row => row.title === "Corrected portrait")!, note: (await ctx.db.query("notes").collect())[0] }));
+  expect(stored.source.type).toBe("census"); expect(stored.media.type).toBe("photo"); expect(stored.media.personIds).toHaveLength(1); expect(stored.media.sourceId).toBe(stored.source._id); expect(stored.note.noteType).toBe("biography");
+});
+
 test("citation link additions report updated, dry planning agrees, repeated targets stay idempotent", async () => {
   const t = convexTest({ schema, modules, transactionLimits: true });
   const grant = await seedGrant(t, { vaultOwnerId: OWNER });

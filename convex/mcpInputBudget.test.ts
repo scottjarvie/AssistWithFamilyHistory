@@ -109,3 +109,47 @@ test("public MCP person context returns imported notes only for the owning decea
     expect(JSON.stringify(payload)).not.toContain("Private living biography");
   }
 });
+
+test("public tree import preserves date ranges through birth death events and relationship storage", async () => {
+  const t = convexTest({ schema, modules: import.meta.glob("./**/*.ts"), transactionLimits: true });
+  const owner = "synthetic-range-import-owner";
+  const principal = { issuer: "https://range.example.test", subject: owner, clientId: "synthetic-range-ai", scopes: [] };
+  const grantId = await seedGrant(t, { vaultOwnerId: owner, issuer: principal.issuer, clientId: principal.clientId });
+  const job = await t.mutation(internal.treeImport.beginTreeImport, { principal, grantId, operationId: "range-begin", requestHash: "range-begin", input: { importKey: "range-tree", system: "familysearch", label: "Synthetic date ranges" } }) as any;
+  let actionCalls = 0;
+  const actionCtx = {
+    runQuery: (ref: any, args: any) => t.query(ref, args), runMutation: (ref: any, args: any) => t.mutation(ref, args),
+    runAction: (ref: any, args: any) => { actionCalls++; return t.action(ref, args); },
+  } as any;
+  const resolution: Parameters<typeof createFamilyHistoryServer>[2] = { state: "active", grant: { grantId, clientId: principal.clientId, issuer: principal.issuer, scopes: ["family_history:research:write"], boundary: { kind: "whole_workspace" } } };
+  const callBatch = async (input: any) => {
+    const name = "family_history_import_tree_batch";
+    const handler = createMcpHandler(() => createFamilyHistoryServer(actionCtx, principal, resolution), { legacy: "stateless", responseMode: "json" });
+    try {
+      const response = await handler.fetch(new Request("https://range.example.test/mcp", { method: "POST", headers: { "content-type": "application/json", "mcp-protocol-version": "2026-07-28", "mcp-method": "tools/call", "mcp-name": name }, body: JSON.stringify({ jsonrpc: "2.0", id: "range", method: "tools/call", params: { name, arguments: input, _meta: { "io.modelcontextprotocol/protocolVersion": "2026-07-28", "io.modelcontextprotocol/clientInfo": { name: "range-test", version: "1" }, "io.modelcontextprotocol/clientCapabilities": {} } } }) }));
+      expect(response.status).toBe(200);
+      return await response.json() as any;
+    } finally { await handler.close(); }
+  };
+  const ranged = (original: string) => ({ original, range: true });
+  const input = {
+    operationId: "range-import", importJobId: job.importJobId, batchIndex: 0,
+    persons: [{ key: "P", living: false, names: [{ given: "Ranged" }], facts: [{ key: "birth", type: "birth", date: ranged("between 1900 and 1905") }, { key: "death", type: "death", date: ranged("between 1970 and 1975") }, { key: "occupation", type: "occupation", date: ranged("between 1920 and 1930") }] }, { key: "Q", living: false, names: [{ given: "Partner" }] }],
+    relationships: [{ key: "R", type: "Couple", person1Key: "P", person2Key: "Q", facts: [{ type: "Marriage", date: ranged("between 1925 and 1930") }] }],
+  };
+  const result = await callBatch(input);
+  expect(result.result.isError).not.toBe(true);
+  expect(result.result.structuredContent.results.filter((row: any) => row.status === "failed")).toEqual([]);
+  expect(actionCalls).toBe(1);
+  const stored = await t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), events: await ctx.db.query("events").collect(), relationships: await ctx.db.query("relationships").collect() }));
+  const person = stored.people.find(row => row.fsId === "P")!;
+  expect(person.birth?.date).toMatchObject(ranged("between 1900 and 1905"));
+  expect(person.death?.date).toMatchObject(ranged("between 1970 and 1975"));
+  expect(stored.events).toHaveLength(3);
+  for (const event of stored.events) { expect(event.date?.range).toBe(true); expect(event.importedFact?.date?.range).toBe(true); }
+  expect(stored.relationships[0].facts?.[0].date).toMatchObject(ranged("between 1925 and 1930"));
+  const invalid = await callBatch({ operationId: "range-invalid", importJobId: job.importJobId, batchIndex: 1, persons: [{ key: "INVALID", living: false, names: [{ given: "Invalid" }], facts: [{ type: "birth", date: { original: "1900", range: "yes" } }] }] });
+  expect(invalid.error ?? invalid.result?.isError).toBeTruthy();
+  expect(actionCalls).toBe(1);
+  expect(await t.run(ctx => ctx.db.query("persons").collect())).toEqual(stored.people);
+});

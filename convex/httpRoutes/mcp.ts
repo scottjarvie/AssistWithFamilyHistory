@@ -508,10 +508,11 @@ const importExternalId = z.object({
   url: z.string().url().max(2_000).optional(),
 }).strict();
 const importPlace = z.object({ original: z.string().trim().min(1).max(500) }).strict();
+const importDate = dateValue.extend({ range: z.boolean().optional() }).strict();
 const importFact = z.object({
   key: importKey.optional(),
   type: z.string().trim().min(1).max(200),
-  date: dateValue.optional(),
+  date: importDate.optional(),
   place: importPlace.optional(),
   value: z.string().trim().max(1_000).optional(),
   description: z.string().trim().max(2_000).optional(),
@@ -547,7 +548,7 @@ const importRelationship = z.object({
   person1Key: importKey,
   person2Key: importKey,
   lineage: z.enum(["biological", "adopted", "step", "foster", "guardianship", "unknown"]).optional(),
-  facts: z.array(z.object({ type: z.string().trim().min(1).max(120), date: dateValue.optional(), place: importPlace.optional(), description: z.string().trim().max(1_000).optional() }).strict()).max(20).optional(),
+  facts: z.array(z.object({ type: z.string().trim().min(1).max(120), date: importDate.optional(), place: importPlace.optional(), description: z.string().trim().max(1_000).optional() }).strict()).max(20).optional(),
   otherIds: z.array(importExternalId).max(10).optional(),
 }).strict();
 const importSource = z.object({

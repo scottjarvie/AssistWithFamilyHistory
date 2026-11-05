@@ -147,6 +147,7 @@ export default defineSchema({
             month: v.optional(v.number()),
             day: v.optional(v.number()),
             approximate: v.optional(v.boolean()),
+            range: v.optional(v.boolean()),
           })
         ),
         place: v.optional(
@@ -168,6 +169,7 @@ export default defineSchema({
             month: v.optional(v.number()),
             day: v.optional(v.number()),
             approximate: v.optional(v.boolean()),
+            range: v.optional(v.boolean()),
           })
         ),
         place: v.optional(
@@ -278,6 +280,7 @@ export default defineSchema({
               month: v.optional(v.number()),
               day: v.optional(v.number()),
               approximate: v.optional(v.boolean()),
+              range: v.optional(v.boolean()),
             })
           ),
           place: v.optional(
