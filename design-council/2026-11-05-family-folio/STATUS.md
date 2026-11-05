@@ -1,3 +1,7 @@
+[Open the organized HTML review](gallery.html) · Six newest-first milestones with20 before/latest page comparisons, Desktop/Phone switches, exact review state and a collapsed502-image archive. Local HTML loads original PNGs on demand for readable full-resolution lightboxes; inline thread adapter uses compressed previews. Existing self-contained PNG bundle preserved as gallery-full-resolution.html.
+
+[Design review page · newest first](gallery.html) · Reorganized for Scott:6 chronological milestones,20 paired page comparisons,Desktop/Phone switches,9 ordered council receipts and502 preserved captures. Gallery browser checks and clean inline preview/display pass. Reader work is explicitly WIP; latest fully checked code isfe77e07. Formal scoring cadence needs catch-up; all-page goal remains open.
+
 [Newest-first gallery](gallery.html) · Settings code committed atfe77e07:57/57 full steps,17 intercepted browser groups +11 Audit regressions,45 new candidate images and8 reconstructed originals.486-image gallery checks/clean preview/inline display pass. Exact-head review packet ready; Claude not woken under current instruction. All-page goal active; local only.
 
 [Newest-first gallery](gallery.html) · Audit refinements committed atb5058bb:57/57 full steps,60 browser checks,22 fresh captures;433-image gallery checks/preview/display pass. Opus accepts preservation/privacy and prior Queue/Operations fixes; next meaningful review with Settings. All-page goal active; local only.

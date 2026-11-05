@@ -133,3 +133,11 @@ design-council/*/settings-matrices/
 design-council/*/settings-capture-attempt*/
 
 design-council/*/settings-capture-before-focus/
+
+# Document reader council captures.
+design-council/*/readers-baseline/
+design-council/*/readers-field-guide/
+design-council/*/readers-attempt*/
+
+# Optional full-resolution self-contained gallery export.
+design-council/*/gallery-full-resolution.html
