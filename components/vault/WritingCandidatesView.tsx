@@ -5,7 +5,7 @@ import type { WritingCandidateRow } from "@/lib/vault/collectionRows";
 const columns:CollectionColumn<WritingCandidateRow>[]=[
  {key:"name",label:"Name",sortOnly:true,render:r=>r.name,sortValue:r=>r.name},
  {key:"workflow",label:"Workflow",render:r=>r.workflow.replace(/_/g," "),sortValue:r=>r.workflow},
- ...(["sources","context","ready"] as const).map(key=>({key,label:key==="sources"?"Sources":key==="context"?"Context reports":"Ready",numeric:true,render:(r:WritingCandidateRow)=>key==="ready"?`${r[key]}%`:r[key],sortValue:(r:WritingCandidateRow)=>r[key]})),
+ ...(["sources","context","ready"] as const).map(key=>({key,label:key==="sources"?"Sources":key==="context"?"Context reports":"Ready",numeric:true,compactLabel:(r:WritingCandidateRow)=>key==="ready"?"ready":key==="context"?(r[key]===1?"context report":"context reports"):(r[key]===1?"source":"sources"),render:(r:WritingCandidateRow)=>key==="ready"?`${r[key]}%`:r[key],sortValue:(r:WritingCandidateRow)=>r[key]})),
 ];
 export function WritingCandidatesView({people,preferenceKey}:{people:WritingCandidateRow[];preferenceKey:string}) {
  return <CollectionPage title="Story Writer" eyebrow="Derived outputs" description="Choose a person with enough evidence, places, and memories to draft a story from the context pack.">

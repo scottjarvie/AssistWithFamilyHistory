@@ -2,6 +2,7 @@ import {test} from "node:test";
 import assert from "node:assert/strict";
 import {projectPlaceRow,projectStoryRow,projectWritingCandidate,projectResearchTask,projectResearchLog} from "../lib/vault/collectionRows";
 import {canonicalFilters,applyCollectionFilters} from "../lib/collections/viewFilters";
+import {countCollectionFacets} from "../lib/collections/facets";
 import {activityWindow, activityDay} from "../lib/activity/window";
 import {resolveCollectionColumns} from "../lib/collections/columnPreferences";
 
@@ -43,4 +44,11 @@ test("Custom activity dates replace a preset; open bounds survive and inverted d
  assert.equal(custom.start,Date.parse("2020-01-01T00:00Z"));assert.equal(custom.end,Date.parse("2020-01-03T00:00Z")-1);assert.equal(custom.invalid,false);
  const openStart=activityWindow("custom",{start:"",end:"2020-01-02"},first,latest);assert.equal(openStart.start,-Infinity);assert.equal(openStart.end,custom.end);
  assert.equal(activityWindow("custom",{start:"2026-11-05",end:"2026-11-01"},first,latest).invalid,true);
+});
+
+
+test("Facet counts share one engine and apply search plus every other active facet",()=>{
+ const rows=[{status:"draft",workflow:"evidence",name:"Samuel"},{status:"review",workflow:"ready",name:"Samuel"},{status:"draft",workflow:"ready",name:"Mabel"}];
+ const counts=countCollectionFacets(rows,[{key:"status",label:"Status",read:r=>r.status,options:[{value:"draft",label:"Draft"},{value:"review",label:"Review"}]},{key:"workflow",label:"Workflow",read:r=>r.workflow,options:[{value:"evidence",label:"Evidence"},{value:"ready",label:"Ready"}]}],{status:"review",workflow:"ready"},r=>r.name==="Samuel");
+ assert.deepEqual(counts.map(f=>f.options.map(o=>o.count)),[[0,1],[0,1]]);
 });

@@ -80,3 +80,36 @@ Previous goal turn classified as progress: committed expanded collections plus l
 No-removal audit: original status/workflow selects and five workflow quick links are consolidated into the labelled + Filter sheet; every option remains one selection deep with counts where loaded data permits, and active filters remove directly. This deliberate added opening step follows Opus T2 and the playbook's decided phone filter sheet, replacing duplicate controls per facet. Date inputs move behind Pick dates per Opus T1; the summary remains direct and keyboard accessible. Stories keeps the original four-line narrative preview plus expansion and all Review/public actions in every chosen view; no shorter clamp was introduced. Living/deceased moves into the always-visible identity, not a hideable column. Short compact count labels retain full table headers and fact titles. Home's three small inventory trays merge into counted rows without dropping text or actions. No new hidden data, hover-only content, icon-only controls, auth/schema/grant/provider/publication behavior or private fixtures.
 
 Formal round 2 is still pending the wider page-family pass. This named capture tranche does not consume or claim a formal council round. Record dossiers/streams, Queue, settings, readers, public and specialist routes remain incomplete.
+
+### Opus review of 7f1ab4f
+
+Sol-authored exact head `7f1ab4fab8d8612d896276d5866ca8fb12ca7e99` received Opus5.5 conditional approval. Receipt: `reviews/opus-activity-facets-7f1ab4f.md`. No privacy/capability regressions; prior R1–R5/R7, Stories reading layout/status colors and Home T1–T4 resolved. Remaining required kit findings C1/C2/C3/C9: consistent contextual facet counts, one status control, sensible missing-date wording, singular/plural compact labels and non-splitting facts. Lead now uses one pure contextual-count engine for Stories/Research, with status only in Stories tabs and direct removal chips; workflow alone is in its picker. Added focused count test. Empty dates render Never imported, compact labels take the row, numeric/date fact units stay together. C4–C7 also fixed: no false Home count-link promise, all author totals included, a six-pixel drag threshold, phone period semantics, and measured SVG width for round marks. Further minor taste refinements remain in the receipt; no new tiny delegate recheck commissioned.
+
+## Person record dossier and single evidence stream · implementation tranche
+
+The authenticated route retains its exact owner lookup, vault action, document action/arguments, unavailable/error states and not-found path. Presentation moves to server-rendered PersonWorkspaceView. RecordSections receives rendered children plus section id/count/date metadata, never a raw workspace. EvidenceStream receives displayed dated metadata and server-rendered content, never raw import artifacts, paths or unknown document fields. A hand-written SVG dossier slot and record glyphs use semantic tokens.
+
+Desktop is dossier left and evidence right; phone is dossier then counted sticky tabs, Contents and stream. All 9 lists every tab including Overview, so a phone never needs to discover sideways scrolling. Tabs support arrows/Home/End, native section anchors and reloadable fragments. Panels remain mounted while hidden to preserve real unfinished intake/check/media drafts. Dossier sticks only when the complete card fits a wide viewport; tall cards remain in normal flow.
+
+No-removal field/control map:
+
+| Original | Current home | Reason |
+|---|---|---|
+| Identity, full original birth/death dates/places, living state, FS id, unsourced/manual-first-start warnings | Dossier | Single canonical facts block; no repeated Life Sketch facts |
+| Completion, critical/recommended/stale gaps | Dossier with explicit auto-inferred status label | Replaces duplicate coverage/Operations Status blocks without dropping values |
+| Sources, memories, places, events, confirmed relationships, stories totals | Matching counted tabs/All menu; phone Contents | Uses the decided section-navigation pattern instead of repeated Story Inputs/summary boxes |
+| Imports, context reports, research-task totals | Dossier counted links | Distinct counts that cannot be inferred from another section's aggregate |
+| AI analysis, Markdown/JSON context-pack export | Dossier | Original destinations and full text stay |
+| Priority gap summaries | Pinned above stream | Every original nextActions entry visible |
+| Recent imports page types/date/merge state/warning count | Single dated stream | All captures retained; full import kind can be selected |
+| Research log summary/kind/details | Same single stream, with recorded author/Updated UTC | Avoids a second copy in Research. Show all exposes every earlier entry in one click from the record, matching the old Research-tab step. Research keeps a direct stream link |
+| All source facts/citations/conflicts/external links | Sources | Existing 12-fact display cap removed; all returned candidates visible |
+| Historical events/gaps/places | Timeline | Separate from recorded update dates; original place text now renders when it is the available place label |
+| Canonical relationships and explicitly provisional relatives | Relationships | Tab count excludes unreviewed provisional claims; their separate labelled block remains |
+| Places, media upload/privacy/rights/AI-use review, documents/copy/download/legacy readers, full story prose/review/public links | Original named sections | Controls and guard semantics retained; semantic roles/colors migrated |
+| Research tasks, inferred/override checks, private context intake/items | Research | Same fields, defaults and mutation routes; unfinished intake survives section switches |
+| No-capture legacy availability and Open Imports | Pinned no-import notice + Next Actions | Direct original CTA and capture-required explanations retained |
+
+The stream initially shows six dated entries with an exact earlier-entry count and Show all. This is the decided dated-stream disclosure, replacing an imports-only four-row preview and the separate log; no entry content is clamped. Original single-page aggregate descriptions/boilerplate are consolidated with their corresponding facts, not treated as stored records. Media/check mutations are disabled only in the labelled synthetic harness; context drafts can be typed there but Save is disabled and guarded. Production defaults retain their behavior. No data schema, API, grant, provider, publishing or access change.
+
+The fixture is assembled offline from invented Finch/Ashford records through the existing pure workspace assembler; no backend reads. Original Person route/header JSX is reconstructed from99980b5 under current shared runtime and the same invented fixture, clearly labelled, not an original-stack capture. Ten reconstructed captures pass. Browser checking fixed native fragment notification (using bare anchors for dossier links), stable hash/popstate subscriptions and preservation of Next history state. A fuller sequence now covers actual reload as well as fragment navigation; consecutive frozen-source Record runs pass12/12 with no errors or API writes. Current captures/full check/exact-head review follow.

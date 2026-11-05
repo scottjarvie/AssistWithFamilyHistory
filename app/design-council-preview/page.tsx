@@ -1,5 +1,9 @@
 /** Development-only component harness. Invented records, no backend or authenticated reads. */
 import { notFound } from "next/navigation";
+import { BaselinePersonWorkspace } from "@/components/design/BaselinePersonWorkspace";
+import { PersonWorkspaceView, type PersonWorkspace } from "@/components/vault/PersonWorkspaceView";
+import personWorkspace from "@/components/design/fixtures/person-workspace.json";
+import type { DocumentRecord } from "@/components/DocumentsViewer";
 import { DashboardView, type DashboardSummary } from "@/components/vault/DashboardView";
 import { PeopleExplorerView, type PeopleExplorerRow } from "@/components/vault/PeopleExplorerView";
 import { PlaceCollectionView } from "@/components/vault/PlaceCollectionView";
@@ -36,14 +40,16 @@ export default async function DesignPreview({searchParams}:{searchParams:Promise
  const surface=requested||page||"home";
  const baseline=surface.startsWith("baseline-");
  const displaySurface=baseline?surface.slice(9):surface;
- const isPeople=["people","people-more","people-long"].includes(surface);
- const fixturePeople=surface==="people-long"?[{...people[0],displayName:"EleanorFinchAshfordBell".repeat(12)},...people.slice(1)]:people;
+ const isPerson=["person","person-no-imports"].includes(surface);
+ const recordFixture=surface==="person-no-imports"?{...personWorkspace,importRuns:[],stats:{...personWorkspace.stats,imports:0}}:personWorkspace;
+ const isPeople=["people","people-more","people-long","people-no-imports"].includes(surface);
+ const fixturePeople=surface==="people-no-imports"?[{...people[0],latestImport:null},...people.slice(1)]:surface==="people-long"?[{...people[0],displayName:"EleanorFinchAshfordBell".repeat(12)},...people.slice(1)]:people;
  const filteredPeople=fixturePeople.filter(p=>(!q||`${p.displayName} ${p.routeId} ${p.birth?.date.year} ${p.death?.date.year}`.toLowerCase().includes(q.toLowerCase()))&&(!status||p.researchStatus===status));
  const key=`awf.collection.${isPeople?"people":surface}.design-fixture${fixtureOwner==="other"?".other":""}`;
- const activePath=isPeople?"/app/people":({places:"/app/places",stories:"/app/stories",research:"/app/research",writing:"/app/story-writer"}[displaySurface]||"/app");
+ const activePath=(isPeople||isPerson||displaySurface==="person")?"/app/people":({places:"/app/places",stories:"/app/stories",research:"/app/research",writing:"/app/story-writer"}[displaySurface]||"/app");
  return <div className={theme==="dark"?"dark":""}><div className="min-h-screen bg-background text-foreground"><FixtureNavigation surface={surface}>
   <AppSidebar accountMode="local" vaultOwnerId="synthetic-design-only" clerkEnabled={false} activePath={activePath}/><AppMobileNav accountMode="local" vaultOwnerId="synthetic-design-only" clerkEnabled={false} activePath={activePath}/>
   <main className="min-h-screen md:ml-64"><AppTopBar clerkEnabled={false}/><p className="border-b border-border bg-muted px-4 py-2 text-xs text-muted-foreground">Design preview · invented records · no backend connected{baseline?" · original route JSX reconstructed with current shared runtime":""}</p>
-   {surface==="baseline-places"?<BaselinePlaces input={places} params={{q}}/>:surface==="baseline-stories"?<BaselineStories input={stories} params={{status,workflow}}/>:surface==="baseline-writing"?<BaselineWriting input={candidates}/>:surface==="baseline-research"?<BaselineResearch tasks={tasks} log={log}/>:isPeople?<PeopleExplorerView preferenceKey={key} people={filteredPeople} firstStartEligible={false} query={q} status={status} loadMoreHref={surface==="people-more"?"/app/people?page=2":null}/>:surface==="places"?<PlaceCollectionView places={places.filter(p=>p.name.toLowerCase().includes(q.toLowerCase()))} query={q} preferenceKey={key}/>:surface==="stories"?<StoriesCollectionView stories={stories} query={q} status={status} workflow={workflow} preferenceKey={key}/>:surface==="writing"?<WritingCandidatesView people={candidates} preferenceKey={key}/>:surface==="research"?<ResearchOverviewView tasks={tasks} log={log} query={q} status={status} preferenceKey={key}/>:<DashboardView summary={surface==="empty"?{...summary,firstStartEligible:true,recentPeople:[],recentImports:[]}:summary}/>}
+   {surface==="baseline-person"?<BaselinePersonWorkspace workspace={personWorkspace as unknown as PersonWorkspace} personId="synthetic-eleanor" documents={personWorkspace.documents as unknown as DocumentRecord[]} documentsError={null}/>:surface==="baseline-places"?<BaselinePlaces input={places} params={{q}}/>:surface==="baseline-stories"?<BaselineStories input={stories} params={{status,workflow}}/>:surface==="baseline-writing"?<BaselineWriting input={candidates}/>:surface==="baseline-research"?<BaselineResearch tasks={tasks} log={log}/>:isPeople?<PeopleExplorerView preferenceKey={key} people={filteredPeople} firstStartEligible={false} query={q} status={status} loadMoreHref={surface==="people-more"?"/app/people?page=2":null}/>:isPerson?<PersonWorkspaceView workspace={recordFixture as unknown as PersonWorkspace} personId="synthetic-eleanor" documents={personWorkspace.documents as unknown as DocumentRecord[]} documentsError={null} readonlyPreview/>:surface==="places"?<PlaceCollectionView places={places.filter(p=>p.name.toLowerCase().includes(q.toLowerCase()))} query={q} preferenceKey={key}/>:surface==="stories"?<StoriesCollectionView stories={stories} query={q} status={status} workflow={workflow} preferenceKey={key}/>:surface==="writing"?<WritingCandidatesView people={candidates} preferenceKey={key}/>:surface==="research"?<ResearchOverviewView tasks={tasks} log={log} query={q} status={status} preferenceKey={key}/>:<DashboardView summary={surface==="empty"?{...summary,firstStartEligible:true,recentPeople:[],recentImports:[]}:summary}/>}
   </main></FixtureNavigation></div></div>;
 }

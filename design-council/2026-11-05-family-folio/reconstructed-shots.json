@@ -21,6 +21,10 @@
     {
       "name": "writing",
       "path": "/design-council-preview?surface=baseline-writing"
+    },
+    {
+      "name": "person",
+      "path": "/design-council-preview?surface=baseline-person"
     }
   ]
 }

@@ -17,7 +17,7 @@ export interface TimelineEvent {
   type: string;
   customType?: string;
   date?: { original?: string; year?: number };
-  place?: { fullName?: string; name?: string };
+  place?: { fullName?: string; name?: string; original?: string };
   description?: string;
 }
 
@@ -33,7 +33,7 @@ function eventYear(event: TimelineEvent): number | null {
 }
 
 function placeLabel(event: TimelineEvent): string | null {
-  return event.place?.fullName || event.place?.name || null;
+  return event.place?.fullName || event.place?.name || event.place?.original || null;
 }
 
 function buildRows(events: TimelineEvent[]): Row[] {
@@ -55,13 +55,13 @@ export function LifeTimeline({ events }: { events: TimelineEvent[] }) {
   const rows = buildRows(events);
 
   return (
-    <ol className="relative ml-1 border-l border-stone-200 pl-6">
+    <ol className="relative ml-1 border-l border-border pl-6">
       {rows.map((row, index) => {
         if (row.kind === "gap") {
           return (
             <li key={`gap-${index}`} className="mb-6">
-              <span className="absolute -left-[5px] mt-1 h-2.5 w-2.5 rounded-full border border-dashed border-amber-400 bg-amber-50" />
-              <div className="rounded-xl border border-dashed border-amber-300 bg-amber-50/60 px-4 py-3 text-sm text-amber-800">
+              <span className="absolute -left-[5px] mt-1 h-2.5 w-2.5 rounded-full border border-dashed border-annotation bg-annotation-surface" />
+              <div className="rounded-xl border border-dashed border-annotation/40 bg-annotation-surface/60 px-4 py-3 text-sm text-annotation">
                 ~{row.toYear - row.fromYear} years with no sourced event ({row.fromYear}–{row.toYear}) — a research gap to investigate.
               </div>
             </li>
@@ -77,22 +77,22 @@ export function LifeTimeline({ events }: { events: TimelineEvent[] }) {
           <li key={String(event._id)} className="mb-6">
             <span
               className={cn(
-                "absolute -left-[6px] mt-1.5 h-3 w-3 rounded-full border-2 border-white",
-                year !== null ? "bg-amber-500" : "bg-stone-300",
+                "absolute -left-[6px] mt-1.5 h-3 w-3 rounded-full border-2 border-card",
+                year !== null ? "bg-annotation-surface0" : "bg-muted-foreground",
               )}
             />
             <div className="flex flex-wrap items-baseline gap-x-3">
-              <span className="font-[family-name:var(--font-cormorant-garamond)] text-2xl font-semibold text-stone-900">
+              <span className="font-[family-name:var(--font-cormorant-garamond)] text-2xl font-semibold text-foreground">
                 {year ?? "—"}
               </span>
-              <p className="font-medium capitalize text-stone-900">{label}</p>
+              <p className="font-medium capitalize text-foreground">{label}</p>
             </div>
-            <p className="mt-0.5 text-sm text-stone-500">
+            <p className="mt-0.5 text-sm text-muted-foreground">
               {event.date?.original || "Undated"}
               {place ? ` · ${place}` : ""}
             </p>
             {event.description ? (
-              <p className="mt-2 text-sm leading-6 text-stone-600">{event.description}</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">{event.description}</p>
             ) : null}
           </li>
         );

@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-11-05T10:05:12.997Z",
+  "checkedAt": "2026-11-05T10:33:48.325Z",
   "checks": [
     "Places keeps kind and every event/citation/media count",
     "Place search and a saved query restore across full navigation",
@@ -11,10 +11,12 @@
     "Unknown task state normalizes to All states and keeps the complete loaded result",
     "AI provenance and self-reported model hints remain distinct",
     "Date-range selection and clear filter the real activity entries",
+    "A chart click leaves the date range unchanged until a real drag",
     "Dragging the activity date axis selects actual log entries",
     "Inverted dates explain paused date filtering and clearing one bound preserves the other",
     "Only recorded activity kinds appear and filter the dated list",
     "Phone filter sheet exposes every state at one level and the removable chip restores all records",
+    "Compact facts handle singular counts and missing dates without misleading prefixes",
     "All five collection surfaces preserve visible records and avoid overflow at 320px"
   ],
   "errors": []

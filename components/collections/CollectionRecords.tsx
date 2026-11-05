@@ -16,10 +16,11 @@ export function CollectionRecords<Row>({ grouped, columns, view, compact, rowKey
   identityLabel: string; primaryColumn?: string; sortKey?: string; descending: boolean; onSort: (key: string) => void;
 }) {
   const picture = (row: Row, grid = false) => <div className={`${grid ? "h-20 w-20" : "h-8 w-8"} text-primary`}>{imageSlot?.(row) || <ArchiveIllustration className="h-full w-full"/>}</div>;
+  const labelFor = (column:CollectionColumn<Row>,row:Row) => typeof column.compactLabel === "function" ? column.compactLabel(row) : column.compactLabel ?? column.label;
   const facts = (row: Row, selected: CollectionColumn<Row>[]) => <p className="text-[13px] leading-6 text-muted-foreground [overflow-wrap:anywhere]">{selected.map((column, index) => {
-    const mode = column.fact || (column.numeric ? "suffix" : "bare");
-    const label = column.compactLabel ?? column.label;
-    return <span key={column.key} title={column.label}>{index > 0 && <span aria-hidden="true"> · </span>}{mode === "prefix" && `${label} `}<span className="text-foreground tabular-nums">{column.render(row)}</span>{mode === "suffix" && ` ${label}`}</span>;
+    const mode = (typeof column.fact === "function" ? column.fact(row) : column.fact) || (column.numeric ? "suffix" : "bare");
+    const label = labelFor(column,row);
+    return <span key={column.key} title={column.label} className={column.numeric || mode === "prefix" ? "inline-block whitespace-nowrap" : "inline"}>{index > 0 && <span aria-hidden="true"> · </span>}{mode === "prefix" && `${label} `}<span className="text-foreground tabular-nums">{column.render(row)}</span>{mode === "suffix" && ` ${label}`}</span>;
   })}</p>;
   const primary = columns.find((column) => column.key === primaryColumn);
   return <div className="space-y-5">{grouped.map(([name, rows]) => <section key={name} aria-label={name || "Loaded records"}>
@@ -39,7 +40,7 @@ export function CollectionRecords<Row>({ grouped, columns, view, compact, rowKey
     {(view === "auto" || view === "list") && <ul className={`${view === "auto" ? "sm:hidden" : ""} divide-y divide-border rounded-lg border border-border bg-card`}>
       {rows.map((row) => <li data-row={rowKey(row)} key={rowKey(row)} className={`flex items-start gap-1 ${compact ? "px-2 py-2" : "px-3 py-3"}`}>
         {select(row)}<div className="min-w-0 flex-1"><RecordLink href={rowHref(row)} className="block min-h-11 text-primary underline-offset-4 hover:underline">
-          <div className="flex items-start gap-3"><div className="mt-1 shrink-0 self-start rounded bg-muted p-1">{picture(row)}</div><div className="min-w-0 flex-1">{renderIdentity(row)}</div>{primary && <p className="shrink-0 text-right font-mono text-sm tabular-nums">{primary.render(row)}<span className="block font-sans text-xs text-muted-foreground">{primary.compactLabel || primary.label}</span></p>}</div><div className="mt-1">{facts(row, columns.filter((column) => column !== primary))}</div>
+          <div className="flex items-start gap-3"><div className="mt-1 shrink-0 self-start rounded bg-muted p-1">{picture(row)}</div><div className="min-w-0 flex-1">{renderIdentity(row)}</div>{primary && <p className="shrink-0 text-right font-mono text-sm tabular-nums">{primary.render(row)}<span className="block font-sans text-xs text-muted-foreground">{labelFor(primary,row)}</span></p>}</div><div className="mt-1">{facts(row, columns.filter((column) => column !== primary))}</div>
         </RecordLink>{renderDetail?.(row)}{renderActions?.(row)}</div>
       </li>)}
     </ul>}

@@ -7,7 +7,7 @@ import type { PlaceCollectionRow } from "@/lib/vault/collectionRows";
 const columns:CollectionColumn<PlaceCollectionRow>[] = [
   {key:"name",label:"Place",sortOnly:true,render:r=>r.name,sortValue:r=>r.name},
   {key:"kind",label:"Kind",render:r=>r.kind,sortValue:r=>r.kind},
-  ...(["events","citations","media"] as const).map(key=>({key,label:key[0].toUpperCase()+key.slice(1),compactLabel:key,numeric:true,render:(r:PlaceCollectionRow)=>r[key],sortValue:(r:PlaceCollectionRow)=>r[key]})),
+  ...(["events","citations","media"] as const).map(key=>({key,label:key[0].toUpperCase()+key.slice(1),compactLabel:(r:PlaceCollectionRow)=>key==="media"?"media":r[key]===1?key.slice(0,-1):key,numeric:true,render:(r:PlaceCollectionRow)=>r[key],sortValue:(r:PlaceCollectionRow)=>r[key]})),
 ];
 export function PlaceCollectionView({places,query="",preferenceKey}:{places:PlaceCollectionRow[];query?:string;preferenceKey:string}) {
   return <CollectionPage title="Places" eyebrow="Place-centric context" description="Explore the locations that shaped migration, worship, residence, marriage, and memory.">

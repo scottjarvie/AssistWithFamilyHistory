@@ -1,4 +1,5 @@
-[Newest-first gallery](gallery.html) · Activity ledger, shared filter sheets and five-tray Home built locally; 15 browser checks / 20 captures pass. 57/57 full checks pass; Opus exact-head review next.
+[Newest-first gallery](gallery.html) · Person dossier/stream and reviewed kit fixes built locally; 32 captures and 12 Record checks pass. Full check and exact-head Opus review next.
+
 
 
 
@@ -58,3 +59,10 @@ Implemented the latest Opus taste calls across the existing collection family an
 Four focused privacy/facet/migration/date-window tests pass; 18 People interactions and 15 expanded cross-page checks pass, including 320px phone sheet selection/chip removal. Twenty current captures pass, no console/page errors or overflow. Full check, exact-head cross-model review and newest gallery update are next. Formal round 2 remains pending; no all-page target clearance. AWF-0071 stays doing; audit not audited. All code local, no push/PR/merge/deploy.
 
 Frozen-tranche full check passed **57/57**, Node22,49s. Current captures are `activity-facets`; the gallery puts this named capture tranche first without counting it as a formal council round. Exact-head Opus review follows the local code commit. No Card/Work Order completion or all-page clearance claimed.
+
+## Person dossier and single evidence stream · current local tranche
+
+- Authenticated Person route keeps its owner/backend/document reads and error/not-found paths. New server-rendered dossier/sections keep every original field/control; repeated canonical facts/totals are consolidated. Single dated import/research stream, eight counted evidence sections plus Overview, pinned All9, phone Contents, keyboard/hash/reload navigation, and sticky-only-when-fitting dossier.
+- Source candidates/conflicts/citations, historical timeline, clearly provisional relatives, places, media privacy/upload, generated/legacy documents, full stories and review/public routes, research checks/tasks and private context intake remain. Unfinished real intake survives section changes. No-capture Open Imports and tool availability guards stay direct.
+- Required Opus7f1ab follow-ups are fixed in the kit: contextual counts/one status chooser, natural empty/singular facts, complete author totals, six-pixel drag threshold, phone period semantics and round chart marks. Five focused regressions,18 People interactions,17 cross-page interactions and12 Record checks pass. Two consecutive frozen Record runs passed; no page errors or API writes. Current32 captures and10 honest reconstructed original comparisons pass.
+- Gallery/current captures are synthetic, with media/check mutations disabled and context Save guarded; no backend acceptance implied. Full check and exact-head cross-model review are next. Formal round2/all-page target/audit remain unfinished. AWF-0071 doing, audit not audited; no completed Work Orders. Local only.

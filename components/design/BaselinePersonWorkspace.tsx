@@ -1,0 +1,753 @@
+/** Reconstructed original route JSX; synthetic data and current shared runtime. Mutations disabled. */
+import { SafeLink, SafeAnchor } from "@/components/layout/SafeLink";
+import {
+  ArrowRight,
+  BookOpen,
+  CheckCircle2,
+  CircleAlert,
+  CircleMinus,
+  Files,
+  Globe2,
+  ImageIcon,
+  Network,
+  ScrollText,
+  Sparkles,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Prose } from "@/components/prose/Prose";
+import { LifeTimeline, type TimelineEvent } from "@/components/viz/LifeTimeline";
+import type { api } from "@/convex/_generated/api";
+
+import { DocumentsViewer } from "@/components/DocumentsViewer";
+import { ResearchChecksPanel } from "@/components/vault/ResearchChecksPanel";
+import { MediaPrivacyReviewPanel } from "@/components/vault/MediaPrivacyReviewPanel";
+import { ContextItemsPanel } from "@/components/vault/ContextItemsPanel";
+import { BaselinePersonHeader as PersonHeader } from "@/components/design/BaselinePersonHeader";
+import { publicStoryPath } from "@/lib/stories/slug";
+
+import type {PersonWorkspace} from "@/components/vault/PersonWorkspaceView";
+import type {DocumentRecord} from "@/components/DocumentsViewer";
+
+export function BaselinePersonWorkspace({workspace,personId,documents,documentsError}:{workspace:PersonWorkspace;personId:string;documents:DocumentRecord[];documentsError:string|null}) {
+  const routeId = workspace.person.routeId || personId;
+  const hasStoredRuns = workspace.importRuns.length > 0;
+  const storyCheckLabels: Record<string, string> = {
+    biography: "Biography or draft",
+    timeline: "Timeline coverage",
+    relationships: "Relationships",
+    birth_record: "Birth evidence",
+    death_record: "Death evidence",
+    memories: "Memories",
+    place_context: "Place context",
+  };
+  const storyReadinessChecks = workspace.researchChecks
+    .filter((check) => Object.keys(storyCheckLabels).includes(check.checkKey))
+    .map((check) => ({
+      key: check.checkKey,
+      label: storyCheckLabels[check.checkKey] || check.checkKey.replace(/_/g, " "),
+      status: check.status,
+      summary: check.summary,
+    }));
+  const currentStory = workspace.stories[0] ?? null;
+  const sourceFacts = workspace.sourceFacts ?? [];
+  const contextItems = workspace.contextItems ?? [];
+  const media = workspace.media ?? [];
+
+  return (
+    <div className="min-w-0 [overflow-wrap:anywhere] p-4 sm:p-8">
+      <PersonHeader
+        person={workspace.person}
+        stats={workspace.stats}
+        operations={workspace.operations}
+        routeId={routeId}
+      />
+
+      <Tabs defaultValue="overview" className="mt-6 space-y-6">
+        {/* One scrolling row on phones (nine tabs would otherwise wrap to three rows); wraps from sm up. */}
+        <TabsList className="-mx-4 flex h-auto w-auto justify-start gap-2 overflow-x-auto rounded-none bg-transparent px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
+          {["overview", "sources", "timeline", "relationships", "places", "memories", "documents", "stories", "research"].map((tab) => (
+            <TabsTrigger key={tab} value={tab} className="min-h-11 flex-none rounded-full border border-stone-200 bg-white px-4 py-2 capitalize data-[state=active]:border-amber-300 data-[state=active]:bg-amber-50 sm:pointer-fine:min-h-9">
+              {tab}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        <TabsContent value="overview">
+          {/* What's next leads; readiness and actions follow; the detailed numbers come last. */}
+          <Card className="mb-5 border-amber-200 bg-amber-50/40">
+            <CardHeader>
+              <CardTitle>Priority Gaps</CardTitle>
+              <CardDescription>The checks blocking stronger AI context packs and story outputs.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {workspace.operations.nextActions.length === 0 ? (
+                <p className="text-sm leading-6 text-stone-600">
+                  <span className="font-medium text-stone-900">No missing or review-needed checks are queued.</span> Work in progress can still remain. Review the research checks below before choosing the next step.
+                </p>
+              ) : (
+                <ol className="space-y-2">
+                  {workspace.operations.nextActions.map((action: string) => (
+                    <li key={action} className="border-l-2 border-amber-500 bg-white px-3 py-2 text-sm leading-6 text-stone-700">
+                      {action}
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </CardContent>
+          </Card>
+
+          <section className="mb-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <Card className="border-stone-200 bg-white">
+              <CardHeader>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <CardTitle className="text-2xl">Story Readiness</CardTitle>
+                    <CardDescription>
+                      Research coverage helps plan a draft. Review, privacy, and publication checks happen on the saved story.
+                    </CardDescription>
+                  </div>
+                  <div className="text-left sm:text-right">
+                    <p className="text-4xl font-semibold text-stone-900">{workspace.operations.completionPercent}%</p>
+                    <p className="text-xs uppercase tracking-[0.18em] text-stone-400">research coverage</p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {storyReadinessChecks.map((check) => (
+                    <div key={check.key} className="border border-stone-200 bg-stone-50 px-3 py-3">
+                      <div className="flex items-center gap-2">
+                        {check.status === "complete" ? (
+                          <CheckCircle2 aria-hidden="true" className="h-4 w-4 shrink-0 text-emerald-600" />
+                        ) : check.status === "not_applicable" ? (
+                          <CircleMinus aria-hidden="true" className="h-4 w-4 shrink-0 text-stone-500" />
+                        ) : (
+                          <CircleAlert aria-hidden="true" className="h-4 w-4 shrink-0 text-amber-700" />
+                        )}
+                        <p className="text-sm font-medium text-stone-900">{check.label}</p>
+                      </div>
+                      <p className="mt-2 text-xs font-medium capitalize text-stone-700">{check.status.replace(/_/g, " ")}</p>
+                      {check.summary ? <p className="mt-1 text-xs leading-5 text-stone-500">{check.summary}</p> : null}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <Button asChild className="bg-amber-700 hover:bg-amber-800">
+                    <SafeLink href={`/app/people/${routeId}/story-writer`}>Draft from context pack</SafeLink>
+                  </Button>
+                  <Button asChild variant="outline">
+                    <SafeLink href="/app/stories">Open Story Studio</SafeLink>
+                  </Button>
+                  {currentStory ? (
+                    <Button asChild variant="outline">
+                      <SafeLink href={`/app/stories/${currentStory._id}`}>Review latest saved story</SafeLink>
+                    </Button>
+                  ) : null}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-stone-200 bg-white">
+              <CardHeader>
+                <CardTitle>Life Sketch Preview</CardTitle>
+                <CardDescription>Quick story frame before diving into dense tabs.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm leading-6 text-stone-600">
+                <p>
+                  <span className="font-medium text-stone-900">{workspace.person.displayName}</span>
+                  {workspace.person.birth?.date?.original ? ` was born ${workspace.person.birth.date.original}` : " has an unknown birth date"}
+                  {workspace.person.birth?.place?.original ? ` in ${workspace.person.birth.place.original}` : ""}.
+                  {workspace.person.death?.date?.original || workspace.person.death?.place?.original ? (
+                    <>
+                      {workspace.person.death.date?.original ? ` Death is recorded as ${workspace.person.death.date.original}` : " Death is recorded"}
+                      {workspace.person.death.place?.original ? ` in ${workspace.person.death.place.original}` : ""}.
+                    </>
+                  ) : null}
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    ["Events", workspace.stats.events],
+                    ["Relationships", workspace.relationships.length],
+                    ["Stories", workspace.stats.stories],
+                    ["Context", workspace.stats.contextReports],
+                  ].map(([label, value]) => (
+                    <div key={label} className="border border-stone-200 px-3 py-3">
+                      <p className="text-lg font-semibold text-stone-900">{value}</p>
+                      <p className="text-xs text-stone-500">{label}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-stone-200 bg-white xl:col-span-2">
+              <CardHeader>
+                <CardTitle>Contextual Research</CardTitle>
+                <CardDescription>
+                  The non-genealogy research that helps turn names, dates, and places into a story: churches, buildings, local history, eras, migration, news, and daily life.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4 lg:grid-cols-[260px_1fr]">
+                <div className="grid grid-cols-2 gap-2 text-center text-sm lg:grid-cols-1">
+                  <div className="border border-stone-200 bg-stone-50 px-3 py-4">
+                    <p className="text-2xl font-semibold text-stone-900">{workspace.contextCoverage.count}</p>
+                    <p className="text-xs text-stone-500">context reports</p>
+                    {workspace.contextCoverage.count > 0 ? (
+                      <p className="mt-2 text-[11px] uppercase tracking-[0.14em] text-stone-400">
+                        {workspace.contextCoverage.aiEligibleCount} reviewed for AI · {workspace.contextCoverage.publishableCount} publish-ready
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="border border-stone-200 bg-stone-50 px-3 py-4">
+                    <p className="text-2xl font-semibold text-stone-900">
+                      {workspace.contextCoverage.placeCountWithContext}/{workspace.contextCoverage.relatedPlaceCount}
+                    </p>
+                    <p className="text-xs text-stone-500">places covered</p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  {workspace.contextCoverage.entries.length === 0 ? (
+                    <div className="rounded-md border border-dashed border-stone-200 px-4 py-6 text-sm leading-6 text-stone-500">
+                      This person has genealogy data, but no linked contextual research reports yet. Add place and era context from the relevant place workspaces before treating the story as ready.
+                    </div>
+                  ) : (
+                    workspace.contextCoverage.entries.slice(0, 4).map((entry) => {
+                      const reviewStatus = entry.reviewStatus ?? "unreviewed";
+                      const privacyLevel = entry.privacyLevel ?? "private";
+                      const aiAllowed = entry.aiUseAllowed === true;
+                      const reviewTone =
+                        reviewStatus === "reviewed" || reviewStatus === "redacted"
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                          : reviewStatus === "disputed" || reviewStatus === "rejected"
+                            ? "border-rose-200 bg-rose-50 text-rose-800"
+                            : "border-amber-200 bg-amber-50 text-amber-800";
+                      const privacyTone =
+                        privacyLevel === "public_source" || privacyLevel === "publish_candidate"
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                          : privacyLevel === "private"
+                            ? "border-rose-200 bg-rose-50 text-rose-800"
+                            : "border-stone-200 bg-stone-50 text-stone-700";
+                      return (
+                        <div key={String(entry._id)} className="border border-stone-200 px-4 py-3">
+                          <p className="font-medium text-stone-900">{entry.title}</p>
+                          <p className="mt-1 text-sm text-stone-500">
+                            {entry.topic.replace(/_/g, " ")} · {entry.timePeriod.startYear}-{entry.timePeriod.endYear}
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            <Badge variant="outline" className={reviewTone}>{reviewStatus}</Badge>
+                            <Badge variant="outline" className={privacyTone}>{privacyLevel.replace(/_/g, " ")}</Badge>
+                            <Badge variant="outline" className={aiAllowed ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-stone-200 bg-stone-50 text-stone-600"}>
+                              AI {aiAllowed ? "allowed" : "blocked"}
+                            </Badge>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+
+          <Card className="mb-5 border-stone-200 bg-gradient-to-br from-white to-amber-50/60">
+            <CardHeader>
+              <CardTitle>Next Actions</CardTitle>
+              <CardDescription>Move from imported evidence to agent-ready research outputs.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {[
+                {
+                  href: `/app/people/${routeId}/raw`,
+                  label: "Generate raw evidence",
+                  description: hasStoredRuns
+                    ? "Create the deterministic source transcript from a stored capture run."
+                    : "Requires a stored FamilySearch capture run before the legacy raw document flow is available.",
+                  available: hasStoredRuns,
+                },
+                {
+                  href: `/app/people/${routeId}/contextualized`,
+                  label: "Open dossier",
+                  description: hasStoredRuns
+                    ? "Review or save contextualized research notes from a stored run."
+                    : "Requires a stored FamilySearch capture run before the legacy dossier flow is available.",
+                  available: hasStoredRuns,
+                },
+                {
+                  href: `/app/people/${routeId}/ai`,
+                  label: "Run AI analysis",
+                  description: hasStoredRuns
+                    ? "Use the staged normalization and synthesis flow on a stored evidence pack."
+                    : "Requires a stored FamilySearch capture run before staged AI analysis can start.",
+                  available: hasStoredRuns,
+                },
+                {
+                  href: `/app/people/${routeId}/story-writer`,
+                  label: "Open Story Writer",
+                  description: "Draft short or long narrative outputs from the context pack.",
+                  available: true,
+                },
+                {
+                  href: `/api/people/${routeId}/context-pack?format=markdown`,
+                  label: "Export context pack",
+                  description: "Hand a clean Markdown package to an AI agent.",
+                  available: true,
+                },
+              ].map((action) =>
+                action.available ? (
+                  <SafeAnchor
+                    key={action.label}
+                    href={action.href}
+                    className="rounded-2xl border border-stone-200 bg-white px-4 py-4 transition hover:border-amber-300 hover:bg-amber-50/70"
+                  >
+                    <p className="font-medium text-stone-900">{action.label}</p>
+                    <p className="mt-2 text-sm leading-6 text-stone-500">{action.description}</p>
+                  </SafeAnchor>
+                ) : (
+                  <div
+                    key={action.label}
+                    className="rounded-2xl border border-dashed border-stone-200 bg-stone-50 px-4 py-4"
+                  >
+                    <p className="font-medium text-stone-900">{action.label}</p>
+                    <p className="mt-2 text-sm leading-6 text-stone-500">{action.description}</p>
+                  </div>
+                )
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+            <Card className="border-stone-200">
+              <CardHeader>
+                <CardTitle>Story Inputs</CardTitle>
+                <CardDescription>The vault pieces most useful to an AI story workflow.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-3">
+                {[
+                  { icon: ScrollText, label: "Evidence sources", value: workspace.stats.sources },
+                  { icon: Globe2, label: "Places", value: workspace.stats.places },
+                  { icon: ImageIcon, label: "Memories", value: workspace.stats.memories },
+                  { icon: Network, label: "Relationships", value: workspace.relationships.length },
+                  { icon: BookOpen, label: "Open research tasks", value: workspace.researchTasks.length },
+                ].map((item) => (
+                  <div key={item.label} className="rounded-2xl bg-stone-50 px-4 py-4">
+                    <item.icon className="mb-3 h-5 w-5 text-amber-700" />
+                    <p className="text-sm text-stone-500">{item.label}</p>
+                    <p className="mt-1 text-2xl font-semibold text-stone-900">{item.value}</p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            <Card className="border-stone-200">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-amber-700" />
+                  <CardTitle>Latest Imports</CardTitle>
+                </div>
+                <CardDescription>Recent FamilySearch captures merged into this person.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {workspace.importRuns.length === 0 ? (
+                  <EmptyWorkspaceState
+                    title="No imports yet"
+                    description="Start with a FamilySearch capture package so this workspace has evidence, places, and memories to build from."
+                    actionHref="/app/imports"
+                    actionLabel="Open Imports"
+                  />
+                ) : (
+                  workspace.importRuns.slice(0, 4).map((run) => (
+                    <div key={String(run._id)} className="rounded-2xl border border-stone-200 px-4 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="font-medium text-stone-900">{run.pageTypes.join(" + ")}</p>
+                        <Badge variant="secondary">{run.mergeStatus}</Badge>
+                      </div>
+                      <p className="mt-2 text-sm text-stone-500">{new Date(run.importedAt).toLocaleString()}</p>
+                      {run.warnings.length > 0 ? (
+                        <p className="mt-2 text-sm text-amber-800">{run.warnings.length} warning(s) still need review.</p>
+                      ) : null}
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="mt-5">
+            <Card className="border-stone-200 bg-gradient-to-br from-white to-stone-50">
+              <CardHeader>
+                <CardTitle>Operations Status</CardTitle>
+                <CardDescription>The auto-inferred research backend view for this person.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                {[
+                  ["Completion", `${workspace.operations.completionPercent}%`],
+                  ["Critical gaps", workspace.operations.requiredMissingCount],
+                  ["Recommended gaps", workspace.operations.recommendedMissingCount],
+                  ["Stale checks", workspace.operations.staleChecksCount],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-2xl bg-white px-4 py-4 ring-1 ring-stone-200">
+                    <p className="text-xs uppercase tracking-[0.2em] text-stone-400">{label}</p>
+                    <p className="mt-2 text-2xl font-semibold text-stone-900">{value}</p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="sources">
+          <div className="grid gap-4">
+            {sourceFacts.length > 0 ? (
+              <Card className="border-stone-200 bg-stone-50/60">
+                <CardHeader>
+                  <CardTitle>Source-backed facts</CardTitle>
+                  <CardDescription>Indexed fields captured as citation-backed candidates. Conflicts require review before canonical facts change.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-3 md:grid-cols-2">
+                  {(sourceFacts as Array<{
+                    _id: string;
+                    factType: string;
+                    label: string;
+                    value: string;
+                    confidence: string;
+                    status: string;
+                    conflictReason?: string;
+                  }>).slice(0, 12).map((fact) => (
+                    <div key={fact._id} className="rounded-md border border-stone-200 bg-white px-4 py-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="font-medium text-stone-900">{fact.factType.replace(/_/g, " ")}</p>
+                        <Badge variant={fact.status === "conflict" ? "destructive" : "secondary"}>{fact.status}</Badge>
+                      </div>
+                      <p className="mt-2 text-sm text-stone-600">{fact.label}: {fact.value}</p>
+                      <p className="mt-1 text-xs text-stone-500">Confidence: {fact.confidence}</p>
+                      {fact.conflictReason ? <p className="mt-2 text-xs text-amber-800">{fact.conflictReason}</p> : null}
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            ) : null}
+            {(workspace.sources as Array<{
+              source: { _id: string; title: string; type: string; url?: string };
+              citations: Array<{ page?: string; extractedText?: string; editedText?: string }>;
+            }>).length === 0 ? (
+              <EmptyWorkspaceState
+                title="No sources attached yet"
+                description="Import a FamilySearch capture package to populate source evidence, citations, and outbound record links."
+                actionHref="/app/imports"
+                actionLabel="Import Capture Package"
+              />
+            ) : (
+              (workspace.sources as Array<{
+                source: { _id: string; title: string; type: string; url?: string };
+                citations: Array<{ page?: string; extractedText?: string; editedText?: string }>;
+              }>).map((entry) => (
+                <Card key={String(entry.source._id)} className="border-stone-200">
+                  <CardHeader>
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <CardTitle>{entry.source.title}</CardTitle>
+                        <CardDescription>{entry.source.type.replace(/_/g, " ")} · {entry.citations.length} citation record(s)</CardDescription>
+                      </div>
+                      {entry.source.url ? (
+                        <Button asChild variant="outline" size="sm">
+                          <SafeAnchor href={entry.source.url} target="_blank" rel="noreferrer">
+                            Open Source
+                            <ArrowRight className="ml-2 h-4 w-4" />
+                          </SafeAnchor>
+                        </Button>
+                      ) : null}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm text-stone-600">
+                    {(entry.citations as Array<{ page?: string; extractedText?: string; editedText?: string }>).map((citation, index) => (
+                      <div key={`${String(entry.source._id)}-${index}`} className="rounded-2xl bg-stone-50 px-4 py-4">
+                        <p className="font-medium text-stone-900">{citation.page || "Imported citation"}</p>
+                        <p className="mt-2 whitespace-pre-wrap">{citation.extractedText || citation.editedText || "No extracted text captured."}</p>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="timeline">
+          <Card className="border-stone-200">
+            <CardHeader>
+              <CardTitle>Timeline</CardTitle>
+              <CardDescription>Ordered life events and evidence-backed moments.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {(workspace.timeline as TimelineEvent[]).length === 0 ? (
+                <EmptyWorkspaceState
+                  title="No timeline events yet"
+                  description="Imported sources usually create timeline moments automatically. If this stays empty, review the sources and place mentions for missing event clues."
+                />
+              ) : (
+                <LifeTimeline events={workspace.timeline as TimelineEvent[]} />
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="relationships">
+          <div className="grid gap-4 md:grid-cols-2">
+            {(workspace.relationships as Array<{
+              _id: string;
+              type: string;
+              relatedName: string;
+              relatedPerson: { fsId?: string };
+            }>).length === 0 ? (
+              <EmptyWorkspaceState
+                title="No relationships discovered yet"
+                description="Related people are inferred from indexed fields in imported sources. Marriage, census, and church records usually populate this area first."
+              />
+            ) : (
+              (workspace.relationships as Array<{
+                _id: string;
+                type: string;
+                relatedName: string;
+                relatedPerson: { fsId?: string };
+              }>).map((relationship) => (
+                <Card key={String(relationship._id)} className="border-stone-200">
+                  <CardHeader>
+                    <CardTitle className="text-lg">{relationship.relatedName}</CardTitle>
+                    <CardDescription>{relationship.type === "Couple" ? "Couple relationship" : "Parent/child relationship"}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-stone-500">{relationship.relatedPerson.fsId || "No FamilySearch ID yet"}</p>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+          {workspace.provisionalRelatives.length > 0 ? (
+            <Card className="mt-4 border-stone-200">
+              <CardHeader>
+                <CardTitle>Provisional Relatives</CardTitle>
+                <CardDescription>Named relatives discovered in sources that still need promotion or merge review.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3 md:grid-cols-2">
+                {workspace.provisionalRelatives.map((relative: { _id: string; displayName: string; relationshipHint?: string; evidenceCount: number }) => (
+                  <div key={relative._id} className="rounded-2xl border border-stone-200 px-4 py-4">
+                    <p className="font-medium text-stone-900">{relative.displayName}</p>
+                    <p className="mt-1 text-sm text-stone-500">
+                      {relative.relationshipHint || "Relationship not labeled"} · {relative.evidenceCount} supporting record(s)
+                    </p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ) : null}
+        </TabsContent>
+
+        <TabsContent value="places">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {(workspace.places as Array<{ _id: string; fullName?: string; name?: string; type?: string }>).length === 0 ? (
+              <EmptyWorkspaceState
+                title="No linked places yet"
+                description="Place mentions from sources and memories become the context graph for migration, churches, residence, and historical research."
+              />
+            ) : (
+              (workspace.places as Array<{ _id: string; fullName?: string; name?: string; type?: string }>).map((place) => (
+                <SafeLink key={place._id} href={`/app/places/${place._id}`}>
+                  <Card className="h-full border-stone-200 transition hover:border-amber-300 hover:bg-amber-50/30">
+                    <CardHeader>
+                      <CardTitle>{place.fullName || place.name || "Unknown place"}</CardTitle>
+                      <CardDescription>{place.type || "place"}</CardDescription>
+                    </CardHeader>
+                  </Card>
+                </SafeLink>
+              ))
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="memories" className="space-y-4">
+          {/* The panel always renders, because its upload control is how a
+              person puts a scan into the vault at all — including the first
+              one, when there is nothing here to import against yet. */}
+          <fieldset disabled><MediaPrivacyReviewPanel media={media} personId={String(workspace.person._id)} /></fieldset>
+          {media.length === 0 ? (
+            <EmptyWorkspaceState
+              title="No memories imported yet"
+              description="Upload a scan, photo, or recording above, or import a FamilySearch memories capture to enrich this person for later story writing."
+              actionHref="/app/imports"
+              actionLabel="Import Memories"
+            />
+          ) : null}
+        </TabsContent>
+
+        <TabsContent value="documents">
+          <Card className="border-stone-200">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Files className="h-5 w-5 text-amber-700" />
+                Derived Documents and Outputs
+              </CardTitle>
+              <CardDescription>Raw transcripts, dossiers, and future story drafts derived from the vault graph for this person.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap gap-3">
+                <Button asChild variant="outline">
+                  <SafeLink href={`/app/people/${personId}/raw`}>Raw Evidence Document</SafeLink>
+                </Button>
+                <Button asChild variant="outline">
+                  <SafeLink href={`/app/people/${personId}/contextualized`}>Contextualized Dossier</SafeLink>
+                </Button>
+              </div>
+              <DocumentsViewer documents={documents} error={documentsError} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="stories">
+          <div className="grid gap-4">
+            <Card className="border-stone-200 bg-gradient-to-br from-white to-amber-50/60">
+              <CardHeader>
+                <CardTitle>Story Writer</CardTitle>
+                <CardDescription>Generate narrative drafts from this person&apos;s context pack, then save them back into the vault.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button asChild className="bg-amber-700 hover:bg-amber-800">
+                  <SafeLink href={`/app/people/${routeId}/story-writer`}>Open Story Writer</SafeLink>
+                </Button>
+              </CardContent>
+            </Card>
+            {workspace.stories.length === 0 ? (
+              <Card className="border-dashed">
+                <CardContent className="py-12 text-center text-stone-500">
+                  No saved story outputs yet. Start from Story Writer or export a context pack to another AI tool.
+                </CardContent>
+              </Card>
+            ) : (
+              workspace.stories.map((story) => (
+                <Card key={String(story._id)} className="border-stone-200">
+                  <CardHeader>
+                    <CardTitle>{story.title}</CardTitle>
+                    <CardDescription>{story.type.replace(/_/g, " ")} · {story.status}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <Prose markdown={story.content} variant="compact" className="text-sm text-stone-600" />
+                    <div className="flex flex-wrap gap-3">
+                      <Button asChild variant="outline" size="sm">
+                        <SafeLink href={`/app/stories/${story._id}`}>Review in Story Studio</SafeLink>
+                      </Button>
+                      {story.status === "published" ? (
+                        <Button asChild variant="outline" size="sm">
+                          <SafeLink href={publicStoryPath(story.publicSlug ?? String(story._id))} target="_blank">Open public page</SafeLink>
+                        </Button>
+                      ) : null}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="research">
+          <div className="grid gap-5 xl:grid-cols-[1fr_1fr]">
+            <Card className="border-stone-200">
+              <CardHeader>
+                <CardTitle>Open Research Tasks</CardTitle>
+                <CardDescription>AI-suggested and human follow-up tasks anchored to this person.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {workspace.researchTasks.length === 0 ? (
+                  <EmptyWorkspaceState
+                    title="No research tasks yet"
+                    description="Imports and AI analysis will start creating follow-up tasks here as the vault spots unresolved questions and story opportunities."
+                  />
+                ) : (
+                  workspace.researchTasks.map((task) => (
+                    <div key={String(task._id)} className="rounded-2xl border border-stone-200 px-4 py-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="font-medium text-stone-900">{task.title}</p>
+                        <Badge variant="secondary">{task.priority}</Badge>
+                      </div>
+                      <p className="mt-2 text-sm text-stone-600">{task.description || task.type}</p>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-stone-200">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <BookOpen className="h-5 w-5 text-amber-700" />
+                  <CardTitle>Research Log</CardTitle>
+                </div>
+                <CardDescription>What the vault has already gathered or generated.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {workspace.researchLog.length === 0 ? (
+                  <EmptyWorkspaceState
+                    title="No research log entries yet"
+                    description="This area will show import activity, AI runs, and future manual research notes for this person."
+                  />
+                ) : (
+                  workspace.researchLog.map((entry) => (
+                    <div key={String(entry._id)} className="rounded-2xl border border-stone-200 px-4 py-4">
+                      <p className="font-medium text-stone-900">{entry.summary}</p>
+                      <p className="mt-1 text-sm text-stone-500">{entry.activityType.replace(/_/g, " ")}</p>
+                      {entry.details ? <p className="mt-2 text-sm text-stone-600">{entry.details}</p> : null}
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="mt-5 border-stone-200">
+            <CardHeader>
+              <CardTitle>Research Checks</CardTitle>
+              <CardDescription>Override or confirm the inferred operational checklist for this person.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <fieldset disabled><ResearchChecksPanel
+                personIdentifier={workspace.person.routeId}
+                checks={workspace.researchChecks}
+              /></fieldset>
+            </CardContent>
+          </Card>
+
+          <div className="mt-5">
+            <fieldset disabled><ContextItemsPanel personIdentifier={routeId} contextItems={contextItems} readonlyPreview/></fieldset>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function EmptyWorkspaceState({
+  title,
+  description,
+  actionHref,
+  actionLabel,
+}: {
+  title: string;
+  description: string;
+  actionHref?: string;
+  actionLabel?: string;
+}) {
+  return (
+    <Card className="border-dashed border-stone-300 bg-white/80">
+      <CardContent className="flex min-h-52 flex-col items-center justify-center px-6 py-10 text-center">
+        <p className="text-lg font-semibold text-stone-900">{title}</p>
+        <p className="mt-2 max-w-xl text-sm leading-6 text-stone-500">{description}</p>
+        {actionHref && actionLabel ? (
+          <Button asChild variant="outline" className="mt-5">
+            <SafeLink href={actionHref}>{actionLabel}</SafeLink>
+          </Button>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}

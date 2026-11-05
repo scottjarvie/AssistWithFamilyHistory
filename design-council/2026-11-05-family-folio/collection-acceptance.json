@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-11-05T10:00:21.109Z",
+  "checkedAt": "2026-11-05T10:27:13.493Z",
   "checks": [
     "Table keeps all four identities and all six evidence/date columns",
     "Numeric sort and direction change actual order",

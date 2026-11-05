@@ -194,6 +194,112 @@
           "text": "Ready"
         }
       ]
+    },
+    {
+      "name": "person",
+      "path": "/design-council-preview?surface=person",
+      "capabilities": [
+        {
+          "can": "open every counted section",
+          "selector": "div[role=\"tablist\"][aria-label=\"Record sections\"]"
+        },
+        {
+          "can": "compare source-backed candidates",
+          "selector": "a[href=\"#record-section-sources\"]"
+        },
+        {
+          "can": "read earlier entries",
+          "text": "earlier entries"
+        },
+        {
+          "can": "export private context pack",
+          "text": "Download Context Pack"
+        }
+      ]
+    },
+    {
+      "name": "person-sources",
+      "path": "/design-council-preview?surface=person",
+      "actions": [
+        {
+          "click": "button[role=\"tab\"]:has-text(\"Sources\")"
+        }
+      ],
+      "capabilities": [
+        {
+          "can": "read conflicting source candidates",
+          "text": "Invented indexes disagree"
+        },
+        {
+          "can": "read full citation",
+          "text": "Synthetic transcript"
+        }
+      ]
+    },
+    {
+      "name": "person-research",
+      "path": "/design-council-preview?surface=person",
+      "actions": [
+        {
+          "click": "button[role=\"tab\"]:has-text(\"Research\")"
+        }
+      ],
+      "capabilities": [
+        {
+          "can": "inspect existing research controls",
+          "text": "Research Checks"
+        },
+        {
+          "can": "type context intake draft",
+          "selector": "input[placeholder=\"Context title\"]"
+        },
+        {
+          "can": "see private unreviewed context",
+          "text": "Invented letter note"
+        }
+      ]
+    },
+    {
+      "name": "person-documents",
+      "path": "/design-council-preview?surface=person",
+      "actions": [
+        {
+          "click": "button[role=\"tab\"]:has-text(\"Documents\")"
+        }
+      ],
+      "capabilities": [
+        {
+          "can": "read generated person sheet",
+          "text": "Synthetic Person Sheet"
+        },
+        {
+          "can": "open legacy transcript route",
+          "text": "Raw Evidence Document"
+        }
+      ]
+    },
+    {
+      "name": "person-memories",
+      "path": "/design-council-preview?surface=person",
+      "actions": [
+        {
+          "click": "button[role=\"tab\"]:has-text(\"Memories\")"
+        }
+      ],
+      "capabilities": [
+        {
+          "can": "see upload surface even before first memory",
+          "text": "Upload"
+        },
+        {
+          "can": "see fixture mutation boundary",
+          "text": "mutations are disabled"
+        }
+      ]
+    },
+    {
+      "name": "person-dark",
+      "path": "/design-council-preview?surface=person&theme=dark"
     }
   ],
   "references": [

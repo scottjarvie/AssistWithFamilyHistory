@@ -116,27 +116,27 @@ export function ResearchChecksPanel({
           const draft = drafts[check.checkKey];
           const stale = isStaleCheck(check);
           return (
-            <Card key={check.checkKey} className="border-stone-200">
+            <Card key={check.checkKey} className="border-border">
               <CardContent className="grid gap-4 p-4 md:grid-cols-[1.2fr_180px_1fr_auto] md:items-start">
                 <div>
-                  <p className="font-medium text-stone-900">{check.checkKey.replace(/_/g, " ")}</p>
-                  <p className="mt-1 text-sm text-stone-500">
+                  <p className="font-medium text-foreground">{check.checkKey.replace(/_/g, " ")}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
                     {check.applicability} {check.summary ? `· ${check.summary}` : ""}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                    <span className="rounded-full bg-stone-100 px-2.5 py-1 text-stone-600">
+                    <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">
                       Source: {formatCompletionSource(check.completionSource)}
                     </span>
-                    <span className="rounded-full bg-stone-100 px-2.5 py-1 text-stone-600">
+                    <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">
                       Reviewed: {formatReviewedAt(check.lastReviewedAt)}
                     </span>
                     {typeof check.confidence === "number" ? (
-                      <span className="rounded-full bg-stone-100 px-2.5 py-1 text-stone-600">
+                      <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">
                         Confidence: {Math.round(check.confidence * 100)}%
                       </span>
                     ) : null}
                     {stale ? (
-                      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-800">
+                      <span className="rounded-full bg-annotation-surface px-2.5 py-1 text-annotation">
                         Stale review
                       </span>
                     ) : null}
@@ -149,7 +149,7 @@ export function ResearchChecksPanel({
                       status: event.target.value as CheckRecord["status"],
                     })
                   }
-                  className="h-11 md:pointer-fine:h-10 rounded-md border border-stone-200 bg-white px-3 text-base md:pointer-fine:text-sm text-stone-700"
+                  className="h-11 md:pointer-fine:h-10 rounded-md border border-border bg-white px-3 text-base md:pointer-fine:text-sm text-foreground"
                 >
                   <option value="missing">Missing</option>
                   <option value="in_progress">In progress</option>
@@ -179,13 +179,13 @@ export function ResearchChecksPanel({
         })}
       </div>
 
-      <Card className="border-stone-200 bg-stone-50/60">
+      <Card className="border-border bg-muted/60">
         <CardContent className="grid gap-3 p-4 md:grid-cols-[1fr_1fr_auto]">
           <input
             value={taskTitle}
             onChange={(event) => setTaskTitle(event.target.value)}
             placeholder="Create a follow-up research task"
-            className="h-10 rounded-md border border-stone-200 bg-white px-3 text-sm text-stone-700"
+            className="h-10 rounded-md border border-border bg-white px-3 text-sm text-foreground"
           />
           <Textarea
             value={taskDescription}
@@ -193,7 +193,7 @@ export function ResearchChecksPanel({
             placeholder="Short description for the task"
             className="min-h-24 bg-white"
           />
-          <Button className="bg-stone-900 hover:bg-stone-800" onClick={() => void createTask()}>
+          <Button className="bg-primary hover:bg-primary/90" onClick={() => void createTask()}>
             Add Task
           </Button>
         </CardContent>

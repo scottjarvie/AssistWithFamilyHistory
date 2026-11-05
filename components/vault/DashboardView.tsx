@@ -18,7 +18,7 @@ const workflowStations = [
 ];
 
 function lifeYears(person: { birth?: { date?: { year?: number } }; death?: { date?: { year?: number } } }) {
-  return `${person.birth?.date?.year || "?"} to ${person.death?.date?.year || "?"}`;
+  return `${person.birth?.date?.year || "?"}–${person.death?.date?.year || "?"}`;
 }
 
 /** A desk of evidence-first trays, backed only by the existing dashboard summary. */
@@ -66,9 +66,9 @@ export function DashboardView({ summary }: { summary: DashboardSummary }) {
           </ul> : <p className="px-4 pb-5 text-sm text-muted-foreground">No people yet. <Link href="/app/people/new" className="text-primary underline">Add a person</Link> or bring in a capture from Imports.</p>}
         </FolioTray>
 
-        <FolioTray id="research-tray-title" title="Research gaps" count={summary.counts.openTasks} countLabel="open tasks" summary="Source-backed research before the next story. These people have critical gaps; the count opens all tasks." href="/app/operations" linkLabel="Work the Research Queue">
+        <FolioTray id="research-tray-title" title="Research gaps" count={summary.counts.openTasks} countLabel="open tasks" summary="Source-backed research before the next story. These people have missing required checks; the total counts open tasks across the vault." href="/app/operations" linkLabel="Work the Research Queue">
           {gaps.length ? <ul className="divide-y divide-border">{gaps.map((person) => <li key={String(person._id)}>
-            <Link href={`/app/people/${person.routeId}`} className="block px-4 py-3 hover:bg-muted/50"><span className="block break-words font-medium">{person.displayName}</span><span className="mt-1 block text-sm leading-6 text-annotation">{person.operations.criticalMissing.slice(0,2).map(key => RESEARCH_CHECK_DEFINITIONS.find(check => check.key === key)?.label || key.replace(/_/g," ")).join(" · ") || `${person.operations.requiredMissingCount} critical gaps`}{person.operations.criticalMissing.length > 2 ? ` · +${person.operations.criticalMissing.length-2} more checks` : ""}</span></Link>
+            <Link href={`/app/people/${person.routeId}`} className="block px-4 py-3 hover:bg-muted/50"><span className="block break-words font-medium">{person.displayName}</span><span className="mt-1 block text-sm leading-6 text-annotation">{person.operations.criticalMissing.slice(0,2).map(key => RESEARCH_CHECK_DEFINITIONS.find(check => check.key === key)?.label || key.replace(/_/g," ")).join(" · ") || `${person.operations.requiredMissingCount} critical gaps`}{person.operations.criticalMissing.length > 2 ? ` · +${person.operations.criticalMissing.length-2} more ${person.operations.criticalMissing.length === 3 ? "check" : "checks"}` : ""}</span></Link>
           </li>)}</ul> : <p className="px-4 pb-4 text-sm text-muted-foreground">No critical gaps in the current highlights. The full queue keeps every research check.</p>}
           <Link href="/app/research" className="mx-4 mb-4 inline-flex min-h-11 items-center text-sm text-primary underline underline-offset-4">Open tasks and research log</Link>
           {summary.counts.provisionalRelatives > 0 && <p className="mx-4 mb-4 border-l-2 border-annotation pl-3 text-sm text-annotation">{summary.counts.provisionalRelatives} provisional relatives await review in Research Queue. Connections remain provisional until reviewed.</p>}

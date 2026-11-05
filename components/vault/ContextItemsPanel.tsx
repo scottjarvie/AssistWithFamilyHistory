@@ -25,9 +25,11 @@ type ContextItem = {
 export function ContextItemsPanel({
   personIdentifier,
   contextItems,
+  readonlyPreview=false,
 }: {
   personIdentifier: string;
   contextItems: ContextItem[];
+  readonlyPreview?:boolean;
 }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -42,6 +44,7 @@ export function ContextItemsPanel({
   const [aiUseAllowed, setAiUseAllowed] = useState(false);
 
   async function saveContextItem() {
+    if(readonlyPreview)return;
     setSaving(true);
     try {
       const response = await fetch("/api/context-items", {
@@ -81,9 +84,9 @@ export function ContextItemsPanel({
 
   return (
     <div className="space-y-5">
-      <Card className="border-stone-200">
+      <Card className="border-border">
         <CardHeader>
-          <CardTitle>Loose Context Intake</CardTitle>
+          <CardTitle role="heading" aria-level={2}>Loose Context Intake</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 md:grid-cols-2">
@@ -104,13 +107,13 @@ export function ContextItemsPanel({
             <SelectField label="Role" value={evidenceRole} options={["raw_material", "researcher_conclusion", "generated_summary", "lead_or_hint", "background_context"]} onChange={setEvidenceRole} />
             <SelectField label="Privacy" value={privacyLevel} options={["private", "family_review", "publish_candidate", "public_source"]} onChange={setPrivacyLevel} />
             <SelectField label="Review" value={reviewStatus} options={["unreviewed", "reviewed", "disputed", "redacted", "rejected"]} onChange={setReviewStatus} />
-            <label className="flex min-h-11 items-center gap-2 rounded-md border border-stone-200 px-3 py-2 text-sm text-stone-700 md:pointer-fine:min-h-0">
+            <label className="flex min-h-11 items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-foreground md:pointer-fine:min-h-0">
               <input checked={aiUseAllowed} onChange={(event) => setAiUseAllowed(event.target.checked)} type="checkbox" />
               AI use
             </label>
           </div>
 
-          <Button onClick={saveContextItem} disabled={saving || !title.trim() || !content.trim()} className="bg-amber-700 hover:bg-amber-800">
+          <Button onClick={saveContextItem} disabled={readonlyPreview || saving || !title.trim() || !content.trim()} className="bg-primary hover:bg-primary/90">
             <Save className="h-4 w-4" />
             Save context
           </Button>
@@ -120,27 +123,27 @@ export function ContextItemsPanel({
       <div className="grid gap-3 md:grid-cols-2">
         {contextItems.length === 0 ? (
           <Card className="border-dashed">
-            <CardContent className="py-8 text-center text-sm text-stone-500">
+            <CardContent className="py-8 text-center text-sm text-muted-foreground">
               No loose context items yet.
             </CardContent>
           </Card>
         ) : (
           contextItems.map((item) => (
-            <Card key={item._id} className="border-stone-200">
+            <Card key={item._id} className="border-border">
               <CardHeader>
                 <div className="flex items-start justify-between gap-3">
-                  <CardTitle className="text-base">{item.title}</CardTitle>
+                  <CardTitle role="heading" aria-level={2} className="text-base">{item.title}</CardTitle>
                   <Badge variant={item.reviewStatus === "reviewed" ? "default" : "secondary"}>
                     {item.reviewStatus.replace(/_/g, " ")}
                   </Badge>
                 </div>
-                <p className="text-sm text-stone-500">
+                <p className="text-sm text-muted-foreground">
                   {item.itemType.replace(/_/g, " ")} · {item.evidenceRole.replace(/_/g, " ")} · {item.privacyLevel.replace(/_/g, " ")}
                 </p>
               </CardHeader>
               <CardContent>
-                <p className="whitespace-pre-wrap text-sm leading-6 text-stone-600">{item.content}</p>
-                {item.sourceLabel ? <p className="mt-3 text-xs text-stone-500">Source: {item.sourceLabel}</p> : null}
+                <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{item.content}</p>
+                {item.sourceLabel ? <p className="mt-3 text-xs text-muted-foreground">Source: {item.sourceLabel}</p> : null}
               </CardContent>
             </Card>
           ))
@@ -162,12 +165,12 @@ function SelectField({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="space-y-1 text-xs font-medium uppercase tracking-[0.12em] text-stone-500">
+    <label className="space-y-1 text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
       {label}
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-11 md:pointer-fine:h-10 w-full rounded-md border border-stone-200 bg-white px-3 text-base md:pointer-fine:text-sm font-normal normal-case tracking-normal text-stone-700"
+        className="h-11 md:pointer-fine:h-10 w-full rounded-md border border-border bg-white px-3 text-base md:pointer-fine:text-sm font-normal normal-case tracking-normal text-foreground"
       >
         {options.map((option) => (
           <option key={option} value={option}>

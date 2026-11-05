@@ -95,3 +95,6 @@ design-council/*/collection-fixes/
 
 # Activity/facet capture tranche; formal judging is recorded separately.
 design-council/*/activity-facets/
+
+# Person record capture tranche, separate from formal judging packets.
+design-council/*/record-stream/
