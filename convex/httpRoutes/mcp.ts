@@ -358,6 +358,8 @@ const citationSave = z.discriminatedUnion("mode", [
   z.object({ mode: z.literal("create"), createKey, ...citationFields, confidence: z.enum(["very_high", "high", "medium", "low", "very_low"]) }).strict(),
   z.object({ mode: z.literal("update"), citationId: id, expectedUpdatedAt: z.number(), ...citationFields }).strict(),
 ]);
+// A connected AI proposes facts; only the person accepts one.
+const factProposalStatus = z.enum(["candidate", "conflict", "rejected"]).describe("candidate (default), conflict or rejected. Only the person can accept a fact.");
 const recordField = z.object({ label: z.string().trim().min(1).max(300), value: z.string().trim().min(1).max(2_000) }).strict();
 const sourceContent = z.object({
   contentKey: createKey,
@@ -392,7 +394,7 @@ const evidenceSave = z.object({
   contents: z.array(sourceContent).max(FAMILY_HISTORY_MCP_LIMITS.contentsPerCall).optional(),
   personas: z.array(persona).max(60).optional(),
   links: z.array(z.object({ targetType: z.enum(["person", "relationship", "event", "place"]), targetId: id, field: z.string().max(160).optional() }).strict()).max(30).optional(),
-  facts: z.array(z.object({ factKey: createKey, personId: id, factType: z.enum(["name", "sex", "birth", "death", "marriage", "census_residence", "residence", "occupation", "other"]), label: z.string().min(1).max(300), value: z.string().min(1).max(2_000), date: z.string().max(160).optional(), place: z.string().max(500).optional(), confidence: z.enum(["high", "medium", "low"]), status: z.enum(["candidate", "accepted", "conflict", "rejected"]).optional(), conflictReason: z.string().max(1_000).optional(), ...claimExtras }).strict()).max(30).optional(),
+  facts: z.array(z.object({ factKey: createKey, personId: id, factType: z.enum(["name", "sex", "birth", "death", "marriage", "census_residence", "residence", "occupation", "other"]), label: z.string().min(1).max(300), value: z.string().min(1).max(2_000), date: z.string().max(160).optional(), place: z.string().max(500).optional(), confidence: z.enum(["high", "medium", "low"]), status: factProposalStatus.optional(), conflictReason: z.string().max(1_000).optional(), ...claimExtras }).strict()).max(30).optional(),
 }).strict();
 
 const researchTaskFields = {
@@ -452,8 +454,47 @@ function compactPersonWorkspace(workspace: any) {
   };
 }
 
-function withOperation<T extends z.ZodType>(schema: T) {
-  return z.intersection(z.object({ operationId }).strict(), schema);
+/**
+ * One object-shaped envelope: `operationId` beside the payload's own fields.
+ *
+ * Clients read the published JSON Schema, not the Zod. An intersection
+ * publishes `allOf: [{operationId}, oneOf[...]]`, which is not object-shaped:
+ * Claude flattened it to `{operationId}` alone and showed the AI none of the
+ * payload fields, and a JSON Schema validator rejects every call because each
+ * `allOf` half forbids the other's keys. So the published shape is one strict
+ * object holding every key any mode accepts (and `mode` as an enum), and the
+ * exact per-mode rules are still enforced here, server-side, against the
+ * original schema.
+ */
+function withOperation(schema: z.ZodType) {
+  const shape: Record<string, z.ZodType> = {};
+  const optional = (field: z.ZodType) => (field instanceof z.ZodOptional ? field : field.optional());
+  if (schema instanceof z.ZodDiscriminatedUnion) {
+    const modes: string[] = [];
+    for (const option of schema.options as z.ZodObject[]) {
+      for (const [key, field] of Object.entries(option.shape)) {
+        if (key === "mode") {
+          modes.push(...[...(field as z.ZodLiteral<string>).values].map(String));
+          continue;
+        }
+        shape[key] ??= optional(field as z.ZodType);
+      }
+    }
+    shape.mode = z.enum(modes as [string, ...string[]]);
+  } else if (schema instanceof z.ZodObject) {
+    Object.assign(shape, schema.shape);
+  } else {
+    throw new Error("withOperation needs an object or a discriminated union of objects.");
+  }
+  return z.object({ operationId, ...shape }).strict().superRefine((value, ctx) => {
+    const payload: Record<string, unknown> = { ...value };
+    delete payload.operationId;
+    const exact = schema.safeParse(payload);
+    if (exact.success) return;
+    for (const issue of exact.error.issues) {
+      ctx.addIssue({ code: "custom", message: issue.message, path: issue.path as PropertyKey[] });
+    }
+  });
 }
 
 /* ------------------------------------------------------------ batch schemas */
@@ -507,7 +548,7 @@ const batchEvidenceSave = z.object({
     date: z.string().max(160).optional(),
     place: z.string().max(500).optional(),
     confidence: z.enum(["high", "medium", "low"]),
-    status: z.enum(["candidate", "accepted", "conflict", "rejected"]).optional(),
+    status: factProposalStatus.optional(),
     conflictReason: z.string().max(1_000).optional(),
     ...claimExtras,
   }).strict()).max(30).optional(),
@@ -1011,6 +1052,8 @@ export function createFamilyHistoryServer(
           principal: queuePrincipal,
           state: input.state,
           priority: input.priority,
+          // A connection narrowed to named Queue items lists only those.
+          queueItemIds: grant?.boundary?.queueItemIds?.length ? grant.boundary.queueItemIds : undefined,
           paginationOpts: { numItems: input.limit, cursor: input.cursor ?? null },
         });
       }
