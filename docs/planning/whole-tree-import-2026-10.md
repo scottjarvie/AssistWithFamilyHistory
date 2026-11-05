@@ -618,3 +618,22 @@ it does not claim rollback of the whole capture. Whole-tree item rollback is
 unchanged. Added 20 synthetic cases for these paths and positive compatibility;
 all remain UNRUN, with no actual provider, user or database exercise. No UI
 changes or deployment. Native Tier2 proof still requires actual admission.
+
+
+Capture evidence ingestion and fact projections (2026-11-05):
+The actual browser-capture caller now requests preserveExisting for both the
+main person and PID-identified relatives. The owned identity is still resolved
+and checked first; an existing person row then stays unchanged, including notes,
+manual corrections, cleared fields, living status, tags and timestamps. Capture
+continues with evidence and receipts; newly identified people are still created
+from capture data. Default person-writer overwrite refusals remain in place.
+This removes capture bookkeeping notes as an accidental gate on evidence import.
+A fact that previously represented birth or death cannot change to another type
+under the same identity without review of its retained person projection. The
+whole person item refuses FACT_PROJECTION_REVIEW_REQUIRED and rolls back rather
+than leaving a stale summary or clearing manual corrections. Unattached facts
+without person projections remain refreshable. Added 12 synthetic cases for
+standard/compatibility capture and notes, retained living-relative details and
+source privacy, birth/death corrections and type swaps, rollback/replay and a
+non-projected positive case. All remain UNRUN, not actual user/Tier2 proof.
+No UI route/layout changes, provider exercise, production writes or deployment.

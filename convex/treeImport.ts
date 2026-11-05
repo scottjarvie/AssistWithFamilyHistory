@@ -739,6 +739,13 @@ async function importFact(c: ChunkContext, personId: string, personKey: string, 
   const existingId = await lookup(c, singular, factKey);
   if (singular === "fact") await assertExplicitIdentity(c, "events", existingId, fact.key);
   const previous = existingId ? await ownedRow(c, "events", existingId) : null;
+  if (previous) {
+    const formerTypes = [previous.type, eventTypeFor(previous.importedFact?.type ?? previous.type).type];
+    if (formerTypes.some(type => (type === "birth" || type === "death") && type !== mapped.type)) {
+      fail("FACT_PROJECTION_REVIEW_REQUIRED", "Changing a birth/death fact type requires review of its retained person summary.",
+        "Review the person summary and its originating fact together before changing the type. This person item saved nothing; original and manually corrected assertions were retained.");
+    }
+  }
   const effective = await effectiveFactInput(c, personKey, fact);
   const saved = await upsertRow(c, {
     table: "events",

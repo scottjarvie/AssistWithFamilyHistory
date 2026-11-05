@@ -2276,7 +2276,7 @@ test.each(["type", "customType", "date", "place", "value", "description"].flatMa
   const batch: TreeImportBatch = { persons: [{ ...person, names: [{ given: "Must roll back", surname: "Person" }], facts: [replacement] }] };
   for (const dryRun of [true, false]) {
     const result = await send(t, grant, job.importJobId, 2, batch, { dryRun }, `fact-attribution-${field}-${attachment}-${dryRun}`);
-    expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("FACT_ATTRIBUTION_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before);
+    expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining(field === "type" ? "FACT_PROJECTION_REVIEW_REQUIRED" : "FACT_ATTRIBUTION_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before);
     expect(await send(t, grant, job.importJobId, 2, batch, { dryRun }, `fact-attribution-${field}-${attachment}-${dryRun}`)).toEqual(dryRun ? result : { ...result, deduplicated: true }); expect(await snapshot()).toEqual(before);
   }
 });
@@ -2586,8 +2586,6 @@ test("actual capture caller resolves an alias without replacing differing origin
   const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER });
   const gedcom = await t.mutation(internal.treeImport.beginTreeImport, { principal: principal(), grantId: grant, operationId: "begin-capture-alias", requestHash: "begin-capture-alias", input: { importKey: "capture-alias-file", system: "gedcom7", label: "Synthetic GEDCOM" } }) as any;
   await send(t, grant, gedcom.importJobId, 0, { persons: [{ key: "@I1@", living: true, names: [{ given: "Liz", surname: "Smith" }], otherIds: [{ system: "familysearch", id: "PID-A" }] }] });
-  const firstPerson = (await t.run(ctx => ctx.db.query("persons").collect()))[0];
-  await t.mutation(internal.persons.update, { id: firstPerson._id, notes: "Imported from FamilySearch person capture." });
   const original = (await t.run(ctx => ctx.db.query("persons").collect()))[0]; const mappings = await t.run(ctx => ctx.db.query("mcpRecordKeys").collect());
   await t.run(async ctx => { const foreign = await ctx.db.insert("persons", { vaultOwnerId: "foreign-capture-owner", fsId: "PID-A", name: { given: "Foreign", surname: "Person" }, sex: "unknown", living: false, createdAt: 1, updatedAt: 1 }); await ctx.db.insert("mcpRecordKeys", { vaultOwnerId: "foreign-capture-owner", recordType: "person", recordKey: externalRecordKey("familysearch", "person", "PID-A"), recordId: String(foreign), externalKeyVersion: 2, createdAt: 1, updatedAt: 1 }); });
   const capture = CapturePackageSchema.parse({ schemaVersion: "2.0", captureId: "synthetic-capture-alias", capturedAt: "2026-01-01T00:00:00Z", extractorVersion: "synthetic-test", extractionDurationMs: 0, pageType: "person", pageUrl: "https://example.test/capture/PID-A", pageTitle: "Synthetic person", uiLocale: "en", person: { familySearchId: "PID-A", name: "Elizabeth Jones" }, sources: [], memories: [], diagnostics: { mode: "standard", warnings: [], errors: [] } });
@@ -2595,14 +2593,11 @@ test("actual capture caller resolves an alias without replacing differing origin
   // This adapter never contacts FamilySearch, a network backend or a real user.
   const owner = t.withIdentity({ subject: OWNER });
   const client = { mutation: (ref: any, args: any) => owner.mutation(ref, args) } as unknown as Parameters<typeof importCapturePackageToConvex>[0]["client"];
-  const snapshot = () => t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), mappings: await ctx.db.query("mcpRecordKeys").collect(), logs: await ctx.db.query("researchLog").collect(), runs: await ctx.db.query("importRuns").collect() })); const before = await snapshot();
-  await expect(importCapturePackageToConvex({ client, vaultOwnerId: OWNER, capture, compatibilityMode: false, artifactPaths: {} })).rejects.toThrow("CAPTURE_PERSON_REVIEW_REQUIRED"); expect(await snapshot()).toEqual(before);
-  const matching = { ...capture, person: { ...capture.person, name: "Liz Smith" } };
-  const captured = await importCapturePackageToConvex({ client, vaultOwnerId: OWNER, capture: matching, compatibilityMode: false, artifactPaths: {} });
+  const captured = await importCapturePackageToConvex({ client, vaultOwnerId: OWNER, capture, compatibilityMode: false, artifactPaths: {} });
   expect(captured.personId).toBe(String(original._id));
   const afterCapture = await t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), mappings: await ctx.db.query("mcpRecordKeys").collect() }));
   expect(afterCapture.people.filter(row => row.vaultOwnerId === OWNER)).toHaveLength(1);
-  expect(afterCapture.people.find(row => row._id === original._id)).toMatchObject({ fsId: "PID-A", name: { given: "Liz", surname: "Smith" }, importedNames: original.importedNames });
+  expect(afterCapture.people.find(row => row._id === original._id)).toEqual(original);
   expect(afterCapture.mappings.filter(row => row.vaultOwnerId === OWNER)).toEqual(mappings);
   const job = await begin(t, grant);
   const result = await send(t, grant, job.importJobId, 0, { persons: [{ key: "PID-A", living: true, names: [{ given: "Liz", surname: "Smith" }], facts: [{ key: "F", type: "occupation", value: "Teacher" }] }] });
@@ -2825,4 +2820,55 @@ test.each([true, false])("capture respects retained legacy source material witho
   const before = await t.run(ctx => ctx.db.get(id)); const call = t.withIdentity({ subject: OWNER }).mutation(api.vaultMutations.upsertSource, { vaultOwnerId: OWNER, fsId: "S", importKey: "new-capture-key", title: "Changed", type: "census", notes: "New captured text" });
   if (attached) { await expect(call).rejects.toThrow("CAPTURE_SOURCE_REVIEW_REQUIRED"); expect(await t.run(ctx => ctx.db.get(id))).toEqual(before); }
   else { expect(await call).toEqual({ sourceId: id, created: false }); expect(await t.run(ctx => ctx.db.get(id))).toMatchObject({ title: "Changed", notes: "New captured text", importKey: "legacy-original" }); }
+});
+
+
+test.each([false, true].flatMap(compatibilityMode => ["absent", "manual", "cleared"].map(note => ({ compatibilityMode, note }))))("browser capture preserves imported people and ingests evidence ($compatibilityMode/$note)", async ({ compatibilityMode, note }) => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  await send(t, grant, job.importJobId, 0, { persons: [{ key: "P", living: false, sex: "unknown", names: [{ given: "Pat", surname: "Person" }], facts: [{ key: "B", type: "birth", date: { original: "1900", year: 1900 } }, { key: "D", type: "death", date: { original: "2000", year: 2000 } }] }, { key: "Q", living: true, sex: "female", names: [{ given: "Corrected", surname: "Relative" }] }] });
+  const people = await t.run(ctx => ctx.db.query("persons").collect()); const p = people.find(row => row.fsId === "P")!; const q = people.find(row => row.fsId === "Q")!;
+  if (note !== "absent") await t.mutation(internal.persons.update, { id: p._id, notes: note === "manual" ? "Private research correction" : "" });
+  await t.mutation(internal.persons.update, { id: q._id, notes: "Relative's retained research" });
+  const before = await t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() }));
+  const privateEvidence = "SYNTHETIC_CAPTURE_EVIDENCE_PRIVATE";
+  const capture = CapturePackageSchema.parse({ schemaVersion: "2.0", captureId: `capture-preserved-${compatibilityMode}-${note}`, capturedAt: "2026-01-01T00:00:00Z", extractorVersion: "synthetic-test", extractionDurationMs: 0, pageType: "sources", pageUrl: "https://example.test/capture/P", pageTitle: "Captured evidence", uiLocale: "en", person: { familySearchId: "P", name: "Pat Person", birthDate: "1900", deathDate: "2000" }, sources: [{ id: "NEW-S", orderIndex: 0, sourceKey: "captured-new", sourceType: "record", title: "Captured census record", citation: privateEvidence, tags: [], indexed: { fields: [], textBlocks: [] }, rawText: privateEvidence, expanded: true, expansionAttempts: 1, expansionSucceeded: true, relatedPeople: [{ familySearchId: "Q", name: "Different Captured Name", role: "spouse" }] }], memories: [], diagnostics: { mode: "standard", warnings: [], errors: [] } });
+  // Actual capture orchestration, synthetic in-memory owner mutations only.
+  const owner = t.withIdentity({ subject: OWNER }); const client = { mutation: (ref: any, args: any) => owner.mutation(ref, args) } as unknown as Parameters<typeof importCapturePackageToConvex>[0]["client"];
+  const result = await importCapturePackageToConvex({ client, vaultOwnerId: OWNER, capture, compatibilityMode, artifactPaths: {} });
+  expect(result.personId).toBe(String(p._id)); expect(result.mergeStatus).toBe("merged"); expect(result.counts.sources).toBe(1); expect(result.counts.citations).toBe(1);
+  expect(await t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() }))).toEqual(before);
+  const saved = await t.run(async ctx => ({ sources: await ctx.db.query("sources").collect(), citations: await ctx.db.query("citations").collect(), links: await ctx.db.query("citationLinks").collect(), relationships: await ctx.db.query("relationships").collect(), runs: await ctx.db.query("importRuns").collect() }));
+  expect(saved.sources).toHaveLength(1); expect(saved.citations).toHaveLength(1); expect(saved.runs).toHaveLength(1); expect(saved.runs[0].personId).toBe(p._id);
+  expect(saved.relationships).toHaveLength(1); expect(saved.relationships[0]).toMatchObject({ person1: p._id, person2: q._id });
+  expect(saved.links.some(link => link.targetType === "relationship" && link.targetId === String(saved.relationships[0]._id))).toBe(true);
+  const context = await t.query(internal.mcpFamilyHistory.getRecordContext, { principal: principal(), kind: "source", id: String(saved.sources[0]._id) }) as any;
+  expect(context.notesWithheld).toBe(true); expect(context.source.notes).toBeUndefined(); expect(JSON.stringify(context)).not.toContain(privateEvidence);
+});
+
+test.each(["birth", "death"].flatMap(type => [false, true].map(manual => ({ type, manual }))))("fact type correction cannot leave a stale $type projection (manual=$manual)", async ({ type, manual }) => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const fact = { key: "F", type, date: { original: "1900", year: 1900 }, description: "Original assertion" }; const person = { key: "P", living: false, names: [{ given: "Original", surname: "Person" }], facts: [fact] };
+  await send(t, grant, job.importJobId, 0, { persons: [person] });
+  const row = (await t.run(ctx => ctx.db.query("persons").collect()))[0];
+  if (manual) await t.mutation(internal.persons.update, { id: row._id, [type]: { date: { original: "1899", year: 1899 }, description: "Manual correction must survive" } });
+  const snapshot = () => t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), events: await ctx.db.query("events").collect(), roles: await ctx.db.query("personEvents").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+  const changed = { ...person, names: [{ given: "Must roll back", surname: "Person" }], facts: [{ ...fact, type: "residence" }] };
+  for (const dryRun of [true, false]) { const operation = `projection-type-${type}-${manual}-${dryRun}`; const result = await send(t, grant, job.importJobId, 1, { persons: [changed] }, { dryRun }, operation); expect(result.results).toEqual([expect.objectContaining({ status: "failed", reason: expect.stringContaining("FACT_PROJECTION_REVIEW_REQUIRED") })]); expect(await snapshot()).toEqual(before); expect(await send(t, grant, job.importJobId, 1, { persons: [changed] }, { dryRun }, operation)).toEqual(dryRun ? result : { ...result, deduplicated: true }); expect(await snapshot()).toEqual(before); }
+});
+
+test("birth and death type swaps also retain both original person projections", async () => {
+  for (const type of ["birth", "death"]) {
+    const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+    const opposite = type === "birth" ? "death" : "birth"; const fact = { key: "F", type, date: { original: "1900", year: 1900 } }; const person = { key: "P", living: false, names: [{ given: "P" }], facts: [fact] };
+    await send(t, grant, job.importJobId, 0, { persons: [person] }); const snapshot = () => t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), events: await ctx.db.query("events").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
+    for (const dryRun of [true, false]) { const result = await send(t, grant, job.importJobId, 1, { persons: [{ ...person, facts: [{ ...fact, type: opposite }] }] }, { dryRun }, `swap-${type}-${dryRun}`); expect(result.results[0].reason).toContain("FACT_PROJECTION_REVIEW_REQUIRED"); expect(await snapshot()).toEqual(before); }
+  }
+});
+
+test("an unattached non-projected fact can still refresh its explicit type", async () => {
+  const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER }); const job = await begin(t, grant);
+  const person = { key: "P", living: false, names: [{ given: "P" }], facts: [{ key: "F", type: "occupation", description: "Original" }] };
+  await send(t, grant, job.importJobId, 0, { persons: [person] }); const before = await t.run(ctx => ctx.db.query("events").collect());
+  const batch = { persons: [{ ...person, facts: [{ ...person.facts[0], type: "residence" }] }] }; const dry = await send(t, grant, job.importJobId, 1, batch, { dryRun: true }, "dry-nonprojected-type"); expect(await t.run(ctx => ctx.db.query("events").collect())).toEqual(before);
+  const real = await send(t, grant, job.importJobId, 1, batch); expect(dry.counts).toEqual(real.counts); expect(real.counts.persons.updated).toBe(1); expect((await t.run(ctx => ctx.db.query("events").collect()))[0]).toMatchObject({ _id: before[0]._id, type: "residence", importedFact: { key: "F", type: "residence" } });
 });

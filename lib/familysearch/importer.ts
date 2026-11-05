@@ -57,6 +57,7 @@ export async function importCapturePackageToConvex({
 
   const personResult = await client.mutation(api.vaultMutations.upsertPerson, {
     vaultOwnerId,
+    preserveExisting: true,
     fsId: capture.person.familySearchId,
     name: personName,
     sex: inferSex(capture.sources),
@@ -197,6 +198,7 @@ export async function importCapturePackageToConvex({
         const relatedPersonName = splitName(related.name);
         const relatedPerson = await client.mutation(api.vaultMutations.upsertPerson, {
           vaultOwnerId,
+          preserveExisting: true,
           fsId: relatedFamilySearchId,
           name: relatedPersonName,
           sex: inferSexFromRole(related.role),

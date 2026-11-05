@@ -340,6 +340,8 @@ async function resolveCapturedFamilySearchPerson(ctx: MutationCtx, owner: string
 export const upsertPerson = mutation({
   args: {
     vaultOwnerId: v.string(),
+    // Capture adds evidence to an identified person without rewriting research.
+    preserveExisting: v.optional(v.boolean()),
     fsId: v.optional(v.string()),
     name: v.object({
       given: v.string(),
@@ -417,6 +419,7 @@ export const upsertPerson = mutation({
     };
 
     if (existing) {
+      if (args.preserveExisting) return { personId: existing._id, created: false };
       const currentPerson = existing;
       const imported = await ctx.db.query("mcpRecordKeys").withIndex("by_owner_type_record", q =>
         q.eq("vaultOwnerId", vaultOwnerId).eq("recordType", "person").eq("recordId", String(currentPerson._id)),
