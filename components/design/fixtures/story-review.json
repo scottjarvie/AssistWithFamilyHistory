@@ -1,0 +1,622 @@
+{
+  "story": {
+    "_id": "stories:synthetic-1",
+    "_creationTime": 1793808000000,
+    "createdAt": 1793808000000,
+    "updatedAt": 1793808000000,
+    "vaultOwnerId": "synthetic-design-only",
+    "personId": "persons:synthetic-1",
+    "type": "biography",
+    "title": "An invented journey",
+    "content": "## A letter and two places\n\nThis is an invented narrative, written only to exercise the design preview. Eleanor’s dates and relationships are synthetic candidates. The discrepancy between two indexes remains unresolved.\n\nA place name opens a question about daily life, rather than proving a person’s experience. The context report describes the town; it does not establish where Eleanor worked or what she believed.\n\n## What the records suggest\n\nThe invented parish entry provides a date candidate. A second synthetic index gives a different day. Both remain visible in the Person workspace until a human compares the original image.\n\n> Remembered family stories belong beside the evidence, with uncertainty visible.\n\n## Questions still open\n\n- Compare the original parish image.\n- Review the context report’s sources.\n- Keep the draft private while the source conflict remains.\n\nNo real family story, personal detail or imported source is used here.",
+    "citationIds": [
+      "citations:synthetic-1"
+    ],
+    "status": "draft",
+    "generatedBy": "ai",
+    "modelUsed": "Self-reported synthetic model",
+    "contextPackIds": [
+      "historicalContext:synthetic-1"
+    ],
+    "tags": [
+      "invented",
+      "design preview"
+    ],
+    "assignedReviewer": "Synthetic reviewer",
+    "secondReviewRequired": true,
+    "publicSlug": "eleanor-finch-an-invented-journey-nthetic1",
+    "publicIndexing": "noindex"
+  },
+  "person": {
+    "_id": "persons:synthetic-1",
+    "_creationTime": 1793808000000,
+    "createdAt": 1793808000000,
+    "updatedAt": 1793808000000,
+    "vaultOwnerId": "synthetic-design-only",
+    "fsId": "synthetic-eleanor",
+    "name": {
+      "given": "Eleanor",
+      "surname": "Finch"
+    },
+    "sex": "female",
+    "living": false,
+    "birth": {
+      "date": {
+        "original": "14 March 1842",
+        "year": 1842
+      },
+      "place": {
+        "original": "Ashford, Kent, England",
+        "placeId": "places:synthetic-1"
+      }
+    },
+    "death": {
+      "date": {
+        "original": "9 July 1913",
+        "year": 1913
+      },
+      "place": {
+        "original": "Whitby, Yorkshire, England",
+        "placeId": "places:synthetic-2"
+      }
+    },
+    "researchStatus": "in_progress",
+    "displayName": "Eleanor Finch",
+    "routeId": "synthetic-eleanor",
+    "lifespan": "1842 to 1913"
+  },
+  "readiness": {
+    "completionPercent": 75,
+    "applicableCount": 14,
+    "requiredMissingCount": 1,
+    "recommendedMissingCount": 1,
+    "staleChecksCount": 0,
+    "criticalMissing": [
+      "identity_review"
+    ],
+    "nextActions": [
+      "Review identity confidence and import warnings.",
+      "Check probate, land, and newspaper collections."
+    ]
+  },
+  "researchChecks": [
+    {
+      "personId": "persons:synthetic-1",
+      "personFsId": "synthetic-eleanor",
+      "checkKey": "identity_review",
+      "status": "needs_review",
+      "applicability": "required",
+      "completionSource": "inferred",
+      "confidence": 0.74,
+      "summary": "Review identity confidence and import warnings.",
+      "linkedSourceIds": [],
+      "linkedPlaceIds": [],
+      "linkedPersonIds": []
+    },
+    {
+      "personId": "persons:synthetic-1",
+      "personFsId": "synthetic-eleanor",
+      "checkKey": "biography",
+      "status": "complete",
+      "applicability": "required",
+      "completionSource": "inferred",
+      "confidence": 0.9,
+      "summary": "Biography output exists.",
+      "linkedSourceIds": [],
+      "linkedPlaceIds": [],
+      "linkedPersonIds": []
+    },
+    {
+      "personId": "persons:synthetic-1",
+      "personFsId": "synthetic-eleanor",
+      "checkKey": "timeline",
+      "status": "in_progress",
+      "applicability": "required",
+      "completionSource": "inferred",
+      "confidence": 0.57,
+      "summary": "Add more dated events from source evidence.",
+      "linkedSourceIds": [],
+      "linkedPlaceIds": [],
+      "linkedPersonIds": []
+    },
+    {
+      "personId": "persons:synthetic-1",
+      "personFsId": "synthetic-eleanor",
+      "checkKey": "relationships",
+      "status": "complete",
+      "applicability": "required",
+      "completionSource": "inferred",
+      "confidence": 0.81,
+      "summary": "Relationships or provisional relatives are linked.",
+      "linkedSourceIds": [],
+      "linkedPlaceIds": [],
+      "linkedPersonIds": []
+    },
+    {
+      "personId": "persons:synthetic-1",
+      "personFsId": "synthetic-eleanor",
+      "checkKey": "birth_record",
+      "status": "complete",
+      "applicability": "required",
+      "completionSource": "inferred",
+      "confidence": 0.86,
+      "summary": "Birth evidence is attached.",
+      "linkedSourceIds": [],
+      "linkedPlaceIds": [],
+      "linkedPersonIds": []
+    },
+    {
+      "personId": "persons:synthetic-1",
+      "personFsId": "synthetic-eleanor",
+      "checkKey": "marriage_record",
+      "status": "complete",
+      "applicability": "required",
+      "completionSource": "inferred",
+      "confidence": 0.8,
+      "summary": "Marriage evidence is attached.",
+      "linkedSourceIds": [],
+      "linkedPlaceIds": [],
+      "linkedPersonIds": []
+    },
+    {
+      "personId": "persons:synthetic-1",
+      "personFsId": "synthetic-eleanor",
+      "checkKey": "death_record",
+      "status": "complete",
+      "applicability": "required",
+      "completionSource": "inferred",
+      "confidence": 0.84,
+      "summary": "Death evidence is attached.",
+      "linkedSourceIds": [],
+      "linkedPlaceIds": [],
+      "linkedPersonIds": []
+    },
+    {
+      "personId": "persons:synthetic-1",
+      "personFsId": "synthetic-eleanor",
+      "checkKey": "census",
+      "status": "complete",
+      "applicability": "recommended",
+      "completionSource": "inferred",
+      "confidence": 0.82,
+      "summary": "Census evidence is attached.",
+      "linkedSourceIds": [],
+      "linkedPlaceIds": [],
+      "linkedPersonIds": []
+    },
+    {
+      "personId": "persons:synthetic-1",
+      "personFsId": "synthetic-eleanor",
+      "checkKey": "immigration",
+      "status": "not_applicable",
+      "applicability": "unknown",
+      "completionSource": "inferred",
+      "confidence": 0.22,
+      "summary": "Review whether migration or naturalization applies.",
+      "linkedSourceIds": [],
+      "linkedPlaceIds": [],
+      "linkedPersonIds": []
+    },
+    {
+      "personId": "persons:synthetic-1",
+      "personFsId": "synthetic-eleanor",
+      "checkKey": "military",
+      "status": "not_applicable",
+      "applicability": "unknown",
+      "completionSource": "inferred",
+      "confidence": 0.2,
+      "summary": "Review likely military-age years for applicable service records.",
+      "linkedSourceIds": [],
+      "linkedPlaceIds": [],
+      "linkedPersonIds": []
+    },
+    {
+      "personId": "persons:synthetic-1",
+      "personFsId": "synthetic-eleanor",
+      "checkKey": "probate_land_newspaper",
+      "status": "missing",
+      "applicability": "recommended",
+      "completionSource": "inferred",
+      "confidence": 0.22,
+      "summary": "Check probate, land, and newspaper collections.",
+      "linkedSourceIds": [],
+      "linkedPlaceIds": [],
+      "linkedPersonIds": []
+    },
+    {
+      "personId": "persons:synthetic-1",
+      "personFsId": "synthetic-eleanor",
+      "checkKey": "church_records",
+      "status": "complete",
+      "applicability": "recommended",
+      "completionSource": "inferred",
+      "confidence": 0.76,
+      "summary": "Church or religious evidence is attached.",
+      "linkedSourceIds": [],
+      "linkedPlaceIds": [],
+      "linkedPersonIds": []
+    },
+    {
+      "personId": "persons:synthetic-1",
+      "personFsId": "synthetic-eleanor",
+      "checkKey": "memories",
+      "status": "complete",
+      "applicability": "recommended",
+      "completionSource": "inferred",
+      "confidence": 0.82,
+      "summary": "Memories or photos are attached.",
+      "linkedSourceIds": [],
+      "linkedPlaceIds": [],
+      "linkedPersonIds": []
+    },
+    {
+      "personId": "persons:synthetic-1",
+      "personFsId": "synthetic-eleanor",
+      "checkKey": "place_context",
+      "status": "complete",
+      "applicability": "recommended",
+      "completionSource": "inferred",
+      "confidence": 0.7,
+      "summary": "Place context is represented in current outputs.",
+      "linkedSourceIds": [],
+      "linkedPlaceIds": [],
+      "linkedPersonIds": []
+    }
+  ],
+  "contextCoverage": {
+    "entries": [
+      {
+        "_id": "historicalContext:synthetic-1",
+        "_creationTime": 1793808000000,
+        "createdAt": 1793808000000,
+        "updatedAt": 1793808000000,
+        "vaultOwnerId": "synthetic-design-only",
+        "placeId": "places:synthetic-1",
+        "timePeriod": {
+          "startYear": 1840,
+          "endYear": 1860
+        },
+        "topic": "daily_life",
+        "title": "Invented town context",
+        "content": "A synthetic context report used solely for layout testing.",
+        "sources": [],
+        "privacyLevel": "private",
+        "reviewStatus": "unreviewed",
+        "aiUseAllowed": false
+      }
+    ],
+    "count": 1,
+    "aiEligibleEntries": [],
+    "aiEligibleCount": 0,
+    "publishableEntries": [],
+    "publishableCount": 0,
+    "topics": [
+      "daily_life"
+    ],
+    "relatedPlaceCount": 2,
+    "placeCountWithContext": 1,
+    "aiPlaceCountWithContext": 0,
+    "missingPlaces": [
+      {
+        "_id": "places:synthetic-2",
+        "name": "Whitby, Yorkshire, England",
+        "type": "city"
+      }
+    ],
+    "aiMissingPlaces": [
+      {
+        "_id": "places:synthetic-1",
+        "name": "Ashford, Kent, England",
+        "type": "city"
+      },
+      {
+        "_id": "places:synthetic-2",
+        "name": "Whitby, Yorkshire, England",
+        "type": "city"
+      }
+    ],
+    "status": "partial"
+  },
+  "publishWarnings": [
+    {
+      "key": "historical_context",
+      "label": "Partial place context",
+      "status": "in_progress",
+      "detail": "1 linked place still lack context reports."
+    },
+    {
+      "key": "story_review",
+      "label": "Internal review",
+      "status": "needs_review",
+      "detail": "This story is still marked as a draft. Move it to review before publishing if possible."
+    },
+    {
+      "key": "media_privacy_review",
+      "label": "Media privacy and rights review",
+      "status": "needs_review",
+      "detail": "1 linked memory or media item are private, unreviewed, or rights-restricted and will not appear publicly."
+    }
+  ],
+  "evidence": [
+    {
+      "source": {
+        "_id": "sources:synthetic-1",
+        "_creationTime": 1793808000000,
+        "createdAt": 1793808000000,
+        "updatedAt": 1793808000000,
+        "vaultOwnerId": "synthetic-design-only",
+        "title": "Invented parish register",
+        "type": "church_record",
+        "repository": "Synthetic archive",
+        "url": "https://example.invalid/synthetic-register"
+      },
+      "citations": [
+        {
+          "_id": "citations:synthetic-1",
+          "_creationTime": 1793808000000,
+          "createdAt": 1793808000000,
+          "updatedAt": 1793808000000,
+          "vaultOwnerId": "synthetic-design-only",
+          "sourceId": "sources:synthetic-1",
+          "isEvidence": true,
+          "confidence": "medium",
+          "page": "Invented folio 12",
+          "extractedText": "Synthetic transcript: Eleanor was recorded in the parish register. This is invented preview material, not family evidence.",
+          "source": {
+            "_id": "sources:synthetic-1",
+            "_creationTime": 1793808000000,
+            "createdAt": 1793808000000,
+            "updatedAt": 1793808000000,
+            "vaultOwnerId": "synthetic-design-only",
+            "title": "Invented parish register",
+            "type": "church_record",
+            "repository": "Synthetic archive",
+            "url": "https://example.invalid/synthetic-register"
+          },
+          "field": "birth"
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "_id": "events:synthetic-1",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793808000000,
+      "updatedAt": 1793808000000,
+      "vaultOwnerId": "synthetic-design-only",
+      "type": "birth",
+      "date": {
+        "original": "14 March 1842",
+        "year": 1842
+      },
+      "place": {
+        "original": "Ashford",
+        "placeId": "places:synthetic-1"
+      }
+    },
+    {
+      "_id": "events:synthetic-2",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793808000000,
+      "updatedAt": 1793808000000,
+      "vaultOwnerId": "synthetic-design-only",
+      "type": "census",
+      "date": {
+        "original": "1881",
+        "year": 1881
+      },
+      "place": {
+        "original": "Whitby",
+        "placeId": "places:synthetic-2"
+      }
+    }
+  ],
+  "places": [
+    {
+      "_id": "places:synthetic-1",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793808000000,
+      "updatedAt": 1793808000000,
+      "vaultOwnerId": "synthetic-design-only",
+      "name": "Ashford",
+      "fullName": "Ashford, Kent, England",
+      "type": "city"
+    },
+    {
+      "_id": "places:synthetic-2",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793808000000,
+      "updatedAt": 1793808000000,
+      "vaultOwnerId": "synthetic-design-only",
+      "name": "Whitby",
+      "fullName": "Whitby, Yorkshire, England",
+      "type": "city"
+    }
+  ],
+  "media": [
+    {
+      "_id": "media:synthetic-1",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793808000000,
+      "updatedAt": 1793808000000,
+      "vaultOwnerId": "synthetic-design-only",
+      "type": "photo",
+      "title": "Invented memory illustration",
+      "url": "/illustrations/synthetic-record.svg",
+      "personIds": [
+        "persons:synthetic-1"
+      ],
+      "privacyLevel": "private",
+      "reviewStatus": "unreviewed",
+      "rightsStatus": "unknown",
+      "aiUseAllowed": false
+    }
+  ],
+  "relationships": [
+    {
+      "_id": "relationships:synthetic-1",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793808000000,
+      "updatedAt": 1793808000000,
+      "vaultOwnerId": "synthetic-design-only",
+      "type": "Couple",
+      "person1": "persons:synthetic-1",
+      "person2": "persons:synthetic-2",
+      "relatedPerson": {
+        "_id": "persons:synthetic-2",
+        "_creationTime": 1793808000000,
+        "createdAt": 1793808000000,
+        "updatedAt": 1793808000000,
+        "vaultOwnerId": "synthetic-design-only",
+        "fsId": "synthetic-samuel",
+        "name": {
+          "given": "Samuel",
+          "surname": "Finch"
+        },
+        "sex": "male",
+        "living": false,
+        "researchStatus": "basic"
+      },
+      "relatedName": "Samuel Finch"
+    }
+  ],
+  "provisionalRelatives": [
+    {
+      "_id": "provisionalRelatives:synthetic-1",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793808000000,
+      "updatedAt": 1793808000000,
+      "vaultOwnerId": "synthetic-design-only",
+      "anchorPersonId": "persons:synthetic-1",
+      "displayName": "Mabel Ashford",
+      "relationshipHint": "Possible cousin — unreviewed synthetic claim",
+      "evidenceCount": 1,
+      "mergeState": "provisional"
+    }
+  ],
+  "reviewHistory": [
+    {
+      "_id": "storyReviewEvents:synthetic-0",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793808000000,
+      "updatedAt": 1793808000000,
+      "vaultOwnerId": "synthetic-design-only",
+      "storyId": "stories:synthetic-1",
+      "eventType": "draft_edit",
+      "actorRole": "story_writer",
+      "actorName": "Synthetic reviewer",
+      "humanReviewNote": "Invented review note; no real person or approval."
+    },
+    {
+      "_id": "storyReviewEvents:synthetic-1",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793721600000,
+      "updatedAt": 1793808000000,
+      "vaultOwnerId": "synthetic-design-only",
+      "storyId": "stories:synthetic-1",
+      "eventType": "assignment",
+      "actorRole": "story_writer",
+      "actorName": "Synthetic reviewer",
+      "assignedTo": "Synthetic reviewer",
+      "humanReviewNote": "Invented review note; no real person or approval."
+    },
+    {
+      "_id": "storyReviewEvents:synthetic-2",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793635200000,
+      "updatedAt": 1793808000000,
+      "vaultOwnerId": "synthetic-design-only",
+      "storyId": "stories:synthetic-1",
+      "eventType": "draft_edit",
+      "actorRole": "story_writer",
+      "actorName": "Synthetic reviewer",
+      "humanReviewNote": "Invented review note; no real person or approval."
+    },
+    {
+      "_id": "storyReviewEvents:synthetic-3",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793548800000,
+      "updatedAt": 1793808000000,
+      "vaultOwnerId": "synthetic-design-only",
+      "storyId": "stories:synthetic-1",
+      "eventType": "assignment",
+      "actorRole": "story_writer",
+      "actorName": "Synthetic reviewer",
+      "assignedTo": "Synthetic reviewer",
+      "humanReviewNote": "Invented review note; no real person or approval."
+    },
+    {
+      "_id": "storyReviewEvents:synthetic-4",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793462400000,
+      "updatedAt": 1793808000000,
+      "vaultOwnerId": "synthetic-design-only",
+      "storyId": "stories:synthetic-1",
+      "eventType": "draft_edit",
+      "actorRole": "story_writer",
+      "actorName": "Synthetic reviewer",
+      "humanReviewNote": "Invented review note; no real person or approval."
+    },
+    {
+      "_id": "storyReviewEvents:synthetic-5",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793376000000,
+      "updatedAt": 1793808000000,
+      "vaultOwnerId": "synthetic-design-only",
+      "storyId": "stories:synthetic-1",
+      "eventType": "assignment",
+      "actorRole": "story_writer",
+      "actorName": "Synthetic reviewer",
+      "assignedTo": "Synthetic reviewer",
+      "humanReviewNote": "Invented review note; no real person or approval."
+    },
+    {
+      "_id": "storyReviewEvents:synthetic-6",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793289600000,
+      "updatedAt": 1793808000000,
+      "vaultOwnerId": "synthetic-design-only",
+      "storyId": "stories:synthetic-1",
+      "eventType": "draft_edit",
+      "actorRole": "story_writer",
+      "actorName": "Synthetic reviewer",
+      "humanReviewNote": "Invented review note; no real person or approval."
+    },
+    {
+      "_id": "storyReviewEvents:synthetic-7",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793203200000,
+      "updatedAt": 1793808000000,
+      "vaultOwnerId": "synthetic-design-only",
+      "storyId": "stories:synthetic-1",
+      "eventType": "assignment",
+      "actorRole": "story_writer",
+      "actorName": "Synthetic reviewer",
+      "assignedTo": "Synthetic reviewer",
+      "humanReviewNote": "Invented review note; no real person or approval."
+    }
+  ],
+  "historicalContext": [
+    {
+      "_id": "historicalContext:synthetic-1",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793808000000,
+      "updatedAt": 1793808000000,
+      "vaultOwnerId": "synthetic-design-only",
+      "placeId": "places:synthetic-1",
+      "timePeriod": {
+        "startYear": 1840,
+        "endYear": 1860
+      },
+      "topic": "daily_life",
+      "title": "Invented town context",
+      "content": "A synthetic context report used solely for layout testing.",
+      "sources": [],
+      "privacyLevel": "private",
+      "reviewStatus": "unreviewed",
+      "aiUseAllowed": false
+    }
+  ],
+  "relatedStories": []
+}

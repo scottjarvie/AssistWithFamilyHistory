@@ -1,6 +1,6 @@
 /** Offline, backend-free fixture assembly. Every person, source and narrative here is invented. */
 import {writeFileSync} from "node:fs";
-import {assemblePersonWorkspaceFromSnapshot} from "../../convex/vault";
+import {assemblePersonWorkspaceFromSnapshot,buildStoryBundle} from "../../convex/vault";
 const stamp=Date.parse("2026-11-04T16:00:00Z");
 const person="persons:synthetic-1", partner="persons:synthetic-2", fsId="synthetic-eleanor";
 const row=(id:string,fields:Record<string,unknown>)=>({_id:id,_creationTime:stamp,createdAt:stamp,updatedAt:stamp,vaultOwnerId:"synthetic-design-only",...fields});
@@ -27,3 +27,15 @@ const workspace=assemblePersonWorkspaceFromSnapshot(snapshot as never,fsId);
 if(!workspace)throw new Error("Synthetic assembly failed");
 writeFileSync("components/design/fixtures/person-workspace.json",JSON.stringify(workspace,null,2)+"\n");
 console.log("Invented Person workspace assembled offline; no backend was used.");
+
+// Separate invented Place and Story records exercise populated sections offline.
+const placeFixture={place:snapshot.places[0],events:snapshot.events.filter(event=>event.place.placeId===snapshot.places[0]._id),people:snapshot.people.map(person=>({...person,routeId:person.fsId})),sources:snapshot.sources,citations:snapshot.citations,contextEntries:snapshot.historicalContext,media:snapshot.media,researchLog:snapshot.researchLog,openTasks:[]};
+writeFileSync("components/design/fixtures/place-workspace.json",JSON.stringify(placeFixture,null,2)+"\n");
+const storyRow={...snapshot.stories[0],modelUsed:"Self-reported synthetic model",contextPackIds:[snapshot.historicalContext[0]._id],tags:["invented","design preview"],assignedReviewer:"Synthetic reviewer",secondReviewRequired:true,content:"## A letter and two places\n\nThis is an invented narrative, written only to exercise the design preview. Eleanor’s dates and relationships are synthetic candidates. The discrepancy between two indexes remains unresolved.\n\nA place name opens a question about daily life, rather than proving a person’s experience. The context report describes the town; it does not establish where Eleanor worked or what she believed.\n\n## What the records suggest\n\nThe invented parish entry provides a date candidate. A second synthetic index gives a different day. Both remain visible in the Person workspace until a human compares the original image.\n\n> Remembered family stories belong beside the evidence, with uncertainty visible.\n\n## Questions still open\n\n- Compare the original parish image.\n- Review the context report’s sources.\n- Keep the draft private while the source conflict remains.\n\nNo real family story, personal detail or imported source is used here."};
+const reviewEvents=Array.from({length:8},(_,index)=>row(`storyReviewEvents:synthetic-${index}`,{storyId:storyRow._id,eventType:index%2?"assignment":"draft_edit",actorRole:"story_writer",actorName:"Synthetic reviewer",assignedTo:index%2?"Synthetic reviewer":undefined,humanReviewNote:"Invented review note; no real person or approval.",createdAt:stamp-index*86400000}));
+const storyBundle=buildStoryBundle({...snapshot,stories:[storyRow],storyReviewEvents:reviewEvents} as never,storyRow as never);
+writeFileSync("components/design/fixtures/story-review.json",JSON.stringify(storyBundle,null,2)+"\n");
+console.log("Invented Place and Story fixtures assembled offline; no backend was used.");
+
+const unlinked=buildStoryBundle({...snapshot,storyReviewEvents:[]} as never,{...storyRow,personId:undefined,contextPackIds:[]} as never);
+writeFileSync("components/design/fixtures/story-unlinked.json",JSON.stringify(unlinked,null,2)+"\n");

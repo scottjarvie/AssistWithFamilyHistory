@@ -1,0 +1,23 @@
+{
+  "checkedAt": "2026-11-05T11:32:52.988Z",
+  "checks": [
+    "Place action opens intake and switching sections preserves an unfinished context report",
+    "Place context retains privacy, review, AI-use, category claims and explicit fixture save guard",
+    "Place research pointer opens all dated log entries with truthful attribution and actual groups",
+    "Place keeps historical dates, full context and linked media separate from the operational stream",
+    "Empty Place sections retain real guidance and zero counts",
+    "Story opens a full saved reading view with authorship, model caution, version truth and readable blocked-publish label",
+    "Story editing survives section changes; every publish/review safeguard remains reachable and preview writes are disabled",
+    "Story keeps source sets, citation counts and provenance distinct from narrative claims",
+    "Story context retains attached-versus-available distinction and background-context warning",
+    "Story life section retains every relationship, historical event, place and memory module",
+    "Story stream shows all earlier events and filters every stored kind including draft edits",
+    "Unlinked Story retains an honest identity and blocked publication",
+    "320px dark place-record: Contents, pinned All, deep links and visible section top; readable controls and no overflow",
+    "320px dark story-record: Contents, pinned All, deep links and visible section top; readable controls and no overflow",
+    "390px dark place-record: Contents, pinned All, deep links and visible section top; readable controls and no overflow",
+    "390px dark story-record: Contents, pinned All, deep links and visible section top; readable controls and no overflow"
+  ],
+  "errors": [],
+  "mutations": []
+}

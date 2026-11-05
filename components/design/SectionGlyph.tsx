@@ -1,5 +1,11 @@
 import type {ComponentProps} from "react";
 const paths:Record<string,string>={
+  people:"M6 5a2 2 0 1 1-4 0 2 2 0 0 1 4 0 M1 14v-3c0-3 6-3 6 0v3 M13 6a2 2 0 1 1-4 0 2 2 0 0 1 4 0 M9 14v-3c0-2 5-2 5 0v3",
+  context:"M2 2h12v12H2z M5 5h6 M5 8h6 M5 11h4",
+  draft:"M2 13l1-4L11 1l4 4-8 8-5 1 M9 3l4 4",
+  review:"M3 2h10v12H3z M5 5l1 1 2-2 M9 5h2 M5 10l1 1 2-2 M9 10h2",
+  life:"M8 15V7 M8 10L3 6 M8 7l4-4 M8 4c-5 0-6-4-2-3 1-2 4 0 2 3 M8 7c4 1 7-1 5-4",
+  history:"M3 3a6 6 0 1 1-1 7 M3 1v4H0 M8 4v4l3 2",
   overview:"M2 2h5v5H2z M9 2h5v5H9z M2 9h5v5H2z M9 9h5v5H9z",
   sources:"M3 2h8l2 2v10H3z M5 6h5 M5 9h3 M5 12h6",
   timeline:"M4 1v14 M4 3h7 M4 8h5 M4 13h8 M2 3h4 M2 8h4 M2 13h4",

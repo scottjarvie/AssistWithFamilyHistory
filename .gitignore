@@ -101,3 +101,6 @@ design-council/*/record-stream/
 
 # Compressed viewing copies for the inline council gallery.
 design-council/*/.gallery-preview/
+
+# Place/Story record capture tranche, separate from formal scoring.
+design-council/*/place-story-records/

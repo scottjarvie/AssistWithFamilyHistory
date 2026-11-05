@@ -4,13 +4,14 @@ from datetime import datetime, timezone
 import html, json, base64, re, os, subprocess
 run=Path(__file__).resolve().parent
 rounds=sorted([p for p in run.glob('round-*') if re.fullmatch(r'round-\d+',p.name) and (p/'ours').exists()],key=lambda p:int(p.name.split('-')[1]),reverse=True)
-sections=[('Record review refinements',run/'record-stream/current'),('Person dossier and evidence stream',run/'record-stream/reviewed-c187b04'),('Activity, facets and Home refinements',run/'activity-facets'),('Collection review fixes',run/'collection-fixes')]+[(p.name,p/'ours') for p in rounds]+[('Starting collections · reconstructed now',run/'baseline-reconstructed'),('Starting page · now',run/'baseline')]
+sections=[('Place and Story records',run/'place-story-records'),('Record review refinements',run/'record-stream/current'),('Person dossier and evidence stream',run/'record-stream/reviewed-c187b04'),('Activity, facets and Home refinements',run/'activity-facets'),('Collection review fixes',run/'collection-fixes')]+[(p.name,p/'ours') for p in rounds]+[('Starting collections · reconstructed now',run/'baseline-reconstructed'),('Starting page · now',run/'baseline')]
 images=[]; blocks=[]
 score_file=run/'scores.json'
 score_data=json.loads(score_file.read_text()) if score_file.exists() else {}
 params=json.loads((run/'params.json').read_text())
 weights={c['key']:c.get('weight',1) for c in params.get('categories',[])}
 def score_line(title):
+ if title=='Place and Story records': return 'Newest local record-family tranche · exact-head cross-model review pending; no formal score'
  if title=='Record review refinements': return 'Newest lead review fixes · checks/captures recorded, next meaningful cross-model review pending; no formal score'
  if title=='Person dossier and evidence stream': return 'Reviewed at c187b04 · Opus conditional approval; original reviewed images retained, no formal score'
  if title=='Activity, facets and Home refinements': return 'Newest local capture tranche · exact-head review pending; no formal score claimed'

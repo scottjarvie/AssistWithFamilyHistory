@@ -21,7 +21,7 @@ export function StoryStatusActions({
   storyId: string;
   publicIdentifier?: string;
   status: StoryStatus;
-  publishReadiness?: Pick<StoryPublishReadiness, "canPublish" | "summary" | "blockers">;
+  publishReadiness?: Pick<StoryPublishReadiness, "canPublish" | "summary">;
 }) {
   const router = useRouter();
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
@@ -106,7 +106,7 @@ export function StoryStatusActions({
   return (
     <div className="flex flex-wrap gap-3">
       {status === "draft" ? (
-        <Button onClick={() => updateStatus("review")} disabled={pending} className="bg-stone-900 hover:bg-stone-800">
+        <Button onClick={() => updateStatus("review")} disabled={pending} className="min-h-11 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100">
           {pendingAction === "review" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
           Mark ready for review
         </Button>
@@ -120,7 +120,7 @@ export function StoryStatusActions({
           <Button
             onClick={() => updateStatus("published")}
             disabled={pending || publishBlocked}
-            className="bg-amber-700 hover:bg-amber-800 disabled:bg-stone-300"
+            className="min-h-11 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
           >
             {pendingAction === "published" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
             Publish public page
@@ -128,7 +128,7 @@ export function StoryStatusActions({
         </>
       ) : (
         <>
-          <Button asChild className="bg-amber-700 hover:bg-amber-800">
+          <Button asChild className="min-h-11">
             <Link href={publicStoryPath(publicIdentifier ?? storyId)} target="_blank">
               <ExternalLink className="h-4 w-4" />
               Open public page
@@ -141,7 +141,7 @@ export function StoryStatusActions({
         </>
       )}
       {publishBlocked ? (
-        <p className="basis-full text-xs text-amber-800">{publishReadiness?.summary}</p>
+        <p className="basis-full text-xs text-annotation">{publishReadiness?.summary}</p>
       ) : null}
     </div>
   );

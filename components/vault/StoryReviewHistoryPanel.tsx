@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ClipboardList, Filter } from "lucide-react";
+import { SectionGlyph } from "@/components/design/SectionGlyph";
+import { UtcDate } from "@/components/design/UtcDate";
+import { Button } from "@/components/ui/button";
 import { WorkspaceStateCard } from "@/components/vault/WorkspaceStateCard";
 
 type StoryReviewEvent = {
@@ -30,23 +32,12 @@ const eventLabels: Record<StoryReviewEvent["eventType"], string> = {
 };
 
 const eventTone: Record<StoryReviewEvent["eventType"], string> = {
-  publish_preview: "border-blue-200 bg-blue-50 text-blue-900",
-  status_change: "border-stone-200 bg-stone-50 text-stone-900",
-  publish_confirmation: "border-emerald-200 bg-emerald-50 text-emerald-900",
-  assignment: "border-amber-200 bg-amber-50 text-amber-900",
-  draft_edit: "border-stone-200 bg-white text-stone-900",
+  publish_preview: "border-primary/30 bg-primary/5 text-foreground",
+  status_change: "border-border bg-muted text-foreground",
+  publish_confirmation: "border-evidence/30 bg-evidence-surface text-evidence",
+  assignment: "border-annotation/30 bg-annotation-surface text-annotation",
+  draft_edit: "border-border bg-card text-foreground",
 };
-
-function formatReviewEventDate(value?: number) {
-  if (!value) return "Unknown time";
-  return new Intl.DateTimeFormat("en", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(value));
-}
 
 function describeEvent(event: StoryReviewEvent) {
   if (event.eventType === "publish_confirmation") return "Public publish confirmed by trusted publisher.";
@@ -56,13 +47,15 @@ function describeEvent(event: StoryReviewEvent) {
   return "No status change.";
 }
 
-export function StoryReviewHistoryPanel({ events }: { events: StoryReviewEvent[] }) {
+export function StoryReviewHistoryPanel({ events, initialLimit }: { events: StoryReviewEvent[]; initialLimit?:number }) {
+  const [showAll,setShowAll]=useState(false);
   const [filter, setFilter] = useState<StoryReviewEvent["eventType"] | "all">("all");
   const filteredEvents = useMemo(
-    () => events.filter((event) => filter === "all" || event.eventType === filter),
+    () => events.filter((event) => filter === "all" || event.eventType === filter).toSorted((a,b)=>(b.createdAt||0)-(a.createdAt||0)||a._id.localeCompare(b._id)),
     [events, filter]
   );
 
+  const visibleEvents=initialLimit&&!showAll?filteredEvents.slice(0,initialLimit):filteredEvents;
   if (events.length === 0) {
     return (
       <WorkspaceStateCard
@@ -78,17 +71,18 @@ export function StoryReviewHistoryPanel({ events }: { events: StoryReviewEvent[]
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.16em] text-stone-500">
-          <Filter className="h-4 w-4" />
+        <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+          <SectionGlyph kind="history"/>
           Filter
         </div>
-        {(["all", "publish_preview", "assignment", "status_change", "publish_confirmation"] as const).map((value) => (
+        {(["all",...Object.keys(eventLabels).filter(key=>events.some(event=>event.eventType===key))] as ("all"|StoryReviewEvent["eventType"])[]).map((value) => (
           <button
             key={value}
             type="button"
-            onClick={() => setFilter(value)}
-            className={`border px-3 py-1.5 text-xs font-medium ${
-              filter === value ? "border-stone-900 bg-stone-900 text-white" : "border-stone-200 bg-white text-stone-700"
+            aria-pressed={filter===value}
+            onClick={() => {setFilter(value);setShowAll(false);}}
+            className={`min-h-11 rounded-md border px-3 py-2 text-xs font-medium ${
+              filter === value ? "border-primary bg-secondary text-foreground" : "border-border bg-card text-foreground"
             }`}
           >
             {value === "all" ? "All" : eventLabels[value]}
@@ -105,7 +99,7 @@ export function StoryReviewHistoryPanel({ events }: { events: StoryReviewEvent[]
           density="compact"
         />
       ) : (
-        filteredEvents.map((event) => (
+        visibleEvents.map((event) => (
           <div key={String(event._id)} className={`border px-4 py-4 ${eventTone[event.eventType]}`}>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -113,26 +107,26 @@ export function StoryReviewHistoryPanel({ events }: { events: StoryReviewEvent[]
                 <p className="mt-1 text-sm opacity-80">{describeEvent(event)}</p>
               </div>
               <p className="text-xs uppercase tracking-[0.14em] opacity-70">
-                {formatReviewEventDate(event.createdAt)}
+                {event.createdAt?<UtcDate value={event.createdAt} withTime/>:"Unknown time"}
               </p>
             </div>
             <div className="mt-3 flex flex-wrap gap-2 text-xs opacity-80">
-              <span className="bg-white/70 px-2 py-1">actor: {event.actorName || event.actorRole}</span>
-              {event.reviewerName ? <span className="bg-white/70 px-2 py-1">reviewer: {event.reviewerName}</span> : null}
-              {typeof event.readinessScore === "number" ? <span className="bg-white/70 px-2 py-1">score: {event.readinessScore}%</span> : null}
-              {typeof event.blockerCount === "number" ? <span className="bg-white/70 px-2 py-1">blockers: {event.blockerCount}</span> : null}
-              {typeof event.warningCount === "number" ? <span className="bg-white/70 px-2 py-1">warnings: {event.warningCount}</span> : null}
+              <span className="bg-card/70 px-2 py-1">actor: {event.actorName || event.actorRole}</span>
+              {event.reviewerName ? <span className="bg-card/70 px-2 py-1">reviewer: {event.reviewerName}</span> : null}
+              {typeof event.readinessScore === "number" ? <span className="bg-card/70 px-2 py-1">score: {event.readinessScore}%</span> : null}
+              {typeof event.blockerCount === "number" ? <span className="bg-card/70 px-2 py-1">blockers: {event.blockerCount}</span> : null}
+              {typeof event.warningCount === "number" ? <span className="bg-card/70 px-2 py-1">warnings: {event.warningCount}</span> : null}
             </div>
             {event.humanReviewNote ? (
               <p className="mt-3 text-sm leading-6 opacity-90">{event.humanReviewNote}</p>
             ) : null}
             {event.readinessSnapshot ? (
-              <details className="mt-3 border border-white/70 bg-white/70 px-3 py-3">
+              <details className="mt-3 border border-border bg-card/70 px-3 py-3">
                 <summary className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-                  <ClipboardList className="h-4 w-4" />
+                  <SectionGlyph kind="review"/>
                   Publish preview snapshot
                 </summary>
-                <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap text-xs leading-5 text-stone-700">
+                <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap text-xs leading-5 text-foreground">
                   {JSON.stringify(event.readinessSnapshot, null, 2)}
                 </pre>
               </details>
@@ -140,6 +134,7 @@ export function StoryReviewHistoryPanel({ events }: { events: StoryReviewEvent[]
           </div>
         ))
       )}
+      {filteredEvents.length>visibleEvents.length&&<Button variant="outline" className="min-h-11" onClick={()=>setShowAll(true)}>{filteredEvents.length-visibleEvents.length} earlier entries · Show all</Button>}
     </div>
   );
 }

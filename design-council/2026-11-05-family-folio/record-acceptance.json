@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-11-05T11:07:43.784Z",
+  "checkedAt": "2026-11-05T11:28:54.484Z",
   "checks": [
     "Dossier keeps source/conflict cues and connections; inferred checks do not inflate counts; unvisited media never mounts",
     "Dated stream keeps full details, shows all earlier entries and filters only actual kinds",

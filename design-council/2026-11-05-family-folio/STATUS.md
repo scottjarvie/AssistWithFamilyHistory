@@ -1,4 +1,4 @@
-[Newest-first gallery](gallery.html) · Record lead-review fixes pass 16 Record / 18 cross-page checks and 38 captures. 57/57 full checks passed; all-page goal remains active.
+[Newest-first gallery](gallery.html) · Place/Story records:16 browser checks,16 Person regressions,30 captures and4 reconstructed comparisons pass. 57/57 full checks passed; exact-head review next, all-page goal active.
 
 
 
@@ -75,3 +75,9 @@ Opus conditionally approved c187b04, confirming every original field/action and 
 Six focused tests,18 cross-page checks and16 Record checks pass with zero errors/writes. All38 fresh desktop/phone/dark captures pass. Old reviewed images remain separately labelled; reconstructed originals remain honest comparisons. Full follow-up verification is next; current lead fixes await the next meaningful cross-model review. No formal scoring/target, complete Card/Work Order or all-page audit claimed. Next long route: Place/Story records, Queue, settings, readers, public and specialist pages. Local only.
 
 Final follow-up receipt: **57/57** full steps passed, Node22,51s; final38-capture container-width correction passed. Newest-first gallery shown inline after clean HTML preview; portable gallery retains original PNGs. Next meaningful Place/Story record review will cover these lead fixes. All-page work and separate audit remain unfinished.
+
+## Place / Story records · newest local tranche
+
+Dossier/sections now cover both existing Place and Story routes. Every original field/action/gate has a destination in record-preservation.md. Story adds the calm saved reading view and keeps complete editing/review/publication/assignment contracts. Place retains full context intake and one dated research stream. Explicit history/status client projections and semantic Prose/form controls retain the privacy boundary.16 new-record checks and16 Person regressions pass;30 candidate captures and4 reconstructed original comparisons pass. Final shared regression, full check and exact-head Opus review are next. Local only, no all-page clearance/audit completion.
+
+Frozen Place/Story receipt: **57/57** full verification passed, Node22,52s (`/tmp/awf-place-story-full-verify.log`);16 Place/Story checks,16 Person regressions and18 cross-page checks passed with zero errors/API writes.30 fresh candidate and4 reconstructed captures pass.206-image gallery lightbox/newest-first/arrows/Escape checks pass, clean HTML preview and inline display completed. Exact-head Opus review next.

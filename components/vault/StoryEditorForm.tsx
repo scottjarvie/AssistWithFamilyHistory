@@ -26,7 +26,9 @@ const STORY_TYPES = [
 
 export function StoryEditorForm({
   story,
+  readonlyPreview = false,
 }: {
+  readonlyPreview?: boolean;
   story: {
     _id: string;
     title: string;
@@ -44,6 +46,7 @@ export function StoryEditorForm({
   const [showPreview, setShowPreview] = useState(true);
 
   async function handleSave() {
+    if (readonlyPreview) return;
     setSaving(true);
     try {
       const response = await fetch(`/api/stories/${story._id}`, {
@@ -72,8 +75,8 @@ export function StoryEditorForm({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-4 lg:grid-cols-[1fr_220px]">
+    <div className="@container space-y-4">
+      <div className="grid gap-4 @[40rem]:grid-cols-[minmax(0,1fr)_12rem]">
         <div className="space-y-2">
           <Label htmlFor="story-title">Title</Label>
           <Input id="story-title" value={title} onChange={(event) => setTitle(event.target.value)} />
@@ -84,7 +87,7 @@ export function StoryEditorForm({
             id="story-type"
             value={type}
             onChange={(event) => setType(event.target.value)}
-            className="h-11 md:pointer-fine:h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-base md:pointer-fine:text-sm text-stone-700"
+            className="h-11 md:pointer-fine:h-9 w-full rounded-md border border-border bg-card px-3 text-base md:pointer-fine:text-sm text-foreground"
           >
             {STORY_TYPES.map((option) => (
               <option key={option} value={option}>
@@ -113,13 +116,13 @@ export function StoryEditorForm({
             variant="ghost"
             size="sm"
             onClick={() => setShowPreview((value) => !value)}
-            className="text-stone-600"
+            className="text-muted-foreground"
           >
             {showPreview ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             {showPreview ? "Hide preview" : "Show preview"}
           </Button>
         </div>
-        <div className={showPreview ? "grid gap-4 lg:grid-cols-2" : ""}>
+        <div className={showPreview ? "grid gap-4 @[48rem]:grid-cols-2" : ""}>
           <Textarea
             id="story-content"
             value={content}
@@ -127,18 +130,18 @@ export function StoryEditorForm({
             className="min-h-[520px] text-sm leading-6"
           />
           {showPreview ? (
-            <div className="min-h-[520px] overflow-auto rounded-md border border-stone-200 bg-white px-5 py-4">
+            <div className="min-h-[520px] overflow-auto rounded-md border border-border bg-card px-5 py-4">
               {content.trim() ? (
                 <Prose markdown={content} variant="compact" />
               ) : (
-                <p className="text-sm text-stone-400">Start typing to see the rendered story…</p>
+                <p className="text-sm text-muted-foreground">Start typing to see the rendered story…</p>
               )}
             </div>
           ) : null}
         </div>
       </div>
 
-      <Button onClick={handleSave} disabled={saving || !title.trim() || !content.trim()} className="bg-stone-900 hover:bg-stone-800">
+      <Button onClick={handleSave} disabled={readonlyPreview || saving || !title.trim() || !content.trim()} className="min-h-11">
         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
         Save story
       </Button>
