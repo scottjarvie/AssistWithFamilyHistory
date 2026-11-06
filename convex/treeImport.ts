@@ -328,7 +328,12 @@ async function ownedRow<T extends TableNames>(c: ChunkContext, table: T, id: str
   if (c.w.rows) {
     c.w.rows.set(id, clean(row));
     if (table === "persons") c.w.personIndexes?.set(id, { surname: (row as Doc<"persons">).name.surname, year: (row as Doc<"persons">).birth?.date?.year ?? null, fsId: (row as Doc<"persons">).fsId });
-    if (table === "relationships") c.w.relationshipIndexes?.set(id, { type: (row as Doc<"relationships">).type, person1: (row as Doc<"relationships">).person1 ?? null, person2: (row as Doc<"relationships">).person2 ?? null, familySearchId: (row as Doc<"relationships">).familySearchId });
+    if (table === "relationships") {
+      // normalizeId/get used this table; TypeScript cannot narrow generic T
+      // from the runtime table check when projecting its index fields.
+      const relationship = row as unknown as Doc<"relationships">;
+      c.w.relationshipIndexes?.set(id, { type: relationship.type, person1: relationship.person1 ?? null, person2: relationship.person2 ?? null, familySearchId: relationship.familySearchId });
+    }
   }
   return row as Doc<T>;
 }

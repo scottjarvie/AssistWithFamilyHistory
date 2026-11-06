@@ -2594,7 +2594,7 @@ test("actual capture caller resolves an alias without replacing differing origin
   const gedcom = await t.mutation(internal.treeImport.beginTreeImport, { principal: principal(), grantId: grant, operationId: "begin-capture-alias", requestHash: "begin-capture-alias", input: { importKey: "capture-alias-file", system: "gedcom7", label: "Synthetic GEDCOM" } }) as any;
   await send(t, grant, gedcom.importJobId, 0, { persons: [{ key: "@I1@", living: true, names: [{ given: "Liz", surname: "Smith" }], otherIds: [{ system: "familysearch", id: "PID-A" }] }] });
   const original = (await t.run(ctx => ctx.db.query("persons").collect()))[0]; const mappings = await t.run(ctx => ctx.db.query("mcpRecordKeys").collect());
-  await t.run(async ctx => { const foreign = await ctx.db.insert("persons", { vaultOwnerId: "foreign-capture-owner", fsId: "PID-A", name: { given: "Foreign", surname: "Person" }, sex: "unknown", living: false, createdAt: 1, updatedAt: 1 }); await ctx.db.insert("mcpRecordKeys", { vaultOwnerId: "foreign-capture-owner", recordType: "person", recordKey: externalRecordKey("familysearch", "person", "PID-A"), recordId: String(foreign), externalKeyVersion: 2, createdAt: 1, updatedAt: 1 }); });
+  await t.run(async ctx => { const foreign = await ctx.db.insert("persons", { researchStatus: "basic", vaultOwnerId: "foreign-capture-owner", fsId: "PID-A", name: { given: "Foreign", surname: "Person" }, sex: "unknown", living: false, createdAt: 1, updatedAt: 1 }); await ctx.db.insert("mcpRecordKeys", { vaultOwnerId: "foreign-capture-owner", recordType: "person", recordKey: externalRecordKey("familysearch", "person", "PID-A"), recordId: String(foreign), externalKeyVersion: 2, createdAt: 1, updatedAt: 1 }); });
   const capture = CapturePackageSchema.parse({ schemaVersion: "2.0", captureId: "synthetic-capture-alias", capturedAt: "2026-01-01T00:00:00Z", extractorVersion: "synthetic-test", extractionDurationMs: 0, pageType: "person", pageUrl: "https://example.test/capture/PID-A", pageTitle: "Synthetic person", uiLocale: "en", person: { familySearchId: "PID-A", name: "Elizabeth Jones" }, sources: [], memories: [], diagnostics: { mode: "standard", warnings: [], errors: [] } });
   // Execute the actual caller through in-memory owner-authorized mutations.
   // This adapter never contacts FamilySearch, a network backend or a real user.
@@ -2620,7 +2620,7 @@ test.each(["splitPID", "duplicatePID", "deleted", "foreign", "correctedPID", "du
   const original = (await t.run(ctx => ctx.db.query("persons").collect()))[0];
   await t.run(async ctx => {
     const mapping = (await ctx.db.query("mcpRecordKeys").collect())[0];
-    if (mode === "splitPID" || mode === "duplicatePID") await ctx.db.insert("persons", { vaultOwnerId: OWNER, fsId: pid, name: { given: "Other", surname: "Person" }, sex: "unknown", living: false, createdAt: 1, updatedAt: 1 });
+    if (mode === "splitPID" || mode === "duplicatePID") await ctx.db.insert("persons", { researchStatus: "basic", vaultOwnerId: OWNER, fsId: pid, name: { given: "Other", surname: "Person" }, sex: "unknown", living: false, createdAt: 1, updatedAt: 1 });
     if (mode === "duplicatePID") await ctx.db.delete(mapping._id);
     if (mode === "splitPID") await ctx.db.patch(original._id, { fsId: undefined });
     if (mode === "foreign") await ctx.db.patch(original._id, { vaultOwnerId: "different-owner" });
@@ -2637,7 +2637,7 @@ test.each(["splitPID", "duplicatePID", "deleted", "foreign", "correctedPID", "du
 
 test.each(["legacyPID", "safeLegacyMapping", "noPIDName", "differentPIDName"])("capture preserves explicit identity and no-PID compatibility (%s)", async mode => {
   const t = convexTest({ schema, modules, transactionLimits: true });
-  const original = await t.run(ctx => ctx.db.insert("persons", { vaultOwnerId: OWNER, ...(mode !== "noPIDName" ? { fsId: "PID-A" } : {}), name: { given: "Same", surname: "Name" }, sex: "unknown", living: false, createdAt: 1, updatedAt: 1 }));
+  const original = await t.run(ctx => ctx.db.insert("persons", { researchStatus: "basic", vaultOwnerId: OWNER, ...(mode !== "noPIDName" ? { fsId: "PID-A" } : {}), name: { given: "Same", surname: "Name" }, sex: "unknown", living: false, createdAt: 1, updatedAt: 1 }));
   if (mode === "safeLegacyMapping") await t.run(ctx => ctx.db.insert("mcpRecordKeys", { vaultOwnerId: OWNER, recordType: "person", recordKey: externalRecordKey("familysearch", "person", "PID-A"), recordId: String(original), createdAt: 1, updatedAt: 1 }));
   const result = await t.withIdentity({ subject: OWNER }).mutation(api.vaultMutations.upsertPerson, { vaultOwnerId: OWNER, ...(mode !== "noPIDName" ? { fsId: mode === "differentPIDName" ? "PID-B" : "PID-A" } : {}), name: { given: "Same", surname: "Name" }, sex: "unknown", living: false });
   expect(result.created).toBe(mode === "differentPIDName");
@@ -3057,7 +3057,7 @@ test("matching legacy relationship IDs link once and retain original lineage and
 
 test("owned legacy relationship lookup is not crowded out by foreign records", async () => {
   const t = convexTest({ schema, modules, transactionLimits: true });
-  await t.run(async ctx => { const person1 = await ctx.db.insert("persons", { vaultOwnerId: "foreign-relationship-owner", name: { given: "Foreign", surname: "Parent" }, sex: "unknown", living: false, createdAt: 1, updatedAt: 1 }); const person2 = await ctx.db.insert("persons", { vaultOwnerId: "foreign-relationship-owner", name: { given: "Foreign", surname: "Child" }, sex: "unknown", living: false, createdAt: 1, updatedAt: 1 }); for (let i = 0; i < 12; i++) await ctx.db.insert("relationships", { vaultOwnerId: "foreign-relationship-owner", type: "ParentChild", person1, person2, familySearchId: "R", createdAt: 1, updatedAt: 1 }); });
+  await t.run(async ctx => { const person1 = await ctx.db.insert("persons", { researchStatus: "basic", vaultOwnerId: "foreign-relationship-owner", name: { given: "Foreign", surname: "Parent" }, sex: "unknown", living: false, createdAt: 1, updatedAt: 1 }); const person2 = await ctx.db.insert("persons", { researchStatus: "basic", vaultOwnerId: "foreign-relationship-owner", name: { given: "Foreign", surname: "Child" }, sex: "unknown", living: false, createdAt: 1, updatedAt: 1 }); for (let i = 0; i < 12; i++) await ctx.db.insert("relationships", { vaultOwnerId: "foreign-relationship-owner", type: "ParentChild", person1, person2, familySearchId: "R", createdAt: 1, updatedAt: 1 }); });
   const foreign = await t.run(ctx => ctx.db.query("relationships").collect()); const f = await legacyRelationshipFixture(t);
   const result = await send(t, f.grant, f.job.importJobId, 1, { relationships: [{ key: "R", type: "ParentChild", lineage: "adopted", person1Key: "P", person2Key: "C" }] }); expect(result.counts.relationships.linked).toBe(1);
   const rows = await t.run(ctx => ctx.db.query("relationships").collect()); expect(rows.filter(row => row.vaultOwnerId === OWNER)).toHaveLength(1); expect(rows.filter(row => row.vaultOwnerId !== OWNER)).toEqual(foreign);
@@ -3134,7 +3134,7 @@ test.each([false, true])("provider aliases cannot restore cleared external-ID UR
 
 test("observing legacy URL metadata does not grant overwrite authority but protects later clearing", async () => {
   const t = convexTest({ schema, modules, transactionLimits: true }); const grant = await seedGrant(t, { vaultOwnerId: OWNER });
-  const id = await t.run(ctx => ctx.db.insert("persons", { vaultOwnerId: OWNER, fsId: "P", name: { given: "Pat", surname: "" }, sex: "unknown", living: false, externalIds: [{ system: "familysearch", id: "P", url: "https://example.test/legacy" }], createdAt: 1, updatedAt: 1 })); const job = await begin(t, grant);
+  const id = await t.run(ctx => ctx.db.insert("persons", { researchStatus: "basic", vaultOwnerId: OWNER, fsId: "P", name: { given: "Pat", surname: "" }, sex: "unknown", living: false, externalIds: [{ system: "familysearch", id: "P", url: "https://example.test/legacy" }], createdAt: 1, updatedAt: 1 })); const job = await begin(t, grant);
   const person = { key: "P", living: false, names: [{ given: "Pat" }], sourceUrl: "https://example.test/legacy" };
   const first = await send(t, grant, job.importJobId, 0, { persons: [person] }); expect(first.counts.persons.linked).toBe(1);
   const mapping = (await t.run(ctx => ctx.db.query("mcpRecordKeys").collect()))[0]; const baseline = JSON.parse(mapping.lastImportedJson!); expect(baseline.externalIds).toBeUndefined(); expect(baseline._externalIdHistory).toContainEqual({ system: "familysearch", id: "P", hadUrl: true });
@@ -3203,7 +3203,7 @@ async function legacyLocalImportFixture(owner = "local-dev", system = "familysea
     principal: principal(owner), grantId, operationId, requestHash: operationId, input: { importJobId: job.importJobId, batchIndex: index, ...input, dryRun },
   }) as Promise<any>;
   const rows = await t.run(async ctx => ({
-    personId: await ctx.db.insert("persons", { fsId: "P", name: { given: "Original", surname: "Person" }, sex: "unknown", living: false, notes: "Retained original person notes", createdAt: 1, updatedAt: 1 }),
+    personId: await ctx.db.insert("persons", { researchStatus: "basic", fsId: "P", name: { given: "Original", surname: "Person" }, sex: "unknown", living: false, notes: "Retained original person notes", createdAt: 1, updatedAt: 1 }),
     sourceId: await ctx.db.insert("sources", { fsId: "S", title: "Original source", type: "book", notes: "Retained original source notes", createdAt: 1, updatedAt: 1 }),
   }));
   return { t, owner, grantId, job, batch, ...rows };
@@ -3238,7 +3238,7 @@ test.each(["person", "source"].flatMap(kind => ["mixedOwners", "bothOwnerless"].
   const f = await legacyLocalImportFixture();
   await f.t.run(async ctx => {
     const owner = form === "mixedOwners" ? { vaultOwnerId: f.owner } : {};
-    if (kind === "person") await ctx.db.insert("persons", { ...owner, fsId: "P", name: { given: "Different", surname: "Person" }, sex: "unknown", living: false, createdAt: 2, updatedAt: 2 });
+    if (kind === "person") await ctx.db.insert("persons", { researchStatus: "basic", ...owner, fsId: "P", name: { given: "Different", surname: "Person" }, sex: "unknown", living: false, createdAt: 2, updatedAt: 2 });
     else await ctx.db.insert("sources", { ...owner, fsId: "S", title: "Different source", type: "book", createdAt: 2, updatedAt: 2 });
   });
   const snapshot = () => f.t.run(async ctx => ({ people: await ctx.db.query("persons").collect(), sources: await ctx.db.query("sources").collect(), keys: await ctx.db.query("mcpRecordKeys").collect() })); const before = await snapshot();
@@ -3305,7 +3305,7 @@ test("observations leave genuinely blank legacy fields fillable and imported lea
 
 test.each(["wholeList", "nestedDescription"])("observed legacy relationship facts preserve later %s clearing", async mode => {
   const f = await legacyLocalImportFixture();
-  const relationshipId = await f.t.run(async ctx => { const partner = await ctx.db.insert("persons", { fsId: "Q", name: { given: "Partner", surname: "Person" }, living: false, sex: "unknown", createdAt: 1, updatedAt: 1 }); return ctx.db.insert("relationships", { type: "Couple", person1: f.personId, person2: partner, facts: [{ type: "Marriage", description: "Ohio" }], createdAt: 1, updatedAt: 1 }); });
+  const relationshipId = await f.t.run(async ctx => { const partner = await ctx.db.insert("persons", { researchStatus: "basic", fsId: "Q", name: { given: "Partner", surname: "Person" }, living: false, sex: "unknown", createdAt: 1, updatedAt: 1 }); return ctx.db.insert("relationships", { type: "Couple", person1: f.personId, person2: partner, facts: [{ type: "Marriage", description: "Ohio" }], createdAt: 1, updatedAt: 1 }); });
   const relationship = { key: "R", type: "Couple" as const, person1Key: "P", person2Key: "Q", facts: [{ type: "Marriage", description: "Ohio" }] };
   await f.batch(0, { relationships: [relationship] });
   await f.t.mutation(internal.relationships.updateFacts, { id: relationshipId, facts: mode === "wholeList" ? [] : [{ type: "Marriage", description: "" }] });
