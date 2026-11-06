@@ -77,6 +77,9 @@ export default async function LibraryPage() {
 
       <section id="research" aria-labelledby="research-heading" className="space-y-3">
         <h2 id="research-heading" className="text-xl font-semibold text-stone-900">Research</h2>
+        {shelves.researchMore && (
+          <p className="text-sm text-stone-600">This shelf may show only part of your research.</p>
+        )}
         {shelves.research.length === 0 ? (
           <p className="text-stone-600">
             No research yet. Findings and tasks you or your AI save appear here. Start from a person on{" "}
@@ -117,6 +120,9 @@ export default async function LibraryPage() {
 
       <section id="resources" aria-labelledby="resources-heading" className="space-y-3">
         <h2 id="resources-heading" className="text-xl font-semibold text-stone-900">Resources</h2>
+        {shelves.resourcesMore && (
+          <p className="text-sm text-stone-600">This shelf may show only part of your resources.</p>
+        )}
         {shelves.resources.length === 0 ? (
           <p className="text-stone-600">
             No resources yet. Place-and-era research packs and topics (a parish, a migration, a trade)

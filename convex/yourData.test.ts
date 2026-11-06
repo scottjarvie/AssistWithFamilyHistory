@@ -80,6 +80,26 @@ describe("your data", () => {
     const stats = await t.query(internal.yourData.getYourStatsInternal, { vaultOwnerId: OWNER });
     expect(stats.people).toMatchObject({ count: 3, more: false, living: 1 });
     expect(stats.ai.activeConnections).toBe(0);
+    expect(stats.ai.connectionsCapped).toBe(false);
+  });
+
+  test("stats count one effective connection per client and issuer, not approval rows", async () => {
+    const t = convexTest(schema, modules);
+    await seedGrant(t, { vaultOwnerId: OWNER, clientId: "same-client", expiresAt: null });
+    await seedGrant(t, { vaultOwnerId: OWNER, clientId: "same-client", expiresAt: null });
+    await seedGrant(t, { vaultOwnerId: OWNER, clientId: "another-client", expiresAt: null });
+    await seedGrant(t, { vaultOwnerId: OWNER, clientId: "same-client", issuer: "https://other-issuer.example.test", expiresAt: null });
+    const stats = await t.query(internal.yourData.getYourStatsInternal, { vaultOwnerId: OWNER });
+    expect(stats.ai).toMatchObject({ activeConnections: 3, connectionsCapped: false });
+  });
+
+  test("stats mark the connection count as partial when the recent list is full", async () => {
+    const t = convexTest(schema, modules);
+    for (let i = 0; i < 101; i++) {
+      await seedGrant(t, { vaultOwnerId: OWNER, clientId: `connection-${i}`, expiresAt: null });
+    }
+    const stats = await t.query(internal.yourData.getYourStatsInternal, { vaultOwnerId: OWNER });
+    expect(stats.ai).toMatchObject({ activeConnections: 100, connectionsCapped: true });
   });
 
   test("the Library research shelf shows the owner's tasks only", async () => {
@@ -89,7 +109,42 @@ describe("your data", () => {
     const shelves = await t.query(internal.yourData.getLibraryShelvesInternal, { vaultOwnerId: OWNER });
     expect(shelves.research.map((row) => row.title)).toEqual(["Find the A marriage record"]);
     expect(shelves.resources).toEqual([]);
+    expect(shelves).toMatchObject({ researchMore: false, resourcesMore: false });
   });
+
+  test.each(["researchLog", "researchTasks", "historicalContext", "topics"] as const)(
+    "the Library stops reading large %s documents before projecting the shelf",
+    async (table) => {
+      const t = convexTest(schema, modules);
+      await t.run(async (ctx) => {
+        const content = "漢".repeat(40_000);
+        for (let i = 0; i < 10; i++) {
+          const common = { vaultOwnerId: OWNER, createdAt: i, updatedAt: i };
+          switch (table) {
+            case "researchLog":
+              await ctx.db.insert(table, { ...common, entityType: "other", activityType: "other", status: "done", summary: `Finding ${i}`, details: content });
+              break;
+            case "researchTasks":
+              await ctx.db.insert(table, { ...common, type: "record_search", title: `Task ${i}`, status: "todo", priority: "medium", aiSuggested: false, description: content });
+              break;
+            case "historicalContext":
+              await ctx.db.insert(table, { ...common, title: `Pack ${i}`, topic: "daily_life", timePeriod: { startYear: 1800, endYear: 1900 }, sources: [], content });
+              break;
+            case "topics":
+              await ctx.db.insert(table, { ...common, name: `Topic ${i}`, kind: "other", description: content });
+              break;
+          }
+        }
+      });
+      const shelves = await t.query(internal.yourData.getLibraryShelvesInternal, { vaultOwnerId: OWNER });
+      const rows = table === "researchLog" || table === "researchTasks" ? shelves.research : shelves.resources;
+      expect(table === "researchLog" || table === "researchTasks" ? shelves.researchMore : shelves.resourcesMore).toBe(true);
+      expect(rows.length).toBeGreaterThan(0);
+      expect(rows.length).toBeLessThan(10);
+      // Whole documents were bounded before they became these small summaries.
+      expect(JSON.stringify(shelves).length).toBeLessThan(5_000);
+    },
+  );
 
   test("the export pages through every row of a table and refuses unknown tables", async () => {
     const t = convexTest(schema, modules);

@@ -7,7 +7,7 @@
  */
 import { v } from "convex/values";
 import type { FunctionReference } from "convex/server";
-import type { TableNames } from "./_generated/dataModel";
+import type { Doc, TableNames } from "./_generated/dataModel";
 import { action, internalQuery, type QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { authorizeTenantAction, type TrustBoundaryShadowEntry } from "./access";
@@ -30,13 +30,12 @@ const PEOPLE_CAP = 5_000;
 const SMALL_CAP = 1_000;
 const DAY = 24 * 60 * 60 * 1000;
 
-async function ownedRows(ctx: QueryCtx, table: TableNames, owner: string, cap: number, order: "asc" | "desc" = "asc") {
+async function ownedRows<T extends TableNames>(ctx: QueryCtx, table: T, owner: string, cap: number, order: "asc" | "desc" = "asc") {
   // Iterate so large story/source documents cannot exhaust the query byte budget.
   // Each table reads at most its cap, or 250 KB plus one document.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const query = (ctx.db.query(table) as any).withIndex("by_owner", (q: any) => q.eq("vaultOwnerId", owner)).order(order);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rows: any[] = [];
+  const rows: Doc<T>[] = [];
   let bytes = 0;
   const encoder = new TextEncoder();
   for await (const row of query) {
@@ -82,7 +81,10 @@ async function readYourStats(ctx: QueryCtx, owner: string) {
     stories: { count: stories.rows.length, more: stories.more, byStatus: tally(stories.rows, (row) => String(row.status)) },
     queue: { count: queue.rows.length, more: queue.more, byState: tally(queue.rows, (row) => String(row.state)) },
     ai: {
-      activeConnections: grants.connections.filter((row) => row.status === "active").length,
+      activeConnections: new Set(grants.connections
+        .filter((row) => row.status === "active")
+        .map((row) => JSON.stringify([row.clientId, row.issuer]))).size,
+      connectionsCapped: grants.connections.length >= 100,
       savesLast30Days: recentAi.length,
       savesCapped: activity.more,
     },
@@ -98,14 +100,16 @@ export type LibraryShelves = Awaited<ReturnType<typeof readLibraryShelves>>;
 
 async function readLibraryShelves(ctx: QueryCtx, owner: string) {
   const [log, tasks, packs, topics] = await Promise.all([
-    ctx.db.query("researchLog").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(50),
-    ctx.db.query("researchTasks").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(50),
-    ctx.db.query("historicalContext").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(50),
-    ctx.db.query("topics").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(50),
+    ownedRows(ctx, "researchLog", owner, 50, "desc"),
+    ownedRows(ctx, "researchTasks", owner, 50, "desc"),
+    ownedRows(ctx, "historicalContext", owner, 50, "desc"),
+    ownedRows(ctx, "topics", owner, 50, "desc"),
   ]);
   return {
+    researchMore: log.more || tasks.more || log.rows.length + tasks.rows.length > 60,
+    resourcesMore: packs.more || topics.more,
     research: [
-      ...log.map((row) => ({
+      ...log.rows.map((row) => ({
         id: String(row._id),
         kind: "finding" as const,
         title: row.summary,
@@ -114,7 +118,7 @@ async function readLibraryShelves(ctx: QueryCtx, owner: string) {
         byAi: row.creationProvenance?.actorKind === "chosen_ai",
         at: row.updatedAt,
       })),
-      ...tasks.map((row) => ({
+      ...tasks.rows.map((row) => ({
         id: String(row._id),
         kind: "task" as const,
         title: row.title,
@@ -125,14 +129,14 @@ async function readLibraryShelves(ctx: QueryCtx, owner: string) {
       })),
     ].sort((a, b) => b.at - a.at).slice(0, 60),
     resources: [
-      ...packs.map((row) => ({
+      ...packs.rows.map((row) => ({
         id: String(row._id),
         kind: "research_pack" as const,
         title: row.title,
         detail: `${row.topic.replace(/_/g, " ")}, ${row.timePeriod.startYear}–${row.timePeriod.endYear}`,
         sources: row.sources.length,
       })),
-      ...topics.map((row) => ({
+      ...topics.rows.map((row) => ({
         id: String(row._id),
         kind: "topic" as const,
         title: row.name,
