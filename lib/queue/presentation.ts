@@ -107,28 +107,28 @@ export const QUEUE_STATE_PRESENTATION: Record<
   { label: string; short: string; accent: string; wash: string }
 > = {
   needs_you: {
-    label: QUEUE_STATE_LABELS.needs_you,
+    label: "Needs you",
     short: "Paused for one answer or action from you.",
-    accent: "#9f5a2d",
-    wash: "#f6e8da",
+    accent: "var(--annotation)",
+    wash: "var(--annotation-surface)",
   },
   working: {
     label: QUEUE_STATE_LABELS.working,
     short: "Actively claimed by you or an authorized AI.",
-    accent: "#245a43",
-    wash: "#e5eee8",
+    accent: "var(--evidence)",
+    wash: "var(--evidence-surface)",
   },
   waiting_for_your_ai: {
     label: QUEUE_STATE_LABELS.waiting_for_your_ai,
     short: "Saved for continuity; nothing is running.",
-    accent: "#98702b",
-    wash: "#f2ead5",
+    accent: "var(--primary)",
+    wash: "var(--secondary)",
   },
   done: {
     label: QUEUE_STATE_LABELS.done,
     short: "Result or cancellation recorded with its trail.",
-    accent: "#4d5f68",
-    wash: "#e8ecec",
+    accent: "var(--muted-foreground)",
+    wash: "var(--muted)",
   },
 };
 
@@ -222,5 +222,16 @@ export function formatQueueDate(value?: number): string {
     year: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    timeZone:"UTC",
+    timeZoneName:"short",
   }).format(new Date(value));
+}
+
+/** Availability mirrors the person's visible commands; the backend remains authoritative. */
+export function canPersonRunQueueCommand(item:QueueItemRecord,command:"claim"|"checkpoint"|"resume"|"complete"|"cancel"|"reopen") {
+ switch(command){case "claim":return canPersonClaim(item);case "checkpoint":case "complete":return canPersonContinue(item);case "resume":return item.state==="needs_you";case "reopen":return item.state==="done";case "cancel":return item.state!=="done";}
+}
+/** Refreshes can overlap retained older pages; one stored activity ID is shown once. */
+export function mergeQueueActivity(existing:QueueActivityRecord[],incoming:QueueActivityRecord[]) {
+ const rows=new Map(existing.map(row=>[row._id,row]));for(const row of incoming)rows.set(row._id,row);return [...rows.values()];
 }

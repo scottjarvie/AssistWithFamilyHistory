@@ -7,7 +7,7 @@
   "vaultReads.ts:getProvisionalRelatives": "72f21eb622e141bade3d123dc64a2779f321e847f728d2ad25fb9a0520228036",
   "vaultReads.ts:getOperationsQueue": "2f55f81eb6438b1b75e7c730043fe44e94ccd963dde98adf0bada16a17907c22",
   "vaultReads.ts:getOperationsSummary": "2a82ba93302acebce13754598408e511038ac3a3c8424654f77249a3e2705ab4",
-  "vaultReads.ts:getVaultAudit": "21a17960e938625242d6bbb15fedad83332d55b76ab820958c26d3965f4825b0",
+  "vaultReads.ts:getVaultAudit": "b8509c75cdaea6dac7a0571e79a90363e4ee02b31f92fef82f85bcb0b2d58d15",
   "vaultReads.ts:getContextCoverage": "a552186b55eb610f9c256d0be07deea74ab0c04d4824f29c2bd3dacd2b891cd5",
   "vaultReads.ts:getStoryReadinessCandidates": "7bf987ea37b93eb7eade8d5aed087651a68a5b86692982dcd2b437b2c3dcaca8",
   "vaultReads.ts:getPlacesExplorer": "b10bb61dd1110e884f0f60c9c98d7c875ab5dcde85a0cc2db519d1b84ad1ca1a",

@@ -1,0 +1,155 @@
+{
+  "checkedAt": "2026-11-05T14:33:09.193Z",
+  "checks": [
+    "Initial list loads no selected-item detail until a thread is opened",
+    "Claim keeps lease, expected version and idempotency fields and updates the selected thread",
+    "A version conflict retains the unfinished checkpoint; successful retry clears it",
+    "Complete records the supplied result without a publication or identity action",
+    "Reopen records the reason and returns to Waiting without running work",
+    "Cancel retains its reason and closes the same handoff",
+    "A delayed detail command completing after Next preserves the newly opened thread",
+    "An in-row answer finishing with another thread open preserves that thread in Everything",
+    "An in-row answer finishing with another thread open preserves that thread in Needs you",
+    "Create preserves directive, desired outcome, required high-priority reason and chosen-AI handoff fields",
+    "Permanent deletion keeps explicit confirmation and removes only the selected invented record"
+  ],
+  "mockWrites": [
+    {
+      "method": "PATCH",
+      "path": "/api/queue/synthetic-queue-waiting",
+      "body": {
+        "command": "claim",
+        "leaseMs": 1800000,
+        "nextStep": "Synthetic claim plan",
+        "expectedVersion": 4,
+        "idempotencyKey": "d77310bd-d012-4fdd-8e59-97d771c11e57"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/queue/synthetic-queue-waiting",
+      "body": {
+        "command": "checkpoint",
+        "leaseMs": 1800000,
+        "nextStep": "Synthetic next step",
+        "expectedVersion": 5,
+        "idempotencyKey": "f2d63624-a170-46ee-bb15-d497aab7be38"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/queue/synthetic-queue-waiting",
+      "body": {
+        "command": "checkpoint",
+        "leaseMs": 1800000,
+        "nextStep": "Synthetic next step",
+        "expectedVersion": 6,
+        "idempotencyKey": "bd389c67-f23f-476c-a4a0-2a73146da76a"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/queue/synthetic-queue-waiting",
+      "body": {
+        "command": "complete",
+        "resultSummary": "Synthetic completed comparison with uncertainty retained",
+        "expectedVersion": 7,
+        "idempotencyKey": "51755217-9c73-49ca-93a7-6fbb3472815d"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/queue/synthetic-queue-waiting",
+      "body": {
+        "command": "reopen",
+        "reason": "Synthetic reason to compare another source",
+        "expectedVersion": 8,
+        "idempotencyKey": "be8346c1-a7f6-48d8-9c65-b2240e39b531"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/queue/synthetic-queue-waiting",
+      "body": {
+        "command": "cancel",
+        "reason": "Synthetic superseding question",
+        "expectedVersion": 9,
+        "idempotencyKey": "d6a8f921-5a23-4b6d-b4ef-b7af99a656d2"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/queue/synthetic-queue-working",
+      "body": {
+        "command": "complete",
+        "resultSummary": "Synthetic delayed result while another handoff is opened",
+        "expectedVersion": 4,
+        "idempotencyKey": "f719dc3d-3401-4a5f-95b7-1a89fc73544f"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/queue/synthetic-queue-needs-you",
+      "body": {
+        "command": "resume",
+        "answerSummary": "Synthetic answer while keeping the source conflict",
+        "expectedVersion": 4,
+        "idempotencyKey": "600f137d-26cc-4ba5-bd6e-852a292d5ab9"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/queue/synthetic-queue-needs-you",
+      "body": {
+        "command": "resume",
+        "answerSummary": "Synthetic answer while keeping the source conflict",
+        "expectedVersion": 5,
+        "idempotencyKey": "66c5594e-6ae0-48af-aac1-c2a1566931dc"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/queue",
+      "body": {
+        "directive": "A new synthetic directive",
+        "requestedOutcome": "An invented evidence comparison",
+        "priority": "high",
+        "priorityReason": "Synthetic priority reason",
+        "chosenAiId": "oauth-chosen-ai",
+        "idempotencyKey": "48f3ef6d-2e6c-4da5-85ca-0472478162f1"
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/queue/synthetic-created-1",
+      "body": {
+        "confirmation": "delete_queue_item_and_history"
+      }
+    }
+  ],
+  "mockReads": [
+    "/api/queue",
+    "/api/queue",
+    "/api/queue/synthetic-queue-waiting",
+    "/api/queue/synthetic-queue-waiting",
+    "/api/queue/synthetic-queue-waiting",
+    "/api/queue/synthetic-queue-waiting",
+    "/api/queue/synthetic-queue-waiting",
+    "/api/queue/synthetic-queue-waiting",
+    "/api/queue/synthetic-queue-waiting",
+    "/api/queue/synthetic-queue-working",
+    "/api/queue/synthetic-queue-ai",
+    "/api/queue",
+    "/api/queue",
+    "/api/queue/synthetic-queue-expired",
+    "/api/queue",
+    "/api/queue/synthetic-queue-expired",
+    "/api/queue",
+    "/api/queue/synthetic-created-1",
+    "/api/queue/synthetic-queue-needs-you"
+  ],
+  "unexpectedAPIs": [],
+  "errors": [],
+  "networkAPIRequests": 0,
+  "note": "All API requests intercepted and fulfilled in the browser. This proves client wiring, not backend acceptance."
+}

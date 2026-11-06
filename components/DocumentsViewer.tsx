@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { UtcDate } from "@/components/design/UtcDate";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -54,8 +55,8 @@ export function DocumentsViewer({ documents, error = null }: DocumentsViewerProp
       <Card>
         <CardContent className="p-8 text-center">
           <AlertTriangle className="w-12 h-12 text-orange-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-stone-900 mb-2">Documents Unavailable</h3>
-          <p className="text-stone-500">{error}</p>
+          <h3 className="text-lg font-medium text-foreground mb-2">Documents Unavailable</h3>
+          <p className="text-muted-foreground">{error}</p>
         </CardContent>
       </Card>
     );
@@ -65,9 +66,9 @@ export function DocumentsViewer({ documents, error = null }: DocumentsViewerProp
     return (
       <Card>
         <CardContent className="p-8 text-center">
-          <FileText className="w-12 h-12 text-stone-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-stone-900 mb-2">No Documents Yet</h3>
-          <p className="text-stone-500">
+          <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-foreground mb-2">No Documents Yet</h3>
+          <p className="text-muted-foreground">
             Generate a Person Sheet (PS) or Complete Source Transcription (CST) to see them here.
           </p>
         </CardContent>
@@ -90,9 +91,9 @@ export function DocumentsViewer({ documents, error = null }: DocumentsViewerProp
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
               <div>
-                <CardTitle>{doc.title}</CardTitle>
+                <CardTitle role="heading" aria-level={2}>{doc.title}</CardTitle>
                 <CardDescription>
-                  Updated {new Date(doc.updatedAt).toLocaleDateString()}
+                  Updated <UtcDate value={new Date(doc.updatedAt).getTime()}/>
                 </CardDescription>
               </div>
               <div className="flex gap-2">
@@ -119,7 +120,7 @@ export function DocumentsViewer({ documents, error = null }: DocumentsViewerProp
               </div>
             </CardHeader>
             <CardContent>
-              <div className="bg-stone-50 rounded-lg p-6 font-mono text-sm whitespace-pre-wrap overflow-x-auto">
+              <div className="bg-muted rounded-lg p-6 font-mono text-sm whitespace-pre-wrap overflow-x-auto">
                 {doc.contentMarkdown}
               </div>
             </CardContent>

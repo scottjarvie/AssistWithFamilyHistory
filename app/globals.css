@@ -4,6 +4,10 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  --color-annotation: var(--annotation);
+  --color-annotation-surface: var(--annotation-surface);
+  --color-evidence: var(--evidence);
+  --color-evidence-surface: var(--evidence-surface);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-instrument-sans);
@@ -48,7 +52,13 @@
 }
 
 :root {
-  --radius: 0.8rem;
+  --radius: 0.5rem;
+  --surface-wash: #e2d8bf;
+  --surface-glow: #f0dcc2;
+  --annotation: #91502e;
+  --annotation-surface: #f4e8dc;
+  --evidence: #355d4c;
+  --evidence-surface: #e6ede5;
   --background: #f7f3e8;
   --foreground: #1d212a;
   --card: #fdf9f0;
@@ -88,6 +98,18 @@
 }
 
 .dark {
+  color-scheme: dark;
+  --surface-wash: #202d30;
+  --surface-glow: #28251f;
+  --annotation: #e2aa7c;
+  --annotation-surface: #33281f;
+  --evidence: #a3c6aa;
+  --evidence-surface: #22352d;
+  --brand-ink: #f5f0e6;
+  --brand-parchment: #12161d;
+  --brand-gold: #d99a5f;
+  --brand-teal: #7ba5b8;
+  --brand-rust: #e2aa7c;
   --background: #12161d;
   --foreground: #f5f0e6;
   --card: #181d25;
@@ -129,9 +151,9 @@
     @apply bg-background text-foreground;
     font-family: var(--font-instrument-sans), ui-sans-serif, sans-serif;
     background-image:
-      radial-gradient(circle at 0% 15%, #e2d8bf 0%, transparent 45%),
-      radial-gradient(circle at 90% 0%, #f0dcc2 0%, transparent 35%),
-      linear-gradient(120deg, #f7f3e8 0%, #f4efe1 40%, #f8f4eb 100%);
+      radial-gradient(circle at 0% 15%, var(--surface-wash) 0%, transparent 45%),
+      radial-gradient(circle at 90% 0%, var(--surface-glow) 0%, transparent 35%),
+      linear-gradient(120deg, var(--background), var(--background));
     background-attachment: fixed;
   }
   h1,
@@ -215,22 +237,8 @@
     animation: shimmer-line 4s linear infinite;
   }
 
-  .queue-ledger {
-    background-color: #f4efe3;
-    background-image:
-      linear-gradient(#98702b0a 1px, transparent 1px),
-      radial-gradient(circle at 12% 0%, #e6d8bc 0%, transparent 34%),
-      radial-gradient(circle at 100% 26%, #dce8df 0%, transparent 30%);
-    background-size: 100% 2.75rem, auto, auto;
-  }
-
-  .queue-paper {
-    background-color: #fffaf2;
-    background-image:
-      linear-gradient(92deg, #ffffff99, transparent 38%),
-      radial-gradient(#24312c0c 0.7px, transparent 0.7px);
-    background-size: auto, 5px 5px;
-  }
+  .queue-ledger { background: var(--background); }
+  .queue-paper { background: var(--card); color: var(--card-foreground); }
 
   @media (prefers-reduced-motion: reduce) {
     .animate-rise-in,
@@ -241,3 +249,42 @@
     }
   }
 }
+
+@layer components {
+  .research-desk { padding: 1.25rem 1rem; border-radius: .75rem; background: color-mix(in srgb, var(--secondary) 36%, transparent); }
+  .folio-tray { min-width: 0; display: flex; flex-direction: column; position: relative; border: 1px solid var(--border); border-radius: .5rem; background: var(--card); box-shadow: 0 2px 3px color-mix(in srgb, var(--foreground) 5%, transparent); }
+  .folio-tray-header { display: flex; align-items: flex-start; gap: 1rem; min-height: 3rem; padding: 1rem 1rem .5rem; }
+  .folio-tray-tab { position: relative; margin-top: -1.85rem; padding: .4rem .7rem; border: 1px solid var(--border); border-bottom: 0; border-radius: .4rem .4rem 0 0; background: var(--card); font: 600 .75rem/1.4 var(--font-ibm-plex-mono), monospace; letter-spacing: .06em; text-transform: uppercase; }
+  .folio-tray-footer { display: flex; align-items: center; justify-content: space-between; min-height: 44px; margin-top: auto; padding: .65rem 1rem; border-top: 1px solid var(--border); color: var(--primary); font-size: .875rem; font-weight: 600; }
+  .folio-tray-footer:hover { background: var(--muted); }
+  .folio-tray-footer:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+}
+@media (max-width: 639px) { .research-desk { padding: 1.25rem .5rem; } }
+
+@layer components {
+  .collection-table th, .collection-table td { padding: .65rem .5rem; }
+  .collection-table.is-compact th, .collection-table.is-compact td { padding: .4rem .6rem; }
+  .collection-table thead th { font-size: .75rem; line-height: 1.5; font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
+}
+/* Table becomes a labelled record on phones; every chosen column stays visible. */
+@media (max-width: 639px) {
+  .collection-table { display: block; }
+  .collection-table thead { display: none; }
+  .collection-table tbody { display: block; }
+  .collection-table tr { display: grid; grid-template-columns: 2.75rem minmax(0,1fr) minmax(0,1fr); padding: .75rem; }
+  .collection-table tr > th { min-width: 0; grid-column: 2 / -1; }
+  .collection-table th, .collection-table td { padding: .35rem; }
+  .collection-table tr > td:not(:first-child) { min-width: 0; }
+  .collection-table tr > td:not(:first-child) > span { display: block; overflow-wrap: anywhere; }
+  .collection-table tr > td:nth-child(2n + 3) { grid-column: 2; }
+  .collection-table tr > td:nth-child(2n + 4) { grid-column: 3; }
+}
+
+@media (min-width: 1280px) { .collection-toolbar { display:flex; align-items:flex-start; flex-wrap:wrap; gap:.5rem; } .collection-toolbar > :first-child { min-width: 20rem; } }
+@media (min-width: 768px) and (pointer: fine) {
+ .collection-workspace button, .collection-workspace select, .collection-workspace summary { min-height:36px; }
+ .collection-workspace input:not([type=checkbox]):not([type=radio]), .collection-workspace select { height:36px; }
+}
+
+/* Research comparison keeps full cells; List/Grid disclose their detailed work. */
+.collection-table .operation-details { display: none; }

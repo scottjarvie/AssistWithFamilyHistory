@@ -37,6 +37,7 @@ const expectedProtected = [
   "/api/capabilities",
   "/api/convex/stats",
   "/api/operations/queue",
+  "/api/audit/records",
   "/api/operations/checks",
   "/api/queue",
   "/api/queue/abc",

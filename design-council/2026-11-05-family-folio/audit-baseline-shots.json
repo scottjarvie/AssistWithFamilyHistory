@@ -1,0 +1,20 @@
+{
+  "baseURL": "http://localhost:3457",
+  "timezone": "America/Phoenix",
+  "defaultVariants": [
+    "desktop-light",
+    "mobile-light"
+  ],
+  "shots": [
+    {
+      "name": "audit-original-reconstructed",
+      "path": "/design-council-preview?surface=baseline-audit",
+      "capabilities": [
+        {
+          "can": "original headline/gaps/workflow/priority layout",
+          "text": "Story Workflow Distribution"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+import {test} from "node:test";
+import assert from "node:assert/strict";
+import {projectPlaceRow,projectStoryRow,projectWritingCandidate,projectResearchTask,projectResearchLog} from "../lib/vault/collectionRows";
+import {canonicalFilters,applyCollectionFilters} from "../lib/collections/viewFilters";
+import {activityAuthorLabel,activityKindLabel} from "../lib/activity/presentation";
+import {countCollectionFacets} from "../lib/collections/facets";
+import {activityWindow, activityDay} from "../lib/activity/window";
+import {resolveCollectionColumns} from "../lib/collections/columnPreferences";
+
+test("Older saved People views retain lifespan/state moved out of identity, while new explicit hides remain respected",()=>{
+ const columns=[{key:"lifespan",introducedVersion:2},{key:"state",introducedVersion:2},{key:"sources"},{key:"documents"}];
+ assert.deepEqual(resolveCollectionColumns(columns,["sources","removed"]),["lifespan","state","sources"]);
+ assert.deepEqual(resolveCollectionColumns(columns,["sources"],2),["sources"]);
+ assert.deepEqual(resolveCollectionColumns(columns),["lifespan","state","sources","documents"]);
+});
+
+test("Every new collection projects visible fields without notes, evidence internals or storage references",()=>{
+ const extra={notes:"PRIVATE_note",vaultOwnerId:"PRIVATE_owner",metadata:"PRIVATE_meta",artifactPaths:"PRIVATE_path",creationProvenance:{actorKind:"chosen_ai",actorId:"PRIVATE_actor",operationId:"PRIVATE_op",method:"mcp",recordedAt:10}};
+ const place=projectPlaceRow({_id:"place",fullName:"Synthetic Town",type:"city",stats:{events:2,citations:3,media:4},...extra} as unknown as Parameters<typeof projectPlaceRow>[0]);
+ assert.deepEqual(place,{id:"place",name:"Synthetic Town",kind:"city",events:2,citations:3,media:4});
+ const story=projectStoryRow({_id:"story",title:"Synthetic story",content:"Displayed narrative",type:"biography",status:"draft",storyWorkflow:"ready_to_review",person:{displayName:"Synthetic Person",...extra},readiness:{completionPercent:80,...extra},evidenceCount:2,placeCount:3,contextReportCount:4,publishWarnings:["PRIVATE_warning"],...extra} as unknown as Parameters<typeof projectStoryRow>[0]);
+ assert.equal(story.content,"Displayed narrative");assert.equal(story.publicHref,null);assert.equal(story.warnings,1);
+ const candidate=projectWritingCandidate({_id:"person",routeId:"synthetic",displayName:"Synthetic Person",lifespan:"1900 to 1980",storyWorkflow:"ready_to_draft",sourceCount:8,contextReportCount:2,completionPercent:75,...extra} as unknown as Parameters<typeof projectWritingCandidate>[0]);
+ const task=projectResearchTask({_id:"task",title:"Look for a record",description:"Displayed task description",type:"record_search",priority:"high",status:"todo",aiSuggested:true,updatedAt:10,person:null,...extra} as unknown as Parameters<typeof projectResearchTask>[0]);
+ const log=projectResearchLog({_id:"log",summary:"Displayed activity",activityType:"context_research",updatedAt:10,person:null,model:"Self-reported model",...extra} as unknown as Parameters<typeof projectResearchLog>[0]);
+ assert.equal(log.authorKind,"chosen_ai");assert.equal(log.method,"mcp");assert.equal(log.modelHint,"Self-reported model");
+ assert.doesNotMatch(JSON.stringify([place,story,candidate,task,log]),/PRIVATE_/);
+});
+
+test("Saved collection views retain every declared facet and cannot inject unrelated URL controls",()=>{
+ const current={q:"original",status:"draft",workflow:"needs_context_research"};
+ const saved={q:"new search",status:"review",workflow:"ready_to_review",next:"https://unrelated.invalid"};
+ const url=new URL(applyCollectionFilters("https://example.invalid/app/stories?page=3&navigation=side",current,saved));
+ assert.equal(url.searchParams.get("q"),"new search");assert.equal(url.searchParams.get("status"),"review");assert.equal(url.searchParams.get("workflow"),"ready_to_review");
+ assert.equal(url.searchParams.get("navigation"),"side");assert.equal(url.searchParams.has("page"),false);assert.equal(url.searchParams.has("next"),false);
+ assert.deepEqual(canonicalFilters({workflow:"ready",q:"name",status:""}),canonicalFilters({status:"",q:"name",workflow:"ready"}));
+});
+
+
+test("Custom activity dates replace a preset; open bounds survive and inverted dates are explicit",()=>{
+ const first=Date.parse("2020-01-01T12:00Z"), latest=Date.parse("2026-11-05T12:00Z");
+ const preset=activityWindow("quarter",{start:"",end:""},first,latest);
+ assert.equal(preset.start,latest-90*activityDay);
+ const custom=activityWindow("custom",{start:"2020-01-01",end:"2020-01-02"},first,latest);
+ assert.equal(custom.start,Date.parse("2020-01-01T00:00Z"));assert.equal(custom.end,Date.parse("2020-01-03T00:00Z")-1);assert.equal(custom.invalid,false);
+ const openStart=activityWindow("custom",{start:"",end:"2020-01-02"},first,latest);assert.equal(openStart.start,-Infinity);assert.equal(openStart.end,custom.end);
+ assert.equal(activityWindow("custom",{start:"2026-11-05",end:"2026-11-01"},first,latest).invalid,true);
+});
+
+
+test("Facet counts share one engine and apply search plus every other active facet",()=>{
+ const rows=[{status:"draft",workflow:"evidence",name:"Samuel"},{status:"review",workflow:"ready",name:"Samuel"},{status:"draft",workflow:"ready",name:"Mabel"}];
+ const counts=countCollectionFacets(rows,[{key:"status",label:"Status",read:r=>r.status,options:[{value:"draft",label:"Draft"},{value:"review",label:"Review"}]},{key:"workflow",label:"Workflow",read:r=>r.workflow,options:[{value:"evidence",label:"Evidence"},{value:"ready",label:"Ready"}]}],{status:"review",workflow:"ready"},r=>r.name==="Samuel");
+ assert.deepEqual(counts.map(f=>f.options.map(o=>o.count)),[[0,1],[0,1]]);assert.deepEqual(counts.map(f=>f.count),[1,1]);
+});
+
+
+test("Shared activity wording distinguishes first-party and chosen AI without inventing unknown authors",()=>{
+ assert.equal(activityAuthorLabel("first_party_ai"),"Family History AI");assert.equal(activityAuthorLabel("chosen_ai"),"Your AI");assert.equal(activityAuthorLabel(null),"Not attributed");assert.equal(activityKindLabel("tier2_sources"),"Sources");
+});
+
+
+test("Operations browser rows exclude raw research-check notes and authorization internals",async()=>{
+ const {projectOperationRow}=await import("../lib/vault/operationsRows");
+ const row={id:"synthetic",rowType:"person",personIdentifier:"synthetic",displayName:"Invented person",lifespan:"1842 to 1913",keyPlaces:[],completionPercent:62,sourceCount:12,memoryCount:3,documentCount:2,contextReportCount:1,storyCount:0,storyWorkflow:"needs_genealogy_evidence",missingCritical:["identity_review"],nextActions:["Compare the invented source."],staleChecksCount:2,anchorPersonIdentifier:"synthetic",badge:"in_progress",lastTouched:10,latestImportAt:null,researchChecks:[{notes:"PRIVATE_check_note",completedBy:"PRIVATE_identity"}],vaultOwnerId:"PRIVATE_owner",authority:{token:"PRIVATE_token"}};
+ const visible=projectOperationRow(row as unknown as Parameters<typeof projectOperationRow>[0]);
+ assert.equal(visible.name,"Invented person");assert.deepEqual(visible.missing,["identity_review"]);assert.ok(!("lastTouched" in visible));assert.ok(!("latestImportAt" in visible));
+ assert.ok(!JSON.stringify(visible).includes("PRIVATE_"));assert.ok(!("researchChecks" in visible));
+});
+
+
+test("Operations handoff and page queries preserve workflow plus every other facet, with first repeated key semantics",async()=>{
+ const {operationQueryArguments,operationFiltersFromURL}=await import("../lib/operations/query");
+ const {normalizeOperationFilters}=await import("../lib/vault/operationsRows");
+ const url=new URLSearchParams("q=Synthetic&type=person&storyStatus=has_story&storyWorkflow=ready_to_review&staleOnly=true&missingCheck=birth_record&sortBy=sourceCount&sortDirection=asc&storyWorkflow=published&page=3");
+ assert.equal(normalizeOperationFilters({staleOnly:"false"}).staleOnly,"");
+ const expected={search:"Synthetic",rowType:"person",storyStatus:"has_story",storyWorkflow:"ready_to_review",staleOnly:true,missingCheck:"birth_record",sortBy:"sourceCount",sortDirection:"asc"};
+ assert.deepEqual(operationQueryArguments(operationFiltersFromURL(url)),expected);
+ assert.deepEqual(operationQueryArguments(normalizeOperationFilters({q:"Synthetic",type:"person",storyStatus:"has_story",storyWorkflow:["ready_to_review","published"],staleOnly:"true",missingCheck:"birth_record",sortBy:"sourceCount",sortDirection:"asc"})),expected);
+ assert.deepEqual(operationQueryArguments(normalizeOperationFilters({type:"untrusted",storyStatus:"untrusted",storyWorkflow:"untrusted",sortBy:"untrusted",sortDirection:"untrusted"})),{search:undefined,rowType:undefined,storyStatus:undefined,storyWorkflow:undefined,staleOnly:undefined,missingCheck:undefined,sortBy:"missingCritical",sortDirection:"desc"});
+});

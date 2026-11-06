@@ -1,0 +1,130 @@
+{
+  "runId": "2026-11-05-family-folio",
+  "site": "Assist With Family History",
+  "target": 8,
+  "minLift": 1.5,
+  "beatReferences": false,
+  "maxRounds": 4,
+  "judges": [
+    {
+      "key": "sol",
+      "label": "Codex gpt-6.1-sol",
+      "providerInstanceId": "codex",
+      "model": "gpt-6.1-sol",
+      "options": {
+        "reasoningEffort": "high"
+      }
+    },
+    {
+      "key": "opus",
+      "label": "Claude Opus 5.5",
+      "providerInstanceId": "claudeAgent",
+      "model": "claude-opus-5-5",
+      "options": {
+        "effort": "high"
+      }
+    }
+  ],
+  "categories": [
+    {
+      "key": "findability",
+      "label": "Intuitiveness & findability",
+      "short": "Find",
+      "weight": 1.5,
+      "question": "Could a new person find things and understand what they are looking at? Clear names, predictable places, search and filters that are easy to spot, nothing that requires decoding."
+    },
+    {
+      "key": "density",
+      "label": "Information density done well",
+      "short": "Dense",
+      "weight": 1.5,
+      "question": "Dense but scannable: lots of real information per screen, organised so the eye can sweep it (alignment, grouping, quiet secondary data). Sparse is not a virtue; cramped and noisy is not either."
+    },
+    {
+      "key": "capability",
+      "label": "Capability preserved",
+      "short": "Capab",
+      "weight": 1,
+      "blocking": true,
+      "question": "Is every piece of stored data, every view, filter, sort, search and detail still reachable, with no more clicks than before (or than this kind of page needs)? Anything removed, hidden or turned into a dead end loses points here. A drop below the baseline blocks the round."
+    },
+    {
+      "key": "aiwork",
+      "label": "AI-work visibility",
+      "short": "AI",
+      "weight": 1,
+      "question": "How clearly does the site show what AIs did and stored: who wrote what and when, AI interpretations versus the person's own observations, research, suggestions, queued work and its state?"
+    },
+    {
+      "key": "hierarchy",
+      "label": "Hierarchy",
+      "short": "Hier",
+      "weight": 1,
+      "question": "Is it obvious what each page is, what matters most and what to do next? One clear focal point per view; secondary things recede without disappearing."
+    },
+    {
+      "key": "typography",
+      "label": "Typography",
+      "short": "Type",
+      "weight": 1,
+      "question": "Type families, scale, weight, line length, line height and rhythm; readable small text; a deliberate ladder rather than many near-identical sizes."
+    },
+    {
+      "key": "iconography",
+      "label": "Iconography & imagery",
+      "short": "Icon",
+      "weight": 0.75,
+      "question": "Icons consistent in style, weight and size, meaningful, aligned with text; images, thumbnails and empty-image placeholders handled with care."
+    },
+    {
+      "key": "spacing",
+      "label": "Spacing & layout",
+      "short": "Space",
+      "weight": 1,
+      "question": "Grid, alignment, consistent spacing scale, good use of width on desktop and of the small screen on mobile."
+    },
+    {
+      "key": "colour",
+      "label": "Colour & contrast",
+      "short": "Colour",
+      "weight": 1,
+      "question": "A purposeful palette with enough colour to feel alive, status colours that mean one thing, legible contrast in light and dark."
+    },
+    {
+      "key": "consistency",
+      "label": "Consistency & polish",
+      "short": "Cons",
+      "weight": 1,
+      "question": "The same thing looks and behaves the same everywhere: buttons, chips, cards, headers, tabs, radii, borders; no stray one-offs or rough edges."
+    },
+    {
+      "key": "fit",
+      "label": "Fit to purpose",
+      "short": "Fit",
+      "weight": 1,
+      "question": "Does it look and feel like what the design brief describes, for the people it describes \u2014 a data-rich workspace a person shares with their AIs? Would they trust it and enjoy using it?"
+    },
+    {
+      "key": "cost",
+      "label": "Running cost",
+      "short": "Cost",
+      "weight": 0.5,
+      "question": "Light to run: no heavy client-side bloat, autoplay media, large images or extra infrastructure for what it does. Judge from what is visible and the measured facts."
+    }
+  ],
+  "briefPath": "design-council/2026-11-05-family-folio/brief.md",
+  "referenceDir": "design-council/reference",
+  "referenceNames": {
+    "national-archives": "US National Archives \u00b7 genealogist resources",
+    "uk-archives": "UK National Archives \u00b7 census research guide",
+    "github-issues": "GitHub Issues \u00b7 dense research/work list"
+  },
+  "shots": "design-council/shots.json",
+  "checks": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test"
+  ],
+  "exploreFirst": true,
+  "baselineCaptureNote": "Independent unchanged baseline captured before editing. exploreFirst prevents prepare-round from treating round-1 candidate as identical to that baseline; no exploration is implied for decided patterns."
+}

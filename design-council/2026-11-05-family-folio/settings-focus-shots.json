@@ -1,0 +1,34 @@
+{
+  "baseURL": "http://localhost:3457",
+  "timezone": "America/Phoenix",
+  "defaultVariants": [
+    "desktop-light",
+    "mobile-light"
+  ],
+  "shots": [
+    {
+      "name": "key-suspend-confirmation",
+      "path": "/design-council-preview?surface=settings-api",
+      "actions": [
+        {
+          "click": "[data-api-key=\"synthetic-key-active\"] button:has-text(\"Suspend\")"
+        }
+      ],
+      "viewportOnly": true
+    },
+    {
+      "name": "key-suspend-confirmation",
+      "path": "/design-council-preview?surface=settings-api&theme=dark",
+      "actions": [
+        {
+          "click": "[data-api-key=\"synthetic-key-active\"] button:has-text(\"Suspend\")"
+        }
+      ],
+      "viewportOnly": true,
+      "variants": [
+        "desktop-dark",
+        "mobile-dark"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "checkedAt": "2026-11-05T14:32:55.859Z",
+  "checks": [
+    "Reloading a conflicted row on list page two retains every loaded row, cursor and private answer",
+    "A conflict reload hides a command that the fresh item state no longer allows",
+    "An unavailable command keeps its draft in private memory and restores it when applicable again",
+    "Successful progress quietly refreshes the thread, keeps earlier activity pages and de-duplicates overlapping cursors"
+  ],
+  "reads": [
+    "/api/queue?limit=25",
+    "/api/queue?limit=25",
+    "/api/queue?limit=25&cursor=2",
+    "/api/queue/synthetic-queue-needs-you?limit=50",
+    "/api/queue/synthetic-queue-working?limit=50",
+    "/api/queue/synthetic-queue-working?limit=50",
+    "/api/queue/synthetic-queue-working?limit=50",
+    "/api/queue/synthetic-queue-working?limit=50&cursor=2",
+    "/api/queue/synthetic-queue-working?limit=50",
+    "/api/queue/synthetic-queue-working?limit=50&cursor=4",
+    "/api/queue/synthetic-queue-working?limit=50&cursor=6"
+  ],
+  "mockWrites": [
+    {
+      "id": "synthetic-queue-needs-you",
+      "body": {
+        "command": "resume",
+        "answerSummary": "Private synthetic answer on list page two",
+        "expectedVersion": 4,
+        "idempotencyKey": "e3fee806-ff78-446e-9366-9a4ec6e8f5c5"
+      }
+    },
+    {
+      "id": "synthetic-queue-needs-you",
+      "body": {
+        "command": "resume",
+        "answerSummary": "Private synthetic answer on list page two",
+        "expectedVersion": 5,
+        "idempotencyKey": "b2d64f31-eccd-400f-b07c-fc7ee4087e06"
+      }
+    },
+    {
+      "id": "synthetic-queue-working",
+      "body": {
+        "command": "checkpoint",
+        "leaseMs": 1800000,
+        "nextStep": "Private checkpoint kept after state changes",
+        "expectedVersion": 4,
+        "idempotencyKey": "49ba59f5-a859-43e6-b165-35ee393ae85f"
+      }
+    },
+    {
+      "id": "synthetic-queue-working",
+      "body": {
+        "command": "checkpoint",
+        "leaseMs": 1800000,
+        "nextStep": "Private checkpoint kept after state changes",
+        "expectedVersion": 6,
+        "idempotencyKey": "12261adb-d9bd-45be-85e1-8608fc745749"
+      }
+    }
+  ],
+  "unexpectedAPIs": [],
+  "errors": [],
+  "networkAPIRequests": 0,
+  "note": "All API requests browser-fulfilled with invented data. Client behavior only, no backend acceptance."
+}

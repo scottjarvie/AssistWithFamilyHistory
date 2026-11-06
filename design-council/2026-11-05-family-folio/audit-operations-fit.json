@@ -1,0 +1,8 @@
+{
+  "checkedAt": "2026-11-05T16:02:13.057Z",
+  "checks": [
+    "Operations 1440px table/cells fit; Coverage heading and stale-check phrase stay whole",
+    "Operations 1280px table/cells fit; Coverage heading and stale-check phrase stay whole"
+  ],
+  "errors": []
+}
