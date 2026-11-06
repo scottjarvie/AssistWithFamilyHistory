@@ -28,6 +28,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import {
+  FAMILY_HISTORY_CONTROL_TOOLS,
   FAMILY_HISTORY_SCOPE_INFO,
   FAMILY_HISTORY_TOOLS,
   NEVER_EXPOSED,
@@ -38,7 +39,7 @@ import AiSetupPage from "../app/ai/page";
 
 const root = process.cwd();
 const failures: string[] = [];
-const catalogNames = new Set(FAMILY_HISTORY_TOOLS.map((tool) => tool.name));
+const catalogNames = new Set([...FAMILY_HISTORY_TOOLS, ...FAMILY_HISTORY_CONTROL_TOOLS].map((tool) => tool.name));
 
 /* --------------------------------------------------- /ai.txt is generated */
 

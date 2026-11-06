@@ -11,9 +11,9 @@
  *   1. A call is allowed when ONE single active grant permits it entirely.
  *      Scopes are never summed across grants. `resolveGrantForRequest` in
  *      `convex/mcpGrants.ts` therefore hands this function exactly one grant.
- *   2. No refusal may reveal whether a record, a tool, or another owner
- *      exists. An unknown tool name and a tool the grant does not cover
- *      produce the identical message, and a boundary refusal is decided
+ *   2. No refusal may reveal whether a private record or another owner
+ *      exists. A known tool refusal names its public missing power, and
+ *      a boundary refusal is decided
  *      before any record lookup happens.
  */
 
@@ -34,7 +34,7 @@ export type GrantBoundary = {
   queueItemIds?: string[];
 };
 
-export type GrantStatus = "pending" | "active" | "revoked" | "expired" | "denied";
+export type GrantStatus = "pending" | "active" | "paused" | "revoked" | "expired" | "denied";
 
 /**
  * Everything the authorizer is allowed to know about a grant. Deliberately
@@ -47,6 +47,8 @@ export type ResolvedGrant = {
   issuer: string;
   scopes: FamilyHistoryScope[];
   scopeChoice?: "full" | "chosen";
+  withheldScopes?: string[];
+  pausedAt?: number;
   boundary: GrantBoundary;
   expiresAt?: number;
 };
@@ -54,10 +56,11 @@ export type ResolvedGrant = {
 export type GrantResolution =
   | { state: "active"; grant: ResolvedGrant }
   | { state: "absent" }
-  | { state: "pending" }
-  | { state: "revoked" }
-  | { state: "expired" }
-  | { state: "denied" };
+  | { state: "pending"; at?: number }
+  | { state: "revoked"; at?: number }
+  | { state: "expired"; at?: number }
+  | { state: "paused"; at?: number }
+  | { state: "denied"; at?: number };
 
 export type AccessRefusal = {
   allowed: false;
@@ -79,7 +82,7 @@ export type AccessDecision = AccessPermit | AccessRefusal;
  * app's navigation contract, and `/settings/ai` redirects here for anyone who
  * types the shorter form.
  */
-export const CONNECTION_SETTINGS_URL = "https://assistwithfamilyhistory.com/app/settings/ai";
+export const CONNECTION_SETTINGS_URL = "https://assistwithfamilyhistory.com/settings/ai";
 
 /**
  * One keyed refusal dictionary. Every entry says what happened AND what to do,
@@ -91,8 +94,8 @@ export const GRANT_REFUSALS: Record<string, AccessRefusal> = {
     allowed: false,
     code: "GRANT_REQUIRED",
     message:
-      "This AI connection has not been approved for Assist With Family History yet. Signing in proved who the person is; it did not decide what this connection may do.",
-    recovery: `Ask the person to open ${CONNECTION_SETTINGS_URL}, find this connection in the pending list, choose which parts of their research it may use, and approve it. Then retry. Do not retry in a loop while you wait.`,
+      "This connection has no active grant. Only the person can restore access.",
+    recovery: `Ask the person to open ${CONNECTION_SETTINGS_URL}, review this connection and restore it. Do not retry in a loop while you wait.`,
   },
   GRANT_PENDING: {
     allowed: false,
@@ -104,7 +107,7 @@ export const GRANT_REFUSALS: Record<string, AccessRefusal> = {
   GRANT_REVOKED: {
     allowed: false,
     code: "GRANT_REVOKED",
-    message: "The person turned this AI connection off.",
+    message: "This AI connection was turned off. Only the person can restore it.",
     recovery: `Stop calling Family History tools. If the person wants to reconnect, they must open Settings at ${CONNECTION_SETTINGS_URL} and choose "Review and approve again" for this connection. Removing it from the list does not clear the refusal.`,
   },
   GRANT_DENIED: {
@@ -122,7 +125,7 @@ export const GRANT_REFUSALS: Record<string, AccessRefusal> = {
   SCOPE_NOT_GRANTED: {
     allowed: false,
     code: "SCOPE_NOT_GRANTED",
-    message: "This connection is not permitted to use that Family History tool.",
+    message: "The requested tool or power is unavailable. Only the person can restore a removed power.",
     recovery: `Use only the tools returned by tools/list for this connection. If the work genuinely needs more, tell the person in plain language what you would do with it and ask them to widen the connection at ${CONNECTION_SETTINGS_URL}.`,
   },
   OUTSIDE_GRANT_BOUNDARY: {
@@ -143,6 +146,8 @@ export function refusalForResolution(resolution: GrantResolution): AccessRefusal
   switch (resolution.state) {
     case "active":
       return null;
+    case "paused":
+      return { ...refusal("GRANT_REVOKED"), message: `This connection was paused${resolution.at ? ` on ${new Date(resolution.at).toISOString()}` : ""}. Only the person can resume it.`, recovery: `Only the person can restore access at ${CONNECTION_SETTINGS_URL}.` };
     case "pending":
       return refusal("GRANT_PENDING");
     case "revoked":
@@ -196,6 +201,7 @@ export function namedRecordsInInput(toolName: string, input: unknown): NamedReco
   if (!tool) return found;
 
   switch (tool.name) {
+    case "family_history_archive_record":
     case "family_history_get_context": {
       if (args.kind === "person") pushId(found.personIds, args.id);
       else found.unattributable = true;
@@ -380,20 +386,27 @@ export function decideToolAccess(params: {
   const grant = (resolution as { state: "active"; grant: ResolvedGrant }).grant;
 
   // Expiry is filtered here at read time, never inferred from token lifetime.
+  if (grant.pausedAt) return { ...refusal("GRANT_REVOKED"), message: "This connection is paused. Only the person can resume it." };
   if (isGrantExpired(grant, now)) return refusal("GRANT_EXPIRED");
 
   const tool = findTool(toolName);
-  // An unknown tool name and a known tool this grant does not cover are the
-  // same refusal on purpose: a caller must not be able to probe the catalog.
+  // Unknown tool names receive a generic refusal; known public tools name the
+  // missing power so the person can understand and restore the right limit.
   if (!tool) return refusal("SCOPE_NOT_GRANTED");
-  if (!effectiveScopes(grant).includes(tool.requiredScope)) return refusal("SCOPE_NOT_GRANTED");
+  if (!effectiveScopes(grant).includes(tool.requiredScope)) return {
+    ...refusal("SCOPE_NOT_GRANTED"), message: `Missing power: ${tool.requiredScope}. Only the person can restore it.`,
+    recovery: `Only the person can restore this power at ${CONNECTION_SETTINGS_URL}.`,
+  };
 
   if (input !== undefined) {
     const args = (input ?? {}) as Record<string, unknown>;
     for (const conditional of tool.conditionalScopes ?? []) {
       const value = args[conditional.whenInputHas];
       const present = Array.isArray(value) ? value.length > 0 : value !== undefined && value !== null;
-      if (present && !effectiveScopes(grant).includes(conditional.scope)) return refusal("SCOPE_NOT_GRANTED");
+      if (present && !effectiveScopes(grant).includes(conditional.scope)) return {
+        ...refusal("SCOPE_NOT_GRANTED"), message: `Missing power: ${conditional.scope}. Only the person can restore it.`,
+        recovery: `Only the person can restore this power at ${CONNECTION_SETTINGS_URL}.`,
+      };
     }
     if (!boundaryPermits(tool, grant.boundary, namedRecordsInInput(tool.name, input))) {
       return refusal("OUTSIDE_GRANT_BOUNDARY");

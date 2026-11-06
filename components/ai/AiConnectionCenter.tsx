@@ -88,6 +88,7 @@ const STATUS_COPY: Record<
   ConnectionRow["status"],
   { label: string; tone: string; meaning: string }
 > = {
+  paused: { label: "Paused", tone: "bg-muted text-muted-foreground", meaning: "This connection is paused. Only you can resume it." },
   pending: {
     label: "Waiting for you",
     tone: "bg-annotation/10 text-annotation",
@@ -695,7 +696,7 @@ export function AiConnectionCenter({
       const response = await fetch("/api/ai-connections", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...body, grantId }),
+        body: JSON.stringify({ ...body, grantId, revision: connections.find(row => row.id === grantId)?.revision ?? 0, opId: crypto.randomUUID() }),
       });
       const payload = (await response.json().catch(() => ({}))) as {
         id?: string;
@@ -761,6 +762,19 @@ export function AiConnectionCenter({
   }
 
   function renderConnectionEditor(connection:ConnectionRow) {
+    const controls = <div className="space-y-3 p-3">
+      {connection.limitedBy === "ai" && connection.limitedAt && <p>Narrowed by your AI on {formatDateTime(connection.limitedAt)}</p>}
+      <div className="flex flex-wrap gap-2">
+        {connection.status === "active" && <Button disabled={busyId === connection.id} variant="outline" onClick={() => send(connection.id, {action:"pause"}, "Paused.")}>Pause</Button>}
+        {connection.status === "paused" && <Button variant="outline" disabled={busyId === connection.id} onClick={() => requestRevoke(connection)}>Revoke…</Button>}
+        {connection.status === "paused" && <Button disabled={busyId === connection.id} onClick={() => send(connection.id, {action:"resume"}, "Resumed with the same limits.")}>Resume</Button>}
+        <Button disabled={busyId === connection.id} variant="outline" onClick={() => send(connection.id, {action:"restore"}, "Access restored. Other limits and the end date are preserved.")}>Restore</Button>
+      </div>
+      <details><summary>Connection history</summary><ol className="space-y-2 py-3">{connection.history?.map((entry, index) => <li key={`${entry.revision}-${index}`} className="text-sm">{formatDateTime(entry.at)} · {entry.actor === "ai" ? "by your AI" : entry.actor === "person" ? "by you" : "by the system"} · {entry.sentence}</li>)}</ol></details>
+    </div>;
+    return <>{controls}{renderLegacyConnectionEditor(connection)}</>;
+  }
+  function renderLegacyConnectionEditor(connection:ConnectionRow) {
     const snapshot=readSnapshot(connection.consentSnapshot);
     if(connection.status==="pending")return (<details id={`connection-editor-${connection.id}`} data-connection-editor={connection.id} key={connection.id} className="scroll-mt-28 rounded-lg border border-annotation/40 bg-card p-4">
                 <summary className="min-h-11 cursor-pointer font-medium">Review request · {connection.label}</summary>
@@ -770,8 +784,7 @@ export function AiConnectionCenter({
                   <Badge className={STATUS_COPY.pending.tone}>{STATUS_COPY.pending.label}</Badge>
                 </div>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  {STATUS_COPY.pending.meaning} Signing in proved whose workspace this is; it did
-                  not decide what this connection may do. That is this page&apos;s whole job.
+                  {STATUS_COPY.pending.meaning} This older connection has saved limits. Review them here; signing in again does not clear them.
                 </p>
                 <ClientIdentity connection={connection} />
                 <p className="mt-3 text-xs text-muted-foreground">
@@ -891,7 +904,7 @@ export function AiConnectionCenter({
                     />
                   </details>
                 )}
-                {connection.status === "expired" && <ExpiryControls busy={busyId === connection.id} onSave={(expiresInDays) => send(connection.id, { action: "expiry", expiresInDays }, "End date updated. Your scopes and record boundary are unchanged.")} />}
+                {(connection.status === "expired" || connection.status === "paused") && <ExpiryControls busy={busyId === connection.id} onSave={(expiresInDays) => send(connection.id, { action: "expiry", expiresInDays }, "End date updated. Your scopes and record boundary are unchanged.")} />}
                 <Button
                   type="button"
                   variant="outline"
@@ -910,10 +923,10 @@ export function AiConnectionCenter({
     <div className="settings-connection-center space-y-8">
       <nav aria-label="AI settings sections" className="sticky top-14 z-20 -mx-1 flex gap-1 overflow-x-auto border-b border-border bg-background px-1">{[["connection-matrix","Connections"],["ceiling-heading","Permissions"],["activity-heading","History"],["manual-heading","Manual brief"]].map(([id,label])=><a key={id} href={`#${id}`} className="inline-flex min-h-11 shrink-0 items-center px-3 text-sm text-primary hover:bg-muted">{label}</a>)}</nav>
       <div id="connection-matrix" className="scroll-mt-28"><ConnectionMatrix connections={connections} busyId={busyId} onEdit={editConnection} onRevoke={connection=>requestRevoke(connection)} onRemove={connection=>{void send(connection.id,{action:"remove"},"Removed from this list.");}} renderEditor={renderConnectionEditor}/></div>
-      <p className="text-sm leading-6 text-muted-foreground">Only you can approve, narrow or turn off a connection. It cannot grant itself more. Turning it off takes effect on its very next request, not whenever its sign-in happens to run out.</p>
+      <p className="text-sm leading-6 text-muted-foreground">You or your AI can limit a connection. Only you can restore access, resume it or extend its end date. Turning it off takes effect on its very next request, not whenever its sign-in happens to run out.</p>
       <Dialog open={revokeRequest!==null} onOpenChange={open=>{if(!open)setRevokeRequest(null);}}><DialogContent onCloseAutoFocus={event=>{event.preventDefault();if(revokeOrigin.current?.isConnected)revokeOrigin.current.focus();else revokeRow.current?.focus();}}><DialogHeader><DialogTitle>Revoke {revokeRequest?.connection.label}?</DialogTitle><DialogDescription>This takes effect on its very next request. Its past research stays in your vault. Review and approve again here if you want to reconnect it later.</DialogDescription></DialogHeader><label className="text-sm">Reason for your own record (optional)<Input className="mt-2 min-h-11" maxLength={300} value={revokeRequest?.reason||""} onChange={event=>setRevokeRequest(current=>current?{...current,reason:event.target.value}:null)}/></label><DialogFooter><MatrixButton variant="outline" disabled={busyId===revokeRequest?.connection.id} onClick={()=>setRevokeRequest(null)}>Cancel</MatrixButton><MatrixButton variant="destructive" disabled={busyId===revokeRequest?.connection.id} onClick={async()=>{if(revokeRequest&&await send(revokeRequest.connection.id,{action:"revoke",reason:revokeRequest.reason.trim()||undefined},"Turned off. Its very next request is refused."))setRevokeRequest(null);}}>Revoke connection</MatrixButton></DialogFooter></DialogContent></Dialog>
       {pending.length===0&&<p className="text-sm text-muted-foreground">Nothing is waiting. An AI you sign in is approved for ordinary research work straight away and shows above; connections from before that change may still wait here.</p>}
-      {active.length===0&&<p className="text-sm text-muted-foreground">No AI is connected to this workspace.</p>}
+      {active.length===0&&<p className="text-sm text-muted-foreground">No active AI is connected to this workspace.</p>}
       <OnlyYouTable/>
       {/* ------------------------------------------- the whole ceiling */}
       <section aria-labelledby="ceiling-heading">

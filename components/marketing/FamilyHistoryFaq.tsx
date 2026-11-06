@@ -2,6 +2,8 @@ import { ChevronDown } from "lucide-react";
 import { SafeLink } from "@/components/layout/SafeLink";
 
 const questions = [
+  { question: "What can my AI do here, and how do I limit it?",
+    answer: "When you connect your AI, it gets full access to your Family History workspace from the start: it can read, save, organise, archive and restore, including tools we add later, with no end date. You can limit it any time: in Settings → AI, or just ask your AI to limit itself (for example, \"only read, don’t change anything\" or \"stop until Friday\"). Your AI can narrow its own access but never widen it. Only you can give access back. It never permanently deletes anything, spends money or publishes for you. Media review and living-person protections still apply." },
   {
     question: "Is this another family-tree site?",
     answer: "A tree can be one view, but the workspace is built for the trail behind it: sources, relationships, events, uncertainty, research questions, context, and stories.",
@@ -19,8 +21,8 @@ const questions = [
     answer: "No. Evidence, candidate conclusions, conflicts, confidence, and accepted understanding remain distinct so you can review what the record really supports.",
   },
   {
-    question: "Can the AI publish or delete for me?",
-    answer: "Not through the current connection. Story saves remain private drafts or review requests; publication and destructive work keep their human gates.",
+    question: "Can the AI publish or permanently delete for me?",
+    answer: "Not through the current connection. Story saves remain private drafts or review requests; publication and permanent deletion keep their human gates. Archive and restore are reversible and available to your AI.",
   },
   {
     question: "Does it import directly from every genealogy provider?",

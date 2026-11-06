@@ -1,4 +1,6 @@
+import { AI_ACCESS_INSTRUCTIONS } from "@/lib/mcp/accessCopy";
 import {
+  FAMILY_HISTORY_CONTROL_TOOLS,
   FAMILY_HISTORY_SCOPE_INFO,
   FAMILY_HISTORY_TOOLS,
   NEVER_EXPOSED,
@@ -17,8 +19,9 @@ export function GET() {
     `Support: ${SUPPORT_DESK_URL} is the one support desk for every Assist With site. No Assist With site has a support, feedback, or privacy email address, so never tell a person to email this product.`,
     "",
     "## Signing in is the approval",
-    "When the person signs in, this connection gets every current permission and future tool across their whole workspace with no end date by default. Fewer permissions or an end date are opt-in settings choices, preserved until the person changes them. Publishing, deleting, merging, sharing and exporting are never available through this connection, whatever happens. The person can narrow or turn the connection off at https://assistwithfamilyhistory.com/app/settings/ai, and that takes effect on your very next request.",
-    "Grant errors: GRANT_EXPIRED (their chosen end date has passed — ask them to change or remove it at https://assistwithfamilyhistory.com/app/settings/ai), GRANT_REVOKED (they turned it off — stop), GRANT_REQUIRED (sign-in did not identify this connection — ask them to reconnect), SCOPE_NOT_GRANTED (use only the tools tools/list returned for this connection), OUTSIDE_GRANT_BOUNDARY (that record is outside what they approved).",
+    AI_ACCESS_INSTRUCTIONS,
+    "When the person signs in, this connection gets every current permission and future tool across their whole workspace with no end date by default. Fewer permissions or an end date are opt-in settings choices, preserved until the person changes them. Publishing, permanent deletion, merging, invitations, public sharing and exporting are never available through this connection, whatever happens. The person can narrow or turn the connection off at https://assistwithfamilyhistory.com/settings/ai, and that takes effect on your very next request.",
+    "Grant errors: GRANT_EXPIRED (their chosen end date has passed — ask them to change or remove it at https://assistwithfamilyhistory.com/settings/ai), GRANT_REVOKED (they turned it off — stop), GRANT_REQUIRED (this connection has no active grant — only the person can restore it in Settings), SCOPE_NOT_GRANTED (use only the tools tools/list returned for this connection), OUTSIDE_GRANT_BOUNDARY (that record is outside what they approved).",
     "tools/list is filtered by what the person approved. Trust it; it is the exact surface this connection has.",
     "",
     "## Required workflow",
@@ -38,6 +41,7 @@ export function GET() {
     "",
     "## Tools",
     "Canonical names are family_history_*. The pre-namespace names are kept as deprecated aliases on the same handlers and the same permission, so a client that connected earlier keeps working; prefer the canonical name.",
+    ...FAMILY_HISTORY_CONTROL_TOOLS.map(tool => `- ${tool.name} (no permission required) — ${tool.humanSummary}`),
     ...FAMILY_HISTORY_TOOLS.map(
       (tool) =>
         `- ${tool.name} (${tool.requiredScope}${tool.writes ? ", writes" : ", read-only"})${tool.alias ? ` [alias: ${tool.alias}]` : ""} — ${tool.humanSummary}`,
@@ -48,9 +52,9 @@ export function GET() {
     ...NEVER_PERMITTED.map((entry) => `- Never permitted: ${entry}`),
     "",
     "## Safety",
-    "- Do not put family_history:* permissions in the OAuth scope parameter of your authorization request. They are product permissions, not provider scopes: the sign-in provider does not issue them and will refuse the whole request with an invalid-scope error before the person ever sees a consent screen. Ask the provider only for its ordinary identity scopes. The person grants Family History permissions separately at https://assistwithfamilyhistory.com/app/settings/ai, and tools/list then shows you exactly what you have.",
+    "- Do not put family_history:* permissions in the OAuth scope parameter of your authorization request. They are product permissions, not provider scopes: the sign-in provider does not issue them and will refuse the whole request with an invalid-scope error before the person ever sees a consent screen. Ask the provider only for its ordinary identity scopes. Full access starts on sign-in. Only the person can restore removed powers at https://assistwithfamilyhistory.com/settings/ai.",
     "- Never provide or invent userId, ownerId, workspaceId, vaultOwnerId, or tenant IDs. The server derives the vault from verified OAuth.",
-    "- Never publish, delete, merge identities, change sharing, or perform external FamilySearch actions through this MCP surface.",
+    "- Never publish, permanently delete, merge identities, invite new people, create public links, or perform external FamilySearch actions through this MCP surface.",
     "- Never ask a person for a link to a private file, and never fetch one yourself. Use family_history_get_evidence; it returns reviewed, AI-allowed items as content blocks and tells you honestly what it could not deliver and why.",
     "- Broad discovery withholds living-person notes. Person hydration includes only reviewed AI-allowed loose context and media.",
     "- Evidence facts do not silently overwrite canonical person conclusions. Save candidates/conflicts and let the person review.",
@@ -63,7 +67,7 @@ export function GET() {
     "Current in production, awaiting joined client proof: family_history_begin_evidence_upload and family_history_finish_evidence_upload accept one checksum-bound file (JPEG, PNG or WebP photos up to 20 MiB, with display copies; PDF, TIFF, HEIC/HEIF, MP3/M4A/WAV and plain text kept as exact originals up to 512 MiB, sent in 16 MiB parts above 20 MiB) through a short-lived PUT capability on the Family History upload relay and leave it Private, unreviewed, rights-unknown, and AI-use-off for the person. The isolated B2 storage boundary is provider-proved; no real chosen AI has yet completed upload, person review, later evidence read, and cleanup as one lifecycle.",
     "Awaiting real-client proof: no AI client has yet completed a whole lifecycle here — discover, register, consent, list tools, read, write, fetch evidence, revoke, be denied. Deployed is not the same as proved by a client, and no client is named as working until it proves it. Broad client compatibility, fresh-device email verification, mobile setup, and refresh/reconnect sit here.",
     "Partial: dynamic client registration is offered by the sign-in provider and is the supported onboarding path, but no client has been observed completing it here. Client ID Metadata Document discovery is deferred until the provider supports it; its validation is written and unused.",
-    "Later: publishing, deletion, identity merge, export, external provider actions, wider client matrix.",
+    "Later: publishing, permanent deletion, identity merge, export, external provider actions, wider client matrix.",
     "",
     "If tools look stale after a deploy: disconnect the MCP server, reconnect it, sign in again, and confirm the family_history_* names above appear before writing.",
     "",

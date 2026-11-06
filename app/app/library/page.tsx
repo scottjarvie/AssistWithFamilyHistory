@@ -66,6 +66,7 @@ export default async function LibraryPage() {
           Three shelves: the research you and your AI have done, prompts that work well, and the
           background you have gathered about places and times.
         </p>
+        <Link href="/app/archive" className="inline-flex min-h-11 items-center text-primary underline">Open Archive and restore records</Link>
         <nav aria-label="Shelves" className="flex flex-wrap gap-2 pt-2 text-sm">
           {[["#research", "Research"], ["#prompts", "Prompts"], ["#resources", "Resources"]].map(([href, label]) => (
             <a key={href} href={href} className="inline-flex min-h-[44px] items-center rounded-full border border-stone-300 bg-white px-4 hover:border-stone-500">

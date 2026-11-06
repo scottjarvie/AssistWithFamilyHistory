@@ -1,5 +1,5 @@
 /** Durable grant choices. This module is shared by discovery, calls and settings. */
-import { FAMILY_HISTORY_SCOPES, clampToScopeCeiling, type FamilyHistoryScope } from "./catalog";
+import { FAMILY_HISTORY_SCOPES, type FamilyHistoryScope } from "./catalog";
 
 // Frozen 2026-10-23 baseline. NEVER add future scopes here: legacy full grants
 // must inherit future catalog additions, while partial grants stay exactly chosen.
@@ -16,7 +16,9 @@ export const LEGACY_FULL_SCOPE_BASELINE = [
 export type ScopeChoice = "full" | "chosen";
 export type GrantChoices = {
   scopes: readonly string[];
+  boundary?: { kind: string; personIds?: string[]; queueItemIds?: string[] };
   scopeChoice?: ScopeChoice;
+  withheldScopes?: readonly string[];
   expiryChoice?: "none" | "chosen";
   expiresAt?: number;
   requestedAt?: number;
@@ -29,8 +31,16 @@ export function effectiveScopeChoice(grant: Pick<GrantChoices, "scopes" | "scope
   return grant.scopeChoice ?? (LEGACY_FULL_SCOPE_BASELINE.every((scope) => grant.scopes.includes(scope)) ? "full" : "chosen");
 }
 
-export function effectiveScopes(grant: Pick<GrantChoices, "scopes" | "scopeChoice">): FamilyHistoryScope[] {
-  return effectiveScopeChoice(grant) === "full" ? [...FAMILY_HISTORY_SCOPES] : clampToScopeCeiling(grant.scopes);
+/** Legacy held lists become a frozen removed list: new powers still arrive. */
+export function effectiveWithheldScopes(grant: GrantChoices): string[] {
+  if (grant.withheldScopes !== undefined) return [...grant.withheldScopes];
+  if (effectiveScopeChoice(grant) === "full" || untouchedAutomaticGrant(grant)) return [];
+  return LEGACY_FULL_SCOPE_BASELINE.filter((scope) => !grant.scopes.includes(scope));
+}
+
+export function effectiveScopes(grant: GrantChoices): FamilyHistoryScope[] {
+  const withheld = new Set(effectiveWithheldScopes(grant));
+  return FAMILY_HISTORY_SCOPES.filter((scope) => !withheld.has(scope));
 }
 
 /** Only a matching sign-in consent receipt demonstrates an automatic old term.
@@ -68,4 +78,21 @@ export function chosenExpiry(expiresInDays: number | undefined, now: number): nu
     throw new Error("Choose a whole number of days from 1 to 365, or no end date");
   }
   return now + expiresInDays * 86_400_000;
+}
+
+/** Only a matching original receipt proves this was an untouched old default.
+ * Missing/ambiguous provenance and any explicit choice remain enforceable. */
+export function untouchedAutomaticGrant(grant: GrantChoices): boolean {
+  if (grant.scopeChoice || grant.expiryChoice || grant.withheldScopes || !grant.consentSnapshot) return false;
+  try {
+    const receipt = JSON.parse(grant.consentSnapshot);
+    const scopes = Array.isArray(receipt.scopes) ? receipt.scopes.map((s: string | { scope: string }) => typeof s === "string" ? s : s.scope) : null;
+    return receipt.approvedBy === "sign_in" && receipt.shownAt === grant.issuedAt
+      && grant.requestedAt === grant.issuedAt && grant.consentedAt === grant.issuedAt
+      && scopes !== null && JSON.stringify([...scopes].sort()) === JSON.stringify([...grant.scopes].sort())
+      && (!grant.boundary || (receipt.boundary?.kind === grant.boundary.kind
+        && (receipt.boundary.personCount ?? 0) === (grant.boundary.personIds?.length ?? 0)
+        && (receipt.boundary.queueItemCount ?? 0) === (grant.boundary.queueItemIds?.length ?? 0)))
+      && (grant.expiresAt === undefined || hasAutomaticLegacyExpiry(grant));
+  } catch { return false; }
 }

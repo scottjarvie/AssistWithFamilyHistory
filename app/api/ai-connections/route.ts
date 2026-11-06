@@ -15,14 +15,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import {
-  approveGrantRef,
-  updateGrantExpiryRef,
-  denyGrantRef,
-  reduceGrantScopesRef,
-  removeGrantRef,
-  revokeGrantRef,
-} from "@/lib/mcp/connectionApi";
+import { controlGrantRef } from "@/lib/mcp/connectionApi";
 import { FAMILY_HISTORY_SCOPES } from "@/lib/mcp/catalog";
 import { getAuthedConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
 import { getVaultAccessContext } from "@/lib/vault/server";
@@ -35,7 +28,7 @@ const BoundarySchema = z.object({
   queueItemIds: z.array(z.string().min(1)).max(500).optional(),
 });
 
-const RequestSchema = z.discriminatedUnion("action", [
+const ActionSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("approve"),
     grantId: z.string().min(1),
@@ -61,7 +54,10 @@ const RequestSchema = z.discriminatedUnion("action", [
   }),
   z.object({ action: z.literal("expiry"), grantId: z.string().min(1), expiresInDays: z.number().int().min(1).max(365).optional() }),
   z.object({ action: z.literal("remove"), grantId: z.string().min(1) }),
+  z.object({ action: z.enum(["pause", "resume", "restore"]), grantId: z.string().min(1) }),
 ]);
+
+const RequestSchema = z.intersection(ActionSchema, z.object({ revision: z.number().int().nonnegative(), opId: z.string().min(1).max(160) }));
 
 /**
  * Convex throws a plain Error for a refused lifecycle change ("Connection not
@@ -102,54 +98,9 @@ export async function POST(request: NextRequest) {
 
   try {
     const client = await getAuthedConvexClient();
-    switch (body.action) {
-      case "approve": {
-        const result = await client.mutation(approveGrantRef, {
-          vaultOwnerId,
-          grantId: body.grantId,
-          label: body.label,
-          scopes: body.scopes,
-          boundary: body.boundary,
-          expiresInDays: body.expiresInDays,
-        });
-        return NextResponse.json({ success: true, ...result });
-      }
-      case "deny": {
-        const result = await client.mutation(denyGrantRef, {
-          vaultOwnerId,
-          grantId: body.grantId,
-          reason: body.reason,
-        });
-        return NextResponse.json({ success: true, ...result });
-      }
-      case "reduce": {
-        const result = await client.mutation(reduceGrantScopesRef, {
-          vaultOwnerId,
-          grantId: body.grantId,
-          scopes: body.scopes,
-        });
-        return NextResponse.json({ success: true, ...result });
-      }
-      case "revoke": {
-        const result = await client.mutation(revokeGrantRef, {
-          vaultOwnerId,
-          grantId: body.grantId,
-          reason: body.reason,
-        });
-        return NextResponse.json({ success: true, ...result });
-      }
-      case "expiry": {
-        const result = await client.mutation(updateGrantExpiryRef, { vaultOwnerId, grantId: body.grantId, expiresInDays: body.expiresInDays });
-        return NextResponse.json({ success: true, ...result });
-      }
-      case "remove": {
-        const result = await client.mutation(removeGrantRef, {
-          vaultOwnerId,
-          grantId: body.grantId,
-        });
-        return NextResponse.json({ success: true, ...result });
-      }
-    }
+    const { grantId, ...change } = body;
+    const result = await client.mutation(controlGrantRef, { vaultOwnerId, grantId, ...change });
+    return NextResponse.json({ success: true, ...result });
   } catch (error) {
     return NextResponse.json({ error: personFacingMessage(error) }, { status: 400 });
   }

@@ -24,7 +24,7 @@ the redacted allowlisted DTO in the backend.
 ## Public HTTP API Capability Presets To Consider Later
 
 These are planning terms for a possible public HTTP API and are not implemented
-HTTP API scopes. They are separate from the seven enforced MCP product
+HTTP API scopes. They are separate from the eight enforced MCP product
 permissions in `lib/mcp/catalog.ts`.
 
 | Preset | Meaning | Current status |
@@ -40,7 +40,7 @@ permissions in `lib/mcp/catalog.ts`.
 
 | Route | Methods | Primary behavior | Owner boundary | API status | Risk / notes |
 | --- | --- | --- | --- | --- | --- |
-| `/api/ai-connections` | POST | Approve, decline, narrow, revoke, or remove one chosen-AI MCP connection grant | Clerk session, server-derived owner, and owner-scoped `convex/mcpGrants.ts` mutations that authorize again | Internal human API; a chosen AI can never call this route | Person-only connection control. Widening is not reachable here — `reduce` only narrows and more permission needs a fresh approval. Revocation takes effect on the connection's very next MCP request |
+| `/api/ai-connections` | POST | Approve, decline, narrow, revoke, or remove one chosen-AI MCP connection grant | Clerk session, server-derived owner, and owner-scoped `convex/mcpGrants.ts` mutations that authorize again | Internal human API; a chosen AI can never call this route | Person-only connection control. Every change carries revision and opId. Only the signed-in person may restore, resume or widen here; MCP has a separate narrow-only control. Revocation takes effect on the connection's very next MCP request |
 | `/api/audit/records` | GET | Bounded matching-record pages behind Audit metrics | Server-derived owner; authenticated Convex subject must match even in shadow mode | Internal human app read | Minimal rows only, private no-store; no notes, raw artifacts or narrative bodies |
 | `/api/capabilities` | GET | Return internal capability actions for the requesting actor role | Protected route; no vault data read | Internal now; future agent-discovery candidate | Story capabilities distinguish writer/reviewer/trusted publisher actions |
 | `/api/keys` | GET, POST | List the owner's agent API keys; mint a new key (raw secret returned once, only the SHA-256 hash stored) | Uses `getVaultAccessContext()`; mint binds to the signed-in owner | Internal-only (human-managed); agents do not mint keys | Credential management. POST generates + hashes the secret server-side and returns it once; GET never returns the hash. Scopes from `lib/auth/scopes.ts` |

@@ -27,6 +27,7 @@ export const FAMILY_HISTORY_SCOPES = [
   "family_history:story:draft",
   "family_history:queue:read",
   "family_history:queue:work",
+  "family_history:records:archive",
 ] as const;
 
 export type FamilyHistoryScope = (typeof FAMILY_HISTORY_SCOPES)[number];
@@ -115,6 +116,9 @@ export const FAMILY_HISTORY_SCOPE_INFO: readonly ScopeInfo[] = [
     limit:
       "Only items you explicitly assigned to a chosen AI. Changing records still needs its own permission above.",
   },
+  { scope: "family_history:records:archive", label: "Archive and restore research records", writes: true,
+    grants: "Move records into Archive and recover them, preserving their evidence and AI attribution.",
+    limit: "Reversible only. Never permanently deletes or purges records or files; published stories stay website-only." },
 ];
 
 /* ---------------------------------------------------------- the never lists */
@@ -133,12 +137,11 @@ export const NEVER_EXPOSED: readonly string[] = [
 ];
 
 export const NEVER_PERMITTED: readonly string[] = [
-  "Archiving or restoring records",
   "Exporting the vault",
   "Permanently deleting anything",
   "Publishing a story or any other public action",
   "Merging or splitting person identities",
-  "Granting, changing, or removing sharing and access",
+  "Inviting new people, creating public links, or changing another person’s access",
   "Acting on FamilySearch or any other outside provider",
   "Billing, account, or subscription changes",
 ];
@@ -181,6 +184,9 @@ const ALIAS_SUNSET =
   "Deprecated alias kept for clients that connected before Family History namespacing. It resolves to the same handler and the same scope. Prefer the family_history_* name; the alias will be sunset only after connected clients are observed to have refreshed.";
 
 export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
+  { name: "family_history_archive_record", requiredScope: "family_history:records:archive", writes: true,
+    title: "Archive or restore a record", description: "Move a record into Archive or restore it. This is a reversible soft delete; never purges records, files or evidence. Use context to read updatedAt first. Published stories require the website.",
+    humanSummary: "Archives or restores a research record without permanently deleting it.", implementedBy: "convex/mcpFamilyHistory.archiveRecord" },
   {
     name: "family_history_get_brief",
     alias: "get_family_history_brief",
@@ -395,7 +401,7 @@ export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
 /** Canonical names, in catalog order. */
 export const FAMILY_HISTORY_CANONICAL_TOOL_NAMES = FAMILY_HISTORY_TOOLS.map((tool) => tool.name);
 
-/** Every name a client may legally call: canonical first, then aliases. */
+/** Grant-governed workflow names, canonical then aliases. Permission-free connection controls are listed separately below. */
 export const FAMILY_HISTORY_ALL_TOOL_NAMES = [
   ...FAMILY_HISTORY_CANONICAL_TOOL_NAMES,
   ...FAMILY_HISTORY_TOOLS.flatMap((tool) => (tool.alias ? [tool.alias] : [])),
@@ -429,7 +435,7 @@ export function isAlias(name: string): boolean {
  * (wired into `pnpm verify`) and by the vitest parity suite.
  */
 export function assertFamilyHistoryCatalogContract(): void {
-  const forbidden = /delete|publish|invite|export|merge|archive|restore|share/i;
+  const forbidden = /delete|publish|invite|export|merge|share/i;
 
   const seen = new Set<string>();
   for (const name of FAMILY_HISTORY_ALL_TOOL_NAMES) {
@@ -494,3 +500,9 @@ export function assertFamilyHistoryCatalogContract(): void {
     throw new Error("The never-lists must stay published");
   }
 }
+
+/** Connection controls have no domain permission and remain available after shutdown. */
+export const FAMILY_HISTORY_CONTROL_TOOLS = [
+  { name: "family_history_connection", title: "Inspect this AI connection", humanSummary: "Shows this connection's state, revision, tools, withheld powers, end date and Settings link." },
+  { name: "family_history_limit_connection", title: "Limit this AI connection", humanSummary: "Removes powers, shortens an end date, pauses or revokes this connection. Never widens; requires revision and opId." },
+] as const;

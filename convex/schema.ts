@@ -91,6 +91,7 @@ export default defineSchema({
    * GEDCOM X: Person extends Subject extends Conclusion
    */
   persons: defineTable({
+    archivedAt: v.optional(v.number()), archivedBy: v.optional(v.string()),
     vaultOwnerId: v.optional(v.string()),
     // FamilySearch Integration
     fsId: v.optional(v.string()),              // FamilySearch Person ID (e.g., "KWCJ-RN4")
@@ -219,6 +220,7 @@ export default defineSchema({
    * - Unknown parents (can have one-sided relationships)
    */
   relationships: defineTable({
+    archivedAt: v.optional(v.number()), archivedBy: v.optional(v.string()),
     vaultOwnerId: v.optional(v.string()),
     type: v.union(
       v.literal("Couple"),                      // Marriage, partnership
@@ -307,6 +309,7 @@ export default defineSchema({
    * - Events that might not have a person yet
    */
   events: defineTable({
+    archivedAt: v.optional(v.number()), archivedBy: v.optional(v.string()),
     vaultOwnerId: v.optional(v.string()),
     type: v.union(
       v.literal("birth"),
@@ -413,6 +416,7 @@ export default defineSchema({
    * GEDCOM X: PlaceDescription with temporal support
    */
   places: defineTable({
+    archivedAt: v.optional(v.number()), archivedBy: v.optional(v.string()),
     vaultOwnerId: v.optional(v.string()),
     name: v.string(),
     fullName: v.string(),                       // Full hierarchical name
@@ -497,6 +501,7 @@ export default defineSchema({
    * Citation is the specific reference (page 42, line 3).
    */
   sources: defineTable({
+    archivedAt: v.optional(v.number()), archivedBy: v.optional(v.string()),
     vaultOwnerId: v.optional(v.string()),
     title: v.string(),
     type: v.union(
@@ -800,6 +805,7 @@ export default defineSchema({
    * people, places and sources to them.
    */
   topics: defineTable({
+    archivedAt: v.optional(v.number()), archivedBy: v.optional(v.string()),
     vaultOwnerId: v.string(),
     name: v.string(),
     kind: v.union(
@@ -1244,6 +1250,7 @@ export default defineSchema({
    * AI-suggested or user-created research tasks
    */
   researchTasks: defineTable({
+    archivedAt: v.optional(v.number()), archivedBy: v.optional(v.string()),
     vaultOwnerId: v.optional(v.string()),
     personId: v.optional(v.id("persons")),
     type: v.union(
@@ -1295,6 +1302,7 @@ export default defineSchema({
    * Tracks research activities across entity types
    */
   researchLog: defineTable({
+    archivedAt: v.optional(v.number()), archivedBy: v.optional(v.string()),
     vaultOwnerId: v.optional(v.string()),
     entityType: v.union(
       v.literal("person"),
@@ -1573,6 +1581,7 @@ export default defineSchema({
    * Our unique differentiator!
    */
   stories: defineTable({
+    archivedAt: v.optional(v.number()), archivedBy: v.optional(v.string()),
     vaultOwnerId: v.optional(v.string()),
     personId: v.optional(v.id("persons")),
     relationshipId: v.optional(v.id("relationships")),
@@ -1937,6 +1946,16 @@ export default defineSchema({
    * The owner is always server-derived from the verified OAuth subject. A
    * client never supplies an owner, a vault, or a grant selector.
    */
+  mcpGrantHistory: defineTable({
+    vaultOwnerId: v.string(), grantId: v.id("mcpGrants"),
+    actor: v.union(v.literal("person"), v.literal("ai"), v.literal("system")),
+    before: v.string(), after: v.string(), sentence: v.string(), at: v.number(),
+    opId: v.string(), request: v.string(), revision: v.number(),
+  }).index("by_owner", ["vaultOwnerId"]).index("by_grant", ["grantId"])
+    .index("by_grant_op", ["grantId", "opId"]),
+  mcpClientAliases: defineTable({
+    vaultOwnerId: v.string(), issuer: v.string(), clientId: v.string(), grantId: v.id("mcpGrants"),
+  }).index("by_owner", ["vaultOwnerId"]).index("by_owner_client_issuer", ["vaultOwnerId", "clientId", "issuer"]).index("by_grant", ["grantId"]),
   mcpGrants: defineTable({
     vaultOwnerId: v.string(),
     /** Verified from the access token, never from a request body. */
@@ -1951,6 +1970,10 @@ export default defineSchema({
     /** Always a subset of the scope ceiling in lib/mcp/catalog.ts. */
     scopes: v.array(v.string()),
     scopeChoice: v.optional(v.union(v.literal("full"), v.literal("chosen"))),
+    withheldScopes: v.optional(v.array(v.string())),
+    revision: v.optional(v.number()), pausedAt: v.optional(v.number()),
+    limitedBy: v.optional(v.union(v.literal("person"), v.literal("ai"))),
+    limitedAt: v.optional(v.number()),
     expiryChoice: v.optional(v.union(v.literal("none"), v.literal("chosen"))),
     boundary: v.object({
       kind: v.union(
