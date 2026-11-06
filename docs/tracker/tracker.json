@@ -4,7 +4,7 @@
   "repository": "github.com/scottjarvie/AssistWithFamilyHistory",
   "projectUrl": "https://assistwithfamilyhistory.com",
   "idPrefix": "AWF",
-  "projectPhilosophy": "../planning/assist-with-family-history-project-philosophy.md",
+  "siteGuide": "../planning/site-guide.md",
   "familyCore": {
     "label": "Assist With Sites — Core Philosophy v1.6.3",
     "date": "2026-08-08",

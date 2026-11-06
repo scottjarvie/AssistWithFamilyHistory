@@ -15,7 +15,7 @@ assert.equal(packageJson.scripts["verify:vercel-ignore-build"], "node scripts/ve
 assert.deepEqual(nonDocsPaths([
   "docs/tracker/cards/AWF-0001.md",
   "docs/tracker/board.html",
-  "docs/planning/assist-with-family-history-project-philosophy.md",
+  "docs/planning/site-guide.md",
   "docs/api/capability-manifest.json",
   "README.md",
   "AGENTS.md",

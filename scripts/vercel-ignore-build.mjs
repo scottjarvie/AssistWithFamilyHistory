@@ -87,7 +87,6 @@ export function runCli(argv = process.argv.slice(2)) {
     head: options.head || process.env.VERCEL_GIT_COMMIT_SHA?.trim(),
     runValidators: () => {
       execFileSync(process.execPath, ["scripts/verify-tracker.mjs"], { stdio: "inherit" });
-      execFileSync(process.execPath, ["scripts/check-family-history-project-philosophy.mjs"], { stdio: "inherit" });
     },
   });
   if (result.ignore) {

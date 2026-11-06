@@ -5,4 +5,4 @@ Agent operating rules for this repo live in a single source of truth: [`AGENTS.m
 Read `AGENTS.md` first — it covers what to read before starting, autonomous mode, escalation rules, privacy defaults, the `pnpm verify` verification baseline, and final reporting.
 
 The canonical product-level direction is the
-[`Assist With Family History Project Philosophy`](docs/planning/assist-with-family-history-project-philosophy.md).
+[`Site Guide`](docs/planning/site-guide.md).

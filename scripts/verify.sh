@@ -37,7 +37,6 @@ steps=(
   "check:context-taxonomy"
   "check:no-raw-markdown-render"
   "check:support-contact"
-  "check:project-philosophy"
   "tracker:verify"
   "verify:vercel-ignore-build"
   "check:import-regression"

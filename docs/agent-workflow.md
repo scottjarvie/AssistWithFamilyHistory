@@ -14,7 +14,7 @@ to start, route, verify, or finish work.
 2. Open the generated [tracker board](tracker/board.html) and inspect Needs
    You, Doing, Next, and Ready/Active Work Orders.
 3. Read the full relevant Cards and Work Order Markdown sources.
-4. Read the Project Philosophy and stable technical/privacy docs named by the
+4. Read the Site Guide and stable technical/privacy docs named by the
    task.
 5. Inspect current code, tests, Git state, pull requests, deployments, and live
    behavior before changing truth.
@@ -78,8 +78,8 @@ Use Cards and Work Orders for:
 ## State Versus Software Publication
 
 State is narrowly limited to canonical Cards, Work Orders, Guide, factual
-tracker metadata, generated tracker readers, and the canonical Project
-Philosophy Markdown/HTML pair. After local validation, Scott's trusted owner
+tracker metadata, generated tracker readers, and the Site Guide
+(`docs/planning/site-guide.md`). After local validation, Scott's trusted owner
 identity may publish only those paths directly to `main` with the final
 `skip-checks: true` trailer. GitHub CI does not run on pushes to `main`;
 Vercel separately ignores the build only when its complete range and validators

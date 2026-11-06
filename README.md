@@ -12,9 +12,8 @@
 
 Assist With Family History is a platform for family historians who want to go beyond collecting names and dates. It transforms genealogical data into compelling narratives using AI assistance.
 
-The canonical product direction, domain model, responsibility split, design
-character, and evidence-backed family alignment live in the
-[Assist With Family History Project Philosophy](docs/planning/assist-with-family-history-project-philosophy.md).
+The canonical product direction, domain model, trust rules, and responsibility
+split live in the [Site Guide](docs/planning/site-guide.md).
 Current project work, approved execution scope, blockers, and durable evidence
 live in the repository-owned [Family History tracker](docs/tracker/board.html);
 start with its [one-minute Guide](docs/tracker/GUIDE.md).

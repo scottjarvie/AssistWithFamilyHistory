@@ -7,7 +7,7 @@ import { SCOPES } from "../lib/auth/scopes";
 const schema = readFileSync("convex/schema.ts", "utf8");
 const queueModule = readFileSync("convex/queue.ts", "utf8");
 const handoff = readFileSync("docs/product/queue-foundation-design-handoff.md", "utf8");
-const philosophy = readFileSync("docs/planning/assist-with-family-history-project-philosophy.md", "utf8");
+const siteGuide = readFileSync("docs/planning/site-guide.md", "utf8");
 const route = readFileSync("app/api/queue/route.ts", "utf8");
 const itemRoute = readFileSync("app/api/queue/[id]/route.ts", "utf8");
 const queuePage = readFileSync("app/app/queue/page.tsx", "utf8");
@@ -55,6 +55,6 @@ assert.match(handoff, /not automatically adapted/i);
 assert.match(handoff, /incoming API-key resolution/i);
 assert.match(handoff, /does not inherit the broader legacy[\s\S]*shadow behavior/i);
 assert.match(handoff, /lifecycle reconciliation, not[\s\S]*autonomous work/i);
-assert.match(philosophy, /There is no fifth product Queue state/);
+assert.match(siteGuide, /are never Queue states/);
 
 console.log("Queue foundation contract assertions passed");

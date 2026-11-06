@@ -77,7 +77,7 @@
   <span class="spacer"></span>
   <nav aria-label="Tracker links">
     <a class="btn" href="https://assistwithfamilyhistory.com">Project</a>
-    <a class="btn" href="../planning/assist-with-family-history-project-philosophy.md">Project Philosophy</a>
+    <a class="btn" href="../planning/site-guide.md">Site Guide</a>
     <a class="btn" href="https://github.com/scottjarvie/assistwithlife/blob/main/planning/assist-with-sites-core-philosophy.md">Family Core</a>
     <a class="btn" href="GUIDE.md">Guide</a>
   </nav>
@@ -118,7 +118,7 @@ regenerate. Nothing else to install or run.</p>
 <h2>How to hand a card to your AI</h2>
 <p>Open any card and press <strong>Copy prompt</strong> — you get a
 ready-to-paste instruction that introduces the project, includes the whole
-card, its linked Work Order, the Project Philosophy, the exact Family Core,
+card, its linked Work Order, the Site Guide, the exact Family Core,
 rules, and current evidence. <strong>Copy work order</strong> bundles the whole
 bounded tranche and every contained Card.</p>
 
@@ -154,7 +154,7 @@ research-to-story identity while following the shared tracker contract.</p>
 <h2>Authority and handoff</h2>
 <p>The bounded loop is <strong>your AI proposes; Scott approves scope; your AI executes; a separate AI audits</strong>. There is no automatic dispatcher. A Work Order states its goal, included Cards, sequence, dependencies, exclusions, stop rules, verification, and genuine human gates. A direct request from Scott in chat authorizes ordinary work on its own; a Work Order is optional context for larger runs, not a gate. Never record approval Scott did not give.</p>
 <p>Routine work is merged and deployed by the AI under the family delivery rule, <a href="https://github.com/scottjarvie/assistwithlife/blob/main/planning/assist-with-sites-core-philosophy.md#166-delivering-changes-localhost-first-then-merge">Core Philosophy §16.6</a>. Stop only for money/billing, deleting real data, domains/DNS, secrets, or a change to who can access production data.</p>
-<p>Copy prompt carries the Project, Project Philosophy, Family Core, full Card, linked Work Order, current evidence, and update rules. Copy Work Order carries the approved tranche and all included Cards.</p>
+<p>Copy prompt carries the Project, Site Guide, Family Core, full Card, linked Work Order, current evidence, and update rules. Copy Work Order carries the approved tranche and all included Cards.</p>
 <h2>Durable authoring rules</h2>
 <ul>
 <li>Cards live in <code>docs/tracker/cards/</code> with stable <code>AWF-####</code> ids.</li>
@@ -167,9 +167,9 @@ research-to-story identity while following the shared tracker contract.</p>
 <p>Cards, Work Orders, Guide, repository evidence, pull requests, deployments, and live proof are the current operating sources. Historical Linear ids may remain in old reports or fixtures as provenance, but agents do not query, update, or depend on Linear to begin, route, verify, or finish work.</p>
 <h2>Safe publication classes</h2>
 <p>Tracker software—generators, parsers, validators, board behavior or styling, templates, package scripts, workflows, instruction files, and build/deployment configuration—uses a normal branch, pull request, full CI, and deployment.</p>
-<p>State only—Cards, Work Orders, this Guide, factual <code>tracker.json</code>, generated readers, and the canonical Project Philosophy Markdown/HTML pair—may use the locally validated trusted-owner direct-main path:</p>
-<p>git add docs/tracker/cards docs/tracker/work-orders docs/tracker/GUIDE.md docs/tracker/board.html docs/tracker/guide.html docs/tracker/tracker.json docs/planning/assist-with-family-history-project-philosophy.md docs/planning/assist-with-family-history-project-philosophy.html pnpm tracker:commit-state -- "Update Family History tracker state" git push origin HEAD:main</p>
-<p>The helper rejects mixed or uncertain changes, runs both tracker and Project Philosophy validators, requires local <code>main</code>, and writes the final <code>skip-checks: true</code> trailer. GitHub CI does not run on pushes to <code>main</code>. Vercel separately compares the complete range since its previous successful deployment and skips the build only when every changed path is documentation and the validators pass. Any uncertainty builds normally.</p>
+<p>State only—Cards, Work Orders, this Guide, factual <code>tracker.json</code>, generated readers, and the Site Guide (<code>docs/planning/site-guide.md</code>)—may use the locally validated trusted-owner direct-main path:</p>
+<p>git add docs/tracker/cards docs/tracker/work-orders docs/tracker/GUIDE.md docs/tracker/board.html docs/tracker/guide.html docs/tracker/tracker.json docs/planning/site-guide.md pnpm tracker:commit-state -- "Update Family History tracker state" git push origin HEAD:main</p>
+<p>The helper rejects mixed or uncertain changes, runs the tracker validator, requires local <code>main</code>, and writes the final <code>skip-checks: true</code> trailer. GitHub CI does not run on pushes to <code>main</code>. Vercel separately compares the complete range since its previous successful deployment and skips the build only when every changed path is documentation and the validators pass. Any uncertainty builds normally.</p>
 <p>Never use this route for software or open a skipped-check pull request. If canonical-branch protection rejects the trusted-owner publication, stop and repair policy through the normal protected path.</p>
 <h2>Family History character</h2>
 <p>This tracker uses archival paper, evidence green, annotation rust, restrained editorial density, and research-to-story language. Other products may copy the information architecture and safety contract, not this identity.</p>

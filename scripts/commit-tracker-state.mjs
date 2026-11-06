@@ -27,7 +27,6 @@ if (rejected.length) {
 }
 
 execFileSync(process.execPath, ["scripts/verify-tracker.mjs"], { stdio: "inherit" });
-execFileSync(process.execPath, ["scripts/check-family-history-project-philosophy.mjs"], { stdio: "inherit" });
 
 if (process.argv.includes("--check")) {
   console.log(`state-only index verified: ${staged.length} change(s)`);

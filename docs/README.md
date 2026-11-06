@@ -6,8 +6,7 @@ This directory keeps project documentation out of the repository root and separa
 
 Durable guidance that stays accurate as the product evolves.
 
-- [Assist With Family History Project Philosophy](planning/assist-with-family-history-project-philosophy.md)
-- [Assist With Family History Project Philosophy editorial reader](planning/assist-with-family-history-project-philosophy.html)
+- [Site Guide](planning/site-guide.md) — the one product document
 - [Family History project tracker](tracker/board.html)
 - [Family History tracker Guide](tracker/GUIDE.md)
 - [Family History Work Orders](tracker/board.html#workspace)
