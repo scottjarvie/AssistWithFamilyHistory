@@ -1,16 +1,18 @@
 ---
 id: AWF-WO-009
 title: Prove the joined newcomer Queue-to-sourced-result workflow
-execution: ready
+execution: complete
 audit: not-audited
 cards: AWF-0037
 created: 2026-08-13
-updated: 2026-08-14
+updated: 2026-11-06
 proposed-by: Codex from Scott's direct delegation
 approved-by: Scott via coordinator delegation
 approved-on: 2026-08-13
 executed-by: Codex
 ---
+
+**Closed 2026-11-06 — cleanup.** Execution complete. The result-link bridge and cleanup rail shipped in PRs #48–#50; the authenticated acceptance run was not done and is not planned separately. AWF-0037 closed.
 
 ## Goal
 
@@ -128,3 +130,5 @@ challenge passed. Detailed proof and the remaining gate are recorded in
   protected delivery and live proof continue.
 - 2026-08-13 · Codex — completed protected production delivery and public proof;
   exact authenticated acceptance remains environment-blocked after safe cleanup.
+
+2026-11-06 Claude: **Closed 2026-11-06 — cleanup.** Execution complete. The result-link bridge and cleanup rail shipped in PRs #48–#50; the authenticated acceptance run was not done and is not planned separately. AWF-0037 closed.

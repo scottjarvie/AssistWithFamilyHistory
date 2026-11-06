@@ -1,13 +1,15 @@
 ---
 id: AWF-WO-019
 title: Complete the shared Assist pages for Family History
-execution: proposed
+execution: superseded
 audit: not-audited
 cards: AWF-0060, AWF-0061, AWF-0016, AWF-0017, AWF-0010, AWF-0018, AWF-0019
 created: 2026-10-06
-updated: 2026-10-06
+updated: 2026-11-06
 proposed-by: Claude (Opus 5.5) from Scott's site-guide and readiness request
 ---
+
+**Closed 2026-11-06 — cleanup.** Execution superseded. Never approved; PR #88 shipped Your stats, Your data export, Support and Ideas and Usage; the rest moved to AWF-0083, AWF-0086 and AWF-0079.
 
 ## Goal
 
@@ -65,3 +67,5 @@ None yet. Proposed on 2026-10-06; Scott approves scope before it becomes Ready.
 ## History
 
 - 2026-10-06: Proposed from the Site Guide draft and the MCP, media and page audits.
+
+2026-11-06 Claude: **Closed 2026-11-06 — cleanup.** Execution superseded. Never approved; PR #88 shipped Your stats, Your data export, Support and Ideas and Usage; the rest moved to AWF-0083, AWF-0086 and AWF-0079.

@@ -1,13 +1,15 @@
 ---
 id: AWF-WO-017
 title: Finish Bring Your AI to the family standard and prove it with real clients
-execution: proposed
+execution: superseded
 audit: not-audited
 cards: AWF-0062, AWF-0063, AWF-0064, AWF-0043, AWF-0050
 created: 2026-10-06
-updated: 2026-10-06
+updated: 2026-11-06
 proposed-by: Claude (Opus 5.5) from Scott's site-guide and readiness request
 ---
+
+**Closed 2026-11-06 — cleanup.** Execution superseded. Never approved; sign-in as approval shipped in AWF-0062 and the rest moved to AWF-0085.
 
 ## Goal
 
@@ -71,3 +73,5 @@ None yet. Proposed on 2026-10-06; Scott approves scope before it becomes Ready.
 ## History
 
 - 2026-10-06: Proposed from the Site Guide draft and the MCP, media and page audits.
+
+2026-11-06 Claude: **Closed 2026-11-06 — cleanup.** Execution superseded. Never approved; sign-in as approval shipped in AWF-0062 and the rest moved to AWF-0085.

@@ -1,16 +1,18 @@
 ---
 id: AWF-WO-010
 title: Make one person and relationship the first private workspace start
-execution: ready
+execution: complete
 audit: not-audited
 cards: AWF-0006
 created: 2026-08-14
-updated: 2026-08-14
+updated: 2026-11-06
 proposed-by: Codex from Scott's portfolio reset
 approved-by: Scott via coordinator delegation
 approved-on: 2026-08-14
 executed-by: Codex
 ---
+
+**Closed 2026-11-06 — cleanup.** Execution complete. The first-person-and-relationship start shipped in PR #53 (v2.1.0); signed-in acceptance proof was not done. AWF-0006 closed.
 
 ## Goal
 
@@ -129,3 +131,5 @@ interaction, and exact synthetic cleanup remain before completion.
   implemented the bounded source slice; protected release proof continues.
 - 2026-08-14 · Codex — proposed from the Core/Project Philosophy and live empty-
   workspace evidence during Scott's portfolio reset.
+
+2026-11-06 Claude: **Closed 2026-11-06 — cleanup.** Execution complete. The first-person-and-relationship start shipped in PR #53 (v2.1.0); signed-in acceptance proof was not done. AWF-0006 closed.

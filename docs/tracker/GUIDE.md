@@ -5,6 +5,10 @@ Assist With Family History. It travels with every
 authorized clone. Markdown is canonical; the generated board and guide are
 zero-setup readers, not separate sources of truth.
 
+**2026-11-06:** Operation Cleanup consolidated the tracker. Open work now lives
+in a few grouped backlog cards (bugs, minor fixes, features, design and
+leftovers); every other Card and Work Order is closed with a one-line reason.
+
 ## The three concepts
 
 - **Cards** preserve one outcome and its current truth, next safe action,
