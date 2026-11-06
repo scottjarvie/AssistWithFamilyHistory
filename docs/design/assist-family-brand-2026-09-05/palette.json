@@ -1,0 +1,12 @@
+{
+  "primary": "#8FD7B4",
+  "accent": "#245A43",
+  "colors": [
+    "#8FD7B4",
+    "#245A43"
+  ],
+  "ground": "#F7F3E8",
+  "status": "Recommended family palette · logo study",
+  "source": "AssistWithFamilyHistory/docs/planning/assist-with-family-history-project-philosophy.md:154; app/globals.css:52",
+  "note": "Recommendation for this logo family: mint #8FD7B4 with jade #245A43. These are the documented portfolio wayfinding colors, applied here to FH03 and FH06 as a new comparison. Scott has not yet selected this palette. The product CSS separately uses deep teal #234D5E, copper #C57D39 and parchment #F7F3E8. Walnut was an exploration proposal, never a settled choice. No product palette is changed."
+}
