@@ -87,7 +87,8 @@ work. Scott does not need to press merge.
   [local preview](docs/operations/local-preview.md). `pnpm dev:live` is
   withheld by the launcher until its production binding is verified.
 - Run `pnpm verify` (it includes the build) before pushing. Work in progress
-  stays a draft PR (drafts run no GitHub CI); mark it ready once.
+  stays a draft PR (drafts run no GitHub CI); mark it ready once. Docs-only
+  PRs pass CI on a path check without verifying.
 - Vercel builds `main` and `preview/*` branches only. A production build also
   deploys Convex ([how production deploys](docs/operations/how-production-deploys.md)).
 - Close out with where the latest change lives: local only, pushed but not
