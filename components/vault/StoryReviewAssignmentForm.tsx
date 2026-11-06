@@ -65,7 +65,7 @@ export function StoryReviewAssignmentForm({
 
   return (
     <div className="space-y-3">
-      <label className="block text-sm font-medium text-stone-700" htmlFor="story-reviewer">
+      <label className="block text-sm font-medium text-foreground" htmlFor="story-reviewer">
         Reviewer
       </label>
       <input
@@ -73,15 +73,16 @@ export function StoryReviewAssignmentForm({
         value={reviewer}
         onChange={(event) => setReviewer(event.target.value)}
         placeholder="Assign reviewer"
-        className="h-11 w-full border border-stone-300 bg-white px-3 text-base text-stone-900 outline-none focus:border-amber-600 md:pointer-fine:h-9 md:pointer-fine:text-sm"
+        className="h-11 w-full border border-border bg-card px-3 text-base text-foreground outline-none focus:border-ring md:pointer-fine:h-9 md:pointer-fine:text-sm"
       />
       <textarea
         value={note}
         onChange={(event) => setNote(event.target.value)}
+        aria-label="Assignment note"
         placeholder="Optional assignment note"
-        className="min-h-20 w-full resize-y border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-amber-600"
+        className="min-h-20 w-full resize-y border border-border bg-card px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
       />
-      <label className="flex items-start gap-2 border border-stone-200 bg-stone-50 px-3 py-3 text-sm text-stone-700">
+      <label className="flex items-start gap-2 border border-border bg-muted px-3 py-3 text-sm text-foreground">
         <input
           type="checkbox"
           checked={requiresSecondReview}
@@ -90,14 +91,14 @@ export function StoryReviewAssignmentForm({
         />
         <span>
           Require second approval for high-risk publish
-          <span className="block text-xs leading-5 text-stone-500">
+          <span className="block text-xs leading-5 text-muted-foreground">
             Use this for living/private-risk, weak-evidence, or sensitive family graph stories.
           </span>
         </span>
       </label>
       {requiresSecondReview ? (
-        <div className="space-y-3 border border-amber-200 bg-amber-50/60 px-3 py-3">
-          <label className="block text-sm font-medium text-stone-700" htmlFor="second-reviewer">
+        <div className="space-y-3 border border-annotation/30 bg-annotation-surface/60 px-3 py-3">
+          <label className="block text-sm font-medium text-foreground" htmlFor="second-reviewer">
             Second reviewer
           </label>
           <input
@@ -105,9 +106,9 @@ export function StoryReviewAssignmentForm({
             value={secondReviewerName}
             onChange={(event) => setSecondReviewerName(event.target.value)}
             placeholder="Assign second reviewer"
-            className="h-11 w-full border border-stone-300 bg-white px-3 text-base text-stone-900 outline-none focus:border-amber-600 md:pointer-fine:h-9 md:pointer-fine:text-sm"
+            className="h-11 w-full border border-border bg-card px-3 text-base text-foreground outline-none focus:border-ring md:pointer-fine:h-9 md:pointer-fine:text-sm"
           />
-          <label className="flex min-h-11 items-center gap-2 text-sm text-stone-700 md:pointer-fine:min-h-0">
+          <label className="flex min-h-11 items-center gap-2 text-sm text-foreground md:pointer-fine:min-h-0">
             <input
               type="checkbox"
               checked={secondReviewApproved}
@@ -117,7 +118,7 @@ export function StoryReviewAssignmentForm({
           </label>
         </div>
       ) : null}
-      <Button onClick={saveAssignment} disabled={isSaving} className="w-full bg-stone-900 hover:bg-stone-800">
+      <Button onClick={saveAssignment} disabled={isSaving} className="min-h-11 w-full">
         {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserCheck className="h-4 w-4" />}
         Save reviewer
       </Button>

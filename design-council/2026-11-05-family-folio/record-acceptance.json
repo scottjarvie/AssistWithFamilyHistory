@@ -1,0 +1,26 @@
+{
+  "checkedAt": "2026-11-05T11:50:39.234Z",
+  "checks": [
+    "Dossier keeps source/conflict cues and connections; inferred checks do not inflate counts; unvisited media never mounts",
+    "Dated stream keeps full details, shows all earlier entries and filters only actual kinds",
+    "Dossier evidence link selects Sources and retains candidate conflicts and full citation text",
+    "Historical life timeline remains separate from recorded update dates",
+    "Confirmed relationship count stays separate from clearly provisional relatives",
+    "Memories loads the synthetic image only when opened and retains privacy/rights/AI-use controls under the fixture guard",
+    "Documents retains the generated reader and both legacy derived-document routes",
+    "Switching record sections preserves an unfinished real context-intake draft",
+    "Research log pointer opens the complete grouped log and scrolls directly to it",
+    "Tab arrow/Home/End navigation moves focus and selected panel",
+    "Reloaded section deep link restores its selected panel without changing route query",
+    "A person without stored captures keeps direct Open Imports and the legacy capture-required guards",
+    "Failed document loads are Unavailable rather than a false zero",
+    "320px dossier links, Contents and pinned All menu open visible section tops without page overflow",
+    "A dossier context count opens its actual context records rather than the top of Overview",
+    "Dark Research and populated Memories have readable closed controls and no phone overflow"
+  ],
+  "errors": [],
+  "mutations": [],
+  "mediaRequests": [
+    "http://localhost:3457/illustrations/synthetic-record.svg"
+  ]
+}

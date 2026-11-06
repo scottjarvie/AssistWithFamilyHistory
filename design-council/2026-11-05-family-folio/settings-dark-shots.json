@@ -1,0 +1,112 @@
+{
+  "baseURL": "http://localhost:3457",
+  "timezone": "America/Phoenix",
+  "defaultVariants": [
+    "desktop-dark",
+    "mobile-dark"
+  ],
+  "shots": [
+    {
+      "name": "ai-permissions",
+      "path": "/design-council-preview?surface=settings-ai&theme=dark",
+      "capabilities": [
+        {
+          "can": "preserve current settings controls",
+          "selector": "main h1"
+        }
+      ]
+    },
+    {
+      "name": "preferences-data",
+      "path": "/design-council-preview?surface=settings-provider&theme=dark",
+      "capabilities": [
+        {
+          "can": "preserve current settings controls",
+          "selector": "main h1"
+        }
+      ]
+    },
+    {
+      "name": "developer-keys",
+      "path": "/design-council-preview?surface=settings-api&theme=dark",
+      "capabilities": [
+        {
+          "can": "preserve current settings controls",
+          "selector": "main h1"
+        }
+      ]
+    },
+    {
+      "name": "operator-ledger",
+      "path": "/design-council-preview?surface=settings-admin&theme=dark",
+      "capabilities": [
+        {
+          "can": "preserve current settings controls",
+          "selector": "main h1"
+        }
+      ]
+    },
+    {
+      "name": "ai-narrow-editor",
+      "path": "/design-council-preview?surface=settings-ai&theme=dark",
+      "actions": [
+        {
+          "click": "[data-connection=\"synthetic-full\"] button[aria-label^=\"Narrow\"]"
+        }
+      ],
+      "focus": "[data-connection-editor=\"synthetic-full\"]",
+      "viewportOnly": true
+    },
+    {
+      "name": "ai-revoke-confirmation",
+      "path": "/design-council-preview?surface=settings-ai&theme=dark",
+      "actions": [
+        {
+          "click": "[data-connection=\"synthetic-full\"] button[aria-label^=\"Revoke\"]"
+        }
+      ],
+      "viewportOnly": true
+    },
+    {
+      "name": "ai-pending-review",
+      "path": "/design-council-preview?surface=settings-ai&theme=dark",
+      "actions": [
+        {
+          "click": "[data-connection=\"synthetic-pending\"] button:has-text(\"Review request\")"
+        }
+      ],
+      "focus": "[data-connection-editor=\"synthetic-pending\"]",
+      "viewportOnly": true
+    },
+    {
+      "name": "ai-no-connections",
+      "path": "/design-council-preview?surface=settings-ai-empty&theme=dark"
+    },
+    {
+      "name": "data-ways-out",
+      "path": "/design-council-preview?surface=settings-provider&theme=dark",
+      "focus": "#your-data",
+      "viewportOnly": true
+    },
+    {
+      "name": "provider-admin-preference",
+      "path": "/design-council-preview?surface=settings-provider&theme=dark",
+      "actions": [
+        {
+          "click": "button:has-text(\"Enable\")"
+        }
+      ],
+      "viewportOnly": true
+    },
+    {
+      "name": "key-suspend-confirmation",
+      "path": "/design-council-preview?surface=settings-api&theme=dark",
+      "actions": [
+        {
+          "click": "[data-api-key=\"synthetic-key-active\"] button:has-text(\"Suspend\")"
+        }
+      ],
+      "viewportOnly": true
+    }
+  ]
+}

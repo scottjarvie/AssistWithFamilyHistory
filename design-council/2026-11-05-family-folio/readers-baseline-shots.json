@@ -1,0 +1,60 @@
+{
+  "baseURL": "http://localhost:3457",
+  "timezone": "America/Phoenix",
+  "defaultVariants": [
+    "desktop-light",
+    "mobile-light"
+  ],
+  "shots": [
+    {
+      "name": "reader-raw-original-reconstructed",
+      "path": "/design-council-preview?surface=baseline-reader-raw",
+      "capabilities": [
+        {
+          "can": "retain original reader controls",
+          "selector": "button"
+        }
+      ]
+    },
+    {
+      "name": "reader-contextualized-original-reconstructed",
+      "path": "/design-council-preview?surface=baseline-reader-contextualized",
+      "capabilities": [
+        {
+          "can": "retain original reader controls",
+          "selector": "button"
+        }
+      ]
+    },
+    {
+      "name": "reader-documents-original-reconstructed",
+      "path": "/design-council-preview?surface=baseline-reader-documents",
+      "capabilities": [
+        {
+          "can": "retain original reader controls",
+          "selector": "button"
+        }
+      ]
+    },
+    {
+      "name": "reader-raw-missing-original-reconstructed",
+      "path": "/design-council-preview?surface=baseline-reader-raw-missing",
+      "capabilities": [
+        {
+          "can": "retain original reader controls",
+          "selector": "button"
+        }
+      ]
+    },
+    {
+      "name": "reader-contextualized-missing-original-reconstructed",
+      "path": "/design-council-preview?surface=baseline-reader-contextualized-missing",
+      "capabilities": [
+        {
+          "can": "retain original reader controls",
+          "selector": "button"
+        }
+      ]
+    }
+  ]
+}

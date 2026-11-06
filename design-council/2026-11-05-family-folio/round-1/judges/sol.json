@@ -1,0 +1,488 @@
+{
+  "judge": "sol",
+  "model": "gpt-6.1-sol",
+  "seconds": null,
+  "ingestedAt": "2026-11-05T08:05:58.274Z",
+  "result": {
+    "sets": {
+      "V1": {
+        "scores": {
+          "findability": 7,
+          "density": 6.5,
+          "capability": 8,
+          "aiwork": 4.5,
+          "hierarchy": 7,
+          "typography": 7.5,
+          "iconography": 7,
+          "spacing": 7,
+          "colour": 7.5,
+          "consistency": 7,
+          "fit": 7.5,
+          "cost": 4.5
+        },
+        "notes": {
+          "findability": "Search and research-state filter are explicit; unselected sidebar and competing route names weaken orientation.",
+          "density": "Home is usefully populated, but People uses run-on microtext instead of aligned comparison and mobile introduction delays records.",
+          "capability": "All checklist controls and counts remain visible, supported by 20 passing probes; downstream routes and undisplayed views cannot be certified.",
+          "aiwork": "AI connection and context export are explained, but no visible work attribution, author/date or interpretation distinction is demonstrated.",
+          "hierarchy": "Person continuation has a clear panel, but Story Studio has the primary CTA despite the evidence-first brief.",
+          "typography": "Editorial headings and readable body text fit the folio; 12px metadata and crowded middle-dot strings are weak.",
+          "iconography": "Consistent outline navigation and crafted folio symbols; identical person thumbnails convey little identifying information.",
+          "spacing": "Responsive columns and stable gutters work; large empty People canvas coexists with tiny record details.",
+          "colour": "Parchment and teal are coherent and dark mode is complete; sidebar secondary labels and small teal metadata could be stronger.",
+          "consistency": "Panels, controls and dark surfaces agree, but square People grid, rounded folio cards and empty-state orange CTA are not fully unified.",
+          "fit": "A credible private research folio with explicit user control; comparison tools and provenance presentation remain less mature than the brief.",
+          "cost": "No image downloads or media, but 4191KB dev JavaScript and 17 requests are heavy for these simple pages; production cost is unproven."
+        }
+      },
+      "V2": {
+        "scores": {
+          "findability": 5.5,
+          "density": 6.5,
+          "capability": 6.5,
+          "aiwork": 3.5,
+          "hierarchy": 5.5,
+          "typography": 6,
+          "iconography": 6.5,
+          "spacing": 7,
+          "colour": 3,
+          "consistency": 4,
+          "fit": 5.5,
+          "cost": 4.5
+        },
+        "notes": {
+          "findability": "Light controls are explicit, but dark-mode page headings and Filter label are effectively invisible.",
+          "density": "Compact home rows preserve all textual information; People retains difficult small run-on metrics and poor cross-record alignment.",
+          "capability": "The same checklist controls and 20 passing probes remain, but dark text on dark canvas makes labels and AI context information practically inaccessible.",
+          "aiwork": "Context-pack explanation exists but disappears into the dark canvas; no actual attributed AI work is shown.",
+          "hierarchy": "Readable light-mode grouping is undermined by missing dark-mode titles and an orange Story Studio CTA that outranks research.",
+          "typography": "Serif title is attractive in light mode, but smaller serif panel labels reduce working hierarchy and metadata is too faint.",
+          "iconography": "Outline icons are consistent, but yellow-orange badges feel generic and add no record differentiation.",
+          "spacing": "Home uses width well and compact rows reduce phone scrolling; People and empty-state introductions remain disproportionately tall.",
+          "colour": "Dark mode mixes white cards with near-black text outside cards and an unreadable Filter button; this is a release-blocking visual failure.",
+          "consistency": "White panels in dark mode, mismatched control surfaces and mixed rounded controls versus square cards look unfinished.",
+          "fit": "Light mode is a competent general dashboard, but weaker archival character and broken dark mode undermine a trusted daily research workspace.",
+          "cost": "Identical 4191KB dev JavaScript, 23KB CSS and 17 requests; visual simplification produces no measured running-cost advantage."
+        }
+      },
+      "R1": {
+        "scores": {
+          "findability": 8.5,
+          "density": 9,
+          "capability": 9,
+          "aiwork": 5,
+          "hierarchy": 8,
+          "typography": 8,
+          "iconography": 8.5,
+          "spacing": 8.5,
+          "colour": 8,
+          "consistency": 9,
+          "fit": 9,
+          "cost": 7.5
+        },
+        "notes": {
+          "findability": "Selected navigation, visible query, labeled facets, sorting and pagination establish location and control immediately.",
+          "density": "Many records retain full titles, author/date, labels and activity in an exceptionally regular scan path.",
+          "capability": "Search, numerous facets, sort, alternate views, pagination and record details are exposed together.",
+          "aiwork": "Issue titles discuss agents but this view demonstrates no separate automated-work attribution; neutral score.",
+          "hierarchy": "Repository, selected Issues tab, search and result toolbar form a clear ladder; pinned issue adds some overhead.",
+          "typography": "Strong title/metadata contrast and predictable line wrapping make long entries readable at useful density.",
+          "iconography": "Status, comments, relationship indicators and avatars have clear stable positions.",
+          "spacing": "Compact repeated rows and aligned right-side metadata support scanning without flattening all information.",
+          "colour": "Restrained neutral frame with semantic status and labels; multicolour labels are slightly busy.",
+          "consistency": "Mature, coherent toolbar, navigation and list treatment throughout the screenshot.",
+          "fit": "An excellent working-list reference that preserves substantial data and controls.",
+          "cost": "Mostly text and small avatars with no visible video, large imagery or advertising; network and bundle facts are unavailable."
+        }
+      },
+      "R2": {
+        "scores": {
+          "findability": 7.5,
+          "density": 7.5,
+          "capability": 8,
+          "aiwork": 5,
+          "hierarchy": 6.5,
+          "typography": 6,
+          "iconography": 4.5,
+          "spacing": 6.5,
+          "colour": 5.5,
+          "consistency": 5.5,
+          "fit": 7,
+          "cost": 7
+        },
+        "notes": {
+          "findability": "Plain topic names, research links and breadcrumbs expose a broad resource library despite many competing sections.",
+          "density": "Substantial resources fit above the footer in organized groups, though sidebars and repeated tiles compete.",
+          "capability": "Getting started, record topics, catalog tools, events and help are directly accessible with useful search limitations stated.",
+          "aiwork": "No AI work is present to judge; neutral score.",
+          "hierarchy": "Clear page title and grouped resources, but closure notice and many near-equal modules dilute the main path.",
+          "typography": "Readable linked lists, but cramped small body text and inconsistent headline sizing look dated.",
+          "iconography": "Mouse, magnifier, tree and promotional thumbnails mix styles and contribute little precision.",
+          "spacing": "Usable resource grid, but uneven module spacing and a crowded right rail reduce composure.",
+          "colour": "Blue links are recognizable; rainbow gradient navigation has little semantic logic.",
+          "consistency": "Repeated panels help, but gradients, illustration styles and promotional blocks do not form a polished system.",
+          "fit": "Credible and content-rich genealogy gateway with explicit caveats; visual craft falls below modern research tools.",
+          "cost": "Several modest images, no visible autoplay or ads; actual page cost is not supplied."
+        }
+      },
+      "R3": {
+        "scores": {
+          "findability": 8,
+          "density": 7.5,
+          "capability": 8.5,
+          "aiwork": 5,
+          "hierarchy": 7,
+          "typography": 6.5,
+          "iconography": 6.5,
+          "spacing": 6.5,
+          "colour": 7.5,
+          "consistency": 7.5,
+          "fit": 8,
+          "cost": 7.5
+        },
+        "notes": {
+          "findability": "Contents, breadcrumbs, explicit access methods and related guides make a long document navigable.",
+          "density": "Rich guide content and 15 linked sections remain visible; floated contents makes the first text column uncomfortably narrow.",
+          "capability": "Access constraints, scope, references, contents, support availability and catalogue path are exposed without hiding the guide.",
+          "aiwork": "No AI work is present to judge; neutral score.",
+          "hierarchy": "Numbered sections and ruled side modules are clear, though cookie banner consumes substantial first-view space.",
+          "typography": "Distinctive mono headings and readable body, but long headings wrap awkwardly beside the contents panel.",
+          "iconography": "Access ticks and crossed status are meaningful; contact illustrations are less refined.",
+          "spacing": "Clear main/right-rail division, but the contents float produces inconsistent text widths and large right-side voids later.",
+          "colour": "High-contrast neutral guide with recognizable blue links and restrained status colour.",
+          "consistency": "Rules, links, headings and numbered sections follow a steady editorial system.",
+          "fit": "Strong source-oriented research guidance with a real record image and catalogue reference.",
+          "cost": "Text-led guide with a useful record image, no visible media or ad clutter; bundle facts unavailable."
+        }
+      }
+    },
+    "capabilityConcerns": [
+      {
+        "set": "V2",
+        "shot": "people-dark--desktop-light.png",
+        "what": "Filter label and page title are near-black on dark surfaces; a technically present control becomes hard to discover or identify."
+      },
+      {
+        "set": "V2",
+        "shot": "home-dark--mobile-light.png",
+        "what": "The AI context-pack explanation and section/page headings are effectively unreadable, concealing available capabilities without deleting them."
+      },
+      {
+        "set": "V1",
+        "shot": "people--desktop-light.png",
+        "what": "The packet exposes a single record grid and one filter; alternate views, sorts and deeper existing capabilities are outside screenshot evidence and must remain separately accepted."
+      },
+      {
+        "set": "V2",
+        "shot": "people--desktop-light.png",
+        "what": "The packet exposes a single record grid and one filter; alternate views, sorts and deeper existing capabilities are outside screenshot evidence and must remain separately accepted."
+      }
+    ],
+    "fixes": [
+      {
+        "set": "V1",
+        "rank": 1,
+        "category": "density",
+        "severity": "high",
+        "capability": "improved",
+        "shots": [
+          "people--desktop-light.png",
+          "people-dark--desktop-light.png",
+          "people--mobile-light.png"
+        ],
+        "where": "People record grid and each record's counts",
+        "problem": "Five different counts run together in 12px text; two-column cards prevent fast comparison of sources and documents.",
+        "fix": "Present the same records as aligned desktop rows with Name, lifespan/state, Sources, Imports, Memories, Documents, Story outputs and Last import columns. Preserve the full mobile fields in two labeled metric rows at 13–14px; add a space on each side of every separator."
+      },
+      {
+        "set": "V1",
+        "rank": 2,
+        "category": "findability",
+        "severity": "high",
+        "capability": "preserved",
+        "shots": [
+          "home--desktop-light.png",
+          "people--desktop-light.png",
+          "people-dark--desktop-light.png"
+        ],
+        "where": "Left navigation",
+        "problem": "Dashboard and People have the same muted treatment as every other destination; location is not visually established.",
+        "fix": "Give the current destination a full-width selected surface, stronger label and a 3px teal leading marker. Raise group-label contrast while retaining all routes and the Soon state."
+      },
+      {
+        "set": "V1",
+        "rank": 3,
+        "category": "hierarchy",
+        "severity": "high",
+        "capability": "preserved",
+        "shots": [
+          "home--desktop-light.png",
+          "home--mobile-light.png"
+        ],
+        "where": "Home heading actions",
+        "problem": "The filled Story Studio action leads an evidence-first workspace and consumes the first phone action slot.",
+        "fix": "Make All people or the existing People destination the filled primary action beside the heading. Keep Research Queue and Story Studio as visible secondary actions; retain their current direct destinations."
+      },
+      {
+        "set": "V1",
+        "rank": 4,
+        "category": "spacing",
+        "severity": "medium",
+        "capability": "preserved",
+        "shots": [
+          "people--mobile-light.png",
+          "people-dark--mobile-light.png"
+        ],
+        "where": "People introduction and controls",
+        "problem": "About 290 CSS pixels below the preview banner pass before the first record, with import emphasized over finding an existing person.",
+        "fix": "Reduce heading/description/action spacing to 12px, place search immediately after the description, then keep the state filter and Import action in compact rows. Preserve 44px touch targets and the complete explanatory text."
+      },
+      {
+        "set": "V1",
+        "rank": 5,
+        "category": "consistency",
+        "severity": "medium",
+        "capability": "preserved",
+        "shots": [
+          "home--desktop-light.png",
+          "home--mobile-light.png"
+        ],
+        "where": "Imports statistic and Recent imports panel",
+        "problem": "The page displays 8 Imports and then says No imports yet, creating an apparent data contradiction.",
+        "fix": "Keep the numeric inventory but label the feed empty state No recent imports to show. Keep the existing Imports workspace link visible so inventory and feed are distinguished without suppressing either."
+      },
+      {
+        "set": "V1",
+        "rank": 6,
+        "category": "typography",
+        "severity": "medium",
+        "capability": "preserved",
+        "shots": [
+          "home--mobile-light.png",
+          "home-dark--mobile-light.png"
+        ],
+        "where": "Person continuation rows",
+        "problem": "Lifespan, research state and critical-gap count are jammed into one sentence and wrap unpredictably.",
+        "fix": "Put lifespan and state on one secondary line with spaced separators; put the existing critical-gap text in a separate short line or right-aligned labeled status area. Keep all counts and full labels visible."
+      },
+      {
+        "set": "V1",
+        "rank": 7,
+        "category": "spacing",
+        "severity": "medium",
+        "capability": "preserved",
+        "shots": [
+          "empty--mobile-light.png"
+        ],
+        "where": "Empty-state hero",
+        "problem": "Large heading and generous vertical rhythm make the compact onboarding task feel like a long landing page.",
+        "fix": "Set the phone hero title to approximately 30px/36px, internal padding to 24px and gaps to 16–20px. Preserve the complete copy, both buttons, reviewed-capture link and privacy explanation on the initial panel."
+      },
+      {
+        "set": "V1",
+        "rank": 8,
+        "category": "aiwork",
+        "severity": "medium",
+        "capability": "improved",
+        "shots": [
+          "home--desktop-light.png",
+          "home--mobile-light.png"
+        ],
+        "where": "AI context-pack explanation at page bottom",
+        "problem": "A core AI handoff capability is relegated below four orientation cards and looks like a footer note.",
+        "fix": "Move the existing complete context-pack explanation into a clearly titled AI handoff strip directly after the continuation/import area. Keep Markdown, JSON, source coverage and person-page location in visible text; invent no activity or attribution."
+      },
+      {
+        "set": "V2",
+        "rank": 1,
+        "category": "colour",
+        "severity": "critical",
+        "capability": "improved",
+        "shots": [
+          "home-dark--desktop-light.png",
+          "home-dark--mobile-light.png",
+          "people-dark--desktop-light.png",
+          "people-dark--mobile-light.png"
+        ],
+        "where": "All dark-mode page canvas, cards and controls",
+        "problem": "Titles and explanatory text vanish into the canvas; white cards remain glaring; Filter label is unreadable.",
+        "fix": "Apply a complete dark palette to every surface and foreground: light heading/body text, dark panel fills, visible borders, dark select fill and a clearly contrasting Filter label. Use the same semantic status accents and legible action foregrounds across all four shots."
+      },
+      {
+        "set": "V2",
+        "rank": 2,
+        "category": "density",
+        "severity": "high",
+        "capability": "improved",
+        "shots": [
+          "people--desktop-light.png",
+          "people--mobile-light.png"
+        ],
+        "where": "People record grid",
+        "problem": "Tiny low-contrast run-on counts are hard to compare despite extensive unused canvas.",
+        "fix": "Use aligned desktop record rows with separately labeled count columns, and keep a two-row labeled metric arrangement on mobile. Raise count/date text to 13–14px and a readable secondary foreground; retain all five count types and last-import dates."
+      },
+      {
+        "set": "V2",
+        "rank": 3,
+        "category": "findability",
+        "severity": "high",
+        "capability": "preserved",
+        "shots": [
+          "home--desktop-light.png",
+          "people--desktop-light.png"
+        ],
+        "where": "Left navigation",
+        "problem": "No selected-route styling distinguishes the current page.",
+        "fix": "Add a selected background, stronger label and 3px leading marker to Dashboard or People as appropriate. Keep every route and group label visible."
+      },
+      {
+        "set": "V2",
+        "rank": 4,
+        "category": "hierarchy",
+        "severity": "high",
+        "capability": "preserved",
+        "shots": [
+          "home--desktop-light.png",
+          "home--mobile-light.png"
+        ],
+        "where": "Heading actions",
+        "problem": "Bright orange Story Studio leads while the most frequent assumed task is finding a person and evidence.",
+        "fix": "Promote the existing People destination to the filled primary action and keep Story Studio plus Research Queue in visible secondary actions with unchanged direct links."
+      },
+      {
+        "set": "V2",
+        "rank": 5,
+        "category": "consistency",
+        "severity": "medium",
+        "capability": "preserved",
+        "shots": [
+          "home--desktop-light.png",
+          "people--desktop-light.png",
+          "empty--desktop-light.png",
+          "people--mobile-light.png"
+        ],
+        "where": "Cards, buttons, search and select",
+        "problem": "Square cards sit beside markedly rounded controls, and the empty state uses a different orange and teal treatment.",
+        "fix": "Set a consistent 6–8px control/panel radius, one panel border and shadow treatment, and one primary-action palette. Use teal for ordinary actions and restrained rust for emphasis, preserving status meanings and all labels."
+      },
+      {
+        "set": "V2",
+        "rank": 6,
+        "category": "spacing",
+        "severity": "medium",
+        "capability": "preserved",
+        "shots": [
+          "people--mobile-light.png",
+          "people-dark--mobile-light.png"
+        ],
+        "where": "Introduction and filter toolbar",
+        "problem": "The large import action delays the search and first record and competes with the page's lookup purpose.",
+        "fix": "Place search directly under the complete introduction, reduce intervening gaps to 12px, and keep filter plus import in compact subsequent rows with at least 44px control height."
+      },
+      {
+        "set": "V2",
+        "rank": 7,
+        "category": "consistency",
+        "severity": "medium",
+        "capability": "preserved",
+        "shots": [
+          "home--desktop-light.png",
+          "home--mobile-light.png"
+        ],
+        "where": "8 Imports metric and Recent imports empty state",
+        "problem": "No imports yet contradicts the inventory count on the same screen.",
+        "fix": "Keep both values visible and change the feed label to No recent imports to show, retaining the Imports workspace link and inventory label."
+      },
+      {
+        "set": "V2",
+        "rank": 8,
+        "category": "typography",
+        "severity": "medium",
+        "capability": "preserved",
+        "shots": [
+          "home--desktop-light.png",
+          "home--mobile-light.png"
+        ],
+        "where": "Continuation and Recent imports panel headings",
+        "problem": "Small regular serif labels have less navigational weight than nearby person names and body text.",
+        "fix": "Use an 18px semibold sans-serif panel-heading style consistently for continuation and imports, reserving the editorial serif for the page title and major section heading."
+      },
+      {
+        "set": "V2",
+        "rank": 9,
+        "category": "aiwork",
+        "severity": "medium",
+        "capability": "improved",
+        "shots": [
+          "home--desktop-light.png",
+          "home--mobile-light.png",
+          "home-dark--mobile-light.png"
+        ],
+        "where": "AI context-pack paragraph",
+        "problem": "The core AI handoff capability is low on the page and unreadable in dark mode.",
+        "fix": "Move the complete existing explanation into an AI handoff strip after the person/import area, use a legible body colour in both themes, and retain all export-format and source-coverage details."
+      },
+      {
+        "set": "V2",
+        "rank": 10,
+        "category": "spacing",
+        "severity": "medium",
+        "capability": "preserved",
+        "shots": [
+          "empty--mobile-light.png"
+        ],
+        "where": "Empty hero",
+        "problem": "Oversized title and vertical gaps push a simple first-connection flow into a lengthy panel.",
+        "fix": "Use approximately 30px/36px mobile title, 24px internal padding and 16–20px gaps while preserving the full copy, both actions, reviewed-capture link and privacy statement."
+      }
+    ],
+    "keep": [
+      {
+        "set": "V1",
+        "what": "Complete coordinated dark surfaces and light text; this is materially better than V2."
+      },
+      {
+        "set": "V1",
+        "what": "Restrained parchment/teal folio character and editorial page headings."
+      },
+      {
+        "set": "V1",
+        "what": "Direct person rows with lifespan, research state and visible gap counts."
+      },
+      {
+        "set": "V1",
+        "what": "Plain search placeholder, explicit research-state filter and full document/source counts."
+      },
+      {
+        "set": "V1",
+        "what": "Empty-state privacy boundary and reviewed-capture path remain explicit alongside first connection."
+      },
+      {
+        "set": "V2",
+        "what": "Compact home person rows retain every textual field without decorative identity thumbnails."
+      },
+      {
+        "set": "V2",
+        "what": "The full record metadata and search/filter controls remain in the light version."
+      },
+      {
+        "set": "V2",
+        "what": "All four workspace destinations retain explanatory text and named actions."
+      },
+      {
+        "set": "V2",
+        "what": "Visible import status and inventory summary are worth preserving after their labels are reconciled."
+      },
+      {
+        "set": "V2",
+        "what": "Empty-state user-control language and reviewed import option are clear and trustworthy."
+      }
+    ],
+    "summary": "GitHub demonstrates the largest missing qualities: an unmistakable selected location, aligned metadata, and rich controls that remain easy to scan. V1 has the stronger folio craft and complete dark mode, but both versions still present record counts as small prose and provide little visible evidence of AI provenance; V2 additionally has a release-blocking dark-theme failure. The archive references expose source context and access constraints directly, a useful standard for the deeper evidence pages not included in this packet.",
+    "pick": {
+      "label": "V1",
+      "why": "Build V1 for its coherent folio palette, legible dark mode and clearer panel hierarchy. Borrow V2's compact textual home rows where they reduce scrolling without losing any data, and borrow GitHub's active navigation and aligned record metadata rather than its visual branding."
+    }
+  }
+}

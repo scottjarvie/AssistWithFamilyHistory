@@ -1,0 +1,50 @@
+{
+  "baseURL": "http://localhost:3457",
+  "timezone": "America/Phoenix",
+  "defaultVariants": [
+    "desktop-light",
+    "mobile-light"
+  ],
+  "shots": [
+    {
+      "name": "ai-connections-original-reconstructed",
+      "path": "/design-council-preview?surface=baseline-settings-ai",
+      "capabilities": [
+        {
+          "can": "retain original setting controls",
+          "selector": "main h1"
+        }
+      ]
+    },
+    {
+      "name": "provider-settings-original-reconstructed",
+      "path": "/design-council-preview?surface=baseline-settings-provider",
+      "capabilities": [
+        {
+          "can": "retain original setting controls",
+          "selector": "main h1"
+        }
+      ]
+    },
+    {
+      "name": "api-keys-original-reconstructed",
+      "path": "/design-council-preview?surface=baseline-settings-api",
+      "capabilities": [
+        {
+          "can": "retain original setting controls",
+          "selector": "main h1"
+        }
+      ]
+    },
+    {
+      "name": "operator-keys-original-reconstructed",
+      "path": "/design-council-preview?surface=baseline-settings-admin",
+      "capabilities": [
+        {
+          "can": "retain original setting controls",
+          "selector": "main h1"
+        }
+      ]
+    }
+  ]
+}

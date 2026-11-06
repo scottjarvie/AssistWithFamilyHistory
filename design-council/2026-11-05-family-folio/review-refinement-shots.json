@@ -1,0 +1,442 @@
+{
+  "baseURL": "http://localhost:3457",
+  "timezone": "America/Phoenix",
+  "defaultVariants": [
+    "desktop-light",
+    "mobile-light"
+  ],
+  "shots": [
+    {
+      "name": "queue",
+      "path": "/design-council-preview?surface=queue",
+      "capabilities": [
+        {
+          "can": "retain Your Queue",
+          "text": "Your Queue"
+        }
+      ]
+    },
+    {
+      "name": "queue-dark",
+      "path": "/design-council-preview?surface=queue&theme=dark",
+      "capabilities": [
+        {
+          "can": "retain Your Queue",
+          "text": "Your Queue"
+        }
+      ]
+    },
+    {
+      "name": "queue-answer-sheet-viewport",
+      "path": "/design-council-preview?surface=queue&item=synthetic-queue-needs-you",
+      "capabilities": [
+        {
+          "can": "retain What needs you",
+          "text": "What needs you"
+        }
+      ],
+      "viewportOnly": true
+    },
+    {
+      "name": "queue-result-sheet-viewport",
+      "path": "/design-council-preview?surface=queue&item=synthetic-queue-done",
+      "capabilities": [
+        {
+          "can": "retain Recorded result",
+          "text": "Recorded result"
+        }
+      ],
+      "viewportOnly": true
+    },
+    {
+      "name": "queue-working-sheet-viewport",
+      "path": "/design-council-preview?surface=queue&item=synthetic-queue-working",
+      "capabilities": [
+        {
+          "can": "retain Current step",
+          "text": "Current step"
+        }
+      ],
+      "viewportOnly": true
+    },
+    {
+      "name": "queue-expired-sheet-viewport",
+      "path": "/design-council-preview?surface=queue&item=synthetic-queue-expired",
+      "capabilities": [
+        {
+          "can": "retain Handoff expired",
+          "text": "Handoff expired"
+        }
+      ],
+      "viewportOnly": true
+    },
+    {
+      "name": "queue-ai",
+      "path": "/design-council-preview?surface=queue&state=working&actor=ai",
+      "capabilities": [
+        {
+          "can": "retain Prepare an invented locality comparison",
+          "text": "Prepare an invented locality comparison"
+        }
+      ]
+    },
+    {
+      "name": "queue-empty",
+      "path": "/design-council-preview?surface=queue-empty",
+      "capabilities": [
+        {
+          "can": "retain Nothing needs carrying forward.",
+          "text": "Nothing needs carrying forward."
+        }
+      ]
+    },
+    {
+      "name": "queue-denied",
+      "path": "/design-council-preview?surface=queue-denied",
+      "capabilities": [
+        {
+          "can": "retain Queue access denied",
+          "text": "Queue access denied"
+        }
+      ]
+    },
+    {
+      "name": "queue-denied-dark",
+      "path": "/design-council-preview?surface=queue-denied&theme=dark",
+      "capabilities": [
+        {
+          "can": "retain Queue access denied",
+          "text": "Queue access denied"
+        }
+      ]
+    },
+    {
+      "name": "queue-detail-error-sheet-viewport",
+      "path": "/design-council-preview?surface=queue-detail-error&item=synthetic-queue-needs-you",
+      "capabilities": [
+        {
+          "can": "retain Queue item unavailable",
+          "text": "Queue item unavailable"
+        }
+      ],
+      "viewportOnly": true
+    },
+    {
+      "name": "queue-new",
+      "path": "/design-council-preview?surface=queue",
+      "actions": [
+        {
+          "click": "button:has-text(\"Leave a directive\")"
+        }
+      ],
+      "capabilities": [
+        {
+          "can": "write a directive",
+          "selector": "#queue-directive"
+        }
+      ]
+    },
+    {
+      "name": "queue-filter-dark",
+      "path": "/design-council-preview?surface=queue&theme=dark",
+      "actions": [
+        {
+          "click": "button:has-text(\"+ Filter\")"
+        }
+      ],
+      "capabilities": [
+        {
+          "can": "use one-level filters",
+          "text": "Filter Queue"
+        }
+      ],
+      "viewportOnly": true
+    },
+    {
+      "name": "queue-sheet-history",
+      "path": "/design-council-preview?surface=queue-more&item=synthetic-queue-needs-you",
+      "actions": [
+        {
+          "scrollIntoView": "#queue-activity-heading"
+        }
+      ],
+      "viewportOnly": true,
+      "capabilities": [
+        {
+          "can": "retain chronological history and earlier pagination",
+          "text": "Older activity"
+        }
+      ]
+    },
+    {
+      "name": "queue-sheet-ledger-dark",
+      "path": "/design-council-preview?surface=queue&item=synthetic-queue-expired&theme=dark",
+      "actions": [
+        {
+          "scrollBottom": "#queue-selected"
+        }
+      ],
+      "viewportOnly": true,
+      "capabilities": [
+        {
+          "can": "retain private ledger and expiry",
+          "text": "Handoff expires"
+        }
+      ]
+    },
+    {
+      "name": "people-kit-fit",
+      "path": "/design-council-preview?surface=people",
+      "capabilities": [
+        {
+          "can": "retain every selected record field",
+          "selector": ".collection-workspace"
+        }
+      ]
+    },
+    {
+      "name": "places-kit-fit",
+      "path": "/design-council-preview?surface=places",
+      "capabilities": [
+        {
+          "can": "retain every selected record field",
+          "selector": ".collection-workspace"
+        }
+      ]
+    },
+    {
+      "name": "stories-kit-fit",
+      "path": "/design-council-preview?surface=stories",
+      "capabilities": [
+        {
+          "can": "retain every selected record field",
+          "selector": ".collection-workspace"
+        }
+      ]
+    },
+    {
+      "name": "writing-kit-fit",
+      "path": "/design-council-preview?surface=writing",
+      "capabilities": [
+        {
+          "can": "retain every selected record field",
+          "selector": ".collection-workspace"
+        }
+      ]
+    },
+    {
+      "name": "research-kit-fit",
+      "path": "/design-council-preview?surface=research",
+      "capabilities": [
+        {
+          "can": "retain every selected record field",
+          "selector": ".collection-workspace"
+        }
+      ]
+    },
+    {
+      "name": "people-kit-fit-1280",
+      "path": "/design-council-preview?surface=people",
+      "desktopWidth": 1280,
+      "variants": [
+        "desktop-light"
+      ],
+      "capabilities": [
+        {
+          "can": "compare loaded records at1280",
+          "selector": "table.collection-table"
+        }
+      ]
+    },
+    {
+      "name": "research-kit-fit-1280",
+      "path": "/design-council-preview?surface=research",
+      "desktopWidth": 1280,
+      "variants": [
+        "desktop-light"
+      ],
+      "capabilities": [
+        {
+          "can": "compare loaded records at1280",
+          "selector": "table.collection-table"
+        }
+      ]
+    },
+    {
+      "name": "operations",
+      "path": "/design-council-preview?surface=operations",
+      "actions": [],
+      "capabilities": [
+        {
+          "can": "retain Operations",
+          "text": "Operations"
+        }
+      ]
+    },
+    {
+      "name": "operations-dark",
+      "path": "/design-council-preview?surface=operations&theme=dark",
+      "actions": [],
+      "capabilities": [
+        {
+          "can": "retain Operations",
+          "text": "Operations"
+        }
+      ]
+    },
+    {
+      "name": "operations-provisional",
+      "path": "/design-council-preview?surface=operations&type=provisional",
+      "actions": [],
+      "capabilities": [
+        {
+          "can": "retain Operations",
+          "text": "Operations"
+        }
+      ]
+    },
+    {
+      "name": "operations-filter-dark",
+      "path": "/design-council-preview?surface=operations&theme=dark",
+      "actions": [
+        {
+          "click": "button[aria-label=\"Filter research rows\"]"
+        }
+      ],
+      "capabilities": [
+        {
+          "can": "retain Operations",
+          "text": "Operations"
+        }
+      ],
+      "viewportOnly": true
+    },
+    {
+      "name": "operations-guest",
+      "path": "/design-council-preview?surface=operations-guest",
+      "actions": [],
+      "capabilities": [
+        {
+          "can": "retain Operations",
+          "text": "Operations"
+        }
+      ]
+    },
+    {
+      "name": "operations-empty",
+      "path": "/design-council-preview?surface=operations-empty",
+      "actions": [],
+      "capabilities": [
+        {
+          "can": "retain Operations",
+          "text": "Operations"
+        }
+      ]
+    },
+    {
+      "name": "operations-1280",
+      "path": "/design-council-preview?surface=operations",
+      "desktopWidth": 1280,
+      "variants": [
+        "desktop-light"
+      ],
+      "capabilities": [
+        {
+          "can": "keep next action visible at1280",
+          "selector": "td[data-label=\"Next action\"]"
+        }
+      ]
+    },
+    {
+      "name": "operations-staged-phone",
+      "path": "/design-council-preview?surface=operations&theme=dark",
+      "variants": [
+        "mobile-light"
+      ],
+      "viewportOnly": true,
+      "actions": [
+        {
+          "click": "button[aria-label=\"Filter research rows\"]"
+        },
+        {
+          "click": "[role=\"dialog\"] button:text-is(\"Canonical people\")"
+        },
+        {
+          "click": "[role=\"dialog\"] button:text-is(\"Ready to review\")"
+        }
+      ],
+      "capabilities": [
+        {
+          "can": "stage more than one facet before Apply",
+          "text": "Apply"
+        }
+      ]
+    },
+    {
+      "name": "operations-sorted-empty",
+      "path": "/design-council-preview?surface=operations-empty&sortBy=completion&sortDirection=asc",
+      "capabilities": [
+        {
+          "can": "show honest empty-vault guidance with sorting",
+          "text": "This vault does not have any people yet"
+        }
+      ]
+    },
+    {
+      "name": "operations-filter-bottom",
+      "path": "/design-council-preview?surface=operations&theme=dark",
+      "viewportOnly": true,
+      "actions": [
+        {
+          "click": "button[aria-label=\"Filter research rows\"]"
+        },
+        {
+          "scrollBottom": "[role=\"dialog\"]"
+        }
+      ],
+      "capabilities": [
+        {
+          "can": "apply server order and multiple facets together",
+          "text": "Default: descending"
+        }
+      ]
+    },
+    {
+      "name": "operations-actions-1280",
+      "path": "/design-council-preview?surface=operations",
+      "desktopWidth": 1280,
+      "variants": [
+        "desktop-light"
+      ],
+      "actions": [
+        {
+          "click": "table [data-row=\"person:synthetic-eleanor\"] summary[aria-label=\"Actions for Eleanor Finch\"]"
+        }
+      ],
+      "capabilities": [
+        {
+          "can": "reach exact-check actions inside the identity column",
+          "text": "Mark birth record done"
+        }
+      ]
+    },
+    {
+      "name": "operations-details-phone",
+      "path": "/design-council-preview?surface=operations&theme=dark",
+      "variants": [
+        "mobile-light"
+      ],
+      "actions": [
+        {
+          "click": "li[data-row=\"person:synthetic-eleanor\"] summary:text-is(\"Full research details\")"
+        }
+      ],
+      "capabilities": [
+        {
+          "can": "inspect every retained evidence/check/action field on phone",
+          "text": "Confirm the provisional relationship against the source image."
+        }
+      ]
+    }
+  ]
+}

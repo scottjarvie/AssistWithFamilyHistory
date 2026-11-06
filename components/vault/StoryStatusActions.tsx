@@ -17,11 +17,13 @@ export function StoryStatusActions({
   publicIdentifier,
   status,
   publishReadiness,
+  compact = false,
 }: {
+  compact?: boolean;
   storyId: string;
   publicIdentifier?: string;
   status: StoryStatus;
-  publishReadiness?: Pick<StoryPublishReadiness, "canPublish" | "summary" | "blockers">;
+  publishReadiness?: Pick<StoryPublishReadiness, "canPublish" | "summary">;
 }) {
   const router = useRouter();
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
@@ -104,31 +106,32 @@ export function StoryStatusActions({
   const pending = pendingAction !== null;
 
   return (
-    <div className="flex flex-wrap gap-3">
+    <div className={compact?"grid grid-cols-3 items-stretch gap-1 [&_button]:h-auto [&_button]:min-h-11 [&_button]:whitespace-normal [&_button]:px-2 [&_button]:text-xs [&_svg:not(.animate-spin)]:hidden lg:flex lg:flex-wrap lg:gap-2 lg:[&_svg]:block":"flex flex-wrap gap-3"}>
       {status === "draft" ? (
-        <Button onClick={() => updateStatus("review")} disabled={pending} className="bg-stone-900 hover:bg-stone-800">
+        <Button aria-label="Mark ready for review" onClick={() => updateStatus("review")} disabled={pending} className="min-h-11 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100">
           {pendingAction === "review" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
-          Mark ready for review
+          {compact?<><span className="lg:hidden">Send to review</span><span className="hidden lg:inline">Mark ready for review</span></>:"Mark ready for review"}
         </Button>
       ) : null}
       {status !== "published" ? (
         <>
-          <Button onClick={previewPublishGates} disabled={pending} variant="outline">
+          <Button aria-label="Preview publish gates" onClick={previewPublishGates} disabled={pending} variant="outline">
             {pendingAction === "preview" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardCheck className="h-4 w-4" />}
-            Preview publish gates
+            {compact?<><span className="lg:hidden">Preview gates</span><span className="hidden lg:inline">Preview publish gates</span></>:"Preview publish gates"}
           </Button>
           <Button
+            aria-label="Publish public page"
             onClick={() => updateStatus("published")}
             disabled={pending || publishBlocked}
-            className="bg-amber-700 hover:bg-amber-800 disabled:bg-stone-300"
+            className="min-h-11 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
           >
             {pendingAction === "published" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
-            Publish public page
+            {compact?<><span className="lg:hidden">Publish</span><span className="hidden lg:inline">Publish public page</span></>:"Publish public page"}
           </Button>
         </>
       ) : (
         <>
-          <Button asChild className="bg-amber-700 hover:bg-amber-800">
+          <Button asChild className="min-h-11">
             <Link href={publicStoryPath(publicIdentifier ?? storyId)} target="_blank">
               <ExternalLink className="h-4 w-4" />
               Open public page
@@ -141,7 +144,7 @@ export function StoryStatusActions({
         </>
       )}
       {publishBlocked ? (
-        <p className="basis-full text-xs text-amber-800">{publishReadiness?.summary}</p>
+        <p className="col-span-3 basis-full text-xs text-annotation">{publishReadiness?.summary}</p>
       ) : null}
     </div>
   );

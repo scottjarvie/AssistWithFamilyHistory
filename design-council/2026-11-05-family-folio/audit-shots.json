@@ -1,0 +1,182 @@
+{
+  "baseURL": "http://localhost:3457",
+  "timezone": "America/Phoenix",
+  "defaultVariants": [
+    "desktop-light",
+    "mobile-light"
+  ],
+  "shots": [
+    {
+      "name": "audit-instruments",
+      "path": "/design-council-preview?surface=audit",
+      "actions": [],
+      "viewportOnly": false,
+      "capabilities": [
+        {
+          "can": "retain Audit record access",
+          "selector": "h1"
+        }
+      ]
+    },
+    {
+      "name": "audit-people-drawer",
+      "path": "/design-council-preview?surface=audit",
+      "actions": [
+        {
+          "click": "[data-audit-metric=\"people\"]"
+        }
+      ],
+      "viewportOnly": true,
+      "capabilities": [
+        {
+          "can": "retain Audit record access",
+          "selector": "[role=\"dialog\"]"
+        }
+      ]
+    },
+    {
+      "name": "audit-save-view",
+      "path": "/design-council-preview?surface=audit",
+      "actions": [
+        {
+          "click": "[data-audit-metric=\"people\"]"
+        },
+        {
+          "click": "[role=\"dialog\"] button:has-text(\"Save view\")"
+        },
+        {
+          "fill": "[role=\"dialog\"] input[maxlength=\"80\"]",
+          "value": "Evidence to revisit"
+        }
+      ],
+      "viewportOnly": true,
+      "capabilities": [
+        {
+          "can": "retain Audit record access",
+          "selector": "[role=\"dialog\"]"
+        }
+      ]
+    },
+    {
+      "name": "audit-sources-view",
+      "path": "/design-council-preview?surface=audit&view=sources",
+      "actions": [],
+      "viewportOnly": false,
+      "capabilities": [
+        {
+          "can": "retain Audit record access",
+          "selector": "h1"
+        }
+      ]
+    },
+    {
+      "name": "audit-instruments-dark",
+      "path": "/design-council-preview?surface=audit&theme=dark",
+      "actions": [],
+      "viewportOnly": false,
+      "capabilities": [
+        {
+          "can": "retain Audit record access",
+          "selector": "h1"
+        }
+      ]
+    },
+    {
+      "name": "audit-people-drawer-dark",
+      "path": "/design-council-preview?surface=audit&theme=dark",
+      "actions": [
+        {
+          "click": "[data-audit-metric=\"people\"]"
+        }
+      ],
+      "viewportOnly": true,
+      "capabilities": [
+        {
+          "can": "retain Audit record access",
+          "selector": "[role=\"dialog\"]"
+        }
+      ]
+    },
+    {
+      "name": "audit-save-view-dark",
+      "path": "/design-council-preview?surface=audit&theme=dark",
+      "actions": [
+        {
+          "click": "[data-audit-metric=\"people\"]"
+        },
+        {
+          "click": "[role=\"dialog\"] button:has-text(\"Save view\")"
+        },
+        {
+          "fill": "[role=\"dialog\"] input[maxlength=\"80\"]",
+          "value": "Evidence to revisit"
+        }
+      ],
+      "viewportOnly": true,
+      "capabilities": [
+        {
+          "can": "retain Audit record access",
+          "selector": "[role=\"dialog\"]"
+        }
+      ]
+    },
+    {
+      "name": "audit-sources-view-dark",
+      "path": "/design-council-preview?surface=audit&view=sources&theme=dark",
+      "actions": [],
+      "viewportOnly": false,
+      "capabilities": [
+        {
+          "can": "retain Audit record access",
+          "selector": "h1"
+        }
+      ]
+    },
+    {
+      "name": "audit-zero-drawer",
+      "path": "/design-council-preview?surface=audit-empty",
+      "actions": [
+        {
+          "click": "[data-audit-metric=\"people\"]"
+        }
+      ],
+      "viewportOnly": true,
+      "capabilities": [
+        {
+          "can": "honest zero records",
+          "text": "No records match this metric"
+        }
+      ]
+    },
+    {
+      "name": "audit-error-drawer",
+      "path": "/design-council-preview?surface=audit-error",
+      "actions": [
+        {
+          "click": "[data-audit-metric=\"sources\"]"
+        }
+      ],
+      "viewportOnly": true,
+      "capabilities": [
+        {
+          "can": "honest failed matching read",
+          "selector": "[role=\"alert\"]"
+        }
+      ]
+    },
+    {
+      "name": "operations-coverage-1280",
+      "path": "/design-council-preview?surface=operations",
+      "desktopWidth": 1280,
+      "variants": [
+        "desktop-light"
+      ],
+      "capabilities": [
+        {
+          "can": "preserve complete coverage heading and noun units",
+          "selector": "td[data-label=\"Coverage\"]"
+        }
+      ]
+    }
+  ]
+}

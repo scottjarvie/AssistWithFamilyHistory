@@ -1,0 +1,34 @@
+[
+ {"id":"readers","title":"Document readers","state":"Work in progress","head":"uncommitted reader work","changed":"A calm reading column, source notes beside the claims that name them, truthful provenance, and exact original Markdown copy/download. Person/run changes now clear the old view and abort its request.","review":"4 focused tests and6 new captures pass. Full browser and repository verification are still pending; no council approval claimed.","features":[
+  {"name":"Contextualized dossier","after":"readers-field-guide/reader-dossier-wip","before":"readers-baseline/reader-contextualized-original-reconstructed"},
+  {"name":"Raw evidence document","after":"readers-field-guide/reader-raw-wip","before":"readers-baseline/reader-raw-original-reconstructed"},
+  {"name":"Source notes beside a claim","after":"readers-field-guide/reader-source-notes-wip","before":"readers-baseline/reader-contextualized-original-reconstructed"}
+ ]},
+ {"id":"settings","title":"AI, data and developer settings","state":"Verified local batch · review pending","head":"fe77e07","changed":"Seven-ability AI permissions matrix on desktop, complete connection cards on phone, named revoke confirmation, a ways-out data matrix, and current-vault developer/operator key ledgers. All existing controls and privacy gates retained.","review":"57/57 full checks;17 Settings browser groups and11 Audit regressions pass. Exact-head Opus packet ready; Claude has not been woken under the current instruction.","features":[
+  {"name":"AI permissions","after":"settings-matrices/ai-permissions","before":"settings-baseline/ai-connections-original-reconstructed"},
+  {"name":"Preferences and your data","after":"settings-matrices/preferences-data","before":"settings-baseline/provider-settings-original-reconstructed"},
+  {"name":"Developer keys","after":"settings-matrices/developer-keys","before":"settings-baseline/api-keys-original-reconstructed"},
+  {"name":"Operator key ledger","after":"settings-matrices/operator-ledger","before":"settings-baseline/operator-keys-original-reconstructed"}
+ ]},
+ {"id":"audit","title":"Audit instruments and matching-record drawers","state":"Opus reviewed · latest fixes pending review","head":"030963f → b5058bb","changed":"Every metric opens its actual matching records. Added compact drawers, owner-keyed saved views, real coverage bars, count grammar, pagination and explicit retry. No invented trends.","review":"Opus030963f approved privacy, preservation and data path; required visual fixes implemented at b5058bb.57/57 full checks,60 browser groups and22 new captures pass. Latest fixes await the next independent review.","features":[
+  {"name":"Vault instruments","after":"audit-review-fixes/audit-instruments","before":"audit-baseline/audit-original-reconstructed"},
+  {"name":"Behind a number","after":"audit-review-fixes/audit-people-drawer","before":"audit-baseline/audit-original-reconstructed"}
+ ]},
+ {"id":"queue-operations","title":"Queue, research operations and collection controls","state":"Required fixes accepted by Opus","head":"76b04ba →27bee8e →b42c5cc","changed":"Saved views and grouped Table/List/Grid, clearer phone filters, answer-first Queue detail, in-place replies, visible-order navigation, scroll/focus restoration and compact research operations.","review":"Nine Opus receipts exist across the run. Latest Opus030963f explicitly accepts prior required Queue/Operations/shared-kit fixes. Latest shared batch:57/57 full checks,109 browser groups,62 captures.","features":[
+  {"name":"Personal Queue","after":"review-refinements/queue","before":"baseline-reconstructed/baseline-queue"},
+  {"name":"Queue answer","after":"review-refinements/queue-answer-sheet-viewport","before":"baseline-reconstructed/baseline-queue"},
+  {"name":"Research operations","after":"review-refinements/operations","before":"baseline-reconstructed/operations-reconstructed"},
+  {"name":"People collection","after":"review-refinements/people-kit-fit","before":"baseline/people"}
+ ]},
+ {"id":"records","title":"Person, Place and Story records","state":"Opus reviewed · fixes accepted in later reviews","head":"c187b04 →0bafa4f →cf9ef0e","changed":"An archival dossier and one evidence stream, counted sticky sections, pinned All menu, phone Contents, preserved source conflicts/privacy review, and readable Story review/editing with honest source margins.","review":"Opus found no privacy or capability regression. Person findings were confirmed fixed at0bafa4f; Story/Place/shared navigation follow-ups were accepted by later Queue/Operations reviews. Separate all-page audit remains open.","features":[
+  {"name":"Person dossier","after":"record-review-fixes/person","before":"baseline-reconstructed/person"},
+  {"name":"Place dossier","after":"record-review-fixes/place-record","before":"baseline-reconstructed/baseline-place-record"},
+  {"name":"Story reader and review","after":"record-review-fixes/story-record","before":"baseline-reconstructed/baseline-story-record"}
+ ]},
+ {"id":"home-collections","title":"Workspace home, collections and activity","state":"Opus reviewed · later shared fixes accepted","head":"2bf2eec →0ec9ea7 →7f1ab4f","changed":"Evidence-first desk trays, visual record slots drawn as SVG, full collection controls, saved browser views, source-aware metadata, and dated activity lanes only for entry kinds actually present.","review":"Home structure approved by Opus; collection privacy/fit/facet findings drove successive corrections. The only formal scored round remains the early foundation: Sol6.8 vs baseline5.4, below target. Later batches have code/taste reviews, not new formal scores.","features":[
+  {"name":"Workspace home","after":"record-stream/current/home","before":"baseline/home","beforeNote":"Starting run snapshot with invented records."},
+  {"name":"Places collection","after":"review-refinements/places-kit-fit","before":"baseline-reconstructed/places"},
+  {"name":"Research activity","after":"review-refinements/research-kit-fit","before":"baseline-reconstructed/research"},
+  {"name":"Stories collection","after":"review-refinements/stories-kit-fit","before":"baseline-reconstructed/stories"}
+ ]}
+]

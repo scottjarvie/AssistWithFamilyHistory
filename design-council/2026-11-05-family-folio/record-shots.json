@@ -1,0 +1,160 @@
+{
+  "baseURL": "http://localhost:3457",
+  "timezone": "America/Phoenix",
+  "defaultVariants": [
+    "desktop-light",
+    "mobile-light"
+  ],
+  "shots": [
+    {
+      "name": "place-record",
+      "path": "/design-council-preview?surface=place-record",
+      "capabilities": [
+        {
+          "can": "retain How To Use This Place",
+          "text": "How To Use This Place"
+        }
+      ]
+    },
+    {
+      "name": "place-record-dark",
+      "path": "/design-council-preview?surface=place-record&theme=dark",
+      "capabilities": [
+        {
+          "can": "retain Evidence stream",
+          "text": "Evidence stream"
+        }
+      ]
+    },
+    {
+      "name": "place-research",
+      "path": "/design-council-preview?surface=place-record#record-section-research",
+      "capabilities": [
+        {
+          "can": "retain Add Context Report",
+          "text": "Add Context Report"
+        }
+      ]
+    },
+    {
+      "name": "place-research-dark",
+      "path": "/design-council-preview?surface=place-record&theme=dark#record-section-research",
+      "capabilities": [
+        {
+          "can": "retain Add Context Report",
+          "text": "Add Context Report"
+        }
+      ]
+    },
+    {
+      "name": "place-context",
+      "path": "/design-council-preview?surface=place-record#record-section-context",
+      "capabilities": [
+        {
+          "can": "retain Historical Context Slots",
+          "text": "Historical Context Slots"
+        }
+      ]
+    },
+    {
+      "name": "place-empty",
+      "path": "/design-council-preview?surface=place-empty",
+      "capabilities": [
+        {
+          "can": "retain No place research entries yet.",
+          "text": "No place research entries yet."
+        }
+      ]
+    },
+    {
+      "name": "story-record",
+      "path": "/design-council-preview?surface=story-record",
+      "capabilities": [
+        {
+          "can": "retain Saved narrative",
+          "text": "Saved narrative"
+        }
+      ]
+    },
+    {
+      "name": "story-record-dark",
+      "path": "/design-council-preview?surface=story-record&theme=dark",
+      "capabilities": [
+        {
+          "can": "retain Saved narrative",
+          "text": "Saved narrative"
+        }
+      ]
+    },
+    {
+      "name": "story-edit",
+      "path": "/design-council-preview?surface=story-record#record-section-draft",
+      "capabilities": [
+        {
+          "can": "retain Editable Markdown Draft",
+          "text": "Editable Markdown Draft"
+        }
+      ]
+    },
+    {
+      "name": "story-review",
+      "path": "/design-council-preview?surface=story-record#record-section-review",
+      "capabilities": [
+        {
+          "can": "retain Publish Gate",
+          "text": "Publish Gate"
+        }
+      ]
+    },
+    {
+      "name": "story-review-dark",
+      "path": "/design-council-preview?surface=story-record&theme=dark#record-section-review",
+      "capabilities": [
+        {
+          "can": "retain Publish Gate",
+          "text": "Publish Gate"
+        }
+      ]
+    },
+    {
+      "name": "story-context",
+      "path": "/design-council-preview?surface=story-record#record-section-context",
+      "capabilities": [
+        {
+          "can": "retain Research Pack Provenance",
+          "text": "Research Pack Provenance"
+        }
+      ]
+    },
+    {
+      "name": "story-evidence",
+      "path": "/design-council-preview?surface=story-record#record-section-sources",
+      "capabilities": [
+        {
+          "can": "retain Grounding Evidence",
+          "text": "Grounding Evidence"
+        }
+      ]
+    },
+    {
+      "name": "story-history",
+      "path": "/design-council-preview?surface=story-record#record-section-history",
+      "capabilities": [
+        {
+          "can": "retain Review History",
+          "text": "Review History"
+        }
+      ]
+    },
+    {
+      "name": "story-unlinked",
+      "path": "/design-council-preview?surface=story-unlinked#record-section-review",
+      "capabilities": [
+        {
+          "can": "retain Publish Gate",
+          "text": "Publish Gate"
+        }
+      ]
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+import {operationQueryArguments,operationFiltersFromURL} from "@/lib/operations/query";
 import { NextRequest, NextResponse } from "next/server";
 import { api } from "@/convex/_generated/api";
 import { getAuthedConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
@@ -26,36 +27,7 @@ export async function GET(request: NextRequest) {
     const client = await getAuthedConvexClient();
     const payload = await client.action(api.vaultReads.getOperationsQueue, {
       vaultOwnerId,
-      search: searchParams.get("q") || undefined,
-      rowType:
-        searchParams.get("type") === "person" || searchParams.get("type") === "provisional"
-          ? (searchParams.get("type") as "person" | "provisional")
-          : undefined,
-      missingCheck: searchParams.get("missingCheck") || undefined,
-      storyStatus:
-        searchParams.get("storyStatus") === "has_story" || searchParams.get("storyStatus") === "no_story"
-          ? (searchParams.get("storyStatus") as "has_story" | "no_story")
-          : undefined,
-      staleOnly: searchParams.get("staleOnly") === "true" ? true : undefined,
-      sortBy:
-        searchParams.get("sortBy") === "completion" ||
-        searchParams.get("sortBy") === "lastTouched" ||
-        searchParams.get("sortBy") === "sourceCount" ||
-        searchParams.get("sortBy") === "storyReadiness" ||
-        searchParams.get("sortBy") === "newestImport" ||
-        searchParams.get("sortBy") === "missingCritical"
-          ? (searchParams.get("sortBy") as
-              | "completion"
-              | "lastTouched"
-              | "sourceCount"
-              | "storyReadiness"
-              | "newestImport"
-              | "missingCritical")
-          : undefined,
-      sortDirection:
-        searchParams.get("sortDirection") === "asc" || searchParams.get("sortDirection") === "desc"
-          ? (searchParams.get("sortDirection") as "asc" | "desc")
-          : undefined,
+      ...operationQueryArguments(operationFiltersFromURL(searchParams)),
     });
 
     if (searchParams.get("format") === "handoff") {

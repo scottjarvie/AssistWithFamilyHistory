@@ -1,0 +1,49 @@
+# Capability contract · 2026-11-05
+
+Full route-by-route baseline: page-inventory.md. A visual pass must keep every listed capability. No auth, Convex, API, import semantics, publishing or grant enforcement changes are authorized by this design run.
+
+## Initial capture tranche
+
+- Home populated: recent people with lifespan, status and critical gaps; Story Studio and Research Queue actions; six workspace totals; recent imports and merge status; Intake/Vault/Research/Stories links and descriptions; AI context pack explanation. Totals will become links to their existing source pages.
+- Home empty: private first connection action, AI connection guidance, reviewed-capture import alternative, privacy explanation, complete workspace map.
+- People: query input and submit, every research-state option, first-connection/import action, person links, lifespan, research state, living/deceased, unsourced provenance, all five counts, last import and pagination.
+- Shared shell: every existing destination and account control remains reachable.
+
+Automated visible-element probes are in ../shots.json. They supplement interaction checks, not replace them. Fixture rows are invented and test presentation only. Real backend acceptance is separate; no fixture capture proves a backend feature works.
+
+## No-removal audit rule
+
+Per round, inspect each changed node for text becoming icon-only, hover-only, hidden or deeper; list it in rounds.md. Do not clamp text or silently collapse facts. Existing public and specialist pages remain on the inventory until built and captured; shared token adoption alone does not complete a page.
+
+## Expanded collection tranche
+
+- Places: original search and every place link, kind, event/citation/media count; same server query. Adds saved search/presentation, grouping/sort/selection and SVG map slot.
+- Stories: original All/Draft/Review/Published counts and links, all five workflow quick links and every workflow option, title/person/kind/state, source/place/context/readiness/warning counts, original four-line narrative preview, review and published-only public links. Adds full-text search, expandable narrative and saved q/status/workflow together.
+- Writing launcher: original 24-candidate server limit/query, workflow/readiness/source/context and each person writing session; adds lifespan and collection arrangements.
+- Research: original titles, descriptions, priority, people, all returned task states and full log summaries/kinds/person links. Global tasks get no invented record destination. Adds dated log/recorded provenance, explicit unverified model-hint labels, author/period/kind/range filters and a real entry-kind SVG chart; date inputs provide the keyboard alternative to dragging.
+- Shared default is responsive: Table on desktop, compact recognition List on phones. Every chosen count/field stays in the wrapped row; explicit view and column choices persist. Older People column selections automatically regain lifespan/state moved from identity; new explicit hides remain respected.
+
+## Activity/facet refinement contract
+
+All original collection facet values remain accessible from + Filter in one sheet, with direct removable chips and Clear all. Stories keeps built-in status links and every review/published action in the new default List. Saved facets/search remain URL-based and owner-scoped. Monthly Research ledger keeps each full summary, recorded origin, Updated UTC date and person link; custom date bounds and lane/author/period controls filter actual stored updates, with explicit invalid-range feedback and a keyboard path. Phone lanes show every used kind. Home's five trays retain all six totals, original descriptions/rows/actions and source destinations.
+
+## Person record contract
+
+Dossier retains canonical identity/facts/provenance warnings, exact AI/export destinations and every unique metric. Nine tabs (Overview plus eight counted sections) have a pinned All9 menu, and phone Overview exposes all eight in Contents. The one dated stream keeps all import/log fields and an honest Show all; history dates remain in Timeline. Source candidates/conflicts and full citations, provisional relatives, every media privacy/rights/AI-use control, document readers/copy/download/legacy routes, full story prose/review/published links, research checks/tasks and private intake stay reachable. Section changes preserve unfinished intake. Read-only synthetic mutation guards are explicit and are not proof of backend operation. Native anchors, keyboard selection, fragments/reload, no-capture CTA/gates and320px reachability have browser probes in check-record.mjs.
+
+
+## Place / Story record contract
+
+Detailed field/action mapping is in record-preservation.md. Place keeps canonical identity/type, derived event span, all linked people, events/descriptions, source title/type, full context content/source counts, context intake/category claims/source selection/synthesis/privacy/review/AI-use and same save endpoint, complete dated log and media titles/types. Story keeps every field and mutating contract in its editor, status/preview/publish/unpublish controls, assignment and second approval, all gate/check/warning/provenance/coverage/evidence modules, full context/category/claim/confidence/ref/synthesis, relationships/events/places/memories, and full returned history/snapshots/filter kinds. Both keep original server owner reads and failure/not-found paths. New counted tabs/pinned All/phone Contents explain the intentional one-level navigation; drafts persist after first visit. No read/write boundary or publication enforcement changed. Populated, empty Place and unlinked Story fixtures exercise only presentation; actual backend limits and authentication acceptance remain separate.
+
+Probes for this named capture tranche are in record-shots.json and check-place-story-records.mjs; the global shots.json retains earlier page-family probes. Reconstructed comparisons use original JSX under current shared runtime, labelled as such.
+
+## Audit instruments · 2026-11-05
+
+Preserve all six totals (formerly four composite cards), five gaps, five workflow distributions with original Operations links, Operations/Places actions, and eight priority people with source/context/workflow/readiness. New behind-the-number lists use actual16 predicates, real totals and50-row pages. Open as a view stays on Audit; Save view retains only owner-keyed metadata with existing collection controls. Empty/error/unknown, zero-count and late-response states have direct checks. No dated trend or AI attribution is fabricated. See audit-preservation.md, audit-shots.json and audit-{api-}acceptance.json; all fixtures invented, no backend acceptance.
+
+## Settings matrices / key ledgers · 2026-11-05
+
+Four original routes retain every existing field, operation, warning and boundary; settings-preservation.md carries the full map. AI overview uses all7 abilities and all6 grant states, direct named narrow/end-date/revoke, native in-place complete editors and exact shared grant defaults. Required named revoke confirmation adds no authority. Provider controls retain legacy storage/defaults/models/costs/toggles and all Admin warnings; honest copy and AWF-0073 separate verified integration gaps. Data ways-out is informational with existing links, no invented export/share command. Developer/operator ledgers retain every preset/raw scope, one-time secret, example, current-vault row, status and operation; suspend/revoke confirmations and failed-refresh retry preserve acknowledged state. Server operator gate and backend endpoints stay intact.
+
+17 intercepted client checks verify exact bodies, replacement consent IDs, narrowing/expiry, cancel/retry, storage/model flags, key secret/copy failure, status acknowledgement/refresh retry, operator rows and1440/1280/390/320 fit.11 existing Audit regression groups pass after the shared44px close target/header spacing; every16 metric drawer and nested Save dialog remain usable. All API/provider requests are invented/intercepted; no backend/auth/production acceptance.44 themed Settings captures plus one invented secret state and8 reconstructed originals retained. The initial dark-label/light-theme capture attempt remains separately excluded. Independent exact-head review and whole-page acceptance remain open.
