@@ -198,3 +198,23 @@ export const exportPage = action({
       cursor: args.cursor,
     }),
 });
+
+
+const ARCHIVE_TABLES = ["persons", "relationships", "events", "sources", "places", "topics", "stories", "researchTasks", "researchLog"] as const;
+async function readArchive(ctx: QueryCtx, vaultOwnerId: string) {
+  const rows = await Promise.all(ARCHIVE_TABLES.map(async table => {
+    const records = await ctx.db.query(table).withIndex("by_owner", q => q.eq("vaultOwnerId", vaultOwnerId)).filter(q => q.neq(q.field("archivedAt"), undefined)).take(100);
+    return records.map(row => ({ id: String(row._id), table, archivedAt: row.archivedAt!, archivedBy: row.archivedBy ?? "unknown",
+      updatedAt: row.updatedAt, title: "name" in row && typeof row.name === "object" ? [row.name.given, row.name.surname].filter(Boolean).join(" ") : "title" in row ? row.title : table }));
+  }));
+  return rows.flat().sort((a,b) => b.archivedAt - a.archivedAt);
+}
+export const getArchiveInternal = internalQuery({ args: { vaultOwnerId: v.string() }, handler: async (ctx, args) => readArchive(ctx, args.vaultOwnerId) });
+export const getArchive = action({
+  args: { vaultOwnerId: v.string() },
+  handler: async (ctx, args): Promise<Awaited<ReturnType<typeof readArchive>>> => {
+    const decision = await authorizeTenantAction(ctx, "yourData.getArchive", args.vaultOwnerId, entry => ctx.runMutation(internal.trustBoundary.recordShadowDenial, entry));
+    if (!decision.allowed) throw new Error("Archive not found");
+    return ctx.runQuery(internal.yourData.getArchiveInternal, { vaultOwnerId: decision.owner });
+  },
+});

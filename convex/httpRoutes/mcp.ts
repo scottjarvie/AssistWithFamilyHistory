@@ -1,3 +1,5 @@
+import { AI_ACCESS_INSTRUCTIONS } from "../../lib/mcp/accessCopy";
+import { FAMILY_HISTORY_CONTROL_TOOLS } from "../../lib/mcp/catalog";
 /* eslint-disable @typescript-eslint/no-explicit-any -- Generated Convex references and SDK callbacks cross a runtime-validated MCP boundary. */
 import type { HttpRouter } from "convex/server";
 import { currentMediaForExport } from "../../lib/media/currentMediaForExport";
@@ -13,7 +15,6 @@ import {
 } from "../../lib/mcp/contract";
 import { FAMILY_HISTORY_SCOPES, findTool } from "../../lib/mcp/catalog";
 import {
-  CONNECTION_SETTINGS_URL,
   decideToolAccess,
   permittedTools,
   queueScopesForGrant,
@@ -651,9 +652,9 @@ export function createFamilyHistoryServer(
   const grant = resolution.state === "active" ? resolution.grant : null;
   const grantId = grant?.grantId;
 
-  const instructions = grant
-    ? `Call family_history_get_brief first. Search, then hydrate a stable ID before editing. For a source that touches several people at once — a census page, a family group sheet — use family_history_save_records: one call, per-item results. Use family_history_save_complete_result when the pass must be all-or-nothing. Never publish, delete, merge identities, or invent owner/workspace IDs. This connection is approved for: ${effectiveScopes(grant).join(", ")}. Tools available to it: ${permitted.map((tool) => tool.name).join(", ")}.`
-    : `This AI connection has not been approved for Assist With Family History yet. Signing in proved who the person is; it did not decide what this connection may do. Ask the person to open ${CONNECTION_SETTINGS_URL}, choose which parts of their research this connection may use, and approve it. No Family History tools are available until they do.`;
+  const identity = { subject: principal.subject, issuer: principal.issuer, clientId: principal.clientId };
+  const connection = { state: resolution.state, changedAt: "at" in resolution ? resolution.at : null, endsAt: grant?.expiresAt };
+  const instructions = `${AI_ACCESS_INSTRUCTIONS} Actual connection: ${connection.state}${connection.changedAt ? `; changed ${new Date(connection.changedAt).toISOString()}` : ""}; end date ${connection.endsAt ? new Date(connection.endsAt).toISOString() : "none"}. Call family_history_connection for current details. Start research with family_history_get_brief, search, then hydrate stable IDs before editing.`;
 
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, {
     instructions,
@@ -744,8 +745,31 @@ export function createFamilyHistoryServer(
     }
   };
 
+  for (const tool of FAMILY_HISTORY_CONTROL_TOOLS) {
+    const isRead = tool.name === "family_history_connection";
+    server.registerTool(tool.name, { title: tool.title, description: tool.humanSummary,
+      inputSchema: isRead ? z.object({}).strict() : z.object({
+        action: z.enum(["limit", "pause", "revoke"]), revision: z.number().int().nonnegative(), opId: z.string().min(1).max(160),
+        removeScopes: z.array(z.string()).optional(), endsAt: z.number().optional(), reason: z.string().max(300).optional(),
+      }).strict(), annotations: { readOnlyHint: isRead, destructiveHint: false, idempotentHint: true },
+    }, (async (input: Record<string, unknown>) => {
+      try {
+        const result = isRead ? await actionCtx.runQuery(grants.describeCallingConnection, identity)
+          : await actionCtx.runMutation(grants.limitCallingConnection, { ...identity, ...input });
+        try { await actionCtx.runMutation(grants.touchCallingConnection, { ...identity, toolName: tool.name }); }
+        catch { /* Usage bookkeeping cannot change a control result. */ }
+        return toolResult(result);
+      } catch (error) { return toolError(error); }
+    }) as any);
+  }
+
   const readOnly = { readOnlyHint: true, destructiveHint: false, idempotentHint: true };
   const writeSafe = { readOnlyHint: false, destructiveHint: false, idempotentHint: true };
+
+  registerTool("family_history_archive_record", {
+    inputSchema: z.object({ operationId, kind: z.enum(["person", "relationship", "event", "source", "place", "topic", "story", "research_task", "research_finding"]), id, expectedUpdatedAt: z.number(), action: z.enum(["archive", "restore"]) }).strict(),
+    annotations: writeSafe,
+  }, (input) => write("family_history_archive_record", mcp.archiveRecord, input));
 
   registerTool("family_history_get_brief", {
     inputSchema: z.object({}).strict(),
@@ -1112,36 +1136,9 @@ function grantRefusalResponse(body: unknown, resolution: GrantResolution): Respo
   const message = body as { id?: unknown; method?: unknown; params?: { name?: unknown } };
   if (message.id === undefined || message.id === null) return null;
 
-  // Discovery with nothing permitted is an empty catalog, not a protocol error.
-  // The MCP server would otherwise refuse tools/list outright because it has no
-  // tools registered, which reads as a broken server rather than an unapproved
-  // connection. The `instructions` returned at initialize say what to do.
-  if (message.method === "tools/list" && permittedTools(resolution, Date.now()).length === 0) {
-    return Response.json(
-      // `resultType` is required by protocol revision 2026-07-28 and the MCP
-      // server is not in this path to stamp it. Without it a conforming client
-      // rejects the empty catalog as a malformed response, which is the one
-      // thing this branch exists to avoid.
-      {
-        jsonrpc: "2.0",
-        id: message.id,
-        result: {
-          resultType: "complete",
-          // Never cached: the person may approve this connection a second from
-          // now, and a cached empty catalog would keep telling their AI it has
-          // no tools long after they said yes. Private because the answer is
-          // one person's grant, not a property of the server.
-          ttlMs: 0,
-          cacheScope: "private",
-          tools: [],
-        },
-      },
-      { headers: { "Cache-Control": "no-store" } },
-    );
-  }
-
   if (message.method !== "tools/call") return null;
   const name = typeof message.params?.name === "string" ? message.params.name : "";
+  if (FAMILY_HISTORY_CONTROL_TOOLS.some(tool => tool.name === name)) return null;
   const decision = decideToolAccess({ toolName: name, resolution, now: Date.now(), input: undefined });
   if (decision.allowed) return null;
   return Response.json(

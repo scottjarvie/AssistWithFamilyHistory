@@ -10,6 +10,8 @@
  * immediate. An already-issued Clerk access token stops mattering the moment
  * the grant leaves `active` — we never wait for the JWT to expire.
  */
+import { hashMcpInput } from "../lib/mcp/contract";
+import { AI_SETTINGS_URL } from "../lib/mcp/accessCopy";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
@@ -23,6 +25,8 @@ import { authorizeTenantAction, authorizeTenantMutation, type TrustBoundaryShado
 import { internal } from "./_generated/api";
 import {
   FAMILY_HISTORY_SCOPES,
+  FAMILY_HISTORY_TOOLS,
+  FAMILY_HISTORY_CONTROL_TOOLS,
   FAMILY_HISTORY_SCOPE_INFO,
   NEVER_EXPOSED,
   NEVER_PERMITTED,
@@ -37,7 +41,7 @@ import {
   type ResolvedGrant,
 } from "../lib/mcp/authorize";
 
-import { effectiveScopes, effectiveScopeChoice, effectiveExpiry, hasAutomaticLegacyExpiry, chosenExpiry } from "../lib/mcp/grantDefaults";
+import { untouchedAutomaticGrant, effectiveWithheldScopes, effectiveScopes, effectiveScopeChoice, effectiveExpiry, hasAutomaticLegacyExpiry, chosenExpiry } from "../lib/mcp/grantDefaults";
 
 /** Skip the last-used write when the same tool ran again inside this window. */
 const USE_TOUCH_THROTTLE_MS = 15_000;
@@ -69,6 +73,8 @@ function toResolvedGrant(row: Doc<"mcpGrants">): ResolvedGrant {
     issuer: row.issuer,
     scopes: effectiveScopes(row),
     scopeChoice: effectiveScopeChoice(row),
+    withheldScopes: effectiveWithheldScopes(row),
+    pausedAt: row.pausedAt,
     boundary: {
       kind: row.boundary.kind,
       personIds: row.boundary.personIds,
@@ -206,7 +212,7 @@ function governingApproval(rows: Doc<"mcpGrants">[]): Doc<"mcpGrants"> | undefin
 
 /** Whether a governing approval authorizes right now. */
 function authorizesNow(row: Doc<"mcpGrants">, now: number): boolean {
-  return row.status === "active" ? !isGrantExpired(row, now) : isUsableExpired(row);
+  return !row.pausedAt && (row.status === "active" ? !isGrantExpired(row, now) : isUsableExpired(row));
 }
 
 /** A new explicit approval must land strictly after every refusal it supersedes. */
@@ -233,10 +239,11 @@ export const resolveForRequest = internalMutation({
   handler: async (ctx, args): Promise<GrantResolution> => {
     const owner = args.subject.trim();
     const clientId = args.clientId.trim();
-    if (!owner || !clientId || !args.issuer.trim()) return { state: "absent" };
+    if (!owner || !clientId || !args.issuer.trim()) throw new Error("Verified owner, issuer and client id are required");
     const now = Date.now();
 
-    const rows = await grantsForClient(ctx, owner, clientId, args.issuer);
+    const aliased = await resolveClientAlias(ctx, owner, clientId, args.issuer, args.observedClientName);
+    const rows = await grantsForClient(ctx, owner, aliased?.clientId ?? clientId, args.issuer);
 
     // Latest event wins. A person's own "no" stands over every approval at or
     // before it — including older active duplicates left by legacy one-row
@@ -248,7 +255,14 @@ export const resolveForRequest = internalMutation({
     // take over from a newer one, and scopes are never combined.
     const governing = governingApproval(rows);
     if (governing) {
-      return authorizesNow(governing, now) ? { state: "active", grant: toResolvedGrant(governing) } : { state: "expired" };
+      if (untouchedAutomaticGrant(governing)) {
+        await ctx.db.patch(governing._id, { scopeChoice: "full", withheldScopes: [], expiryChoice: "none", expiresAt: undefined,
+          revision: (governing.revision ?? 0) + 1, updatedAt: now });
+        const after = (await ctx.db.get(governing._id))!;
+        await appendHistory(ctx, after, governing, "system", "Updated an untouched automatic connection to full access with no end date.", `default-upgrade:${governing._id}`, "default-upgrade");
+        return after.pausedAt ? { state: "paused", at: after.pausedAt } : { state: "active", grant: toResolvedGrant(after) };
+      }
+      return governing.pausedAt ? { state: "paused", at: governing.pausedAt } : authorizesNow(governing, now) ? { state: "active", grant: toResolvedGrant(governing) } : { state: "expired", at: effectiveExpiry(governing) };
     }
 
     // A denied or turned-off connection is never reopened by signing in
@@ -257,7 +271,7 @@ export const resolveForRequest = internalMutation({
       // A new attempt reveals the refusal in settings for explicit reapproval.
       // It never changes status, scopes, boundary, expiry, or the consent receipt.
       if (closed.hiddenAt !== undefined) await ctx.db.patch(closed._id, { hiddenAt: undefined });
-      return { state: closed.status as "denied" | "revoked" };
+      return { state: closed.status as "denied" | "revoked", at: refusalTime(closed) };
     }
 
     // Signing in grants every current and future tool, with no end date.
@@ -266,7 +280,7 @@ export const resolveForRequest = internalMutation({
     // No refusal exists past this point, so nothing below can reopen one.
     // No approval exists either (expired rows were handled as governing above).
     const previous = rows.filter((row) => row.status === "pending").sort(newestApprovalFirst)[0];
-    if (previous && (previous.scopeChoice === "chosen" || previous.expiryChoice === "chosen" || previous.scopes.length > 0)) return { state: "pending" };
+    if (previous && (previous.scopeChoice === "chosen" || previous.expiryChoice === "chosen" || previous.scopes.length > 0)) return { state: "pending", at: previous.requestedAt };
     const scopes = [...FAMILY_HISTORY_SCOPES];
     const boundary: Doc<"mcpGrants">["boundary"] = { kind: "whole_workspace" };
     const fields = {
@@ -276,6 +290,8 @@ export const resolveForRequest = internalMutation({
       consentedAt: now,
       issuedAt: now,
       expiresAt: undefined,
+      withheldScopes: [],
+      revision: 0,
       scopeChoice: "full" as const,
       expiryChoice: "none" as const,
       updatedAt: now,
@@ -292,6 +308,7 @@ export const resolveForRequest = internalMutation({
     if (previous) {
       await ctx.db.patch(previous._id, fields);
       const row = (await ctx.db.get(previous._id))!;
+      await appendHistory(ctx, row, previous, "system", "Connected with full access and no end date.", `connect:${row._id}`, "connect");
       return { state: "active", grant: toResolvedGrant(row) };
     }
     const id = await ctx.db.insert("mcpGrants", {
@@ -306,7 +323,9 @@ export const resolveForRequest = internalMutation({
       useCount: 0,
       ...fields,
     });
-    return { state: "active", grant: toResolvedGrant((await ctx.db.get(id))!) };
+    const created = (await ctx.db.get(id))!;
+    await appendHistory(ctx, created, null, "system", "Connected with full access and no end date.", `connect:${id}`, "connect");
+    return { state: "active", grant: toResolvedGrant(created) };
   },
 });
 
@@ -389,7 +408,7 @@ export async function assertGrantPermits(
     machineError(
       "GRANT_REQUIRED",
       "This AI connection has not been approved for Assist With Family History yet.",
-      "Ask the person to approve the connection at https://assistwithfamilyhistory.com/app/settings/ai, then retry.",
+      "Ask the person to approve the connection at https://assistwithfamilyhistory.com/settings/ai, then retry.",
     );
   }
   const normalized = ctx.db.normalizeId("mcpGrants", params.grantId);
@@ -398,9 +417,11 @@ export async function assertGrantPermits(
     machineError(
       "GRANT_REQUIRED",
       "This AI connection has not been approved for Assist With Family History yet.",
-      "Ask the person to approve the connection at https://assistwithfamilyhistory.com/app/settings/ai, then retry.",
+      "Ask the person to approve the connection at https://assistwithfamilyhistory.com/settings/ai, then retry.",
     );
   }
+  const alias = await ctx.db.query("mcpClientAliases").withIndex("by_owner_client_issuer", q => q.eq("vaultOwnerId", row.vaultOwnerId).eq("clientId", row.clientId).eq("issuer", row.issuer)).unique();
+  if (alias && alias.grantId !== row._id) machineError("GRANT_REVOKED", "This earlier connection has been superseded.", `Only the person can restore access at ${AI_SETTINGS_URL}.`);
   // The ID must be the approval request resolution would choose. A later
   // refusal closes it even if its own row still says active (legacy one-row
   // revocation or expired-row removal); a newer ended approval means expired;
@@ -417,6 +438,7 @@ export async function assertGrantPermits(
         ? { state: authorizesNow(governing, Date.now()) ? "absent" : "expired" }
         : { state: "active", grant: toResolvedGrant(row) };
   }
+  if (row.pausedAt) resolution = { state: "paused", at: row.pausedAt };
   const decision = decideToolAccess({
     toolName: params.toolName,
     resolution,
@@ -468,12 +490,14 @@ function storedConnectionRow(row: Doc<"mcpGrants">, now: number) {
     clientProvenance: row.clientProvenance,
     clientMetadataUrl: row.clientMetadataUrl ?? null,
     scopes: effectiveScopes(row),
-    scopeChoice: effectiveScopeChoice(row),
+    scopeChoice: effectiveWithheldScopes(row).length ? "chosen" as const : "full" as const,
+    withheldScopes: effectiveWithheldScopes(row), revision: row.revision ?? 0,
+    pausedAt: row.pausedAt ?? null, limitedBy: row.limitedBy ?? null, limitedAt: row.limitedAt ?? null,
     boundary: row.boundary,
     // Expiry is decided in code at read time, so a row that has aged out
     // reads as expired even before anything rewrites its status.
     status: (row.status === "active" || isUsableExpired(row))
-      ? (isGrantExpired(row, now) ? "expired" : "active") : row.status,
+      ? (row.pausedAt ? "paused" : isGrantExpired(row, now) ? "expired" : "active") : row.status,
     requestedAt: row.requestedAt,
     consentedAt: row.consentedAt ?? null,
     issuedAt: row.issuedAt ?? null,
@@ -524,7 +548,10 @@ export async function readConnections(ctx: QueryCtx, vaultOwnerId: string) {
     scopeInfo: FAMILY_HISTORY_SCOPE_INFO,
     neverExposed: NEVER_EXPOSED,
     neverPermitted: NEVER_PERMITTED,
-    connections: rows.map((row) => connectionRow(row, now, refusedBy.get(row._id))),
+    connections: await Promise.all(rows.map(async (row) => ({ ...connectionRow(row, now, refusedBy.get(row._id)),
+      history: (await ctx.db.query("mcpGrantHistory").withIndex("by_grant", q => q.eq("grantId", row._id)).order("desc").take(50))
+        .map(h => ({ actor: h.actor, at: h.at, sentence: h.sentence, revision: h.revision })),
+    }))),
   };
 }
 
@@ -643,8 +670,10 @@ function normalizeBoundary(boundary: Doc<"mcpGrants">["boundary"]): Doc<"mcpGran
   };
 }
 
+/** Compatibility entry points also require a revision and replay id. */
+const versionArgs = { revision: v.optional(v.number()), opId: v.optional(v.string()) };
 export const approveGrant = mutation({
-  args: {
+  args: { ...versionArgs,
     vaultOwnerId: v.string(),
     grantId: v.id("mcpGrants"),
     label: v.string(),
@@ -653,6 +682,9 @@ export const approveGrant = mutation({
     expiresInDays: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const guard = await authorizeTenantMutation(ctx, "mcpGrants.legacyControl", args.vaultOwnerId);
+    if (!guard.allowed) throw new Error("Connection not found");
+    return revisionedLegacyChange(ctx, args, async () => {
     const decision = await authorizeTenantMutation(ctx, "mcpGrants.approveGrant", args.vaultOwnerId);
     if (!decision.allowed) throw new Error("Connection not found");
     const row = await ownedGrant(ctx, decision.owner, args.grantId);
@@ -715,13 +747,17 @@ export const approveGrant = mutation({
       await ctx.db.patch(row._id, { ...fields, hiddenAt: undefined });
     }
     return { id, status: "active" as const, scopes, boundary, expiresAt: expiresAt ?? null, scopeChoice, connection: connectionRow((await ctx.db.get(id))!, now) };
+    });
   },
 });
 
 /** Explicit settings choice; independent of scopes and record boundary. */
 export const updateGrantExpiry = mutation({
-  args: { vaultOwnerId: v.string(), grantId: v.id("mcpGrants"), expiresInDays: v.optional(v.number()) },
+  args: { ...versionArgs, vaultOwnerId: v.string(), grantId: v.id("mcpGrants"), expiresInDays: v.optional(v.number()) },
   handler: async (ctx, args) => {
+    const guard = await authorizeTenantMutation(ctx, "mcpGrants.legacyControl", args.vaultOwnerId);
+    if (!guard.allowed) throw new Error("Connection not found");
+    return revisionedLegacyChange(ctx, args, async () => {
     const decision = await authorizeTenantMutation(ctx, "mcpGrants.updateGrantExpiry", args.vaultOwnerId);
     if (!decision.allowed) throw new Error("Connection not found");
     const row = await ownedGrant(ctx, decision.owner, args.grantId);
@@ -735,12 +771,16 @@ export const updateGrantExpiry = mutation({
     const expiresAt = chosenExpiry(args.expiresInDays, now);
     await ctx.db.patch(row._id, { expiresAt, expiryChoice: expiresAt === undefined ? "none" : "chosen", status: "active", updatedAt: now });
     return { id: row._id, status: "active" as const, expiresAt: expiresAt ?? null };
+    });
   },
 });
 
 export const denyGrant = mutation({
-  args: { vaultOwnerId: v.string(), grantId: v.id("mcpGrants"), reason: v.optional(v.string()) },
+  args: { ...versionArgs, vaultOwnerId: v.string(), grantId: v.id("mcpGrants"), reason: v.optional(v.string()) },
   handler: async (ctx, args) => {
+    const guard = await authorizeTenantMutation(ctx, "mcpGrants.legacyControl", args.vaultOwnerId);
+    if (!guard.allowed) throw new Error("Connection not found");
+    return revisionedLegacyChange(ctx, args, async () => {
     const decision = await authorizeTenantMutation(ctx, "mcpGrants.denyGrant", args.vaultOwnerId);
     if (!decision.allowed) throw new Error("Connection not found");
     const row = await ownedGrant(ctx, decision.owner, args.grantId);
@@ -753,12 +793,16 @@ export const denyGrant = mutation({
       updatedAt: now,
     });
     return { id: row._id, status: "denied" as const };
+    });
   },
 });
 
 export const reduceGrantScopes = mutation({
-  args: { vaultOwnerId: v.string(), grantId: v.id("mcpGrants"), scopes: v.array(v.string()) },
+  args: { ...versionArgs, vaultOwnerId: v.string(), grantId: v.id("mcpGrants"), scopes: v.array(v.string()) },
   handler: async (ctx, args) => {
+    const guard = await authorizeTenantMutation(ctx, "mcpGrants.legacyControl", args.vaultOwnerId);
+    if (!guard.allowed) throw new Error("Connection not found");
+    return revisionedLegacyChange(ctx, args, async () => {
     const decision = await authorizeTenantMutation(ctx, "mcpGrants.reduceGrantScopes", args.vaultOwnerId);
     if (!decision.allowed) throw new Error("Connection not found");
     const row = await ownedGrant(ctx, decision.owner, args.grantId);
@@ -776,12 +820,16 @@ export const reduceGrantScopes = mutation({
     const scopeChoice = FAMILY_HISTORY_SCOPES.every((scope) => next.includes(scope)) ? "full" as const : "chosen" as const;
     await ctx.db.patch(row._id, { scopes: next, scopeChoice, updatedAt: now });
     return { id: row._id, scopes: next, scopeChoice };
+    });
   },
 });
 
 export const revokeGrant = mutation({
-  args: { vaultOwnerId: v.string(), grantId: v.id("mcpGrants"), reason: v.optional(v.string()) },
+  args: { ...versionArgs, vaultOwnerId: v.string(), grantId: v.id("mcpGrants"), reason: v.optional(v.string()) },
   handler: async (ctx, args) => {
+    const guard = await authorizeTenantMutation(ctx, "mcpGrants.legacyControl", args.vaultOwnerId);
+    if (!guard.allowed) throw new Error("Connection not found");
+    return revisionedLegacyChange(ctx, args, async () => {
     const decision = await authorizeTenantMutation(ctx, "mcpGrants.revokeGrant", args.vaultOwnerId);
     if (!decision.allowed) throw new Error("Connection not found");
     const row = await ownedGrant(ctx, decision.owner, args.grantId);
@@ -812,12 +860,16 @@ export const revokeGrant = mutation({
       });
     }
     return { id: row._id, status: "revoked" as const };
+    });
   },
 });
 
 export const removeGrant = mutation({
-  args: { vaultOwnerId: v.string(), grantId: v.id("mcpGrants") },
+  args: { ...versionArgs, vaultOwnerId: v.string(), grantId: v.id("mcpGrants") },
   handler: async (ctx, args) => {
+    const guard = await authorizeTenantMutation(ctx, "mcpGrants.legacyControl", args.vaultOwnerId);
+    if (!guard.allowed) throw new Error("Connection not found");
+    return revisionedLegacyChange(ctx, args, async () => {
     const decision = await authorizeTenantMutation(ctx, "mcpGrants.removeGrant", args.vaultOwnerId);
     if (!decision.allowed) throw new Error("Connection not found");
     const row = await ownedGrant(ctx, decision.owner, args.grantId);
@@ -843,10 +895,266 @@ export const removeGrant = mutation({
       }),
     });
     return { id: row._id, removed: true as const };
+    });
   },
 });
 
 /** Small helper the transport uses to name the tool in an activity row. */
 export function activityToolLabel(name: string): string {
   return findTool(name)?.name ?? "unknown_tool";
+}
+
+/* AWL-0015: one revisioned control path for person and connection. */
+
+function safeSentence(value: string): string {
+  return value.replace(/bearer\s+\S+|\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)?|\b(?:sk|pk|api[_-]?key|token|secret)[_:= -]+[A-Za-z0-9_./+-]{8,}/gi, "[redacted]").slice(0, 300);
+}
+function accessSnapshot(row: Doc<"mcpGrants">) {
+  return { status: row.status, withheldScopes: effectiveWithheldScopes(row), boundary: row.boundary,
+    endsAt: effectiveExpiry(row) ?? null, pausedAt: row.pausedAt ?? null, revision: row.revision ?? 0 };
+}
+async function appendHistory(ctx: MutationCtx, after: Doc<"mcpGrants">, before: Doc<"mcpGrants"> | null,
+  actor: "person" | "ai" | "system", sentence: string, opId: string, request: string) {
+  await ctx.db.insert("mcpGrantHistory", { vaultOwnerId: after.vaultOwnerId, grantId: after._id, actor,
+    before: JSON.stringify(before ? accessSnapshot(before) : null), after: JSON.stringify(accessSnapshot(after)),
+    sentence: safeSentence(sentence), at: Date.now(), opId, request, revision: after.revision ?? 0 });
+}
+
+/** Matching a reported name may ONLY reduce authority. Never use it to restore. */
+async function resolveClientAlias(ctx: MutationCtx, owner: string, clientId: string, issuer: string, name?: string) {
+  const alias = await ctx.db.query("mcpClientAliases").withIndex("by_owner_client_issuer", q => q.eq("vaultOwnerId", owner).eq("clientId", clientId).eq("issuer", issuer)).unique();
+  if (alias) return await ctx.db.get(alias.grantId);
+  const existing = await grantsForClient(ctx, owner, clientId, issuer);
+  if (existing.length) return null;
+  const key = name?.trim().replace(/\s+/g, " ").toLowerCase();
+  if (!key) return null;
+  // Bounded and fail closed: a history truncation must never mint full access.
+  const all = await ctx.db.query("mcpGrants").withIndex("by_owner", q => q.eq("vaultOwnerId", owner)).take(1001);
+  if (all.length > 1000) throw new Error(`Connection history needs person review at ${AI_SETTINGS_URL}`);
+  const matches = all.filter(r => r.issuer === issuer && r.observedClientName?.trim().replace(/\s+/g, " ").toLowerCase() === key);
+  const clients = [...new Set(matches.map(r => r.clientId))];
+  const candidates: Doc<"mcpGrants">[] = [];
+  for (const id of clients) {
+    const linked = await ctx.db.query("mcpClientAliases").withIndex("by_owner_client_issuer", q => q.eq("vaultOwnerId", owner).eq("clientId", id).eq("issuer", issuer)).unique();
+    const history = await grantsForClient(ctx, owner, id, issuer);
+    const row = linked ? await ctx.db.get(linked.grantId) : governingApproval(history) ?? latestRefusal(history) ?? history.sort(newestApprovalFirst)[0];
+    if (row && !candidates.some(r => r._id === row._id)) candidates.push(row);
+  }
+  if (!candidates.length) return null;
+  const anchor = candidates[0];
+  const withheld = new Set(candidates.flatMap(effectiveWithheldScopes));
+  let boundary = anchor.boundary;
+  for (const row of candidates.slice(1)) {
+    if (boundary.kind === "whole_workspace") boundary = row.boundary;
+    else if (row.boundary.kind !== "whole_workspace" && boundary.kind !== row.boundary.kind) {
+      // Incompatible record boundaries intersect at no domain authority.
+      for (const scope of FAMILY_HISTORY_SCOPES) withheld.add(scope);
+    } else if (boundary.kind === "selected_people" && row.boundary.kind === "selected_people") {
+      const personIds = (boundary.personIds ?? []).filter(id => row.boundary.personIds?.includes(id));
+      if (!personIds.length) for (const scope of FAMILY_HISTORY_SCOPES.filter(s => !s.includes(":queue:"))) withheld.add(scope);
+      boundary = { ...boundary, personIds };
+    }
+    const a = boundary.queueItemIds ?? [], b = row.boundary.queueItemIds ?? [];
+    if (a.length || b.length) {
+      const ids = !a.length ? b : !b.length ? a : a.filter(id => b.includes(id));
+      if (!ids.length) for (const scope of FAMILY_HISTORY_SCOPES.filter(s => s.includes(":queue:"))) withheld.add(scope);
+      boundary = { ...boundary, queueItemIds: ids };
+    }
+  }
+  const ends = candidates.map(effectiveExpiry).filter((x): x is number => x !== undefined);
+  const paused = candidates.map(r => r.pausedAt).filter((x): x is number => x !== undefined);
+  const refusal = candidates.find(r => r.status === "revoked" || r.status === "denied");
+  const now = Date.now();
+  await ctx.db.patch(anchor._id, { withheldScopes: [...withheld], scopes: FAMILY_HISTORY_SCOPES.filter(s => !withheld.has(s)),
+    scopeChoice: withheld.size ? "chosen" : "full", boundary,
+    expiresAt: ends.length ? Math.min(...ends) : undefined, expiryChoice: ends.length ? "chosen" : "none",
+    pausedAt: paused.length ? Math.min(...paused) : undefined,
+    status: refusal ? "revoked" : anchor.status, revokedAt: refusal ? now : anchor.revokedAt,
+    revision: (anchor.revision ?? 0) + 1, updatedAt: now });
+  for (const id of new Set([...clients, clientId, ...candidates.map(r => r.clientId)])) {
+    const old = await ctx.db.query("mcpClientAliases").withIndex("by_owner_client_issuer", q => q.eq("vaultOwnerId", owner).eq("clientId", id).eq("issuer", issuer)).unique();
+    if (old) await ctx.db.patch(old._id, { grantId: anchor._id });
+    else await ctx.db.insert("mcpClientAliases", { vaultOwnerId: owner, issuer, clientId: id, grantId: anchor._id });
+  }
+  for (const row of candidates.slice(1)) await ctx.db.patch(row._id, { hiddenAt: now });
+  const after = (await ctx.db.get(anchor._id))!;
+  await appendHistory(ctx, after, anchor, "system", "Reconnected client inherited the narrowest earlier limits.", `alias:${clientId}`, "alias");
+  return after;
+}
+
+const callingIdentityArgs = { subject: v.string(), issuer: v.string(), clientId: v.string() };
+async function callingGrant(ctx: QueryCtx | MutationCtx, args: { subject: string; issuer: string; clientId: string }) {
+  if (!args.subject.trim() || !args.issuer.trim() || !args.clientId.trim()) throw new Error("Verified connection identity required");
+  const alias = await ctx.db.query("mcpClientAliases").withIndex("by_owner_client_issuer", q => q.eq("vaultOwnerId", args.subject).eq("clientId", args.clientId).eq("issuer", args.issuer)).unique();
+  if (alias) return await ctx.db.get(alias.grantId);
+  const rows = await grantsForClient(ctx, args.subject, args.clientId, args.issuer);
+  return governingApproval(rows) ?? latestRefusal(rows) ?? rows.sort(newestApprovalFirst)[0] ?? null;
+}
+function describeConnection(row: Doc<"mcpGrants"> | null) {
+  const state = !row ? "absent" : row.status === "revoked" || row.status === "denied" || row.status === "pending" ? row.status
+    : row.pausedAt ? "paused" : isGrantExpired(row, Date.now()) ? "expired" : "active";
+  const scopes = row ? effectiveScopes(row) : [];
+  const heldBack = FAMILY_HISTORY_TOOLS.filter(t => state !== "active" || !scopes.includes(t.requiredScope) || (row?.boundary.kind === "queue_only" && !t.requiredScope.includes(":queue:")))
+    .map(t => ({ tool: t.name, missingPower: t.requiredScope, reason: state === "active" ? "Power removed or outside the record boundary" : `Connection ${state}`, restore: `Only the person can restore access at ${AI_SETTINGS_URL}` }));
+  return { state, revision: row?.revision ?? 0, powers: scopes, boundary: row?.boundary ?? null, withheldScopes: row ? effectiveWithheldScopes(row) : [],
+    tools: [...FAMILY_HISTORY_CONTROL_TOOLS.map(t => t.name), ...FAMILY_HISTORY_TOOLS.filter(t => !heldBack.some(h => h.tool === t.name)).map(t => t.name)],
+    heldBack, endsAt: row ? effectiveExpiry(row) ?? null : null, pausedAt: row?.pausedAt ?? null,
+    changedAt: !row ? null : state === "revoked" || state === "denied" ? row.revokedAt ?? row.updatedAt : state === "paused" ? row.pausedAt : state === "expired" ? effectiveExpiry(row) : row.updatedAt,
+    reason: !row ? "No connection record" : state === "revoked" || state === "denied" ? row.revokedReason ?? `Connection ${state}` : state === "paused" ? "Connection paused" : state === "expired" ? "The chosen end date has passed" : state === "pending" ? "An earlier connection has saved choices awaiting review" : "Connection active",
+    settingsUrl: AI_SETTINGS_URL };
+}
+export const describeCallingConnection = internalQuery({
+  args: callingIdentityArgs,
+  handler: async (ctx, args) => describeConnection(await callingGrant(ctx, args)),
+});
+
+type Change = { action: string; revision?: number; opId?: string; scopes?: string[]; removeScopes?: string[];
+  endsAt?: number; expiresInDays?: number; reason?: string; label?: string; boundary?: Doc<"mcpGrants">["boundary"] };
+async function changeConnection(ctx: MutationCtx, row: Doc<"mcpGrants">, change: Change, actor: "ai" | "person") {
+  if (!change.opId || change.opId.length > 160 || safeSentence(change.opId) !== change.opId) throw new Error("A non-secret opId of at most 160 characters is required");
+  const request = await hashMcpInput({ actor, ...change });
+  const replay = await ctx.db.query("mcpGrantHistory").withIndex("by_grant_op", q => q.eq("grantId", row._id).eq("opId", change.opId!)).unique();
+  if (replay) {
+    if (replay.request !== request) throw new Error("IDEMPOTENCY_CONFLICT: opId was already used for a different change");
+    return { id: row._id, connection: await connectionWithHistory(ctx, row), ...describeConnection(row), deduplicated: true };
+  }
+  if (!Number.isInteger(change.revision) || change.revision !== (row.revision ?? 0)) throw new Error("STALE_VERSION: read the current connection revision before changing it");
+  const patch: Partial<Doc<"mcpGrants">> = { revision: (row.revision ?? 0) + 1, updatedAt: Date.now(), withheldScopes: effectiveWithheldScopes(row) };
+  const action = change.action;
+  if (actor === "ai" && action !== "limit" && (change.removeScopes?.length || change.endsAt !== undefined)) throw new Error("Use the limit action to remove powers or set an end date before pausing or revoking");
+  if (actor === "ai" && !["limit", "pause", "revoke"].includes(action)) throw new Error(`Only the person can restore access at ${AI_SETTINGS_URL}`);
+  if (actor === "ai" && (change.scopes || change.boundary || change.expiresInDays !== undefined)) throw new Error("AI connection changes can only remove powers and shorten an end date");
+  if (action === "limit" || action === "reduce") {
+    const current = effectiveScopes(row);
+    const removed = change.removeScopes ?? (action === "reduce" ? current.filter(s => !change.scopes?.includes(s)) : []);
+    if (removed.some(s => !FAMILY_HISTORY_SCOPES.includes(s as FamilyHistoryScope))) throw new Error("Unknown power");
+    if (action === "reduce" && change.scopes?.some(s => !current.includes(s as FamilyHistoryScope))) throw new Error("Widening requires the person to restore access on the website");
+    patch.withheldScopes = [...new Set([...effectiveWithheldScopes(row), ...removed])];
+    if (change.endsAt !== undefined) {
+      const oldEnd = effectiveExpiry(row);
+      if (!Number.isFinite(change.endsAt) || change.endsAt <= Date.now() || (oldEnd !== undefined && change.endsAt > oldEnd)) throw new Error("An end date must be in the future and may only be shortened");
+      patch.expiresAt = change.endsAt; patch.expiryChoice = "chosen";
+    }
+    patch.limitedAt = Date.now(); patch.limitedBy = actor;
+  } else if (action === "pause") {
+    patch.pausedAt = row.pausedAt ?? Date.now(); patch.limitedAt = Date.now(); patch.limitedBy = actor;
+  } else if (action === "revoke" || action === "deny") {
+    patch.status = action === "deny" ? "denied" : "revoked";
+    patch.revokedAt = Date.now(); patch.revokedReason = safeSentence(change.reason ?? "Connection turned off.");
+    patch.limitedAt = Date.now(); patch.limitedBy = actor;
+  } else if (action === "resume") {
+    if (row.status === "revoked" || row.status === "denied") throw new Error("Restore the revoked connection first");
+    patch.pausedAt = undefined;
+  } else if (action === "restore") {
+    if (row.status === "revoked" || row.status === "denied") {
+      // Restore exactly the pre-revoke powers, boundary, pause and chosen date.
+      patch.status = "active"; patch.revokedAt = undefined; patch.revokedReason = undefined;
+      patch.consentedAt = explicitApprovalTime(await grantsForClient(ctx, row.vaultOwnerId, row.clientId, row.issuer), Date.now());
+    } else {
+      patch.withheldScopes = []; patch.boundary = { kind: "whole_workspace" };
+      if (!row.pausedAt && effectiveExpiry(row) === undefined) { patch.limitedBy = undefined; patch.limitedAt = undefined; }
+    }
+    patch.hiddenAt = undefined;
+  } else if (action === "expiry") {
+    patch.expiresAt = chosenExpiry(change.expiresInDays, Date.now());
+    patch.expiryChoice = patch.expiresAt === undefined ? "none" : "chosen";
+    if (row.status === "expired") patch.status = "active";
+  } else if (action === "approve") {
+    if (!change.scopes || !change.boundary) throw new Error("Choose powers and a record boundary");
+    patch.withheldScopes = FAMILY_HISTORY_SCOPES.filter(s => !change.scopes!.includes(s));
+    patch.boundary = normalizeBoundary(change.boundary);
+    patch.expiresAt = chosenExpiry(change.expiresInDays, Date.now()); patch.expiryChoice = patch.expiresAt === undefined ? "none" : "chosen";
+    patch.label = trimmed(change.label, 80) ?? row.label;
+    patch.status = "active"; patch.pausedAt = undefined; patch.revokedAt = undefined; patch.hiddenAt = undefined;
+    patch.consentedAt = explicitApprovalTime(await grantsForClient(ctx, row.vaultOwnerId, row.clientId, row.issuer), Date.now());
+  } else if (action === "remove") {
+    if (row.status === "active" && !isGrantExpired(row, Date.now())) throw new Error("Revoke the connection before removing it");
+    patch.hiddenAt = Date.now(); patch.status = "revoked"; patch.revokedAt = row.revokedAt ?? Date.now();
+  } else throw new Error("Unknown connection action");
+  patch.scopes = FAMILY_HISTORY_SCOPES.filter(s => !patch.withheldScopes!.includes(s));
+  patch.scopeChoice = patch.withheldScopes!.length ? "chosen" : "full";
+  // Capture legacy automatic expiry as unlimited before storing a deliberate choice.
+  if (!patch.expiryChoice && effectiveExpiry(row) === undefined) { patch.expiryChoice = "none"; patch.expiresAt = undefined; }
+  await ctx.db.patch(row._id, patch);
+  const after = (await ctx.db.get(row._id))!;
+  await appendHistory(ctx, after, row, actor, `${actor === "ai" ? "Your AI" : "You"} ${({ limit: "narrowed", reduce: "narrowed", pause: "paused", revoke: "revoked", deny: "declined", resume: "resumed", restore: "restored", expiry: "changed the end date for", approve: "approved", remove: "hid" } as Record<string,string>)[action]} the connection.${change.reason ? ` ${change.reason}` : ""}`, change.opId, request);
+  return { id: after._id, connection: await connectionWithHistory(ctx, after), ...describeConnection(after), removed: action === "remove" };
+}
+async function personChange(ctx: MutationCtx, args: Change & { vaultOwnerId: string; grantId: Id<"mcpGrants"> }) {
+  const decision = await authorizeTenantMutation(ctx, "mcpGrants.controlGrant", args.vaultOwnerId);
+  if (!decision.allowed) throw new Error("Connection not found");
+  const identity = await ctx.auth.getUserIdentity();
+  // A delegated OAuth access token is never a website authority token.
+  if (identity?.client_id) throw new Error("Connection restoration requires the signed-in website session");
+  const row = await ownedGrant(ctx, decision.owner, args.grantId);
+  const governing = await callingGrant(ctx, { subject: decision.owner, issuer: row.issuer, clientId: row.clientId });
+  if (governing?._id !== row._id && args.action !== "remove") throw new Error("This approval has been superseded. Reload the connection list.");
+  return changeConnection(ctx, row, args, "person");
+}
+export const controlGrant = mutation({
+  args: { vaultOwnerId: v.string(), grantId: v.id("mcpGrants"), action: v.string(), revision: v.number(), opId: v.string(),
+    scopes: v.optional(v.array(v.string())), removeScopes: v.optional(v.array(v.string())), endsAt: v.optional(v.number()),
+    expiresInDays: v.optional(v.number()), reason: v.optional(v.string()), label: v.optional(v.string()), boundary: v.optional(boundaryValidator) },
+  handler: async (ctx, args) => {
+    const guard = await authorizeTenantMutation(ctx, "mcpGrants.controlGrant", args.vaultOwnerId);
+    if (!guard.allowed) throw new Error("Connection not found");
+    return personChange(ctx, args);
+  },
+});
+export const touchCallingConnection = internalMutation({
+  args: { ...callingIdentityArgs, toolName: v.string() },
+  handler: async (ctx, args) => {
+    if (!FAMILY_HISTORY_CONTROL_TOOLS.some(tool => tool.name === args.toolName)) return;
+    const row = await callingGrant(ctx, args);
+    if (!row) return;
+    const now = Date.now();
+    if (row.lastToolName === args.toolName && row.lastUsedAt && now - row.lastUsedAt < USE_TOUCH_THROTTLE_MS) return;
+    await ctx.db.patch(row._id, { lastUsedAt: now, lastToolName: args.toolName, useCount: row.useCount + 1 });
+  },
+});
+export const limitCallingConnection = internalMutation({
+  args: { ...callingIdentityArgs, action: v.union(v.literal("limit"), v.literal("pause"), v.literal("revoke")),
+    revision: v.number(), opId: v.string(), removeScopes: v.optional(v.array(v.string())), endsAt: v.optional(v.number()), reason: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const row = await callingGrant(ctx, args);
+    if (!row) throw new Error("Connection not found");
+    try { return await changeConnection(ctx, row, args, "ai"); }
+    catch (error) {
+      const message = error instanceof Error ? error.message : "Connection change refused";
+      const code = message.startsWith("STALE_VERSION") ? "STALE_VERSION" : message.startsWith("IDEMPOTENCY_CONFLICT") ? "IDEMPOTENCY_CONFLICT" : "VALIDATION_ERROR";
+      machineError(code, safeSentence(message), `Read family_history_connection before retrying a limit. Only the person can restore access at ${AI_SETTINGS_URL}.`);
+    }
+  },
+});
+
+async function connectionWithHistory(ctx: QueryCtx | MutationCtx, row: Doc<"mcpGrants">) {
+  const history = await ctx.db.query("mcpGrantHistory").withIndex("by_grant", q => q.eq("grantId", row._id)).order("desc").take(50);
+  return { ...connectionRow(row, Date.now()), history: history.map(h => ({ actor: h.actor, at: h.at, sentence: h.sentence, revision: h.revision })) };
+}
+
+/** Older clients use the same revision and history requirements. Business rules
+ * retain legacy refusal ordering and duplicate cleanup until those clients move. */
+async function revisionedLegacyChange<T extends { id: Id<"mcpGrants"> }>(ctx: MutationCtx,
+  args: { vaultOwnerId: string; grantId: Id<"mcpGrants">; revision?: number; opId?: string }, work: () => Promise<T>): Promise<T> {
+  const decision = await authorizeTenantMutation(ctx, "mcpGrants.legacyControl", args.vaultOwnerId);
+  if (!decision.allowed) throw new Error("Connection not found");
+  const identity = await ctx.auth.getUserIdentity();
+  if (identity?.client_id) throw new Error("Website session required");
+  const before = await ownedGrant(ctx, decision.owner, args.grantId);
+  if (!args.opId || args.opId.length > 160 || safeSentence(args.opId) !== args.opId) throw new Error("A non-secret opId is required");
+  if (args.revision !== (before.revision ?? 0)) throw new Error("STALE_VERSION: read the current connection revision");
+  // Legacy calls refuse replay rather than reapplying a previous change.
+  const replay = await ctx.db.query("mcpGrantHistory").withIndex("by_grant_op", q => q.eq("grantId", before._id).eq("opId", args.opId!)).unique();
+  if (replay) throw new Error("Operation already recorded; reload this connection");
+  const result = await work();
+  if (result.id !== before._id) {
+    const aliases = await ctx.db.query("mcpClientAliases").withIndex("by_grant", q => q.eq("grantId", before._id)).collect();
+    for (const alias of aliases) await ctx.db.patch(alias._id, { grantId: result.id });
+  }
+  const after = (await ctx.db.get(result.id))!;
+  const scopesChanged = JSON.stringify(after.scopes) !== JSON.stringify(before.scopes);
+  const withheldScopes = scopesChanged || result.id !== before._id ? FAMILY_HISTORY_SCOPES.filter(s => !after.scopes.includes(s)) : effectiveWithheldScopes(after);
+  await ctx.db.patch(after._id, { revision: (before.revision ?? 0) + 1, withheldScopes });
+  await appendHistory(ctx, (await ctx.db.get(after._id))!, before, "person", "You changed this connection in Settings.", args.opId, await hashMcpInput(args));
+  return result;
 }

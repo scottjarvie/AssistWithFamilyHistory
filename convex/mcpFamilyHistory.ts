@@ -1,8 +1,9 @@
+import { authorizeTenantMutation } from "./access";
 /* eslint-disable @typescript-eslint/no-explicit-any -- Internal inputs are validated by the public MCP Zod schemas before dispatch. */
 import { v } from "convex/values";
 import type { Doc, Id, TableNames } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import { internalMutation, internalQuery } from "./_generated/server";
+import { mutation, internalMutation, internalQuery } from "./_generated/server";
 import { anyApi } from "convex/server";
 import { FAMILY_HISTORY_MCP_LIMITS } from "../lib/mcp/contract";
 import { matchesVaultOwner } from "./vaultCore";
@@ -1220,10 +1221,10 @@ export const getBrief = internalQuery({
     const limit = FAMILY_HISTORY_MCP_LIMITS.briefRows;
     const researchScan = FAMILY_HISTORY_MCP_LIMITS.searchScanPerType;
     const [people, stories, tasks, findings, queueGroups] = await Promise.all([
-      ctx.db.query("persons").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(limit + 1),
-      ctx.db.query("stories").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(limit + 1),
-      ctx.db.query("researchTasks").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(researchScan + 1),
-      ctx.db.query("researchLog").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(limit + 1),
+      ctx.db.query("persons").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(limit + 1),
+      ctx.db.query("stories").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(limit + 1),
+      ctx.db.query("researchTasks").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(researchScan + 1),
+      ctx.db.query("researchLog").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(limit + 1),
       Promise.all(["needs_you", "working", "waiting_for_your_ai", "done"].map((state) =>
         ctx.db.query("queueItems").withIndex("by_owner_state_updated", (q) => q.eq("vaultOwnerId", owner).eq("state", state as any)).order("desc").take(4),
       )),
@@ -1268,35 +1269,35 @@ export const search = internalQuery({
       for (const row of rows) if (results.length < limit) results.push({ kind, ...row });
     };
     if (kinds.has("person")) {
-      const rows = await ctx.db.query("persons").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(scan + 1);
+      const rows = await ctx.db.query("persons").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(scan + 1);
       add("person", rows.filter((row) => `${row.name.given} ${row.name.surname} ${(row.alternateNames ?? []).map((name) => `${name.given} ${name.surname}`).join(" ")} ${(row.tags ?? []).join(" ")}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, name: `${row.name.given} ${row.name.surname}`.trim(), living: row.living, researchStatus: row.researchStatus, updatedAt: row.updatedAt })));
     }
     if (kinds.has("source") && results.length < limit) {
-      const rows = await ctx.db.query("sources").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(scan + 1);
+      const rows = await ctx.db.query("sources").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(scan + 1);
       add("source", rows.filter((row) => `${row.title} ${row.repository ?? ""} ${row.author ?? ""} ${row.type}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, title: row.title, type: row.type, repository: row.repository, updatedAt: row.updatedAt })));
     }
     if (kinds.has("story") && results.length < limit) {
-      const rows = await ctx.db.query("stories").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(scan + 1);
+      const rows = await ctx.db.query("stories").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(scan + 1);
       add("story", rows.filter((row) => `${row.title} ${(row.tags ?? []).join(" ")} ${row.type}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, title: row.title, type: row.type, status: row.status, personId: row.personId, updatedAt: row.updatedAt })));
     }
     if (kinds.has("research_task") && results.length < limit) {
-      const rows = await ctx.db.query("researchTasks").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(scan + 1);
+      const rows = await ctx.db.query("researchTasks").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(scan + 1);
       add("research_task", rows.filter((row) => `${row.title} ${row.description ?? ""} ${row.notes ?? ""}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, title: row.title, status: row.status, priority: row.priority, personId: row.personId, updatedAt: row.updatedAt })));
     }
     if (kinds.has("research_finding") && results.length < limit) {
-      const rows = await ctx.db.query("researchLog").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(scan + 1);
+      const rows = await ctx.db.query("researchLog").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(scan + 1);
       add("research_finding", rows.filter((row) => `${row.summary} ${row.details ?? ""}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, summary: row.summary, entityType: row.entityType, entityId: row.entityId, status: row.status, updatedAt: row.updatedAt })));
     }
     if (kinds.has("event") && results.length < limit) {
-      const rows = await ctx.db.query("events").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(scan + 1);
+      const rows = await ctx.db.query("events").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(scan + 1);
       add("event", rows.filter((row) => `${row.type} ${row.customType ?? ""} ${row.description ?? ""} ${row.place?.original ?? ""} ${row.date?.original ?? ""}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, type: row.type, customType: row.customType, date: row.date, place: row.place, description: row.description, updatedAt: row.updatedAt })));
     }
     if (kinds.has("place") && results.length < limit) {
-      const rows = await ctx.db.query("places").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(scan + 1);
+      const rows = await ctx.db.query("places").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(scan + 1);
       add("place", rows.filter((row) => `${row.name} ${row.fullName} ${row.type} ${(row.alternateNames ?? []).map((name) => name.name).join(" ")}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, name: row.name, fullName: row.fullName, type: row.type, parentId: row.parentId, updatedAt: row.updatedAt })));
     }
     if (kinds.has("topic") && results.length < limit) {
-      const rows = await ctx.db.query("topics").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").take(scan + 1);
+      const rows = await ctx.db.query("topics").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(scan + 1);
       add("topic", rows.filter((row) => `${row.name} ${row.kind} ${(row.alternateNames ?? []).join(" ")} ${row.description ?? ""}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, name: row.name, kind: row.kind, updatedAt: row.updatedAt })));
     }
     return { query: args.query, results, limit, truncated: results.length === limit, nextRecommendedTool: "get_family_history_context" };
@@ -1891,5 +1892,36 @@ export const getPersonOriginals = internalQuery({
       connections: related.connections,
       truncated: personas.length > max || related.truncated,
     };
+  },
+});
+
+
+/** Reversible archive; records and their files are never deleted or purged. */
+export const archiveRecord = internalMutation({
+  args: { principal: principalValidator, grantId: v.optional(v.string()), operationId: v.string(), requestHash: v.string(), input: v.any() },
+  handler: async (ctx, args) => operation(ctx, { ...args, toolName: "family_history_archive_record" }, async (owner) => {
+    const tables = { person: "persons", relationship: "relationships", event: "events", source: "sources", place: "places", topic: "topics", story: "stories", research_task: "researchTasks", research_finding: "researchLog" } as const;
+    const table = tables[args.input.kind as keyof typeof tables];
+    if (!table) throw new Error("Unsupported archive record kind");
+    const row = await owned(ctx, table, args.input.id, owner, "Archive record");
+    assertFresh(row, args.input.expectedUpdatedAt, "Archive record");
+    if ("status" in row && row.status === "published") throw new Error("Published stories require the website");
+    if (!["archive", "restore"].includes(args.input.action)) throw new Error("Choose archive or restore");
+    const now = Date.now();
+    await ctx.db.patch(row._id, { archivedAt: args.input.action === "archive" ? now : undefined,
+      archivedBy: args.input.action === "archive" ? args.principal.clientId : undefined, updatedAt: now });
+    return { result: { id: row._id, kind: args.input.kind, archived: args.input.action === "archive", updatedAt: now }, detail: `AI ${args.input.action === "archive" ? "archived" : "restored"} a research record; no permanent deletion.` };
+  }),
+});
+
+export const restoreArchivedRecord = mutation({
+  args: { vaultOwnerId: v.string(), table: v.union(v.literal("persons"), v.literal("relationships"), v.literal("events"), v.literal("sources"), v.literal("places"), v.literal("topics"), v.literal("stories"), v.literal("researchTasks"), v.literal("researchLog")), id: v.string(), expectedUpdatedAt: v.number() },
+  handler: async (ctx, args) => {
+    const decision = await authorizeTenantMutation(ctx, "mcpFamilyHistory.restoreArchivedRecord", args.vaultOwnerId);
+    if (!decision.allowed) throw new Error("Record not found");
+    const row = await owned(ctx, args.table, args.id, decision.owner, "Archived record");
+    assertFresh(row, args.expectedUpdatedAt, "Archived record");
+    await ctx.db.patch(row._id, { archivedAt: undefined, archivedBy: undefined, updatedAt: Date.now() });
+    return { restored: true };
   },
 });

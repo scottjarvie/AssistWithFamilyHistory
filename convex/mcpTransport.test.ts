@@ -1,3 +1,4 @@
+import { FAMILY_HISTORY_CONTROL_TOOLS } from "../lib/mcp/catalog";
 /// <reference types="vite/client" />
 
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
@@ -56,8 +57,8 @@ function modernRequest(
   };
 }
 
-async function accessToken() {
-  return new SignJWT({ scope: "family_history:read family_history:write", client_id: "synthetic-client" })
+async function accessToken(clientId = "synthetic-client") {
+  return new SignJWT({ scope: "family_history:read family_history:write", client_id: clientId })
     .setProtectedHeader({ alg: "RS256", kid: "synthetic-key", typ: "at+jwt" })
     .setIssuer(ISSUER)
     .setSubject(SUBJECT)
@@ -141,7 +142,7 @@ describe("stateless Family History MCP transport", () => {
 
       const published = document["x-assistwithfamilyhistory.productScopes"];
       expect(published).toEqual([...FAMILY_HISTORY_SCOPES]);
-      expect(published).toHaveLength(7);
+      expect(published).toHaveLength(FAMILY_HISTORY_SCOPES.length);
       // Nothing outside the ceiling may be published, ever. A published scope
       // with no tool and no code path is a promise the server cannot keep.
       for (const scope of published as string[]) {
@@ -246,7 +247,7 @@ describe("stateless Family History MCP transport", () => {
     const payload = await response.json();
     expect(payload.error).toBeUndefined();
     expect(payload.result.tools.map((tool: { name: string }) => tool.name).sort()).toEqual(
-      [...FAMILY_HISTORY_ALL_TOOL_NAMES].sort(),
+      [...FAMILY_HISTORY_ALL_TOOL_NAMES, ...FAMILY_HISTORY_CONTROL_TOOLS.map(t => t.name)].sort(),
     );
     for (const tool of payload.result.tools) {
       expect(tool.inputSchema?.properties?.ownerId).toBeUndefined();
@@ -337,7 +338,7 @@ describe("stateless Family History MCP transport", () => {
 
     await client.connect(transport);
     const catalog = await client.listTools();
-    expect(catalog.tools.map((tool) => tool.name).sort()).toEqual([...FAMILY_HISTORY_ALL_TOOL_NAMES].sort());
+    expect(catalog.tools.map((tool) => tool.name).sort()).toEqual([...FAMILY_HISTORY_ALL_TOOL_NAMES, ...FAMILY_HISTORY_CONTROL_TOOLS.map(t => t.name)].sort());
     const result = await client.callTool({
       name: "save_person",
       arguments: {
@@ -596,7 +597,7 @@ describe("reconnecting refreshes the tool list without a session to reset", () =
 
     const firstNames = (await first.json()).result.tools.map((tool: { name: string }) => tool.name).sort();
     const secondNames = (await second.json()).result.tools.map((tool: { name: string }) => tool.name).sort();
-    expect(firstNames).toEqual([...FAMILY_HISTORY_ALL_TOOL_NAMES].sort());
+    expect(firstNames).toEqual([...FAMILY_HISTORY_ALL_TOOL_NAMES, ...FAMILY_HISTORY_CONTROL_TOOLS.map(t => t.name)].sort());
     expect(secondNames).toEqual(firstNames);
   });
 
@@ -606,7 +607,7 @@ describe("reconnecting refreshes the tool list without a session to reset", () =
     const token = await accessToken();
 
     const before = (await (await t.fetch("/mcp", modernRequest("tools/list", token))).json()).result.tools;
-    expect(before.length).toBe(FAMILY_HISTORY_ALL_TOOL_NAMES.length);
+    expect(before.length).toBe(FAMILY_HISTORY_ALL_TOOL_NAMES.length + FAMILY_HISTORY_CONTROL_TOOLS.length);
 
     // The person narrows the connection to reading only.
     await t.run(async (ctx) => {
@@ -642,7 +643,7 @@ describe("reconnecting refreshes the tool list without a session to reset", () =
     const after = await t.fetch("/mcp", modernRequest("tools/list", token));
     const payload = await after.json();
     const tools = payload.result?.tools ?? [];
-    expect(tools).toHaveLength(0);
+    expect(tools.map((t: { name: string }) => t.name).sort()).toEqual(FAMILY_HISTORY_CONTROL_TOOLS.map(t => t.name).sort());
   });
 });
 
@@ -662,4 +663,33 @@ test.each(["person", "story"] as const)("%s context exports current media withou
   expect(response.status).toBe(200); const payload = await response.json(); expect(payload.result.isError).not.toBe(true);
   const context = JSON.parse(payload.result.content[0].text); expect(context.media).toEqual([expect.objectContaining({ _id: mediaId, title: "Current reviewed replacement" })]);
   const text = JSON.stringify(payload); expect(text).not.toContain("replacedB2Files"); expect(text).not.toContain("synthetic-old-private"); expect(text).not.toContain("exact_private");
+});
+
+
+describe("AWL-0015 controls through the authenticated wire", () => {
+  test("narrow, pause, describe, revoke and re-register without regaining authority", async () => {
+    const t = convexTest(schema, modules);
+    const token = await accessToken();
+    const call = async (name: string, args: Record<string, unknown>, bearer = token) => {
+      const response = await t.fetch("/mcp", modernRequest("tools/call", bearer, { name, arguments: args }, name));
+      return (await response.json()).result;
+    };
+    const first = await call("family_history_connection", {});
+    expect(first.structuredContent).toMatchObject({ state: "active", revision: 0, endsAt: null });
+    expect((await call("family_history_limit_connection", { action: "limit", revision: 0, opId: "wire-read-only", removeScopes: FAMILY_HISTORY_SCOPES.filter(s => !s.endsWith(":read")) })).isError).not.toBe(true);
+    const refused = await call("family_history_save_person", { operationId: "refused-write" });
+    expect(refused.structuredContent.error).toMatchObject({ code: "SCOPE_NOT_GRANTED", message: expect.stringContaining("family_history:research:write"), recovery: expect.stringContaining("https://assistwithfamilyhistory.com/settings/ai") });
+    await call("family_history_limit_connection", { action: "pause", revision: 1, opId: "wire-pause" });
+    expect((await call("family_history_connection", {})).structuredContent.state).toBe("paused");
+    const stale = await call("family_history_limit_connection", { action: "revoke", revision: 0, opId: "wire-stale" });
+    expect(stale.structuredContent.error.code).toBe("STALE_VERSION");
+    await call("family_history_limit_connection", { action: "revoke", revision: 2, opId: "wire-revoke" });
+    const newer = await accessToken("re-registered-synthetic-client");
+    expect((await call("family_history_connection", {}, newer)).structuredContent.state).toBe("revoked");
+    const catalog = await t.fetch("/mcp", modernRequest("tools/list", newer));
+    expect((await catalog.json()).result.tools.map((tool: { name: string }) => tool.name)).toEqual(FAMILY_HISTORY_CONTROL_TOOLS.map(tool => tool.name));
+    expect((await call("family_history_connection", {})).structuredContent.state).toBe("revoked");
+    const selfRestore = await call("family_history_limit_connection", { action: "restore", revision: 3, opId: "wire-self-restore" });
+    expect(selfRestore?.isError).toBe(true);
+  });
 });

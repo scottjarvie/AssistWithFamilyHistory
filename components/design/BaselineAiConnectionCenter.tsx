@@ -95,6 +95,7 @@ const STATUS_COPY: Record<
   ConnectionRow["status"],
   { label: string; tone: string; meaning: string }
 > = {
+  paused: { label: "Paused", tone: "bg-muted", meaning: "This connection is paused." },
   pending: {
     label: "Waiting for you",
     tone: "bg-amber-100 text-amber-900",

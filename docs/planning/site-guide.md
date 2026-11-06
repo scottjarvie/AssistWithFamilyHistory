@@ -167,7 +167,7 @@ The Queue is how the person hands work to their AI. Family History follows the f
 
 - **The directive is enough.** The person's words alone create an item. "Add context" is optional and offers three Family History groups: **who or where** (person, relationship, place, topic), **evidence** (source, claim, photo) and **work** (project, question, story, list).
 - **Lifecycle and order** follow Core: **Waiting on AI · AI working · Needs your input · Answered · Everything**, with *Needs your input* as a flag. Record states — proposed, disputed, needs review, publishable — are never Queue states.
-- **A directive never widens authority.** It cannot give the AI access to a person or source it may not read, or authorize a new objective, deletion, an identity merge, accepting a disputed claim or publishing. When something only the person can supply is missing, the item asks the smallest exact question.
+- **A directive never widens authority.** It cannot give the AI access to a person or source it may not read, or authorize a new objective, permanent deletion, an identity merge, accepting a disputed claim or publishing. When something only the person can supply is missing, the item asks the smallest exact question.
 - **Priority is the person's.** The AI never sets it.
 - **AI Suggestions** are where the AI parks ideas the person did not ask for (*these two Johns may be one person*, *nobody has looked for a burial record*). Accepting one creates a Queue item.
 - **The Queue is not the build tracker** (`docs/tracker/`) and not a research-task list; it carries a person's directives inside the product.
@@ -176,9 +176,9 @@ The Queue is how the person hands work to their AI. Family History follows the f
 
 The site's `/mcp` server is how a connected AI reads and saves. The family MCP and OAuth standard (linked from Core) owns the connection rules. Tool names start `family_history_`; tools return record identifiers and links so the AI can continue an existing record, tolerate a repeated request without duplicating, and attribute everything to the AI that did it.
 
-**Connecting.** Signing in and clicking Allow is the approval. A new connection gets every current and future tool with no end date. The person may deliberately choose fewer permissions or an end date in AI Connections, and signing in again never undoes those choices. Full access is resolved against the current catalogue, not frozen on the day of connection. Review, evidence privacy and publishing gates still apply to every call.
+**Connecting.** Signing in and clicking Allow is the approval. A new connection gets every current and future tool with no end date. The person may deliberately choose fewer permissions or an end date in AI Connections, and signing in again never undoes those choices. Every connection follows future tools except the powers explicitly removed. Either the person or their AI can narrow, pause, revoke or shorten an end date. Only the person on the website can widen, resume or restore. Archive and restore are reversible; archived records stay recoverable in the Library’s Archive. Each connection change has a revision and dated receipt. Re-registration with the same reported client name inherits earlier limits; the name can only reduce access. Review, evidence privacy and publishing gates still apply to every call.
 
-**No AI can ever** accept its own proposals, merge or split people, publish, share or change access, permanently delete, archive or restore, export the tree, act on FamilySearch or any outside provider, or touch billing. **No AI ever sees** another owner's records, raw storage links, provider credentials or raw database access. These are not grantable.
+**No AI can ever** accept its own proposals, merge or split people, publish, invite new people, create public links or change another person’s access, permanently delete, export the tree, act on FamilySearch or any outside provider, or touch billing. **No AI ever sees** another owner's records, raw storage links, provider credentials or raw database access. These are not grantable.
 
 What the AI must be able to do, by job:
 

@@ -1,3 +1,4 @@
+import { withGrantVersions } from "../lib/mcp/testSupport";
 /// <reference types="vite/client" />
 /**
  * Grant history ordering: the latest event wins. A refusal (revoked or denied)
@@ -53,7 +54,7 @@ describe("revoke after grant (persisted legacy partial revocation)", () => {
     ["older approval revoked later", { consentedAt: -3000, revokedAt: -500 }],
     ["revocation tied with the active approval", { consentedAt: -3000, revokedAt: -2000 }],
   ] as const)("%s closes the older active row for MCP, by ID, in Settings and for edits", async (_name, refusal) => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     const now = Date.now();
     // Recent usage bumps updatedAt; it must never make the old approval newer.
     const oldId = await insert(t, grant({ consentedAt: now - 2000, updatedAt: now, lastUsedAt: now, useCount: 9 }));
@@ -83,7 +84,7 @@ describe("revoke after grant (persisted legacy partial revocation)", () => {
   });
 
   test("a denial after an approval also wins; other owners, clients and issuers are unaffected", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     const now = Date.now();
     const oldId = await insert(t, grant({ consentedAt: now - 2000 }));
     await insert(t, grant({ consentedAt: undefined, issuedAt: undefined, requestedAt: now - 1500, status: "denied", revokedAt: now - 1000, updatedAt: now - 1000 }));
@@ -105,7 +106,7 @@ describe("revoke after grant (persisted legacy partial revocation)", () => {
 
 describe("expired grant removal", () => {
   test("removing the governing expired approval cannot expose an older active duplicate", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     const now = Date.now();
     const olderId = await insert(t, grant({ consentedAt: now - 5000 }));
     const expiredId = await insert(t, grant({ consentedAt: now - 3000, expiryChoice: "chosen", expiresAt: now - 1 }));
@@ -127,7 +128,7 @@ describe("expired grant removal", () => {
   });
 
   test.each(["expired", "pending"] as const)("tidying an older %s row only hides it and never turns off a newer approval", async (status) => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     const now = Date.now();
     const olderId = await insert(t, grant(status === "expired"
       ? { consentedAt: now - 5000, status: "expired", expiryChoice: "chosen", expiresAt: now - 4000 }
@@ -135,7 +136,7 @@ describe("expired grant removal", () => {
     const newerId = await insert(t, grant({ consentedAt: now - 1000 }));
     const before = (await t.run((ctx) => ctx.db.get(olderId)))!;
     await t.withIdentity(identity).mutation(api.mcpGrants.removeGrant, { vaultOwnerId: owner, grantId: olderId });
-    expect(await t.run((ctx) => ctx.db.get(olderId))).toEqual({ ...before, hiddenAt: expect.any(Number) });
+    expect(await t.run((ctx) => ctx.db.get(olderId))).toMatchObject({ ...before, revision: 1, hiddenAt: expect.any(Number) });
     expect(await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs)).toMatchObject({ state: "active", grant: { grantId: String(newerId) } });
     await expect(permits(t, newerId)).resolves.not.toBeNull();
   });
@@ -143,7 +144,7 @@ describe("expired grant removal", () => {
 
 describe("re-grant after revoke", () => {
   test("explicit reapproval in the same millisecond as the refusal still lands after it", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     const now = Date.now();
     const oldId = await insert(t, grant({ consentedAt: now - 2000 }));
     const revokedId = await insert(t, grant({ consentedAt: now - 1000, status: "revoked", revokedAt: now, updatedAt: now }));
@@ -187,7 +188,7 @@ describe("re-grant after revoke", () => {
   });
 
   test("an active row closed by history can be reapproved from its own Settings entry", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     const now = Date.now();
     const oldId = await insert(t, grant({ consentedAt: now - 2000 }));
     await insert(t, grant({ consentedAt: now - 1000, status: "revoked", revokedAt: now - 500, updatedAt: now - 500, hiddenAt: now - 400 }));
@@ -203,7 +204,7 @@ describe("re-grant after revoke", () => {
   });
 
   test("an approval that predates the refusal never wins, whatever its row says", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     const now = Date.now();
     await insert(t, grant({ consentedAt: now - 1000, status: "revoked", revokedAt: now - 100, updatedAt: now - 100 }));
     // Legacy usable-expired and active rows consented before the refusal.
@@ -221,7 +222,7 @@ describe("re-grant after revoke", () => {
 
 describe("newest approval governs, whatever its status", () => {
   test("a newer legacy usable-expired approval governs over an older active one", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     const now = Date.now();
     const olderId = await insert(t, grant({ consentedAt: now - 5000, scopes: ["family_history:context:read"], scopeChoice: "chosen" }));
     const newerId = await insert(t, grant({ consentedAt: now - 1000, status: "expired", expiryChoice: "none" }));
@@ -237,7 +238,7 @@ describe("newest approval governs, whatever its status", () => {
   });
 
   test("a newer ended approval means expired, never a fall back to an older active approval", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     const now = Date.now();
     const olderId = await insert(t, grant({ consentedAt: now - 5000 }));
     const endedId = await insert(t, grant({ consentedAt: now - 3000, status: "expired", expiryChoice: "chosen", expiresAt: now - 10 }));
@@ -261,7 +262,7 @@ describe("newest approval governs, whatever its status", () => {
   });
 
   test("an ended governing approval can be approved again explicitly", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     const now = Date.now();
     const olderId = await insert(t, grant({ consentedAt: now - 5000 }));
     const endedId = await insert(t, grant({ consentedAt: now - 3000, status: "expired", expiryChoice: "chosen", expiresAt: now - 10 }));
@@ -274,7 +275,7 @@ describe("newest approval governs, whatever its status", () => {
   });
 
   test("with legacy active duplicates and no refusal, only the governing ID is authority", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     const now = Date.now();
     const olderId = await insert(t, grant({ consentedAt: now - 5000, updatedAt: now, lastUsedAt: now }));
     const newerId = await insert(t, grant({ consentedAt: now - 1000 }));

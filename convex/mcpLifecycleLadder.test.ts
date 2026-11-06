@@ -1,3 +1,5 @@
+import { FAMILY_HISTORY_CONTROL_TOOLS } from "../lib/mcp/catalog";
+import { withGrantVersions } from "../lib/mcp/testSupport";
 /// <reference types="vite/client" />
 
 /**
@@ -137,7 +139,7 @@ afterAll(() => {
 
 describe("chosen-AI lifecycle ladder (locally provable rungs)", () => {
   test("1 · an anonymous request is challenged with this resource's own metadata", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     const response = await t.fetch("/mcp", {
       method: "POST",
       headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
@@ -150,7 +152,7 @@ describe("chosen-AI lifecycle ladder (locally provable rungs)", () => {
   });
 
   test("2 · protected-resource metadata is well formed and names the branded resource", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     const response = await t.fetch("/.well-known/oauth-protected-resource/mcp");
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -161,7 +163,7 @@ describe("chosen-AI lifecycle ladder (locally provable rungs)", () => {
   });
 
   test("3 · sign-in approves the connection, and a narrowed grant filters discovery", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     const token = await accessToken(OWNER);
 
     const firstContact = await connect(t, token);
@@ -185,7 +187,7 @@ describe("chosen-AI lifecycle ladder (locally provable rungs)", () => {
     await afterApproval.close();
 
     expect(names.length).toBeGreaterThan(0);
-    for (const name of names) {
+    for (const name of names.filter(name => !FAMILY_HISTORY_CONTROL_TOOLS.some(t => t.name === name))) {
       expect(findTool(name), `${name} must be in the catalog`).toBeTruthy();
       expect(findTool(name)!.requiredScope).toBe("family_history:context:read");
     }
@@ -194,7 +196,7 @@ describe("chosen-AI lifecycle ladder (locally provable rungs)", () => {
   });
 
   test("4 · an out-of-scope call refuses with the right code and leaks nothing", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     const token = await accessToken(OWNER);
     await seedGrant(t, {
       vaultOwnerId: OWNER,
@@ -216,7 +218,7 @@ describe("chosen-AI lifecycle ladder (locally provable rungs)", () => {
   });
 
   test("6 · a reviewed stored scan arrives as real image bytes, and a reference-only row does not", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     const token = await accessToken(OWNER);
     await seedGrant(t, {
       vaultOwnerId: OWNER,
@@ -313,7 +315,7 @@ describe("chosen-AI lifecycle ladder (locally provable rungs)", () => {
   });
 
   test("7 · one batch save, one correction, and a stale write refused", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     const token = await accessToken(OWNER);
     await seedGrant(t, { vaultOwnerId: OWNER, clientId: CLIENT_ID, issuer: ISSUER });
     const client = await connect(t, token);
@@ -385,7 +387,7 @@ describe("chosen-AI lifecycle ladder (locally provable rungs)", () => {
   });
 
   test("8 · unknown, ungranted, invented, and cross-owner refusals are indistinguishable", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     await seedGrant(t, { vaultOwnerId: OWNER, clientId: CLIENT_ID, issuer: ISSUER });
     await seedGrant(t, { vaultOwnerId: OTHER_OWNER, clientId: CLIENT_ID, issuer: ISSUER });
 
@@ -421,7 +423,7 @@ describe("chosen-AI lifecycle ladder (locally provable rungs)", () => {
   });
 
   test("9 · replaying an operationId returns the stored receipt instead of writing twice", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     const token = await accessToken(OWNER);
     await seedGrant(t, { vaultOwnerId: OWNER, clientId: CLIENT_ID, issuer: ISSUER });
     const client = await connect(t, token);
@@ -458,7 +460,7 @@ describe("chosen-AI lifecycle ladder (locally provable rungs)", () => {
   });
 
   test("10 · revoking denies the very next call and empties discovery, on the same token", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     const token = await accessToken(OWNER);
     const grantId = await seedGrant(t, { vaultOwnerId: OWNER, clientId: CLIENT_ID, issuer: ISSUER });
     const client = await connect(t, token);
@@ -472,7 +474,7 @@ describe("chosen-AI lifecycle ladder (locally provable rungs)", () => {
     // Same connection, same still-valid token: nothing had to expire.
     const denied = await callTool(client, "family_history_get_brief", {});
     expect(refusalCode(denied)).toBe("GRANT_REVOKED");
-    expect((await client.listTools()).tools).toEqual([]);
+    expect((await client.listTools()).tools.map(t => t.name)).toEqual(FAMILY_HISTORY_CONTROL_TOOLS.map(t => t.name));
     await client.close();
   });
 });

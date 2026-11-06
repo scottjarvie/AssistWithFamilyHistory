@@ -86,7 +86,7 @@ function assertRunKey(value: string) {
   return runKey;
 }
 
-async function boundedOwnerRows<T extends "persons" | "relationships" | "events" | "personEvents" | "sources" | "citations" | "citationLinks" | "sourceFacts" | "researchTasks" | "researchLog" | "queueItems" | "stories" | "storyReviewEvents" | "agentActivity" | "mcpOperations" | "mcpRecordKeys" | "media" | "documents" | "mcpGrants">(
+async function boundedOwnerRows<T extends "persons" | "relationships" | "events" | "personEvents" | "sources" | "citations" | "citationLinks" | "sourceFacts" | "researchTasks" | "researchLog" | "queueItems" | "stories" | "storyReviewEvents" | "agentActivity" | "mcpOperations" | "mcpRecordKeys" | "media" | "documents" | "mcpGrants" | "mcpGrantHistory" | "mcpClientAliases">(
   ctx: FixtureCtx,
   table: T,
   owner: string,
@@ -250,6 +250,8 @@ async function fixtureGraph(ctx: FixtureCtx, runKeyInput: string) {
     throw new Error("Refusing cleanup because a marked connection lacks its visible synthetic acceptance marker.");
   }
   const grantIds = idSet(grants);
+  const grantHistory = (await boundedOwnerRows(ctx, "mcpGrantHistory", owner)).filter(row => grantIds.has(String(row.grantId)));
+  const clientAliases = (await boundedOwnerRows(ctx, "mcpClientAliases", owner)).filter(row => grantIds.has(String(row.grantId)));
   const grantClientIds = new Set(grants.map((row) => row.clientId));
 
   // A client identifier shared with an unmarked connection is not this run's to
@@ -326,6 +328,8 @@ async function fixtureGraph(ctx: FixtureCtx, runKeyInput: string) {
     operations: fixtureOperations,
     activity: fixtureActivity,
     grants,
+    grantHistory,
+    clientAliases,
     registrations,
     personEvents: relatedPersonEvents,
     citationLinks: relatedCitationLinks,
@@ -405,6 +409,8 @@ export const clear = mutation({
     // client registration go last, leaving no row pointing at a deleted id.
     for (const row of graph.activity) await ctx.db.delete(row._id);
     for (const row of graph.mappings) await ctx.db.delete(row._id);
+    for (const row of graph.grantHistory) await ctx.db.delete(row._id);
+    for (const row of graph.clientAliases) await ctx.db.delete(row._id);
     for (const row of graph.grants) await ctx.db.delete(row._id);
     for (const row of graph.registrations) await ctx.db.delete(row._id);
     return { removed: true as const, runKey: graph.runKey, counts: removed };

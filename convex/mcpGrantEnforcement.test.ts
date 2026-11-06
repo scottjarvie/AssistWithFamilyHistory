@@ -1,3 +1,4 @@
+import { withGrantVersions } from "../lib/mcp/testSupport";
 /// <reference types="vite/client" />
 /**
  * Adversarial tests for the product-grant layer.
@@ -13,6 +14,7 @@ import { exportJWK, generateKeyPair, SignJWT, type KeyLike } from "jose";
 import schema from "./schema";
 import { api, internal } from "./_generated/api";
 import {
+  FAMILY_HISTORY_CONTROL_TOOLS,
   FAMILY_HISTORY_ALL_TOOL_NAMES,
   FAMILY_HISTORY_SCOPES,
   FAMILY_HISTORY_TOOLS,
@@ -196,7 +198,7 @@ describe("scope to tool matrix", () => {
 
 describe("grant states: sign-in approves, the person's no stands", () => {
   test("signing in approves a new connection for the ordinary permissions, once", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     expect(await toolNames(t, OWNER_A)).toContain("family_history_get_brief");
 
     const call = await callTool(t, OWNER_A, "family_history_get_brief", {});
@@ -224,9 +226,9 @@ describe("grant states: sign-in approves, the person's no stands", () => {
 
   test("revoked and denied stay refused after signing in again", async () => {
     for (const status of ["revoked", "denied"] as const) {
-      const t = convexTest(schema, modules);
+      const t = withGrantVersions(convexTest(schema, modules));
       await seedGrant(t, { vaultOwnerId: OWNER_A, clientId: CLIENT_ID, issuer: ISSUER, status });
-      expect(await toolNames(t, OWNER_A)).toEqual([]);
+      expect(await toolNames(t, OWNER_A)).toEqual(FAMILY_HISTORY_CONTROL_TOOLS.map(t => t.name));
       const call = await callTool(t, OWNER_A, "family_history_get_brief", {});
       expect(call.isError).toBe(true);
       expect(call.body.code).toBe("GRANT_REVOKED");
@@ -234,7 +236,7 @@ describe("grant states: sign-in approves, the person's no stands", () => {
   });
 
   test("a waiting request from before sign-in approval becomes the whole grant", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     await seedGrant(t, { vaultOwnerId: OWNER_A, clientId: CLIENT_ID, issuer: ISSUER, status: "pending", scopes: [] });
     const call = await callTool(t, OWNER_A, "family_history_get_brief", {});
     expect(call.isError).toBe(false);
@@ -244,7 +246,7 @@ describe("grant states: sign-in approves, the person's no stands", () => {
   });
 
   test("an ambiguous expired term stays expired on sign-in and keeps the person's narrowing", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     await seedGrant(t, {
       vaultOwnerId: OWNER_A,
       clientId: CLIENT_ID,
@@ -259,11 +261,11 @@ describe("grant states: sign-in approves, the person's no stands", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].scopes).toEqual(["family_history:context:read"]);
     expect(rows[0].expiresAt!).toBeLessThan(Date.now());
-    expect(await toolNames(t, OWNER_A)).toEqual([]);
+    expect(await toolNames(t, OWNER_A)).toEqual(FAMILY_HISTORY_CONTROL_TOOLS.map(t => t.name));
   });
 
   test("revoking a grant denies the very next request with the same token", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     const grantId = await seedGrant(t, { vaultOwnerId: OWNER_A, clientId: CLIENT_ID, issuer: ISSUER });
     const before = await callTool(t, OWNER_A, "family_history_get_brief", {});
     expect(before.isError).toBe(false);
@@ -277,11 +279,11 @@ describe("grant states: sign-in approves, the person's no stands", () => {
     const after = await callTool(t, OWNER_A, "family_history_get_brief", {});
     expect(after.isError).toBe(true);
     expect(after.body.code).toBe("GRANT_REVOKED");
-    expect(await toolNames(t, OWNER_A)).toEqual([]);
+    expect(await toolNames(t, OWNER_A)).toEqual(FAMILY_HISTORY_CONTROL_TOOLS.map(t => t.name));
   });
 
   test("revoking newest of multiple legacy approvals refuses the next MCP call with the same token", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     const olderId = await seedGrant(t, { vaultOwnerId: OWNER_A, clientId: CLIENT_ID, issuer: ISSUER });
     const newestId = await seedGrant(t, { vaultOwnerId: OWNER_A, clientId: CLIENT_ID, issuer: ISSUER });
     await t.run((ctx) => ctx.db.patch(olderId as never, { consentedAt: Date.now() - 1000 }));
@@ -298,7 +300,7 @@ describe("grant states: sign-in approves, the person's no stands", () => {
     const refused = await call();
     expect(refused.isError).toBe(true);
     expect(JSON.parse(refused.content.find((block: { type: string }) => block.type === "text").text).code).toBe("GRANT_REVOKED");
-    expect(await toolNames(t, OWNER_A)).toEqual([]);
+    expect(await toolNames(t, OWNER_A)).toEqual(FAMILY_HISTORY_CONTROL_TOOLS.map(t => t.name));
     const approved = await own.mutation(api.mcpGrants.approveGrant, {
       vaultOwnerId: OWNER_A, grantId: newestId as never, label: "Explicit reapproval",
       scopes: ["family_history:context:read"], boundary: { kind: "whole_workspace" }, expiresInDays: 7,
@@ -313,7 +315,7 @@ describe("grant states: sign-in approves, the person's no stands", () => {
 
 describe("scope filtering", () => {
   test("discovery shows exactly the approved surface, canonical plus alias", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     await seedGrant(t, {
       vaultOwnerId: OWNER_A,
       clientId: CLIENT_ID,
@@ -329,7 +331,7 @@ describe("scope filtering", () => {
   });
 
   test("a write tool outside the grant is refused with the same words as an unknown tool", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     await seedGrant(t, {
       vaultOwnerId: OWNER_A,
       clientId: CLIENT_ID,
@@ -345,12 +347,13 @@ describe("scope filtering", () => {
       living: false,
     });
     const unknown = await callTool(t, OWNER_A, "family_history_delete_everything", {});
-    expect(ungranted.body).toEqual(unknown.body);
+    expect(ungranted.body.code).toEqual(unknown.body.code);
+    expect(ungranted.body.message).toContain("family_history:research:write");
     expect(ungranted.body.code).toBe("SCOPE_NOT_GRANTED");
   });
 
   test("the alias and the canonical name behave identically", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     await seedGrant(t, { vaultOwnerId: OWNER_A, clientId: CLIENT_ID, issuer: ISSUER });
     const canonical = await callTool(t, OWNER_A, "family_history_get_brief", {});
     const alias = await callTool(t, OWNER_A, "get_family_history_brief", {});
@@ -376,7 +379,7 @@ describe("record boundaries", () => {
   }
 
   test("a selected-people grant cannot be walked sideways onto another person", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     const inside = await seedPerson(t, OWNER_A, "Inside");
     const outside = await seedPerson(t, OWNER_A, "Outside");
     await seedGrant(t, {
@@ -401,7 +404,7 @@ describe("record boundaries", () => {
   });
 
   test("a boundary refusal is identical for a real record and an invented one", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     const inside = await seedPerson(t, OWNER_A, "Inside");
     const outside = await seedPerson(t, OWNER_A, "Outside");
     await seedGrant(t, {
@@ -419,7 +422,7 @@ describe("record boundaries", () => {
   });
 
   test("a queue-only grant reaches no record tools at all", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     await seedGrant(t, {
       vaultOwnerId: OWNER_A,
       clientId: CLIENT_ID,
@@ -434,7 +437,7 @@ describe("record boundaries", () => {
 
   test("a grant narrowed to named Queue items lists only those items", async () => {
     vi.stubEnv("TRUST_BOUNDARY_MODE", "enforce");
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     const create = (key: string) => t.withIdentity({ subject: OWNER_A }).mutation(api.queue.createQueueItem, {
       vaultOwnerId: OWNER_A,
       directive: `Synthetic Queue directive ${key}.`,
@@ -463,7 +466,7 @@ describe("record boundaries", () => {
 
   test("named Queue paging does not skip working items after expiry reconciliation", async () => {
     vi.stubEnv("TRUST_BOUNDARY_MODE", "enforce");
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     const now = Date.now();
     const items = [];
     for (const key of ["oldest", "middle", "expired"]) {
@@ -518,7 +521,7 @@ describe("record boundaries", () => {
 
   test("a whole-workspace grant without a Queue boundary still lists every Queue item", async () => {
     vi.stubEnv("TRUST_BOUNDARY_MODE", "enforce");
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     for (const key of ["one", "two"]) {
       await t.withIdentity({ subject: OWNER_A }).mutation(api.queue.createQueueItem, {
         vaultOwnerId: OWNER_A,
@@ -534,7 +537,7 @@ describe("record boundaries", () => {
 
 describe("cross-owner isolation", () => {
   test("owner B's grant is invisible to owner A and vice versa", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     await seedGrant(t, {
       vaultOwnerId: OWNER_B,
       clientId: CLIENT_ID,
@@ -550,7 +553,7 @@ describe("cross-owner isolation", () => {
   });
 
   test("no grant refusal anywhere names a record, an owner, or a table", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     await seedGrant(t, {
       vaultOwnerId: OWNER_A,
       clientId: CLIENT_ID,
@@ -570,7 +573,7 @@ describe("cross-owner isolation", () => {
 
 describe("the data layer refuses independently of the transport", () => {
   test("a write mutation called without a grant fails closed", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     await expect(
       t.mutation(internal.mcpFamilyHistory.savePerson, {
         principal: { issuer: ISSUER, subject: OWNER_A, clientId: CLIENT_ID, scopes: [] },
@@ -588,7 +591,7 @@ describe("the data layer refuses independently of the transport", () => {
   });
 
   test("a write mutation cannot borrow another owner's grant id", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     const otherGrant = await seedGrant(t, { vaultOwnerId: OWNER_B, clientId: CLIENT_ID, issuer: ISSUER });
     await expect(
       t.mutation(internal.mcpFamilyHistory.savePerson, {
@@ -608,7 +611,7 @@ describe("the data layer refuses independently of the transport", () => {
   });
 
   test("a grant narrowed to reads cannot be used for a write even with a valid id", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     const readOnly = await seedGrant(t, {
       vaultOwnerId: OWNER_A,
       clientId: CLIENT_ID,
@@ -635,7 +638,7 @@ describe("the data layer refuses independently of the transport", () => {
 
 describe("token audience", () => {
   test("a token minted for a different resource is refused", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     await seedGrant(t, { vaultOwnerId: OWNER_A, clientId: CLIENT_ID, issuer: ISSUER });
     const response = await t.fetch(
       "/mcp",
@@ -645,7 +648,7 @@ describe("token audience", () => {
   });
 
   test("a token with no audience claim is still accepted, because the grant is the authority", async () => {
-    const t = convexTest(schema, modules);
+    const t = withGrantVersions(convexTest(schema, modules));
     await seedGrant(t, { vaultOwnerId: OWNER_A, clientId: CLIENT_ID, issuer: ISSUER });
     const response = await t.fetch("/mcp", rpc("tools/list", await tokenFor(OWNER_A, undefined)));
     expect(response.status).toBe(200);

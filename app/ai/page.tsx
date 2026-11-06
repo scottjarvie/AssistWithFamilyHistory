@@ -1,3 +1,5 @@
+import { AI_ACCESS_INSTRUCTIONS } from "@/lib/mcp/accessCopy";
+import { FAMILY_HISTORY_CONTROL_TOOLS } from "@/lib/mcp/catalog";
 import type { Metadata } from "next";
 import {
   Archive,
@@ -51,6 +53,7 @@ const toolGroups = [
       "family_history:evidence:read",
       "family_history:evidence:write",
       "family_history:research:write",
+      "family_history:records:archive",
     ] as const,
     copy: "Reviewed files can be read, new evidence can be placed into private person-only review, and structured saves land in the same vault the web workspace reads. Evidence stays separate from conclusions, with citations and provenance intact.",
   },
@@ -77,12 +80,12 @@ const ALIAS_COUNT = FAMILY_HISTORY_TOOLS.filter((tool) => tool.alias).length;
  */
 const currentInSource = [
   `${TOOL_COUNT} Family History tools share one stateless connection address, with ${ALIAS_COUNT} older names kept working as aliases.`,
-  "Signing in approves full access to current and future tools with no end date by default. You can deliberately limit the scope or set an end date in Settings; publishing, deleting, merging, sharing and exporting are never available to a connection. Every request re-checks the permission, so narrowing it or turning it off works at once.",
+  "Signing in approves full access to current and future tools with no end date by default. You can deliberately limit the scope or set an end date in Settings; publishing, permanent deletion, merging, invitations, public sharing and exporting are never available to a connection. Every request re-checks the permission, so narrowing it or turning it off works at once.",
   "Turning a connection off takes effect on its very next request, because the permission is re-checked every time rather than waiting for a sign-in to expire.",
   "A whole source's worth of records saves in one call, reporting each row's own outcome instead of discarding the pass.",
   "Reviewed, AI-allowed files are delivered through the connection itself; a storage link is never handed to a model.",
   "A scan or photograph you upload is stored privately here, so your AI can read the record itself rather than only its title — and an item that holds a link somewhere else says so honestly instead of pretending.",
-  "An unknown tool, a tool outside the permission, and another person's record all return the same refusal, so nothing can be discovered by probing.",
+  "Refusals name a missing power and link to Settings. Another person’s records remain undiscoverable.",
 ];
 
 export default function AiSetupPage() {
@@ -131,8 +134,10 @@ export default function AiSetupPage() {
               </div>
               <p className="mt-7 flex gap-2 border-t border-[#d8cfbd] pt-5 text-xs leading-5 text-[#687169]">
                 <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0 text-[#245a43]" aria-hidden="true" />
-                Connecting signs into the same private account. No research runs automatically, and no tool can publish or delete family records.
+                Connecting signs into the same private account. No research runs automatically, and no tool can publish or permanently delete family records.
               </p>
+              <p className="mt-4 text-sm leading-6">{AI_ACCESS_INSTRUCTIONS}</p>
+              <ul className="mt-3 text-sm">{FAMILY_HISTORY_CONTROL_TOOLS.map(tool => <li key={tool.name}><code>{tool.name}</code> — {tool.humanSummary}</li>)}</ul>
             </aside>
           </div>
         </section>
@@ -174,7 +179,7 @@ export default function AiSetupPage() {
                 {[
                   ["Choose a compatible client", "It must support remote Streamable HTTP MCP and OAuth. Exact menu names differ by client."],
                   ["Add the MCP address", "Use https://assistwithfamilyhistory.com/mcp as the server URL."],
-                  ["Sign in", "Signing in gives the connection every current and future tool in your workspace with no end date by default. You can choose fewer permissions, set an end date, or turn it off at /app/settings/ai."],
+                  ["Sign in", "Signing in gives the connection every current and future tool in your workspace with no end date by default. You can choose fewer permissions, set an end date, or turn it off at /settings/ai."],
                   ["Ask for the Family History brief", "Your AI should call family_history_get_brief first, then search and hydrate before changing records."],
                 ].map(([title, copy], index) => (
                   <li key={title} className="grid grid-cols-[2.5rem_1fr] gap-4">
@@ -187,7 +192,7 @@ export default function AiSetupPage() {
             <div className="rounded-[2rem] bg-[#24312c] p-6 text-[#fffaf2] sm:p-8">
               <p className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-[#d8b16d]"><Bot className="h-4 w-4" aria-hidden="true" /> First-session instruction</p>
               <blockquote className="mt-6 border-l border-[#d8b16d] pl-5 font-[family-name:var(--font-cormorant-garamond)] text-2xl leading-9">
-                “Start with my Family History brief. Search before creating duplicates, hydrate stable IDs before corrections, preserve source provenance and uncertainty, prefer the complete-result save for a finished pass, and never publish or delete.”
+                “Start with my Family History brief. Search before creating duplicates, hydrate stable IDs before corrections, preserve source provenance and uncertainty, prefer the complete-result save for a finished pass, and never publish or permanently delete.”
               </blockquote>
               <div className="mt-8 grid gap-3 border-t border-[#53635d] pt-6 sm:grid-cols-2">
                 {[

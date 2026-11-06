@@ -105,11 +105,9 @@ const ungrantedRefusal = decideToolAccess({
 });
 assert.equal(unknownRefusal.allowed, false);
 assert.equal(ungrantedRefusal.allowed, false);
-assert.deepEqual(
-  unknownRefusal,
-  ungrantedRefusal,
-  "an unknown tool and an ungranted tool must produce the identical refusal",
-);
+assert.equal(unknownRefusal.code, ungrantedRefusal.code);
+assert.match(ungrantedRefusal.message, /family_history:research:write/);
+assert.match(ungrantedRefusal.recovery, /Only the person.*https:\/\/assistwithfamilyhistory.com\/settings\/ai/);
 
 // No refusal may name a record, an owner, or a table.
 for (const state of ["absent", "pending", "revoked", "expired", "denied"] as const) {
@@ -191,19 +189,17 @@ const jsonRpcResults: string[] = [];
 for (let index = transport.indexOf('jsonrpc: "2.0"'); index >= 0; index = transport.indexOf('jsonrpc: "2.0"', index + 1)) {
   jsonRpcResults.push(transport.slice(index, index + 700));
 }
-assert.ok(jsonRpcResults.length >= 2, "the empty-catalog and preflight-refusal wire paths must both exist");
+assert.ok(jsonRpcResults.length >= 1, "the preflight-refusal wire path must exist");
 for (const block of jsonRpcResults) {
   assert.ok(
     block.includes('resultType: "complete"'),
     "every hand-written JSON-RPC result must carry the protocol revision's required resultType",
   );
 }
-// A complete tools/list result additionally owes cache fields, and an empty
-// catalog must never be cached: the person may approve a second from now.
-const emptyCatalog = jsonRpcResults.find((block) => block.includes("tools: []"));
-assert.ok(emptyCatalog, "the empty tool catalog response must exist");
-assert.ok(emptyCatalog!.includes("ttlMs: 0"), "an empty tool catalog must not be cached");
-assert.ok(emptyCatalog!.includes('cacheScope: "private"'), "a grant-dependent catalog is private");
+// Connection controls remain discoverable even when every domain tool is refused.
+assert.ok(transport.includes("FAMILY_HISTORY_CONTROL_TOOLS"));
+assert.ok(transport.includes("describeCallingConnection"));
+assert.ok(transport.includes("limitCallingConnection"));
 
 // The connection label must come from the client's own clientInfo, not from the
 // Mcp-Name header — that header carries the tool being called, so reading it

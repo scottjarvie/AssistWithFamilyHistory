@@ -50,7 +50,7 @@ const storyWorkflowValidator = v.union(
 // Exported for the GEN-92 parity test (scripts/test-person-snapshot-parity.ts),
 // which deep-equals the full-snapshot assembly against the per-person loader.
 export async function getVaultSnapshot(ctx: QueryCtx, vaultOwnerId: string): Promise<VaultSnapshot> {
-  const owned = <T extends { vaultOwnerId?: string }>(rows: T[]) => filterByVaultOwner(rows, vaultOwnerId);
+  const owned = <T extends { vaultOwnerId?: string; archivedAt?: number }>(rows: T[]) => filterByVaultOwner(rows, vaultOwnerId).filter(row => row.archivedAt === undefined);
 
   // GEN-70: use by_owner indexes instead of full-table scans. All 20 tables
   // queried below have a `by_owner` index defined in convex/schema.ts. The
@@ -1117,14 +1117,14 @@ async function findPersonByIdentifier(
   const normalizedId = ctx.db.normalizeId("persons", personIdentifier);
   if (normalizedId) {
     const byId = await ctx.db.get(normalizedId);
-    if (byId && matchesVaultOwner(byId.vaultOwnerId, vaultOwnerId)) return byId;
+    if (byId && byId.archivedAt === undefined && matchesVaultOwner(byId.vaultOwnerId, vaultOwnerId)) return byId;
   }
   const byFsId = await ctx.db
     .query("persons")
     .withIndex("by_fsId", (q) => q.eq("fsId", personIdentifier))
     .collect();
   return (
-    byFsId.find((person) => matchesVaultOwner(person.vaultOwnerId, vaultOwnerId)) ?? null
+    byFsId.find((person) => person.archivedAt === undefined && matchesVaultOwner(person.vaultOwnerId, vaultOwnerId)) ?? null
   );
 }
 
@@ -1140,8 +1140,8 @@ export async function loadPersonScopedSnapshot(
   vaultOwnerId: string,
   personIdentifier: string
 ): Promise<VaultSnapshot | null> {
-  const owned = <T extends { vaultOwnerId?: string }>(rows: T[]) =>
-    filterByVaultOwner(rows, vaultOwnerId);
+  const owned = <T extends { vaultOwnerId?: string; archivedAt?: number }>(rows: T[]) =>
+    filterByVaultOwner(rows, vaultOwnerId).filter(row => row.archivedAt === undefined);
 
   const person = await findPersonByIdentifier(ctx, vaultOwnerId, personIdentifier);
   if (!person) return null;
@@ -1417,7 +1417,7 @@ export async function loadStoryScopedSnapshot(
   storyId: Id<"stories">
 ): Promise<VaultSnapshot | null> {
   const story = await ctx.db.get(storyId);
-  if (!story || !matchesVaultOwner(story.vaultOwnerId, vaultOwnerId)) return null;
+  if (!story || story.archivedAt !== undefined || !matchesVaultOwner(story.vaultOwnerId, vaultOwnerId)) return null;
 
   // storyReviewEvents for THIS story, owner-filtered (GEN-70 defense-in-depth),
   // ordered ascending _creationTime to match the full snapshot's by_owner order

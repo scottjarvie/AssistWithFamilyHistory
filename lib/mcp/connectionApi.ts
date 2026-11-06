@@ -34,6 +34,9 @@ export type ConnectionRow = {
   clientMetadataUrl: string | null;
   scopes: FamilyHistoryScope[];
   scopeChoice?: "full" | "chosen";
+  withheldScopes?: string[]; revision?: number; pausedAt?: number | null;
+  limitedBy?: "person" | "ai" | null; limitedAt?: number | null;
+  history?: { actor: "person" | "ai" | "system"; at: number; sentence: string; revision: number }[];
   boundary: ConnectionBoundary;
   status: GrantStatus;
   requestedAt: number;
@@ -119,3 +122,8 @@ export const updateGrantExpiryRef = makeFunctionReference<
   { vaultOwnerId: string; grantId: string; expiresInDays?: number },
   { id: string; status: "active"; expiresAt: number | null }
 >("mcpGrants:updateGrantExpiry");
+
+export const controlGrantRef = makeFunctionReference<"mutation", {
+  vaultOwnerId: string; grantId: string; action: string; revision: number; opId: string;
+  scopes?: string[]; expiresInDays?: number; label?: string; reason?: string; boundary?: ConnectionBoundary;
+}, { id: string; connection: ConnectionRow; removed?: boolean }>("mcpGrants:controlGrant");

@@ -313,3 +313,17 @@ for (const scope of FAMILY_HISTORY_SCOPES) {
 }
 assert.match(closedMarkup, new RegExp(`id="boundary-${closed.id}-selected_people"[^>]*checked`));
 assert.ok(!closedMarkup.includes("I do not recognise this"), "Closed connections cannot submit the pending-only decline action");
+
+// AWL-0015: actual person controls and dated AI history stay visible after pause.
+const pausedByAi: ConnectionRow = {
+  ...active, status: "paused", revision: 4, pausedAt: 1_755_400_000_000,
+  limitedBy: "ai", limitedAt: 1_755_400_000_000,
+  history: [{ actor: "ai", at: 1_755_400_000_000, sentence: "Your AI paused the connection.", revision: 4 }],
+};
+const pausedMarkup = decode(renderToStaticMarkup(React.createElement(AiConnectionCenter, {
+  initialConnections: [pausedByAi], initialActivity: [],
+})));
+for (const text of ["Narrowed by your AI on", "Resume", "Restore", "Connection history", "by your AI", "Your AI paused the connection."]) {
+  assert.ok(pausedMarkup.includes(text), `Paused connection must show ${text}`);
+}
+assert.ok(!pausedMarkup.includes("Only you can approve, narrow or turn off"));

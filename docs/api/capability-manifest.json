@@ -12,6 +12,7 @@
     "oauth": "protected-resource metadata at both the resource-path and origin compatibility spellings plus exact-issuer Clerk-shaped OAuth access-token JWT verification; ordinary session JWTs are rejected; provider DCR is advertised, while CIMD is deferred and its validator is not connected to requests",
     "ownerBoundary": "The verified OAuth subject selects the vault server-side. No MCP tool accepts an owner, user, workspace, or vault identifier.",
     "currentInSource": [
+      "family_history_archive_record",
       "family_history_get_brief",
       "family_history_search",
       "family_history_get_context",
@@ -38,7 +39,8 @@
         "family_history:research:write",
         "family_history:story:draft",
         "family_history:queue:read",
-        "family_history:queue:work"
+        "family_history:queue:work",
+        "family_history:records:archive"
       ],
       "personApproved": [
         "family_history:context:read",
@@ -47,20 +49,20 @@
         "family_history:research:write",
         "family_history:story:draft",
         "family_history:queue:read",
-        "family_history:queue:work"
+        "family_history:queue:work",
+        "family_history:records:archive"
       ],
       "raisedOutsideOrdinaryApproval": [],
       "reservedNeverIssuable": [
-        "Archiving or restoring records",
         "Exporting the vault",
         "Permanently deleting anything",
         "Publishing a story or any other public action",
         "Merging or splitting person identities",
-        "Granting, changing, or removing sharing and access",
+        "Inviting new people, creating public links, or changing another person’s access",
         "Acting on FamilySearch or any other outside provider",
         "Billing, account, or subscription changes"
       ],
-      "policy": "Family History intentionally grants nothing from OAuth sign-in alone. Every ordinary MCP permission is selected by the person; no current scope has a separate raised tier, and reserved authorities have no tool or issuable scope."
+      "policy": "Full access on sign-in, including future tools minus removed powers, with no end date. AI may narrow only its own connection; only the person restores access on the website. Media review and living-person gates remain."
     },
     "notExposed": [
       "delete",
@@ -69,7 +71,11 @@
       "sharing_or_collaboration_grants",
       "external_familysearch_actions"
     ],
-    "proofBoundary": "Source, tests, protected release, live discovery/DCR metadata, production route behavior, and the isolated provider storage boundary are proven separately. No real AI client has completed registration, consent, direct evidence upload, person review, later evidence read, correction, revoke, reconnect, and exact cleanup as one lifecycle; no named client is claimed."
+    "proofBoundary": "Source, tests, protected release, live discovery/DCR metadata, production route behavior, and the isolated provider storage boundary are proven separately. No real AI client has completed registration, consent, direct evidence upload, person review, later evidence read, correction, revoke, reconnect, and exact cleanup as one lifecycle; no named client is claimed.",
+    "connectionControls": [
+      "family_history_connection",
+      "family_history_limit_connection"
+    ]
   },
   "scopePresets": {
     "read_only_assistant": "Owner-scoped reads for people, context packs, queue summaries, stories, and documents.",
