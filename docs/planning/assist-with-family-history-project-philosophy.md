@@ -204,7 +204,7 @@ expression, with the reason).
 | §16.1 | Repo-owned Cards, Work Orders, Guide | Adopted | `docs/tracker/` (GUIDE.md, tracker.json, cards, work-orders AWF-WO-001 to 020) |
 | §2, §6 | Home page: promise line, person/AI/site roles, FAQ, `/ai` invitation | Deferred (partial) | FAQ and `/ai` link on `app/page.tsx`; Site Guide "Pages and features" says Home lacks the promise line and the person/AI/site explanation |
 | §6 | Public Ideas and Usage page at `/ideas-and-usage` | Deferred | No `app/ideas-and-usage/` route; Site Guide lists it "to build" |
-| §4, §17.2.4 | Three lifecycle states plus Needs-your-input flag, tab order Waiting on AI first, Everything last | Deferred | `convex/schema.ts` `queueItems.state` is `needs_you, working, waiting_for_your_ai, done`; `lib/queue/contract.ts` `QUEUE_STATES`. Owned by AWF-0060; migration plan in AWF-0073 |
+| §4, §17.2.4 | Three lifecycle states plus Needs-your-input flag, tab order Waiting on AI first, Everything last | Deferred | `convex/schema.ts` `queueItems.state` is `needs_you, working, waiting_for_your_ai, done`; `lib/queue/contract.ts` `QUEUE_STATES`. Owned by AWF-0060; migration plan in AWF-0075 |
 | §4 | Archive with Show archived; delete | Deferred (delete only) | `convex/queue.ts` `deleteQueueItemBatch` hard-deletes; cancel writes `state: "done", condition: "canceled"`; no archive field |
 | §4 | Queue item page | Deferred | No `app/app/queue/[id]` route; AWF-0060 |
 | §4 | Connected AI may add attributed Queue items | Deferred | Catalog has only `family_history_get_queue` and `family_history_update_queue` (`lib/mcp/catalog.ts`); Site Guide gap list |
@@ -1976,7 +1976,7 @@ before it was run.
   (2026-10-14) and recorded the result as a dated amendment: 14 requirements
   adopted, 21 deferred with their tracker owners, 3 deliberate differences. The
   Queue's four stored states (with "needs you" as a state) do not yet match
-  Core §4's three states plus a Needs-your-input flag; AWF-0073 holds the data
+  Core §4's three states plus a Needs-your-input flag; AWF-0075 holds the data
   migration plan. No code, data, provider or public-page change.
 - **1.10.0 · 2026-09-03** — corrected the chosen-AI capability record to the
   deployed seven-permission, sixteen-tool catalog and the private image-upload

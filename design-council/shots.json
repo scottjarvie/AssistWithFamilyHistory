@@ -1,0 +1,361 @@
+{
+  "baseURL": "http://localhost:3457",
+  "timezone": "America/Phoenix",
+  "hide": [
+    "nextjs-portal"
+  ],
+  "defaultVariants": [
+    "desktop-light",
+    "mobile-light"
+  ],
+  "shots": [
+    {
+      "name": "home",
+      "path": "/design-council-preview",
+      "capabilities": [
+        {
+          "can": "open all people",
+          "text": "All people"
+        },
+        {
+          "can": "open Story Studio",
+          "text": "Open Story Studio"
+        },
+        {
+          "can": "open research operations",
+          "text": "Work Research Queue"
+        },
+        {
+          "can": "see source import status",
+          "text": "Recent imports"
+        }
+      ]
+    },
+    {
+      "name": "people",
+      "path": "/design-council-preview?surface=people",
+      "capabilities": [
+        {
+          "can": "search",
+          "selector": "input[name=q]"
+        },
+        {
+          "can": "filter research state",
+          "selector": "button[aria-label=\"Filter people\"]"
+        },
+        {
+          "can": "open a person",
+          "selector": "a[href='/app/people/synthetic-0']"
+        },
+        {
+          "can": "see labelled document counts",
+          "selector": "td[data-label=\"Documents\"]"
+        },
+        {
+          "can": "change grouping",
+          "selector": "select[aria-label=\"Group records\"]"
+        },
+        {
+          "can": "change sorting",
+          "selector": "select[aria-label=\"Sort loaded records\"]"
+        },
+        {
+          "can": "save a named view",
+          "text": "+ New view"
+        },
+        {
+          "can": "manage named views",
+          "text": "Manage views"
+        },
+        {
+          "can": "choose density and columns",
+          "text": "Options"
+        }
+      ]
+    },
+    {
+      "name": "empty",
+      "path": "/design-council-preview?surface=empty",
+      "capabilities": [
+        {
+          "can": "create first connection",
+          "text": "Add your first connection"
+        },
+        {
+          "can": "import reviewed capture",
+          "text": "Or bring in a capture you have reviewed"
+        }
+      ]
+    },
+    {
+      "name": "home-dark",
+      "path": "/design-council-preview?theme=dark"
+    },
+    {
+      "name": "people-dark",
+      "path": "/design-council-preview?surface=people&theme=dark"
+    },
+    {
+      "name": "people-grid",
+      "path": "/design-council-preview?surface=people",
+      "variants": [
+        "desktop-light"
+      ],
+      "actions": [
+        {
+          "click": "button:has-text(\"grid\")"
+        }
+      ]
+    },
+    {
+      "name": "people-options",
+      "path": "/design-council-preview?surface=people",
+      "variants": [
+        "mobile-light"
+      ],
+      "actions": [
+        {
+          "click": "summary:has-text(\"Options\")"
+        }
+      ]
+    },
+    {
+      "name": "places",
+      "path": "/design-council-preview?surface=places",
+      "capabilities": [
+        {
+          "can": "search places",
+          "selector": "input[name=q]"
+        },
+        {
+          "can": "open a place",
+          "selector": "a[href=\"/app/places/place-1\"]"
+        },
+        {
+          "can": "see media counts",
+          "selector": "td[data-label=\"Media\"]"
+        }
+      ]
+    },
+    {
+      "name": "stories",
+      "path": "/design-council-preview?surface=stories",
+      "capabilities": [
+        {
+          "can": "filter publication state",
+          "selector": "button[aria-label=\"Filter stories\"]"
+        },
+        {
+          "can": "filter workflow",
+          "selector": "button[aria-label=\"Filter stories\"]"
+        },
+        {
+          "can": "review a story",
+          "selector": "a[href=\"/app/stories/story-1\"]"
+        },
+        {
+          "can": "open published story",
+          "text": "Open published story"
+        },
+        {
+          "can": "read full narrative preview",
+          "text": "Read full preview"
+        }
+      ]
+    },
+    {
+      "name": "research",
+      "path": "/design-council-preview?surface=research",
+      "capabilities": [
+        {
+          "can": "read original task description",
+          "text": "Compare the indexed entry"
+        },
+        {
+          "can": "filter activity by author",
+          "selector": "div[role=\"group\"][aria-label=\"Activity author\"]"
+        },
+        {
+          "can": "see source attribution uncertainty",
+          "text": "Self-reported model hint"
+        }
+      ]
+    },
+    {
+      "name": "writing",
+      "path": "/design-council-preview?surface=writing",
+      "capabilities": [
+        {
+          "can": "open person writing session",
+          "selector": "a[href=\"/app/people/synthetic-0/story-writer\"]"
+        },
+        {
+          "can": "see readiness",
+          "text": "Ready"
+        }
+      ]
+    },
+    {
+      "name": "person",
+      "path": "/design-council-preview?surface=person",
+      "capabilities": [
+        {
+          "can": "open every counted section",
+          "selector": "div[role=\"tablist\"][aria-label=\"Record sections\"]"
+        },
+        {
+          "can": "compare source-backed candidates",
+          "selector": "a[href=\"#record-section-sources\"]"
+        },
+        {
+          "can": "read earlier entries",
+          "text": "earlier entries"
+        },
+        {
+          "can": "export private context pack",
+          "text": "Download Context Pack"
+        }
+      ]
+    },
+    {
+      "name": "person-sources",
+      "path": "/design-council-preview?surface=person",
+      "actions": [
+        {
+          "click": "button[role=\"tab\"]:has-text(\"Sources\")"
+        }
+      ],
+      "capabilities": [
+        {
+          "can": "read conflicting source candidates",
+          "text": "Invented indexes disagree"
+        },
+        {
+          "can": "read full citation",
+          "text": "Synthetic transcript"
+        }
+      ]
+    },
+    {
+      "name": "person-research",
+      "path": "/design-council-preview?surface=person",
+      "actions": [
+        {
+          "click": "button[role=\"tab\"]:has-text(\"Research\")"
+        }
+      ],
+      "capabilities": [
+        {
+          "can": "inspect existing research controls",
+          "text": "Research Checks"
+        },
+        {
+          "can": "type context intake draft",
+          "selector": "input[placeholder=\"Context title\"]"
+        },
+        {
+          "can": "see private unreviewed context",
+          "text": "Invented letter note"
+        }
+      ]
+    },
+    {
+      "name": "person-documents",
+      "path": "/design-council-preview?surface=person",
+      "actions": [
+        {
+          "click": "button[role=\"tab\"]:has-text(\"Documents\")"
+        }
+      ],
+      "capabilities": [
+        {
+          "can": "read generated person sheet",
+          "text": "Synthetic Person Sheet"
+        },
+        {
+          "can": "open legacy transcript route",
+          "text": "Raw Evidence Document"
+        }
+      ]
+    },
+    {
+      "name": "person-memories",
+      "path": "/design-council-preview?surface=person",
+      "actions": [
+        {
+          "click": "button[role=\"tab\"]:has-text(\"Memories\")"
+        }
+      ],
+      "capabilities": [
+        {
+          "can": "see populated memory privacy and upload controls",
+          "text": "Upload"
+        },
+        {
+          "can": "see fixture mutation boundary",
+          "text": "mutations are disabled"
+        }
+      ]
+    },
+    {
+      "name": "person-dark",
+      "path": "/design-council-preview?surface=person&theme=dark"
+    },
+    {
+      "name": "person-research-dark",
+      "path": "/design-council-preview?surface=person&theme=dark",
+      "actions": [
+        {
+          "click": "button[role=\"tab\"]:has-text(\"Research\")"
+        }
+      ]
+    },
+    {
+      "name": "person-memories-dark",
+      "path": "/design-council-preview?surface=person&theme=dark",
+      "actions": [
+        {
+          "click": "button[role=\"tab\"]:has-text(\"Memories\")"
+        }
+      ]
+    },
+    {
+      "name": "person-memories-empty",
+      "path": "/design-council-preview?surface=person-no-media",
+      "actions": [
+        {
+          "click": "button[role=\"tab\"]:has-text(\"Memories\")"
+        }
+      ],
+      "capabilities": [
+        {
+          "can": "keep first upload available in empty Memories",
+          "text": "Upload files"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "name": "national-archives",
+      "url": "https://www.archives.gov/research/genealogy",
+      "variants": [
+        "desktop-light"
+      ]
+    },
+    {
+      "name": "uk-archives",
+      "url": "https://www.nationalarchives.gov.uk/help-with-your-research/research-guides/census-records/",
+      "variants": [
+        "desktop-light"
+      ]
+    },
+    {
+      "name": "github-issues",
+      "url": "https://github.com/microsoft/vscode/issues",
+      "variants": [
+        "desktop-light"
+      ]
+    }
+  ]
+}

@@ -68,3 +68,76 @@ sandbox-backend-before-source-owned-guard-20261007/
 .record-only-codegen-test-*/
 dependency-donor-receipt.json
 .local-sandbox/
+
+# Per-user agent settings (may hold local permission rules; never commit)
+.claude/settings.local.json
+
+# Council captures and blind packets (local evidence; never private data)
+design-council/reference/
+design-council/*/baseline/
+design-council/*/round-*/ours/
+design-council/*/round-*/packet/
+design-council/*/round-*/manifest.json
+design-council/*/round-*/judge-brief.md
+design-council/*/round-*/judges/*.raw.md
+
+# Self-contained generated council gallery embeds the ignored capture assets.
+design-council/*/gallery.html
+
+# Small local-path adapter for the inline HTML renderer; portable gallery remains separate.
+design-council/*/gallery-inline.html
+
+# Reconstructed archive JSX captures (current shared runtime; original route source).
+design-council/*/baseline-reconstructed/
+
+# Follow-up to the reviewed collection capture tranche.
+design-council/*/collection-fixes/
+
+# Activity/facet capture tranche; formal judging is recorded separately.
+design-council/*/activity-facets/
+
+# Person record capture tranche, separate from formal judging packets.
+design-council/*/record-stream/
+
+# Compressed viewing copies for the inline council gallery.
+design-council/*/.gallery-preview/
+
+# Place/Story record capture tranche, separate from formal scoring.
+design-council/*/place-story-records/
+
+# Lead fixes from Place/Story exact-head review.
+design-council/*/record-review-fixes/
+
+# Queue list/thread capture tranche.
+design-council/*/queue-records/
+
+# Operations and Queue review refinements, separate from formal scoring packets.
+design-council/*/operations-records/
+design-council/*/queue-review-fixes/
+
+# Shared collection / Queue corrections after Opus27bee8e.
+design-council/*/review-refinements/
+
+# Audit instrument capture tranche.
+design-council/*/audit-instruments/
+design-council/*/audit-baseline/
+
+# Audit refinements after exact-head Opus review.
+design-council/*/audit-review-fixes/
+
+# Settings matrix council captures.
+design-council/*/settings-baseline/
+design-council/*/settings-matrices/
+
+# Retained nonaccepted capture attempts (theme label mismatch)
+design-council/*/settings-capture-attempt*/
+
+design-council/*/settings-capture-before-focus/
+
+# Document reader council captures.
+design-council/*/readers-baseline/
+design-council/*/readers-field-guide/
+design-council/*/readers-attempt*/
+
+# Optional full-resolution self-contained gallery export.
+design-council/*/gallery-full-resolution.html

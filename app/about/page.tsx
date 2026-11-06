@@ -69,8 +69,8 @@ export default function AboutPage() {
 
           {/* Mission */}
           <section className="mb-16">
-            <h2 className="text-2xl font-bold text-stone-900 mb-4">Our Mission</h2>
-            <div className="prose prose-stone prose-lg max-w-none">
+            <h2 className="text-2xl font-bold text-stone-900 mb-4">Our mission</h2>
+            <div className="prose prose-stone prose-lg max-w-none space-y-4">
               <p className="text-stone-600 leading-relaxed">
                 Traditional genealogy software focuses on building trees—collecting names, 
                 dates, and connecting relationships. That&apos;s important work, but it&apos;s only 
@@ -91,7 +91,7 @@ export default function AboutPage() {
 
           {/* Principles */}
           <section className="mb-16">
-            <h2 className="text-2xl font-bold text-stone-900 mb-8">Our Principles</h2>
+            <h2 className="text-2xl font-bold text-stone-900 mb-8">Our principles</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {principles.map((principle) => (
                 <div key={principle.title} className="flex gap-4">
@@ -115,8 +115,8 @@ export default function AboutPage() {
 
           {/* How It Works */}
           <section className="mb-16">
-            <h2 className="text-2xl font-bold text-stone-900 mb-4">How It Works</h2>
-            <div className="bg-stone-50 rounded-2xl p-8">
+            <h2 className="text-2xl font-bold text-stone-900 mb-4">How it works</h2>
+            <div className="bg-stone-50 rounded-2xl p-5 sm:p-8">
               <ol className="space-y-6">
                 <li className="flex gap-4">
                   <span className="flex-shrink-0 w-8 h-8 bg-amber-700 text-white rounded-full flex items-center justify-center font-bold">
@@ -124,7 +124,7 @@ export default function AboutPage() {
                   </span>
                   <div>
                     <h3 className="font-semibold text-stone-900">Extract</h3>
-                    <p className="text-stone-500">
+                    <p className="text-stone-500 text-sm leading-relaxed">
                       Begin with a person and known relationship, or preserve the source, memory,
                       place, event, or question that brought you here.
                     </p>
@@ -136,7 +136,7 @@ export default function AboutPage() {
                   </span>
                   <div>
                     <h3 className="font-semibold text-stone-900">Document</h3>
-                    <p className="text-stone-500">
+                    <p className="text-stone-500 text-sm leading-relaxed">
                       Keep original material, citations, extracts, confidence, conflicts, and
                       capture provenance connected to every relevant person and event.
                     </p>
@@ -148,7 +148,7 @@ export default function AboutPage() {
                   </span>
                   <div>
                     <h3 className="font-semibold text-stone-900">Contextualize</h3>
-                    <p className="text-stone-500">
+                    <p className="text-stone-500 text-sm leading-relaxed">
                       Compare evidence and context without silently turning a proposal into a fact.
                       Unresolved gaps become durable research work rather than lost chat history.
                     </p>
@@ -160,7 +160,7 @@ export default function AboutPage() {
                   </span>
                   <div>
                     <h3 className="font-semibold text-stone-900">Tell</h3>
-                    <p className="text-stone-500">
+                    <p className="text-stone-500 text-sm leading-relaxed">
                       Build a private, source-aware story, follow details back to their evidence,
                       and keep publication as a separate human-reviewed decision.
                     </p>

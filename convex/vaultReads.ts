@@ -7,9 +7,10 @@ import type {
   FunctionReturnType,
 } from "convex/server";
 import { v } from "convex/values";
+import {auditMetrics} from "../lib/audit/contract";
 import { internal } from "./_generated/api";
 import { action, type ActionCtx } from "./_generated/server";
-import { authorizeTenantAction, type TrustBoundaryShadowEntry } from "./access";
+import { decideTenantAccess, authorizeTenantAction, type TrustBoundaryShadowEntry } from "./access";
 import type * as vaultFunctions from "./vault";
 import { EvidenceB2Store, loadEvidenceB2Config } from "../lib/media/evidenceB2";
 
@@ -183,11 +184,26 @@ export const getOperationsSummary = action({
 });
 
 export const getVaultAudit = action({
-  args: { vaultOwnerId: v.string() },
-  handler: async (ctx, args): Promise<FunctionReturnType<typeof vaultInternal.getVaultAudit>> =>
-    ctx.runQuery(vaultInternal.getVaultAudit, {
+  args: {
+    vaultOwnerId: v.string(),
+    metric: v.optional(v.union(...auditMetrics.map(metric => v.literal(metric)))),
+    offset: v.optional(v.number()),
+  },
+  handler: async (ctx, args): Promise<FunctionReturnType<typeof vaultInternal.getVaultAudit>> => {
+    // New record drilldowns always require the matched authenticated owner,
+    // including during the legacy shadow rollout. Ordinary summary callers
+    // retain their existing authorization and response behavior.
+    if (args.metric) {
+      const identity = await ctx.auth.getUserIdentity();
+      const decision = decideTenantAccess({identitySubject: identity?.subject, suppliedOwner: args.vaultOwnerId, mode: "enforce"});
+      if (!decision.allowed) throw new Error(`Trust boundary denied: ${decision.reason}`);
+      if (!Number.isSafeInteger(args.offset ?? 0) || (args.offset ?? 0) < 0) throw new Error("Invalid Audit offset");
+    }
+    return ctx.runQuery(vaultInternal.getVaultAudit, {
+      ...args,
       vaultOwnerId: await authorizedOwner(ctx, "vault.getVaultAudit", args.vaultOwnerId),
-    }),
+    });
+  },
 });
 
 export const getContextCoverage = action({
@@ -227,6 +243,15 @@ export const getPlaceWorkspace = action({
     ctx.runQuery(vaultInternal.getPlaceWorkspace, {
       ...args,
       vaultOwnerId: await authorizedOwner(ctx, "vault.getPlaceWorkspace", args.vaultOwnerId),
+    }),
+});
+
+/** The People pages' small question: may the private first start be offered? */
+export const getFirstStartEligibility = action({
+  args: { vaultOwnerId: v.string() },
+  handler: async (ctx, args): Promise<FunctionReturnType<typeof vaultInternal.getFirstStartEligibility>> =>
+    ctx.runQuery(vaultInternal.getFirstStartEligibility, {
+      vaultOwnerId: await authorizedOwner(ctx, "vault.getFirstStartEligibility", args.vaultOwnerId),
     }),
 });
 

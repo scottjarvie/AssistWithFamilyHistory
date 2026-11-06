@@ -1,0 +1,176 @@
+{
+  "checkedAt": "2026-11-05T17:37:30.350Z",
+  "checks": [
+    "Six grant states use one responsive DOM with unique consent IDs and no invented connection operations",
+    "Narrow sends exactly the retained permissions, no owner, and cannot offer a removed ability back",
+    "Explicit expiry and removal retain the existing endpoint/body, scopes and record boundary",
+    "Named revoke confirmation cancels without a write and preserves reason/context after a failed attempt",
+    "Pending review keeps all/no-end defaults and boundary/label choices; replacement approval never activates the old ID",
+    "Closed reapproval is reachable in one row action and preserves chosen partial permissions",
+    "Expired renewal changes only the existing end-date action, retaining its one chosen permission",
+    "Closed Remove remains a direct existing action; other connections and their work stay present",
+    "Provider key masking/save/test retain legacy storage and model-list endpoint with an invented intercepted credential",
+    "Every model remains available and privacy preference persists without promising a bypass or an unimplemented redaction effect",
+    "Admin preference retains confirmation/warnings/cancel/disable and the modal close target is44px",
+    "Key mint retains preset/body and one-time secret, honest clipboard fallback and explicit dismissal",
+    "Suspend is confirmed, ACK state survives a failed read, retry works and Reactivate remains direct",
+    "Key revoke is named/confirmed and keeps the exact DELETE endpoint",
+    "Operator counts filter their actual current-vault rows; stale evidence and full recorded scopes remain reachable",
+    "All four surfaces and in-place editors fit1440/1280/390/320px with desktop comparison/mobile dossiers and dark phones"
+  ],
+  "requests": [
+    {
+      "path": "/api/ai-connections",
+      "method": "POST",
+      "body": {
+        "action": "reduce",
+        "scopes": [
+          "family_history:evidence:read",
+          "family_history:evidence:write",
+          "family_history:research:write",
+          "family_history:story:draft",
+          "family_history:queue:read",
+          "family_history:queue:work"
+        ],
+        "grantId": "synthetic-full"
+      }
+    },
+    {
+      "path": "/api/ai-connections",
+      "method": "POST",
+      "body": {
+        "action": "expiry",
+        "expiresInDays": 7,
+        "grantId": "synthetic-full"
+      }
+    },
+    {
+      "path": "/api/ai-connections",
+      "method": "POST",
+      "body": {
+        "action": "expiry",
+        "grantId": "synthetic-full"
+      }
+    },
+    {
+      "path": "/api/ai-connections",
+      "method": "POST",
+      "body": {
+        "action": "revoke",
+        "reason": "Finished the invented pass",
+        "grantId": "synthetic-full"
+      }
+    },
+    {
+      "path": "/api/ai-connections",
+      "method": "POST",
+      "body": {
+        "action": "revoke",
+        "reason": "Finished the invented pass",
+        "grantId": "synthetic-full"
+      }
+    },
+    {
+      "path": "/api/ai-connections",
+      "method": "POST",
+      "body": {
+        "action": "approve",
+        "label": "Reviewed invented helper",
+        "scopes": [
+          "family_history:context:read",
+          "family_history:evidence:read",
+          "family_history:evidence:write",
+          "family_history:research:write",
+          "family_history:story:draft",
+          "family_history:queue:read",
+          "family_history:queue:work"
+        ],
+        "boundary": {
+          "kind": "selected_people",
+          "personIds": [
+            "synthetic-eleanor",
+            "synthetic-samuel"
+          ]
+        },
+        "grantId": "synthetic-pending"
+      }
+    },
+    {
+      "path": "/api/ai-connections",
+      "method": "POST",
+      "body": {
+        "action": "expiry",
+        "expiresInDays": 30,
+        "grantId": "synthetic-expired"
+      }
+    },
+    {
+      "path": "/api/ai-connections",
+      "method": "POST",
+      "body": {
+        "action": "remove",
+        "grantId": "synthetic-denied"
+      }
+    },
+    {
+      "path": "intercepted-provider-model-check",
+      "method": "GET"
+    },
+    {
+      "path": "/api/keys",
+      "method": "POST",
+      "body": {
+        "label": "Invented new developer key",
+        "preset": "read_only_assistant"
+      }
+    },
+    {
+      "path": "/api/keys",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "path": "/api/keys/synthetic-key-active",
+      "method": "PATCH",
+      "body": {
+        "status": "suspended"
+      }
+    },
+    {
+      "path": "/api/keys",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "path": "/api/keys",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "path": "/api/keys/synthetic-key-active",
+      "method": "PATCH",
+      "body": {
+        "status": "active"
+      }
+    },
+    {
+      "path": "/api/keys",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "path": "/api/keys/synthetic-key-active",
+      "method": "DELETE",
+      "body": null
+    },
+    {
+      "path": "/api/keys",
+      "method": "GET",
+      "body": null
+    }
+  ],
+  "expectedFailures": 2,
+  "errors": [],
+  "unexpectedRequests": [],
+  "note": "All API/provider requests fulfilled with invented data. Client wiring only; no real keys, grants, provider charges or backend acceptance."
+}

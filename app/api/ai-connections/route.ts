@@ -17,6 +17,7 @@ import { z } from "zod";
 
 import {
   approveGrantRef,
+  updateGrantExpiryRef,
   denyGrantRef,
   reduceGrantScopesRef,
   removeGrantRef,
@@ -58,6 +59,7 @@ const RequestSchema = z.discriminatedUnion("action", [
     grantId: z.string().min(1),
     reason: z.string().max(300).optional(),
   }),
+  z.object({ action: z.literal("expiry"), grantId: z.string().min(1), expiresInDays: z.number().int().min(1).max(365).optional() }),
   z.object({ action: z.literal("remove"), grantId: z.string().min(1) }),
 ]);
 
@@ -134,6 +136,10 @@ export async function POST(request: NextRequest) {
           grantId: body.grantId,
           reason: body.reason,
         });
+        return NextResponse.json({ success: true, ...result });
+      }
+      case "expiry": {
+        const result = await client.mutation(updateGrantExpiryRef, { vaultOwnerId, grantId: body.grantId, expiresInDays: body.expiresInDays });
         return NextResponse.json({ success: true, ...result });
       }
       case "remove": {

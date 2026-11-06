@@ -1,0 +1,80 @@
+{
+  "baseURL": "http://localhost:3457",
+  "timezone": "America/Phoenix",
+  "defaultVariants": [
+    "desktop-light",
+    "mobile-light"
+  ],
+  "shots": [
+    {
+      "name": "operations",
+      "path": "/design-council-preview?surface=operations",
+      "actions": [],
+      "capabilities": [
+        {
+          "can": "retain Operations",
+          "text": "Operations"
+        }
+      ]
+    },
+    {
+      "name": "operations-dark",
+      "path": "/design-council-preview?surface=operations&theme=dark",
+      "actions": [],
+      "capabilities": [
+        {
+          "can": "retain Operations",
+          "text": "Operations"
+        }
+      ]
+    },
+    {
+      "name": "operations-provisional",
+      "path": "/design-council-preview?surface=operations&type=provisional",
+      "actions": [],
+      "capabilities": [
+        {
+          "can": "retain Operations",
+          "text": "Operations"
+        }
+      ]
+    },
+    {
+      "name": "operations-filter-dark",
+      "path": "/design-council-preview?surface=operations&theme=dark",
+      "actions": [
+        {
+          "click": "button[aria-label=\"Filter research rows\"]"
+        }
+      ],
+      "capabilities": [
+        {
+          "can": "retain Operations",
+          "text": "Operations"
+        }
+      ]
+    },
+    {
+      "name": "operations-guest",
+      "path": "/design-council-preview?surface=operations-guest",
+      "actions": [],
+      "capabilities": [
+        {
+          "can": "retain Operations",
+          "text": "Operations"
+        }
+      ]
+    },
+    {
+      "name": "operations-empty",
+      "path": "/design-council-preview?surface=operations-empty",
+      "actions": [],
+      "capabilities": [
+        {
+          "can": "retain Operations",
+          "text": "Operations"
+        }
+      ]
+    }
+  ]
+}

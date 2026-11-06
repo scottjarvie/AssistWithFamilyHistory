@@ -1,0 +1,26 @@
+{
+  "baseURL": "http://localhost:3457",
+  "timezone": "America/Phoenix",
+  "defaultVariants": [
+    "desktop-light",
+    "mobile-light"
+  ],
+  "shots": [
+    {
+      "name": "reader-raw-wip",
+      "path": "/design-council-preview?surface=reader-raw",
+      "viewportOnly": true
+    },
+    {
+      "name": "reader-dossier-wip",
+      "path": "/design-council-preview?surface=reader-contextualized",
+      "viewportOnly": true
+    },
+    {
+      "name": "reader-source-notes-wip",
+      "path": "/design-council-preview?surface=reader-contextualized",
+      "viewportOnly": true,
+      "focus": "[data-reader-block=\"paragraph\"]:has(aside[aria-label=\"Sources named in this paragraph\"])"
+    }
+  ]
+}

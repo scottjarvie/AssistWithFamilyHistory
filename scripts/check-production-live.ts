@@ -18,15 +18,14 @@
  * # expect 200
  * ```
  *
- * It returns **404 forever**, on every build, no matter what is deployed.
- * `/app/*` is a protected route, so `clerkMiddleware` calls `auth.protect()`
- * for a signed-out visitor — and Clerk content-negotiates its refusal. A
- * request that does not say it accepts HTML is treated as a data request and
- * gets a rewrite to 404 (`x-clerk-auth-reason: protect-rewrite`); a real
- * browser, which sends `Accept: text/html`, gets `307 → /sign-in`. `curl`
- * sends a wildcard Accept and never asks for HTML. So the probe measured
- * curl's Accept header, not the deploy, and 200 was never a reachable
- * expectation while signed out.
+ * It returned **404** on every build, no matter what was deployed.
+ * `/app/*` is a protected route. A signed-out read is redirected to
+ * `/sign-in` and back to the requested page, for a browser and for curl.
+ * That used to be true only when the request accepted HTML. Anything else
+ * was rewritten to 404 (`x-clerk-auth-reason: protect-rewrite`), so a bare
+ * curl looked exactly like a missing route. On 2026-08-17 that 404 was read
+ * as a failed deploy. It was not: production was current, and 200 was never
+ * a reachable expectation while signed out.
  *
  * The cost of that mistake was large: a correct, healthy production deployment
  * was read as a failed one, and work was queued to "recover" it.
@@ -34,8 +33,9 @@
  * ## The rule this encodes
  *
  * **Never infer deploy freshness from the status code of an authenticated
- * route.** An auth refusal and a missing route look alike from outside, and
- * the auth refusal is the one that never changes. Prove freshness from an
+ * route.** A signed-out vault page redirects to sign-in on every build. That
+ * redirect is not a freshness signal, and a 404 there is a regression, not
+ * proof of which commit is deployed. Prove freshness from an
  * unauthenticated, content-bearing surface instead. `/ai.txt` is exactly that:
  * public, generated from `lib/mcp/catalog.ts`, and therefore a direct
  * fingerprint of the deployed catalogue.
@@ -52,7 +52,15 @@ const BROWSER_ACCEPT =
   "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8";
 
 const failures: string[] = [];
-const notes: string[] = [];
+
+const SIGNED_OUT_VAULT_PAGES = [
+  "/app",
+  "/app/imports",
+  "/app/people",
+  "/app/queue",
+  "/app/story-writer",
+  "/app/settings/ai",
+] as const;
 
 function ok(label: string, detail: string) {
   console.log(`  PASS  ${label} — ${detail}`);
@@ -103,47 +111,45 @@ async function checkCatalogueIsCurrent() {
 
 /* ------------------------------------------------------- 2 · the auth boundary */
 
-async function checkProtectedRouteRefusesCorrectly() {
-  const asBrowser = await fetch(`${BASE}/app/settings/ai`, {
-    headers: { accept: BROWSER_ACCEPT },
+async function expectSignedOutVaultRedirect(path: string, accept: string, label: string) {
+  const response = await fetch(`${BASE}${path}`, {
+    headers: { accept },
     redirect: "manual",
   });
-
-  if (asBrowser.status === 307 || asBrowser.status === 302) {
-    const location = asBrowser.headers.get("location") ?? "";
-    if (location.includes("/sign-in")) {
-      ok(
-        "/app/settings/ai refuses a signed-out browser correctly",
-        `${asBrowser.status} → /sign-in`,
-      );
-    } else {
-      fail(
-        "/app/settings/ai refuses a signed-out browser correctly",
-        `redirected to ${location || "(no location)"} rather than /sign-in`,
-      );
-    }
-  } else if (asBrowser.status === 200) {
-    fail(
-      "/app/settings/ai refuses a signed-out browser correctly",
-      "returned 200 to a signed-out visitor — the connection centre must never be readable without sign-in",
-    );
-  } else {
-    fail(
-      "/app/settings/ai refuses a signed-out browser correctly",
-      `expected 307 → /sign-in, got ${asBrowser.status}`,
-    );
+  const location = response.headers.get("location") ?? "";
+  let returnTo = "";
+  try {
+    returnTo = new URL(location, BASE).searchParams.get("redirect_url") ?? "";
+  } catch {
+    returnTo = "";
   }
+  const returnsToPage = returnTo === `${BASE}${path}`;
 
-  // The historical false alarm, asserted so it can never be mistaken again.
-  const asCurl = await fetch(`${BASE}/app/settings/ai`, {
-    headers: { accept: "*/*" },
-    redirect: "manual",
-  });
-  if (asCurl.status === 404) {
-    notes.push(
-      "A request without `Accept: text/html` gets 404 from /app/settings/ai " +
-        "(Clerk's protect-rewrite for signed-out data requests). That is the auth " +
-        "boundary working, NOT a stale deploy. Do not use it as a deploy signal.",
+  if ((response.status === 307 || response.status === 302) && location.includes("/sign-in") && returnsToPage) {
+    ok(label, `${response.status} → /sign-in, then back to ${path}`);
+    return;
+  }
+  if (response.status === 200) {
+    fail(label, "returned 200 to a signed-out visitor");
+    return;
+  }
+  fail(
+    label,
+    `expected 307 → /sign-in?redirect_url=${BASE}${path}, got ${response.status} location=${location || "(none)"}`,
+  );
+}
+
+async function checkProtectedRouteRefusesCorrectly() {
+  for (const path of SIGNED_OUT_VAULT_PAGES) {
+    await expectSignedOutVaultRedirect(
+      path,
+      BROWSER_ACCEPT,
+      `${path} redirects a signed-out browser to sign-in`,
+    );
+    await expectSignedOutVaultRedirect(
+      path,
+      "*/*",
+      `${path} redirects a signed-out non-document read to sign-in`,
     );
   }
 }
@@ -292,11 +298,6 @@ async function main() {
   const authorizationServer = await checkResourceMetadata();
   if (authorizationServer) {
     await checkAuthorizationServer(authorizationServer);
-  }
-
-  if (notes.length > 0) {
-    console.log("\nWorth knowing:");
-    for (const note of notes) console.log(`  - ${note}`);
   }
 
   if (failures.length > 0) {

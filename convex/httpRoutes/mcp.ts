@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- Generated Convex references and SDK callbacks cross a runtime-validated MCP boundary. */
 import type { HttpRouter } from "convex/server";
+import { currentMediaForExport } from "../../lib/media/currentMediaForExport";
 import { EVIDENCE_LARGE_ORIGINAL_MAX_BYTES, EVIDENCE_UPLOAD_TYPES } from "../../lib/media/evidenceStandard";
 import { McpServer, createMcpHandler, type AuthInfo } from "@modelcontextprotocol/server";
 import { createRemoteJWKSet, errors as joseErrors, jwtVerify } from "jose";
@@ -19,10 +20,16 @@ import {
   type AccessRefusal,
   type GrantResolution,
 } from "../../lib/mcp/authorize";
+import { effectiveScopes } from "../../lib/mcp/grantDefaults";
 import { EVIDENCE_SKIP_GUIDANCE } from "../mcpEvidence";
 
 const SERVER_NAME = "assist-with-family-history";
 const SERVER_VERSION = "0.3.0";
+// Preserve the current rich record batches while bounding pre-schema work.
+// A near-byte-limit mixed records batch can exceed 32K entries. Keep 64K
+// headroom for that supported shape while rejecting compact array bombs before
+// schema validation; the independent 256 KiB transport limit still applies.
+const MAX_MCP_TOOL_INPUT_ELEMENTS = 65_536;
 const DEFAULT_RESOURCE = "https://assistwithfamilyhistory.com/mcp";
 const LEGACY_RESOURCE_HOST = "discovertheirstories.com";
 const LEGACY_ISSUER_HOST = "clerk.discovertheirstories.com";
@@ -351,6 +358,8 @@ const citationSave = z.discriminatedUnion("mode", [
   z.object({ mode: z.literal("create"), createKey, ...citationFields, confidence: z.enum(["very_high", "high", "medium", "low", "very_low"]) }).strict(),
   z.object({ mode: z.literal("update"), citationId: id, expectedUpdatedAt: z.number(), ...citationFields }).strict(),
 ]);
+// A connected AI proposes facts; only the person accepts one.
+const factProposalStatus = z.enum(["candidate", "conflict", "rejected"]).describe("candidate (default), conflict or rejected. Only the person can accept a fact.");
 const recordField = z.object({ label: z.string().trim().min(1).max(300), value: z.string().trim().min(1).max(2_000) }).strict();
 const sourceContent = z.object({
   contentKey: createKey,
@@ -385,7 +394,7 @@ const evidenceSave = z.object({
   contents: z.array(sourceContent).max(FAMILY_HISTORY_MCP_LIMITS.contentsPerCall).optional(),
   personas: z.array(persona).max(60).optional(),
   links: z.array(z.object({ targetType: z.enum(["person", "relationship", "event", "place"]), targetId: id, field: z.string().max(160).optional() }).strict()).max(30).optional(),
-  facts: z.array(z.object({ factKey: createKey, personId: id, factType: z.enum(["name", "sex", "birth", "death", "marriage", "census_residence", "residence", "occupation", "other"]), label: z.string().min(1).max(300), value: z.string().min(1).max(2_000), date: z.string().max(160).optional(), place: z.string().max(500).optional(), confidence: z.enum(["high", "medium", "low"]), status: z.enum(["candidate", "accepted", "conflict", "rejected"]).optional(), conflictReason: z.string().max(1_000).optional(), ...claimExtras }).strict()).max(30).optional(),
+  facts: z.array(z.object({ factKey: createKey, personId: id, factType: z.enum(["name", "sex", "birth", "death", "marriage", "census_residence", "residence", "occupation", "other"]), label: z.string().min(1).max(300), value: z.string().min(1).max(2_000), date: z.string().max(160).optional(), place: z.string().max(500).optional(), confidence: z.enum(["high", "medium", "low"]), status: factProposalStatus.optional(), conflictReason: z.string().max(1_000).optional(), ...claimExtras }).strict()).max(30).optional(),
 }).strict();
 
 const researchTaskFields = {
@@ -435,7 +444,7 @@ function compactPersonWorkspace(workspace: any) {
     researchLog: (workspace.researchLog ?? []).slice(0, cap),
     stories: (workspace.stories ?? []).slice(0, cap),
     contextItems: (workspace.contextItems ?? []).filter((item: any) => item.aiUseAllowed && item.reviewStatus === "reviewed").slice(0, cap),
-    media: (workspace.media ?? []).filter((item: any) => item.aiUseAllowed && item.reviewStatus === "reviewed").slice(0, cap),
+    media: (workspace.media ?? []).filter((item: any) => item.aiUseAllowed && item.reviewStatus === "reviewed").slice(0, cap).map(currentMediaForExport),
     places: (workspace.places ?? []).slice(0, cap),
     researchChecks: (workspace.researchChecks ?? []).slice(0, cap),
     operations: workspace.operations,
@@ -445,8 +454,47 @@ function compactPersonWorkspace(workspace: any) {
   };
 }
 
-function withOperation<T extends z.ZodType>(schema: T) {
-  return z.intersection(z.object({ operationId }).strict(), schema);
+/**
+ * One object-shaped envelope: `operationId` beside the payload's own fields.
+ *
+ * Clients read the published JSON Schema, not the Zod. An intersection
+ * publishes `allOf: [{operationId}, oneOf[...]]`, which is not object-shaped:
+ * Claude flattened it to `{operationId}` alone and showed the AI none of the
+ * payload fields, and a JSON Schema validator rejects every call because each
+ * `allOf` half forbids the other's keys. So the published shape is one strict
+ * object holding every key any mode accepts (and `mode` as an enum), and the
+ * exact per-mode rules are still enforced here, server-side, against the
+ * original schema.
+ */
+function withOperation(schema: z.ZodType) {
+  const shape: Record<string, z.ZodType> = {};
+  const optional = (field: z.ZodType) => (field instanceof z.ZodOptional ? field : field.optional());
+  if (schema instanceof z.ZodDiscriminatedUnion) {
+    const modes: string[] = [];
+    for (const option of schema.options as z.ZodObject[]) {
+      for (const [key, field] of Object.entries(option.shape)) {
+        if (key === "mode") {
+          modes.push(...[...(field as z.ZodLiteral<string>).values].map(String));
+          continue;
+        }
+        shape[key] ??= optional(field as z.ZodType);
+      }
+    }
+    shape.mode = z.enum(modes as [string, ...string[]]);
+  } else if (schema instanceof z.ZodObject) {
+    Object.assign(shape, schema.shape);
+  } else {
+    throw new Error("withOperation needs an object or a discriminated union of objects.");
+  }
+  return z.object({ operationId, ...shape }).strict().superRefine((value, ctx) => {
+    const payload: Record<string, unknown> = { ...value };
+    delete payload.operationId;
+    const exact = schema.safeParse(payload);
+    if (exact.success) return;
+    for (const issue of exact.error.issues) {
+      ctx.addIssue({ code: "custom", message: issue.message, path: issue.path as PropertyKey[] });
+    }
+  });
 }
 
 /* ------------------------------------------------------------ batch schemas */
@@ -500,7 +548,7 @@ const batchEvidenceSave = z.object({
     date: z.string().max(160).optional(),
     place: z.string().max(500).optional(),
     confidence: z.enum(["high", "medium", "low"]),
-    status: z.enum(["candidate", "accepted", "conflict", "rejected"]).optional(),
+    status: factProposalStatus.optional(),
     conflictReason: z.string().max(1_000).optional(),
     ...claimExtras,
   }).strict()).max(30).optional(),
@@ -604,10 +652,13 @@ export function createFamilyHistoryServer(
   const grantId = grant?.grantId;
 
   const instructions = grant
-    ? `Call family_history_get_brief first. Search, then hydrate a stable ID before editing. For a source that touches several people at once — a census page, a family group sheet — use family_history_save_records: one call, per-item results. Use family_history_save_complete_result when the pass must be all-or-nothing. Never publish, delete, merge identities, or invent owner/workspace IDs. This connection is approved for: ${grant.scopes.join(", ")}. Tools available to it: ${permitted.map((tool) => tool.name).join(", ")}.`
+    ? `Call family_history_get_brief first. Search, then hydrate a stable ID before editing. For a source that touches several people at once — a census page, a family group sheet — use family_history_save_records: one call, per-item results. Use family_history_save_complete_result when the pass must be all-or-nothing. Never publish, delete, merge identities, or invent owner/workspace IDs. This connection is approved for: ${effectiveScopes(grant).join(", ")}. Tools available to it: ${permitted.map((tool) => tool.name).join(", ")}.`
     : `This AI connection has not been approved for Assist With Family History yet. Signing in proved who the person is; it did not decide what this connection may do. Ask the person to open ${CONNECTION_SETTINGS_URL}, choose which parts of their research this connection may use, and approve it. No Family History tools are available until they do.`;
 
-  const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, { instructions });
+  const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, {
+    instructions,
+    maxToolInputElements: MAX_MCP_TOOL_INPUT_ELEMENTS,
+  });
 
   /** Register the canonical name and its compatibility alias on ONE handler. */
   const registerTool = (
@@ -738,10 +789,12 @@ export function createFamilyHistoryServer(
         return { ...workspace, ...originals, truncated: workspace.truncated || originals.truncated };
       }
       if (input.kind === "story") {
-        return await actionCtx.runQuery(vault.getStoryReview, {
+        const bundle = await actionCtx.runQuery(vault.getStoryReview, {
           vaultOwnerId: principal.subject,
           storyId: input.id as any,
         });
+        // The human review view retains history; AI context gets current media.
+        return bundle ? { ...bundle, media: bundle.media.map(currentMediaForExport) } : null;
       }
       return await actionCtx.runQuery(mcp.getRecordContext, { principal, kind: input.kind, id: input.id });
     });
@@ -980,7 +1033,7 @@ export function createFamilyHistoryServer(
     ownerId: principal.subject,
     actorId: "oauth-chosen-ai",
     actorKind: "chosen_ai" as const,
-    scopes: queueScopesForGrant(grant?.scopes ?? []),
+    scopes: queueScopesForGrant(grant ? effectiveScopes(grant) : []),
     credentialId: `${principal.issuer}#${principal.clientId}`,
   };
 
@@ -999,6 +1052,8 @@ export function createFamilyHistoryServer(
           principal: queuePrincipal,
           state: input.state,
           priority: input.priority,
+          // A connection narrowed to named Queue items lists only those.
+          queueItemIds: grant?.boundary?.queueItemIds?.length ? grant.boundary.queueItemIds : undefined,
           paginationOpts: { numItems: input.limit, cursor: input.cursor ?? null },
         });
       }
@@ -1183,7 +1238,7 @@ async function handleMcp(actionCtx: ActionCtx, request: Request) {
   };
   const handler = createMcpHandler(
     () => createFamilyHistoryServer(actionCtx, principal, resolution),
-    { legacy: "stateless", responseMode: "json", onerror: () => console.error("[MCP] Family History protocol error") },
+    { legacy: "stateless", responseMode: "json", maxRequestBodySize: FAMILY_HISTORY_MCP_LIMITS.requestBytes, onerror: () => console.error("[MCP] Family History protocol error") },
   );
   return await handler.fetch(request, { authInfo: auth });
 }

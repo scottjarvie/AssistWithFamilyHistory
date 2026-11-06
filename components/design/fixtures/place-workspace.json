@@ -1,0 +1,295 @@
+{
+  "place": {
+    "_id": "places:synthetic-1",
+    "_creationTime": 1793808000000,
+    "createdAt": 1793808000000,
+    "updatedAt": 1793808000000,
+    "vaultOwnerId": "synthetic-design-only",
+    "name": "Ashford",
+    "fullName": "Ashford, Kent, England",
+    "type": "city"
+  },
+  "events": [
+    {
+      "_id": "events:synthetic-1",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793808000000,
+      "updatedAt": 1793808000000,
+      "vaultOwnerId": "synthetic-design-only",
+      "type": "birth",
+      "date": {
+        "original": "14 March 1842",
+        "year": 1842
+      },
+      "place": {
+        "original": "Ashford",
+        "placeId": "places:synthetic-1"
+      }
+    }
+  ],
+  "people": [
+    {
+      "_id": "persons:synthetic-1",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793808000000,
+      "updatedAt": 1793808000000,
+      "vaultOwnerId": "synthetic-design-only",
+      "fsId": "synthetic-eleanor",
+      "name": {
+        "given": "Eleanor",
+        "surname": "Finch"
+      },
+      "sex": "female",
+      "living": false,
+      "birth": {
+        "date": {
+          "original": "14 March 1842",
+          "year": 1842
+        },
+        "place": {
+          "original": "Ashford, Kent, England",
+          "placeId": "places:synthetic-1"
+        }
+      },
+      "death": {
+        "date": {
+          "original": "9 July 1913",
+          "year": 1913
+        },
+        "place": {
+          "original": "Whitby, Yorkshire, England",
+          "placeId": "places:synthetic-2"
+        }
+      },
+      "researchStatus": "in_progress",
+      "routeId": "synthetic-eleanor"
+    },
+    {
+      "_id": "persons:synthetic-2",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793808000000,
+      "updatedAt": 1793808000000,
+      "vaultOwnerId": "synthetic-design-only",
+      "fsId": "synthetic-samuel",
+      "name": {
+        "given": "Samuel",
+        "surname": "Finch"
+      },
+      "sex": "male",
+      "living": false,
+      "researchStatus": "basic",
+      "routeId": "synthetic-samuel"
+    }
+  ],
+  "sources": [
+    {
+      "_id": "sources:synthetic-1",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793808000000,
+      "updatedAt": 1793808000000,
+      "vaultOwnerId": "synthetic-design-only",
+      "title": "Invented parish register",
+      "type": "church_record",
+      "repository": "Synthetic archive",
+      "url": "https://example.invalid/synthetic-register"
+    }
+  ],
+  "citations": [
+    {
+      "_id": "citations:synthetic-1",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793808000000,
+      "updatedAt": 1793808000000,
+      "vaultOwnerId": "synthetic-design-only",
+      "sourceId": "sources:synthetic-1",
+      "isEvidence": true,
+      "confidence": "medium",
+      "page": "Invented folio 12",
+      "extractedText": "Synthetic transcript: Eleanor was recorded in the parish register. This is invented preview material, not family evidence."
+    }
+  ],
+  "contextEntries": [
+    {
+      "_id": "historicalContext:synthetic-1",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793808000000,
+      "updatedAt": 1793808000000,
+      "vaultOwnerId": "synthetic-design-only",
+      "placeId": "places:synthetic-1",
+      "timePeriod": {
+        "startYear": 1840,
+        "endYear": 1860
+      },
+      "topic": "daily_life",
+      "title": "Invented town context",
+      "content": "A synthetic context report used solely for layout testing.",
+      "sources": [],
+      "privacyLevel": "private",
+      "reviewStatus": "unreviewed",
+      "aiUseAllowed": false
+    }
+  ],
+  "media": [
+    {
+      "_id": "media:synthetic-1",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793808000000,
+      "updatedAt": 1793808000000,
+      "vaultOwnerId": "synthetic-design-only",
+      "type": "photo",
+      "title": "Invented memory illustration",
+      "url": "/illustrations/synthetic-record.svg",
+      "personIds": [
+        "persons:synthetic-1"
+      ],
+      "privacyLevel": "private",
+      "reviewStatus": "unreviewed",
+      "rightsStatus": "unknown",
+      "aiUseAllowed": false
+    }
+  ],
+  "researchLog": [
+    {
+      "_id": "researchLog:synthetic-0",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793808000000,
+      "updatedAt": 1793808000000,
+      "vaultOwnerId": "synthetic-design-only",
+      "entityType": "person",
+      "entityId": "persons:synthetic-1",
+      "activityType": "context_research",
+      "status": "done",
+      "model": "self-reported synthetic model",
+      "summary": "Synthetic research update 1",
+      "details": "Invented research detail retained in full, with interpretation separate from observation.",
+      "creationProvenance": {
+        "actorKind": "chosen_ai",
+        "actorId": "synthetic-origin",
+        "method": "mcp",
+        "recordedAt": 1793808000000,
+        "evidenceStatus": "derived"
+      }
+    },
+    {
+      "_id": "researchLog:synthetic-1",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793808000000,
+      "updatedAt": 1793721600000,
+      "vaultOwnerId": "synthetic-design-only",
+      "entityType": "person",
+      "entityId": "persons:synthetic-1",
+      "activityType": "tier2_sources",
+      "status": "done",
+      "summary": "Synthetic research update 2",
+      "details": "Invented research detail retained in full, with interpretation separate from observation.",
+      "creationProvenance": {
+        "actorKind": "user",
+        "actorId": "synthetic-origin",
+        "method": "mcp",
+        "recordedAt": 1793721600000,
+        "evidenceStatus": "derived"
+      }
+    },
+    {
+      "_id": "researchLog:synthetic-2",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793808000000,
+      "updatedAt": 1793635200000,
+      "vaultOwnerId": "synthetic-design-only",
+      "entityType": "person",
+      "entityId": "persons:synthetic-1",
+      "activityType": "context_research",
+      "status": "done",
+      "summary": "Synthetic research update 3",
+      "details": "Invented research detail retained in full, with interpretation separate from observation.",
+      "creationProvenance": {
+        "actorKind": "chosen_ai",
+        "actorId": "synthetic-origin",
+        "method": "mcp",
+        "recordedAt": 1793635200000,
+        "evidenceStatus": "derived"
+      }
+    },
+    {
+      "_id": "researchLog:synthetic-3",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793808000000,
+      "updatedAt": 1793548800000,
+      "vaultOwnerId": "synthetic-design-only",
+      "entityType": "person",
+      "entityId": "persons:synthetic-1",
+      "activityType": "tier2_sources",
+      "status": "done",
+      "summary": "Synthetic research update 4",
+      "details": "Invented research detail retained in full, with interpretation separate from observation.",
+      "creationProvenance": {
+        "actorKind": "user",
+        "actorId": "synthetic-origin",
+        "method": "mcp",
+        "recordedAt": 1793548800000,
+        "evidenceStatus": "derived"
+      }
+    },
+    {
+      "_id": "researchLog:synthetic-4",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793808000000,
+      "updatedAt": 1793462400000,
+      "vaultOwnerId": "synthetic-design-only",
+      "entityType": "person",
+      "entityId": "persons:synthetic-1",
+      "activityType": "context_research",
+      "status": "done",
+      "summary": "Synthetic research update 5",
+      "details": "Invented research detail retained in full, with interpretation separate from observation.",
+      "creationProvenance": {
+        "actorKind": "chosen_ai",
+        "actorId": "synthetic-origin",
+        "method": "mcp",
+        "recordedAt": 1793462400000,
+        "evidenceStatus": "derived"
+      }
+    },
+    {
+      "_id": "researchLog:synthetic-5",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793808000000,
+      "updatedAt": 1793376000000,
+      "vaultOwnerId": "synthetic-design-only",
+      "entityType": "person",
+      "entityId": "persons:synthetic-1",
+      "activityType": "tier2_sources",
+      "status": "done",
+      "summary": "Synthetic research update 6",
+      "details": "Invented research detail retained in full, with interpretation separate from observation.",
+      "creationProvenance": {
+        "actorKind": "user",
+        "actorId": "synthetic-origin",
+        "method": "mcp",
+        "recordedAt": 1793376000000,
+        "evidenceStatus": "derived"
+      }
+    },
+    {
+      "_id": "researchLog:synthetic-6",
+      "_creationTime": 1793808000000,
+      "createdAt": 1793808000000,
+      "updatedAt": 1793289600000,
+      "vaultOwnerId": "synthetic-design-only",
+      "entityType": "person",
+      "entityId": "persons:synthetic-1",
+      "activityType": "context_research",
+      "status": "done",
+      "summary": "Synthetic research update 7",
+      "details": "Invented research detail retained in full, with interpretation separate from observation.",
+      "creationProvenance": {
+        "actorKind": "chosen_ai",
+        "actorId": "synthetic-origin",
+        "method": "mcp",
+        "recordedAt": 1793289600000,
+        "evidenceStatus": "derived"
+      }
+    }
+  ],
+  "openTasks": []
+}

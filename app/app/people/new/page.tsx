@@ -27,8 +27,8 @@ export default async function NewPeoplePage() {
   const client = await getAuthedConvexClient();
   let firstStartEligible = false;
   try {
-    const summary = await client.action(api.vaultReads.getDashboardSummary, { vaultOwnerId });
-    firstStartEligible = summary.firstStartEligible;
+    const eligibility = await client.action(api.vaultReads.getFirstStartEligibility, { vaultOwnerId });
+    firstStartEligible = eligibility.firstStartEligible;
   } catch (error) {
     const issue = getConvexRuntimeIssue(error);
     return <div className="p-6 sm:p-8"><VaultStateCard title={issue.title} description={issue.description} /></div>;

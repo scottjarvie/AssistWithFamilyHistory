@@ -160,11 +160,11 @@ export function MediaPrivacyReviewPanel({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="@container space-y-4">
       <MediaUploadCard personId={personId} onUploaded={() => router.refresh()} />
 
       {media.length === 0 ? null : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 @[42rem]:grid-cols-2 @[72rem]:grid-cols-3">
           {media.map((item) => {
             const draft = drafts[item._id];
             const publicEligible =
@@ -183,12 +183,12 @@ export function MediaPrivacyReviewPanel({
             const isImage = held ? true : Boolean(item.url);
 
             return (
-              <Card key={item._id} className="border-stone-200">
+              <Card key={item._id} className="border-border">
                 <CardHeader>
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <CardTitle className="text-lg">{item.title}</CardTitle>
-                      <p className="mt-1 text-sm text-stone-500">{item.type}</p>
+                      <CardTitle role="heading" aria-level={2} className="text-lg">{item.title}</CardTitle>
+                      <p className="mt-1 text-sm text-muted-foreground">{item.type}</p>
                     </div>
                     <Badge variant={publicEligible ? "default" : "secondary"}>
                       {publicEligible ? "story eligible" : "review gated"}
@@ -197,27 +197,27 @@ export function MediaPrivacyReviewPanel({
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {previewSrc && isImage ? (
-                    <div className="overflow-hidden rounded-md border border-stone-200 bg-stone-100">
+                    <div className="overflow-hidden rounded-md border border-border bg-muted">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={previewSrc} alt={item.title} className="h-44 w-full object-cover" />
                     </div>
                   ) : null}
 
-                  <div className="rounded-md border border-stone-200 bg-stone-50 p-3 text-sm text-stone-600">
+                  <div className="rounded-md border border-border bg-muted p-3 text-sm text-muted-foreground">
                     {held ? (
                       <p>
-                        <span className="font-medium text-stone-800">This file is stored here.</span>{" "}
+                        <span className="font-medium text-foreground">This file is stored here.</span>{" "}
                         Once you mark it reviewed with usable rights and allow AI use, a connected
                         AI can read the record itself, not just its title.
                       </p>
                     ) : (
                       <p>
-                        <span className="font-medium text-stone-800">Only a reference is stored.</span>{" "}
+                        <span className="font-medium text-foreground">Only a reference is stored.</span>{" "}
                         This item points at a file elsewhere, so a connected AI cannot read it. Upload
                         the file to let one see the record.
                       </p>
                     )}
-                    <label className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100">
+                    <label className="mt-3 inline-flex min-h-11 cursor-pointer items-center gap-2 md:pointer-fine:min-h-0 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium text-foreground hover:bg-muted">
                       <Upload className="h-4 w-4" />
                       {uploadingId === item._id
                         ? "Uploading…"
@@ -238,11 +238,11 @@ export function MediaPrivacyReviewPanel({
                     </label>
                   </div>
 
-                  {item.description ? <p className="text-sm text-stone-600">{item.description}</p> : null}
+                  {item.description ? <p className="text-sm text-muted-foreground">{item.description}</p> : null}
 
                   {item.metadataProposal ? (
-                    <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-stone-700">
-                      <p className="font-medium text-stone-900">Proposed metadata evidence</p>
+                    <div className="space-y-2 rounded-md border border-annotation/30 bg-annotation-surface p-3 text-sm text-foreground">
+                      <p className="font-medium text-foreground">Proposed metadata evidence</p>
                       {item.metadataProposal.temporal.cameraCaptureTime ? (
                         <p>Camera capture time: {item.metadataProposal.temporal.cameraCaptureTime}</p>
                       ) : null}
@@ -264,7 +264,7 @@ export function MediaPrivacyReviewPanel({
                         options={["pending", "accepted", "declined"]}
                         onChange={(value) => updateDraft(item._id, { metadataDecision: value as typeof draft.metadataDecision })}
                       />
-                      <p className="text-xs text-stone-600">
+                      <p className="text-xs text-muted-foreground">
                         Accepting this proposal does not publish a coordinate or turn a camera/scan time into a historical event date.
                       </p>
                     </div>
@@ -289,7 +289,7 @@ export function MediaPrivacyReviewPanel({
                       options={["unknown", "owned", "permitted", "public_domain", "restricted"]}
                       onChange={(value) => updateDraft(item._id, { rightsStatus: value as typeof draft.rightsStatus })}
                     />
-                    <label className="flex items-center gap-2 rounded-md border border-stone-200 px-3 py-2 text-sm text-stone-700">
+                    <label className="flex min-h-11 items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-foreground md:pointer-fine:min-h-0">
                       <input
                         type="checkbox"
                         checked={draft.aiUseAllowed}
@@ -306,7 +306,7 @@ export function MediaPrivacyReviewPanel({
                     className="min-h-24"
                   />
 
-                  <Button onClick={() => void saveReview(item)} disabled={savingId === item._id} className="w-full bg-stone-900 hover:bg-stone-800">
+                  <Button onClick={() => void saveReview(item)} disabled={savingId === item._id} className="w-full bg-primary hover:bg-primary/90">
                     <ShieldCheck className="h-4 w-4" />
                     Save Review
                   </Button>
@@ -358,11 +358,11 @@ function MediaUploadCard({
   }
 
   return (
-    <Card className="border-dashed border-stone-300 bg-stone-50">
+    <Card className="border-dashed border-border bg-muted">
       <CardContent className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-stone-800">Add a scan, photo, or recording</p>
-          <p className="mt-1 text-sm text-stone-600">
+          <p className="text-sm font-medium text-foreground">Add a scan, photo, or recording</p>
+          <p className="mt-1 text-sm text-muted-foreground">
             Files you upload are stored privately here. Nothing is shared with an AI until you
             review the item and allow AI use.
           </p>
@@ -406,12 +406,12 @@ function FieldSelect({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="space-y-1 text-xs font-medium uppercase tracking-[0.12em] text-stone-500">
+    <label className="space-y-1 text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
       {label}
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-10 w-full rounded-md border border-stone-200 bg-white px-3 text-sm font-normal normal-case tracking-normal text-stone-700"
+        className="h-11 md:pointer-fine:h-10 w-full rounded-md border border-border bg-card px-3 text-base md:pointer-fine:text-sm font-normal normal-case tracking-normal text-foreground"
       >
         {options.map((option) => (
           <option key={option} value={option}>

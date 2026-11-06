@@ -1,0 +1,30 @@
+{
+  "baseURL": "http://localhost:3457",
+  "timezone": "America/Phoenix",
+  "defaultVariants": [
+    "desktop-light",
+    "mobile-light"
+  ],
+  "shots": [
+    {
+      "name": "baseline-place-record",
+      "path": "/design-council-preview?surface=baseline-place-record",
+      "capabilities": [
+        {
+          "can": "retain context intake",
+          "text": "Add Context Report"
+        }
+      ]
+    },
+    {
+      "name": "baseline-story-record",
+      "path": "/design-council-preview?surface=baseline-story-record",
+      "capabilities": [
+        {
+          "can": "retain publish gates",
+          "text": "Publish Gate"
+        }
+      ]
+    }
+  ]
+}

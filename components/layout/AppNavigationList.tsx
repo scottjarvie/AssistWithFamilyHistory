@@ -26,13 +26,13 @@ export function AppNavigationList({
   return sections.map((section) => (
     <div key={section.label} className="mb-5">
       {variant === "mobile" ? (
-        <p className="mb-2 px-3 text-xs font-medium uppercase tracking-wider text-stone-500">
+        <p className="mb-2 px-3 text-xs font-medium uppercase tracking-wider text-stone-400">
           {section.label}
         </p>
       ) : (
         <div className={cn("px-3 mb-2", collapsed && "px-2")}>
           {!collapsed && (
-            <span className="text-xs font-medium text-stone-500 uppercase tracking-wider">
+            <span className="text-xs font-medium text-stone-400 uppercase tracking-wider">
               {section.label}
             </span>
           )}
@@ -61,6 +61,7 @@ export function AppNavigationList({
           const link = (
             <SafeLink
               href={item.comingSoon ? "#" : item.href}
+              aria-current={!item.comingSoon && isNavItemActive(pathname, item.href, item.exact) ? "page" : undefined}
               aria-label={collapsedAccessibleName}
               title={collapsedAccessibleName}
               className={
@@ -68,13 +69,13 @@ export function AppNavigationList({
                   ? cn(
                       "flex items-center gap-3 rounded-lg px-3 py-2.5",
                       isNavItemActive(pathname, item.href, item.exact)
-                        ? "bg-amber-700 text-white"
+                        ? "bg-primary text-primary-foreground shadow-[inset_3px_0_0_var(--brand-gold)]"
                         : "text-stone-300 hover:bg-stone-800"
                     )
                   : cn(
                       "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
                       isNavItemActive(pathname, item.href, item.exact)
-                        ? "bg-amber-700 text-white"
+                        ? "bg-primary text-primary-foreground shadow-[inset_3px_0_0_var(--brand-gold)]"
                         : item.comingSoon
                           ? "text-stone-500 cursor-not-allowed"
                           : "text-stone-400 hover:text-white hover:bg-stone-800",

@@ -1,0 +1,197 @@
+{
+  "baseURL": "http://localhost:3457",
+  "timezone": "America/Phoenix",
+  "defaultVariants": [
+    "desktop-light",
+    "mobile-light"
+  ],
+  "shots": [
+    {
+      "name": "queue",
+      "path": "/design-council-preview?surface=queue",
+      "capabilities": [
+        {
+          "can": "retain Your Queue",
+          "text": "Your Queue"
+        }
+      ]
+    },
+    {
+      "name": "queue-dark",
+      "path": "/design-council-preview?surface=queue&theme=dark",
+      "capabilities": [
+        {
+          "can": "retain Your Queue",
+          "text": "Your Queue"
+        }
+      ]
+    },
+    {
+      "name": "queue-answer-sheet-viewport",
+      "path": "/design-council-preview?surface=queue&item=synthetic-queue-needs-you",
+      "capabilities": [
+        {
+          "can": "retain What needs you",
+          "text": "What needs you"
+        }
+      ],
+      "viewportOnly": true
+    },
+    {
+      "name": "queue-result-sheet-viewport",
+      "path": "/design-council-preview?surface=queue&item=synthetic-queue-done",
+      "capabilities": [
+        {
+          "can": "retain Recorded result",
+          "text": "Recorded result"
+        }
+      ],
+      "viewportOnly": true
+    },
+    {
+      "name": "queue-working-sheet-viewport",
+      "path": "/design-council-preview?surface=queue&item=synthetic-queue-working",
+      "capabilities": [
+        {
+          "can": "retain Current step",
+          "text": "Current step"
+        }
+      ],
+      "viewportOnly": true
+    },
+    {
+      "name": "queue-expired-sheet-viewport",
+      "path": "/design-council-preview?surface=queue&item=synthetic-queue-expired",
+      "capabilities": [
+        {
+          "can": "retain Handoff expired",
+          "text": "Handoff expired"
+        }
+      ],
+      "viewportOnly": true
+    },
+    {
+      "name": "queue-ai",
+      "path": "/design-council-preview?surface=queue&state=working&actor=ai",
+      "capabilities": [
+        {
+          "can": "retain Prepare an invented locality comparison",
+          "text": "Prepare an invented locality comparison"
+        }
+      ]
+    },
+    {
+      "name": "queue-empty",
+      "path": "/design-council-preview?surface=queue-empty",
+      "capabilities": [
+        {
+          "can": "retain Nothing needs carrying forward.",
+          "text": "Nothing needs carrying forward."
+        }
+      ]
+    },
+    {
+      "name": "queue-denied",
+      "path": "/design-council-preview?surface=queue-denied",
+      "capabilities": [
+        {
+          "can": "retain Queue access denied",
+          "text": "Queue access denied"
+        }
+      ]
+    },
+    {
+      "name": "queue-denied-dark",
+      "path": "/design-council-preview?surface=queue-denied&theme=dark",
+      "capabilities": [
+        {
+          "can": "retain Queue access denied",
+          "text": "Queue access denied"
+        }
+      ]
+    },
+    {
+      "name": "queue-detail-error-sheet-viewport",
+      "path": "/design-council-preview?surface=queue-detail-error&item=synthetic-queue-needs-you",
+      "capabilities": [
+        {
+          "can": "retain Queue item unavailable",
+          "text": "Queue item unavailable"
+        }
+      ],
+      "viewportOnly": true
+    },
+    {
+      "name": "queue-new",
+      "path": "/design-council-preview?surface=queue",
+      "actions": [
+        {
+          "click": "button:has-text(\"Leave a directive\")"
+        }
+      ],
+      "capabilities": [
+        {
+          "can": "write a directive",
+          "selector": "#queue-directive"
+        }
+      ]
+    },
+    {
+      "name": "queue-filter-dark",
+      "path": "/design-council-preview?surface=queue&theme=dark",
+      "actions": [
+        {
+          "click": "button:has-text(\"+ Filter\")"
+        }
+      ],
+      "capabilities": [
+        {
+          "can": "use one-level filters",
+          "text": "Filter Queue"
+        }
+      ]
+    },
+    {
+      "name": "queue-sheet-history",
+      "path": "/design-council-preview?surface=queue-more&item=synthetic-queue-needs-you",
+      "actions": [
+        {
+          "scrollIntoView": "#queue-activity-heading"
+        }
+      ],
+      "viewportOnly": true,
+      "capabilities": [
+        {
+          "can": "retain chronological history and earlier pagination",
+          "text": "Older activity"
+        }
+      ]
+    },
+    {
+      "name": "queue-sheet-ledger-dark",
+      "path": "/design-council-preview?surface=queue&item=synthetic-queue-expired&theme=dark",
+      "actions": [
+        {
+          "scrollBottom": "#queue-selected"
+        }
+      ],
+      "viewportOnly": true,
+      "capabilities": [
+        {
+          "can": "retain private ledger and expiry",
+          "text": "Handoff expires"
+        }
+      ]
+    },
+    {
+      "name": "story-source-caps-review-fix",
+      "path": "/design-council-preview?surface=story-capped#record-section-sources",
+      "capabilities": [
+        {
+          "can": "disclose per-source citation caps honestly",
+          "text": "No recorded citation among the first 3 returned"
+        }
+      ]
+    }
+  ]
+}

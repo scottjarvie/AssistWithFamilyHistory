@@ -546,6 +546,52 @@ export const listQueueItemsInternal = internalQuery({
   },
 });
 
+/**
+ * A connection narrowed to named Queue items lists exactly those items, never
+ * the owner's whole Queue. Read by id (the list is small and person-chosen),
+ * newest creation first. The immutable creation-time/ID cursor survives expiry
+ * reconciliation changing updatedAt or removing rows from a state filter.
+ */
+export const listAllowedQueueItemsInternal = internalQuery({
+  args: { ...listQueueArgs, queueItemIds: v.array(v.string()) },
+  handler: async (ctx, args): Promise<PaginationResult<QueueItem>> => {
+    const rows: QueueItem[] = [];
+    for (const raw of new Set(args.queueItemIds)) {
+      const id = ctx.db.normalizeId("queueItems", raw);
+      const item = id ? await ctx.db.get(id) : null;
+      if (!item || !matchesVaultOwner(item.vaultOwnerId, args.vaultOwnerId)) continue;
+      if (args.state && item.state !== args.state) continue;
+      if (args.priority && item.priority !== args.priority) continue;
+      rows.push(item);
+    }
+    rows.sort((a, b) => b._creationTime - a._creationTime || (a._id < b._id ? 1 : a._id > b._id ? -1 : 0));
+    let remaining = rows;
+    const cursor = args.paginationOpts.cursor;
+    if (cursor !== null) {
+      let key: unknown;
+      try {
+        key = JSON.parse(cursor);
+      } catch {
+        throw new Error("Invalid Queue continuation cursor; restart pagination.");
+      }
+      if (!Array.isArray(key) || key.length !== 2 || typeof key[0] !== "number" ||
+          !Number.isFinite(key[0]) || typeof key[1] !== "string" || !ctx.db.normalizeId("queueItems", key[1])) {
+        throw new Error("Invalid Queue continuation cursor; restart pagination.");
+      }
+      const [createdAt, id] = key as [number, string];
+      remaining = rows.filter((item) => item._creationTime < createdAt ||
+        (item._creationTime === createdAt && item._id < id));
+    }
+    const page = remaining.slice(0, Math.min(args.paginationOpts.numItems, QUEUE_LIMITS.itemPage));
+    const last = page.at(-1);
+    return {
+      page,
+      isDone: page.length >= remaining.length,
+      continueCursor: last ? JSON.stringify([last._creationTime, last._id]) : cursor ?? "",
+    };
+  },
+});
+
 export const listQueueItems = action({
   args: listQueueArgs,
   handler: async (ctx, args): Promise<PaginationResult<QueueItem>> => {
@@ -623,15 +669,21 @@ export const agentListQueueItems = internalAction({
     state: v.optional(queueStateValidator),
     priority: v.optional(queuePriorityValidator),
     paginationOpts: paginationOptsValidator,
+    // The grant's named Queue items, when the person narrowed the connection
+    // to them. Absent or empty means the grant names no Queue boundary.
+    queueItemIds: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args): Promise<PaginationResult<QueueItem>> => {
     const actor = verifyPrincipal(args.principal, "list_queue_items");
-    const result = await ctx.runQuery(internal.queue.listQueueItemsInternal, {
+    const listArgs = {
       vaultOwnerId: actor.ownerId,
       state: args.state,
       priority: args.priority,
       paginationOpts: args.paginationOpts,
-    });
+    };
+    const result = args.queueItemIds && args.queueItemIds.length > 0
+      ? await ctx.runQuery(internal.queue.listAllowedQueueItemsInternal, { ...listArgs, queueItemIds: args.queueItemIds })
+      : await ctx.runQuery(internal.queue.listQueueItemsInternal, listArgs);
     const page: QueueItem[] = [];
     for (const item of result.page) {
       const transition = queueExpiryTransition(item, Date.now());

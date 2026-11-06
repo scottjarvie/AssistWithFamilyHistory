@@ -54,11 +54,13 @@ export function ContextReportForm({
   placeName,
   startYear,
   endYear,
+  readonlyPreview = false,
 }: {
   placeId?: string;
   placeName?: string;
   startYear?: number;
   endYear?: number;
+  readonlyPreview?: boolean;
 }) {
   const router = useRouter();
   const [title, setTitle] = useState(placeName ? `${placeName} context report` : "");
@@ -136,6 +138,7 @@ export function ContextReportForm({
   }
 
   async function handleSave() {
+    if (readonlyPreview) return;
     setSaving(true);
     try {
       const categoryBlocks = localityEraBriefCategories
@@ -195,8 +198,8 @@ export function ContextReportForm({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-[1fr_180px]">
+    <div className="@container space-y-4">
+      <div className="grid gap-3 @[36rem]:grid-cols-[1fr_180px]">
         <div className="space-y-2">
           <Label htmlFor="context-title">Report title</Label>
           <Input id="context-title" value={title} onChange={(event) => setTitle(event.target.value)} />
@@ -207,7 +210,7 @@ export function ContextReportForm({
             id="context-topic"
             value={topic}
             onChange={(event) => setTopic(event.target.value)}
-            className="h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-sm text-stone-700"
+            className="h-11 md:pointer-fine:h-9 w-full rounded-md border border-border bg-card px-3 text-base md:pointer-fine:text-sm text-foreground"
           >
             {CONTEXT_TOPICS.map((option) => (
               <option key={option} value={option}>
@@ -229,14 +232,14 @@ export function ContextReportForm({
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+      <div className="grid gap-3 @[36rem]:grid-cols-[1fr_1fr_auto]">
         <div className="space-y-2">
           <Label htmlFor="context-privacy">Privacy</Label>
           <select
             id="context-privacy"
             value={privacyLevel}
             onChange={(event) => setPrivacyLevel(event.target.value)}
-            className="h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-sm text-stone-700"
+            className="h-11 md:pointer-fine:h-9 w-full rounded-md border border-border bg-card px-3 text-base md:pointer-fine:text-sm text-foreground"
           >
             <option value="private">private</option>
             <option value="family_review">family review</option>
@@ -250,7 +253,7 @@ export function ContextReportForm({
             id="context-review"
             value={reviewStatus}
             onChange={(event) => setReviewStatus(event.target.value)}
-            className="h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-sm text-stone-700"
+            className="h-11 md:pointer-fine:h-9 w-full rounded-md border border-border bg-card px-3 text-base md:pointer-fine:text-sm text-foreground"
           >
             <option value="unreviewed">unreviewed</option>
             <option value="reviewed">reviewed</option>
@@ -259,12 +262,12 @@ export function ContextReportForm({
             <option value="rejected">rejected</option>
           </select>
         </div>
-        <label className="flex h-9 items-center gap-2 self-end rounded-md border border-stone-200 px-3 text-sm text-stone-700">
+        <label className="flex h-11 md:pointer-fine:h-9 items-center gap-2 self-end rounded-md border border-border px-3 text-sm text-foreground">
           <input
             type="checkbox"
             checked={aiUseAllowed}
             onChange={(event) => setAiUseAllowed(event.target.checked)}
-            className="h-4 w-4 accent-amber-700"
+            className="h-4 w-4 accent-primary"
           />
           AI use allowed
         </label>
@@ -281,17 +284,17 @@ export function ContextReportForm({
         />
       </div>
 
-      <div className="space-y-3 rounded-xl border border-stone-200 bg-stone-50 p-4">
+      <div className="space-y-3 rounded-xl border border-border bg-muted p-4">
         <div>
-          <p className="text-sm font-medium text-stone-900">Locality Era Brief</p>
-          <p className="mt-1 text-xs text-stone-500">{LOCALITY_ERA_TEMPLATE_VERSION}</p>
+          <p className="text-sm font-medium text-foreground">Locality Era Brief</p>
+          <p className="mt-1 text-xs text-muted-foreground">{LOCALITY_ERA_TEMPLATE_VERSION}</p>
         </div>
         <div className="grid gap-3">
           {localityEraBriefCategories.map((entry) => {
             const claims = categoryClaims[entry.category];
             return (
-              <div key={entry.category} className="space-y-3 border-t border-stone-200 pt-3 first:border-t-0 first:pt-0">
-                <div className="grid gap-2 md:grid-cols-2">
+              <div key={entry.category} className="space-y-3 border-t border-border pt-3 first:border-t-0 first:pt-0">
+                <div className="grid gap-2 @[36rem]:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor={`context-pack-${entry.category}`}>{entry.label}</Label>
                     <Textarea
@@ -303,7 +306,7 @@ export function ContextReportForm({
                           [entry.category]: event.target.value,
                         }))
                       }
-                      className="min-h-24 bg-white text-sm leading-6"
+                      className="min-h-24 bg-card text-sm leading-6"
                       placeholder={entry.prompt}
                     />
                   </div>
@@ -318,7 +321,7 @@ export function ContextReportForm({
                           [entry.category]: event.target.value,
                         }))
                       }
-                      className="min-h-24 bg-white text-sm leading-6"
+                      className="min-h-24 bg-card text-sm leading-6"
                       placeholder="Optional synthesis wording or caution for Story Writer."
                     />
                   </div>
@@ -337,7 +340,7 @@ export function ContextReportForm({
                     </Button>
                   </div>
                   {claims.length === 0 ? (
-                    <p className="rounded-md border border-dashed border-stone-200 bg-white px-3 py-3 text-xs leading-5 text-stone-500">
+                    <p className="rounded-md border border-dashed border-border bg-card px-3 py-3 text-xs leading-5 text-muted-foreground">
                       No claims yet. Add a claim to record a specific assertion with its supporting source refs.
                     </p>
                   ) : (
@@ -345,7 +348,7 @@ export function ContextReportForm({
                       {claims.map((claim, index) => (
                         <div
                           key={index}
-                          className="space-y-2 rounded-md border border-stone-200 bg-white p-3"
+                          className="space-y-2 rounded-md border border-border bg-card p-3"
                         >
                           <div className="flex gap-2">
                             <Textarea
@@ -362,7 +365,7 @@ export function ContextReportForm({
                                     confidence: event.target.value as "high" | "medium" | "low",
                                   })
                                 }
-                                className="h-9 rounded-md border border-stone-200 bg-white px-2 text-xs text-stone-700"
+                                className="h-11 md:pointer-fine:h-9 rounded-md border border-border bg-card px-2 text-base md:pointer-fine:text-xs text-foreground"
                                 aria-label="Confidence"
                               >
                                 <option value="high">high</option>
@@ -381,7 +384,7 @@ export function ContextReportForm({
                             </div>
                           </div>
                           {parsedSources.length === 0 ? (
-                            <p className="text-xs text-stone-500">
+                            <p className="text-xs text-muted-foreground">
                               Add sources below to attach refs to this claim.
                             </p>
                           ) : (
@@ -394,10 +397,10 @@ export function ContextReportForm({
                                     type="button"
                                     onClick={() => toggleSourceRef(entry.category, index, source)}
                                     className={
-                                      "rounded-full border px-2 py-0.5 text-[11px] " +
+                                      "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] pointer-coarse:min-h-11 " +
                                       (selected
-                                        ? "border-amber-300 bg-amber-50 text-amber-800"
-                                        : "border-stone-200 bg-white text-stone-500 hover:bg-stone-50")
+                                        ? "border-annotation/40 bg-annotation-surface text-annotation"
+                                        : "border-border bg-card text-muted-foreground hover:bg-muted")
                                     }
                                   >
                                     {source.length > 36 ? source.slice(0, 33) + "…" : source}
@@ -411,7 +414,7 @@ export function ContextReportForm({
                                     key={`orphan-${orphan}`}
                                     type="button"
                                     onClick={() => toggleSourceRef(entry.category, index, orphan)}
-                                    className="rounded-full border border-stone-200 bg-stone-100 px-2 py-0.5 text-[11px] text-stone-500 line-through"
+                                    className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground line-through pointer-coarse:min-h-11"
                                     title="This source was removed from the form-level list. Click to drop it from this claim."
                                   >
                                     {orphan.length > 36 ? orphan.slice(0, 33) + "…" : orphan}
@@ -441,7 +444,7 @@ export function ContextReportForm({
         />
       </div>
 
-      <Button onClick={handleSave} disabled={saving || !title.trim() || !content.trim()} className="bg-amber-700 hover:bg-amber-800">
+      <Button onClick={handleSave} disabled={readonlyPreview || saving || !title.trim() || !content.trim()} className="min-h-11">
         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
         Save context report
       </Button>
