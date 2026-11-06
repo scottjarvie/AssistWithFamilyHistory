@@ -2,7 +2,7 @@
 import { FAMILY_HISTORY_SCOPES, clampToScopeCeiling, type FamilyHistoryScope } from "./catalog";
 
 // Frozen 2026-10-23 baseline. NEVER add future scopes here: legacy full grants
-// must inherit future catalog additions, while partial grants stay exactly chosen.
+// stay frozen. Only an explicit full marker inherits future catalog additions.
 export const LEGACY_FULL_SCOPE_BASELINE = [
   "family_history:context:read",
   "family_history:evidence:read",
@@ -26,14 +26,15 @@ export type GrantChoices = {
 };
 
 export function effectiveScopeChoice(grant: Pick<GrantChoices, "scopes" | "scopeChoice">): ScopeChoice {
-  return grant.scopeChoice ?? (LEGACY_FULL_SCOPE_BASELINE.every((scope) => grant.scopes.includes(scope)) ? "full" : "chosen");
+  return grant.scopeChoice ?? "chosen";
 }
 
 export function effectiveScopes(grant: Pick<GrantChoices, "scopes" | "scopeChoice">): FamilyHistoryScope[] {
   return effectiveScopeChoice(grant) === "full" ? [...FAMILY_HISTORY_SCOPES] : clampToScopeCeiling(grant.scopes);
 }
 
-/** Only a matching sign-in consent receipt demonstrates an automatic old term.
+/** Historical classification only; this MUST NOT change effective authority.
+ * Only a matching sign-in consent receipt demonstrates an automatic old term.
  * Dates without provenance (including settings approvals) remain enforceable.
  * First issuance must match creation: old renewals could overwrite earlier
  * settings consent, so renewal receipts alone are ambiguous and stay enforced.
@@ -58,7 +59,7 @@ export function hasAutomaticLegacyExpiry(grant: Omit<GrantChoices, "scopes">): b
 }
 
 export function effectiveExpiry(grant: Omit<GrantChoices, "scopes">): number | undefined {
-  if (grant.expiryChoice === "none" || hasAutomaticLegacyExpiry(grant)) return undefined;
+  if (grant.expiryChoice === "none") return undefined;
   return grant.expiresAt;
 }
 

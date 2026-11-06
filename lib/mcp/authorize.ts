@@ -43,6 +43,7 @@ export type GrantStatus = "pending" | "active" | "revoked" | "expired" | "denied
  */
 export type ResolvedGrant = {
   grantId: string;
+  version?: number;
   clientId: string;
   issuer: string;
   scopes: FamilyHistoryScope[];
@@ -348,6 +349,7 @@ function boundaryPermits(
     // the vault. `whole_workspace` is the grant for broad reading.
     if (named.unattributable) return false;
     const allowed = boundary.personIds ?? [];
+    if (!allowed.length) return false;
     if (named.personIds.length === 0) return true;
     return named.personIds.every((id) => allowed.includes(id));
   }
@@ -386,6 +388,7 @@ export function decideToolAccess(params: {
   // An unknown tool name and a known tool this grant does not cover are the
   // same refusal on purpose: a caller must not be able to probe the catalog.
   if (!tool) return refusal("SCOPE_NOT_GRANTED");
+  if (tool.requiredScope === "connection:self") return { allowed: true, tool };
   if (!effectiveScopes(grant).includes(tool.requiredScope)) return refusal("SCOPE_NOT_GRANTED");
 
   if (input !== undefined) {

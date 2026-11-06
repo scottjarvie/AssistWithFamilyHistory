@@ -16,6 +16,7 @@ import { getAuthedConvexClient, getConvexRuntimeIssue, isConvexConfigured } from
 import { getVaultAccessContext } from "@/lib/vault/server";
 import { generateApiKey } from "@/lib/auth/apiKey";
 import {
+  fullOwnDataScopes,
   isScopePreset,
   presetScopes,
   presetTier,
@@ -31,6 +32,7 @@ const MintSchema = z.object({
   label: z.string().transform((value) => value.trim()),
   preset: z.string().optional(),
   scopes: z.array(z.string()).optional(),
+  scopeChoice: z.enum(["full", "chosen"]).optional(),
   expiresAt: z.number().optional(),
 });
 
@@ -52,18 +54,15 @@ export async function POST(request: NextRequest) {
     if (parsed.data.preset && isScopePreset(parsed.data.preset)) {
       scopes = presetScopes(parsed.data.preset);
       tier = presetTier(parsed.data.preset);
-    } else if (parsed.data.scopes && parsed.data.scopes.length > 0) {
+    } else if (parsed.data.scopes !== undefined) {
       scopes = sanitizeScopes(parsed.data.scopes);
       tier = tierForScopes(scopes);
     } else {
-      return NextResponse.json(
-        { error: "Provide a valid scope preset or an explicit scopes array" },
-        { status: 400 },
-      );
+      if (parsed.data.preset !== undefined) return NextResponse.json({ error: "Unknown preset" }, { status: 400 });
+      scopes = fullOwnDataScopes();
+      tier = "standard";
     }
-    if (scopes.length === 0) {
-      return NextResponse.json({ error: "No valid scopes were provided" }, { status: 400 });
-    }
+
 
     // Admin/operator scopes require the admin role (shared-model: Admin is a role).
     if (scopesRequireAdmin(scopes) && !isAdminUser(userId)) {
@@ -81,6 +80,7 @@ export async function POST(request: NextRequest) {
       hashedSecret: generated.hashedSecret,
       label: parsed.data.label,
       scopes,
+      scopeChoice: parsed.data.scopeChoice === "full" || parsed.data.preset === "full" || (parsed.data.preset === undefined && parsed.data.scopes === undefined) ? "full" : "chosen",
       tier,
       expiresAt: parsed.data.expiresAt,
       createdByUserId: userId ?? undefined,

@@ -25,6 +25,7 @@ export type ConnectionBoundary = {
 /** One row as the connection centre sees it. Never carries record content. */
 export type ConnectionRow = {
   id: string;
+  version?: number;
   label: string;
   /** What the software called itself. A label the person can recognise, never authority. */
   observedClientName: string | null;
@@ -83,9 +84,12 @@ export const approveGrantRef = makeFunctionReference<
     vaultOwnerId: string;
     grantId: string;
     label: string;
-    scopes: string[];
+    scopes?: string[];
     boundary: ConnectionBoundary;
     expiresInDays?: number;
+    expiresAt?: number;
+    scopeChoice?: "full" | "chosen";
+    expectedVersion?: number;
   },
   { id: string; status: "active"; scopes: FamilyHistoryScope[]; boundary: ConnectionBoundary; expiresAt: number | null }
 >("mcpGrants:approveGrant");
@@ -116,6 +120,6 @@ export const removeGrantRef = makeFunctionReference<
 
 export const updateGrantExpiryRef = makeFunctionReference<
   "mutation",
-  { vaultOwnerId: string; grantId: string; expiresInDays?: number },
+  { vaultOwnerId: string; grantId: string; expectedVersion?: number; expiresInDays?: number },
   { id: string; status: "active"; expiresAt: number | null }
 >("mcpGrants:updateGrantExpiry");

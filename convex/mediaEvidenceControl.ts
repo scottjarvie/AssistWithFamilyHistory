@@ -227,6 +227,8 @@ export const recordMcpEvidencePart = internalMutation({
       || session.expiresAt <= Date.now()
       || !session.multipartUploadId
     ) throw new Error("Upload authorization not found.");
+    await assertGrantPermits(ctx, { owner: session.vaultOwnerId, grantId: session.grantId ? String(session.grantId) : undefined,
+      toolName: "family_history_begin_evidence_upload", input: { personId: String(session.personIds[0]) } });
     const expected = evidenceUploadParts(session.declaredSizeBytes, session.partSizeBytes)
       .find((part) => part.partNumber === args.partNumber);
     if (!expected || expected.sizeBytes !== args.sizeBytes || !/^[a-f0-9]{64}$/.test(args.sha256)) {
@@ -255,6 +257,10 @@ export const relayAuthorization = internalQuery({
       || session.relayTokenHash !== args.relayTokenHash
       || session.expiresAt <= Date.now()
     ) return null;
+    try {
+      await assertGrantPermits(ctx, { owner: session.vaultOwnerId, grantId: session.grantId ? String(session.grantId) : undefined,
+        toolName: "family_history_begin_evidence_upload", input: { personId: String(session.personIds[0]) } });
+    } catch { return null; }
     return {
       vaultOwnerId: session.vaultOwnerId,
       objectKey: session.objectKey,

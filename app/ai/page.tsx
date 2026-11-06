@@ -40,7 +40,7 @@ const toolGroups = [
   {
     label: "Orient",
     icon: FileSearch,
-    scopes: ["family_history:context:read", "family_history:queue:read"] as const,
+    scopes: ["connection:self", "family_history:context:read", "family_history:queue:read"] as const,
     copy: "Your AI starts with a compact map, searches summaries, then opens only the people, evidence, events, research, or stories the work needs — inside the boundary you approved.",
   },
   {

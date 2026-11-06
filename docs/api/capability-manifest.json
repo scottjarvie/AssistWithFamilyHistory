@@ -12,6 +12,7 @@
     "oauth": "protected-resource metadata at both the resource-path and origin compatibility spellings plus exact-issuer Clerk-shaped OAuth access-token JWT verification; ordinary session JWTs are rejected; provider DCR is advertised, while CIMD is deferred and its validator is not connected to requests",
     "ownerBoundary": "The verified OAuth subject selects the vault server-side. No MCP tool accepts an owner, user, workspace, or vault identifier.",
     "currentInSource": [
+      "family_history_manage_connection",
       "family_history_get_brief",
       "family_history_search",
       "family_history_get_context",
@@ -60,7 +61,7 @@
         "Acting on FamilySearch or any other outside provider",
         "Billing, account, or subscription changes"
       ],
-      "policy": "Family History intentionally grants nothing from OAuth sign-in alone. Every ordinary MCP permission is selected by the person; no current scope has a separate raised tier, and reserved authorities have no tool or issuable scope."
+      "policy": "New connections explicitly mark full current/future entitled private-data access with no end date. Existing unmarked scopes and stored dates stay frozen. AI may only reduce its own verified connection with an atomic versioned audit receipt; only the person in Settings may increase access. Domain publication, identity, sharing and quality gates remain."
     },
     "notExposed": [
       "delete",
@@ -78,7 +79,8 @@
     "research_operator": "Work an assigned Queue handoff, create tasks, and update checks with evidence-backed notes. Queue scopes do not grant domain-record writes.",
     "story_writer": "Save story drafts inside an owner vault.",
     "trusted_operator": "Higher-risk merges, publish actions, and bulk operations.",
-    "admin_security": "Cross-user, incident, or security workflows. Not present."
+    "admin_security": "Cross-user, incident, or security workflows. Not present.",
+    "full": "Default: all current and future entitled private-data scopes, no end date; no role promotion or person-only gate bypass."
   },
   "storyRoles": {
     "story_writer": {

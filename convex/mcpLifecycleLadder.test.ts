@@ -175,7 +175,7 @@ describe("chosen-AI lifecycle ladder (locally provable rungs)", () => {
     expect(granted[0].observedClientName).toContain(RUN_KEY);
 
     // The person narrows it to reading only.
-    await t.withIdentity({ subject: OWNER }).mutation(
+    await t.withIdentity({ subject: OWNER, sid: "sess_synthetic_person" }).mutation(
       (await import("./_generated/api")).api.mcpGrants.reduceGrantScopes,
       { vaultOwnerId: OWNER, grantId: granted[0]._id, scopes: ["family_history:context:read"] },
     );
@@ -187,7 +187,7 @@ describe("chosen-AI lifecycle ladder (locally provable rungs)", () => {
     expect(names.length).toBeGreaterThan(0);
     for (const name of names) {
       expect(findTool(name), `${name} must be in the catalog`).toBeTruthy();
-      expect(findTool(name)!.requiredScope).toBe("family_history:context:read");
+      expect(findTool(name)!.requiredScope).toBe(name === "family_history_manage_connection" ? "connection:self" : "family_history:context:read");
     }
     // A read-only grant reaches no write tool at all.
     expect(names).not.toContain("family_history_save_records");

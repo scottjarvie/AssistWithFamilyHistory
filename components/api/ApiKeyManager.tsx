@@ -29,10 +29,11 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { SCOPES, SCOPE_PRESETS_META, type Scope } from "@/lib/auth/scopes";
+import { SCOPES, SCOPE_PRESETS_META, presetScopes, fullOwnDataScopes, type Scope } from "@/lib/auth/scopes";
 
 export interface ApiKeyRow {
   keyId: string;
+  version?: number;
   label: string;
   scopes: string[];
   tier: "trial" | "standard" | "trusted";
@@ -85,9 +86,11 @@ export function ApiKeyManager({
     setNowMs(Date.now());
   }, []);
   const [label, setLabel] = useState("");
-  const [preset, setPreset] = useState<string>("read_only_assistant");
+  const [preset, setPreset] = useState<string>("full");
   const [advanced, setAdvanced] = useState(false);
-  const [customScopes, setCustomScopes] = useState<Scope[]>([]);
+  const [customScopes, setCustomScopes] = useState<Scope[]>(fullOwnDataScopes);
+  const [includeFuture, setIncludeFuture] = useState(true);
+  const [endDate, setEndDate] = useState("");
   const [minting, setMinting] = useState(false);
   const [busyKeyId, setBusyKeyId] = useState<string | null>(null);
   const [mintedKey, setMintedKey] = useState<{ key: string; keyId: string; label: string } | null>(null);
@@ -108,18 +111,22 @@ export function ApiKeyManager({
     setMinting(true);
     try {
       const body = advanced
-        ? { label: label.trim(), scopes: customScopes }
+        ? { label: label.trim(), scopes: customScopes, scopeChoice: includeFuture ? "full" : "chosen" }
         : { label: label.trim(), preset };
       const res = await fetch("/api/keys", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ ...body, expiresAt: endDate ? new Date(`${endDate}T23:59:59`).getTime() : undefined }),
       });
       const data = await res.json();
       if (!res.ok || !data?.success) throw new Error(data?.error || "Could not mint key");
       setMintedKey({ key: data.key, keyId: data.keyId, label: data.label });
       setLabel("");
-      setCustomScopes([]);
+      setCustomScopes(fullOwnDataScopes());
+      setPreset("full");
+      setAdvanced(false);
+      setIncludeFuture(true);
+      setEndDate("");
       toast.success("API key created — copy it now, it won't be shown again");
       await refresh();
     } catch (error) {
@@ -150,7 +157,7 @@ export function ApiKeyManager({
       const res = await fetch(`/api/keys/${keyId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, expectedVersion: keys.find((key) => key.keyId === keyId)?.version ?? 0 }),
       });
       const data = await res.json();
       if (!res.ok || !data?.success) throw new Error(data?.error || "Could not update key");
@@ -220,6 +227,7 @@ export function ApiKeyManager({
           ) : (
             <div className="rounded-xl border border-stone-200 p-4">
               <p className="mb-3 text-sm text-stone-500">Advanced: choose individual scopes.</p>
+              <label className="mb-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={includeFuture} onChange={(event) => { setIncludeFuture(event.target.checked); if (event.target.checked) setCustomScopes(fullOwnDataScopes()); }} />Include all current and future private-data permissions</label>
               <div className="grid gap-2 sm:grid-cols-2">
                 {SCOPES.map((scope) => {
                   const checked = customScopes.includes(scope);
@@ -228,11 +236,12 @@ export function ApiKeyManager({
                       <input
                         type="checkbox"
                         checked={checked}
-                        onChange={() =>
+                        onChange={() => {
+                          setIncludeFuture(false);
                           setCustomScopes((prev) =>
                             checked ? prev.filter((s) => s !== scope) : [...prev, scope],
-                          )
-                        }
+                          );
+                        }}
                       />
                       <code className="font-mono text-xs">{scope}</code>
                     </label>
@@ -242,12 +251,13 @@ export function ApiKeyManager({
             </div>
           )}
 
+          <label className="block text-sm text-stone-700">Optional end date (blank means no end date)<Input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} /></label>
           <div className="flex flex-wrap items-center gap-3">
             <Button onClick={mint} disabled={minting} className="bg-stone-900 hover:bg-stone-800">
               {minting ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
               Create key
             </Button>
-            <Button type="button" variant="ghost" size="sm" onClick={() => setAdvanced((v) => !v)} className="text-stone-600">
+            <Button type="button" variant="ghost" size="sm" onClick={() => { if (!advanced) { setCustomScopes(presetScopes(preset)); setIncludeFuture(preset === "full"); } setAdvanced((v) => !v); }} className="text-stone-600">
               {advanced ? "Use a preset instead" : "Advanced: choose raw scopes"}
             </Button>
           </div>

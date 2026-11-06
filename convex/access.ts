@@ -190,3 +190,13 @@ export function requireTrustBoundarySuperAdmin(identitySubject?: string | null):
     throw new Error("Trust boundary summary requires a configured super-admin");
   }
 }
+
+/** Authority management requires a verified browser session, never an OAuth AI identity. */
+export async function requirePersonSession(ctx: AuthContext): Promise<void> {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity || typeof identity.sid !== "string" || !identity.sid.trim()
+    || identity.client_id !== undefined
+    || (identity.azp !== undefined && !["https://assistwithfamilyhistory.com", "https://local.assistwithfamilyhistory.com", "http://family-history.localhost:3443"].includes(String(identity.azp)))) {
+    throw new Error("Only the person can increase or manage other connections in Settings > AI connections. AI callers may only reduce their own connection.");
+  }
+}

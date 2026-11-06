@@ -75,7 +75,14 @@ export interface ScopePresetDef {
   admin?: boolean;
 }
 
+/** Own private reversible data. Publication, identity and admin scopes remain separate gates. */
+export const fullOwnDataScopes = (): Scope[] => SCOPES.filter((scope) => !scope.startsWith("admin:") && !["stories:publish", "provisional:resolve"].includes(scope));
+export function effectiveApiKeyScopes(key: { scopes: readonly string[]; scopeChoice?: "full" | "chosen" }): Scope[] {
+  return key.scopeChoice === "full" ? fullOwnDataScopes() : sanitizeScopes(key.scopes);
+}
+
 export const SCOPE_PRESETS_META: ScopePresetDef[] = [
+  { key: "full", label: "Full access to my data", description: "All current and future entitled private-data permissions, with no end date. Publication, sharing and identity decisions keep their person-only gates.", scopes: fullOwnDataScopes(), tier: "standard" },
   {
     key: "read_only_assistant",
     label: "Read-only assistant",

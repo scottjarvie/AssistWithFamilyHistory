@@ -1858,6 +1858,8 @@ export default defineSchema({
   apiKeys: defineTable({
     vaultOwnerId: v.string(),
     keyId: v.string(),                 // public prefix, e.g. "dts_live_<hex>"
+    scopeChoice: v.optional(v.union(v.literal("full"), v.literal("chosen"))),
+    version: v.optional(v.number()),
     hashedSecret: v.string(),          // SHA-256(secret) hex; raw secret never stored
     label: v.string(),
     scopes: v.array(v.string()),
@@ -1916,6 +1918,7 @@ export default defineSchema({
    * client never supplies an owner, a vault, or a grant selector.
    */
   mcpGrants: defineTable({
+    version: v.optional(v.number()),
     vaultOwnerId: v.string(),
     /** Verified from the access token, never from a request body. */
     clientId: v.string(),

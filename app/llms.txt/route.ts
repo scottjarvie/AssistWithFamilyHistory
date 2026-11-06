@@ -24,6 +24,7 @@ const BODY = [
   "- The stateless remote MCP backend and one disposable public PKCE client lifecycle are production-proven. Broad client compatibility, fresh-device email, reconnect, and immediate issued-JWT revocation remain Partial.",
   "",
   "## Principles",
+  "- New AI connections default to every current and future entitled own-data permission and no end date. Optional per-connection approval-first is off. Person-only publication, sharing, identity and validation gates remain. AI may only reduce its own verified connection, with a durable versioned receipt; only the person can increase or restore access in Settings.",
   "- Evidence vs conclusion: raw record data never overwrites confirmed facts — agents propose, humans confirm.",
   "- Privacy by default: living people and private notes are protected.",
   "- Sign-in required: every write is scoped to exactly one owner's vault.",

@@ -400,3 +400,7 @@ sign-in must never undo those choices. Full access is a durable choice, resolved
 the current catalog, rather than a scope list frozen on the day of connection. Existing
 review, evidence privacy, publishing and other per-action safety gates still apply.
 Implementation and verification are separate from production delivery.
+
+### 24 October 2026 — Scott's full-access clarification
+
+API keys and MCP connections default to all current and future entitled private-data permissions, all records, and no end date. Optional per-connection approval-first limits default off. This does not grant Trusted/Admin roles or relax person-only publication, sharing, identity decisions, permanent destruction or evidence/import validation gates. An AI can reduce only its verified calling connection (scopes, record boundary, end date, pause/revoke), with an atomic versioned audit receipt. Only the person in Settings can increase or restore access, using the loaded governing grant ID and revision. Existing unmarked scope arrays, chosen/legacy dates, refusals and inactive statuses remain enforced exactly; there is no migration or automatic lift.

@@ -160,7 +160,8 @@ async function verifyOAuth(request: Request, resource: URL, issuer: URL): Promis
       : typeof result.payload.azp === "string"
         ? result.payload.azp
         : null;
-    if (!clientId) throw new Error("OAuth token is missing its client identifier.");
+    if (result.payload.client_id !== undefined && result.payload.azp !== undefined && result.payload.client_id !== result.payload.azp) throw new Error("Conflicting OAuth client identity.");
+    if (!clientId || !clientId.trim() || clientId !== clientId.trim()) throw new Error("OAuth token is missing its client identifier.");
     if (clientId.length > 160) throw new Error("OAuth client identifier is too long.");
     // ---------------------------------------------------------------- audience
     //
@@ -610,7 +611,7 @@ export function createFamilyHistoryServer(
   const grantId = grant?.grantId;
 
   const instructions = grant
-    ? `Call family_history_get_brief first. Search, then hydrate a stable ID before editing. For a source that touches several people at once — a census page, a family group sheet — use family_history_save_records: one call, per-item results. Use family_history_save_complete_result when the pass must be all-or-nothing. Never publish, delete, merge identities, or invent owner/workspace IDs. This connection is approved for: ${effectiveScopes(grant).join(", ")}. Tools available to it: ${permitted.map((tool) => tool.name).join(", ")}.`
+    ? `Call family_history_get_brief first. Search, then hydrate a stable ID before editing. For a source that touches several people at once — a census page, a family group sheet — use family_history_save_records: one call, per-item results. Use family_history_save_complete_result when the pass must be all-or-nothing. Never publish, delete, merge identities, or invent owner/workspace IDs. New connections default to full current/future private-data access and no end date. Use family_history_manage_connection to inspect or reduce only this connection; increasing/restoring access requires the person in Settings > AI connections. This connection is approved for: ${effectiveScopes(grant).join(", ")}. Tools available to it: ${permitted.map((tool) => tool.name).join(", ")}.`
     : `This AI connection has not been approved for Assist With Family History yet. Signing in proved who the person is; it did not decide what this connection may do. Ask the person to open ${CONNECTION_SETTINGS_URL}, choose which parts of their research this connection may use, and approve it. No Family History tools are available until they do.`;
 
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, {
@@ -704,6 +705,13 @@ export function createFamilyHistoryServer(
 
   const readOnly = { readOnlyHint: true, destructiveHint: false, idempotentHint: true };
   const writeSafe = { readOnlyHint: false, destructiveHint: false, idempotentHint: true };
+
+  registerTool("family_history_manage_connection", {
+    inputSchema: z.object({ action: z.enum(["inspect", "reduce", "pause", "revoke"]), expectedGrantId: z.string().optional(), expectedVersion: z.number().int().nonnegative().optional(), scopes: z.array(z.string()).optional(), boundary: z.object({ kind: z.enum(["whole_workspace", "selected_people", "queue_only"]), personIds: z.array(z.string()).max(500).optional(), queueItemIds: z.array(z.string()).max(500).optional() }).strict().optional(), expiresAt: z.number().optional() }).strict(),
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+  }, (input: any) => read("family_history_manage_connection", () => actionCtx.runMutation(grants.reduceOwnConnection, {
+    ...input, subject: principal.subject, issuer: principal.issuer, clientId: principal.clientId,
+  })));
 
   registerTool("family_history_get_brief", {
     inputSchema: z.object({}).strict(),

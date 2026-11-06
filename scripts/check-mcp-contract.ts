@@ -31,7 +31,7 @@ assertMcpToolContract();
 
 for (const tool of FAMILY_HISTORY_TOOLS) {
   assert.ok(
-    FAMILY_HISTORY_SCOPES.includes(tool.requiredScope),
+    tool.requiredScope === "connection:self" ? tool.name === "family_history_manage_connection" : FAMILY_HISTORY_SCOPES.includes(tool.requiredScope),
     `${tool.name} requires a scope outside the ceiling`,
   );
   assert.equal(scopeForTool(tool.name), tool.requiredScope);
@@ -48,6 +48,10 @@ for (const unknown of ["", "save_everything", "family_history_delete_person", "t
   assert.equal(scopeForTool(unknown), null, `${unknown} must map to no scope`);
 }
 
+// Own-reduction control is not an issuable data permission. Domain read scopes
+// still reach no domain writers, and scope-free grants retain only self-control.
+assert.equal(FAMILY_HISTORY_TOOLS.filter((tool) => tool.requiredScope === "connection:self").length, 1);
+assert.equal(decideToolAccess({ toolName: "family_history_manage_connection", resolution: { state: "active", grant: { grantId: "self", clientId: "self", issuer: "synthetic", scopes: [], boundary: { kind: "queue_only" } } }, now: Date.now() }).allowed, true);
 // No read scope may reach a tool that writes.
 for (const scope of FAMILY_HISTORY_SCOPES.filter((entry) => entry.endsWith(":read"))) {
   const writers = FAMILY_HISTORY_TOOLS.filter((tool) => tool.requiredScope === scope && tool.writes);

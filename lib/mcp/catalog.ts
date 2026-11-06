@@ -162,7 +162,8 @@ export type CatalogTool = {
    * without a real sunset decision.
    */
   alias?: string;
-  requiredScope: FamilyHistoryScope;
+  /** connection:self is control authority, never an issuable data scope. */
+  requiredScope: FamilyHistoryScope | "connection:self";
   /** Extra scopes required only when the call carries certain input. */
   conditionalScopes?: readonly ConditionalScope[];
   writes: boolean;
@@ -181,6 +182,9 @@ const ALIAS_SUNSET =
   "Deprecated alias kept for clients that connected before Family History namespacing. It resolves to the same handler and the same scope. Prefer the family_history_* name; the alias will be sunset only after connected clients are observed to have refreshed.";
 
 export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
+  { name: "family_history_manage_connection", requiredScope: "connection:self", writes: true,
+    title: "Inspect or reduce this connection", description: "Inspect this verified calling connection or reduce only its own scopes/entities, add or shorten its end date, pause or revoke it. Returns a durable versioned audit receipt. Never adds access, extends/removes dates, restores a connection or changes a sibling. Only the person can increase access in Settings > AI connections.",
+    humanSummary: "Lets your AI inspect or reduce its own access.", implementedBy: "convex/mcpGrants.reduceOwnConnection" },
   {
     name: "family_history_get_brief",
     alias: "get_family_history_brief",
@@ -413,7 +417,7 @@ export function findTool(name: string): CatalogTool | undefined {
 }
 
 /** The scope a name needs, or null when the name is not in the catalog at all. */
-export function scopeForTool(name: string): FamilyHistoryScope | null {
+export function scopeForTool(name: string): CatalogTool["requiredScope"] | null {
   return BY_NAME.get(name)?.requiredScope ?? null;
 }
 
@@ -444,7 +448,11 @@ export function assertFamilyHistoryCatalogContract(): void {
     if (forbidden.test(tool.name)) {
       throw new Error(`Tool name implies an action outside the scope ceiling: ${tool.name}`);
     }
-    if (!isFamilyHistoryScope(tool.requiredScope)) {
+    if (tool.requiredScope === "connection:self") {
+      if (tool.name !== "family_history_manage_connection" || tool.alias || tool.conditionalScopes?.length || !tool.writes || tool.implementedBy !== "convex/mcpGrants.reduceOwnConnection") {
+        throw new Error("Self-control authority is reserved exclusively for the verified own-reduction handler");
+      }
+    } else if (!isFamilyHistoryScope(tool.requiredScope)) {
       throw new Error(`Tool ${tool.name} requires a scope outside the ceiling`);
     }
     // A read scope must never be able to change anything.

@@ -40,7 +40,10 @@ const RequestSchema = z.discriminatedUnion("action", [
     action: z.literal("approve"),
     grantId: z.string().min(1),
     label: z.string().min(1).max(80),
-    scopes: z.array(ScopeEnum).min(1),
+    scopes: z.array(ScopeEnum).optional(),
+    scopeChoice: z.enum(["full", "chosen"]).optional(),
+    expectedVersion: z.number().int().nonnegative(),
+    expiresAt: z.number().optional(),
     boundary: BoundarySchema,
     expiresInDays: z.number().int().min(1).max(365).optional(),
   }),
@@ -52,14 +55,14 @@ const RequestSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("reduce"),
     grantId: z.string().min(1),
-    scopes: z.array(ScopeEnum).min(1),
+    scopes: z.array(ScopeEnum),
   }),
   z.object({
     action: z.literal("revoke"),
     grantId: z.string().min(1),
     reason: z.string().max(300).optional(),
   }),
-  z.object({ action: z.literal("expiry"), grantId: z.string().min(1), expiresInDays: z.number().int().min(1).max(365).optional() }),
+  z.object({ action: z.literal("expiry"), expectedVersion: z.number().int().nonnegative(), grantId: z.string().min(1), expiresInDays: z.number().int().min(1).max(365).optional() }),
   z.object({ action: z.literal("remove"), grantId: z.string().min(1) }),
 ]);
 
@@ -109,6 +112,9 @@ export async function POST(request: NextRequest) {
           grantId: body.grantId,
           label: body.label,
           scopes: body.scopes,
+          scopeChoice: body.scopeChoice,
+          expectedVersion: body.expectedVersion,
+          expiresAt: body.expiresAt,
           boundary: body.boundary,
           expiresInDays: body.expiresInDays,
         });
@@ -139,7 +145,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true, ...result });
       }
       case "expiry": {
-        const result = await client.mutation(updateGrantExpiryRef, { vaultOwnerId, grantId: body.grantId, expiresInDays: body.expiresInDays });
+        const result = await client.mutation(updateGrantExpiryRef, { vaultOwnerId, grantId: body.grantId, expectedVersion: body.expectedVersion, expiresInDays: body.expiresInDays });
         return NextResponse.json({ success: true, ...result });
       }
       case "remove": {

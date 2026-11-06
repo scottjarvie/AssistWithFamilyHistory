@@ -353,15 +353,18 @@ function ApprovalForm({
     scopes: FamilyHistoryScope[];
     boundary: ConnectionBoundary;
     expiresInDays?: number;
+    expiresAt?: number;
+    scopeChoice?: "full" | "chosen";
   }) => void;
   onDeny?: (reason: string) => void;
 }) {
   const [label, setLabel] = useState(connection.label);
-  const [scopes, setScopes] = useState<FamilyHistoryScope[]>(connection.status === "pending" && connection.scopes.length === 0 ? [...FAMILY_HISTORY_SCOPES] : [...connection.scopes]);
+  const [scopes, setScopes] = useState<FamilyHistoryScope[]>(connection.status === "pending" && connection.scopes.length === 0 && connection.scopeChoice !== "chosen" ? [...FAMILY_HISTORY_SCOPES] : [...connection.scopes]);
   const [boundaryKind, setBoundaryKind] = useState<ConnectionBoundary["kind"]>(connection.boundary.kind);
   const [personIdText, setPersonIdText] = useState((connection.boundary.personIds ?? []).join("\n"));
   const [queueItemText, setQueueItemText] = useState((connection.boundary.queueItemIds ?? []).join("\n"));
-  const [expiresInDays, setExpiresInDays] = useState(connection.expiresAt == null ? 0 : 7);
+  const [expiresInDays, setExpiresInDays] = useState(connection.expiresAt == null ? 0 : -1);
+  const [includeFuture, setIncludeFuture] = useState(connection.scopeChoice === "full" || (connection.status === "pending" && connection.scopes.length === 0 && connection.scopeChoice !== "chosen"));
   const [denyReason, setDenyReason] = useState("");
 
   const personIds = useMemo(() => parseIdList(personIdText), [personIdText]);
@@ -369,6 +372,7 @@ function ApprovalForm({
   const boundaryIncomplete = boundaryKind === "selected_people" && personIds.length === 0;
 
   function toggleScope(scope: FamilyHistoryScope, next: boolean) {
+    setIncludeFuture(false);
     setScopes((current) =>
       next ? [...new Set([...current, scope])] : current.filter((entry) => entry !== scope),
     );
@@ -381,8 +385,9 @@ function ApprovalForm({
           1 · What may it do?
         </h4>
         <p className="mt-1 text-sm leading-6 text-stone-600">
-          Your saved permissions and record boundary are selected below. Review each choice before approving. Selecting every permission includes tools added later.
+          Your saved permissions and record boundary are selected below. Review each choice before approving. Choose whether to include future permissions explicitly.
         </p>
+        <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={includeFuture} disabled={busy} onChange={(event) => { setIncludeFuture(event.target.checked); if (event.target.checked) setScopes([...FAMILY_HISTORY_SCOPES]); }} />Include all current and future permissions</label>
         <ul className="mt-3 space-y-3">
           {FAMILY_HISTORY_SCOPE_INFO.map((scope) => (
             <ScopeExplainer
@@ -458,6 +463,7 @@ function ApprovalForm({
           in place until you change or remove it. You can turn the connection off at any time.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
+          {connection.expiresAt != null && <button type="button" disabled={busy} aria-pressed={expiresInDays === -1} onClick={() => setExpiresInDays(-1)}>Keep saved end date: {new Date(connection.expiresAt).toLocaleDateString()}</button>}
           {EXPIRY_CHOICES.map((choice) => (
             <button
               key={choice.days}
@@ -497,7 +503,7 @@ function ApprovalForm({
       <div className="flex flex-col gap-3 border-t border-stone-200 pt-5 sm:flex-row sm:items-center">
         <Button
           type="button"
-          disabled={busy || scopes.length === 0 || boundaryIncomplete || !label.trim()}
+          disabled={busy || boundaryIncomplete || !label.trim()}
           onClick={() =>
             onApprove({
               label: label.trim(),
@@ -508,7 +514,9 @@ function ApprovalForm({
                 queueItemIds:
                   boundaryKind === "queue_only" && queueItemIds.length ? queueItemIds : undefined,
               },
-              expiresInDays,
+              scopeChoice: includeFuture ? "full" : "chosen",
+              expiresInDays: expiresInDays > 0 ? expiresInDays : undefined,
+              expiresAt: expiresInDays === -1 ? connection.expiresAt ?? undefined : undefined,
             })
           }
           className="min-h-11 bg-emerald-800 hover:bg-emerald-900 sm:w-auto"
@@ -696,10 +704,11 @@ export function AiConnectionCenter({
       const response = await fetch("/api/ai-connections", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...body, grantId }),
+        body: JSON.stringify({ ...body, grantId, expectedVersion: connections.find((row) => row.id === grantId)?.version ?? 0 }),
       });
       const payload = (await response.json().catch(() => ({}))) as {
         id?: string;
+        version?: number;
         connection?: ConnectionRow;
         error?: string;
         status?: ConnectionRow["status"];
@@ -731,6 +740,7 @@ export function AiConnectionCenter({
                   revokedAt: null, revokedReason: null, consentSnapshot: null,
                   lastUsedAt: null, lastToolName: null, useCount: 0,
                 } : {}),
+                version: payload.version ?? row.version,
                 status: payload.status ?? row.status,
                 scopes: payload.scopes ?? row.scopes,
                 expiresAt: payload.expiresAt === undefined ? row.expiresAt : payload.expiresAt,
@@ -824,10 +834,7 @@ export function AiConnectionCenter({
                       connection.id,
                       {
                         action: "approve",
-                        label: input.label,
-                        scopes: input.scopes,
-                        boundary: input.boundary,
-                        expiresInDays: input.expiresInDays || undefined,
+                        ...input,
                       },
                       "Approved. This connection now works inside exactly what you chose.",
                     )

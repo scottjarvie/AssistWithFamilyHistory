@@ -12,11 +12,14 @@
  * it is intentionally NOT a public query here (no public lookup-by-keyId).
  */
 import { v } from "convex/values";
-import { action, internalQuery, mutation } from "./_generated/server";
+import { action, internalMutation, internalQuery, mutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
-import { authorizeTenantAction, authorizeTenantMutation } from "./access";
+import { authorizeTenantAction, authorizeTenantMutation, requirePersonSession } from "./access";
 import { filterByVaultOwner, matchesVaultOwner } from "./vaultCore";
+
+import { isAdminUser } from "../lib/auth/admin";
+import { effectiveApiKeyScopes, fullOwnDataScopes, sanitizeScopes, scopesRequireAdmin } from "../lib/auth/scopes";
 
 const tierValidator = v.union(v.literal("trial"), v.literal("standard"), v.literal("trusted"));
 
@@ -26,13 +29,16 @@ export const mintKey = mutation({
     keyId: v.string(),
     hashedSecret: v.string(),
     label: v.string(),
-    scopes: v.array(v.string()),
-    tier: tierValidator,
+    scopes: v.optional(v.array(v.string())),
+    scopeChoice: v.optional(v.union(v.literal("full"), v.literal("chosen"))),
+    tier: v.optional(tierValidator),
     expiresAt: v.optional(v.number()),
     createdByUserId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    await requirePersonSession(ctx);
     const decision = await authorizeTenantMutation(ctx, "apiKeys.mintKey", args.vaultOwnerId);
+    if (!decision.allowed) throw new Error("API key not found");
     const vaultOwnerId = decision.owner;
     if (!args.keyId.startsWith("dts_")) {
       throw new Error("Invalid API key id prefix");
@@ -40,14 +46,21 @@ export const mintKey = mutation({
     if (args.label.trim().length === 0) {
       throw new Error("API key label is required");
     }
+    if (await ctx.db.query("apiKeys").withIndex("by_keyId", (q) => q.eq("keyId", args.keyId)).first()) throw new Error("API key id already exists");
+    const scopeChoice = args.scopeChoice ?? (args.scopes === undefined ? "full" : "chosen");
+    const scopes = scopeChoice === "full" ? fullOwnDataScopes() : sanitizeScopes(args.scopes ?? []);
+    if (scopesRequireAdmin(scopes) && !isAdminUser(decision.caller)) throw new Error("Admin scopes require an operator role");
+    if (scopeChoice === "full" && args.scopes !== undefined && !fullOwnDataScopes().every((scope) => args.scopes!.includes(scope))) throw new Error("Full access requires all private-data permissions");
     const now = Date.now();
     const id = await ctx.db.insert("apiKeys", {
       vaultOwnerId,
       keyId: args.keyId,
       hashedSecret: args.hashedSecret,
       label: args.label.trim(),
-      scopes: args.scopes,
-      tier: args.tier,
+      scopes,
+      scopeChoice,
+      version: 0,
+      tier: args.tier ?? "standard",
       status: "active",
       createdAt: now,
       expiresAt: args.expiresAt,
@@ -63,7 +76,9 @@ export const mintKey = mutation({
 export const revokeKey = mutation({
   args: { vaultOwnerId: v.string(), keyId: v.string() },
   handler: async (ctx, args) => {
+    await requirePersonSession(ctx);
     const decision = await authorizeTenantMutation(ctx, "apiKeys.revokeKey", args.vaultOwnerId);
+    if (!decision.allowed) throw new Error("API key not found");
     const vaultOwnerId = decision.owner;
     const row = await ctx.db
       .query("apiKeys")
@@ -73,7 +88,8 @@ export const revokeKey = mutation({
       throw new Error("API key not found");
     }
     if (row.status !== "revoked") {
-      await ctx.db.patch(row._id, { status: "revoked", revokedAt: Date.now() });
+      await ctx.db.patch(row._id, { status: "revoked", revokedAt: Date.now(), version: (row.version ?? 0) + 1 });
+      await auditKey(ctx, row, "revoke");
     }
     return { keyId: args.keyId, status: "revoked" as const };
   },
@@ -85,9 +101,12 @@ export const setKeyStatus = mutation({
     vaultOwnerId: v.string(),
     keyId: v.string(),
     status: v.union(v.literal("active"), v.literal("suspended")),
+    expectedVersion: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    await requirePersonSession(ctx);
     const decision = await authorizeTenantMutation(ctx, "apiKeys.setKeyStatus", args.vaultOwnerId);
+    if (!decision.allowed) throw new Error("API key not found");
     const vaultOwnerId = decision.owner;
     const row = await ctx.db
       .query("apiKeys")
@@ -99,7 +118,9 @@ export const setKeyStatus = mutation({
     if (row.status === "revoked") {
       throw new Error("Revoked keys cannot be reactivated");
     }
-    await ctx.db.patch(row._id, { status: args.status });
+    if (args.status === "active" && args.expectedVersion !== (row.version ?? 0)) throw new Error("Connection changed. Reload the API Center before restoring access");
+    await ctx.db.patch(row._id, { status: args.status, version: (row.version ?? 0) + 1 });
+    await auditKey(ctx, row, args.status);
     return { keyId: args.keyId, status: args.status };
   },
 });
@@ -123,7 +144,9 @@ export const listKeysInternal = internalQuery({
       .map((row) => ({
         keyId: row.keyId,
         label: row.label,
-        scopes: row.scopes,
+        scopes: effectiveApiKeyScopes(row),
+        version: row.version ?? 0,
+        scopeChoice: row.scopeChoice,
         tier: row.tier,
         status: row.status,
         createdAt: row.createdAt,
@@ -148,5 +171,32 @@ export const listKeys = action({
       ...args,
       vaultOwnerId: decision.owner,
     });
+  },
+});
+
+async function auditKey(ctx: import("./_generated/server").MutationCtx, row: Doc<"apiKeys">, action: string, detail?: string) {
+  return ctx.db.insert("agentActivity", { vaultOwnerId: row.vaultOwnerId, keyId: row.keyId,
+    requestId: `authority:${row._id}:${(row.version ?? 0) + 1}`, principalKind: "api_key", route: "/api-key/access", method: action,
+    outcome: "ok", statusCode: 200, createdAt: Date.now(), detail: detail ?? JSON.stringify({ action, version: (row.version ?? 0) + 1 }) });
+}
+
+/** Hash derived by the HTTP transport. Never reachable as a public Convex function. */
+export const reduceOwnKey = internalMutation({
+  args: { keyId: v.string(), hashedSecret: v.string(), action: v.union(v.literal("inspect"), v.literal("reduce"), v.literal("pause"), v.literal("revoke")),
+    expectedVersion: v.optional(v.number()), scopes: v.optional(v.array(v.string())), expiresAt: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const row = await ctx.db.query("apiKeys").withIndex("by_keyId", (q) => q.eq("keyId", args.keyId)).unique();
+    if (!row || row.hashedSecret !== args.hashedSecret || row.status !== "active" || (row.expiresAt !== undefined && row.expiresAt <= Date.now())) throw new Error("Invalid or inactive connection. Only the person can restore access in Settings > API Center.");
+    const before = { keyId: row.keyId, version: row.version ?? 0, scopes: effectiveApiKeyScopes(row), expiresAt: row.expiresAt ?? null, status: row.status };
+    if (args.action === "inspect") return before;
+    if (args.expectedVersion !== (row.version ?? 0)) throw new Error("Connection changed. Inspect your own connection again before reducing it.");
+    if (args.scopes?.some((scope) => !effectiveApiKeyScopes(row).includes(scope as never)) || (args.expiresAt !== undefined && (!Number.isFinite(args.expiresAt) || (row.expiresAt !== undefined && args.expiresAt > row.expiresAt)))) throw new Error("AI cannot increase access. The person can change it in Settings > API Center.");
+    const patch = { scopes: args.scopes ?? row.scopes, scopeChoice: args.scopes === undefined ? row.scopeChoice : "chosen" as const,
+      expiresAt: args.expiresAt ?? row.expiresAt, status: args.action === "revoke" ? "revoked" as const : args.action === "pause" ? "suspended" as const : row.status,
+      version: (row.version ?? 0) + 1, ...(args.action === "revoke" ? { revokedAt: Date.now() } : {}) };
+    await ctx.db.patch(row._id, patch);
+    const after = { keyId: row.keyId, version: patch.version, scopes: effectiveApiKeyScopes({ ...row, ...patch }), expiresAt: patch.expiresAt ?? null, status: patch.status };
+    const receiptId = await auditKey(ctx, row, args.action, JSON.stringify({ before, after, action: args.action }));
+    return { ...after, receiptId };
   },
 });

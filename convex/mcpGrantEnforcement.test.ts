@@ -268,7 +268,7 @@ describe("grant states: sign-in approves, the person's no stands", () => {
     const before = await callTool(t, OWNER_A, "family_history_get_brief", {});
     expect(before.isError).toBe(false);
 
-    await t.withIdentity({ subject: OWNER_A }).mutation(
+    await t.withIdentity({ subject: OWNER_A, sid: "sess_synthetic_person" }).mutation(
       (await import("./_generated/api")).api.mcpGrants.revokeGrant,
       { vaultOwnerId: OWNER_A, grantId: grantId as never, reason: "Finished the project" },
     );
@@ -293,16 +293,16 @@ describe("grant states: sign-in approves, the person's no stands", () => {
       return payload.result;
     };
     expect((await call()).isError).not.toBe(true);
-    const own = t.withIdentity({ subject: OWNER_A });
+    const own = t.withIdentity({ subject: OWNER_A, sid: "sess_synthetic_person" });
     await own.mutation(api.mcpGrants.revokeGrant, { vaultOwnerId: OWNER_A, grantId: newestId as never });
     const refused = await call();
     expect(refused.isError).toBe(true);
     expect(JSON.parse(refused.content.find((block: { type: string }) => block.type === "text").text).code).toBe("GRANT_REVOKED");
     expect(await toolNames(t, OWNER_A)).toEqual([]);
-    const approved = await own.mutation(api.mcpGrants.approveGrant, {
+    const approved = await own.mutation(api.mcpGrants.approveGrant, await loaded(t, {
       vaultOwnerId: OWNER_A, grantId: newestId as never, label: "Explicit reapproval",
       scopes: ["family_history:context:read"], boundary: { kind: "whole_workspace" }, expiresInDays: 7,
-    });
+    }));
     expect([olderId, newestId]).not.toContain(String(approved.id));
     expect((await call()).isError).not.toBe(true);
     for (const id of [olderId, newestId]) {
@@ -552,3 +552,8 @@ describe("token audience", () => {
     expect(response.status).toBe(200);
   });
 });
+
+async function loaded<T extends { grantId: unknown }>(t: ReturnType<typeof convexTest>, args: T): Promise<T & { expectedVersion: number }> {
+  const row = await t.run((ctx) => ctx.db.get(args.grantId as never));
+  return { ...args, expectedVersion: (row as { version?: number } | null)?.version ?? 0 };
+}

@@ -11,7 +11,7 @@ import { seedGrant } from "../lib/mcp/testSupport";
 
 const modules = import.meta.glob("./**/*.ts");
 const owner = "user_synthetic_grant_defaults";
-const identity = { subject: owner };
+const identity = { subject: owner, sid: "sess_synthetic_person" };
 const resolveArgs = { subject: owner, issuer: "https://identity.example.test", clientId: "synthetic-mcp-client" };
 
 function autoExpiry(issuedAt: number) {
@@ -42,17 +42,17 @@ describe("durable full access", () => {
     const full = { state: "active" as const, grant };
     expect(permittedTools(full, Date.now()).length).toBeGreaterThan(0);
     expect(decideToolAccess({ resolution: full, toolName: "family_history_save_records", input: {}, now: Date.now() }).allowed).toBe(true);
-    expect(permittedTools({ state: "active", grant: { ...grant, scopeChoice: "chosen" } }, Date.now())).toEqual([]);
+    expect(permittedTools({ state: "active", grant: { ...grant, scopeChoice: "chosen" } }, Date.now()).map((tool) => tool.name)).toEqual(["family_history_manage_connection"]);
     expect(effectiveScopes({ scopes: [...LEGACY_FULL_SCOPE_BASELINE], scopeChoice: "chosen" })).toEqual([...FAMILY_HISTORY_SCOPES]);
   });
 
-  test("legacy inference uses the frozen baseline, not future catalog membership", () => {
-    expect(effectiveScopeChoice({ scopes: [...LEGACY_FULL_SCOPE_BASELINE] })).toBe("full");
+  test("unmarked legacy arrays never infer future-full access", () => {
+    expect(effectiveScopeChoice({ scopes: [...LEGACY_FULL_SCOPE_BASELINE] })).toBe("chosen");
     expect(effectiveScopeChoice({ scopes: LEGACY_FULL_SCOPE_BASELINE.slice(1) })).toBe("chosen");
     const catalog = FAMILY_HISTORY_SCOPES as unknown as string[];
     catalog.push("family_history:future:synthetic");
     try {
-      expect(effectiveScopes({ scopes: [...LEGACY_FULL_SCOPE_BASELINE] })).toContain("family_history:future:synthetic");
+      expect(effectiveScopes({ scopes: [...LEGACY_FULL_SCOPE_BASELINE] })).not.toContain("family_history:future:synthetic");
       expect(effectiveScopes({ scopes: [...LEGACY_FULL_SCOPE_BASELINE], scopeChoice: "chosen" })).not.toContain("family_history:future:synthetic");
     } finally { catalog.pop(); }
   });
@@ -70,9 +70,9 @@ describe("durable full access", () => {
 });
 
 describe("explicit and legacy expiry", () => {
-  test("only matching automatic sign-in receipts ignore old dates", () => {
+  test("all unmarked legacy dates remain enforced", () => {
     const automatic = autoExpiry(Date.now() - 100 * 86_400_000);
-    expect(effectiveExpiry(automatic)).toBeUndefined();
+    expect(effectiveExpiry(automatic)).toBe(automatic.expiresAt);
     expect(effectiveExpiry({ ...automatic, requestedAt: automatic.issuedAt - 1 })).toBe(automatic.expiresAt);
     expect(effectiveExpiry({ ...automatic, consentSnapshot: JSON.stringify({ approvedBy: "sign_in", shownAt: automatic.issuedAt + 1, expiresAt: automatic.expiresAt }) })).toBe(automatic.expiresAt);
     expect(effectiveExpiry({ ...automatic, expiryChoice: "chosen" })).toBe(automatic.expiresAt);
@@ -82,33 +82,27 @@ describe("explicit and legacy expiry", () => {
     expect(effectiveExpiry({ ...automatic, consentSnapshot: JSON.stringify({ approvedBy: "settings", shownAt: automatic.issuedAt, expiresAt: automatic.expiresAt }) })).toBe(automatic.expiresAt);
   });
 
-  test.each(["active", "expired"] as const)("legacy automatic %s dates are ignored at read time without modifying rows or scopes", async (status) => {
+  test.each(["active", "expired"] as const)("legacy automatic %s dates stay enforced without modifying rows", async (status) => {
     const { t, grantId } = await fixture();
-    await t.run((ctx) => ctx.db.patch(grantId, { ...autoExpiry(Date.now() - 100 * 86_400_000), status, scopes: ["family_history:context:read"], boundary: { kind: "selected_people", personIds: ["synthetic-person"] } }));
+    await t.run((ctx) => ctx.db.patch(grantId, { ...autoExpiry(Date.now() - 100 * 86_400_000), status, scopes: ["family_history:context:read"] }));
     const before = await t.run((ctx) => ctx.db.get(grantId));
-    const resolved = await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs);
-    expect(resolved.state).toBe("active");
-    if (resolved.state === "active") {
-      expect(resolved.grant.expiresAt).toBeUndefined();
-      expect(resolved.grant.scopes).toEqual(["family_history:context:read"]);
-      expect(resolved.grant.boundary.kind).toBe("selected_people");
-    }
+    expect((await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs)).state).toBe("expired");
     const listing = await t.query(internal.mcpGrants.listConnectionsInternal, { vaultOwnerId: owner });
-    expect(listing.connections[0]).toMatchObject({ status: "active", expiresAt: null });
+    expect(listing.connections[0]).toMatchObject({ status: "expired", expiresAt: before!.expiresAt });
     expect(await t.run((ctx) => ctx.db.get(grantId))).toEqual(before);
-    expect(await t.run((ctx) => assertGrantPermits(ctx, { owner, grantId, toolName: "family_history_get_context", input: { kind: "person", id: "synthetic-person" } }))).not.toBeNull();
+    await expect(t.run((ctx) => assertGrantPermits(ctx, { owner, grantId, toolName: "family_history_get_context", input: {} }))).rejects.toThrow("GRANT_EXPIRED");
   });
 
   test("settings add/change/remove a chosen date independently of scopes; sign-in never renews it", async () => {
     const { t, grantId } = await fixture();
     const args = { vaultOwnerId: owner, grantId };
-    await t.withIdentity(identity).mutation(api.mcpGrants.updateGrantExpiry, { ...args, expiresInDays: 7 });
+    await t.withIdentity(identity).mutation(api.mcpGrants.updateGrantExpiry, await loaded(t, { ...args, expiresInDays: 7 }));
     expect(await t.run((ctx) => ctx.db.get(grantId))).toMatchObject({ expiryChoice: "chosen" });
-    const later = await t.withIdentity(identity).mutation(api.mcpGrants.updateGrantExpiry, { ...args, expiresInDays: 30 });
+    const later = await t.withIdentity(identity).mutation(api.mcpGrants.updateGrantExpiry, await loaded(t, { ...args, expiresInDays: 30 }));
     expect(later.expiresAt!).toBeGreaterThan(Date.now() + 29 * 86_400_000);
     await t.run((ctx) => ctx.db.patch(grantId, { expiresAt: Date.now() - 1 }));
     expect((await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs)).state).toBe("expired");
-    await t.withIdentity(identity).mutation(api.mcpGrants.updateGrantExpiry, args);
+    await t.withIdentity(identity).mutation(api.mcpGrants.updateGrantExpiry, await loaded(t, args));
     const row = await t.run((ctx) => ctx.db.get(grantId));
     expect(row).toMatchObject({ expiryChoice: "none", scopes: [...FAMILY_HISTORY_SCOPES] });
     expect(row!.expiresAt).toBeUndefined();
@@ -119,7 +113,7 @@ describe("explicit and legacy expiry", () => {
     for (const limited of [false, true]) {
       const { t, grantId } = await fixture();
       await t.run((ctx) => ctx.db.patch(grantId, { status: "pending" }));
-      await t.withIdentity(identity).mutation(api.mcpGrants.approveGrant, { vaultOwnerId: owner, grantId, label: "Synthetic", scopes: limited ? ["family_history:context:read"] : [...FAMILY_HISTORY_SCOPES], boundary: { kind: "whole_workspace" }, ...(limited ? { expiresInDays: 7 } : {}) });
+      await t.withIdentity(identity).mutation(api.mcpGrants.approveGrant, await loaded(t, { vaultOwnerId: owner, grantId, label: "Synthetic", scopeChoice: limited ? "chosen" : "full", scopes: limited ? ["family_history:context:read"] : [...FAMILY_HISTORY_SCOPES], boundary: { kind: "whole_workspace" }, ...(limited ? { expiresInDays: 7 } : {}) }));
       const row = await t.run((ctx) => ctx.db.get(grantId));
       expect(row).toMatchObject({ expiryChoice: limited ? "chosen" : "none", scopeChoice: limited ? "chosen" : "full" });
       if (!limited) expect(row!.expiresAt).toBeUndefined();
@@ -129,13 +123,13 @@ describe("explicit and legacy expiry", () => {
   test("foreign owners, invalid days and revoked/denied grants cannot be changed", async () => {
     const { t, grantId } = await fixture();
     const args = { vaultOwnerId: owner, grantId };
-    await expect(t.mutation(api.mcpGrants.updateGrantExpiry, args)).rejects.toThrow();
-    await expect(t.withIdentity({ subject: "user_other_synthetic" }).mutation(api.mcpGrants.updateGrantExpiry, args)).rejects.toThrow();
-    for (const expiresInDays of [0, -1, 1.5, 366]) await expect(t.withIdentity(identity).mutation(api.mcpGrants.updateGrantExpiry, { ...args, expiresInDays })).rejects.toThrow();
+    await expect(t.mutation(api.mcpGrants.updateGrantExpiry, await loaded(t, args))).rejects.toThrow();
+    await expect(t.withIdentity({ subject: "user_other_synthetic", sid: "sess_synthetic_person" }).mutation(api.mcpGrants.updateGrantExpiry, await loaded(t, args))).rejects.toThrow();
+    for (const expiresInDays of [0, -1, 1.5, 366]) await expect(t.withIdentity(identity).mutation(api.mcpGrants.updateGrantExpiry, await loaded(t, { ...args, expiresInDays }))).rejects.toThrow();
     for (const status of ["revoked", "denied"] as const) {
       await t.run((ctx) => ctx.db.patch(grantId, { status, ...autoExpiry(Date.now() - 100 * 86_400_000) }));
       expect((await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs)).state).toBe(status);
-      await expect(t.withIdentity(identity).mutation(api.mcpGrants.updateGrantExpiry, args)).rejects.toThrow();
+      await expect(t.withIdentity(identity).mutation(api.mcpGrants.updateGrantExpiry, await loaded(t, args))).rejects.toThrow();
     }
   });
 });
@@ -164,11 +158,11 @@ describe("durable revocation and owner removal", () => {
         expect(await t.run((ctx) => ctx.db.get(grantId))).toEqual(before);
         return;
       }
-      await expect(own.mutation(api.mcpGrants.removeGrant, args)).resolves.toEqual({ id: grantId, removed: true });
-      const hidden = { ...before, status: "revoked", revokedAt: expiresAt + offset, hiddenAt: expiresAt + offset, updatedAt: expiresAt + offset };
+      await expect(own.mutation(api.mcpGrants.removeGrant, args)).resolves.toMatchObject({ id: grantId, removed: true, version: 1, receiptId: expect.any(String) });
+      const hidden = { ...before, version: 1, status: "revoked", revokedAt: expiresAt + offset, hiddenAt: expiresAt + offset, updatedAt: expiresAt + offset };
       expect(await t.run((ctx) => ctx.db.get(grantId))).toEqual(hidden);
       expect((await t.query(internal.mcpGrants.listConnectionsInternal, { vaultOwnerId: owner })).connections).toEqual([]);
-      await expect(own.mutation(api.mcpGrants.updateGrantExpiry, args)).rejects.toThrow("Only an approved connection");
+      await expect(own.mutation(api.mcpGrants.updateGrantExpiry, await loaded(t, args))).rejects.toThrow(/Only an approved connection|connection changed/);
       for (let attempt = 0; attempt < 2; attempt++) {
         const refused = await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs);
         expect(refused.state).toBe("revoked");
@@ -180,21 +174,21 @@ describe("durable revocation and owner removal", () => {
       expect(await t.run((ctx) => ctx.db.query("mcpGrants").collect())).toHaveLength(1);
       // Only explicit owner reapproval creates a new grant; the old receipt,
       // person boundary, chosen end date and usage history survive intact.
-      const approved = await own.mutation(api.mcpGrants.approveGrant, {
+      const approved = await own.mutation(api.mcpGrants.approveGrant, await loaded(t, {
         ...args, label: before.label, scopes: before.scopes,
         boundary: before.boundary, expiresInDays: 7,
-      });
+      }));
       expect(approved.id).not.toBe(grantId);
       expect(await t.run((ctx) => ctx.db.get(grantId))).toEqual(hidden);
       expect(await t.run((ctx) => ctx.db.query("mcpGrants").collect())).toHaveLength(2);
     } finally { clock.mockRestore(); }
   });
 
-  test.each(["none", "automatic"] as const)("elapsed raw date with %s effective expiry still requires revocation", async (choice) => {
+  test("explicit no-end marker remains effective despite a raw date", async () => {
     const { t, grantId } = await fixture();
     await t.run((ctx) => ctx.db.patch(grantId, {
       ...autoExpiry(Date.now() - 100 * 86_400_000),
-      ...(choice === "none" ? { expiryChoice: "none" as const } : {}),
+      expiryChoice: "none" as const,
     }));
     const before = await t.run((ctx) => ctx.db.get(grantId));
     await expect(t.withIdentity(identity).mutation(api.mcpGrants.removeGrant, { vaultOwnerId: owner, grantId })).rejects.toThrow("Revoke");
@@ -210,11 +204,11 @@ describe("durable revocation and owner removal", () => {
     const own = t.withIdentity(identity);
     const args = { vaultOwnerId: owner, grantId };
     await own.mutation(api.mcpGrants.reduceGrantScopes, { ...args, scopes: ["family_history:context:read"] });
-    await own.mutation(api.mcpGrants.updateGrantExpiry, { ...args, expiresInDays: 7 });
+    await own.mutation(api.mcpGrants.updateGrantExpiry, await loaded(t, { ...args, expiresInDays: 7 }));
     await t.run((ctx) => ctx.db.patch(grantId, { boundary: { kind: "selected_people", personIds: ["synthetic-person"] } }));
     await own.mutation(api.mcpGrants.revokeGrant, { ...args, reason: "Synthetic owner refusal" });
     const revoked = await t.run((ctx) => ctx.db.get(grantId));
-    const foreign = t.withIdentity({ subject: "user_foreign_synthetic" });
+    const foreign = t.withIdentity({ subject: "user_foreign_synthetic", sid: "sess_synthetic_person" });
     await expect(t.mutation(api.mcpGrants.removeGrant, args)).rejects.toThrow();
     await expect(foreign.action(api.mcpGrants.listConnections, { vaultOwnerId: owner })).rejects.toThrow();
     await expect(foreign.action(api.mcpGrants.recentConnectionActivity, { vaultOwnerId: owner })).rejects.toThrow();
@@ -222,7 +216,7 @@ describe("durable revocation and owner removal", () => {
     await expect(foreign.mutation(api.mcpGrants.removeGrant, { ...args, vaultOwnerId: "user_foreign_synthetic" })).rejects.toThrow("Connection not found");
     await own.mutation(api.mcpGrants.removeGrant, args);
     const hidden = await t.run((ctx) => ctx.db.get(grantId));
-    expect(hidden).toMatchObject({ ...revoked!, hiddenAt: expect.any(Number) });
+    expect(hidden).toMatchObject({ ...revoked!, version: (revoked!.version ?? 0) + 1, hiddenAt: expect.any(Number) });
     expect((await t.query(internal.mcpGrants.listConnectionsInternal, { vaultOwnerId: owner })).connections).toEqual([]);
     await t.run(async (ctx) => {
       await expect(assertGrantPermits(ctx, { owner, grantId, toolName: "family_history_get_context", input: { kind: "person", id: "synthetic-person" } })).rejects.toThrow();
@@ -235,18 +229,18 @@ describe("durable revocation and owner removal", () => {
       expect(denied.state).toBe("revoked");
       expect(permittedTools(denied, Date.now())).toEqual([]);
     }
-    expect(await t.run((ctx) => ctx.db.get(grantId))).toEqual(revoked);
+    expect(await t.run((ctx) => ctx.db.get(grantId))).toEqual({ ...revoked, version: (revoked!.version ?? 0) + 1 });
     const listing = await t.query(internal.mcpGrants.listConnectionsInternal, { vaultOwnerId: owner });
     expect(listing.connections).toHaveLength(1);
     expect(listing.connections[0]).toMatchObject({ status: "revoked", scopeChoice: "chosen", scopes: ["family_history:context:read"], expiresAt: revoked!.expiresAt, boundary: revoked!.boundary });
     const approval = { ...args, label: "Explicit new approval", scopes: ["family_history:context:read"], boundary: revoked!.boundary, expiresInDays: 7 };
-    await expect(foreign.mutation(api.mcpGrants.approveGrant, approval)).rejects.toThrow();
-    await expect(foreign.mutation(api.mcpGrants.approveGrant, { ...approval, vaultOwnerId: "user_foreign_synthetic" })).rejects.toThrow("Connection not found");
+    await expect(foreign.mutation(api.mcpGrants.approveGrant, await loaded(t, approval))).rejects.toThrow();
+    await expect(foreign.mutation(api.mcpGrants.approveGrant, await loaded(t, { ...approval, vaultOwnerId: "user_foreign_synthetic" }))).rejects.toThrow("Connection not found");
     expect((await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs)).state).toBe("revoked");
-    const approved = await own.mutation(api.mcpGrants.approveGrant, approval);
-    await expect(own.mutation(api.mcpGrants.approveGrant, approval)).rejects.toThrow("already approved");
+    const approved = await own.mutation(api.mcpGrants.approveGrant, await loaded(t, approval));
+    await expect(own.mutation(api.mcpGrants.approveGrant, await loaded(t, approval))).rejects.toThrow(/already approved|Connection changed|connection changed/);
     expect(approved.id).not.toBe(grantId);
-    expect(await t.run((ctx) => ctx.db.get(grantId))).toMatchObject({ ...revoked!, hiddenAt: expect.any(Number) });
+    expect(await t.run((ctx) => ctx.db.get(grantId))).toMatchObject({ ...revoked!, version: (revoked!.version ?? 0) + 1, hiddenAt: expect.any(Number) });
     const active = await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs);
     expect(active.state).toBe("active");
     if (active.state === "active") expect(active.grant).toMatchObject({ scopes: ["family_history:context:read"], scopeChoice: "chosen", boundary: revoked!.boundary, expiresAt: approved.expiresAt });
@@ -301,7 +295,7 @@ describe("durable revocation and owner removal", () => {
     await own.mutation(api.mcpGrants.revokeGrant, { vaultOwnerId: owner, grantId: governingId });
     for (const id of [grantId, nextId, automaticId]) {
       const closed = (await t.run((ctx) => ctx.db.get(id)))!;
-      expect(closed.status).toBe("revoked");
+      expect(closed.status).toBe(id === automaticId ? "expired" : "revoked");
       expect(closed.scopes).toEqual(fields.scopes);
       expect(closed.scopeChoice).toBe("chosen");
       if (id !== automaticId) {
@@ -323,10 +317,10 @@ describe("durable revocation and owner removal", () => {
       expect(refusal.recovery).toContain('"Review and approve again"');
       expect(refusal.recovery).toContain("Removing it from the list does not clear the refusal");
     }
-    const approved = await own.mutation(api.mcpGrants.approveGrant, {
+    const approved = await own.mutation(api.mcpGrants.approveGrant, await loaded(t, {
       vaultOwnerId: owner, grantId: governingId, label: "Explicit reapproval",
       scopes: fields.scopes, boundary: fields.boundary, expiresInDays: 7,
-    });
+    }));
     expect([String(grantId), String(nextId), String(automaticId)]).not.toContain(String(approved.id));
     const after = await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs);
     expect(after).toMatchObject({ state: "active", grant: { grantId: String(approved.id), scopes: fields.scopes, expiresAt: approved.expiresAt } });
@@ -357,9 +351,9 @@ describe("durable revocation and owner removal", () => {
     const own = t.withIdentity(identity);
     await expect(own.mutation(api.mcpGrants.revokeGrant, { vaultOwnerId: owner, grantId })).rejects.toThrow("too much approval history");
     const closed = before.find((row) => row.status === "revoked")!;
-    await expect(own.mutation(api.mcpGrants.approveGrant, {
+    await expect(own.mutation(api.mcpGrants.approveGrant, await loaded(t, {
       vaultOwnerId: owner, grantId: closed._id, label: "Overflow", scopes: [...FAMILY_HISTORY_SCOPES], boundary: { kind: "whole_workspace" },
-    })).rejects.toThrow("too much approval history");
+    }))).rejects.toThrow("too much approval history");
     expect(await t.run((ctx) => ctx.db.query("mcpGrants").collect())).toEqual(before);
     expect(await t.mutation(internal.mcpGrants.resolveForRequest, { ...resolveArgs, issuer: otherIssuer })).toMatchObject({ state: "active", grant: { grantId: String(otherId) } });
   });
@@ -396,8 +390,8 @@ describe("durable revocation and owner removal", () => {
     expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
     expect(results.filter((r) => r.status === "rejected")).toHaveLength(1);
     const approval = { ...args, label: "New", scopes: [...FAMILY_HISTORY_SCOPES], boundary: { kind: "whole_workspace" as const } };
-    const approved = await own.mutation(api.mcpGrants.approveGrant, approval);
-    await expect(own.mutation(api.mcpGrants.approveGrant, approval)).rejects.toThrow("already approved");
+    const approved = await own.mutation(api.mcpGrants.approveGrant, await loaded(t, approval));
+    await expect(own.mutation(api.mcpGrants.approveGrant, await loaded(t, approval))).rejects.toThrow(/already approved|Connection changed|connection changed/);
     await expect(own.mutation(api.mcpGrants.revokeGrant, args)).rejects.toThrow("Only an active connection");
     await own.mutation(api.mcpGrants.revokeGrant, { ...args, grantId: approved.id });
     expect((await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs)).state).toBe("revoked");
@@ -425,3 +419,8 @@ describe("durable revocation and owner removal", () => {
     expect(listing.connections.map((row) => row.id)).toEqual([grantId]);
   });
 });
+
+async function loaded<T extends { grantId: unknown }>(t: ReturnType<typeof convexTest>, args: T): Promise<T & { expectedVersion: number }> {
+  const row = await t.run((ctx) => ctx.db.get(args.grantId as never));
+  return { ...args, expectedVersion: (row as { version?: number } | null)?.version ?? 0 };
+}

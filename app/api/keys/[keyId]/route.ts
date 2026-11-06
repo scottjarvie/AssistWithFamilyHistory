@@ -19,14 +19,14 @@ export async function PATCH(
   }
   try {
     const { keyId } = await params;
-    const body = (await request.json().catch(() => null)) as { status?: string } | null;
+    const body = (await request.json().catch(() => null)) as { status?: string; expectedVersion?: number } | null;
     const status = body?.status;
     if (status !== "active" && status !== "suspended") {
       return NextResponse.json({ error: "status must be 'active' or 'suspended'" }, { status: 400 });
     }
     const { vaultOwnerId } = await getVaultAccessContext();
     const client = await getAuthedConvexClient();
-    const result = await client.mutation(api.apiKeys.setKeyStatus, { vaultOwnerId, keyId, status });
+    const result = await client.mutation(api.apiKeys.setKeyStatus, { vaultOwnerId, keyId, status, expectedVersion: body?.expectedVersion });
     return NextResponse.json({ success: true, ...result });
   } catch (error) {
     const issue = getConvexRuntimeIssue(error);

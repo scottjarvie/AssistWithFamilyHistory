@@ -233,3 +233,15 @@ describe("connected-AI family evidence sessions", () => {
     })).rejects.toThrow(/GRANT_REVOKED/);
   });
 });
+
+test.each(["scope", "entity", "expiry", "revoke"])("stored upload capability loses authority after own %s reduction", async (kind) => {
+  const t = convexTest(schema, modules);
+  const personId = await t.run((ctx) => ctx.db.insert("persons", { vaultOwnerId: OWNER, name: { given: "Synthetic", surname: "Fixture" }, sex: "unknown", living: false, researchStatus: "basic", createdAt: Date.now(), updatedAt: Date.now() }));
+  const grantId = await seedGrant(t, { vaultOwnerId: OWNER, clientId: "synthetic-media-client", expiresAt: null });
+  await t.mutation(plan, { principal: principal(), grantId, operationId: "own-capability", requestHash: "synthetic-hash", uploadRef: "synthetic-own-capability", relayTokenHash: "synthetic-token-hash", objectKey: "private/synthetic/original", expiresAt: Date.now() + 60000, input: { personId: String(personId), title: "Synthetic", fileName: "synthetic.jpg", contentType: "image/jpeg", sizeBytes: 100, sha256: "a".repeat(64) } });
+  const relay = makeFunctionReference<"query">("mediaEvidenceControl:relayAuthorization");
+  expect(await t.query(relay, { uploadRef: "synthetic-own-capability", relayTokenHash: "synthetic-token-hash" })).not.toBeNull();
+  const reduce = makeFunctionReference<"mutation">("mcpGrants:reduceOwnConnection");
+  await t.mutation(reduce, { subject: OWNER, clientId: "synthetic-media-client", issuer: "https://identity.example.test", action: kind === "revoke" ? "revoke" : "reduce", expectedGrantId: grantId, expectedVersion: 0, ...(kind === "scope" ? { scopes: [] } : kind === "entity" ? { boundary: { kind: "selected_people", personIds: [] } } : kind === "expiry" ? { expiresAt: Date.now() - 1 } : {}) });
+  expect(await t.query(relay, { uploadRef: "synthetic-own-capability", relayTokenHash: "synthetic-token-hash" })).toBeNull();
+});

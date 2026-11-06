@@ -128,6 +128,4 @@ At a meaningful stopping point, report:
 New MCP grants use `scopeChoice: "full"` and `expiryChoice: "none"`. Use
 `lib/mcp/grantDefaults.ts` for effective scopes and expiry in every authorization,
 discovery and settings read. Never extend its frozen legacy scope baseline.
-Explicit and ambiguous legacy end dates remain enforced; only matching automatic
-sign-in consent receipts may have their old 90-day term ignored at read time.
-No grant cleanup is required or authorized by this implementation.
+Unmarked legacy arrays are frozen; all stored legacy end dates and inactive statuses remain enforced. New API keys explicitly mark full entitled private-data access and no end date; this never promotes Trusted/Admin roles or bypasses person-only domain gates. Optional per-grant review-first defaults off. AI may reduce only its verified calling connection, with atomic versioned audit receipts; only a verified person session in Settings can increase access, against a loaded current grant ID and revision. Never backfill, migrate or lift existing records.
