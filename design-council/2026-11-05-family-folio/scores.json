@@ -173,10 +173,142 @@
           }
         }
       ]
+    },
+    {
+      "round": 2,
+      "sameAsBaseline": false,
+      "explore": false,
+      "categories": [
+        "findability",
+        "density",
+        "capability",
+        "aiwork",
+        "hierarchy",
+        "typography",
+        "iconography",
+        "spacing",
+        "colour",
+        "consistency",
+        "fit",
+        "cost"
+      ],
+      "categoryNote": "Expanded completed private-page checkpoint. Readers/public/specialist workflows excluded. Baselines are preserved original/reconstructed views with invented data; compared within this round, not directly with round1 scope.",
+      "capabilityProbes": {
+        "passed": 38,
+        "failed": []
+      },
+      "referenceNames": {
+        "R1": "GitHub Issues · dense research/work list",
+        "R2": "US National Archives · genealogist resources",
+        "R3": "UK National Archives · census research guide"
+      },
+      "judges": [
+        {
+          "judge": "sol",
+          "model": "gpt-6.1-sol",
+          "seconds": null,
+          "subjects": {
+            "baseline": {
+              "findability": 6.5,
+              "density": 5.5,
+              "capability": 6.5,
+              "aiwork": 5.5,
+              "hierarchy": 6,
+              "typography": 6.5,
+              "iconography": 6.5,
+              "spacing": 5.5,
+              "colour": 4,
+              "consistency": 5.5,
+              "fit": 6,
+              "cost": 7.5
+            },
+            "candidate": {
+              "findability": 8,
+              "density": 7.5,
+              "capability": 8,
+              "aiwork": 8.5,
+              "hierarchy": 8,
+              "typography": 8,
+              "iconography": 8,
+              "spacing": 7.5,
+              "colour": 8.5,
+              "consistency": 8,
+              "fit": 8.5,
+              "cost": 7.5
+            },
+            "ref:github-issues": {
+              "findability": 8.5,
+              "density": 9,
+              "capability": 9,
+              "aiwork": 5,
+              "hierarchy": 8.5,
+              "typography": 8,
+              "iconography": 8.5,
+              "spacing": 8.5,
+              "colour": 8,
+              "consistency": 9,
+              "fit": 8.5,
+              "cost": 7.5
+            },
+            "ref:national-archives": {
+              "findability": 7,
+              "density": 7.5,
+              "capability": 8,
+              "aiwork": 5,
+              "hierarchy": 7,
+              "typography": 6.5,
+              "iconography": 5.5,
+              "spacing": 7,
+              "colour": 7,
+              "consistency": 6.5,
+              "fit": 8,
+              "cost": 7
+            },
+            "ref:uk-archives": {
+              "findability": 8,
+              "density": 7.5,
+              "capability": 8.5,
+              "aiwork": 5,
+              "hierarchy": 7.5,
+              "typography": 7,
+              "iconography": 6.5,
+              "spacing": 7.5,
+              "colour": 7.5,
+              "consistency": 7.5,
+              "fit": 8.5,
+              "cost": 7.5
+            }
+          },
+          "bestRef": {
+            "findability": 8.5,
+            "density": 9,
+            "capability": 9,
+            "aiwork": 5,
+            "hierarchy": 8.5,
+            "typography": 8,
+            "iconography": 8.5,
+            "spacing": 8.5,
+            "colour": 8,
+            "consistency": 9,
+            "fit": 8.5,
+            "cost": 7.5
+          },
+          "summary": {
+            "candidateAvg": 8,
+            "baselineAvg": 5.887755102040816,
+            "lift": 2.112244897959184,
+            "minCategory": 7.5,
+            "bestRefAvg": 8.23469387755102,
+            "beatsRefs": false,
+            "blockedBy": [],
+            "pass": false
+          }
+        }
+      ]
     }
   ],
   "decision": {
     "action": "fix",
-    "why": "round 1: sol below target (min 4.5, lift 1.4). Fix and start round 2"
+    "why": "round 2: sol below target (min 7.5, lift 2.1). Fix and start round 3"
   }
 }

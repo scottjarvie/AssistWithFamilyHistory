@@ -1,0 +1,200 @@
+{
+  "baseURL": "http://localhost:3457",
+  "timezone": "America/Phoenix",
+  "defaultVariants": [
+    "desktop-light",
+    "mobile-light"
+  ],
+  "shots": [
+    {
+      "name": "home",
+      "path": "/design-council-preview?surface=home",
+      "capabilities": [
+        {
+          "can": "open existing page identity",
+          "selector": "main h1"
+        }
+      ]
+    },
+    {
+      "name": "people",
+      "path": "/design-council-preview?surface=people",
+      "capabilities": [
+        {
+          "can": "open existing page identity",
+          "selector": "main h1"
+        }
+      ]
+    },
+    {
+      "name": "places",
+      "path": "/design-council-preview?surface=places",
+      "capabilities": [
+        {
+          "can": "open existing page identity",
+          "selector": "main h1"
+        }
+      ]
+    },
+    {
+      "name": "stories",
+      "path": "/design-council-preview?surface=stories",
+      "capabilities": [
+        {
+          "can": "open existing page identity",
+          "selector": "main h1"
+        }
+      ]
+    },
+    {
+      "name": "writing",
+      "path": "/design-council-preview?surface=writing",
+      "capabilities": [
+        {
+          "can": "open existing page identity",
+          "selector": "main h1"
+        }
+      ]
+    },
+    {
+      "name": "research",
+      "path": "/design-council-preview?surface=research",
+      "capabilities": [
+        {
+          "can": "open existing page identity",
+          "selector": "main h1"
+        }
+      ]
+    },
+    {
+      "name": "person",
+      "path": "/design-council-preview?surface=person",
+      "capabilities": [
+        {
+          "can": "open existing page identity",
+          "selector": "main h1"
+        }
+      ]
+    },
+    {
+      "name": "place-record",
+      "path": "/design-council-preview?surface=place-record",
+      "capabilities": [
+        {
+          "can": "open existing page identity",
+          "selector": "main h1"
+        }
+      ]
+    },
+    {
+      "name": "story-record",
+      "path": "/design-council-preview?surface=story-record",
+      "capabilities": [
+        {
+          "can": "open existing page identity",
+          "selector": "main h1"
+        }
+      ]
+    },
+    {
+      "name": "queue",
+      "path": "/design-council-preview?surface=queue",
+      "capabilities": [
+        {
+          "can": "open existing page identity",
+          "selector": "main h1"
+        }
+      ]
+    },
+    {
+      "name": "operations",
+      "path": "/design-council-preview?surface=operations",
+      "capabilities": [
+        {
+          "can": "open existing page identity",
+          "selector": "main h1"
+        }
+      ]
+    },
+    {
+      "name": "audit",
+      "path": "/design-council-preview?surface=audit",
+      "capabilities": [
+        {
+          "can": "open existing page identity",
+          "selector": "main h1"
+        }
+      ]
+    },
+    {
+      "name": "settings-ai",
+      "path": "/design-council-preview?surface=settings-ai",
+      "capabilities": [
+        {
+          "can": "open existing page identity",
+          "selector": "main h1"
+        }
+      ]
+    },
+    {
+      "name": "settings-provider",
+      "path": "/design-council-preview?surface=settings-provider",
+      "capabilities": [
+        {
+          "can": "open existing page identity",
+          "selector": "main h1"
+        }
+      ]
+    },
+    {
+      "name": "settings-api",
+      "path": "/design-council-preview?surface=settings-api",
+      "capabilities": [
+        {
+          "can": "open existing page identity",
+          "selector": "main h1"
+        }
+      ]
+    },
+    {
+      "name": "settings-admin",
+      "path": "/design-council-preview?surface=settings-admin",
+      "capabilities": [
+        {
+          "can": "open existing page identity",
+          "selector": "main h1"
+        }
+      ]
+    },
+    {
+      "name": "home-dark",
+      "path": "/design-council-preview?surface=home&theme=dark",
+      "capabilities": [
+        {
+          "can": "open dark page identity",
+          "selector": "main h1"
+        }
+      ]
+    },
+    {
+      "name": "people-dark",
+      "path": "/design-council-preview?surface=people&theme=dark",
+      "capabilities": [
+        {
+          "can": "open dark page identity",
+          "selector": "main h1"
+        }
+      ]
+    },
+    {
+      "name": "settings-ai-dark",
+      "path": "/design-council-preview?surface=settings-ai&theme=dark",
+      "capabilities": [
+        {
+          "can": "open dark page identity",
+          "selector": "main h1"
+        }
+      ]
+    }
+  ]
+}

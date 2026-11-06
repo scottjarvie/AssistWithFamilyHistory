@@ -698,11 +698,11 @@ function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspac
   const itemDeleted=useCallback((id:string)=>latestHandlers.current.deleted(id),[]);
 
   return <div className="min-w-0 p-4 sm:p-8">
-    <header className="mb-5 flex flex-wrap items-end justify-between gap-4">
-      <div><p className="font-mono text-xs uppercase tracking-[.14em] text-annotation">Private continuity ledger</p><h1 className="mt-2 text-4xl font-semibold sm:text-5xl">Your Queue</h1><p className="mt-2 text-xl">Keep the research thread.</p><p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Your Queue preserves directives, handoffs, next steps, and results across sessions. It is not the Research Queue and it does not run research on its own.</p></div>
+    <header className="mb-3 flex flex-wrap items-end justify-between gap-3 sm:mb-5 sm:gap-4">
+      <div><p className="font-mono text-xs uppercase tracking-[.14em] text-annotation">Private continuity ledger</p><h1 className="mt-1 text-[30px] font-semibold leading-tight sm:mt-2 sm:text-5xl">Your Queue</h1><p className="mt-1 text-base sm:mt-2 sm:text-xl">Keep the research thread.</p><p className="mt-1.5 max-w-3xl text-sm leading-5 text-muted-foreground sm:mt-2 sm:leading-6">Your Queue preserves directives, handoffs, next steps, and results across sessions. It is not the Research Queue and it does not run research on its own.</p></div>
       <Button className="min-h-11" onClick={()=>setShowNew(true)}><Plus/>Leave a directive</Button>
     </header>
-    <p className="mb-5 max-w-3xl text-sm leading-6 text-muted-foreground"><Bot className="mr-2 inline h-4 w-4 text-primary"/>A compatible AI can connect through MCP and OAuth. <SafeLink href="/ai" className="text-primary underline">See setup</SafeLink>. Nothing runs until it deliberately claims a directive.</p>
+    <p className="mb-3 max-w-3xl text-sm leading-5 text-muted-foreground sm:mb-5 sm:leading-6"><Bot className="mr-2 inline h-4 w-4 text-primary"/>A compatible AI can connect through MCP and OAuth. <SafeLink href="/ai" className="text-primary underline">See setup</SafeLink>. Nothing runs until it deliberately claims a directive.</p>
 
     {showNew&&<div className="mb-5"><NewDirectiveForm onCreated={handleCreated} onClose={()=>setShowNew(false)}/></div>}
     {preview&&<p className="mb-4 text-xs text-annotation">Synthetic preview: all writes are disabled; no backend connected.</p>}

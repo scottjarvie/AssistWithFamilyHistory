@@ -1,0 +1,170 @@
+{
+  "baseURL": "http://localhost:3457",
+  "timezone": "America/Phoenix",
+  "defaultVariants": [
+    "desktop-light",
+    "mobile-light"
+  ],
+  "shots": [
+    {
+      "name": "reader-raw",
+      "path": "/design-council-preview?surface=reader-raw",
+      "variants": [
+        "desktop-light",
+        "mobile-light"
+      ],
+      "capabilities": [
+        {
+          "can": "retain original reading and Markdown controls",
+          "selector": "[data-document-reader]"
+        }
+      ]
+    },
+    {
+      "name": "reader-raw",
+      "path": "/design-council-preview?surface=reader-raw&theme=dark",
+      "variants": [
+        "desktop-dark",
+        "mobile-dark"
+      ],
+      "capabilities": [
+        {
+          "can": "retain original reading and Markdown controls",
+          "selector": "[data-document-reader]"
+        }
+      ]
+    },
+    {
+      "name": "reader-dossier",
+      "path": "/design-council-preview?surface=reader-contextualized",
+      "variants": [
+        "desktop-light",
+        "mobile-light"
+      ],
+      "capabilities": [
+        {
+          "can": "retain original reading and Markdown controls",
+          "selector": "[data-document-reader]"
+        }
+      ]
+    },
+    {
+      "name": "reader-dossier",
+      "path": "/design-council-preview?surface=reader-contextualized&theme=dark",
+      "variants": [
+        "desktop-dark",
+        "mobile-dark"
+      ],
+      "capabilities": [
+        {
+          "can": "retain original reading and Markdown controls",
+          "selector": "[data-document-reader]"
+        }
+      ]
+    },
+    {
+      "name": "stored-documents",
+      "path": "/design-council-preview?surface=reader-documents",
+      "variants": [
+        "desktop-light",
+        "mobile-light"
+      ],
+      "capabilities": [
+        {
+          "can": "retain original reading and Markdown controls",
+          "selector": "[data-document-reader]"
+        }
+      ]
+    },
+    {
+      "name": "stored-documents",
+      "path": "/design-council-preview?surface=reader-documents&theme=dark",
+      "variants": [
+        "desktop-dark",
+        "mobile-dark"
+      ],
+      "capabilities": [
+        {
+          "can": "retain original reading and Markdown controls",
+          "selector": "[data-document-reader]"
+        }
+      ]
+    },
+    {
+      "name": "reader-long",
+      "path": "/design-council-preview?surface=reader-raw-long",
+      "variants": [
+        "desktop-light",
+        "mobile-light"
+      ],
+      "capabilities": [
+        {
+          "can": "retain original reading and Markdown controls",
+          "selector": "[data-document-reader]"
+        }
+      ]
+    },
+    {
+      "name": "reader-long",
+      "path": "/design-council-preview?surface=reader-raw-long&theme=dark",
+      "variants": [
+        "desktop-dark",
+        "mobile-dark"
+      ],
+      "capabilities": [
+        {
+          "can": "retain original reading and Markdown controls",
+          "selector": "[data-document-reader]"
+        }
+      ]
+    },
+    {
+      "name": "reader-original-markdown",
+      "path": "/design-council-preview?surface=reader-raw",
+      "actions": [
+        {
+          "click": "button:has-text(\"Original Markdown\")"
+        }
+      ],
+      "focus": "[data-original-markdown]",
+      "viewportOnly": true
+    },
+    {
+      "name": "reader-source-notes",
+      "path": "/design-council-preview?surface=reader-contextualized",
+      "actions": [
+        {
+          "click": "button[aria-controls]:has-text(\"Sources\")"
+        }
+      ],
+      "focus": "[data-reader-block=\"paragraph\"]:has(aside[aria-label=\"Sources named in this paragraph\"])",
+      "viewportOnly": true,
+      "variants": [
+        "mobile-light"
+      ]
+    },
+    {
+      "name": "stored-source-transcription",
+      "path": "/design-council-preview?surface=reader-documents",
+      "actions": [
+        {
+          "click": "[role=\"tab\"]:has-text(\"CST\")"
+        }
+      ]
+    },
+    {
+      "name": "reader-provenance-phone",
+      "path": "/design-council-preview?surface=reader-raw",
+      "actions": [
+        {
+          "click": "a:has-text(\"Who wrote this\")"
+        }
+      ],
+      "focus": "[aria-label=\"Document provenance\"]",
+      "viewportOnly": true,
+      "variants": [
+        "mobile-light"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,100 @@
+{
+  "baseURL": "http://localhost:3457",
+  "timezone": "America/Phoenix",
+  "defaultVariants": [
+    "desktop-light",
+    "mobile-light"
+  ],
+  "shots": [
+    {
+      "name": "ai-wayfinding",
+      "path": "/design-council-preview?surface=settings-ai",
+      "variants": [
+        "desktop-light",
+        "mobile-light"
+      ],
+      "viewportOnly": true
+    },
+    {
+      "name": "ai-wayfinding",
+      "path": "/design-council-preview?surface=settings-ai&theme=dark",
+      "variants": [
+        "desktop-dark",
+        "mobile-dark"
+      ],
+      "viewportOnly": true
+    },
+    {
+      "name": "data-wayfinding",
+      "path": "/design-council-preview?surface=settings-provider",
+      "variants": [
+        "desktop-light",
+        "mobile-light"
+      ],
+      "viewportOnly": true
+    },
+    {
+      "name": "data-wayfinding",
+      "path": "/design-council-preview?surface=settings-provider&theme=dark",
+      "variants": [
+        "desktop-dark",
+        "mobile-dark"
+      ],
+      "viewportOnly": true
+    },
+    {
+      "name": "key-wayfinding",
+      "path": "/design-council-preview?surface=settings-api",
+      "variants": [
+        "desktop-light",
+        "mobile-light"
+      ],
+      "viewportOnly": true
+    },
+    {
+      "name": "key-wayfinding",
+      "path": "/design-council-preview?surface=settings-api&theme=dark",
+      "variants": [
+        "desktop-dark",
+        "mobile-dark"
+      ],
+      "viewportOnly": true
+    },
+    {
+      "name": "operator-wayfinding",
+      "path": "/design-council-preview?surface=settings-admin",
+      "variants": [
+        "desktop-light",
+        "mobile-light"
+      ],
+      "viewportOnly": true
+    },
+    {
+      "name": "operator-wayfinding",
+      "path": "/design-council-preview?surface=settings-admin&theme=dark",
+      "variants": [
+        "desktop-dark",
+        "mobile-dark"
+      ],
+      "viewportOnly": true
+    },
+    {
+      "name": "home-natural-trays",
+      "path": "/design-council-preview?surface=home",
+      "variants": [
+        "desktop-light",
+        "mobile-light"
+      ],
+      "viewportOnly": true
+    },
+    {
+      "name": "home-natural-trays",
+      "path": "/design-council-preview?surface=home&theme=dark",
+      "variants": [
+        "desktop-dark",
+        "mobile-dark"
+      ],
+      "viewportOnly": true
+    }
+  ]
+}

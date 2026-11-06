@@ -1,0 +1,866 @@
+[
+  {
+    "set": "V1",
+    "file": "home--desktop-light.png",
+    "original": "baseline/home--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 1007,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "home--desktop-light.png",
+    "original": "round-2/ours-checkpoint/home--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 2039,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "home--mobile-light.png",
+    "original": "baseline/home--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 3798,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "home--mobile-light.png",
+    "original": "round-2/ours-checkpoint/home--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 6988,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "people--desktop-light.png",
+    "original": "baseline/people--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 900,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "people--desktop-light.png",
+    "original": "round-2/ours-checkpoint/people--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 900,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "people--mobile-light.png",
+    "original": "baseline/people--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 1908,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "people--mobile-light.png",
+    "original": "round-2/ours-checkpoint/people--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 2232,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "places--desktop-light.png",
+    "original": "baseline-reconstructed/places--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 900,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "places--desktop-light.png",
+    "original": "round-2/ours-checkpoint/places--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 900,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "places--mobile-light.png",
+    "original": "baseline-reconstructed/places--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 2382,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "places--mobile-light.png",
+    "original": "round-2/ours-checkpoint/places--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 1818,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "stories--desktop-light.png",
+    "original": "baseline-reconstructed/stories--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 1390,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "stories--desktop-light.png",
+    "original": "round-2/ours-checkpoint/stories--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 1318,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "stories--mobile-light.png",
+    "original": "baseline-reconstructed/stories--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 5150,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "stories--mobile-light.png",
+    "original": "round-2/ours-checkpoint/stories--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 3702,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "writing--desktop-light.png",
+    "original": "baseline-reconstructed/writing--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 900,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "writing--desktop-light.png",
+    "original": "round-2/ours-checkpoint/writing--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 932,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "writing--mobile-light.png",
+    "original": "baseline-reconstructed/writing--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 2826,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "writing--mobile-light.png",
+    "original": "round-2/ours-checkpoint/writing--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 2240,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "research--desktop-light.png",
+    "original": "baseline-reconstructed/research--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 900,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "research--desktop-light.png",
+    "original": "round-2/ours-checkpoint/research--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 1778,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "research--mobile-light.png",
+    "original": "baseline-reconstructed/research--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 2714,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "research--mobile-light.png",
+    "original": "round-2/ours-checkpoint/research--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 4026,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "person--desktop-light.png",
+    "original": "baseline-reconstructed/person--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 2901,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "person--desktop-light.png",
+    "original": "round-2/ours-checkpoint/person--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 2996,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "person--mobile-light.png",
+    "original": "baseline-reconstructed/person--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 10138,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "person--mobile-light.png",
+    "original": "round-2/ours-checkpoint/person--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 9552,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "place-record--desktop-light.png",
+    "original": "baseline-reconstructed/baseline-place-record--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 6602,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "place-record--desktop-light.png",
+    "original": "round-2/ours-checkpoint/place-record--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 1369,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "place-record--mobile-light.png",
+    "original": "baseline-reconstructed/baseline-place-record--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 15530,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "place-record--mobile-light.png",
+    "original": "round-2/ours-checkpoint/place-record--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 4958,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "story-record--desktop-light.png",
+    "original": "baseline-reconstructed/baseline-story-record--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 7463,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "story-record--desktop-light.png",
+    "original": "round-2/ours-checkpoint/story-record--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 3029,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "story-record--mobile-light.png",
+    "original": "baseline-reconstructed/baseline-story-record--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 22378,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "story-record--mobile-light.png",
+    "original": "round-2/ours-checkpoint/story-record--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 9268,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "queue--desktop-light.png",
+    "original": "baseline-reconstructed/baseline-queue--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 2171,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "queue--desktop-light.png",
+    "original": "round-2/ours-checkpoint/queue--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 2368,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "queue--mobile-light.png",
+    "original": "baseline-reconstructed/baseline-queue--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 9738,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "queue--mobile-light.png",
+    "original": "round-2/ours-checkpoint/queue--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 6688,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "operations--desktop-light.png",
+    "original": "baseline-reconstructed/operations-reconstructed--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 2534,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "operations--desktop-light.png",
+    "original": "round-2/ours-checkpoint/operations--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 2066,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "operations--mobile-light.png",
+    "original": "baseline-reconstructed/operations-reconstructed--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 8926,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "operations--mobile-light.png",
+    "original": "round-2/ours-checkpoint/operations--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 5854,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "audit--desktop-light.png",
+    "original": "audit-baseline/audit-original-reconstructed--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 1948,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "audit--desktop-light.png",
+    "original": "round-2/ours-checkpoint/audit--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 1604,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "audit--mobile-light.png",
+    "original": "audit-baseline/audit-original-reconstructed--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 8244,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "audit--mobile-light.png",
+    "original": "round-2/ours-checkpoint/audit--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 5628,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "settings-ai--desktop-light.png",
+    "original": "settings-baseline/ai-connections-original-reconstructed--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 10117,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "settings-ai--desktop-light.png",
+    "original": "round-2/ours-checkpoint/settings-ai--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 5587,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "settings-ai--mobile-light.png",
+    "original": "settings-baseline/ai-connections-original-reconstructed--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 32404,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "settings-ai--mobile-light.png",
+    "original": "round-2/ours-checkpoint/settings-ai--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 20818,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "settings-provider--desktop-light.png",
+    "original": "settings-baseline/provider-settings-original-reconstructed--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 1213,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "settings-provider--desktop-light.png",
+    "original": "round-2/ours-checkpoint/settings-provider--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 2121,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "settings-provider--mobile-light.png",
+    "original": "settings-baseline/provider-settings-original-reconstructed--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 3312,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "settings-provider--mobile-light.png",
+    "original": "round-2/ours-checkpoint/settings-provider--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 8050,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "settings-api--desktop-light.png",
+    "original": "settings-baseline/api-keys-original-reconstructed--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 2143,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "settings-api--desktop-light.png",
+    "original": "round-2/ours-checkpoint/settings-api--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 2360,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "settings-api--mobile-light.png",
+    "original": "settings-baseline/api-keys-original-reconstructed--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 6040,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "settings-api--mobile-light.png",
+    "original": "round-2/ours-checkpoint/settings-api--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 7546,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "settings-admin--desktop-light.png",
+    "original": "settings-baseline/operator-keys-original-reconstructed--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 1849,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "settings-admin--desktop-light.png",
+    "original": "round-2/ours-checkpoint/settings-admin--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 2269,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "settings-admin--mobile-light.png",
+    "original": "settings-baseline/operator-keys-original-reconstructed--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 5628,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "settings-admin--mobile-light.png",
+    "original": "round-2/ours-checkpoint/settings-admin--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 7492,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "home-dark--desktop-light.png",
+    "original": "baseline/home-dark--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 1007,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "home-dark--desktop-light.png",
+    "original": "round-2/ours-checkpoint/home-dark--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 2039,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "home-dark--mobile-light.png",
+    "original": "baseline/home-dark--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 3798,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "home-dark--mobile-light.png",
+    "original": "round-2/ours-checkpoint/home-dark--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 6988,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "people-dark--desktop-light.png",
+    "original": "baseline/people-dark--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 900,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "people-dark--desktop-light.png",
+    "original": "round-2/ours-checkpoint/people-dark--desktop-light.png",
+    "width": 1440,
+    "height": 900,
+    "fullHeight": 900,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V1",
+    "file": "people-dark--mobile-light.png",
+    "original": "baseline/people-dark--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 1908,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "set": "V2",
+    "file": "people-dark--mobile-light.png",
+    "original": "round-2/ours-checkpoint/people-dark--mobile-light.png",
+    "width": 780,
+    "height": 1688,
+    "fullHeight": 2232,
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  }
+]

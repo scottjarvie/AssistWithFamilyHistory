@@ -28,10 +28,10 @@ export function PeopleExplorerView({ people, firstStartEligible, query, status:r
   const status = researchStates.some(([value]) => value === requestedStatus) ? requestedStatus : "";
   const action = firstStartEligible ? <Button asChild className="min-h-11"><Link href="/app/people/new">Start with two people</Link></Button> : <Button asChild className="min-h-11"><Link href="/app/imports">Import FamilySearch Capture</Link></Button>;
   return <div className="min-w-0 p-4 sm:p-8">
-    <header className="mb-5 flex flex-wrap items-end justify-between gap-3"><div>
-      <p className="mb-2 font-mono text-xs uppercase tracking-[.16em] text-annotation">The family vault</p>
-      <h1 className="text-4xl font-semibold sm:text-5xl">People</h1>
-      <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Each ancestor is a research workspace with sources, places, memories, documents, and AI context packs.</p>
+    <header className="mb-3 flex flex-wrap items-end justify-between gap-3 sm:mb-5"><div>
+      <p className="mb-1 font-mono text-xs uppercase tracking-[.16em] text-annotation sm:mb-2">The family vault</p>
+      <h1 className="text-[30px] font-semibold leading-tight sm:text-5xl">People</h1>
+      <p className="mt-1.5 max-w-2xl text-sm leading-5 text-muted-foreground sm:mt-2 sm:leading-6">Each ancestor is a research workspace with sources, places, memories, documents, and AI context packs.</p>
     </div>{action}</header>
     <CollectionWorkspace
       rows={people} columns={columns} preferenceKey={preferenceKey} query={query} status={status} noun="people" identityLabel="Person" defaultGroup="" columnVersion={2} primaryColumn="sources" loadMoreHref={loadMoreHref}

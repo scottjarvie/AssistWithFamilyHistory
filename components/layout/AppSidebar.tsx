@@ -109,10 +109,11 @@ export function AppMobileNav({ accountMode, vaultOwnerId, clerkEnabled, activePa
                 <SheetClose asChild>
                   <SafeLink
                     href="/app/settings"
+                    aria-current={(isNavItemActive(pathname,"/app/settings")||isNavItemActive(pathname,"/app/api"))?"page":undefined}
                     className={cn(
                       "flex items-center gap-3 rounded-lg px-3 py-2.5",
-                      isNavItemActive(pathname, "/app/settings")
-                        ? "bg-amber-700 text-white"
+                      (isNavItemActive(pathname, "/app/settings") || isNavItemActive(pathname, "/app/api"))
+                        ? "bg-primary text-primary-foreground shadow-[inset_3px_0_0_var(--brand-gold)]"
                         : "text-stone-300 hover:bg-stone-800"
                     )}
                   >
@@ -179,12 +180,13 @@ export function AppSidebar({ accountMode, vaultOwnerId, clerkEnabled, activePath
       <div className="border-t border-stone-800 p-2">
         <SafeLink
           href="/app/settings"
+          aria-current={(isNavItemActive(pathname,"/app/settings")||isNavItemActive(pathname,"/app/api"))?"page":undefined}
           aria-label={collapsed ? "Settings" : undefined}
           title={collapsed ? "Settings" : undefined}
           className={cn(
             "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
-            isNavItemActive(pathname, "/app/settings")
-              ? "bg-amber-700 text-white"
+            (isNavItemActive(pathname, "/app/settings") || isNavItemActive(pathname, "/app/api"))
+              ? "bg-primary text-primary-foreground shadow-[inset_3px_0_0_var(--brand-gold)]"
               : "text-stone-400 hover:text-white hover:bg-stone-800",
             collapsed && "justify-center px-2"
           )}

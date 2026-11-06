@@ -141,3 +141,8 @@ design-council/*/readers-attempt*/
 
 # Optional full-resolution self-contained gallery export.
 design-council/*/gallery-full-resolution.html
+
+# Fresh round2 visual checkpoint; preserve earlier round2/ours.
+design-council/*/round-2/ours-checkpoint/
+design-council/*/round-2/packet-*/
+design-council/*/round-2/settings-wayfinding-fixes/

@@ -1,0 +1,48 @@
+{
+  "baselineFiles": {
+    "home": "baseline/home",
+    "people": "baseline/people",
+    "places": "baseline-reconstructed/places",
+    "stories": "baseline-reconstructed/stories",
+    "writing": "baseline-reconstructed/writing",
+    "research": "baseline-reconstructed/research",
+    "person": "baseline-reconstructed/person",
+    "place-record": "baseline-reconstructed/baseline-place-record",
+    "story-record": "baseline-reconstructed/baseline-story-record",
+    "queue": "baseline-reconstructed/baseline-queue",
+    "operations": "baseline-reconstructed/operations-reconstructed",
+    "audit": "audit-baseline/audit-original-reconstructed",
+    "settings-ai": "settings-baseline/ai-connections-original-reconstructed",
+    "settings-provider": "settings-baseline/provider-settings-original-reconstructed",
+    "settings-api": "settings-baseline/api-keys-original-reconstructed",
+    "settings-admin": "settings-baseline/operator-keys-original-reconstructed",
+    "home-dark": "baseline/home-dark",
+    "people-dark": "baseline/people-dark"
+  },
+  "candidateFolder": "ours-checkpoint",
+  "candidatePairs": [
+    "home",
+    "people",
+    "places",
+    "stories",
+    "writing",
+    "research",
+    "person",
+    "place-record",
+    "story-record",
+    "queue",
+    "operations",
+    "audit",
+    "settings-ai",
+    "settings-provider",
+    "settings-api",
+    "settings-admin",
+    "home-dark",
+    "people-dark"
+  ],
+  "extraUnscoredDarkCapture": [
+    "settings-ai-dark"
+  ],
+  "scope": "16 completed app routes + Home/People dark pairs. No all-page clearance; shared source has uncommitted reader work excluded from the scored pages. Full check/captures must pass before dispatch.",
+  "origin": "Source tracked atf0f460f plus documented uncommitted reader implementation; scored image snapshots are the frozen visual evidence, not exact-head independent code approval."
+}

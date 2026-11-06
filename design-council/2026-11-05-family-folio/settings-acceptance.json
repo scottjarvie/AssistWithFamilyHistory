@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-11-05T17:44:43.531Z",
+  "checkedAt": "2026-11-05T18:39:23.230Z",
   "checks": [
     "Six grant states use one responsive DOM with unique consent IDs and no invented connection operations",
     "Narrow sends exactly the retained permissions, no owner, and cannot offer a removed ability back",

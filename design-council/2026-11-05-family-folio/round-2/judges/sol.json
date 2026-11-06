@@ -1,0 +1,566 @@
+{
+  "judge": "sol",
+  "model": "gpt-6.1-sol",
+  "seconds": null,
+  "ingestedAt": "2026-11-05T18:33:28.059Z",
+  "result": {
+    "sets": {
+      "V1": {
+        "scores": {
+          "findability": 6.5,
+          "density": 5.5,
+          "capability": 6.5,
+          "aiwork": 5.5,
+          "hierarchy": 6,
+          "typography": 6.5,
+          "iconography": 6.5,
+          "spacing": 5.5,
+          "colour": 4,
+          "consistency": 5.5,
+          "fit": 6,
+          "cost": 7.5
+        },
+        "notes": {
+          "findability": "Straightforward page nouns and search help, but record sections slide out of view on phones and settings lack a shared local navigation.",
+          "density": "Desktop cards often hold little data, while large phone introductions and stacked counters delay actual records.",
+          "capability": "Original detail tabs, export actions and filters are visible in places; collection view/selection tools and deep phone navigation are much less exposed.",
+          "aiwork": "Research and Queue mention AI activity, but author, timestamp and recorded-model provenance are largely absent from the visible record overviews.",
+          "hierarchy": "Several routes prioritize promotional headings and summary tiles over the evidence, work item or editable content.",
+          "typography": "The serif titles establish archival character, but oversized phone headings and faint secondary metadata weaken sustained scanning.",
+          "iconography": "Consistent outline symbols help navigation, although repeated generic book/location tiles communicate less than the later dossier art.",
+          "spacing": "Clean alignment is undermined by deep padded cards, nested containers and especially tall mobile summary stacks.",
+          "colour": "Light parchment and rust are coherent; dark Home/People leave near-black headings and Filter text on dark backgrounds with white cards.",
+          "consistency": "Collection, record and settings structures vary considerably; dark rendering visibly follows incomplete rules.",
+          "fit": "Evidence gaps and publication warnings support responsible genealogy, but the visible workspace feels more like a collection of landing pages than a research desk.",
+          "cost": "Mostly text, small icons and no visible media overhead; production transfer, hydration and infrastructure cost remain unmeasured."
+        }
+      },
+      "V2": {
+        "scores": {
+          "findability": 8,
+          "density": 7.5,
+          "capability": 8,
+          "aiwork": 8.5,
+          "hierarchy": 8,
+          "typography": 8,
+          "iconography": 8,
+          "spacing": 7.5,
+          "colour": 8.5,
+          "consistency": 8,
+          "fit": 8.5,
+          "cost": 7.5
+        },
+        "notes": {
+          "findability": "Saved views, search, counted sections and labelled dossier links make desktop discovery strong; phone settings tabs and generic Options still need decoding.",
+          "density": "Tables and audit rows reveal substantial real information, but mobile introductions/control stacks and some narrow desktop descriptions consume too much height.",
+          "capability": "Visible grouping, sorting, selection, Table/List/Grid and counted All menus improve reachability; below-crop settings controls and original-detail depth cannot be verified here.",
+          "aiwork": "Dated evidence streams distinguish You/Your AI, explicitly qualify self-reported models, and expose story authorship and Queue actors without inventing certainty.",
+          "hierarchy": "Clear page identity, dossier/evidence split and review warnings work well; phone records and Queue still place substantial introductory material before useful work.",
+          "typography": "Editorial serif titles, restrained body copy and compact metadata form a deliberate ladder, with a few overly long lines and undersized ledger details.",
+          "iconography": "Code-native dossier/map artwork supplies specific archival identity without pretending to be a portrait or evidence image; small utility symbols remain consistent.",
+          "spacing": "Desktop collection grids and dossiers align well; phone summaries, repeated preambles and controls need a tighter vertical rhythm.",
+          "colour": "Parchment, teal and rust carry meaning and the shown dark pages remain legible; settings' orange active navigation is a small cross-surface inconsistency.",
+          "consistency": "Collection and dossier systems are recognizable across routes, though settings navigation and several title weights retain a separate visual dialect.",
+          "fit": "The visible evidence, uncertainty, provenance and publication gates feel appropriate for a private genealogy workspace shared with AIs.",
+          "cost": "Small code-native art and text-heavy layouts appear restrained; no production transfer, first-load or runtime cost measurement supports a higher claim."
+        }
+      },
+      "R1": {
+        "scores": {
+          "findability": 8.5,
+          "density": 9,
+          "capability": 9,
+          "aiwork": 5,
+          "hierarchy": 8.5,
+          "typography": 8,
+          "iconography": 8.5,
+          "spacing": 8.5,
+          "colour": 8,
+          "consistency": 9,
+          "fit": 8.5,
+          "cost": 7.5
+        },
+        "notes": {
+          "findability": "Explicit Issues navigation, query, status counts and labelled facets expose the primary collection tools together.",
+          "density": "Many issues remain distinguishable through consistent title/metadata rows and quiet right-aligned activity.",
+          "capability": "Views, filters, sorting, layout choices and pagination are visible for the issue collection; authenticated operations are not proven.",
+          "aiwork": "No automated-work provenance is presented in the reference page; neutral score per brief.",
+          "hierarchy": "Repository, current Issues surface, query and results have predictable levels; the pinned issue adds modest competition.",
+          "typography": "Bold row titles and muted metadata are efficient, although the small secondary text is demanding.",
+          "iconography": "Status, comments, linked work and avatars are consistently positioned and semantically useful.",
+          "spacing": "Compact aligned rows and economical controls preserve a large working area.",
+          "colour": "Restrained neutral surfaces and status/label accents support scanning with little decorative load.",
+          "consistency": "Repeated rows, chips and controls are exceptionally systematic across the shown long collection.",
+          "fit": "A mature, practical issue desk that makes sustained scanning and filtering credible.",
+          "cost": "Tiny avatars/icons and no visible heavy media; client payload and infrastructure remain unmeasured."
+        }
+      },
+      "R2": {
+        "scores": {
+          "findability": 7,
+          "density": 7.5,
+          "capability": 8,
+          "aiwork": 5,
+          "hierarchy": 7,
+          "typography": 6.5,
+          "iconography": 5.5,
+          "spacing": 7,
+          "colour": 7,
+          "consistency": 6.5,
+          "fit": 8,
+          "cost": 7
+        },
+        "notes": {
+          "findability": "Plain named groups and descriptive links help genealogists; the search limitation is useful but distant from the search box.",
+          "density": "Numerous resources fit into meaningful groups, although the sidebar and promotional modules compete.",
+          "capability": "Research entry points, record types, tools, events and further learning are exposed with substantial navigation depth.",
+          "aiwork": "No AI or automated work is shown; neutral score per brief.",
+          "hierarchy": "Group headings organize the directory, but closure notice, news and campaign cards create multiple competing starts.",
+          "typography": "Readable conventional typography has too many heading treatments and relatively small body links.",
+          "iconography": "Mixed clip-art, historical thumbnails and promotional graphics have visibly inconsistent styles.",
+          "spacing": "The main resource grid is coherent; sidebar modules and lower campaign tiles produce uneven rhythm.",
+          "colour": "Mostly legible institutional colour, with unrelated multicolour navigation gradients reducing unity.",
+          "consistency": "Box styles repeat, but imagery and module headings belong to several visual systems.",
+          "fit": "Clear institutional genealogy language and links convey practical authority despite dated presentation.",
+          "cost": "Several raster/promotional images are visible; no heavy video is apparent and actual delivery cost is unknown."
+        }
+      },
+      "R3": {
+        "scores": {
+          "findability": 8,
+          "density": 7.5,
+          "capability": 8.5,
+          "aiwork": 5,
+          "hierarchy": 7.5,
+          "typography": 7,
+          "iconography": 6.5,
+          "spacing": 7.5,
+          "colour": 7.5,
+          "consistency": 7.5,
+          "fit": 8.5,
+          "cost": 7.5
+        },
+        "notes": {
+          "findability": "A numbered linked contents panel, breadcrumbs and explicit access modes make a deep research guide navigable.",
+          "density": "Guide text, contents and assistance are well grouped, though three narrow columns cause considerable wrapping.",
+          "capability": "Fifteen contents links, record access methods, advice and related guides expose substantial research depth.",
+          "aiwork": "No AI or automated work is shown; neutral score per brief.",
+          "hierarchy": "The guide structure is explicit, but the large cookie/header region delays it and advice competes with the introduction.",
+          "typography": "Numbered headings are distinctive and body text is readable, with cramped narrow-column line lengths.",
+          "iconography": "Actual archival imagery is relevant and captioned; contact/access illustrations are less stylistically unified.",
+          "spacing": "Consistent dividers and column alignment organize depth, but the introductory three-column layout is compressed.",
+          "colour": "Restrained blue links and neutral guide panels preserve legibility and institutional identity.",
+          "consistency": "Numbering, links and separators repeat reliably with a few legacy-looking widgets.",
+          "fit": "Source-specific explanation, archival reference caption and access guidance suit careful family-history research.",
+          "cost": "One meaningful source image and otherwise mostly text; actual production transfer and script cost are unmeasured."
+        }
+      }
+    },
+    "capabilityConcerns": [
+      {
+        "set": "V1",
+        "shot": "person--mobile-light.png",
+        "what": "Later record tabs extend beyond the right edge and there is no complete section chooser in the shown crop; the destinations may exist but require more discovery."
+      },
+      {
+        "set": "V1",
+        "shot": "people--desktop-light.png",
+        "what": "Table/List/Grid, saved-view, sort, columns, density and selection tools are not exposed in the shown collection; cannot establish whether available elsewhere."
+      },
+      {
+        "set": "V1",
+        "shot": "settings-ai--mobile-light.png",
+        "what": "Actual connection-specific narrowing, end-date and revoke controls are below the required crop; reachability is unproven, not evidence of removal."
+      },
+      {
+        "set": "V2",
+        "shot": "people--mobile-light.png",
+        "what": "Desktop Table/List/Grid and Manage views are not directly visible on phone; Options may retain them but its name does not establish that path."
+      },
+      {
+        "set": "V2",
+        "shot": "person--mobile-light.png",
+        "what": "Phone Contents and original-detail access are below the crop; the tall dossier makes evidence navigation harder to reach even though the desktop counted All 9 menu is visible."
+      },
+      {
+        "set": "V2",
+        "shot": "person--desktop-light.png",
+        "what": "V1 shows three Priority Gaps while this overview shows two; the third may be retained in a deeper section. The crop does not prove its one-step full-detail reachability."
+      },
+      {
+        "set": "V2",
+        "shot": "settings-admin--mobile-light.png",
+        "what": "The current operator-ledger destination is off the visible settings navigation strip; its content exists but the active location is harder to identify."
+      },
+      {
+        "set": "V2",
+        "shot": "settings-api--desktop-light.png",
+        "what": "The ledger-first ordering leaves mint/secret/preset forms below the crop; no removal is established, but retaining a labelled jump to creation would make depth clearer."
+      },
+      {
+        "set": "V2",
+        "shot": "settings-ai--mobile-light.png",
+        "what": "Narrow/end-date/revoke controls are below this top crop; desktop shows them clearly, but phone action parity and named revoke confirmation cannot be proven visually."
+      },
+      {
+        "set": "V2",
+        "shot": "settings-provider--desktop-light.png",
+        "what": "Your data supplies a plausible depth link, but the contents/readers/duration/control comparison and remaining legacy controls are not shown and cannot be scored as verified."
+      }
+    ],
+    "fixes": [
+      {
+        "set": "V1",
+        "rank": 1,
+        "category": "colour",
+        "severity": "high",
+        "capability": "preserved",
+        "shots": [
+          "home-dark--desktop-light.png",
+          "home-dark--mobile-light.png",
+          "people-dark--desktop-light.png",
+          "people-dark--mobile-light.png"
+        ],
+        "where": "Page titles, explanatory text, Filter button and white collection surfaces",
+        "problem": "Dark backgrounds retain nearly black title/button text and unrelated bright white content cards.",
+        "fix": "Apply a complete dark surface/text palette: pale foreground for titles and controls, readable muted copy, dark cards and visible separators; keep rust for warnings."
+      },
+      {
+        "set": "V1",
+        "rank": 2,
+        "category": "density",
+        "severity": "high",
+        "capability": "preserved",
+        "shots": [
+          "stories--mobile-light.png",
+          "operations--mobile-light.png",
+          "audit--mobile-light.png",
+          "queue--mobile-light.png"
+        ],
+        "where": "Introductory cards and stacked numeric summaries",
+        "problem": "The crop contains mostly preamble and oversized counters; the underlying work is delayed by multiple screenfuls.",
+        "fix": "Remove the outer hero-card padding, use a short route title, retain explanatory text at body size, and lay counters into a compact two-column grid with 12–16px cell padding."
+      },
+      {
+        "set": "V1",
+        "rank": 3,
+        "category": "findability",
+        "severity": "high",
+        "capability": "improved",
+        "shots": [
+          "person--mobile-light.png",
+          "person--desktop-light.png"
+        ],
+        "where": "Record section navigation below identity card",
+        "problem": "A wide strip exposes only the first few phone sections and does not show their counts or a complete section chooser.",
+        "fix": "Keep the tabs but add the existing section counts and an always-visible All sections control; put a labelled Contents list directly below the phone identity summary."
+      },
+      {
+        "set": "V1",
+        "rank": 4,
+        "category": "capability",
+        "severity": "high",
+        "capability": "improved",
+        "shots": [
+          "people--desktop-light.png",
+          "places--desktop-light.png",
+          "stories--desktop-light.png"
+        ],
+        "where": "Collection header between title and results",
+        "problem": "Visible collections expose inconsistent controls and little indication of alternate views, density, grouping or selection.",
+        "fix": "Use one collection toolbar that visibly exposes available saved views, search/facets, sort/group, Table/List/Grid and selection; keep every currently available filter and detail link."
+      },
+      {
+        "set": "V1",
+        "rank": 5,
+        "category": "aiwork",
+        "severity": "high",
+        "capability": "improved",
+        "shots": [
+          "research--desktop-light.png",
+          "person--desktop-light.png",
+          "place-record--desktop-light.png",
+          "story-record--desktop-light.png"
+        ],
+        "where": "Research entries and record overview",
+        "problem": "Visible text does not readily show who recorded each update or when; the story header lacks clear authorship/provenance.",
+        "fix": "Present existing attribution and timestamps alongside each research entry, and existing recorded-model/unknown-author information in the story summary; label unknowns plainly."
+      },
+      {
+        "set": "V1",
+        "rank": 6,
+        "category": "hierarchy",
+        "severity": "medium",
+        "capability": "preserved",
+        "shots": [
+          "story-record--desktop-light.png",
+          "story-record--mobile-light.png"
+        ],
+        "where": "Story identity, workflow step cards and editor",
+        "problem": "A long action/step presentation dominates the record before its draft text or evidence.",
+        "fix": "Reduce Draft/Review/Published to a compact horizontal step strip, keep the blocker summary adjacent to review actions, and bring the existing draft preview/editor directly below."
+      },
+      {
+        "set": "V1",
+        "rank": 7,
+        "category": "density",
+        "severity": "medium",
+        "capability": "preserved",
+        "shots": [
+          "places--desktop-light.png",
+          "places--mobile-light.png",
+          "writing--desktop-light.png",
+          "writing--mobile-light.png"
+        ],
+        "where": "Individual place/writing cards",
+        "problem": "Large repeated icons, padding and stat tiles consume space without aiding comparison.",
+        "fix": "Use a compact list/table presentation with icon, title, status and existing counts on aligned rows; keep the card view available as an alternate."
+      },
+      {
+        "set": "V1",
+        "rank": 8,
+        "category": "hierarchy",
+        "severity": "medium",
+        "capability": "improved",
+        "shots": [
+          "settings-ai--desktop-light.png",
+          "settings-ai--mobile-light.png"
+        ],
+        "where": "Permission catalogue preceding actual connections",
+        "problem": "The permission explanations dominate the first view and do not reveal which connection currently has which abilities.",
+        "fix": "Put existing connections and their allowed abilities together first; retain every full permission explanation in the labelled Permissions section and keep narrow/end-date/revoke controls adjacent to each connection."
+      },
+      {
+        "set": "V1",
+        "rank": 9,
+        "category": "findability",
+        "severity": "medium",
+        "capability": "improved",
+        "shots": [
+          "settings-provider--desktop-light.png",
+          "settings-api--desktop-light.png",
+          "settings-admin--desktop-light.png"
+        ],
+        "where": "Top of settings pages",
+        "problem": "Generic Settings, API Center and Admin API lack a common local wayfinding system.",
+        "fix": "Add a shared labelled local navigation for AI connections, Preferences & data, Developer keys and the gated operator ledger; preserve the current forms and role boundaries."
+      },
+      {
+        "set": "V1",
+        "rank": 10,
+        "category": "typography",
+        "severity": "medium",
+        "capability": "preserved",
+        "shots": [
+          "people--desktop-light.png",
+          "home--desktop-light.png",
+          "audit--desktop-light.png"
+        ],
+        "where": "Secondary counts, import dates and all-caps metric labels",
+        "problem": "Very faint small metadata makes the most useful comparison details harder to read.",
+        "fix": "Raise muted text contrast, set desktop metadata to at least 12px with clear line height, and use sentence-case labels for numerical summaries."
+      },
+      {
+        "set": "V2",
+        "rank": 1,
+        "category": "hierarchy",
+        "severity": "high",
+        "capability": "improved",
+        "shots": [
+          "person--mobile-light.png",
+          "place-record--mobile-light.png",
+          "story-record--mobile-light.png"
+        ],
+        "where": "Phone dossier card before Contents/evidence",
+        "problem": "The complete desktop sidebar becomes a tall phone block; person and story crops end before the evidence/navigation work surface.",
+        "fix": "Keep name, key dates/status and critical warning expanded, move the existing Contents control immediately after them, and place secondary operational/provenance fields into labelled compact disclosure groups without removing any fields."
+      },
+      {
+        "set": "V2",
+        "rank": 2,
+        "category": "density",
+        "severity": "high",
+        "capability": "preserved",
+        "shots": [
+          "queue--mobile-light.png",
+          "operations--mobile-light.png",
+          "research--mobile-light.png",
+          "stories--mobile-light.png"
+        ],
+        "where": "Phone introduction, saved views and toolbar above first result",
+        "problem": "Large preambles, multiple control rows and wide vertical gaps consume most or all of the crop before useful work.",
+        "fix": "At phone widths use a 28–30px route title, 12–16px section gaps and compact explanatory text; reduce repeated preamble spacing and keep saved-view/search controls directly above the first record. Retain all text and controls through clearly labelled disclosures where needed."
+      },
+      {
+        "set": "V2",
+        "rank": 3,
+        "category": "findability",
+        "severity": "high",
+        "capability": "improved",
+        "shots": [
+          "settings-admin--mobile-light.png",
+          "settings-api--mobile-light.png",
+          "settings-ai--mobile-light.png",
+          "settings-provider--mobile-light.png"
+        ],
+        "where": "Settings top navigation and AI subsection navigation",
+        "problem": "Developer keys is clipped and the operator ledger's active tab is outside the shown horizontal strip; Manual brief also clips.",
+        "fix": "Use a wrapping two-column settings navigation or a labelled section selector that always displays the current full section name; retain all destinations and show the active AI subsection clearly."
+      },
+      {
+        "set": "V2",
+        "rank": 4,
+        "category": "findability",
+        "severity": "medium",
+        "capability": "improved",
+        "shots": [
+          "people--mobile-light.png",
+          "people-dark--mobile-light.png",
+          "places--mobile-light.png",
+          "stories--mobile-light.png"
+        ],
+        "where": "Search row and generic Options button",
+        "problem": "The narrow search placeholder truncates the search scope and Options does not reveal where view/density/columns live.",
+        "fix": "Place the search field on a full-width phone row with a persistent Search label, then Search/Filter controls below; label the existing options entry View & columns or display its current view/density summary."
+      },
+      {
+        "set": "V2",
+        "rank": 5,
+        "category": "density",
+        "severity": "medium",
+        "capability": "preserved",
+        "shots": [
+          "home--desktop-light.png",
+          "home-dark--desktop-light.png",
+          "home--mobile-light.png",
+          "home-dark--mobile-light.png"
+        ],
+        "where": "Recently touched tray and phone top actions",
+        "problem": "The desktop tray stretches below its last record, while phone title/actions/tray heading consume a large area before the first record.",
+        "fix": "Let Recently touched size to its four rows instead of matching the adjacent tray's height; reduce tray description spacing and use one primary phone action plus two compact secondary links while keeping all three destinations."
+      },
+      {
+        "set": "V2",
+        "rank": 6,
+        "category": "typography",
+        "severity": "medium",
+        "capability": "preserved",
+        "shots": [
+          "stories--desktop-light.png"
+        ],
+        "where": "Story preview paragraph in first list entry",
+        "problem": "The preview spans nearly the entire content width, making a long dense line; the same warning is repeated in metadata and again below.",
+        "fix": "Limit preview prose to about 75–85 characters per line and put existing review metadata/actions in the remaining side area; show the warning count once prominently while retaining the full warning details."
+      },
+      {
+        "set": "V2",
+        "rank": 7,
+        "category": "spacing",
+        "severity": "medium",
+        "capability": "preserved",
+        "shots": [
+          "research--desktop-light.png",
+          "queue--desktop-light.png"
+        ],
+        "where": "Task/directive descriptive column",
+        "problem": "The first descriptive column wraps short explanations into many lines while secondary scalar columns reserve large widths.",
+        "fix": "Give task/directive title and description about 40–45% of the table, tighten priority/state/actor columns to their contents, and keep dates/scalars aligned; retain every column via column settings."
+      },
+      {
+        "set": "V2",
+        "rank": 8,
+        "category": "typography",
+        "severity": "medium",
+        "capability": "preserved",
+        "shots": [
+          "settings-api--desktop-light.png",
+          "settings-admin--desktop-light.png",
+          "settings-ai--desktop-light.png",
+          "story-record--desktop-light.png"
+        ],
+        "where": "Ledger metadata, connection details and provenance sidebars",
+        "problem": "Several long operational details are noticeably smaller than the surrounding working text.",
+        "fix": "Increase these details to a consistent 12–13px desktop size, shorten line lengths with wrapping, and keep the qualifying labels attached to their values."
+      },
+      {
+        "set": "V2",
+        "rank": 9,
+        "category": "consistency",
+        "severity": "low",
+        "capability": "preserved",
+        "shots": [
+          "settings-ai--desktop-light.png",
+          "settings-provider--desktop-light.png",
+          "settings-api--desktop-light.png",
+          "settings-admin--desktop-light.png",
+          "people--desktop-light.png"
+        ],
+        "where": "Sidebar Settings active item",
+        "problem": "Settings uses an orange filled active item while other active destinations use teal with a rust edge.",
+        "fix": "Use the same teal active destination treatment for Settings; reserve rust for warnings, conflict and destructive-action emphasis."
+      },
+      {
+        "set": "V2",
+        "rank": 10,
+        "category": "hierarchy",
+        "severity": "medium",
+        "capability": "improved",
+        "shots": [
+          "settings-ai--mobile-light.png",
+          "settings-api--mobile-light.png",
+          "settings-admin--mobile-light.png"
+        ],
+        "where": "Explanatory copy before first connection/key controls",
+        "problem": "The first connection abilities or key actions arrive very low despite the user entering an operational settings surface.",
+        "fix": "Present the existing top safety/setup explanation as a compact labelled summary with expandable full text; place current connections/keys immediately after the route heading and keep all scope, expiry and revoke controls within each record."
+      }
+    ],
+    "keep": [
+      {
+        "set": "V1",
+        "what": "Plain genealogical nouns, visible search and direct links to source people."
+      },
+      {
+        "set": "V1",
+        "what": "The parchment background, editorial serif headings and rust warning vocabulary."
+      },
+      {
+        "set": "V1",
+        "what": "Visible publication blocker count and distinct Draft/Review/Published stages."
+      },
+      {
+        "set": "V1",
+        "what": "Research task descriptions preserve uncertainty and tell the person what to compare."
+      },
+      {
+        "set": "V1",
+        "what": "Original context-pack/JSON actions and detailed legacy settings remain visibly represented."
+      },
+      {
+        "set": "V2",
+        "what": "Counted All section menus, dossier identity and dated evidence streams with You/Your AI attribution."
+      },
+      {
+        "set": "V2",
+        "what": "Explicit unknown/unverified authorship, recorded-model qualification and unresolved evidence wording."
+      },
+      {
+        "set": "V2",
+        "what": "Shared collection saved views, search, grouping, sorting, selection and Table/List/Grid controls."
+      },
+      {
+        "set": "V2",
+        "what": "Connection-by-ability matrix, visible narrow/end-date/revoke actions and current-vault key-ledger boundaries."
+      },
+      {
+        "set": "V2",
+        "what": "Legible shown dark modes, quiet archival SVG placeholders and compact linked Audit numbers without fabricated time trends."
+      }
+    ],
+    "summary": "V2 is a strong desktop research workspace, with much clearer evidence provenance and collection capability than V1. GitHub remains visibly better at economical scanning and control-to-result distance; V2's largest remaining gap is the amount of phone screen occupied before records, evidence, questions and security actions appear. This judges only the 16 shown route families plus Home/People dark pairs, not the unfinished site or authenticated operation.",
+    "pick": {
+      "label": "V2",
+      "why": "Build V2: its dossiers, collection controls, evidence attribution and coherent dark palette are visibly stronger. Retain V1's direct context-pack/JSON and legacy form discoverability within clearly labelled depth, and borrow the references' economical rows and explicit numbered contents rather than their visual styling."
+    }
+  }
+}

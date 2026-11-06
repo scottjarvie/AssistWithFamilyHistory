@@ -18,7 +18,7 @@ const columns:CollectionColumn<StoryCollectionRow>[] = [
 ];
 function NarrativePreview({content}:{content:string}) {
   const [expanded,setExpanded]=useState(false);
-  return <div className="mt-2"><p className={`${expanded?"":"line-clamp-4"} whitespace-pre-wrap text-sm leading-6 text-muted-foreground`}>{content}</p><button className="min-h-11 text-sm text-primary underline underline-offset-4" aria-expanded={expanded} onClick={()=>setExpanded(!expanded)}>{expanded?"Collapse preview":"Read full preview"}</button></div>;
+  return <div className="mt-2 max-w-[80ch]"><p className={`${expanded?"":"line-clamp-4"} whitespace-pre-wrap text-sm leading-6 text-muted-foreground`}>{content}</p><button className="min-h-11 text-sm text-primary underline underline-offset-4" aria-expanded={expanded} onClick={()=>setExpanded(!expanded)}>{expanded?"Collapse preview":"Read full preview"}</button></div>;
 }
 export function StoriesCollectionView({stories,query="",status:requestedStatus="",workflow:requestedWorkflow="",preferenceKey}:{stories:StoryCollectionRow[];query?:string;status?:string;workflow?:string;preferenceKey:string}) {
   const status=["draft","review","published"].includes(requestedStatus)?requestedStatus:"";

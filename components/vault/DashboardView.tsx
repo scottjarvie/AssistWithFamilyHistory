@@ -50,7 +50,7 @@ export function DashboardView({ summary }: { summary: DashboardSummary }) {
         </div>
       </header>
 
-      <div className="research-desk mt-8 grid gap-6 lg:grid-cols-3">
+      <div className="research-desk mt-8 grid items-start gap-6 lg:grid-cols-3">
         <FolioTray id="recent-people-title" title="Recently touched" count={summary.counts.people} countLabel="people" summary="Pick up where you left off. People and the evidence around them." href="/app/people" linkLabel="All people" className="lg:col-span-2">
           {summary.recentPeople.length ? <ul className="divide-y divide-border">
             {summary.recentPeople.map((person) => <li key={String(person._id)}>

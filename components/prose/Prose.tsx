@@ -12,7 +12,7 @@
  * `variant="story"` matches the large serif public-page aesthetic; `variant="compact"`
  * is for in-app previews and the editor preview pane.
  */
-import ReactMarkdown, { type Components } from "react-markdown";
+import ReactMarkdown, { type Components, type Options } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
 
@@ -71,14 +71,18 @@ export function Prose({
   markdown,
   variant = "story",
   className,
+  components,
+  remarkPlugins = [],
 }: {
   markdown: string;
   variant?: ProseVariant;
   className?: string;
+  components?: Components;
+  remarkPlugins?: Options["remarkPlugins"];
 }) {
   return (
     <div className={cn("max-w-none", className)}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={buildComponents(variant)}>
+      <ReactMarkdown remarkPlugins={[remarkGfm,...(remarkPlugins||[])]} components={{...buildComponents(variant),...components}}>
         {markdown}
       </ReactMarkdown>
     </div>

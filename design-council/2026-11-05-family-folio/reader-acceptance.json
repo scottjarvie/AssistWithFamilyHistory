@@ -1,0 +1,193 @@
+{
+  "checkedAt": "2026-11-05T18:37:43.405Z",
+  "checks": [
+    "Both readers copy/download byte-identical full Markdown with original filenames; reading view retains the exact original",
+    "Clipboard failure reveals and selects complete original Markdown without false success",
+    "Six claim-specific source notes lead to the matching raw section with the read-run retained",
+    "Missing source anchors stay honest; remote Markdown images and raw HTML never execute or auto-load",
+    "Embedded PS/CST tabs preserve exact stored text, titles, update provenance and filename contracts",
+    "Actual raw controller retains selected/latest run and safely encodes route/query values",
+    "Pack failure keeps the original raw-API fallback and truthfully unknown document provenance",
+    "No-run raw state retains Context Pack, Story Writer and Person recovery links",
+    "All contextualized missing states and read failure retain their original recovery choices; retry does not fabricate an empty document",
+    "Real Next person navigation clears old private content synchronously while the new read is delayed",
+    "Late aborted previous-person response cannot overwrite the new person document",
+    "Same-person run changes also clear prior content until the newly selected run arrives",
+    "All readers, embedded documents, long literal data and phone source notes fit1440/1280/390/320px with dark phones"
+  ],
+  "requests": [
+    {
+      "path": "/api/people/synthetic-reader",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader/runs/synthetic%20run%2Fone%3F/pack",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader/runs/synthetic%20fallback/pack",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader/raw",
+      "query": "?run=synthetic%20fallback",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader/contextualized",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader/contextualized",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader/contextualized",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader/contextualized",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader/contextualized",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader/contextualized",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader/contextualized",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader/contextualized",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader/contextualized",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader/runs/synthetic-reader-run/pack",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader-other",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader-other",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader-other/runs/synthetic-other-run/pack",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader/contextualized",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader/contextualized",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader-other/contextualized",
+      "query": "?run=synthetic-other-run",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader-other/contextualized",
+      "query": "?run=synthetic-other-run",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader/runs/synthetic-first-run/pack",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader",
+      "query": "",
+      "method": "GET"
+    },
+    {
+      "path": "/api/people/synthetic-reader/runs/synthetic-second-run/pack",
+      "query": "",
+      "method": "GET"
+    }
+  ],
+  "errors": [],
+  "unexpected": [],
+  "note": "All provider/API data invented and intercepted; no actual backend or private family data."
+}
