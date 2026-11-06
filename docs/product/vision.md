@@ -12,8 +12,8 @@ It is also an **AI family history lab**: an experimental product asking what mod
 
 > "Go beyond names and dates. Research deeply, tell stories, create content."
 
-The canonical product-level doctrine is the
-[Assist With Family History Project Philosophy](../planning/assist-with-family-history-project-philosophy.md).
+The canonical product-level direction is the
+[Site Guide](../planning/site-guide.md).
 
 The goal isn't just to find records or add names to a family tree. It's to:
 

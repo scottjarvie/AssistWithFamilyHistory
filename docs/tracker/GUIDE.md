@@ -72,7 +72,7 @@ Routine work is merged and deployed by the AI under the family delivery rule,
 [Core Philosophy §16.6](https://github.com/scottjarvie/assistwithlife/blob/main/planning/assist-with-sites-core-philosophy.md#166-delivering-changes-localhost-first-then-merge). Stop only for money/billing, deleting real data,
 domains/DNS, secrets, or a change to who can access production data.
 
-Copy prompt carries the Project, Project Philosophy, Family Core, full Card,
+Copy prompt carries the Project, Site Guide, Family Core, full Card,
 linked Work Order, current evidence, and update rules. Copy Work Order carries
 the approved tranche and all included Cards.
 
@@ -101,17 +101,17 @@ templates, package scripts, workflows, instruction files, and build/deployment
 configuration—uses a normal branch, pull request, full CI, and deployment.
 
 State only—Cards, Work Orders, this Guide, factual `tracker.json`, generated
-readers, and the canonical Project Philosophy Markdown/HTML pair—may use the
+readers, and the Site Guide (`docs/planning/site-guide.md`)—may use the
 locally validated trusted-owner direct-main path:
 
 ```text
-git add docs/tracker/cards docs/tracker/work-orders docs/tracker/GUIDE.md docs/tracker/board.html docs/tracker/guide.html docs/tracker/tracker.json docs/planning/assist-with-family-history-project-philosophy.md docs/planning/assist-with-family-history-project-philosophy.html
+git add docs/tracker/cards docs/tracker/work-orders docs/tracker/GUIDE.md docs/tracker/board.html docs/tracker/guide.html docs/tracker/tracker.json docs/planning/site-guide.md
 pnpm tracker:commit-state -- "Update Family History tracker state"
 git push origin HEAD:main
 ```
 
-The helper rejects mixed or uncertain changes, runs both tracker and Project
-Philosophy validators, requires local `main`, and writes the final
+The helper rejects mixed or uncertain changes, runs the tracker validator,
+requires local `main`, and writes the final
 `skip-checks: true` trailer. GitHub CI does not run on pushes to `main`.
 Vercel separately compares the complete range since its previous successful
 deployment and skips the build only when every changed path is documentation

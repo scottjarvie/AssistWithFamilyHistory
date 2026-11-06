@@ -92,7 +92,7 @@ for (const name of ["board.html", "guide.html"]) {
   for (const script of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) new vm.Script(script[1], { filename: `${name}:inline-script` });
 }
 const board = fs.readFileSync(path.join(TRACKER, "board.html"), "utf8");
-for (const label of ["Project", "Project Philosophy", "Family Core", "Guide", "Kanban", "Work Orders", "Needs You"] ) assert(board.includes(label), `board missing ${label}`);
+for (const label of ["Project", "Site Guide", "Family Core", "Guide", "Kanban", "Work Orders", "Needs You"] ) assert(board.includes(label), `board missing ${label}`);
 for (const status of CARD_STATUSES) assert(board.includes(`\\"${status}\\"`) || board.includes(`"${status}"`), `board missing status ${status}`);
 assert.match(board, /Copy whole work order/);
 assert.match(board, /No automatic dispatch/);

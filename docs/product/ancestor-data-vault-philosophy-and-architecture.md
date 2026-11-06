@@ -4,6 +4,8 @@ Last updated: 2026-06-28
 
 Status: draft product architecture. This document is a research-backed direction note, not an approved schema migration.
 
+Product rules live in the [Site Guide](../planning/site-guide.md); where this architecture reference differs, the Site Guide wins.
+
 ## Philosophy
 
 Assist With Family History should be built around one core idea:

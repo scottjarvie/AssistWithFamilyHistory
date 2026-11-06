@@ -31,7 +31,7 @@ const TRACKER = JSON.parse(readFileSync(join(TRACKER_DIR, "tracker.json"), "utf8
 const REPO_NAME = TRACKER.project;
 const REPO_SLUG = TRACKER.repository;
 const SITE_URL = TRACKER.projectUrl;
-const PROJECT_PHILOSOPHY = TRACKER.projectPhilosophy;
+const SITE_GUIDE = TRACKER.siteGuide;
 const FAMILY_CORE = TRACKER.familyCore;
 
 /* Family History palette — archival paper, teal evidence, and rust annotations. */
@@ -296,7 +296,7 @@ regenerate. Nothing else to install or run.</p>
 <h2>How to hand a card to your AI</h2>
 <p>Open any card and press <strong>Copy prompt</strong> — you get a
 ready-to-paste instruction that introduces the project, includes the whole
-card, its linked Work Order, the Project Philosophy, the exact Family Core,
+card, its linked Work Order, the Site Guide, the exact Family Core,
 rules, and current evidence. <strong>Copy work order</strong> bundles the whole
 bounded tranche and every contained Card.</p>
 
@@ -339,7 +339,7 @@ ${SHARED_CSS}
   <span class="spacer"></span>
   <nav aria-label="Tracker links">
     <a class="btn" href="${SITE_URL}">Project</a>
-    <a class="btn" href="${PROJECT_PHILOSOPHY}">Project Philosophy</a>
+    <a class="btn" href="${SITE_GUIDE}">Site Guide</a>
     <a class="btn" href="${FAMILY_CORE.url}">Family Core</a>
     <a class="btn" href="GUIDE.md">Guide</a>
   </nav>
@@ -528,7 +528,7 @@ ${SHARED_CSS}
   <span class="spacer"></span>
   <nav aria-label="Tracker links">
     <a class="btn" href="${SITE_URL}">Project</a>
-    <a class="btn" href="${PROJECT_PHILOSOPHY}">Project Philosophy</a>
+    <a class="btn" href="${SITE_GUIDE}">Site Guide</a>
     <a class="btn" href="${FAMILY_CORE.url}">Family Core</a>
     <a class="btn" href="guide.html">Guide</a>
   </nav>
@@ -582,7 +582,7 @@ ${SHARED_CSS}
 const REPO_NAME = ${JSON.stringify(REPO_NAME)};
 const REPO_SLUG = ${JSON.stringify(REPO_SLUG)};
 const PROJECT_URL = ${JSON.stringify(SITE_URL)};
-const PROJECT_PHILOSOPHY = ${JSON.stringify(PROJECT_PHILOSOPHY)};
+const SITE_GUIDE = ${JSON.stringify(SITE_GUIDE)};
 const FAMILY_CORE = ${JSON.stringify(FAMILY_CORE)};
 const CARDS = ${DATA};
 const WORK_ORDERS = ${WORK_ORDER_DATA};
@@ -622,7 +622,7 @@ mode.onclick = () => setMode(root.dataset.mode === "paper" ? "studio" : "paper")
 /* ---- copy-as-prompt ---- */
 const AI_NOTES = "\\n\\n---\\nWorking notes for you, the AI taking this on:\\n" +
   "- Project: " + REPO_NAME + " (" + PROJECT_URL + "; " + REPO_SLUG + ").\\n" +
-  "- Project Philosophy: " + PROJECT_PHILOSOPHY + ".\\n" +
+  "- Site Guide: " + SITE_GUIDE + ".\\n" +
   "- Family Core: " + FAMILY_CORE.label + " dated " + FAMILY_CORE.date + " at commit " + FAMILY_CORE.commit + " (" + FAMILY_CORE.url + ").\\n" +
   "- Tracker rules: docs/tracker/GUIDE.md. Card path: docs/tracker/cards/<ID>.md.\\n" +
   "- No automatic dispatch. AI proposes; Scott approves Proposed -> Ready; AI executes; a separate AI audits.\\n" +

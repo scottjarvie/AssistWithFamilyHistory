@@ -1,402 +1,232 @@
 # Assist With Family History — Site Guide
 
-**Canonical product direction** · Edition 2 · 6 October 2026 · Canonical since 6 October 2026
-
-**Assist With Family History assists your AI, so your AI can assist you with family history.** A capable AI can already read an old record, compare two census entries, explain what life was like in a parish in 1850, and help write a grandparent's story. Family History is where the person and their AI **organize** that work and where it **lasts**: the people, how they are related, the sources behind every important detail, the questions still open, and the stories that come from it all.
-
-This guide tells a builder what the site is made of — its **building blocks**, the pages each one needs, how the shared Assist pages apply here, and what the person's AI needs from the site. It is the Family History companion to the family [Core Site Guide](#documents-that-help-build-family-history), in the same shape as the Scriptures and Languages site guides.
-
-**How this guide relates to the Project Philosophy.** This guide is canonical product direction (Scott, 6 October 2026). The [Project Philosophy](assist-with-family-history-project-philosophy.md) remains the reference for the long-form trust boundaries, language rules and capability-evidence history, and nothing here relaxes them. Where the two differ, this guide reflects newer owner direction; binding rulings are in [Decisions](#decisions).
-
-**Status words.** *Built* means it exists in the repository and is live on assistwithfamilyhistory.com. *Partial* means some of it is live. *To build* means it is designed here and not yet built. Anything marked **Proposed** is a recommendation not yet ruled on; open questions live in [`site-guide-content.json`](site-guide-content.json).
+The one product document for Assist With Family History. It is written for the people and AIs who build and maintain the site, and states the rules as they stand now. Git keeps the history; the [tracker](../tracker/GUIDE.md) holds current work. Shared rules every Assist site follows (support, storage limits, URL map, launch and update rules, navigation, the delivery rule) live in the family [Core Philosophy](https://github.com/scottjarvie/assistwithlife/blob/main/planning/assist-with-sites-core-philosophy.md); this guide covers only what is specific to Family History. Page layout lives in code and the [Family Folio design system](../design/family-folio-system.md). Open owner questions are in [`site-guide-content.json`](site-guide-content.json).
 
 ---
 
-## The promise
+## What Family History is
 
-Family history work is long. A question about one great-grandmother can take years, pass through several AIs, and touch dozens of records. Most of that work today ends up scattered: a tree on one website, scans in a folder, a chat that found something useful last spring and is now impossible to find, and a story draft that no longer says where its details came from.
+**Assist With Family History assists your AI, so your AI can assist you with family history.** It is a durable, user-controlled research-to-story workspace: the person and their AI keep the people, how they are related, the sources behind every important detail, the questions still open, and the stories that come from it all — connected, attributed and still there when they return months later, possibly with a different AI.
 
-Family History keeps all of it connected:
+The subject of the work can be a person, a family line, a relationship, a place, a building, a community, a religion, an event or an era — not only a pedigree position. A family tree is one view of the research, not its limit.
 
-- **People** and the many names they went by, without forcing two uncertain matches into one person.
-- **Relationships** — parents, spouses, children, step and adoptive families, households, godparents, witnesses, neighbours — each with the evidence for it.
-- **Sources**: the census page, the certificate, the journal, the photograph, the headstone, the recording of an aunt telling the story she was told — preserved once and connected to everyone they mention.
-- **Claims** with their receipts: what each source actually says, how sure we are, and where sources disagree.
-- **Places** and the **historical context** around a life, kept clearly apart from evidence about the person.
-- **Projects** that gather a piece of research work, and the **Questions** inside them — the open research problems — with the AI's plan, what was searched, what was found, and what was *not* found.
-- **Stories** made from all of the above, with a path back to the evidence when someone asks "how do we know that?"
+- **Not a family tree website.** FamilySearch and Ancestry are built around one tree and one answer per detail. Here the centre is the research — evidence, uncertainty, competing interpretations, questions and stories. FamilySearch stays the shared tree; this is the person's private research desk beside it.
+- **Not an AI on its own.** The AI's work is organized, sourced and connected, and survives the conversation, the subscription and a change of AI.
+- **Not a folder of scans.** Every file knows who and what it is about, what it says, and which claims and stories depend on it.
+- **Not an autonomous genealogy service.** It does not promise complete genealogy, archive access, unattended research, automatic import, infallible conclusions or automatic publishing.
 
-**The more the family's research grows here, the more useful it becomes.** Success means the person can return months later, possibly with a different AI, and continue without re-explaining the family. Their own memories, the original records, and what each AI found are all still there and still easy to tell apart.
-
-### Context that outlives the conversation
-
-A future, much more capable AI will be able to take the same records and notice what nobody saw the first time: that two "different" men are the same person under a spelling variant, that a witness at a baptism was actually a cousin, that a migration lines up with a famine in the home parish. That only works if the site kept more than conclusions. **Store generously; retrieve selectively.** Keep the original record, the exact wording, the transcription, who extracted which claim, the searches that came up empty, and why one interpretation currently leads. Give any AI a compact way to find the specific people, sources and questions it needs without loading the whole family into every request.
-
-### Who it is for and what makes it different
-
-Family History is for anyone doing family history over time: the experienced genealogist, the relative who inherited a box of photographs, the cousin trying to solve one brick wall, the parent who wants their children to know who came before, and the storyteller who wants a life to be understood without inventing it.
-
-- **From a family tree website** (FamilySearch, Ancestry): those are built around one tree and one answer per detail. Here the centre is the *research* — evidence, uncertainty, competing interpretations, questions and stories — and the tree is one view of it. FamilySearch stays the shared tree; this is the person's private research desk beside it.
-- **From an AI on its own:** the AI's work is organized, sourced and connected, and it survives the conversation, the subscription and a change of AI.
-- **From a folder of scans and documents:** every file knows who and what it is about, what it says, and which claims and stories depend on it.
-
----
+**Store generously; retrieve selectively.** Keep the original record, the exact wording, the transcription, who extracted which claim, the searches that came up empty, and why one interpretation currently leads — so a later, more capable AI can notice what nobody saw the first time. Give any AI a compact way to find the specific people, sources and questions it needs without loading the whole family into every request.
 
 ## The person, their AI, and the site
 
-Core owns this principle for the family. In Family History:
+- **The person** decides what to research, which conclusions to accept, what is shared or published, and which AI they use.
+- **Their AI** reads records, transcribes, compares evidence, proposes identities and relationships, researches context, plans research and drafts stories, using whatever abilities its client has.
+- **The site** stores, organizes, connects and shows what they save, and offers tools a connected AI can use. It has no AI of its own and does not research on its own.
 
-- **The person** decides what to research, which conclusions to accept, what is shared or published, and which AI they use. They may ask their AI to do anything in its own environment — search FamilySearch, read an archive, write to a cousin. The site does not police that conversation.
-- **Their AI** reads records, transcribes, compares evidence, proposes identities and relationships, researches historical context, plans research, and drafts stories, using whatever abilities its client has.
-- **The site** stores, organizes, connects and shows what the person and their AI save, and offers tools a connected AI can use. It has no AI of its own and does not research on its own. Its connection settings govern only its own records.
+**The site governs only its own boundary.** The person may discuss anything with their AI and ask it to do anything in its own environment — search FamilySearch, read an archive, write to a cousin. Family History does not monitor or police that. It decides only whether that AI may use Family History's tools and data. A refused tool call limits the product operation, never the conversation; a broad conversation never authorizes one private read or one change here.
 
-**Family History's extra rules,** because genealogy has real consequences for real families:
+**The site never acts in the outside world.** It does not contact relatives, archives, churches or record providers, buy, publish elsewhere, crawl in the background, or act on FamilySearch. It never stores FamilySearch, Ancestry, archive, browser or AI passwords, cookies or sessions, and inherits none of the AI's outside access. Only what is deliberately saved through its own tools becomes Family History data.
 
-1. **Evidence first.** An important claim without a source is visibly marked as unsourced. The AI may *propose* a claim, an identity match or a relationship; only the person accepts it as their conclusion.
-2. **Uncertainty stays visible.** Proposed, accepted, disputed and rejected are different states and look different. A correction never erases the trail that led to it.
-3. **Never silently merge people.** Two records that might be the same person stay separate until the person decides.
-4. **Context is setting, not proof.** "Cork was in famine in 1847" can enrich a story; it is not evidence that this family experienced it.
-5. **Living people are private by default.** Nothing about a living person, a private memory or an unresolved relative is ever shown publicly. Public stories pass a living-person check.
-6. **Human work is complete without an AI.** Everything an AI can save, the person can add or correct by hand.
+**Human work is complete without an AI.** Everything an AI can save, the person can add, inspect, correct and organize by hand.
+
+## Family History's trust rules
+
+Genealogy has real consequences for real families. These hold everywhere in the product, for every person and every AI.
+
+1. **Evidence first.** An important claim without a source is visibly marked unsourced. A source reference alone does not prove a claim: show which detail the source supports, how directly, what conflicts, and who reviewed it.
+2. **Proposals are not conclusions.** An AI may *propose* a claim, identity match or relationship; only the person accepts it. Proposed, Accepted, Disputed and Rejected look different.
+3. **Never silently merge people.** Two records that might be the same person stay separate until the person decides. No AI can merge or split identities.
+4. **Keep the kinds of knowing apart.** Never flatten these into one undifferentiated truth: a record-supported fact, an exact quotation or transcription, the person's conclusion, a reasonable inference, historical context, family memory or lore, an AI suggestion or synthesis, and an unresolved contradiction.
+5. **Context is setting, not proof.** "Cork was in famine in 1847" can enrich a story; it is not evidence that this family experienced it. If a parish was central to local life, that does not prove the person attended it.
+6. **Corrections keep the trail.** Accepted claims can be superseded and names renormalized, but a correction is an attributed change, never a silent overwrite, and the path that led to the current understanding stays.
+7. **Living people are private by default** (see [Living people and private material](#living-people-and-private-material)).
+8. **Sharing and publishing are explicit acts**, never a side effect of import, AI use, a suggestion or a connection.
+9. **No guarantee of accuracy.** The product never claims genealogical certainty, legal rights, archival completeness or that research is finished.
 
 ---
 
 ## Trees: separate workspaces
 
-A person can keep **several trees**, each its own workspace, and switch between them the way you switch profiles (Scott, 6 October 2026). The reason is real use: researching your own family, helping a friend or relative with theirs, or a genealogist working for clients. Switching trees changes almost everything you see, so it is a deliberate move, not a filter.
+A person can keep **several trees**, each its own workspace, switched like a profile — for their own family, a friend's or relative's, or a genealogist's clients. Switching is a deliberate move, not a filter.
 
 - **Inside a tree:** People, Relationships, Events, Claims, Sources and their files, the Places used, Projects and Questions, Stories, Notes, Research and Lists. Nothing in one tree appears in another.
-- **Across all trees (account level):** Resources (websites, software and other research tools), Preferences, Instructions, the AI connection, and the Queue (each Queue item names its tree). **Proposed:** Topics also sit at account level, because a war or a migration is useful context in any tree; a Topic's connections to people stay inside their tree.
-- **Your AI** works in the active tree by default, can list trees and switch to one by name, and never mixes records between trees.
-- **Later:** copying a person from one tree to another, and handing a finished tree to the family it belongs to (this rides on sharing, which is not in the first builds).
+- **Across all trees (account level):** Resources (websites, software and other research tools), Preferences, Instructions, the AI connection and the Queue (each Queue item names its tree). Whether Topics sit at account level or in each tree is an open owner question.
+- **The AI** works in the active tree by default, switches only when the person asks or names a tree, and never mixes records between trees.
 
-## The building blocks at a glance
+## Building blocks
 
-A **building block** is a named kind of information the person and their AI can save, connect and revisit. The Core Site Guide requires each one to say whether it gets a collection page, a detail page, or a section inside another record. The current database already holds most of the genealogy blocks in a person-centred, FamilySearch-shaped form; several family-standard blocks do not exist yet. The **Today** column says which.
+A **building block** is a named kind of information the person and their AI can save, connect and revisit. Each has a stable link and a place to inspect and correct it.
 
-### Main building blocks
+### Main blocks
 
-| Building block | What it is | Pages | Today |
-| --- | --- | --- | --- |
-| **Person** | Someone who lived or lives. Names over time (birth, married, anglicized, nicknames), sex, living or deceased, life summary, identifiers such as a FamilySearch ID. A person can be a family member, a witness, a neighbour, or someone whose identity is still uncertain. | People collection · Person page | Partial — table and pages exist |
-| **Source** | Anything that tells us something: a record, document, photograph, letter, journal, headstone, book, newspaper item, recording, or a family memory written down. Holds the original file(s), where it came from, a citation, a transcription, rights and privacy. One source connects to every person, place and event it mentions. | Sources collection · Source page | Partial — sources, citations and media are separate tables |
-| **Place** | A location as it was known at the time: country, county, parish, town, address, cemetery, church, school, farm, ship, mine. Places nest (a parish inside a county) and their names and borders change over time. | Places collection · Place page | Partial |
-| **Project** | A piece of research work with a purpose: *Trace the Scottish line*, *Prepare for the reunion*, a client's request. Holds Questions, and gathers the Research, Sources, Lists and Stories that belong to the work. | Projects collection · Project page | To build |
-| **Question** | An open research problem: *Who were Mary Kelly's parents? Where did the family live before 1880? Is this the same John Smith?* The specific research unit inside a Project (or standing alone) — it holds the AI's plan, the research log (what was searched, what was found and *not* found), the Research produced, and the conclusion when it is answered. Big questions can hold smaller ones. | Questions collection · Question page | Partial — research tasks/checks exist with different vocabulary |
-| **Story** | Something the person and their AI write to be read: a life sketch, a migration story, a day in the life, a family narrative, a story about a place or a war. Every version records who wrote it and what was asked for; details can link back to their claims and sources. Can be published after review. | Stories collection · Story page with editor | Partial — Story Writer and Story Studio exist |
-| **Topic** | A subject that connects many lives and is worth researching once: a war, a migration, a famine, a religious movement, an occupation, a community, a ship. Historical context research attaches here and to Places, so it is reused across every ancestor it touches. | Topics collection · Topic page | Partial — context items and place/era packs exist |
+| Block | What it is |
+| --- | --- |
+| **Person** | Someone who lived or lives: names over time (birth, married, anglicized, nicknames), sex, living or deceased, life summary, identifiers such as a FamilySearch ID. Can be a family member, a witness, a neighbour, or someone whose identity is still uncertain. |
+| **Source** | Anything that tells us something: a record, document, photograph, letter, journal, headstone, book, newspaper item, recording, or a family memory written down. Holds the original file(s), where it came from, a citation, a transcription, rights and privacy. Preserved once and connected to every person, place and event it mentions — never owned by one profile. |
+| **Place** | A location as it was known at the time — country, county, parish, town, address, cemetery, church, school, farm, ship, mine. Places nest and their names and borders change over time. Buildings and institutions are places too. |
+| **Project** | A piece of research work with a purpose (*Trace the Scottish line*, *Prepare for the reunion*, a client's request). Holds Questions and gathers the Research, Sources, Lists and Stories for the work. A scope for work, never permission to merge what is inside it. |
+| **Question** | An open research problem (*Who were Mary Kelly's parents? Is this the same John Smith?*), inside a Project or standing alone. Holds the AI's plan, the research log (searched, found, *not* found), the Research produced, and the conclusion with its reasoning when answered. Questions can nest and can stay open for years without blocking other work. |
+| **Story** | Something written to be read: a life sketch, migration story, day in the life, family narrative, a story about a place or a war. Every version records who wrote it and what was asked for. |
+| **Topic** | A subject that connects many lives and is worth researching once: a war, a migration, a famine, a religious movement, an occupation, a community, a ship. Historical context attaches here and to Places, always labelled as context, with its own sources, confidence and time-and-place scope. |
 
-### Content written by the person or their AI
+### Who made it is never ambiguous
 
-Following the Scriptures split, which the family may adopt: **who made it** is never ambiguous.
-
-| Block | Who writes it | Where it shows |
-| --- | --- | --- |
-| **Note** | Only the person. Their own thinking, a reminder, a hunch, something they remember. | Attached to anything; Your work |
-| **Research** | Only their AI. A saved report: what it looked at, what it found, what it did not find, its reasoning, sources, which AI, and the Preferences it followed. | Attached to what it is about; Your work; Library Research shelf |
-| **Story** | Made together; every version says who wrote it. | Stories |
+| Block | Who writes it |
+| --- | --- |
+| **Note** | Only the person: their thinking, a reminder, a hunch, something they remember. |
+| **Research** | Only their AI: a saved report of what it looked at, found and did not find, its reasoning, sources, which AI, and the Preferences it followed. |
+| **Story** | Made together; every version says who wrote it. |
 
 ### Supporting records
 
-These make the main pages work. Each has a stable link and a place to inspect and correct it, but no main-menu destination.
-
-- **Relationship.** A link between two people — biological, adoptive, step, foster, guardian, spouse, partner, household, godparent, witness, neighbour, employer — with dates, its evidence, confidence and state. Shown on both Person pages and in the Tree; opens to its own small page because relationships get disputed (*is this really her father?*).
-- **Claim**. One statement a source makes about a subject: *born about 1842 in County Cork* — the exact original wording, the normalized value, the source and citation that support or contradict it, primary/secondary/family-lore, confidence, state (**Proposed · Accepted · Disputed · Rejected**), and who added or accepted it. Shown on the Person page's Claims section with conflicts side by side.
-- **Event.** Something that happened — birth, baptism, marriage, census, migration, military service, death, burial — with a date that may be exact, approximate or a range, a place, and participants in roles (child, parent, witness, officiant, head of household). Shown on Person pages, timelines and maps.
-- **Citation.** Exactly where in a source a claim is found: page, line, image number, entry.
-- **File.** An uploaded original (photo, scan, PDF, audio, video) and what is made from it (display sizes, transcript). Stored once, inside a Source (a Source can hold several files, such as the front and back of a photo), and connected to everything it matters to. A Person's portrait is a crop of a Source image chosen for that person. See [Media](#media-in-family-history).
-- **Possible match.** Two people the person or their AI suspects are the same, with the evidence, waiting for the person's decision. (Today: provisional relatives and merge review.)
-- **Import.** One FamilySearch capture or other import: what arrived, what was matched, warnings, and its review state.
-- **External identifier.** A FamilySearch ID, Find a Grave ID, or other link to the same person or record elsewhere.
-- **Version and request.** Saved versions of Research and Stories, each with its author and the request behind it.
-- **Plan item.** One step in a Question's plan: what to search, in what order, who is doing it, and what happened.
-- **Connection.** Any other link between two things (see below).
+- **Relationship** — a link between two people (biological, adoptive, step, foster, guardian, spouse, partner, household, godparent, witness, neighbour, employer) with dates, evidence, confidence and state. Relationships get disputed, so each has its own small page. A provisional relative is research material, not an accepted identity.
+- **Claim** — one statement a source makes about a subject: the exact original wording, the normalized value, the sources and citations that support or contradict it, primary / secondary / derivative / family lore, confidence, state (**Proposed · Accepted · Disputed · Rejected**), who added or accepted it, and why it currently leads. The interface and the AI tools say **Claim**, never "Fact". A Person's birth date is the currently accepted Claim; the others stay visible beside it.
+- **Event** — something that happened (birth, baptism, marriage, census, migration, military service, death, burial) with a date that may be exact, approximate, inferred, disputed or a range, a place, and participants in roles.
+- **Citation** — exactly where in a source a claim is found: page, line, image number, entry.
+- **File** — an uploaded original and what is derived from it (see [Media](#media)).
+- **Possible match** — two people suspected to be the same, with the evidence for and against, waiting for the person's *same person*, *different people* or *not sure yet*.
+- **Import** — one FamilySearch capture or other import: what arrived, what was matched, warnings, and its review state.
+- **External identifier** — a FamilySearch ID, Find a Grave ID or other link to the same person or record elsewhere.
+- **Version and request** — saved versions of Research and Stories, each with its author and the request behind it.
+- **Plan item** — one step in a Question's plan: what to search, in what order, who is doing it, what happened.
+- **Connection** — any other link between two things (below).
 
 ### Shared family blocks, in Family History
 
-- **Lists** — the person's own gatherings: *Ancestors missing a birth record · Graves to photograph · Records to order · Photos to identify · Cousins to interview · Brick walls*. Entries point at real records; one person can be on many Lists.
-- **Library** — the small go-to shelf, ordered **Research · Sources · Instructions**, plus a **Stories** shelf (Core allows Family History this extra shelf). The Sources shelf is a flag on the Sources the person returns to most — the family Bible, a grandfather's journal, a county history — not a copy of every source.
-- **Queue** and **AI Suggestions** — see [shared pages](#shared-pages-expressed-in-family-history).
-- **Preferences** — how the person wants help: research depth, citation style, whether to prefer original records over indexes, which family lines matter most, tone for stories, what to do about living relatives.
+- **Lists** — the person's own gatherings (*Ancestors missing a birth record · Graves to photograph · Photos to identify · Brick walls*). Entries point at real records; one person can be on many Lists.
+- **Library** — shelves **Research · Sources · Instructions · Stories**. The Sources shelf is a flag on the sources the person returns to most (the family Bible, a grandfather's journal), not a copy of every source.
+- **Preferences** — how the person wants help: research depth, citation style, original records over indexes, which lines matter most, story tone, what to do about living relatives. Preferences guide; they never grant permission.
+- **Queue** and **AI Suggestions** — see [The Queue](#the-queue).
 
 ## How the blocks fit together
 
-**Person, Relationship, Event, Place — the family picture.** People are connected by Relationships and appear in Events at Places. The **Tree**, **Timeline** and **Map** are views of these records, not separate data. Start small: one person and one known relationship is already useful (live today, see 2.1.0).
+**Person, Relationship, Event, Place — the family picture.** The Tree, Timeline and Map are views over these records, not separate data. The friendliest start is one person and one known relationship; imports and the AI's research are accelerators into that picture, never a required shape.
 
-**Source → Claim → Person — the evidence chain.** A Source is preserved once. Claims extracted from it each name their subject (a person, relationship or event) and their citation. A Person's birth date on their page is the currently accepted Claim, and the page can always show the others: *Census 1851 says about 1842; headstone says 1840; family memory says 1843 — 1842 leads because…*. This is the site's most important difference from a tree website.
+**Source → Claim → Person — the evidence chain.** A Source is preserved once. Claims extracted from it each name their subject and citation. A page can always show the alternatives: *Census 1851 says about 1842; headstone says 1840; family memory says 1843 — 1842 leads because…*. This is the site's most important difference from a tree website.
 
-**Project → Question → Plan → Research → Conclusion — the research loop.** A Project gathers a piece of work and holds its Questions. A Question names the problem and the people, places or sources it concerns. The AI writes a Plan (which records, in what order). Each piece of work becomes Research with its sources — including negative results, which genealogists value because they stop the next AI repeating a dead end. New Claims and Possible matches arrive as **Proposed** for the person to review. When answered, the Question holds the conclusion and the reasoning (a proof argument, in genealogy terms). A Question can also simply stay open for years.
+**Project → Question → Plan → Research → Conclusion — the research loop.** The AI writes a plan; each piece of work becomes Research with its sources, including negative results, which stop the next AI repeating a dead end. New Claims and Possible matches arrive as **Proposed**. When answered, the Question holds the conclusion and its reasoning.
 
-**Topic and Place — context reused.** Research about *the 1847 famine in Cork* or *coal mining in 1890s Pennsylvania* is saved once on the Topic or Place, then shown wherever a life touches it, always labelled as historical context.
+**Topic and Place — context reused.** Context about *the 1847 famine in Cork* is saved once on the Topic or Place, then shown wherever a life touches it, always labelled as historical context.
 
-**Story — the output that leads back.** A Story draws on accepted Claims, Sources, Notes and context. Its evidence links are an optional reader layer, not a required citation format. A story can reveal a weak link and open a new Question.
+**Story — the output that leads back.** A story draws on accepted Claims, Sources, Notes and context. It can reveal a weak link and open a new Question.
 
-**Where a starting thought lives.** A thing the person remembers is a **Note** (or, when recorded from a relative, a **Source** of kind *family memory*). A record they found is a **Source**. A piece of research work is a **Project**; a problem to solve inside it is a **Question**. A request for their AI is a **Queue item**. Something to gather is a **List**. Each links back to what it came from.
+**Where a starting thought lives.** Something the person remembers is a **Note**; a memory recorded from a relative is a **Source** of kind *family memory* that can support Claims labelled as family lore. A record they found is a **Source**. A piece of research work is a **Project**; a problem inside it is a **Question**. A request for their AI is a **Queue item**. Something to gather is a **List**.
 
-### Connections: the glue
+**Separate interpretations.** Shared evidence does not force one answer. Each researcher, or their AI acting for them, may hold a different interpretation of the same records with its own reasoning, confidence, sources and authorship. The product keeps them side by side rather than resolving the conflict silently.
 
-Most links have a home of their own: a Claim links a Source to a Person, a Relationship links two People, an Event links People to a Place. Everything else is a **Connection**: a photo of a building connected to the Place, a Topic connected to a Person, a Story connected to a Question, one Source that mentions another. A Connection holds its two ends, a kind (*about, mentions, depicts, answers, contradicts, same as?*), a short reason, who made it, and the Research it came from. **Photos are the commonest case.** A 1910 wedding photo is one Source (perhaps two files, front and the handwritten back). It is connected to each person *shown in* it, with an optional box marking each face, to the wedding Event, the church Place (*taken at*), and any Story or Project that uses it. It shows on every one of those pages and in the Sources gallery, but it is still one file, so a better scan or a correction updates it everywhere. The AI may suggest tags and connections; they arrive as suggestions the person accepts. Connections show on both ends and in "what's connected to this" on every page. The person can remove any of them; every AI-made batch can be reviewed or removed together.
+### Connections
 
-**When an AI finds many things at once.** Suppose the AI searches a parish register and finds 30 baptisms with the surname. That produces (1) **Research** describing the search, the criteria and what it left out; (2) a **List** of the 30 with the AI's reason for each; and (3) **Proposed** Claims or Possible matches only for the entries it believes belong to this family. The 30 do not go straight onto anyone's Person page.
+Most links have a home of their own: a Claim links a Source to a Person, a Relationship links two People, an Event links People to a Place. Everything else is a **Connection** — two ends, a kind (*about, mentions, depicts, answers, contradicts, same as?*), a short reason, who made it, and the Research it came from. Connections show on both ends; the person can remove any of them, and every AI-made batch can be reviewed or removed together.
 
----
+**Photos are the commonest case.** A wedding photo is one Source (perhaps two files: the front and the handwritten back), connected to each person shown in it (with an optional face box), the wedding Event, the church Place and any Story or Project that uses it. It appears on every one of those pages but is still one file, so a better scan or a correction updates it everywhere. AI-suggested tags and connections arrive as suggestions the person accepts.
 
-## Building blocks and their pages
-
-Every collection has **Table · Grid · List** views, search, sort and the Core's drill-down filter families; the AI's find tools use the same families. On a phone, collections become one-column lists with filters in a sheet, and detail pages keep their first screen for content.
-
-### People collection
-
-**Purpose:** find anyone fast and see where research is thin.
-**Shows:** name (with variants searchable), lifespan, birth and death places, living flag, portrait thumbnail, relationship to the person's home person, counts of sources and open questions, and a research-coverage signal (*no birth source*, *parents unknown*).
-**Filters:** surname, living/deceased, century, place, line (paternal/maternal of the home person), has open Questions, coverage gaps, added by (me, my AI, import).
-**Grid** shows portraits; **Table** is the default.
-
-### Person page — the life file
-
-The most visited page on the site. Leads with **identity and life summary**: name, lifespan, portrait, places, and a short accepted summary. Then tabs or sections:
-
-- **Overview** — family at a glance (parents, spouses, children, siblings), key events, open Questions, recent changes.
-- **Claims & evidence** — every Claim grouped by kind (birth, marriage, residence…), accepted value first, alternatives and conflicts beside it, each with its sources. Unsourced claims are marked. *Accept*, *dispute*, *add source* in place.
-- **Timeline** — the person's events in order, with optional historical context interleaved and clearly labelled.
-- **Sources & media** — everything about this person, photos first (this replaces today's "Memories" tab, which holds uploaded files).
-- **Research & notes** — the AI's Research and the person's Notes about this person, kept visibly apart.
-- **Stories** — stories about or mentioning them.
-- **History** — who changed what and when, including which AI.
-
-**Actions:** add relative, add claim, add source or photo, ask your AI (prefilled Queue item), start a Question, mark possible match, write a story.
-
-### Tree
-
-**Purpose:** see the family picture and move around it. Not a separate record — a view over People and Relationships.
-**Views:** pedigree (ancestors), descendants, family group (a couple and children), and later a fan chart. Proposed and disputed relationships draw differently from accepted ones. Clicking anyone opens their Person page or re-centres the tree. On a phone, a family-group card with swipe up to parents and down to children replaces a wide chart.
-
-### Sources collection
-
-**Purpose:** the family's archive, findable by what it is and who it mentions.
-**Shows:** title, kind (census, vital record, church record, military, immigration, newspaper, photograph, letter, journal, headstone, book, recording, family memory…), date, place, repository, people mentioned, review state, rights.
-**Filters:** kind, person mentioned, place, date, repository, has transcription, review state (unreviewed, reviewed), AI may read (yes/no), added by.
-**Grid** is the photo-and-document gallery.
-
-### Source page
-
-Leads with the **original**: image viewer with zoom for scans and photos, an audio player for recordings, the document for PDFs. Beside it: the **citation** (repository, collection, page, image), the **transcription** (and translation), and **what this source says** — its Claims, each linked to a person, with *propose a claim from this line*. Then everyone and everything it is connected to (people shown or mentioned, places, events, Projects, Stories), its review/rights/privacy status (private, reviewed, AI may read), where it came from (import, upload, AI), and its history.
-
-### Places collection and Place page
-
-**Collection** filters: kind (country, county, parish, town, address, cemetery, church, building, ship), inside which place, time period, has people.
-**Page:** the place's names over time and what it sat inside, a map, people and events there (by decade), Sources about it, historical context for each era with its own sources, Topics connected, and Stories set there.
-
-### Projects collection and Project page
-
-**Collection** filters: status (active, parked, done), subject person or line, place, who it is for (myself, a relative, a client), last worked.
-**Page:** the Project's purpose in the person's words, its Questions with their state, and the Research, Sources, Lists and Stories gathered for it. *Send to my AI* creates a Queue item linked to the Project.
-
-### Questions collection and Question page
-
-**Collection** filters: status (open, being worked, answered, parked), Project, subject person, place, kind (identity, relationship, origin, date, location, other), who is working on it, last worked.
-**Page:** the question in the person's words, its subjects, the current best answer and confidence, the AI's **Plan** with items and progress, the **research log** (searched, found, not found, by whom, when), linked Research, Proposed claims and Possible matches waiting for review, smaller Questions inside it, and the conclusion when answered. *Send to my AI* creates a Queue item linked to the Question.
-
-### Topics collection and Topic page
-
-**Collection** filters: kind (event, migration, religion, occupation, community, ship, institution), time period, place, has people.
-**Page:** a sourced overview written by the AI or the person, a timeline, the places and people it touches, Stories that use it, and its own Research. Always labelled historical context.
-
-### Stories collection and Story page
-
-**Collection** filters: subject (person, family, place, topic), kind (biography, day in the life, migration, family narrative, anecdote, research summary), state (draft, in review, published), written by.
-**Page:** reading view first; an editor beside it. Every version shows who wrote it and the request behind it. An optional evidence layer marks which lines rest on accepted claims, which on context, and which on family memory, each linking back. Review and publish follow the existing guarded path (living-person and privacy checks, explicit confirmation, unpublish).
-
-### Possible matches and Imports
-
-No main destination; reached from Home, People and the person page. **Possible matches** shows pairs side by side with the evidence for and against, with *same person*, *different people*, and *not sure yet*. **Imports** shows each FamilySearch capture, what was added or matched, warnings, and the review queue it created.
+**When an AI finds many things at once** — say 30 baptisms with the surname in a parish register — it saves (1) **Research** describing the search, criteria and what it left out; (2) a **List** of the 30 with its reason for each; and (3) **Proposed** Claims or Possible matches only for entries it believes belong to this family. The 30 never go straight onto anyone's Person page.
 
 ---
 
-## Shared pages, expressed in Family History
+## Living people and private material
 
-Family History uses the Core Site Guide's shared pages. What changes here is the content and examples:
+Privacy is a quiet boundary, not the product's headline: historical research mostly uses public records about people long dead. But living people and private family material need deliberate control.
 
-- **Public Home** — the promise in family-history words, a real example that connects a short answer to the records behind it (with a contradiction kept visible), FAQ, an early invitation to connect an AI, Ideas and Usage, and the family strip. Uses synthetic, clearly labelled example families only.
-- **Signed-in Home** — the Queue composer first, then: what needs review (proposed claims, possible matches, unreviewed uploads), Questions recently worked, people recently changed, and a way back into whatever the person was last doing. For a new account, the friendly start: *add yourself or one ancestor and one relationship*.
-- **Ideas and Usage** (`/ideas-and-usage`) — concrete ways to use it: *break a brick wall*, *turn a box of photos into an archive*, *prepare for a trip to the ancestral village*, *interview a grandparent*, *check a FamilySearch tree against the records*, *write a life sketch for a reunion*, *come back with a different AI*.
-- **Queue** (`/queue`) and **Queue item** — composer first; the words alone are enough. "Add context" offers the three Family History groups the philosophy already defines: **who or where** (person, relationship, place, topic), **evidence** (source, claim, photo), and **work** (project, question, story, list). Uses the family lifecycle and order: **Waiting on AI · AI working · Needs your input · Answered · Everything**, with *Needs your input* as a flag.
-- **AI Suggestions** — where the AI parks ideas the person did not ask for: *these two Johns may be one person*, *this 1880 census may show the family*, *nobody has looked for a burial record*. Accepting one creates a Queue item.
-- **Lists** (`/lists`) — as above.
-- **Library** (`/library`) — **Research · Sources · Instructions · Stories**. Public Instructions are the curated research prompts and loops the philosophy already approved (*make a research plan for an ancestor*, *compare evidence for a same-person hypothesis*, *research place and era context*, *draft interview questions for a relative*, *transcribe and translate a record*).
-- **Your work** (`/work`) — the person's Notes, the AI's Research and Stories in one place, with *made by* always visible.
-- **Connect your AI** (`/settings/ai`), **Preferences** (`/preferences`) and **For your AI** (`/ai`, `/ai.txt`) — three linked pages with different jobs.
-- **Your stats** (`/me`) — people, sources, files and storage, Questions answered, what each connected AI read and saved.
-- **Updates** (`/updates`), **Search** (`/search` — names with spelling variants, places, sources, everything the person owns), **Support** (the Assist With Life desk), and account controls (`/settings/data` export and delete, `/delete-account`).
-- **Admin** (`/admin`, owner and admins) — Overview, Accounts (roles, Pro), AI activity (clients, tools, errors), Storage (bytes by account, files awaiting processing), and Public content (public Instructions, published stories). Admin sees counts and metadata, never the content of anyone's family records.
+- **Private by default** covers living people, private notes, correspondence, recent addresses, contributor details, restricted media, sensitive relationships, oral histories and unreviewed family claims. Private does not mean hidden from the owner's own workspace.
+- **Records about living people and private memories stay unreadable to the AI until the person has reviewed them.**
+- **Never infer death from age.** Deceased status comes from the person's explicit statement or supporting evidence, with its provenance visible.
+- **Private, AI-readable and public are separate states.** Something may be visible to the owner but not to the AI; readable by the AI but never public. Public historical context never makes linked family details public. A deceased label never makes linked living relatives, private notes or sensitive relationships shareable.
+- **Public stories pass a living-person and privacy check**, explicit human confirmation, and can be unpublished. Publishing one story never exposes the people, sources, notes or tree around it.
+- **Sharing.** The only sharing is guarded public-story publishing. Any wider sharing is per tree, never a whole account; uses the family access words (Private, Unlisted, Trusted, Public); is explicit, previewable, revocable and attributed; and never broadens linked records.
+- **Admin sees counts and metadata, never the content of anyone's family records.**
+- **Marketing and examples use synthetic, clearly labelled families only** — never private data, real credentials or unresolved living-person material.
+- **Identity is site-specific.** Signing in to or deleting a Family History account never signs a person into, deletes from, or moves data through another Assist site.
+- **The person owns their data**: they can view and correct it, export it in a useful form, and delete records and their account. Deleting a record removes its attachments and content-bearing history.
 
-### Pages and routes (target)
+## Stories
 
-Family History's signed-in pages currently live under `/app/...`. The Core URL map puts collections at the top level (`/people/...`, `/queue`, `/me`). This guide targets the Core map; old `/app/...` addresses redirect permanently.
+Storytelling is a primary capability, not a decorative export. The author — the person or their AI — stays in control of voice, structure and imagination; the product does not require a citation on every sentence.
 
-| Page | Target route | Today |
-| --- | --- | --- |
-| Public Home · Updates · For your AI | `/` · `/updates` · `/ai`, `/ai.txt` | Built |
-| Ideas and Usage · FAQ | `/ideas-and-usage` · on `/` | FAQ built on Home; Ideas and Usage to build |
-| Signed-in Home | `/home` | Partial (`/app`) |
-| People · Person | `/people` · `/people/[id]` | Partial (`/app/people`) |
-| Tree | `/tree` (`?root=`) | To build |
-| Sources · Source | `/sources` · `/sources/[id]` | Partial (`/app/source-docs`, media on person pages) |
-| Places · Place | `/places` · `/places/[id]` | Partial (`/app/places`) |
-| Trees (switcher) | `/trees` | To build |
-| Projects · Project | `/projects` · `/projects/[id]` | To build |
-| Questions · Question | `/questions` · `/questions/[id]` | Partial (`/app/research`, `/app/operations`) |
-| Topics · Topic | `/topics` · `/topics/[id]` | To build |
-| Stories · Story | `/stories` · `/stories/[id]` | Partial (`/app/stories`, `/app/story-writer`; public `/stories`) |
-| Timeline · Map | `/timeline` · `/map` | Timeline placeholder; Map to build |
-| Possible matches · Imports | `/matches` · `/imports` | Partial (`/app/imports`, operations) |
-| Lists · List | `/lists` · `/lists/[id]` | To build |
-| Your work · Note · Research | `/work` · `/notes/[id]` · `/research/[id]` | To build |
-| Library | `/library` | To build |
-| Queue · Queue item · AI Suggestions | `/queue` · `/queue/[id]` · `/queue/suggestions` | Partial (`/app/queue`) |
-| Preferences · Connect your AI | `/preferences` · `/settings/ai` | Connect built (`/app/settings/ai`); Preferences to build |
-| Your stats · Search · Support | `/me` · `/search` · Life support desk | Support link built; others to build |
-| Export and delete | `/settings/data` · `/delete-account` | To build |
-| Admin | `/admin`, `/admin/accounts`, `/admin/ai`, `/admin/storage`, `/admin/content` | To build |
+- **The evidence layer is optional.** A passage *may* link to people, relationships, sources, events, places, claims, uncertainty notes and labelled context. The story stands on its own; a curious reader can open what lies behind a passage. Writers may link densely, lightly or not at all.
+- **Context stays distinguishable from evidence** in the reader layer, and story language should make that difference clear without turning every paragraph into a disclaimer.
+- **Corrections flow through.** A corrected claim updates the reader layer without erasing earlier versions or the research trail.
+- **Every version records who wrote it and what was asked for.** Review and publication follow the guarded path above.
 
-## Navigation
+## Media
 
-- **Tree switcher:** the active tree's name sits at the top of every signed-in page and opens the list of trees; switching is deliberate and the whole site changes with it.
-- **Phone:** a bottom bar of **People · Sources · Queue (raised, centre) · Library · Menu**. Tree opens from People and from every Person page. Menu holds Home, Tree, Places, Projects, Questions, Topics, Stories, Lists, Your work, AI Suggestions, Ideas and Usage, Your stats, Preferences, Updates and sign-out. A quick *add a memory or photo* button is reachable from most pages.
-- **Larger screens:** top or side navigation (the person chooses; AWF-0051) with **Home · People · Tree · Sources · Places · Projects · Stories · Lists · Library · Queue**, Questions one level down under Projects, Topics one level down under Places, and AI Suggestions as a small dot beside Queue. Search and quick Queue entry are always within reach.
-- **Profile menu:** Core's sections — **Learn** (Ideas and Usage, Connect your AI, For your AI, What's new), **You** (account, Preferences, Your stats, Export and delete), appearance (theme, navigation), **Admin** for the owner, sign-out.
+Family history is media-heavy: scanned records, old photographs, certificates, letters, headstones, recorded interviews, sometimes film. The family media storage standard (linked from Core) owns how bytes are stored. In Family History:
+
+- **Every file belongs to a Source**, stored once and connected to everything it matters to. A portrait is a crop of a Source image chosen for that person. A photo uploaded with no context becomes a Source of kind *photograph* that can be described later.
+- **One upload path for everyone.** The person's uploads and the AI's uploads use the same private storage, the same display sizes and the same deletion.
+- **New uploads are private, unreviewed and not readable by the AI** until the person reviews them.
+- **Originals are never altered.** Display sizes, portrait crops, enhanced copies, transcripts and translations are derived files linked to the original. Capture time and location in a file are proposals the person reviews, handled under the standard's privacy rules.
+- **The AI reads the actual image, scan or audio** the person has allowed, not only its title, and never receives a raw storage link.
+- **Audio and video need a transcript** as a derived file; oral history matters more here than on most sites.
 
 ---
 
-## Tools for the person's AI
+## The Queue
 
-The site's `/mcp` server is how a connected AI reads and saves. The [family MCP and OAuth standard](#documents-that-help-build-family-history) owns the connection rules; this section maps the tools to Family History's blocks. Tool names start `family_history_`. Tools return record identifiers and links so the AI can continue an existing record, tolerate a repeated request without duplicating, and attribute everything to the AI that did it.
+The Queue is how the person hands work to their AI. Family History follows the family Queue in Core; what is specific here:
 
-What the AI should be able to do, by job (current coverage in [Where Family History stands](#where-family-history-stands-6-october-2026)):
+- **The directive is enough.** The person's words alone create an item. "Add context" is optional and offers three Family History groups: **who or where** (person, relationship, place, topic), **evidence** (source, claim, photo) and **work** (project, question, story, list).
+- **Lifecycle and order** follow Core: **Waiting on AI · AI working · Needs your input · Answered · Everything**, with *Needs your input* as a flag. Record states — proposed, disputed, needs review, publishable — are never Queue states.
+- **A directive never widens authority.** It cannot give the AI access to a person or source it may not read, or authorize a new objective, deletion, an identity merge, accepting a disputed claim or publishing. When something only the person can supply is missing, the item asks the smallest exact question.
+- **Priority is the person's.** The AI never sets it.
+- **AI Suggestions** are where the AI parks ideas the person did not ask for (*these two Johns may be one person*, *nobody has looked for a burial record*). Accepting one creates a Queue item.
+- **The Queue is not the build tracker** (`docs/tracker/`) and not a research-task list; it carries a person's directives inside the product.
 
-1. **Get oriented** — the active tree and the list of trees, then that tree's overview: counts, the home person, recent work, open Questions, what is waiting for review, the person's Preferences, and the Library catalogue.
-2. **Find** — people (with name variants and lifespan), sources, places, projects, questions, topics, stories, lists, using the same filter families as the pages.
+## The AI connection and tools
+
+The site's `/mcp` server is how a connected AI reads and saves. The family MCP and OAuth standard (linked from Core) owns the connection rules. Tool names start `family_history_`; tools return record identifiers and links so the AI can continue an existing record, tolerate a repeated request without duplicating, and attribute everything to the AI that did it.
+
+**Connecting.** Signing in and clicking Allow is the approval. A new connection gets every current and future tool with no end date. The person may deliberately choose fewer permissions or an end date in AI Connections, and signing in again never undoes those choices. Full access is resolved against the current catalogue, not frozen on the day of connection. Review, evidence privacy and publishing gates still apply to every call.
+
+**No AI can ever** accept its own proposals, merge or split people, publish, share or change access, permanently delete, archive or restore, export the tree, act on FamilySearch or any outside provider, or touch billing. **No AI ever sees** another owner's records, raw storage links, provider credentials or raw database access. These are not grantable.
+
+What the AI must be able to do, by job:
+
+1. **Get oriented** — the active tree and the list of trees, then the tree's overview: counts, the home person, recent work, open Questions, what is waiting for review, Preferences and the Library catalogue.
+2. **Find** — people (with name variants and lifespan), sources, places, projects, questions, topics, stories and lists, with the same filter families the pages use.
 3. **Read** — one record with its connected context in manageable amounts: a person with claims, relationships, events and sources; a source with its file, transcription and claims; a question with its plan and log.
-4. **Look at the evidence** — receive the actual image, scan or audio the person has allowed AI to read, not only its title.
-5. **Save** — new people, relationships, events, places, sources (with files), connections and photo tags as suggestions, proposed claims, possible matches, research reports, projects, plans and log entries, topics, stories and story versions, notes the person dictates, lists — in batches with per-item results.
-6. **Work the Queue** — pick up, report progress, ask the person a question, answer, and add attributed follow-ups; park unsolicited ideas in AI Suggestions.
-7. **Switch trees** — only when the person asks or names a tree; every save lands in the active tree.
-8. **Never** — accept its own proposals, merge people, publish, share, delete, or act as the person on FamilySearch. Those stay the person's.
+4. **Look at the evidence** — the actual image, scan or audio the person allows.
+5. **Save** — people, relationships, events, places, sources with files, connections and photo tags as suggestions, proposed claims, possible matches, research, projects, plans and log entries, topics, stories and versions, notes the person dictates, and lists — in batches with per-item results.
+6. **Work the Queue** — pick up, report progress, ask the person a question, answer, add attributed follow-ups, and park unrequested ideas in AI Suggestions.
+7. **Switch trees** — only when the person asks or names a tree.
 
-**Connecting.** Signing in and clicking Allow is the approval, as on every Assist site; Settings only narrows. The limits above can never be granted to an AI, and records about living people and private memories stay unreadable to the AI until the person has reviewed them (Scott, 6 October 2026).
+## Language
 
----
-
-## Media in Family History
-
-Family history is media-heavy: scanned records, old photographs, certificates, letters, headstones, recorded interviews, sometimes film. The family [media storage standard](#documents-that-help-build-family-history) owns how bytes are stored (Backblaze B2, private by default, exact versions, display sizes made at upload, the person's AI can read the photos). In Family History:
-
-- **Every file belongs to a Source**, stored once and connected to every person, place, event, Project and Story it matters to. A portrait is a crop chosen from a Source image. Uploading a photo with no context creates a Source of kind *photograph* that can be described later.
-- **One upload path for everyone.** The person's uploads and the AI's uploads use the same private B2 path, with the same display sizes and the same deletion.
-- **Private, unreviewed and AI-not-allowed until the person says otherwise** is today's live behaviour for evidence uploads. This guide recommends keeping *private* as the default but letting the person's own Preferences decide whether newly uploaded files are readable by their AI immediately — still an open recommendation.
-- **Originals are never altered.** Display sizes, crops for portraits, enhanced copies, transcripts and translations are derived files linked to the original.
-- **Phone first for capture:** a photo of a headstone or a page in a relative's album, straight from the camera, any size, including iPhone HEIC; location data handled under the standard's privacy rules.
-- **Audio and video** matter here more than on most sites (oral history). They are part of the standard's later classes and need a transcript as a derived file.
+- Say **your AI** for the AI the person chooses; avoid "agent" in user-facing copy. Family History is the workspace, never the AI itself.
+- Prefer **person, family, relationship, place, event, source, claim, question, context, story** over data-model terms; **where this came from** or **research trail** over "provenance" for general readers.
+- Label the actual state: **source-backed**, **inferred**, **disputed**, **family lore**, **historical context**. Distinguish original, transcription, extraction, conclusion, synthesis and narrative.
+- Describe hypotheses and separate interpretations as legitimate research states, not errors to hide.
+- Never say "the AI knows your family", "automatic genealogy", "searches every archive", "imports everything", "proves your ancestry", "writes the true story", "works with any AI", "connects all your accounts" or "publishes for you".
+- Name an AI client only to illustrate choice, never to imply a supported integration unless that client has been proven against production.
+- The product is **Assist With Family History**, or **Family History** where shorter is clearer. "Discover Their Stories" is a retired name, kept only in historical records and required technical identifiers.
+- The voice is calm, curious, humane and specific. It invites correction without scolding and never makes private-family safeguards the emotional headline. The visual character — a serious research folio, not a SaaS dashboard or chatbot — is set in the [Family Folio design system](../design/family-folio-system.md).
 
 ---
 
-## Look and feel
+## For the person and their AI: defaults we set
 
-The Project Philosophy's [design character](assist-with-family-history-project-philosophy.md#distinctive-design-and-interaction-character) stands: a serious, generous research folio — parchment surfaces, map and compass cues, margin notes, source marks, restrained teal and rust, and a visible thread from clue to evidence to story. Dense where comparison needs it, calm everywhere else; first-class light and dark; one-handed at 320px. Family History has no Claude Design prototype yet (AWF-0051 notes it was absent from the design project in September); the September 5 family brand assets are installed.
+This section is guidance for end users and the AI they connect — what `/ai`, `/ai.txt`, the Library Instructions and the tool descriptions should teach. These are defaults; the person's own Preferences and instructions win wherever the trust rules allow.
 
----
-
-<a id="decisions-scott-needs-to-make"></a>
-
-## Decisions
-
-Dated decisions Scott has made that builders must follow. The questions, their options and the recommendations behind them are in [`site-guide-content.json`](site-guide-content.json).
-
-| Date | Decision |
-| --- | --- |
-| 6 Oct 2026 | This Site Guide is canonical. The Project Philosophy is kept as the reference for trust boundaries, language rules and capability-evidence history. |
-| 6 Oct 2026 | **Projects and Questions.** A Project gathers a piece of research work and holds Questions; Questions remain the specific research unit and can nest. |
-| 6 Oct 2026 | **Claims**, not Facts, in the interface and the AI tools. A Claim is one source-backed statement with the states Proposed, Accepted, Disputed and Rejected. |
-| 6 Oct 2026 | **Several trees.** Each tree is a separate workspace the person switches into, like a profile. Resources, Preferences, Instructions, the AI connection and the Queue carry across trees. The AI works in the active tree and never mixes trees. See [Trees](#trees-separate-workspaces). |
-| 6 Oct 2026 | **Photos live inside Sources**, stored once, and are connectable to every person, place, event, Project and Story they matter to, with face tags and portrait crops. |
-| 6 Oct 2026 | **Family memories:** what the person remembers is a Note; a memory recorded from a relative is a Source of kind *family memory* that can support Claims labelled as family lore. The Person page's "Memories" tab becomes "Sources & media". |
-| 6 Oct 2026 | **Topics** are a main block for reusable historical context, always labelled as context. |
-| 6 Oct 2026 | **Connecting an AI:** signing in and clicking Allow is the approval; Settings only narrows. No AI can publish, delete, merge people or share, and living-person and private-memory records stay unreadable to the AI until reviewed. This supersedes the "keep a second approval" recommendation in [sibling lessons](sibling-lessons-2026-10-06.md). |
-| 6 Oct 2026 | **No new sharing in the first builds.** Guarded public-story publishing stays; Unlisted links and Trusted collaborators (AWF-0014/0015) come after the core blocks are in use, and will share one tree, never a whole account. |
+- **Start oriented.** Read the active tree's overview, the person's Preferences and the Library Instructions before researching. Work in the active tree; never mix trees.
+- **Search before creating.** Find the existing person, source or question and continue it rather than making a duplicate.
+- **Keep the original.** Save the source with its exact wording, citation and file before extracting claims from it. Preserve where it came from, when it was retrieved, and any transcription or translation as a derived item.
+- **Propose, don't decide.** Save claims, identity matches and relationships as Proposed with a confidence and a one-line reason. The person accepts.
+- **Record what was not found.** A search that came up empty is Research worth saving, with where and how it was searched.
+- **Label context as context.** Place-and-era research goes on the Topic or Place and is never written onto a person as fact.
+- **Many results → Research + List + a few proposals**, as described [above](#connections).
+- **Living people stay private.** Do not ask to read or include unreviewed living-person or private-memory records, and treat anything about the living as private in stories and summaries.
+- **Answer in chat, save as you go.** Batch saves into one call; say what was saved and link to it.
+- **Ask the smallest question.** When only the person can supply something, set *Needs your input* with one exact question rather than guessing.
+- **Prompts and research loops in the Library are optional starting points** — *make a research plan for an ancestor*, *compare evidence for a same-person hypothesis*, *research place and era context*, *draft interview questions for a relative*, *transcribe and translate a record*. Each carries its version, date, purpose and limits; the person or AI may edit, combine or ignore any of them. A prompt is one instruction; a loop is a repeatable pattern (gather, compare, record, find the next gap) run under the person's direction, never an autonomous engine.
+- **Outside the site, the person directs their AI.** Searching FamilySearch, writing to an archive or contacting a cousin happens in the AI's own environment under the person's instructions; Family History stores only what is deliberately saved back.
 
 ---
 
-## Where Family History stands (6 October 2026)
-
-This is a dated snapshot, not a live ledger. The tracker owns current work; the production site and dated receipts establish what works. Live version on assistwithfamilyhistory.com: **2.2.0** (17 August 2026). Since then the private evidence-media pipeline, the Backblaze storage proof and MCP hardening shipped (last on 3 September) without a new public release entry. Scott plans to start entering real family data next, which is why settling the building blocks now is cheap: changing the model before data exists is an edit, afterwards it is a migration.
-
-Three read-only audits were run on 6 October against the family standards as they stood that day: Core Site Guide proposal (24 Sep), Core Philosophy 1.14.x, MCP/OAuth standard 1.3.0 and media standard 1.8.0. Family History's own records still cite Core **1.6.3** (`tracker.json`) and media standard **1.4** (AWF-WO-012), so every family ruling since mid-August postdates its plans.
-
-### Bring Your AI (MCP and OAuth): strong engineering, not yet finished
-
-**What is solid and live:** a stateless `/mcp` on the 2026-07-28 protocol using the official SDK; 16 `family_history_` tools plus 12 older aliases from one catalogue; the connection is re-checked on every request, so revoking takes effect immediately; replay protection, batch saves and an all-or-nothing save; protected evidence reads that never hand out a storage link; a checksum-bound private image upload; Clerk OAuth with dynamic client registration; `/ai` and `/ai.txt` generated from the catalogue and checked for drift; a connection centre at `/app/settings/ai` to see, narrow and revoke.
-
-**What remains:**
-
-1. **Signing in is not yet the approval.** First contact creates a *pending* connection with no permissions, the AI sees an empty tool list, and every call returns `GRANT_REQUIRED` until the person ticks permissions in Settings. The family ruled on 1 September that **Allow completes setup**. This is decision 8 above.
-2. **No real AI client has ever connected.** The only live proofs are a disposable test client on 12–13 August. Claude, ChatGPT and Codex have never been run against production (AWF-0043).
-3. **Standard 1.3.0 conformance gaps (small):** `www.` machine paths redirect to the apex instead of answering directly; `offline_access` is not advertised and token renewal is untested; an identity-provider outage returns 401 (should be 503); the tools capability is not declared when the list is empty; `/llms.txt` is hand-written, names old tool aliases and is out of date; `/ai` lacks per-client steps and a "did it work?" check; no output schemas (AWF-WO-014).
-4. **Tool gaps against this guide's blocks:** search needs typed text (no browsing by surname, place, dates, living/deceased) and has no paging; one record per read; no tools for places, historical context, the research log or possible matches; the AI cannot add a Queue item for the person or file its own follow-ups; no AI Suggestions; no Library; uploads accept only JPEG, PNG and WebP and cannot be attached to a specific source.
-
-### Media: the AI's upload path is excellent; everything around it is unfinished
-
-**What is solid and live:** two encrypted, versioned Backblaze B2 buckets with bucket-scoped keys (proved with zero residue on 3 September); a same-origin upload relay; byte-exact originals plus three metadata-free display sizes (192, 1200, 2400) made at upload; capture time and GPS kept as proposals the person reviews; short-lived private delivery.
-
-**What remains:**
-
-1. **The person's own uploads do not use that path.** Uploads from the Person page's Memories tab still go to legacy Convex storage with no display sizes, served raw with location data intact, and anything over 2 MiB is refused to the AI.
-2. **Ordinary phone photos and scans probably fail.** Both upload routes pass the file through a Vercel function, which caps requests at about 4.5 MB, while the site advertises 25 MB. Not yet observed live; it is the first thing to check.
-3. **No deletion at all.** No way to delete a file, every version and its display sizes. Replacing a file on a B2 record leaves the old copy being served.
-4. **iPhone HEIC and TIFF scans** are stored raw; the AI path refuses them.
-5. **The AI cannot always see the photo:** only the 1200 px copy, no region crops or contact sheets for large sets, and plain `INTERNAL_ERROR` instead of the standard's error names.
-6. **No storage counting, no upload recovery** for a large batch, no camera capture or paste/drop, no PDF viewer or audio player (PDFs and audio show as broken images), no portraits, and no scans on source pages. The Memories tab is the only place media appears.
-
-### Pages and features
-
-| Area | State |
-| --- | --- |
-| Public Home, FAQ on Home, Updates, For your AI, Privacy | Built. Home lacks the family promise line, the person/AI/site explanation and Ideas and Usage link; `/features` and `/roadmap` still show "Coming soon", which the family ruled out on 20 August. |
-| People, Person page, Places, Imports | Built and working with real data; the Person page is the most mature page on the site. |
-| Queue | Built at `/app/queue` but with the retired four-state vocabulary, no archive, and no item page. |
-| Stories (Story Writer, Story Studio, public story) | Built, including the guarded publish path. |
-| Research Log, Research Queue (operations), Vault Audit | Built as earlier genealogy tools; overlap with the Queue and with the proposed Questions. |
-| Connect your AI | Built at `/app/settings/ai`. |
-| Sources, Source page, Relationships, Events, Tree, Map | Not built as pages; data exists inside Person pages. Timeline is a placeholder. |
-| Questions, Topics, Notes/Research split, Lists, Library, Preferences, AI Suggestions, Ideas and Usage | Not built. |
-| Your stats, Admin, Export and delete, Support source key, family strip, phone bottom bar, top/side navigation, dark mode, Table/Grid/List views | Not built (cards AWF-0010, 0016–0021, 0051). |
-| Leftovers to retire | `/app/settings` (old OpenRouter key), `/api/process`, `/app/source-docs/*` and their aliases, `/features/source-docs`, the API-key "API Center" (`/app/api`), the guest vault, `/roadmap`. |
-
-The work to close these gaps is proposed as Work Orders AWF-WO-015 to AWF-WO-019 in the [tracker](../tracker/GUIDE.md).
-
----
-
-## Documents that help build Family History
+## Related documents
 
 | Document | Use it for |
 | --- | --- |
-| [Project Philosophy](assist-with-family-history-project-philosophy.md) | Trust boundaries, language rules, capability evidence history |
-| Core Site Guide — `assistwithlife`, branch `codex/core-short-philosophy-proposal`, `planning/assist-with-sites-core-philosophy-short-proposal.md` | The shared pages every Assist site builds and the navigation pattern |
-| Full Core Philosophy — `assistwithlife/planning/assist-with-sites-core-philosophy.md` | Detailed family standards, URL map, Queue law, launch and tracker rules |
-| Bring Your AI MCP and OAuth standard — `assistwithlife/planning/bring-your-ai-mcp-oauth-standard.md`, with `mcp-site-guidance.md` and `mcp-connector-playbook.md` | Connection, grants, tool design, real-client proof |
-| Media storage standard — `assistwithlife/planning/assist-media-storage-standard.md`, with `media-storage-lessons-2026-09.md` | B2 storage, uploads, display sizes, AI reading photos, deletion |
-| Sibling guides — `assistwithscriptures/planning/site-guide.md`, `assistwithlanguages/docs/site-guide.html` | Worked examples of this document's shape |
-| [Tracker](../tracker/GUIDE.md) | Approved work, Cards and Work Orders |
-
-## Changelog
-
-- **Edition 2 · 6 October 2026** — Scott ruled on all nine building-block decisions and the guide became canonical. Added Projects (holding Questions), several trees as separate workspaces, Claims in place of Facts, photos connectable from inside Sources, family-memory Sources, Topics, sign-in as the AI approval, and no new sharing in the first builds. Decisions now follow the Scriptures shape: a dated table here, with the questions and options in `site-guide-content.json`.
-- **Draft edition 1 · 6 October 2026** — First Site Guide, written from the Project Philosophy 1.10.0, the Core Site Guide proposal (24 September), Core Philosophy 1.14.x, MCP/OAuth standard 1.3.0, media standard 1.8.0, the Scriptures (edition 9) and Languages (v1.1) guides, the current schema and routes, and 6 October audits of MCP, media and pages. Proposes the building-block model and nine decisions for Scott, and Work Orders AWF-WO-015 to AWF-WO-019.
-
-### 23 October 2026 — AI connection defaults (Scott, 22 October)
-
-Connecting an AI gives it every current and future tool with no end date by default.
-The person may deliberately choose fewer permissions or an end date in AI Connections;
-sign-in must never undo those choices. Full access is a durable choice, resolved against
-the current catalog, rather than a scope list frozen on the day of connection. Existing
-review, evidence privacy, publishing and other per-action safety gates still apply.
-Implementation and verification are separate from production delivery.
+| [Core Philosophy](https://github.com/scottjarvie/assistwithlife/blob/main/planning/assist-with-sites-core-philosophy.md) (Assist With Life) | Shared pages, URL map, Queue lifecycle, support, storage, launch, `/updates`, navigation and delivery rules for every Assist site; it links the family MCP/OAuth and media storage standards |
+| [Family Folio design system](../design/family-folio-system.md) | Visual character, components and page families |
+| [Ancestor data vault architecture](../product/ancestor-data-vault-philosophy-and-architecture.md) | Research-backed layered data model (originals, citations, mentions, candidate claims, conclusions, context graph); this guide's rules win where they differ |
+| [Tracker](../tracker/GUIDE.md) | Current work, Cards and Work Orders |

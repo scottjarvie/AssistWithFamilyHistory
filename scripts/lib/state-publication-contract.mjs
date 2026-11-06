@@ -4,7 +4,7 @@ const STATE_PATHS = [
   /^docs\/tracker\/GUIDE\.md$/,
   /^docs\/tracker\/(?:board|guide)\.html$/,
   /^docs\/tracker\/tracker\.json$/,
-  /^docs\/planning\/assist-with-family-history-project-philosophy\.(?:md|html)$/,
+  /^docs\/planning\/site-guide\.md$/,
 ];
 
 export const STATE_COMMIT_TRAILER = "skip-checks: true";
