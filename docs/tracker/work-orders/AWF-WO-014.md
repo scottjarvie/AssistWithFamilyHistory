@@ -1,13 +1,15 @@
 ---
 id: AWF-WO-014
 title: Lock the existing chosen-AI wire contracts and truth surfaces together
-execution: proposed
+execution: superseded
 audit: not-audited
 cards: AWF-0022, AWF-0050
 created: 2026-09-03
-updated: 2026-09-03
+updated: 2026-11-06
 proposed-by: Codex from the bounded MCP readiness audit
 ---
+
+**Closed 2026-11-06 — cleanup.** Execution superseded. Never approved; its contract-freeze work moved to AWF-0085.
 
 ## Goal
 
@@ -133,3 +135,5 @@ authorize a new capability or provider change.
   delta: product-owned transport conformance checks, output schemas, complete
   annotations, client-side issuer proof, and evidence-based legacy retention;
   no new tool or authority is proposed.
+
+2026-11-06 Claude: **Closed 2026-11-06 — cleanup.** Execution superseded. Never approved; its contract-freeze work moved to AWF-0085.

@@ -1,13 +1,15 @@
 ---
 id: AWF-WO-016
 title: Build the Family History pages from the Site Guide
-execution: proposed
+execution: superseded
 audit: not-audited
 cards: AWF-0053, AWF-0054, AWF-0055, AWF-0056, AWF-0057, AWF-0058, AWF-0059, AWF-0051, AWF-0020, AWF-0021
 created: 2026-10-06
-updated: 2026-10-06
+updated: 2026-11-06
 proposed-by: Claude (Opus 5.5) from Scott's site-guide and readiness request
 ---
+
+**Closed 2026-11-06 — cleanup.** Execution superseded. Never approved; its cards moved to AWF-0086 (blocks and views), AWF-0075 (Library) and AWF-0079 (shell, leftovers).
 
 ## Goal
 
@@ -74,3 +76,5 @@ None yet. Proposed on 2026-10-06; Scott approves scope before it becomes Ready.
 ## History
 
 - 2026-10-06: Proposed from the Site Guide draft and the MCP, media and page audits.
+
+2026-11-06 Claude: **Closed 2026-11-06 — cleanup.** Execution superseded. Never approved; its cards moved to AWF-0086 (blocks and views), AWF-0075 (Library) and AWF-0079 (shell, leftovers).
