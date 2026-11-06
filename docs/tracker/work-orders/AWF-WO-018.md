@@ -1,15 +1,17 @@
 ---
 id: AWF-WO-018
 title: Make media work the way family photos, scans and recordings need
-execution: active
+execution: superseded
 audit: not-audited
 cards: AWF-0065, AWF-0066, AWF-0067, AWF-0068, AWF-0048
 created: 2026-10-06
-updated: 2026-10-13
+updated: 2026-11-06
 approved-by: Scott Jarvie
 approval-evidence: "2026-10-13 project thread: large originals like pictures and whole books go to Backblaze; it's up to you to make sure this is all ready to go."
 proposed-by: Claude (Opus 5.5) from Scott's site-guide and readiness request
 ---
+
+**Closed 2026-11-06 — cleanup.** Execution superseded. The AI relay with PDF, TIFF, HEIC, audio and text landed; the remaining media work moved to AWF-0084.
 
 ## Goal
 
@@ -72,3 +74,5 @@ TIFF, HEIC/HEIF, audio and text originals (AWF-0065).
 ## History
 
 - 2026-10-06: Proposed from the Site Guide draft and the MCP, media and page audits.
+
+2026-11-06 Claude: **Closed 2026-11-06 — cleanup.** Execution superseded. The AI relay with PDF, TIFF, HEIC, audio and text landed; the remaining media work moved to AWF-0084.

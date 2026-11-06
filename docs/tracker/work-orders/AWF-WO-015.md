@@ -1,15 +1,17 @@
 ---
 id: AWF-WO-015
 title: Settle the building blocks before real family data goes in
-execution: active
+execution: superseded
 audit: not-audited
 cards: AWF-0052, AWF-0053, AWF-0054, AWF-0055, AWF-0057, AWF-0070
 created: 2026-10-06
-updated: 2026-10-13
+updated: 2026-11-06
 approved-by: Scott Jarvie
 approval-evidence: "2026-10-13 project thread: get the site ready to store every ancestor and all their data; it's up to you to make sure this is all ready to go."
 proposed-by: Claude (Opus 5.5) from Scott's site-guide and readiness request
 ---
+
+**Closed 2026-11-06 — cleanup.** Execution superseded. The original-record model (AWF-0070) and Site Guide decisions (AWF-0052) landed; the remaining blocks moved to AWF-0086.
 
 ## Goal
 
@@ -90,3 +92,5 @@ Preferences remain.
 - 2026-10-06: Proposed from the Site Guide draft and the MCP, media and page audits.
 - 2026-10-06: Scope updated for Scott's answers: trees, Projects, Claims, connected files.
 - 2026-10-13: Approved in the project thread and started with the original-record model (AWF-0070).
+
+2026-11-06 Claude: **Closed 2026-11-06 — cleanup.** Execution superseded. The original-record model (AWF-0070) and Site Guide decisions (AWF-0052) landed; the remaining blocks moved to AWF-0086.

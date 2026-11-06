@@ -1,14 +1,16 @@
 ---
 id: AWF-WO-012
 title: Carry private family evidence safely between the person and their chosen AI
-execution: active
+execution: complete
 audit: not-audited
 cards: AWF-0046, AWF-0047, AWF-0048
 created: 2026-08-30
-updated: 2026-09-03
+updated: 2026-11-06
 proposed-by: Codex
 proposal-evidence: current origin/main MCP, grants, protected evidence, private Convex upload, FamilySearch boundary, tracker, Project Philosophy, family media standard, connector playbook, and success-scenario reconciliation
 ---
+
+**Closed 2026-11-06 — cleanup.** Execution complete. The private B2 foundation and the AI evidence upload tools shipped and are deployed. Live proof and person uploads on B2 moved to AWF-0084.
 
 ## Goal
 
@@ -222,3 +224,5 @@ corresponding runtime and retained evidence exist.
   and reran it successfully. Exact bytes/hashes, reciprocal credential denial,
   exact-version deletion, and zero marked residue are now retained evidence;
   real upload/person-review/named-client proof remains.
+
+2026-11-06 Claude: **Closed 2026-11-06 — cleanup.** Execution complete. The private B2 foundation and the AI evidence upload tools shipped and are deployed. Live proof and person uploads on B2 moved to AWF-0084.

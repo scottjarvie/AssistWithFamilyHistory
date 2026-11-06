@@ -1,14 +1,16 @@
 ---
 id: AWF-WO-020
 title: Complete local Live and isolated record-only Sandbox
-execution: active
+execution: complete
 audit: not-audited
 cards: AWF-0069
 created: 2026-10-07
-updated: 2026-10-13
+updated: 2026-11-06
 approved-by: Scott Jarvie
 approval-evidence: "2026-10-07 owner chat: make a plan and keep going until it's complete, for every site in both local Live and Sandbox."
 ---
+
+**Closed 2026-11-06 — cleanup.** Execution complete. Local session bridge, launcher and record-only Sandbox tooling are on main (tests wired in PR #127); Local Live waits on enforcement in AWF-0080.
 
 ## Goal
 
@@ -51,3 +53,5 @@ Own browser sign-in and OS trust prompts if required. No secret disclosure in ch
 2026-10-07 Codex: prepared source only under direct owner authorization; coordinator owns runtime acceptance.
 
 2026-10-13 Claude: merged into main so local modes run from the normal checkout.
+
+2026-11-06 Claude: **Closed 2026-11-06 — cleanup.** Execution complete. Local session bridge, launcher and record-only Sandbox tooling are on main (tests wired in PR #127); Local Live waits on enforcement in AWF-0080.

@@ -1,16 +1,18 @@
 ---
 id: AWF-WO-011
 title: Let a person bring a chosen AI into bounded, reviewable Family History work
-execution: active
+execution: complete
 audit: not-audited
 cards: AWF-0034, AWF-0038, AWF-0040, AWF-0041, AWF-0042, AWF-0043, AWF-0045
 created: 2026-08-16
-updated: 2026-09-03
+updated: 2026-11-06
 proposed-by: Codex from Scott's Bring Your AI delegation
 approved-by: Scott
 approved-on: 2026-08-16
 approval-evidence: "Bring Your AI Implementation Program — August 2026 (assistwithlife planning/mcp-program-2026-08.md), Wave 2 Family History"
 ---
+
+**Closed 2026-11-06 — cleanup.** Execution complete. Grants, immediate revocation, DCR onboarding and evidence reads shipped. The named-client lifecycle run moved to AWF-0085; the opaque-token decision to AWF-0080.
 
 ## Goal
 
@@ -580,3 +582,5 @@ deployment received the ordinary codegen push and nothing else.
   the PR rather than in the Vercel build. Un-gated §0e of the provider runbook and
   made its dry-run pre-flight name its deployment explicitly. No provider, secret,
   environment, production-deployment, or real-data change.
+
+2026-11-06 Claude: **Closed 2026-11-06 — cleanup.** Execution complete. Grants, immediate revocation, DCR onboarding and evidence reads shipped. The named-client lifecycle run moved to AWF-0085; the opaque-token decision to AWF-0080.
