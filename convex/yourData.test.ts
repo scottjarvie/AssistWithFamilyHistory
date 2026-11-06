@@ -83,6 +83,16 @@ describe("your data", () => {
     expect(stats.ai.connectionsCapped).toBe(false);
   });
 
+  test("stats count one effective connection per client and issuer, not approval rows", async () => {
+    const t = convexTest(schema, modules);
+    await seedGrant(t, { vaultOwnerId: OWNER, clientId: "same-client", expiresAt: null });
+    await seedGrant(t, { vaultOwnerId: OWNER, clientId: "same-client", expiresAt: null });
+    await seedGrant(t, { vaultOwnerId: OWNER, clientId: "another-client", expiresAt: null });
+    await seedGrant(t, { vaultOwnerId: OWNER, clientId: "same-client", issuer: "https://other-issuer.example.test", expiresAt: null });
+    const stats = await t.query(internal.yourData.getYourStatsInternal, { vaultOwnerId: OWNER });
+    expect(stats.ai).toMatchObject({ activeConnections: 3, connectionsCapped: false });
+  });
+
   test("stats mark the connection count as partial when the recent list is full", async () => {
     const t = convexTest(schema, modules);
     for (let i = 0; i < 101; i++) {

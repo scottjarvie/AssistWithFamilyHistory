@@ -81,7 +81,9 @@ async function readYourStats(ctx: QueryCtx, owner: string) {
     stories: { count: stories.rows.length, more: stories.more, byStatus: tally(stories.rows, (row) => String(row.status)) },
     queue: { count: queue.rows.length, more: queue.more, byState: tally(queue.rows, (row) => String(row.state)) },
     ai: {
-      activeConnections: grants.connections.filter((row) => row.status === "active").length,
+      activeConnections: new Set(grants.connections
+        .filter((row) => row.status === "active")
+        .map((row) => JSON.stringify([row.clientId, row.issuer]))).size,
       connectionsCapped: grants.connections.length >= 100,
       savesLast30Days: recentAi.length,
       savesCapped: activity.more,
