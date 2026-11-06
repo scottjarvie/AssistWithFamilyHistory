@@ -28,6 +28,9 @@ paid checks for the moment a change is about to ship.
 1. **GitHub CI runs only on ready pull requests.** Drafts skip it. Marking a
    PR ready, pushing to a ready PR, or running the workflow by hand triggers it.
    A newer push cancels the older run.
+   Docs-only PRs (`docs/`, `.claude/`, top-level Markdown) pass the required
+   `build-and-smoke` check after a path check, without installing or verifying;
+   `eslint` ignores `docs/**` so archived scripts there cannot break `main`.
 2. **No CI on `main`.** The merged commit already passed on its PR.
 3. **CI does not build or start the app.** Local `pnpm verify` is the build
    check for ordinary PR branches; Vercel builds only `main` and `preview/*`

@@ -18,6 +18,8 @@ const eslintConfig = defineConfig([
     ".next-local-*/**",
     "sandbox-backend*/**",
     ".record-only-codegen-test-*/**",
+    // Docs (archived evidence, prototypes) skip CI, so they must not lint.
+    "docs/**",
   ]),
 ]);
 
