@@ -165,7 +165,9 @@ for (const token of [
   assert(contextPackSource.includes(token), `Context pack export is missing ${token}`);
 }
 
-const storyReviewSource = readFileSync("app/app/stories/[storyId]/page.tsx", "utf8");
+const storyReviewRoute = readFileSync("app/app/stories/[storyId]/page.tsx", "utf8");
+assert(storyReviewRoute.includes("<StoryReviewView"), "Story review route must render its preserved workspace");
+const storyReviewSource = readFileSync("components/vault/StoryReviewView.tsx", "utf8");
 for (const token of [
   "Research Pack Provenance",
   "contextPackIds",

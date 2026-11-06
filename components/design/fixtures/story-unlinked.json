@@ -1,0 +1,60 @@
+{
+  "story": {
+    "_id": "stories:synthetic-1",
+    "_creationTime": 1793808000000,
+    "createdAt": 1793808000000,
+    "updatedAt": 1793808000000,
+    "vaultOwnerId": "synthetic-design-only",
+    "type": "biography",
+    "title": "An invented journey",
+    "content": "## A letter and two places\n\nThis is an invented narrative, written only to exercise the design preview. Eleanor’s dates and relationships are synthetic candidates. The discrepancy between two indexes remains unresolved.\n\nA place name opens a question about daily life, rather than proving a person’s experience. The context report describes the town; it does not establish where Eleanor worked or what she believed.\n\n## What the records suggest\n\nThe invented parish entry provides a date candidate. A second synthetic index gives a different day. Both remain visible in the Person workspace until a human compares the original image.\n\n> Remembered family stories belong beside the evidence, with uncertainty visible.\n\n## Questions still open\n\n- Compare the original parish image.\n- Review the context report’s sources.\n- Keep the draft private while the source conflict remains.\n\nNo real family story, personal detail or imported source is used here.",
+    "citationIds": [
+      "citations:synthetic-1"
+    ],
+    "status": "draft",
+    "generatedBy": "ai",
+    "modelUsed": "Self-reported synthetic model",
+    "contextPackIds": [],
+    "tags": [
+      "invented",
+      "design preview"
+    ],
+    "assignedReviewer": "Synthetic reviewer",
+    "secondReviewRequired": true,
+    "publicSlug": "an-invented-journey-nthetic1",
+    "publicIndexing": "noindex"
+  },
+  "person": null,
+  "readiness": null,
+  "researchChecks": [],
+  "contextCoverage": null,
+  "publishWarnings": [
+    {
+      "key": "sources",
+      "label": "No linked source evidence",
+      "status": "missing",
+      "detail": "This story has no grouped source evidence attached through the person timeline yet."
+    },
+    {
+      "key": "historical_context",
+      "label": "Historical context reports",
+      "status": "missing",
+      "detail": "No place, era, church, building, news, or locality context report is linked to this person's known places and years."
+    },
+    {
+      "key": "story_review",
+      "label": "Internal review",
+      "status": "needs_review",
+      "detail": "This story is still marked as a draft. Move it to review before publishing if possible."
+    }
+  ],
+  "evidence": [],
+  "events": [],
+  "places": [],
+  "media": [],
+  "relationships": [],
+  "provisionalRelatives": [],
+  "reviewHistory": [],
+  "historicalContext": [],
+  "relatedStories": []
+}

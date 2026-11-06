@@ -87,7 +87,8 @@ work. Scott does not need to press merge.
   [local preview](docs/operations/local-preview.md). `pnpm dev:live` is
   withheld by the launcher until its production binding is verified.
 - Run `pnpm verify` (it includes the build) before pushing. Work in progress
-  stays a draft PR (drafts run no GitHub CI); mark it ready once.
+  stays a draft PR (drafts run no GitHub CI); mark it ready once. Docs-only
+  PRs pass CI on a path check without verifying.
 - Vercel builds `main` and `preview/*` branches only. A production build also
   deploys Convex ([how production deploys](docs/operations/how-production-deploys.md)).
 - Close out with where the latest change lives: local only, pushed but not
@@ -131,3 +132,13 @@ discovery and settings read. Never extend its frozen legacy scope baseline.
 Explicit and ambiguous legacy end dates remain enforced; only matching automatic
 sign-in consent receipts may have their old 90-day term ignored at read time.
 No grant cleanup is required or authorized by this implementation.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+## This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

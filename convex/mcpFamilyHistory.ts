@@ -466,6 +466,17 @@ async function savePersonRecord(ctx: MutationCtx, owner: string, input: any, pro
   }
   const row = await owned(ctx, "persons", input.personId, owner, "Person");
   assertFresh(row, input.expectedUpdatedAt, "Person");
+  // A person the owner entered or imported carries their conclusions about who
+  // this is. An AI proposes a different name, sex, living state or date as a
+  // candidate source fact; it does not rewrite the person's record.
+  const identityChanges = PERSON_IDENTITY_FIELDS.filter((field) => input[field] !== undefined);
+  if (identityChanges.length > 0 && row.creationProvenance?.actorKind !== "chosen_ai") {
+    machineError(
+      "FORBIDDEN",
+      `Only the person can change ${identityChanges.join(", ")} on a person they entered or imported.`,
+      "Propose the correction as a candidate source fact with family_history_save_source_evidence, or record it as a research finding. Research status, priority, notes and tags can still be updated.",
+    );
+  }
   const patch = pickDefined(input, [
     "name", "alternateNames", "sex", "living", "birth", "death", "researchStatus", "researchPriority", "notes", "tags",
   ]);
@@ -507,6 +518,9 @@ async function saveRelationshipRecord(ctx: MutationCtx, owner: string, input: an
   }
   const row = await owned(ctx, "relationships", input.relationshipId, owner, "Relationship");
   assertFresh(row, input.expectedUpdatedAt, "Relationship");
+  if (row.creationProvenance?.actorKind !== "chosen_ai") {
+    machineError("FORBIDDEN", "Only the person can change a relationship they entered or imported.", "Propose the correction as a candidate source fact or research finding.");
+  }
   if (input.person1) await owned(ctx, "persons", input.person1, owner, "Relationship person");
   if (input.person2) await owned(ctx, "persons", input.person2, owner, "Relationship person");
   const patch = pickDefined(input, ["type", "childRelationType", "person1", "person2", "facts"]);
@@ -549,6 +563,9 @@ async function saveEventRecord(ctx: MutationCtx, owner: string, input: any) {
   } else {
     const row = await owned(ctx, "events", input.eventId, owner, "Event");
     assertFresh(row, input.expectedUpdatedAt, "Event");
+    if (!row.importKey?.startsWith("mcp:")) {
+      machineError("FORBIDDEN", "Only the person can change an event they entered or imported, including its person roles.", "Propose the correction as a candidate source fact or research finding.");
+    }
     const patch = pickDefined(input, ["type", "customType", "date", "endDate", "place", "description", "notes"]);
     if (patch.description !== undefined) patch.description = cleanText(patch.description, "event description", FAMILY_HISTORY_MCP_LIMITS.notes);
     if (patch.notes !== undefined) patch.notes = cleanText(patch.notes, "event notes", FAMILY_HISTORY_MCP_LIMITS.notes);
@@ -562,15 +579,48 @@ async function saveEventRecord(ctx: MutationCtx, owner: string, input: any) {
       .withIndex("by_person_and_event", (q) => q.eq("personId", role.personId).eq("eventId", eventId))
       .collect();
     const existing = matches.find((row) => matchesVaultOwner(row.vaultOwnerId, owner));
-    if (existing) await ctx.db.patch(existing._id, { role: role.role });
+    if (existing && existing.role !== role.role) {
+      machineError("FORBIDDEN", "An AI cannot overwrite an existing person-event role.", "Record the proposed role correction as a research finding for the person to review.");
+    }
+    if (existing) continue;
     else await ctx.db.insert("personEvents", { vaultOwnerId: owner, personId: role.personId, eventId, role: role.role, createdAt: now });
   }
   return { id: eventId, created, updatedAt: now, createKey };
 }
 
+/**
+ * The research permission is "proposals only": a connected AI may propose,
+ * flag a conflict or reject its own reading, but accepting a conclusion is the
+ * person's. Checked before the first write so a refused row saves nothing.
+ */
+async function assertFactsAreProposals(ctx: MutationCtx, owner: string, facts: any[]) {
+  for (const fact of facts) {
+    if (fact?.status === "accepted") {
+      machineError(
+        "FORBIDDEN",
+        "Only the person can accept a source fact.",
+        "Save it as candidate (the default) or conflict; the person accepts it in Family History.",
+      );
+    }
+    const mapping = typeof fact?.factKey === "string" ? await mappedRecord(ctx, owner, "source_fact", cleanKey(fact.factKey, "factKey")) : null;
+    const existing = mapping ? await ctx.db.get(mapping.recordId as Id<"sourceFacts">) : null;
+    if (existing && matchesVaultOwner(existing.vaultOwnerId, owner) && existing.status === "accepted") {
+      machineError(
+        "FORBIDDEN",
+        "This source fact is accepted, and an AI cannot overwrite an accepted fact.",
+        "Leave it as it is, or save a new fact under a new factKey with status conflict and a conflictReason.",
+      );
+    }
+  }
+}
+
+/** Identity fields an AI may change only on a person it created itself. */
+const PERSON_IDENTITY_FIELDS = ["name", "alternateNames", "sex", "living", "birth", "death"] as const;
+
 async function saveSourceEvidenceRecord(ctx: MutationCtx, owner: string, input: any, provenance?: McpProvenance) {
   const now = Date.now();
   const sourceInput = input.source;
+  await assertFactsAreProposals(ctx, owner, input.facts ?? []);
   await assertOwnedPlaceRefs(ctx, owner, sourceInput, "Source coverage place");
   let sourceId: Id<"sources">;
   let sourceCreated = false;

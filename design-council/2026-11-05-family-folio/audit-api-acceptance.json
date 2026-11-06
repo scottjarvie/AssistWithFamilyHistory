@@ -1,0 +1,394 @@
+{
+  "checkedAt": "2026-11-05T15:58:27.628Z",
+  "checks": [
+    "All16 instrument numbers call the real read controller with their exact metric/offset and no caller-supplied owner",
+    "Live pagination retains loaded rows after a failed next page, retries the same offset and shows changed snapshot totals honestly",
+    "Loaded search stays explicitly bounded and failed Refresh retries page0 with replacement and keeps the search",
+    "Closing/switching sheets aborts old reads; a late person response cannot replace source matches",
+    "Live zero-result response is distinct from a failed read",
+    "Unauthenticated detail read explicitly requests owner sign-in and shows the error heading once"
+  ],
+  "requests": [
+    {
+      "metric": "people",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "people",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "sources",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "sources",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "citations",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "citations",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "historicalContext",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "historicalContext",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "stories",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "stories",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "publishedStories",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "publishedStories",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "peopleWithoutSources",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "peopleWithoutSources",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "peopleWithoutContext",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "peopleWithoutContext",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "peopleWithoutStories",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "peopleWithoutStories",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "placesWithoutContext",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "placesWithoutContext",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "openResearchTasks",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "openResearchTasks",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "workflow:needs_genealogy_evidence",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "workflow:needs_genealogy_evidence",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "workflow:needs_context_research",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "workflow:needs_context_research",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "workflow:ready_to_draft",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "workflow:ready_to_draft",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "workflow:ready_to_review",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "workflow:ready_to_review",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "workflow:published",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "workflow:published",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "people",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "people",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "people",
+      "offset": 50,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "people",
+      "offset": 50,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "people",
+      "offset": 100,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "people",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "people",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "people",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "people",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "sources",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "sources",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "citations",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "citations",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "historicalContext",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    },
+    {
+      "metric": "historicalContext",
+      "offset": 0,
+      "keys": [
+        "metric",
+        "offset"
+      ]
+    }
+  ],
+  "unexpectedAPIs": [],
+  "errors": [],
+  "expectedHTTPFailures": 4,
+  "networkAPIRequests": 0,
+  "note": "All API requests fulfilled with invented data in browser. Client/controller proof, not live backend acceptance. Development StrictMode may replay the mount read; abandoned requests are aborted."
+}

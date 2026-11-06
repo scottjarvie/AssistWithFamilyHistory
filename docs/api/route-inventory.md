@@ -41,6 +41,7 @@ permissions in `lib/mcp/catalog.ts`.
 | Route | Methods | Primary behavior | Owner boundary | API status | Risk / notes |
 | --- | --- | --- | --- | --- | --- |
 | `/api/ai-connections` | POST | Approve, decline, narrow, revoke, or remove one chosen-AI MCP connection grant | Clerk session, server-derived owner, and owner-scoped `convex/mcpGrants.ts` mutations that authorize again | Internal human API; a chosen AI can never call this route | Person-only connection control. Widening is not reachable here — `reduce` only narrows and more permission needs a fresh approval. Revocation takes effect on the connection's very next MCP request |
+| `/api/audit/records` | GET | Bounded matching-record pages behind Audit metrics | Server-derived owner; authenticated Convex subject must match even in shadow mode | Internal human app read | Minimal rows only, private no-store; no notes, raw artifacts or narrative bodies |
 | `/api/capabilities` | GET | Return internal capability actions for the requesting actor role | Protected route; no vault data read | Internal now; future agent-discovery candidate | Story capabilities distinguish writer/reviewer/trusted publisher actions |
 | `/api/keys` | GET, POST | List the owner's agent API keys; mint a new key (raw secret returned once, only the SHA-256 hash stored) | Uses `getVaultAccessContext()`; mint binds to the signed-in owner | Internal-only (human-managed); agents do not mint keys | Credential management. POST generates + hashes the secret server-side and returns it once; GET never returns the hash. Scopes from `lib/auth/scopes.ts` |
 | `/api/keys/[keyId]` | PATCH, DELETE | PATCH suspends/reactivates a key; DELETE revokes it (idempotent) | Uses `getVaultAccessContext()` and Convex owner check | Internal-only (human-managed) | Credential suspend/revoke; owner-guarded in the Convex mutation |
@@ -74,6 +75,7 @@ permissions in `lib/mcp/catalog.ts`.
 | `/api/stories/[id]/review` | PATCH | Assign a story reviewer, optionally require second approval, and record review history | Uses `getVaultAccessContext()` and Convex owner checks | Internal now; future reviewer/trusted-operator candidate | Explicit `story_writer` role is denied reviewer assignment |
 | `/api/stories/[id]/status` | GET, PATCH | Preview publish readiness or change story status between draft/review/published | Clerk JWT plus Convex owner and record checks | Internal now; future story-writer/trusted-operator candidate | Convex recomputes publish safety and human/second-review gates, then records publish confirmation atomically |
 | `/api/vault/migrate-guest` | POST | Re-tag a preview guest vault to the signed-in Clerk user | Destination is bound to the verified Clerk subject | Shadow-only legacy path | Enforce denies the unsigned guest source until a signed guest capability exists |
+| `/api/vault/export` | GET | Stream the signed-in person's whole workspace as one JSON file, table by table | `getVaultAccessContext()` owner plus the owner-checked `yourData.exportPage` action | Owner only, from `/app/settings/data` | Never cached; secrets, receipts and upload tokens are left out (`lib/vault/exportTables.ts`) |
 
 ## Current Gaps
 

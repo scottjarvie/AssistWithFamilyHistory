@@ -7,8 +7,9 @@
  * operator view of the current vault's keys.)
  */
 import type { Metadata } from "next";
+import {ApiCenterView} from "@/components/api/ApiCenterView";
 import { ShieldAlert } from "lucide-react";
-import { ApiKeyManager, type ApiKeyRow } from "@/components/api/ApiKeyManager";
+import { type ApiKeyRow } from "@/components/api/ApiKeyManager";
 import { VaultStateCard } from "@/components/vault/VaultStateCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api } from "@/convex/_generated/api";
@@ -60,11 +61,13 @@ export default async function AdminApiPage() {
     );
   }
 
+  let ownerKey="unresolved";
   let keys: ApiKeyRow[] = [];
   let authorized = false;
   let runtimeIssue: { title: string; description: string } | null = null;
   try {
     const { vaultOwnerId, userId } = await getVaultAccessContext();
+    ownerKey=vaultOwnerId;
     if (isAdminUser(userId)) {
       authorized = true;
       const client = await getAuthedConvexClient();
@@ -86,21 +89,5 @@ export default async function AdminApiPage() {
     return <NotAuthorized />;
   }
 
-  return (
-    <div className="max-w-4xl p-4 sm:p-8">
-      <header className="mb-8">
-        <div className="flex items-center gap-2">
-          <ShieldAlert className="h-6 w-6 text-amber-700" />
-          <h1 className="font-[family-name:var(--font-cormorant-garamond)] text-4xl font-semibold text-stone-950">
-            Admin API
-          </h1>
-        </div>
-        <p className="mt-2 max-w-2xl text-stone-600">
-          Operator console: review keys, flag stale credentials, and suspend or revoke access. Admin
-          and security scopes require this operator role, separate from the normal key tiers.
-        </p>
-      </header>
-      <ApiKeyManager initialKeys={keys} mode="admin" isAdmin />
-    </div>
-  );
+  return <ApiCenterView keys={keys} ownerKey={ownerKey} admin operatorView/>;
 }

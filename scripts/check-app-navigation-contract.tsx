@@ -6,6 +6,7 @@ import {
   BookOpen,
   Bot,
   ClipboardList,
+  Database,
   ExternalLink,
   FileUp,
   FlaskConical,
@@ -13,10 +14,12 @@ import {
   Inbox,
   KeyRound,
   LayoutDashboard,
+  Library,
   MapPinned,
   PenTool,
   PlugZap,
   TableProperties,
+  UserRound,
   Users,
   Clock,
 } from "lucide-react";
@@ -32,6 +35,7 @@ const expectedSections = [
     items: [
       { href: "/app", label: "Dashboard", icon: LayoutDashboard, exact: true },
       { href: "/app/queue", label: "Your Queue", icon: Inbox },
+      { href: "/app/library", label: "Library", icon: Library },
     ],
   },
   {
@@ -81,6 +85,13 @@ const expectedSections = [
     ],
   },
   {
+    label: "You",
+    items: [
+      { href: "/app/me", label: "Your stats", icon: UserRound },
+      { href: "/app/settings/data", label: "Your data", icon: Database },
+    ],
+  },
+  {
     label: "Lab",
     items: [{ href: "/app/experiments", label: "Experiments", icon: FlaskConical }],
   },
@@ -112,7 +123,8 @@ const mobileMarkup = renderToStaticMarkup(
   />
 );
 
-assert.match(mobileMarkup, /bg-amber-700 text-white[^>]*><svg[^>]*>.*?<\/svg><span>People<\/span>/);
+assert.match(mobileMarkup, /<a aria-current="page"[^>]*href="\/app\/people"/);
+assert.equal([...mobileMarkup.matchAll(/aria-current="page"/g)].length, 1, "Only the current destination is marked active");
 assert.match(mobileMarkup, /text-stone-300 hover:bg-stone-800/);
 assert.match(mobileMarkup, />Timeline<\/span><span class="text-xs bg-stone-700/);
 assert.doesNotMatch(mobileMarkup, /href="#"/);

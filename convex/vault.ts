@@ -1,3 +1,5 @@
+import {buildAuditRecordPage} from "../lib/audit/records";
+import {auditMetrics} from "../lib/audit/contract";
 import { v } from "convex/values";
 import { internalQuery, query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -1942,6 +1944,8 @@ export const getOperationsSummary = internalQuery({
 export const getVaultAudit = internalQuery({
   args: {
     vaultOwnerId: v.string(),
+    metric: v.optional(v.union(...auditMetrics.map(metric => v.literal(metric)))),
+    offset: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
@@ -1955,6 +1959,7 @@ export const getVaultAudit = internalQuery({
     const peopleWithoutStories = peopleRows.filter((row) => row.stats.stories === 0);
 
     return {
+      records: args.metric ? buildAuditRecordPage(snapshot, peopleRows, args.vaultOwnerId, args.metric, args.offset) : null,
       counts: {
         people: snapshot.people.length,
         relationships: snapshot.relationships.length,

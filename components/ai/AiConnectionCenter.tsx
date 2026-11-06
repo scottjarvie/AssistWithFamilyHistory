@@ -23,19 +23,12 @@
  */
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import {
-  AlertTriangle,
-  CheckCircle2,
-  ClipboardCopy,
-  Clock,
-  Eye,
-  Loader2,
-  Lock,
-  PlugZap,
-  RefreshCw,
-  ShieldOff,
-  Trash2,
-} from "lucide-react";
+import {FamilyIcons} from "@/components/ui/FamilySymbol";
+const {AlertTriangle,CheckCircle2,ClipboardCopy,Clock,Eye,Loader2,Lock,PlugZap,RefreshCw,ShieldOff,Trash2}=FamilyIcons;
+import {OnlyYouTable} from "./OnlyYouTable";
+import {ConnectionMatrix} from "./ConnectionMatrix";
+import {Button as MatrixButton} from "@/components/ui/button";
+import {Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription,DialogFooter} from "@/components/ui/dialog";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -97,27 +90,27 @@ const STATUS_COPY: Record<
 > = {
   pending: {
     label: "Waiting for you",
-    tone: "bg-amber-100 text-amber-900",
+    tone: "bg-annotation/10 text-annotation",
     meaning: "This AI asked to connect. It can read and change nothing until you approve it.",
   },
   active: {
     label: "Approved",
-    tone: "bg-emerald-100 text-emerald-900",
+    tone: "bg-primary/10 text-primary",
     meaning: "This connection is working inside exactly the permissions and boundary below.",
   },
   revoked: {
     label: "Turned off",
-    tone: "bg-stone-200 text-stone-700",
+    tone: "bg-muted text-muted-foreground",
     meaning: "You turned this off. It was refused from its very next request onward.",
   },
   denied: {
     label: "Declined",
-    tone: "bg-stone-200 text-stone-700",
+    tone: "bg-muted text-muted-foreground",
     meaning: "You declined this request. It was never given any permission.",
   },
   expired: {
     label: "Ran out",
-    tone: "bg-stone-200 text-stone-700",
+    tone: "bg-muted text-muted-foreground",
     meaning: "This approval reached the end date you chose and stopped working then.",
   },
 };
@@ -238,7 +231,7 @@ function ScopeExplainer({
 }) {
   const inputId = `${idPrefix}-${scope.scope}`;
   return (
-    <li className="rounded-lg border border-stone-200 bg-white p-4">
+    <li className="rounded-lg border border-border bg-card p-4">
       <div className="flex gap-3">
         {onToggle ? (
           <input
@@ -247,28 +240,28 @@ function ScopeExplainer({
             checked={checked}
             disabled={disabled}
             onChange={(event) => onToggle(event.target.checked)}
-            className="mt-1 h-5 w-5 shrink-0 accent-emerald-800"
+            className="mt-1 h-5 w-5 shrink-0 accent-primary"
           />
         ) : (
-          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-800" aria-hidden="true" />
+          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
         )}
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <Label htmlFor={onToggle ? inputId : undefined} className="text-sm font-semibold text-stone-900">
+            <Label htmlFor={onToggle ? inputId : undefined} className="text-sm font-semibold text-foreground">
               {scope.label}
             </Label>
             <Badge
               className={cn(
                 "text-[11px]",
-                scope.writes ? "bg-amber-100 text-amber-900" : "bg-stone-100 text-stone-700",
+                scope.writes ? "bg-annotation/10 text-annotation" : "bg-muted text-muted-foreground",
               )}
             >
               {scope.writes ? "Can change things" : "Read only"}
             </Badge>
           </div>
-          <p className="mt-1 text-sm leading-6 text-stone-700">{scope.grants}</p>
-          <p className="mt-1 text-sm leading-6 text-stone-500">
-            <span className="font-medium text-stone-600">Still cannot: </span>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">{scope.grants}</p>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+            <span className="font-medium text-muted-foreground">Still cannot: </span>
             {scope.limit}
           </p>
         </div>
@@ -279,26 +272,26 @@ function ScopeExplainer({
 
 function NeverLists() {
   return (
-    <div className="grid gap-4 rounded-lg border border-stone-200 bg-stone-50 p-4 sm:grid-cols-2">
+    <div className="grid gap-4 rounded-lg border border-border bg-muted/40 p-4 sm:grid-cols-2">
       <div>
-        <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-stone-600">
+        <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           <Eye className="h-4 w-4" aria-hidden="true" /> Never shown to any AI
         </p>
         <ul className="mt-2 space-y-1.5">
           {NEVER_EXPOSED.map((entry) => (
-            <li key={entry} className="text-sm leading-6 text-stone-700">
+            <li key={entry} className="text-sm leading-6 text-muted-foreground">
               {entry}
             </li>
           ))}
         </ul>
       </div>
       <div>
-        <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-stone-600">
+        <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           <Lock className="h-4 w-4" aria-hidden="true" /> Never allowed, whatever you approve
         </p>
         <ul className="mt-2 space-y-1.5">
           {NEVER_PERMITTED.map((entry) => (
-            <li key={entry} className="text-sm leading-6 text-stone-700">
+            <li key={entry} className="text-sm leading-6 text-muted-foreground">
               {entry}
             </li>
           ))}
@@ -312,24 +305,24 @@ function ClientIdentity({ connection }: { connection: ConnectionRow }) {
   return (
     <dl className="mt-4 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
       <div>
-        <dt className="text-xs font-semibold uppercase tracking-wider text-stone-500">
+        <dt className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           What it called itself
         </dt>
-        <dd className="mt-1 break-words text-stone-800">
+        <dd className="mt-1 break-words text-foreground">
           {connection.observedClientName ?? "It did not give a name."}
-          <span className="mt-1 block text-xs leading-5 text-stone-500">
+          <span className="mt-1 block text-xs leading-5 text-muted-foreground">
             This is a name the software chose for itself. It is a label to help you recognise it —
             not proof of what it is.
           </span>
         </dd>
       </div>
       <div>
-        <dt className="text-xs font-semibold uppercase tracking-wider text-stone-500">
+        <dt className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           How it identified itself
         </dt>
-        <dd className="mt-1 text-stone-800">
+        <dd className="mt-1 text-foreground">
           {PROVENANCE_COPY[connection.clientProvenance]}
-          <span className="mt-1 block break-all font-mono text-xs text-stone-500">
+          <span className="mt-1 block break-all font-mono text-xs text-muted-foreground">
             {connection.clientId}
           </span>
         </dd>
@@ -377,10 +370,10 @@ function ApprovalForm({
   return (
     <div className="mt-6 space-y-6">
       <div>
-        <h4 className="text-sm font-semibold uppercase tracking-wider text-stone-600">
+        <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           1 · What may it do?
         </h4>
-        <p className="mt-1 text-sm leading-6 text-stone-600">
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">
           Your saved permissions and record boundary are selected below. Review each choice before approving. Selecting every permission includes tools added later.
         </p>
         <ul className="mt-3 space-y-3">
@@ -398,12 +391,12 @@ function ApprovalForm({
       </div>
 
       <div>
-        <h4 className="text-sm font-semibold uppercase tracking-wider text-stone-600">
+        <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           2 · Which records?
         </h4>
         <ul className="mt-3 space-y-3">
           {BOUNDARY_CHOICES.map((choice) => (
-            <li key={choice.kind} className="rounded-lg border border-stone-200 bg-white p-4">
+            <li key={choice.kind} className="rounded-lg border border-border bg-card p-4">
               <div className="flex gap-3">
                 <input
                   id={`boundary-${connection.id}-${choice.kind}`}
@@ -412,16 +405,16 @@ function ApprovalForm({
                   checked={boundaryKind === choice.kind}
                   disabled={busy}
                   onChange={() => setBoundaryKind(choice.kind)}
-                  className="mt-1 h-5 w-5 shrink-0 accent-emerald-800"
+                  className="mt-1 h-5 w-5 shrink-0 accent-primary"
                 />
                 <div className="min-w-0">
                   <Label
                     htmlFor={`boundary-${connection.id}-${choice.kind}`}
-                    className="text-sm font-semibold text-stone-900"
+                    className="text-sm font-semibold text-foreground"
                   >
                     {choice.label}
                   </Label>
-                  <p className="mt-1 text-sm leading-6 text-stone-600">{choice.detail}</p>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{choice.detail}</p>
                   {choice.kind === "selected_people" && boundaryKind === "selected_people" && (
                     <Textarea
                       value={personIdText}
@@ -450,10 +443,10 @@ function ApprovalForm({
       </div>
 
       <div>
-        <h4 className="text-sm font-semibold uppercase tracking-wider text-stone-600">
+        <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           3 · For how long?
         </h4>
-        <p className="mt-1 text-sm leading-6 text-stone-600">
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">
           Connections have no end date by default. An end date you pick is your choice and stays
           in place until you change or remove it. You can turn the connection off at any time.
         </p>
@@ -468,8 +461,8 @@ function ApprovalForm({
               className={cn(
                 "min-h-11 rounded-lg border px-4 text-sm font-medium",
                 expiresInDays === choice.days
-                  ? "border-emerald-800 bg-emerald-800 text-white"
-                  : "border-stone-300 bg-white text-stone-700 hover:border-stone-400",
+                  ? "border-primary bg-primary text-white"
+                  : "border-border bg-card text-muted-foreground hover:border-primary/60",
               )}
             >
               {choice.label}
@@ -479,7 +472,7 @@ function ApprovalForm({
       </div>
 
       <div>
-        <h4 className="text-sm font-semibold uppercase tracking-wider text-stone-600">
+        <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           4 · What will you call it?
         </h4>
         <Input
@@ -494,7 +487,7 @@ function ApprovalForm({
 
       <NeverLists />
 
-      <div className="flex flex-col gap-3 border-t border-stone-200 pt-5 sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-3 border-t border-border pt-5 sm:flex-row sm:items-center">
         <Button
           type="button"
           disabled={busy || scopes.length === 0 || boundaryIncomplete || !label.trim()}
@@ -511,12 +504,12 @@ function ApprovalForm({
               expiresInDays,
             })
           }
-          className="min-h-11 bg-emerald-800 hover:bg-emerald-900 sm:w-auto"
+          className="min-h-11 bg-primary hover:bg-primary/90 sm:w-auto"
         >
           {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" /> : null}
           Approve exactly this
         </Button>
-        <span className="text-sm text-stone-500">
+        <span className="text-sm text-muted-foreground">
           {scopes.length === 0
             ? "Tick at least one permission first."
             : boundaryIncomplete
@@ -529,8 +522,8 @@ function ApprovalForm({
         </span>
       </div>
 
-      {onDeny && <details className="rounded-lg border border-stone-200 bg-stone-50 p-4">
-        <summary className="cursor-pointer text-sm font-medium text-stone-700">
+      {onDeny && <details className="rounded-lg border border-border bg-muted/40 p-4">
+        <summary className="cursor-pointer text-sm font-medium text-muted-foreground">
           I do not recognise this — decline it
         </summary>
         <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -563,9 +556,9 @@ function ExpiryControls({ busy, onSave }: { busy: boolean; onSave: (days?: numbe
   return (
     <div className="mt-4 space-y-2">
       <Label>End date (optional)</Label>
-      <p className="text-sm text-stone-600">No end date by default. A date you choose stays until you change or remove it.</p>
+      <p className="text-sm text-muted-foreground">No end date by default. A date you choose stays until you change or remove it.</p>
       <div className="flex flex-wrap items-center gap-2">
-        <select aria-label="Connection end date" value={days} disabled={busy} onChange={(event) => setDays(Number(event.target.value))} className="min-h-11 rounded border border-stone-300 bg-white px-3 text-sm">
+        <select aria-label="Connection end date" value={days} disabled={busy} onChange={(event) => setDays(Number(event.target.value))} className="min-h-11 rounded border border-border bg-card px-3 text-sm">
           {EXPIRY_CHOICES.map((choice) => <option key={choice.days} value={choice.days}>{choice.label}</option>)}
         </select>
         <Button type="button" variant="outline" disabled={busy} onClick={() => onSave(days || undefined)} className="min-h-11">
@@ -596,7 +589,7 @@ function ActiveConnectionControls({
   return (
     <div className="mt-5 space-y-5">
       <div>
-        <h4 className="text-sm font-semibold uppercase tracking-wider text-stone-600">
+        <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           What you approved
         </h4>
         <ul className="mt-3 space-y-3">
@@ -629,18 +622,18 @@ function ActiveConnectionControls({
           >
             Narrow to what is still ticked
           </Button>
-          <span className="text-sm text-stone-500">
+          <span className="text-sm text-muted-foreground">
             Untick to take a permission away. Giving one back needs a fresh approval, so you always
             see the consent screen again before a connection gets more.
           </span>
         </div>
       </div>
 
-      <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-        <p className="flex items-center gap-2 text-sm font-semibold text-red-900">
+      <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4">
+        <p className="flex items-center gap-2 text-sm font-semibold text-destructive">
           <ShieldOff className="h-4 w-4" aria-hidden="true" /> Turn this connection off
         </p>
-        <p className="mt-1 text-sm leading-6 text-red-900/80">
+        <p className="mt-1 text-sm leading-6 text-destructive/80">
           This takes effect on the connection&apos;s very next request — not whenever its sign-in
           happens to run out. The moment you turn it off, the next thing that AI tries is refused.
         </p>
@@ -651,14 +644,14 @@ function ActiveConnectionControls({
             maxLength={300}
             onChange={(event) => setRevokeReason(event.target.value)}
             placeholder="Why, for your own record (optional)"
-            className="h-11 bg-white sm:max-w-sm"
+            className="h-11 bg-card sm:max-w-sm"
             aria-label="Reason for turning this connection off"
           />
           <Button
             type="button"
             disabled={busy}
             onClick={() => onRevoke(revokeReason.trim())}
-            className="min-h-11 bg-red-700 hover:bg-red-800 sm:w-auto"
+            className="min-h-11 bg-destructive hover:bg-destructive/90 sm:w-auto"
           >
             Turn it off now
           </Button>
@@ -681,15 +674,21 @@ export function AiConnectionCenter({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const inFlight = useRef(new Set<string>());
+  const [revokeRequest,setRevokeRequest]=useState<{connection:ConnectionRow;reason:string}|null>(null);
+  const revokeOrigin=useRef<HTMLElement|null>(null);
+  const revokeRow=useRef<HTMLElement|null>(null);
+  function requestRevoke(connection:ConnectionRow,reason="") {revokeOrigin.current=document.activeElement as HTMLElement;revokeRow.current=revokeOrigin.current?.closest("[data-connection]") as HTMLElement|null;setRevokeRequest({connection,reason});}
+  function editConnection(id:string,focus?:"expiry"|"permissions"|"decline") {
+    const editor=document.getElementById(`connection-editor-${id}`) as HTMLDetailsElement|null;
+    if(!editor)return;if(editor.tagName==="DETAILS")editor.open=true;else editor.querySelector("details")?.setAttribute("open","");if(focus==="decline"||["revoked","denied"].includes(connections.find(row=>row.id===id)?.status||""))editor.querySelector("details")?.setAttribute("open","");editor.scrollIntoView({block:"start",behavior:"smooth"});
+    const control=editor.querySelector<HTMLElement>(focus==="expiry"?'[aria-label="Connection end date"]':focus==="decline"?'input[placeholder*="Why"]':focus==="permissions"?'input[id^="narrow-"]':"input,select,button");control?.focus({preventScroll:true});
+  }
 
   const pending = connections.filter((row) => row.status === "pending");
   const active = connections.filter((row) => row.status === "active");
-  const closed = connections.filter(
-    (row) => row.status === "revoked" || row.status === "denied" || row.status === "expired",
-  );
 
   async function send(grantId: string, body: Record<string, unknown>, success: string) {
-    if (inFlight.current.has(grantId)) return;
+    if (inFlight.current.has(grantId)) return false;
     inFlight.current.add(grantId);
     setBusyId(grantId);
     try {
@@ -711,13 +710,13 @@ export function AiConnectionCenter({
       };
       if (!response.ok) {
         toast.error(payload.error ?? "That connection change could not be applied.");
-        return;
+        return false;
       }
       // An approval can create a replacement grant. Never activate the old ID,
       // including when talking to a backend predating the complete-row response.
       if (body.action === "approve" && !payload.id) {
         toast.error("Approval could not be refreshed. Reload to see the current connection.");
-        return;
+        return false;
       }
       toast.success(success);
       setConnections((current) => {
@@ -740,8 +739,10 @@ export function AiConnectionCenter({
             : row,
         );
       });
+      return true;
     } catch {
       toast.error("That connection change could not be sent. Check your network and try again.");
+      return false;
     } finally {
       inFlight.current.delete(grantId);
       setBusyId((current) => current === grantId ? null : current);
@@ -759,61 +760,21 @@ export function AiConnectionCenter({
     }
   }
 
-  return (
-    <div className="space-y-10">
-      {/* ------------------------------------------- the whole ceiling */}
-      <section aria-labelledby="ceiling-heading">
-        <h2
-          id="ceiling-heading"
-          className="font-[family-name:var(--font-cormorant-garamond)] text-2xl font-semibold text-stone-900"
-        >
-          Everything an AI can ever be given here
-        </h2>
-        <p className="mt-2 text-sm leading-6 text-stone-600">
-          Full access includes every current permission below and future tools. You can choose fewer
-          permissions or an end date. Review, privacy, and publishing safeguards still apply.
-        </p>
-        <ul className="mt-4 space-y-3">
-          {FAMILY_HISTORY_SCOPE_INFO.map((scope) => (
-            <ScopeExplainer key={scope.scope} scope={scope} checked idPrefix="ceiling" />
-          ))}
-        </ul>
-        <div className="mt-4">
-          <NeverLists />
-        </div>
-      </section>
-
-      {/* ------------------------------------------------ waiting for you */}
-      <section aria-labelledby="pending-heading">
-        <h2
-          id="pending-heading"
-          className="font-[family-name:var(--font-cormorant-garamond)] text-2xl font-semibold text-stone-900"
-        >
-          Waiting for you
-        </h2>
-        {pending.length === 0 ? (
-          <p className="mt-2 text-sm leading-6 text-stone-600">
-            Nothing is waiting. An AI you sign in is approved for ordinary research work straight
-            away and shows below; connections from before that change may still wait here.
-          </p>
-        ) : (
-          <div className="mt-4 space-y-6">
-            {pending.map((connection) => (
-              <article
-                key={connection.id}
-                className="rounded-xl border border-amber-300 bg-amber-50/60 p-5 sm:p-6"
-              >
+  function renderConnectionEditor(connection:ConnectionRow) {
+    const snapshot=readSnapshot(connection.consentSnapshot);
+    if(connection.status==="pending")return (<details id={`connection-editor-${connection.id}`} data-connection-editor={connection.id} key={connection.id} className="scroll-mt-28 rounded-lg border border-annotation/40 bg-card p-4">
+                <summary className="min-h-11 cursor-pointer font-medium">Review request · {connection.label}</summary>
                 <div className="flex flex-wrap items-center gap-3">
-                  <PlugZap className="h-5 w-5 text-amber-800" aria-hidden="true" />
-                  <h3 className="text-lg font-semibold text-stone-900">{connection.label}</h3>
+                  <PlugZap className="h-5 w-5 text-annotation" aria-hidden="true" />
+                  <h3 className="text-lg font-semibold text-foreground">{connection.label}</h3>
                   <Badge className={STATUS_COPY.pending.tone}>{STATUS_COPY.pending.label}</Badge>
                 </div>
-                <p className="mt-2 text-sm leading-6 text-stone-700">
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
                   {STATUS_COPY.pending.meaning} Signing in proved whose workspace this is; it did
                   not decide what this connection may do. That is this page&apos;s whole job.
                 </p>
                 <ClientIdentity connection={connection} />
-                <p className="mt-3 text-xs text-stone-500">
+                <p className="mt-3 text-xs text-muted-foreground">
                   First asked {formatDateTime(connection.requestedAt)}
                 </p>
                 <ApprovalForm
@@ -840,77 +801,53 @@ export function AiConnectionCenter({
                     )
                   }
                 />
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* ------------------------------------------------------ connected */}
-      <section aria-labelledby="active-heading">
-        <h2
-          id="active-heading"
-          className="font-[family-name:var(--font-cormorant-garamond)] text-2xl font-semibold text-stone-900"
-        >
-          Connected now
-        </h2>
-        {active.length === 0 ? (
-          <p className="mt-2 text-sm leading-6 text-stone-600">
-            No AI is connected to this workspace.
-          </p>
-        ) : (
-          <div className="mt-4 space-y-6">
-            {active.map((connection) => {
-              const snapshot = readSnapshot(connection.consentSnapshot);
-              return (
-                <article
-                  key={connection.id}
-                  className="rounded-xl border border-stone-300 bg-white p-5 sm:p-6"
-                >
+              </details>);
+    if(connection.status==="active")return (<details id={`connection-editor-${connection.id}`} data-connection-editor={connection.id} key={connection.id} className="scroll-mt-28 rounded-lg border border-border bg-card p-4">
+                  <summary className="min-h-11 cursor-pointer font-medium">Edit permissions and end date · {connection.label}</summary>
                   <div className="flex flex-wrap items-center gap-3">
-                    <PlugZap className="h-5 w-5 text-emerald-800" aria-hidden="true" />
-                    <h3 className="text-lg font-semibold text-stone-900">{connection.label}</h3>
+                    <PlugZap className="h-5 w-5 text-primary" aria-hidden="true" />
+                    <h3 className="text-lg font-semibold text-foreground">{connection.label}</h3>
                     <Badge className={STATUS_COPY.active.tone}>{STATUS_COPY.active.label}</Badge>
                   </div>
-                  <p className="mt-2 text-sm leading-6 text-stone-700">
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
                     {STATUS_COPY.active.meaning}
                   </p>
                   <ClientIdentity connection={connection} />
                   <dl className="mt-4 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
                     <div>
-                      <dt className="text-xs font-semibold uppercase tracking-wider text-stone-500">
+                      <dt className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         Records it may reach
                       </dt>
-                      <dd className="mt-1 text-stone-800">{boundarySummary(connection.boundary)}</dd>
+                      <dd className="mt-1 text-foreground">{boundarySummary(connection.boundary)}</dd>
                     </div>
                     <div>
-                      <dt className="text-xs font-semibold uppercase tracking-wider text-stone-500">
+                      <dt className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         Runs out
                       </dt>
-                      <dd className="mt-1 text-stone-800">{connection.expiresAt == null ? "No end date" : formatDate(connection.expiresAt)}</dd>
+                      <dd className="mt-1 text-foreground">{connection.expiresAt == null ? "No end date" : formatDate(connection.expiresAt)}</dd>
                     </div>
                     <div>
-                      <dt className="text-xs font-semibold uppercase tracking-wider text-stone-500">
+                      <dt className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         Last used
                       </dt>
-                      <dd className="mt-1 text-stone-800">
+                      <dd className="mt-1 text-foreground">
                         {formatDateTime(connection.lastUsedAt)}
                         {connection.lastToolName ? (
-                          <span className="mt-0.5 block break-all font-mono text-xs text-stone-500">
+                          <span className="mt-0.5 block break-all font-mono text-xs text-muted-foreground">
                             {connection.lastToolName}
                           </span>
                         ) : null}
                       </dd>
                     </div>
                     <div>
-                      <dt className="text-xs font-semibold uppercase tracking-wider text-stone-500">
+                      <dt className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         Times used
                       </dt>
-                      <dd className="mt-1 text-stone-800">{connection.useCount}</dd>
+                      <dd className="mt-1 text-foreground">{connection.useCount}</dd>
                     </div>
                   </dl>
                   {snapshot?.shownAt ? (
-                    <p className="mt-3 text-xs leading-5 text-stone-500">
+                    <p className="mt-3 text-xs leading-5 text-muted-foreground">
                       What you were shown when you approved this on{" "}
                       {formatDateTime(snapshot.shownAt)} is kept word for word, so a later change to
                       this page can never rewrite what you agreed to.
@@ -927,52 +864,26 @@ export function AiConnectionCenter({
                         "Narrowed. The next thing this AI tries is judged against the smaller list.",
                       )
                     }
-                    onRevoke={(reason) =>
-                      send(
-                        connection.id,
-                        { action: "revoke", reason: reason || undefined },
-                        "Turned off. Its very next request is refused.",
-                      )
-                    }
+                    onRevoke={reason=>requestRevoke(connection,reason)}
                   />
-                </article>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {/* --------------------------------------------------------- closed */}
-      {closed.length > 0 && (
-        <section aria-labelledby="closed-heading">
-          <h2
-            id="closed-heading"
-            className="font-[family-name:var(--font-cormorant-garamond)] text-2xl font-semibold text-stone-900"
-          >
-            No longer connected
-          </h2>
-          <ul className="mt-4 space-y-3">
-            {closed.map((connection) => (
-              <li
-                key={connection.id}
-                className="flex flex-col gap-3 rounded-lg border border-stone-200 bg-stone-50 p-4 sm:flex-row sm:items-center sm:justify-between"
-              >
+                </details>);
+    return (<details id={`connection-editor-${connection.id}`} data-connection-editor={connection.id} className="scroll-mt-28 p-4"><summary className="min-h-11 cursor-pointer font-medium">Review connection · {connection.label}</summary><div className="space-y-4">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-stone-900">{connection.label}</span>
+                    <span className="font-medium text-foreground">{connection.label}</span>
                     <Badge className={STATUS_COPY[connection.status].tone}>
                       {STATUS_COPY[connection.status].label}
                     </Badge>
                   </div>
-                  <p className="mt-1 text-sm leading-6 text-stone-600">
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
                     {STATUS_COPY[connection.status].meaning}
                     {connection.revokedReason ? ` You noted: “${connection.revokedReason}”` : ""}
                   </p>
                 </div>
                 {(connection.status === "revoked" || connection.status === "denied") && (
                   <details className="w-full">
-                    <summary className="cursor-pointer text-sm font-medium text-emerald-800">Review and approve again</summary>
-                    <p className="mt-2 text-sm text-stone-600">This connection stays off until you approve the choices below. Choose a new end date for this new approval.</p>
+                    <summary className="cursor-pointer text-sm font-medium text-primary">Review and approve again</summary>
+                    <p className="mt-2 text-sm text-muted-foreground">This connection stays off until you approve the choices below. Choose a new end date for this new approval.</p>
                     <ApprovalForm
                       connection={connection}
                       busy={busyId === connection.id}
@@ -992,31 +903,59 @@ export function AiConnectionCenter({
                 >
                   <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" /> Remove from this list
                 </Button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+              </div></details>);
+  }
+
+  return (
+    <div className="settings-connection-center space-y-8">
+      <nav aria-label="AI settings sections" className="sticky top-14 z-20 -mx-1 flex gap-1 overflow-x-auto border-b border-border bg-background px-1">{[["connection-matrix","Connections"],["ceiling-heading","Permissions"],["activity-heading","History"],["manual-heading","Manual brief"]].map(([id,label])=><a key={id} href={`#${id}`} className="inline-flex min-h-11 shrink-0 items-center px-3 text-sm text-primary hover:bg-muted">{label}</a>)}</nav>
+      <div id="connection-matrix" className="scroll-mt-28"><ConnectionMatrix connections={connections} busyId={busyId} onEdit={editConnection} onRevoke={connection=>requestRevoke(connection)} onRemove={connection=>{void send(connection.id,{action:"remove"},"Removed from this list.");}} renderEditor={renderConnectionEditor}/></div>
+      <p className="text-sm leading-6 text-muted-foreground">Only you can approve, narrow or turn off a connection. It cannot grant itself more. Turning it off takes effect on its very next request, not whenever its sign-in happens to run out.</p>
+      <Dialog open={revokeRequest!==null} onOpenChange={open=>{if(!open)setRevokeRequest(null);}}><DialogContent onCloseAutoFocus={event=>{event.preventDefault();if(revokeOrigin.current?.isConnected)revokeOrigin.current.focus();else revokeRow.current?.focus();}}><DialogHeader><DialogTitle>Revoke {revokeRequest?.connection.label}?</DialogTitle><DialogDescription>This takes effect on its very next request. Its past research stays in your vault. Review and approve again here if you want to reconnect it later.</DialogDescription></DialogHeader><label className="text-sm">Reason for your own record (optional)<Input className="mt-2 min-h-11" maxLength={300} value={revokeRequest?.reason||""} onChange={event=>setRevokeRequest(current=>current?{...current,reason:event.target.value}:null)}/></label><DialogFooter><MatrixButton variant="outline" disabled={busyId===revokeRequest?.connection.id} onClick={()=>setRevokeRequest(null)}>Cancel</MatrixButton><MatrixButton variant="destructive" disabled={busyId===revokeRequest?.connection.id} onClick={async()=>{if(revokeRequest&&await send(revokeRequest.connection.id,{action:"revoke",reason:revokeRequest.reason.trim()||undefined},"Turned off. Its very next request is refused."))setRevokeRequest(null);}}>Revoke connection</MatrixButton></DialogFooter></DialogContent></Dialog>
+      {pending.length===0&&<p className="text-sm text-muted-foreground">Nothing is waiting. An AI you sign in is approved for ordinary research work straight away and shows above; connections from before that change may still wait here.</p>}
+      {active.length===0&&<p className="text-sm text-muted-foreground">No AI is connected to this workspace.</p>}
+      <OnlyYouTable/>
+      {/* ------------------------------------------- the whole ceiling */}
+      <section aria-labelledby="ceiling-heading">
+        <h2
+          id="ceiling-heading"
+          className="font-[family-name:var(--font-cormorant-garamond)] text-2xl font-semibold text-foreground"
+        >
+          Everything an AI can ever be given here
+        </h2>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          Full access includes every current permission below and future tools. You can choose fewer
+          permissions or an end date. Review, privacy, and publishing safeguards still apply.
+        </p>
+        <ul className="mt-4 space-y-3">
+          {FAMILY_HISTORY_SCOPE_INFO.map((scope) => (
+            <ScopeExplainer key={scope.scope} scope={scope} checked idPrefix="ceiling" />
+          ))}
+        </ul>
+        <div className="mt-4">
+          <NeverLists />
+        </div>
+      </section>
 
       {/* ------------------------------------------------------- activity */}
       <section aria-labelledby="activity-heading">
         <h2
           id="activity-heading"
-          className="font-[family-name:var(--font-cormorant-garamond)] text-2xl font-semibold text-stone-900"
+          className="font-[family-name:var(--font-cormorant-garamond)] text-2xl font-semibold text-foreground"
         >
           Recent activity
         </h2>
-        <p className="mt-2 text-sm leading-6 text-stone-600">
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
           Which tool ran and how it ended. Nothing your family records actually say is ever kept
           here — this is a log of activity, not of content.
         </p>
         {initialActivity.length === 0 ? (
-          <p className="mt-3 text-sm text-stone-500">No AI has used this workspace yet.</p>
+          <p className="mt-3 text-sm text-muted-foreground">No AI has used this workspace yet.</p>
         ) : (
           <div className="mt-4 overflow-x-auto">
             <table className="w-full min-w-[32rem] border-collapse text-sm">
               <thead>
-                <tr className="border-b border-stone-200 text-left text-xs uppercase tracking-wider text-stone-500">
+                <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
                   <th scope="col" className="py-2 pr-4 font-semibold">
                     When
                   </th>
@@ -1031,10 +970,10 @@ export function AiConnectionCenter({
               <tbody>
                 {initialActivity.map((row) => (
                   <tr key={row.id} className="border-b border-stone-100">
-                    <td className="py-2 pr-4 whitespace-nowrap text-stone-600">
+                    <td className="py-2 pr-4 whitespace-nowrap text-muted-foreground">
                       {formatDateTime(row.at)}
                     </td>
-                    <td className="py-2 pr-4 break-all font-mono text-xs text-stone-800">
+                    <td className="py-2 pr-4 break-all font-mono text-xs text-foreground">
                       {row.tool ?? "—"}
                     </td>
                     <td className="py-2">
@@ -1042,10 +981,10 @@ export function AiConnectionCenter({
                         className={cn(
                           "text-[11px]",
                           row.outcome === "ok"
-                            ? "bg-emerald-100 text-emerald-900"
+                            ? "bg-primary/10 text-primary"
                             : row.outcome === "denied"
-                              ? "bg-amber-100 text-amber-900"
-                              : "bg-stone-200 text-stone-700",
+                              ? "bg-annotation/10 text-annotation"
+                              : "bg-muted text-muted-foreground",
                         )}
                       >
                         {row.outcome === "ok"
@@ -1066,33 +1005,33 @@ export function AiConnectionCenter({
       </section>
 
       {/* -------------------------------------------- stale-tool recovery */}
-      <section aria-labelledby="stale-heading" className="rounded-xl border border-stone-200 bg-stone-50 p-5 sm:p-6">
+      <section aria-labelledby="stale-heading" className="rounded-xl border border-border bg-muted/40 p-5 sm:p-6">
         <h2
           id="stale-heading"
-          className="flex items-center gap-2 font-[family-name:var(--font-cormorant-garamond)] text-2xl font-semibold text-stone-900"
+          className="flex items-center gap-2 font-[family-name:var(--font-cormorant-garamond)] text-2xl font-semibold text-foreground"
         >
-          <RefreshCw className="h-5 w-5 text-stone-600" aria-hidden="true" /> If the tools look wrong
+          <RefreshCw className="h-5 w-5 text-muted-foreground" aria-hidden="true" /> If the tools look wrong
         </h2>
-        <p className="mt-2 text-sm leading-6 text-stone-600">
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
           After we release a change, an assistant can hold on to the old list of tools and keep
           calling names that no longer mean anything. Nothing is broken and nothing is lost — it just
           needs to ask again.
         </p>
-        <ol className="mt-4 space-y-2 text-sm leading-6 text-stone-700">
+        <ol className="mt-4 space-y-2 text-sm leading-6 text-muted-foreground">
           <li>1. In your AI, disconnect the Assist With Family History server.</li>
           <li>2. Add it back with the same address.</li>
           <li>3. Sign in again when it asks.</li>
           <li>
             4. Ask it to list the tools it now has. The names should start with{" "}
-            <code className="rounded bg-white px-1 py-0.5 font-mono text-xs">family_history_</code>.
+            <code className="rounded bg-card px-1 py-0.5 font-mono text-xs">family_history_</code>.
           </li>
           <li>
             5. Check this page. If the connection shows here as approved, its permissions are
             unchanged — reconnecting does not widen anything.
           </li>
         </ol>
-        <p className="mt-3 flex gap-2 text-sm leading-6 text-stone-600">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
+        <p className="mt-3 flex gap-2 text-sm leading-6 text-muted-foreground">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-annotation" aria-hidden="true" />
           If it still refuses everything, look at the status above. A connection that ran out or was
           turned off is refused on purpose. Signing in again reveals it here so you can review and approve a new
           request instead.
@@ -1103,18 +1042,18 @@ export function AiConnectionCenter({
       <section aria-labelledby="manual-heading">
         <h2
           id="manual-heading"
-          className="font-[family-name:var(--font-cormorant-garamond)] text-2xl font-semibold text-stone-900"
+          className="font-[family-name:var(--font-cormorant-garamond)] text-2xl font-semibold text-foreground"
         >
           When an assistant cannot connect at all
         </h2>
-        <p className="mt-2 text-sm leading-6 text-stone-600">
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
           Plenty of assistants cannot connect to anything. You can still use one: copy this brief,
           fill it in from your own workspace, and paste it into any chat. It carries context and no
           authority — nothing you paste can reach back into your records.
         </p>
-        <div className="mt-4 rounded-xl border border-stone-300 bg-white">
-          <div className="flex flex-col gap-3 border-b border-stone-200 p-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="flex items-center gap-2 text-sm font-medium text-stone-700">
+        <div className="mt-4 rounded-xl border border-border bg-card">
+          <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
               <Clock className="h-4 w-4" aria-hidden="true" /> One question, one family line
             </p>
             <Button
@@ -1127,7 +1066,7 @@ export function AiConnectionCenter({
               {copied ? "Copied" : "Copy the brief"}
             </Button>
           </div>
-          <pre className="overflow-x-auto p-4 font-mono text-xs leading-6 text-stone-800">
+          <pre className="overflow-x-auto p-4 font-mono text-xs leading-6 text-foreground">
             <code>{MANUAL_QUEUE_BRIEF}</code>
           </pre>
         </div>

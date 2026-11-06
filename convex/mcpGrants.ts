@@ -487,7 +487,7 @@ function storedConnectionRow(row: Doc<"mcpGrants">, now: number) {
   };
 }
 
-async function readConnections(ctx: QueryCtx, vaultOwnerId: string) {
+export async function readConnections(ctx: QueryCtx, vaultOwnerId: string) {
   const rows = await ctx.db
     .query("mcpGrants")
     .withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId))

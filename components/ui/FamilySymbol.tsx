@@ -1,0 +1,10 @@
+import type {SVGProps} from "react";
+
+/** Codex-written marks. Stroke and colour follow the surrounding interface. */
+export function FamilySymbol({name="shield",...props}:SVGProps<SVGSVGElement>&{name?:string}) {
+ const paths:Record<string,string>={close:"m5 5 14 14M19 5 5 19","eye-off":"M2 2 22 22M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z","shield-off":"M2 2 22 22M12 2 3 6v6c0 5 9 9 9 9s9-4 9-9V6l-9-4Z",shield:"M12 2 3 6v6c0 5 9 9 9 9s9-4 9-9V6l-9-4Zm-4 9 3 3 5-6",key:"M14 4a6 6 0 1 0 1 9l6 6v3h-4v-3h-3l-2-2M7 7h.01",pencil:"m4 16 12-12 4 4L8 20H4v-4Zm9-9 4 4",clock:"M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm0 4v5l4 2",check:"m4 12 5 5L20 5",copy:"M9 3h11v14H9V3ZM5 7H3v14h11v-2",lock:"M6 10V7a6 6 0 0 1 12 0v3M4 10h16v12H4V10Zm8 4v4",plug:"M8 2v5m8-5v5M5 7h14v3a7 7 0 0 1-14 0V7Zm7 10v5",refresh:"M20 8a8 8 0 1 0 0 8M20 3v5h-5",trash:"M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7",alert:"m12 2 10 19H2L12 2Zm0 6v6m0 3v1",eye:"M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Zm10-3a3 3 0 1 0 0 6 3 3 0 0 0 0-6",brain:"M12 4c-4-4-9 1-6 5-5 2-3 8 1 8 0 5 5 5 5 1V4Zm0 0c4-4 9 1 6 5 5 2 3 8-1 8 0 5-5 5-5 1M7 9l3 2m7-2-3 2",plus:"M12 3v18M3 12h18",pause:"M8 4v16M16 4v16",play:"m6 3 15 9-15 9V3"};
+ return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props} className={props.className||"size-4"}><path d={paths[name]||paths.shield}/></svg>;
+}
+
+const mark=(name:string)=>function FamilyIcon(props:SVGProps<SVGSVGElement>){return <FamilySymbol name={name} {...props}/>;};
+export const FamilyIcons={AlertTriangle:mark("alert"),CheckCircle2:mark("check"),Check:mark("check"),ClipboardCopy:mark("copy"),Copy:mark("copy"),Clock:mark("clock"),Eye:mark("eye"),EyeOff:mark("eye-off"),Loader2:mark("refresh"),Lock:mark("lock"),PlugZap:mark("plug"),RefreshCw:mark("refresh"),ShieldOff:mark("shield-off"),ShieldAlert:mark("shield"),Shield:mark("shield"),Trash2:mark("trash"),KeyRound:mark("key"),Key:mark("key"),Brain:mark("brain"),Plus:mark("plus"),PauseCircle:mark("pause"),PlayCircle:mark("play")};
