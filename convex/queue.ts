@@ -546,10 +546,18 @@ export const listQueueItemsInternal = internalQuery({
  * reconciliation changing updatedAt or removing rows from a state filter.
  */
 export const listAllowedQueueItemsInternal = internalQuery({
-  args: { ...listQueueArgs, queueItemIds: v.array(v.string()) },
+  args: { ...listQueueArgs, mcpGrantId: v.optional(v.string()), queueItemIds: v.array(v.string()) },
   handler: async (ctx, args): Promise<PaginationResult<QueueItem>> => {
+    const grant = args.mcpGrantId ? await assertGrantPermits(ctx, {
+      owner: args.vaultOwnerId, grantId: args.mcpGrantId,
+      toolName: "family_history_get_queue", input: { action: "list" },
+    }) : null;
+    const allowedIds = grant?.boundary.queueItemIds;
     const rows: QueueItem[] = [];
     for (const raw of new Set(args.queueItemIds)) {
+      // The action's list can be stale if the person narrowed the connection.
+      // Intersect with current authority before reading or reconciling a row.
+      if (allowedIds?.length && !allowedIds.includes(raw)) continue;
       const id = ctx.db.normalizeId("queueItems", raw);
       const item = id ? await ctx.db.get(id) : null;
       if (!item || !matchesVaultOwner(item.vaultOwnerId, args.vaultOwnerId)) continue;

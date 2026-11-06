@@ -708,6 +708,33 @@ describe("token audience", () => {
 
 
 describe("explicit Queue list boundary", () => {
+  test("named Queue query rechecks narrowed or revoked grants against a stale action list", async () => {
+    const t = convexTest(schema, modules);
+    const create = async (label: string) => (await t.withIdentity({ subject: OWNER_A }).mutation(api.queue.createQueueItem, {
+      vaultOwnerId: OWNER_A, directive: label, chosenAiId: "oauth-chosen-ai", idempotencyKey: label,
+    })).item._id;
+    const retained = await create("Retained named item");
+    const removed = await create("Removed named item");
+    const grantId = await seedGrant(t, {
+      vaultOwnerId: OWNER_A, scopes: ["family_history:queue:read"],
+      boundary: { kind: "queue_only", queueItemIds: [String(retained), String(removed)] },
+    });
+    const args = {
+      vaultOwnerId: OWNER_A, mcpGrantId: grantId,
+      queueItemIds: [String(retained), String(removed)],
+      paginationOpts: { numItems: 10, cursor: null },
+    };
+    const initial = await t.query(internal.queue.listAllowedQueueItemsInternal, args);
+    expect(initial.page.map((row) => row._id).sort()).toEqual([retained, removed].sort());
+    await t.run((ctx) => ctx.db.patch(grantId as import("./_generated/dataModel").Id<"mcpGrants">, {
+      boundary: { kind: "queue_only", queueItemIds: [String(retained)] },
+    }));
+    const narrowed = await t.query(internal.queue.listAllowedQueueItemsInternal, args);
+    expect(narrowed.page.map((row) => row._id)).toEqual([retained]);
+    await t.run((ctx) => ctx.db.patch(grantId as import("./_generated/dataModel").Id<"mcpGrants">, { status: "revoked" }));
+    await expect(t.query(internal.queue.listAllowedQueueItemsInternal, args)).rejects.toThrow(/GRANT_REVOKED/);
+  });
+
   test.each(["selected_people", "queue_only", "whole_workspace"] as const)("%s filters before pagination and outside expiry reconciliation", async (kind) => {
     const t = convexTest(schema, modules);
     const queueItem = async (label: string) => (await t.withIdentity({ subject: OWNER_A }).mutation(api.queue.createQueueItem, { vaultOwnerId: OWNER_A, directive: label, chosenAiId: "oauth-chosen-ai", idempotencyKey: label })).item._id;
