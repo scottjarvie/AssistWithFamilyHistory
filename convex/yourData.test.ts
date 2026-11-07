@@ -71,7 +71,7 @@ describe("your data", () => {
       });
     });
     const stats = await t.query(internal.yourData.getYourStatsInternal, { vaultOwnerId: OWNER });
-    expect(stats.ai.activeConnections).toBe(2);
+    expect(stats.ai.activeConnections).toBe(0); // unresolved same-issuer revoke applies to all unproven lineages
   });
   test("stats count only the owner's records", async () => {
     const t = convexTest(schema, modules);
@@ -93,13 +93,13 @@ describe("your data", () => {
     expect(stats.ai).toMatchObject({ activeConnections: 3, connectionsCapped: false });
   });
 
-  test("stats mark the connection count as partial when the recent list is full", async () => {
+  test("stats include all current connections beyond the former recent-list cap", async () => {
     const t = convexTest(schema, modules);
     for (let i = 0; i < 101; i++) {
       await seedGrant(t, { vaultOwnerId: OWNER, clientId: `connection-${i}`, expiresAt: null });
     }
     const stats = await t.query(internal.yourData.getYourStatsInternal, { vaultOwnerId: OWNER });
-    expect(stats.ai).toMatchObject({ activeConnections: 100, connectionsCapped: true });
+    expect(stats.ai).toMatchObject({ activeConnections: 101, connectionsCapped: false });
   });
 
   test("the Library research shelf shows the owner's tasks only", async () => {

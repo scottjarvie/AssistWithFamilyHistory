@@ -10,7 +10,7 @@ export const EXPORT_TABLES = [
   "sourceFacts", "sourceContents", "recordPersonas", "topics", "connections", "media", "contextItems",
   "importRuns", "familySearchSync", "researchTasks", "researchLog",
   "queueItems", "queueActivity", "documents", "stories", "storyReviewEvents", "provisionalRelatives",
-  "researchChecks", "historicalContext", "agentActivity", "mcpGrants", "mcpGrantHistory",
+  "researchChecks", "historicalContext", "agentActivity", "mcpGrants", "mcpGrantHistory", "mcpCarriedRestrictions",
 ] as const satisfies readonly TableNames[];
 
 export type ExportTable = (typeof EXPORT_TABLES)[number];

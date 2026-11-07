@@ -5,6 +5,7 @@ import schema from "./schema";
 import { api, internal } from "./_generated/api";
 import { FAMILY_HISTORY_SCOPES } from "../lib/mcp/catalog";
 import { effectiveScopes } from "../lib/mcp/grantDefaults";
+import { prepareLegacyOwner } from "../lib/mcp/testSupport";
 import { getVaultSnapshot } from "./vault";
 const modules = import.meta.glob("./**/*.ts");
 const identity = { subject: "user_connection_controls", issuer: "https://identity.example.test", clientId: "first-registration" };
@@ -14,7 +15,7 @@ async function fixture() {
   const row = (await t.run(ctx => ctx.db.query("mcpGrants").collect()))[0];
   const describe = () => t.query(internal.mcpGrants.describeCallingConnection, identity);
   const limit = (args: { revision: number; opId: string; action: "limit" | "pause" | "revoke"; removeScopes?: string[]; endsAt?: number; reason?: string }) => t.mutation(internal.mcpGrants.limitCallingConnection, { ...identity, ...args });
-  const person = (args: { revision: number; opId: string; action: string; expiresInDays?: number }) => t.withIdentity({ subject: identity.subject, azp: "https://website.example.test" }).mutation(api.mcpGrants.controlGrant, { vaultOwnerId: identity.subject, grantId: row._id, ...args });
+  const person = async (args: { revision: number; opId: string; action: string; expiresInDays?: number }) => t.withIdentity({ subject: identity.subject, azp: "https://website.example.test" }).mutation(api.mcpGrants.controlGrant, { vaultOwnerId: identity.subject, grantId: row._id, carriedRevision: (await describe()).carriedRevision, ...args });
   return { t, row, describe, limit, person };
 }
 
@@ -55,7 +56,7 @@ describe("AWL-0015 revisioned connection authority", () => {
     await t.mutation(internal.mcpGrants.resolveForRequest, identity);
     expect((await describe()).state).toBe("revoked");
     // The AI control's validated contract has no restore/resume/held-list path.
-    await expect(t.mutation(internal.mcpGrants.limitCallingConnection, { ...identity, action: "restore", revision: 3, opId: "self-restore" } as never)).rejects.toThrow();
+    await expect(t.mutation(internal.mcpGrants.limitCallingConnection, { ...identity, action: "restore", revision: 3, opId: "self-restore" } as never)).rejects.toThrow(/action|restore|Validator/i);
     await person({ action: "restore", revision: 3, opId: "person-restore" });
     expect(await describe()).toMatchObject({ state: "paused", endsAt, withheldScopes: ["family_history:research:write"] });
     await person({ action: "resume", revision: 4, opId: "person-resume" });
@@ -81,7 +82,7 @@ describe("AWL-0015 revisioned connection authority", () => {
   });
   test("website authority rejects a delegated token, foreign owner and missing revisions", async () => {
     const { t, row } = await fixture();
-    const args = { vaultOwnerId: identity.subject, grantId: row._id, action: "restore", revision: 0, opId: "restore" };
+    const args = { vaultOwnerId: identity.subject, grantId: row._id, action: "restore", revision: 0, carriedRevision: 0, opId: "restore" };
     await expect(t.withIdentity({ subject: identity.subject, client_id: "delegated-client" }).mutation(api.mcpGrants.controlGrant, args)).rejects.toThrow("website session");
     await expect(t.withIdentity({ subject: "user_someone_else" }).mutation(api.mcpGrants.controlGrant, args)).rejects.toThrow();
     await expect(t.withIdentity({ subject: identity.subject }).mutation(api.mcpGrants.revokeGrant, { vaultOwnerId: identity.subject, grantId: row._id })).rejects.toThrow("opId");
@@ -121,6 +122,7 @@ test("untouched earlier automatic defaults lift lazily; deliberate choices never
     requestedAt: issuedAt, issuedAt, consentedAt: issuedAt, expiresAt, updatedAt: issuedAt, useCount: 0,
     consentSnapshot: JSON.stringify({ approvedBy: "sign_in", shownAt: issuedAt, scopes: scopes.map(scope => ({ scope })), boundary: { kind: "whole_workspace", personCount: null, queueItemCount: null }, expiresAt }) };
   const id = await t.run(ctx => ctx.db.insert("mcpGrants", row));
+  await prepareLegacyOwner(t, identity.subject);
   expect((await t.mutation(internal.mcpGrants.resolveForRequest, identity)).state).toBe("active");
   expect(await t.query(internal.mcpGrants.describeCallingConnection, identity)).toMatchObject({ powers: [...FAMILY_HISTORY_SCOPES], endsAt: null, revision: 1 });
   expect(await t.run(ctx => ctx.db.query("mcpGrantHistory").collect())).toHaveLength(1);

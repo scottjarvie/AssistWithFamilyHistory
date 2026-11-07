@@ -286,7 +286,7 @@ describe("grant states: sign-in approves, the person's no stands", () => {
     const t = withGrantVersions(convexTest(schema, modules));
     const olderId = await seedGrant(t, { vaultOwnerId: OWNER_A, clientId: CLIENT_ID, issuer: ISSUER });
     const newestId = await seedGrant(t, { vaultOwnerId: OWNER_A, clientId: CLIENT_ID, issuer: ISSUER });
-    await t.run((ctx) => ctx.db.patch(olderId as never, { consentedAt: Date.now() - 1000 }));
+    await t.run((ctx) => ctx.db.patch(olderId as never, { authorityGrantId: newestId as never }));
     const token = await tokenFor(OWNER_A);
     const call = async () => {
       const response = await t.fetch("/mcp", rpc("tools/call", token, { name: "family_history_get_brief", arguments: {} }));
@@ -307,9 +307,9 @@ describe("grant states: sign-in approves, the person's no stands", () => {
     });
     expect([olderId, newestId]).not.toContain(String(approved.id));
     expect((await call()).isError).not.toBe(true);
-    for (const id of [olderId, newestId]) {
-      expect(await t.run((ctx) => ctx.db.get(id as never))).toMatchObject({ status: "revoked" });
-    }
+    expect(await t.run(ctx => ctx.db.get(newestId as never))).toMatchObject({ status: "revoked", authorityGrantId: approved.id });
+    expect(await t.run(ctx => ctx.db.get(olderId as never))).toMatchObject({ status: "active" });
+    // Historical raw rows retain their receipt; only the canonical authority gates calls.
   });
 });
 
