@@ -84,7 +84,7 @@ async function readYourStats(ctx: QueryCtx, owner: string) {
       activeConnections: new Set(grants.connections
         .filter((row) => row.status === "active")
         .map((row) => JSON.stringify([row.clientId, row.issuer]))).size,
-      connectionsCapped: grants.connections.length >= 100,
+      connectionsCapped: grants.preparing,
       savesLast30Days: recentAi.length,
       savesCapped: activity.more,
     },
@@ -179,8 +179,11 @@ async function authorizedOwner(ctx: Parameters<typeof authorizeTenantAction>[0] 
 
 export const getYourStats = action({
   args: { vaultOwnerId: v.string() },
-  handler: async (ctx, args): Promise<YourStats> =>
-    ctx.runQuery(self.getYourStatsInternal, { vaultOwnerId: await authorizedOwner(ctx, "yourData.getYourStats", args.vaultOwnerId) }),
+  handler: async (ctx, args): Promise<YourStats> => {
+    const vaultOwnerId = await authorizedOwner(ctx, "yourData.getYourStats", args.vaultOwnerId);
+    await ctx.runMutation(internal.mcpGrants.prepareOwnerConnections, { vaultOwnerId });
+    return ctx.runQuery(self.getYourStatsInternal, { vaultOwnerId });
+  },
 });
 
 export const getLibraryShelves = action({

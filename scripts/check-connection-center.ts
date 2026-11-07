@@ -327,3 +327,9 @@ for (const text of ["Narrowed by your AI on", "Resume", "Restore", "Connection h
   assert.ok(pausedMarkup.includes(text), `Paused connection must show ${text}`);
 }
 assert.ok(!pausedMarkup.includes("Only you can approve, narrow or turn off"));
+
+const linkedMarkup = decode(renderToStaticMarkup(React.createElement(AiConnectionCenter, {
+  initialConnections: [{ ...active, linkedByName: true }], initialActivity: [],
+})));
+assert.ok(linkedMarkup.includes("Linked by name."));
+assert.ok(linkedMarkup.includes("Separate installations reporting the same name"));

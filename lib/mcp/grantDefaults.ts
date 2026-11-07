@@ -28,13 +28,16 @@ export type GrantChoices = {
 };
 
 export function effectiveScopeChoice(grant: Pick<GrantChoices, "scopes" | "scopeChoice">): ScopeChoice {
-  return grant.scopeChoice ?? (LEGACY_FULL_SCOPE_BASELINE.every((scope) => grant.scopes.includes(scope)) ? "full" : "chosen");
+  return grant.scopeChoice ?? (untouchedAutomaticGrant(grant) ? "full" : "chosen");
 }
 
 /** Legacy held lists become a frozen removed list: new powers still arrive. */
 export function effectiveWithheldScopes(grant: GrantChoices): string[] {
   if (grant.withheldScopes !== undefined) return [...grant.withheldScopes];
   if (effectiveScopeChoice(grant) === "full" || untouchedAutomaticGrant(grant)) return [];
+  // An unmarked Settings/ambiguous receipt is not consent to powers absent
+  // from its stored list. Freeze those omissions before future catalog growth.
+  if (!grant.scopeChoice) return FAMILY_HISTORY_SCOPES.filter((scope) => !grant.scopes.includes(scope));
   return LEGACY_FULL_SCOPE_BASELINE.filter((scope) => !grant.scopes.includes(scope));
 }
 

@@ -68,6 +68,8 @@ type ToolCallResult = {
 
 /** The same official client and protocol pin the live harness connects with. */
 async function connect(t: ReturnType<typeof convexTest>, token: string) {
+  const { internal } = await import("./_generated/api");
+  await t.mutation(internal.mcpClientTrust.saveRegistration, { clientId: CLIENT_ID, clientName: `[SYNTHETIC QA - DELETE ME] ${RUN_KEY}`, redirectUris: [], provenance: "dcr", status: "valid" });
   const client = new Client(
     { name: `[SYNTHETIC QA - DELETE ME] ${RUN_KEY}`, version: "1.0.0" },
     { versionNegotiation: { mode: { pin: PROTOCOL_VERSION } } },

@@ -56,7 +56,7 @@ export type ResolvedGrant = {
 export type GrantResolution =
   | { state: "active"; grant: ResolvedGrant }
   | { state: "absent" }
-  | { state: "pending"; at?: number }
+  | { state: "pending"; at?: number; reason?: string }
   | { state: "revoked"; at?: number }
   | { state: "expired"; at?: number }
   | { state: "paused"; at?: number }
@@ -149,7 +149,7 @@ export function refusalForResolution(resolution: GrantResolution): AccessRefusal
     case "paused":
       return { ...refusal("GRANT_REVOKED"), message: `This connection was paused${resolution.at ? ` on ${new Date(resolution.at).toISOString()}` : ""}. Only the person can resume it.`, recovery: `Only the person can restore access at ${CONNECTION_SETTINGS_URL}.` };
     case "pending":
-      return refusal("GRANT_PENDING");
+      return resolution.reason ? { ...refusal("GRANT_PENDING"), message: resolution.reason, recovery: "Retry after the automatic preparation finishes. No sign-in or new approval is needed." } : refusal("GRANT_PENDING");
     case "revoked":
       return refusal("GRANT_REVOKED");
     case "denied":

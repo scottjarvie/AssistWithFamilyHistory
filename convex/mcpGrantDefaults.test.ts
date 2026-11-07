@@ -1,4 +1,4 @@
-import { withGrantVersions } from "../lib/mcp/testSupport";
+import { prepareLegacyOwner, withGrantVersions } from "../lib/mcp/testSupport";
 /// <reference types="vite/client" />
 import { describe, expect, test, vi } from "vitest";
 import { convexTest } from "convex-test";
@@ -7,7 +7,7 @@ import { assertGrantPermits } from "./mcpGrants";
 import { api, internal } from "./_generated/api";
 import { FAMILY_HISTORY_SCOPES } from "../lib/mcp/catalog";
 import { decideToolAccess, permittedTools } from "../lib/mcp/authorize";
-import { effectiveScopes, effectiveScopeChoice, effectiveExpiry, LEGACY_FULL_SCOPE_BASELINE } from "../lib/mcp/grantDefaults";
+import { effectiveWithheldScopes, effectiveScopes, effectiveScopeChoice, effectiveExpiry, LEGACY_FULL_SCOPE_BASELINE } from "../lib/mcp/grantDefaults";
 import { seedGrant } from "../lib/mcp/testSupport";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -47,13 +47,19 @@ describe("durable full access", () => {
     expect(effectiveScopes({ scopes: [...LEGACY_FULL_SCOPE_BASELINE], scopeChoice: "chosen" })).toEqual([...FAMILY_HISTORY_SCOPES]);
   });
 
-  test("legacy inference uses the frozen baseline, not future catalog membership", () => {
-    expect(effectiveScopeChoice({ scopes: [...LEGACY_FULL_SCOPE_BASELINE] })).toBe("full");
+  test("unmarked legacy Settings and ambiguous rows keep their stored powers; only proven automatic defaults lift", () => {
+    expect(effectiveScopeChoice({ scopes: [...LEGACY_FULL_SCOPE_BASELINE] })).toBe("chosen");
     expect(effectiveScopeChoice({ scopes: LEGACY_FULL_SCOPE_BASELINE.slice(1) })).toBe("chosen");
     const catalog = FAMILY_HISTORY_SCOPES as unknown as string[];
     catalog.push("family_history:future:synthetic");
     try {
-      expect(effectiveScopes({ scopes: [...LEGACY_FULL_SCOPE_BASELINE] })).toContain("family_history:future:synthetic");
+      expect(effectiveScopes({ scopes: [...LEGACY_FULL_SCOPE_BASELINE] })).toEqual([...LEGACY_FULL_SCOPE_BASELINE]);
+      expect(effectiveScopes({ scopes: [...LEGACY_FULL_SCOPE_BASELINE], consentSnapshot: JSON.stringify({ approvedBy: "settings" }) })).toEqual([...LEGACY_FULL_SCOPE_BASELINE]);
+      const issuedAt = 100;
+      const automatic = { scopes: [...LEGACY_FULL_SCOPE_BASELINE], requestedAt: issuedAt, issuedAt, consentedAt: issuedAt,
+        consentSnapshot: JSON.stringify({ approvedBy: "sign_in", shownAt: issuedAt, scopes: [...LEGACY_FULL_SCOPE_BASELINE] }) };
+      expect(effectiveScopeChoice(automatic)).toBe("full");
+      expect(effectiveScopes(automatic)).toContain("family_history:future:synthetic");
       expect(effectiveScopes({ scopes: [...LEGACY_FULL_SCOPE_BASELINE], scopeChoice: "chosen" })).toContain("family_history:future:synthetic");
     } finally { catalog.pop(); }
   });
@@ -91,7 +97,7 @@ describe("explicit and legacy expiry", () => {
     expect(resolved.state).toBe("active");
     if (resolved.state === "active") {
       expect(resolved.grant.expiresAt).toBeUndefined();
-      expect(resolved.grant.scopes).toEqual(["family_history:context:read", "family_history:records:archive"]);
+      expect(resolved.grant.scopes).toEqual(["family_history:context:read"]);
       expect(resolved.grant.boundary.kind).toBe("selected_people");
     }
     const listing = await t.query(internal.mcpGrants.listConnectionsInternal, { vaultOwnerId: owner });
@@ -166,8 +172,8 @@ describe("durable revocation and owner removal", () => {
         return;
       }
       await expect(own.mutation(api.mcpGrants.removeGrant, args)).resolves.toEqual({ id: grantId, removed: true });
-      const hidden = { ...before, status: "revoked", revokedAt: expiresAt + offset, hiddenAt: expiresAt + offset, updatedAt: expiresAt + offset };
-      expect(await t.run((ctx) => ctx.db.get(grantId))).toMatchObject(hidden);
+      const hidden = { ...before, revision: 1, withheldScopes: effectiveWithheldScopes(before), status: "revoked", revokedAt: expiresAt + offset, hiddenAt: expiresAt + offset, updatedAt: expiresAt + offset };
+      expect(await t.run((ctx) => ctx.db.get(grantId))).toEqual(hidden);
       expect((await t.query(internal.mcpGrants.listConnectionsInternal, { vaultOwnerId: owner })).connections).toEqual([]);
       await expect(own.mutation(api.mcpGrants.updateGrantExpiry, args)).rejects.toThrow("Only an approved connection");
       for (let attempt = 0; attempt < 2; attempt++) {
@@ -177,7 +183,7 @@ describe("durable revocation and owner removal", () => {
       }
       await expect(t.run((ctx) => assertGrantPermits(ctx, { owner, grantId, toolName: "family_history_get_context", input: { kind: "person", id: "synthetic-person" } }))).rejects.toThrow();
       const revealed = Object.fromEntries(Object.entries(hidden).filter(([key]) => key !== "hiddenAt"));
-      expect(await t.run((ctx) => ctx.db.get(grantId))).toMatchObject({ ...revealed, revision: 1 });
+      expect(await t.run((ctx) => ctx.db.get(grantId))).toEqual({ ...revealed, revision: 1 });
       expect(await t.run((ctx) => ctx.db.query("mcpGrants").collect())).toHaveLength(1);
       // Only explicit owner reapproval creates a new grant; the old receipt,
       // person boundary, chosen end date and usage history survive intact.
@@ -186,7 +192,7 @@ describe("durable revocation and owner removal", () => {
         boundary: before.boundary, expiresInDays: 7,
       });
       expect(approved.id).not.toBe(grantId);
-      expect(await t.run((ctx) => ctx.db.get(grantId))).toMatchObject(hidden);
+      expect(await t.run((ctx) => ctx.db.get(grantId))).toEqual({ ...hidden, authorityGrantId: approved.id });
       expect(await t.run((ctx) => ctx.db.query("mcpGrants").collect())).toHaveLength(2);
     } finally { clock.mockRestore(); }
   });
@@ -230,7 +236,7 @@ describe("durable revocation and owner removal", () => {
     });
     const other = await t.mutation(internal.mcpGrants.resolveForRequest, { ...resolveArgs, subject: "user_foreign_synthetic" });
     expect(other.state).toBe("active");
-    expect(await t.run((ctx) => ctx.db.get(grantId))).toMatchObject(hidden);
+    expect(await t.run((ctx) => ctx.db.get(grantId))).toEqual(hidden);
     for (let attempt = 0; attempt < 2; attempt++) {
       const denied = await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs);
       expect(denied.state).toBe("revoked");
@@ -245,7 +251,7 @@ describe("durable revocation and owner removal", () => {
     await expect(foreign.mutation(api.mcpGrants.approveGrant, { ...approval, vaultOwnerId: "user_foreign_synthetic" })).rejects.toThrow("Connection not found");
     expect((await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs)).state).toBe("revoked");
     const approved = await own.mutation(api.mcpGrants.approveGrant, approval);
-    await expect(own.mutation(api.mcpGrants.approveGrant, approval)).rejects.toThrow("already approved");
+    await expect(own.mutation(api.mcpGrants.approveGrant, approval)).rejects.toThrow("superseded");
     expect(approved.id).not.toBe(grantId);
     expect(await t.run((ctx) => ctx.db.get(grantId))).toMatchObject({ ...revoked!, revision: (revoked!.revision ?? 0) + 1, hiddenAt: expect.any(Number) });
     const active = await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs);
@@ -254,7 +260,7 @@ describe("durable revocation and owner removal", () => {
     expect(decideToolAccess({ resolution: active, toolName: "family_history_save_records", now: Date.now() }).allowed).toBe(false);
     // Stale tabs cannot report success against the old refusal or alter it.
     const oldHistory = await t.run((ctx) => ctx.db.get(grantId));
-    await expect(own.mutation(api.mcpGrants.revokeGrant, args)).rejects.toThrow("Only an active connection");
+    await expect(own.mutation(api.mcpGrants.revokeGrant, args)).rejects.toThrow("superseded");
     await expect(foreign.mutation(api.mcpGrants.revokeGrant, { vaultOwnerId: owner, grantId: approved.id })).rejects.toThrow();
     await expect(foreign.mutation(api.mcpGrants.revokeGrant, { vaultOwnerId: "user_foreign_synthetic", grantId: approved.id })).rejects.toThrow("Connection not found");
     expect(await t.run((ctx) => ctx.db.get(grantId))).toEqual(oldHistory);
@@ -287,22 +293,27 @@ describe("durable revocation and owner removal", () => {
     const automaticId = await t.run((ctx) => ctx.db.insert("mcpGrants", {
       ...fields, ...autoExpiry(now - 100 * 86_400_000), status: "expired", expiryChoice: undefined,
     }));
+    // A trusted lineage pointer, rather than consent timestamps, identifies
+    // the explicit replacement approval.
+    await t.run(async ctx => {
+      await ctx.db.patch(grantId, { authorityGrantId: nextId });
+      await ctx.db.patch(automaticId, { authorityGrantId: nextId });
+    });
     const isolated = await t.run(async (ctx) => Promise.all([
       ctx.db.insert("mcpGrants", { ...fields, vaultOwnerId: "other-synthetic-owner" }),
-      ctx.db.insert("mcpGrants", { ...fields, clientId: "other-synthetic-client" }),
       ctx.db.insert("mcpGrants", { ...fields, issuer: "https://other-issuer.example.test" }),
     ]));
     const snapshots = await t.run(async (ctx) => Promise.all(isolated.map((id) => ctx.db.get(id))));
     const before = await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs);
     expect(before.state).toBe("active");
     if (before.state !== "active") throw new Error("Expected active fixture");
-    // Resolve and revoke share the deterministic consent/creation/ID ordering.
+    // Resolve and revoke follow the same durable authority.
     expect(before.grant.grantId).toBe(String(nextId));
     const governingId = nextId;
     await own.mutation(api.mcpGrants.revokeGrant, { vaultOwnerId: owner, grantId: governingId });
     for (const id of [grantId, nextId, automaticId]) {
       const closed = (await t.run((ctx) => ctx.db.get(id)))!;
-      expect(closed.status).toBe("revoked");
+      expect(closed.status).toBe(id === nextId ? "revoked" : id === automaticId ? "expired" : "active");
       expect(closed.scopes).toEqual(fields.scopes);
       expect(closed.scopeChoice).toBe("chosen");
       if (id !== automaticId) {
@@ -343,25 +354,21 @@ describe("durable revocation and owner removal", () => {
     }
   });
 
-  test("overflow refuses resolution, revoke and approval without partial writes; issuers have separate budgets", async () => {
+  test("legacy history beyond 256 rows is indexed completely, without an authorization cap", async () => {
     const { t, grantId } = await fixture();
     const otherIssuer = "https://separate-budget.example.test";
-    const otherId = await t.run(async (ctx) => {
+    const otherId = await t.run(async ctx => {
       const row = (await ctx.db.get(grantId))!;
-      const { _id, _creationTime, ...fields } = row;
-      void _id; void _creationTime;
+      const { _id, _creationTime, ...fields } = row; void _id; void _creationTime;
       for (let i = 0; i < 256; i++) await ctx.db.insert("mcpGrants", { ...fields, status: "revoked" });
       return ctx.db.insert("mcpGrants", { ...fields, issuer: otherIssuer });
     });
-    const before = await t.run((ctx) => ctx.db.query("mcpGrants").collect());
-    await expect(t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs)).rejects.toThrow("too much approval history");
-    const own = t.withIdentity(identity);
-    await expect(own.mutation(api.mcpGrants.revokeGrant, { vaultOwnerId: owner, grantId })).rejects.toThrow("too much approval history");
-    const closed = before.find((row) => row.status === "revoked")!;
-    await expect(own.mutation(api.mcpGrants.approveGrant, {
-      vaultOwnerId: owner, grantId: closed._id, label: "Overflow", scopes: [...FAMILY_HISTORY_SCOPES], boundary: { kind: "whole_workspace" },
-    })).rejects.toThrow("too much approval history");
-    expect(await t.run((ctx) => ctx.db.query("mcpGrants").collect())).toEqual(before);
+    expect((await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs)).state).toBe("revoked");
+    const listing = await t.query(internal.mcpGrants.listConnectionsInternal, { vaultOwnerId: owner });
+    const currentId = listing.connections[0].id;
+    const approved = await t.withIdentity(identity).mutation(api.mcpGrants.approveGrant, { vaultOwnerId: owner, grantId: currentId, label: "Explicit restore", scopes: [...FAMILY_HISTORY_SCOPES], boundary: { kind: "whole_workspace" } });
+    expect((await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs)).state).toBe("active");
+    expect(approved.id).not.toBe(currentId);
     expect(await t.mutation(internal.mcpGrants.resolveForRequest, { ...resolveArgs, issuer: otherIssuer })).toMatchObject({ state: "active", grant: { grantId: String(otherId) } });
   });
 
@@ -379,10 +386,11 @@ describe("durable revocation and owner removal", () => {
     const { _id, _creationTime, ...fields } = original;
     void _id; void _creationTime;
     const nextId = await t.run((ctx) => ctx.db.insert("mcpGrants", { ...fields, consentedAt: Date.now() + 1000 }));
+    await prepareLegacyOwner(t, owner, true);
     const own = t.withIdentity(identity);
     await expect(own.mutation(api.mcpGrants.revokeGrant, { vaultOwnerId: owner, grantId })).rejects.toThrow("superseded");
     await t.run((ctx) => ctx.db.patch(grantId, { hiddenAt: Date.now() }));
-    await expect(own.mutation(api.mcpGrants.revokeGrant, { vaultOwnerId: owner, grantId })).rejects.toThrow("Only an active connection");
+    await expect(own.mutation(api.mcpGrants.revokeGrant, { vaultOwnerId: owner, grantId })).rejects.toThrow("superseded");
     expect((await t.run((ctx) => ctx.db.get(nextId)))!.status).toBe("active");
   });
 
@@ -398,8 +406,8 @@ describe("durable revocation and owner removal", () => {
     expect(results.filter((r) => r.status === "rejected")).toHaveLength(1);
     const approval = { ...args, label: "New", scopes: [...FAMILY_HISTORY_SCOPES], boundary: { kind: "whole_workspace" as const } };
     const approved = await own.mutation(api.mcpGrants.approveGrant, approval);
-    await expect(own.mutation(api.mcpGrants.approveGrant, approval)).rejects.toThrow("already approved");
-    await expect(own.mutation(api.mcpGrants.revokeGrant, args)).rejects.toThrow("Only an active connection");
+    await expect(own.mutation(api.mcpGrants.approveGrant, approval)).rejects.toThrow("superseded");
+    await expect(own.mutation(api.mcpGrants.revokeGrant, args)).rejects.toThrow("superseded");
     await own.mutation(api.mcpGrants.revokeGrant, { ...args, grantId: approved.id });
     expect((await t.mutation(internal.mcpGrants.resolveForRequest, resolveArgs)).state).toBe("revoked");
   });

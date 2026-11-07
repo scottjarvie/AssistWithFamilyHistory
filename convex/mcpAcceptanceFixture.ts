@@ -250,6 +250,9 @@ async function fixtureGraph(ctx: FixtureCtx, runKeyInput: string) {
     throw new Error("Refusing cleanup because a marked connection lacks its visible synthetic acceptance marker.");
   }
   const grantIds = idSet(grants);
+  if (allGrants.some(row => !grantIds.has(String(row._id)) && row.authorityGrantId && grantIds.has(String(row.authorityGrantId)))) {
+    throw new Error("Refusing cleanup because an unmarked connection shares the marked lineage authority.");
+  }
   const grantHistory = (await boundedOwnerRows(ctx, "mcpGrantHistory", owner)).filter(row => grantIds.has(String(row.grantId)));
   const clientAliases = (await boundedOwnerRows(ctx, "mcpClientAliases", owner)).filter(row => grantIds.has(String(row.grantId)));
   const grantClientIds = new Set(grants.map((row) => row.clientId));
@@ -411,7 +414,14 @@ export const clear = mutation({
     for (const row of graph.mappings) await ctx.db.delete(row._id);
     for (const row of graph.grantHistory) await ctx.db.delete(row._id);
     for (const row of graph.clientAliases) await ctx.db.delete(row._id);
+    const markedGrantIds = new Set(graph.grants.map(row => String(row._id)));
+    const carried = await ctx.db.query("mcpCarriedRestrictions").withIndex("by_owner", q => q.eq("vaultOwnerId", graph.owner)).unique();
+    if (carried) {
+      if (carried.entries.some(e => markedGrantIds.has(String(e.sourceGrantId)) !== markedGrantIds.has(String(e.lineageGrantId)))) throw new Error("Refusing cleanup because carried restrictions cross the exact fixture boundary.");
+      await ctx.db.patch(carried._id, { entries: carried.entries.filter(e => !markedGrantIds.has(String(e.sourceGrantId))), names: carried.names.filter(n => !markedGrantIds.has(String(n.grantId))) });
+    }
     for (const row of graph.grants) await ctx.db.delete(row._id);
+    if (carried && !(await ctx.db.query("mcpGrants").withIndex("by_owner", q => q.eq("vaultOwnerId", graph.owner)).first())) await ctx.db.delete(carried._id);
     for (const row of graph.registrations) await ctx.db.delete(row._id);
     return { removed: true as const, runKey: graph.runKey, counts: removed };
   },

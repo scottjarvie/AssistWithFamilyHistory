@@ -667,11 +667,16 @@ function ActiveConnectionControls({
 export function AiConnectionCenter({
   initialConnections,
   initialActivity,
+  initialSupersededConnections = [],
+  preparing = false,
 }: {
   initialConnections: ConnectionRow[];
   initialActivity: ConnectionActivityRow[];
+  initialSupersededConnections?: ConnectionRow[];
+  preparing?: boolean;
 }) {
   const [connections, setConnections] = useState(initialConnections);
+  const [supersededConnections, setSupersededConnections] = useState(initialSupersededConnections);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const inFlight = useRef(new Set<string>());
@@ -696,11 +701,13 @@ export function AiConnectionCenter({
       const response = await fetch("/api/ai-connections", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...body, grantId, revision: connections.find(row => row.id === grantId)?.revision ?? 0, opId: crypto.randomUUID() }),
+        body: JSON.stringify({ ...body, grantId, revision: connections.find(row => row.id === grantId)?.revision ?? 0, carriedRevision: connections.find(row => row.id === grantId)?.carriedRevision ?? 0, opId: crypto.randomUUID() }),
       });
       const payload = (await response.json().catch(() => ({}))) as {
         id?: string;
         connection?: ConnectionRow;
+        connections?: ConnectionRow[];
+        supersededConnections?: ConnectionRow[];
         error?: string;
         status?: ConnectionRow["status"];
         scopes?: FamilyHistoryScope[];
@@ -720,7 +727,9 @@ export function AiConnectionCenter({
         return false;
       }
       toast.success(success);
+      if (payload.supersededConnections) setSupersededConnections(payload.supersededConnections);
       setConnections((current) => {
+        if (payload.connections) return payload.connections;
         if (payload.removed) return current.filter((row) => row.id !== grantId);
         return current.map((row) =>
           row.id === grantId
@@ -763,6 +772,8 @@ export function AiConnectionCenter({
 
   function renderConnectionEditor(connection:ConnectionRow) {
     const controls = <div className="space-y-3 p-3">
+      {connection.inheritedLimits && <p className="text-sm text-muted-foreground">Unresolved earlier connection limits also apply here. Restore joins this connection’s lineage before giving access back.</p>}
+      {connection.linkedByName && <p className="text-sm text-muted-foreground">Linked by name. Separate installations reporting the same name share this connection’s limits. Only you can restore access.</p>}
       {connection.limitedBy === "ai" && connection.limitedAt && <p>Narrowed by your AI on {formatDateTime(connection.limitedAt)}</p>}
       <div className="flex flex-wrap gap-2">
         {connection.status === "active" && <Button disabled={busyId === connection.id} variant="outline" onClick={() => send(connection.id, {action:"pause"}, "Paused.")}>Pause</Button>}
@@ -921,6 +932,8 @@ export function AiConnectionCenter({
 
   return (
     <div className="settings-connection-center space-y-8">
+      {preparing && <p role="status">Preparing earlier connection limits automatically. Access stays paused until this finishes. <button type="button" className="min-h-11 underline" onClick={() => window.location.reload()}>Refresh connections</button></p>}
+      {supersededConnections.length > 0 && <details><summary className="min-h-11 cursor-pointer">Superseded connection history</summary><ul className="space-y-2">{supersededConnections.map(row => <li key={row.id} className="text-sm text-muted-foreground">{row.label} · last used {formatDateTime(row.lastUsedAt)} · superseded; shares its current lineage’s authority</li>)}</ul></details>}
       <nav aria-label="AI settings sections" className="sticky top-14 z-20 -mx-1 flex gap-1 overflow-x-auto border-b border-border bg-background px-1">{[["connection-matrix","Connections"],["ceiling-heading","Permissions"],["activity-heading","History"],["manual-heading","Manual brief"]].map(([id,label])=><a key={id} href={`#${id}`} className="inline-flex min-h-11 shrink-0 items-center px-3 text-sm text-primary hover:bg-muted">{label}</a>)}</nav>
       <div id="connection-matrix" className="scroll-mt-28"><ConnectionMatrix connections={connections} busyId={busyId} onEdit={editConnection} onRevoke={connection=>requestRevoke(connection)} onRemove={connection=>{void send(connection.id,{action:"remove"},"Removed from this list.");}} renderEditor={renderConnectionEditor}/></div>
       <p className="text-sm leading-6 text-muted-foreground">You or your AI can limit a connection. Only you can restore access, resume it or extend its end date. Turning it off takes effect on its very next request, not whenever its sign-in happens to run out.</p>
