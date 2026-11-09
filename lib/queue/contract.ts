@@ -1,17 +1,16 @@
 export const QUEUE_STATES = [
-  "needs_you",
-  "working",
   "waiting_for_your_ai",
+  "working",
   "done",
 ] as const;
 
-export type QueueState = (typeof QUEUE_STATES)[number];
+export type QueueState = (typeof QUEUE_STATES)[number] | "needs_you"; // legacy storage only
 
 export const QUEUE_STATE_LABELS: Record<QueueState, string> = {
-  needs_you: "Needs You",
-  working: "Working",
-  waiting_for_your_ai: "Waiting for your AI",
-  done: "Done",
+  needs_you: "Needs your input",
+  working: "AI working",
+  waiting_for_your_ai: "Waiting on AI",
+  done: "Answered",
 };
 
 export const QUEUE_CONDITIONS = [
@@ -29,7 +28,7 @@ export const QUEUE_CONDITIONS = [
 export type QueueCondition = (typeof QUEUE_CONDITIONS)[number];
 export type QueuePriority = "high" | "normal" | "low";
 export type QueueActorKind = "user" | "chosen_ai" | "first_party_ai" | "system";
-export type QueueOperation = "queue:read" | "queue:claim" | "queue:update" | "queue:complete";
+export type QueueOperation = "queue:archive" | "queue:add" | "queue:suggest" | "queue:read" | "queue:claim" | "queue:update" | "queue:complete";
 
 export const QUEUE_SERVICE_STATES = [
   "loading",
@@ -59,6 +58,9 @@ export const QUEUE_LIMITS = {
 } as const;
 
 export type QueueSnapshot = {
+  needsInput?: { question: string; raisedAt: number; actorId: string };
+  archivedAt?: number;
+  suggestionStatus?: "open" | "accepted" | "dismissed" | "withdrawn";
   state: QueueState;
   condition: QueueCondition;
   version: number;
@@ -73,7 +75,7 @@ export type QueueSnapshot = {
 
 export type QueueExpiryTransition = {
   expiresAt: number;
-  state: "needs_you";
+  state: QueueState;
   condition: "expired";
   requiredAction: string;
 };
@@ -178,7 +180,7 @@ export function leaseExpiresAtForActor(
 }
 
 export function queueExpiryDeadline(snapshot: QueueSnapshot): number | undefined {
-  if (snapshot.state === "done" || snapshot.state === "needs_you") return undefined;
+  if (snapshot.state === "done" || snapshot.state === "needs_you" || !!snapshot.needsInput || !!snapshot.archivedAt || snapshot.suggestionStatus === "open") return undefined;
   const deadlines: number[] = [];
   if (snapshot.state === "working" && snapshot.leaseExpiresAt !== undefined) {
     deadlines.push(snapshot.leaseExpiresAt);
@@ -200,7 +202,7 @@ export function queueExpiryTransition(
   if (expiresAt === undefined || expiresAt > now) return null;
   return {
     expiresAt,
-    state: "needs_you",
+    state: snapshot.state,
     condition: "expired",
     requiredAction: "Reconnect or choose an AI for this directive, then return it to Waiting for your AI.",
   };
@@ -212,12 +214,14 @@ export function assertCommandAllowed(
   actor: { kind: QueueActorKind; id: string },
   now: number,
 ): void {
+  if ((snapshot.archivedAt || snapshot.suggestionStatus === "open") && !(command==="resume"&&actor.kind==="user"&&(snapshot.needsInput||snapshot.state==="needs_you"))) throw new Error("Accept the AI suggestion or restore the archived item before working on it");
   switch (command) {
     case "assign":
       if (actor.kind !== "user") throw new Error("Only the user can assign Queue work");
       if (snapshot.state === "done") throw new Error("Reopen Done work before assigning it");
       return;
     case "claim":
+      if(snapshot.needsInput)throw new Error("Only the person can answer or clear Needs your input before pickup");
       if (
         actor.kind !== "user" &&
         snapshot.handoffExpiresAt !== undefined &&
@@ -236,15 +240,16 @@ export function assertCommandAllowed(
       if (snapshot.state === "working" && (snapshot.leaseExpiresAt ?? 0) <= now) return;
       throw new Error("Only waiting work or a Working item with an expired claim can be claimed");
     case "checkpoint":
-    case "request_user_action":
     case "release":
     case "fail":
     case "complete":
       assertActiveActor(snapshot, actor, now);
       return;
+    case "request_user_action":
+      return; // Assigned-AI authority checked by the mutation; raising a flag never changes state.
     case "resume":
-      if (actor.kind !== "user") throw new Error("Only the user can answer and resume Needs You work");
-      if (snapshot.state !== "needs_you") throw new Error("Only Needs You work can be resumed");
+      if (actor.kind !== "user") throw new Error("Only the person can answer Needs your input");
+      if (!snapshot.needsInput && snapshot.state !== "needs_you") throw new Error("Only a flagged item can be answered");
       return;
     case "cancel":
       if (actor.kind !== "user") throw new Error("Only the user can cancel Queue work");
@@ -252,7 +257,7 @@ export function assertCommandAllowed(
       return;
     case "expire":
       if (actor.kind !== "system") throw new Error("Only the system can expire a handoff");
-      if (snapshot.state === "done" || snapshot.state === "needs_you") {
+      if (snapshot.state === "done" || snapshot.state === "needs_you" || !!snapshot.needsInput) {
         throw new Error("Only Waiting or Working handoffs can expire");
       }
       return;
@@ -271,7 +276,7 @@ export function nextStateForFailure(snapshot: QueueSnapshot, retryable: boolean)
   if (retryable && nextRetryCount <= snapshot.maxRetries) {
     return { state: "waiting_for_your_ai", condition: "retry_scheduled" };
   }
-  return { state: "needs_you", condition: "failed" };
+  return { state: snapshot.state, condition: "failed" };
 }
 
 export function handoffLine(input: {

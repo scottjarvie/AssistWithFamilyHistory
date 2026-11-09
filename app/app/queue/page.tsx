@@ -12,7 +12,7 @@ export const metadata: Metadata = createPageMetadata({
 
 export const dynamic = "force-dynamic";
 
-export default async function QueuePage({searchParams}:{searchParams:Promise<{q?:string;state?:string;view?:string;item?:string;priority?:string;condition?:string;actor?:string}>}) {
+export default async function QueuePage({searchParams}:{searchParams:Promise<{suggestions?:string;archived?:string;q?:string;state?:string;view?:string;item?:string;priority?:string;condition?:string;actor?:string}>}) {
   const {vaultOwnerId}=await getVaultAccessContext();
   return <QueueWorkspace key={vaultOwnerId} preferenceKey={`awf.collection.queue.${vaultOwnerId}`} initialFilters={normalizeQueueFilters(await searchParams)}/>;
 }

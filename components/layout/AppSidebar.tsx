@@ -97,7 +97,7 @@ export function AppMobileNav({ accountMode, vaultOwnerId, clerkEnabled, activePa
               </SafeLink>
             </div>
             <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-              <AppNavigationList
+              <AppNavigationList key={vaultOwnerId}
                 pathname={pathname}
                 sections={appNavigationSections}
                 variant="mobile"
@@ -167,7 +167,7 @@ export function AppSidebar({ accountMode, vaultOwnerId, clerkEnabled, activePath
 
       {/* Navigation */}
       <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-4">
-        <AppNavigationList
+        <AppNavigationList key={vaultOwnerId}
           collapsed={collapsed}
           pathname={pathname}
           sections={appNavigationSections}

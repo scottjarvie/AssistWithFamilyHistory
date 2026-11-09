@@ -190,3 +190,22 @@ export function requireTrustBoundarySuperAdmin(identitySubject?: string | null):
     throw new Error("Trust boundary summary requires a configured super-admin");
   }
 }
+
+/** Convex trusts only Clerk's audience-specific website token (auth.config.ts).
+ * OAuth access tokens are verified separately by /mcp and are never website sessions.
+ * Native Clerk Convex sessions can include sid without azp. Missing azp is valid.
+ */
+export async function requireWebsitePerson(ctx:Pick<ActionCtx|MutationCtx,"auth">){
+ const identity=await ctx.auth.getUserIdentity();
+ const configured=process.env.CLERK_JWT_ISSUER_DOMAIN?.replace(/\/$/,"");
+ const issuer=configured==="https://clerk.discovertheirstories.com"?"https://clerk.assistwithfamilyhistory.com":configured;
+ const oauthClaims=["client_id","clientId","scope","scp","grant_type","gty"];
+ if(!identity?.subject||!issuer||identity.issuer.replace(/\/$/,"")!==issuer||oauthClaims.some(key=>identity[key]!==undefined))throw new Error("Trust boundary denied: missing_identity (website person session required)");
+ // The platform verifies signature and aud=convex before exposing this identity.
+ // Check exposed audience claims too, so alternate future providers fail closed.
+ const origins=new Set(["https://assistwithfamilyhistory.com","https://www.assistwithfamilyhistory.com","https://local.assistwithfamilyhistory.com","http://localhost:3444","http://127.0.0.1:3444","http://family-history.localhost:3443"]);
+ for(const azp of [identity.azp,identity.authorizedParty])if(azp!==undefined&&(typeof azp!=="string"||!origins.has(azp)))throw new Error("Website person session required: foreign authorized party");
+ const audience=identity.audience??identity.aud;
+ if(audience!==undefined&&audience!=="convex"&&!(Array.isArray(audience)&&audience.length===1&&audience[0]==="convex"))throw new Error("Website person session required");
+ return identity;
+}

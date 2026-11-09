@@ -6,6 +6,7 @@ import { getAuthedConvexClient, getConvexRuntimeIssue, isConvexConfigured } from
 import { getVaultAccessContext } from "@/lib/vault/server";
 
 const CommandSchema = z.discriminatedUnion("command", [
+ z.object({command:z.literal("review"),action:z.enum(["accept","dismiss","archive","restore","clear_input","edit"]),directive:z.string().max(4000).optional(),reason:z.string().max(4000).optional(),optionIndex:z.number().int().min(0).optional(),expectedVersion:z.number().int().positive(),idempotencyKey:z.string().min(1).max(160)}),
   z.object({ command: z.literal("assign"), chosenAiId: z.string().min(1).max(160), expectedVersion: z.number().int().positive(), idempotencyKey: z.string().min(1).max(160) }),
   z.object({ command: z.literal("claim"), leaseMs: z.number().int(), nextStep: z.string().min(1).max(1_000), expectedVersion: z.number().int().positive(), idempotencyKey: z.string().min(1).max(160) }),
   z.object({ command: z.literal("checkpoint"), leaseMs: z.number().int(), nextStep: z.string().min(1).max(1_000), expectedVersion: z.number().int().positive(), idempotencyKey: z.string().min(1).max(160) }),
@@ -59,6 +60,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const command = parsed.data;
     let result;
     switch (command.command) {
+      case "review": {
+        const input={action:command.action,directive:command.directive,reason:command.reason,optionIndex:command.optionIndex,expectedVersion:command.expectedVersion,idempotencyKey:command.idempotencyKey};
+        result=await client.mutation(api.queue.reviewQueueItem,{vaultOwnerId,queueItemId,...input});break;
+      }
       case "assign":
         result = await client.mutation(api.queue.assignQueueItemToAi, { vaultOwnerId, queueItemId, chosenAiId: command.chosenAiId, expectedVersion: command.expectedVersion, idempotencyKey: command.idempotencyKey });
         break;

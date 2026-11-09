@@ -1,0 +1,17 @@
+{
+  "phase": "before",
+  "checks": [
+    "before 1440 /design-council-preview?surface=person",
+    "before 1440 /design-council-preview?surface=settings-ai",
+    "before 1440 /ai",
+    "before 1440 /",
+    "before 1440 /design-council-preview?surface=research",
+    "before 390 /design-council-preview?surface=person",
+    "before 390 /design-council-preview?surface=settings-ai",
+    "before 390 /ai",
+    "before 390 /",
+    "before 390 /design-council-preview?surface=research"
+  ],
+  "errors": [],
+  "requests": []
+}

@@ -15,8 +15,8 @@ const queueWorkspace = readFileSync("components/queue/QueueWorkspace.tsx", "utf8
 const queuePresentation = readFileSync("lib/queue/presentation.ts", "utf8");
 const appNavigation = readFileSync("components/layout/appNavigation.ts", "utf8");
 
-assert.deepEqual(QUEUE_STATES, ["needs_you", "working", "waiting_for_your_ai", "done"]);
-assert.deepEqual(Object.values(QUEUE_STATE_LABELS), ["Needs You", "Working", "Waiting for your AI", "Done"]);
+assert.deepEqual(QUEUE_STATES, ["waiting_for_your_ai", "working", "done"]);
+assert.deepEqual(Object.values(QUEUE_STATE_LABELS), ["Needs your input", "AI working", "Waiting on AI", "Answered"]);
 for (const state of QUEUE_STATES) assert.match(schema, new RegExp(`v\\.literal\\(\"${state}\"\\)`));
 
 for (const table of ["queueItems", "queueActivity", "queueCommandReceipts"]) {
@@ -32,7 +32,7 @@ for (const surfaceState of QUEUE_SERVICE_STATES) {
   assert.ok(handoff.includes(surfaceState), `Design handoff must explain ${surfaceState}`);
 }
 
-assert.equal(QUEUE_AGENT_TOOLS.length, 7);
+assert.equal(QUEUE_AGENT_TOOLS.length, 10);
 assert.doesNotMatch(QUEUE_AGENT_TOOLS.map((tool) => tool.name).join(" "), /delete|publish|merge|access|identity/i);
 assert.match(queueModule, /QUEUE_LIMITS\.itemPage/);
 assert.match(queueModule, /QUEUE_LIMITS\.activityPage/);

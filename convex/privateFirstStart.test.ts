@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { beforeEach, afterEach, describe, expect, test, vi } from "vitest";
 import { convexTest } from "convex-test";
 import schema from "./schema";
 import { api } from "./_generated/api";
@@ -155,3 +155,6 @@ test("first-start eligibility keeps the existing authenticated-owner policy", as
   await expect(t.action(api.vaultReads.getFirstStartEligibility, { vaultOwnerId: OWNER })).rejects.toThrow(/missing_identity/);
   await expect(t.withIdentity({ subject: OTHER_OWNER }).action(api.vaultReads.getFirstStartEligibility, { vaultOwnerId: OWNER })).rejects.toThrow(/owner_mismatch/);
 });
+
+// Explicit website JWT issuer for synthetic person identities; never an auth bypass.
+beforeEach(()=>vi.stubEnv("CLERK_JWT_ISSUER_DOMAIN","https://convex.test"));

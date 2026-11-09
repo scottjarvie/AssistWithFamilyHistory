@@ -1,0 +1,3 @@
+/** Archived pre-AWL-0016 /app/me Queue card JSX, with invented counts for comparison only. */
+import {Card,CardContent,CardDescription,CardHeader,CardTitle} from "@/components/ui/card";
+export function BaselineMeQueue(){return <Card><CardHeader><CardTitle>Your Queue</CardTitle><CardDescription>Work you handed to your AI.</CardDescription></CardHeader><CardContent><ul className="space-y-1 text-sm text-stone-700">{[['Waiting on your AI',1],['AI working',2],['Needs your input',2],['Answered',2]].map(([label,count])=><li key={label} className="flex justify-between"><span>{label}</span><span className="font-medium">{count}</span></li>)}</ul></CardContent></Card>;}

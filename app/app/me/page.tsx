@@ -1,3 +1,4 @@
+import {QueueOverview} from "@/components/queue/QueueOverview";
 import type { Metadata } from "next";
 import { SafeLink as Link } from "@/components/layout/SafeLink";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,14 +22,8 @@ export const metadata: Metadata = createPageMetadata({
 /** One person's numbers: rendered per request and cached by nobody. */
 export const dynamic = "force-dynamic";
 
-const QUEUE_LABELS: Record<string, string> = {
-  waiting_for_your_ai: "Waiting on your AI",
-  working: "AI working",
-  needs_you: "Needs your input",
-  done: "Answered",
-};
-
-function formatCount(count: number, more: boolean) {
+function formatCount(count: number|null, more: boolean) {
+  if(count===null)return "Unavailable";
   return `${count.toLocaleString("en-US")}${more ? "+" : ""}`;
 }
 
@@ -61,7 +56,7 @@ export default async function YourStatsPage() {
     { label: "Relationships", value: formatCount(stats.relationships.count, stats.relationships.more), href: "/app/people", note: "Couples and parent-child links" },
     { label: "Sources", value: formatCount(stats.sources.count, stats.sources.more), href: "/app/source-docs", note: `${formatCount(stats.citations.count, stats.citations.more)} citations` },
     { label: "Stories", value: formatCount(stats.stories.count, stats.stories.more), href: "/app/stories", note: `${formatCount(stats.stories.byStatus.published ?? 0, stats.stories.more)} published` },
-    { label: "Queue", value: formatCount(stats.queue.count, stats.queue.more), href: "/app/queue", note: `${formatCount(stats.queue.byState.needs_you ?? 0, stats.queue.more)} need your input` },
+    { label: "Queue records", value: formatCount(stats.queue.count, stats.queue.more), href: "/app/queue", note: `${formatCount(stats.queue.needsInput, stats.queue.more)} need your input` },
   ];
 
   return (
@@ -112,22 +107,7 @@ export default async function YourStatsPage() {
             </p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Your Queue</CardTitle>
-            <CardDescription>Work you handed to your AI.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-1 text-sm text-stone-700">
-              {Object.entries(QUEUE_LABELS).map(([state, label]) => (
-                <li key={state} className="flex justify-between">
-                  <span>{label}</span>
-                  <span className="font-medium">{formatCount(stats.queue.byState[state] ?? 0, stats.queue.more)}</span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+        <QueueOverview queue={stats.queue}/>
       </section>
 
       <p className="text-sm text-stone-600">

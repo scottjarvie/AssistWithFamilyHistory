@@ -28,6 +28,7 @@ export const FAMILY_HISTORY_SCOPES = [
   "family_history:queue:read",
   "family_history:queue:work",
   "family_history:records:archive",
+  "family_history:queue:suggest",
 ] as const;
 
 export type FamilyHistoryScope = (typeof FAMILY_HISTORY_SCOPES)[number];
@@ -55,6 +56,7 @@ export type ScopeInfo = {
 };
 
 export const FAMILY_HISTORY_SCOPE_INFO: readonly ScopeInfo[] = [
+ {scope:"family_history:queue:suggest",label:"Propose suggestions",grants:"Propose work ideas in the person’s private Queue.",writes:true,limit:"Only the person accepts or dismisses. The AI may withdraw its own suggestion before the person acts."},
   {
     scope: "family_history:context:read",
     label: "Read your research context",
@@ -150,6 +152,7 @@ export const NEVER_PERMITTED: readonly string[] = [
 export type ConditionalScope = {
   /** Top-level input key whose presence pulls in an extra required scope. */
   whenInputHas: string;
+  whenInputEquals?: string;
   scope: FamilyHistoryScope;
   /** Why the extra permission is needed, for the refusal message. */
   because: string;
@@ -309,7 +312,7 @@ export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
     writes: true,
     title: "Save research work",
     description:
-      "Create or correct a research task, a durable research finding, or both. Record blocked and uncertain outcomes honestly instead of omitting them.",
+      "Create or correct a research task, a durable research finding, or both. Record blocked and uncertain outcomes honestly instead of omitting them. Research tasks are record-level research steps, not Queue suggestions. Put your own ideas for new work in family_history_add_queue with addedBy ai_suggestion.",
     humanSummary: "Records a research task or a finding, including dead ends.",
     implementedBy: "convex/mcpFamilyHistory.saveResearchWork",
     sunsetNote: ALIAS_SUNSET,
@@ -383,6 +386,8 @@ export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
     implementedBy: "convex/mcpFamilyHistory.saveCompleteResult",
     sunsetNote: ALIAS_SUNSET,
   },
+  {name:"family_history_add_queue",alias:"add_queue",requiredScope:"family_history:queue:work",conditionalScopes:[{whenInputHas:"addedBy",whenInputEquals:"ai_suggestion",scope:"family_history:queue:suggest",because:"the AI is raising its own idea"}],writes:true,title:"Add to Queue",description:"Add work the person requested with addedBy ai_on_request, or your own idea with addedBy ai_suggestion and a reason. Missing addedBy is refused. Suggestions need Propose suggestions power and cannot be worked until the person accepts. Optional options, evidence and fromRecord preserve context.",humanSummary:"Adds requested work or a private AI suggestion.",implementedBy:"convex/queue.agentAddQueueItem",sunsetNote:ALIAS_SUNSET},
+  {name:"family_history_withdraw_suggestion",alias:"withdraw_suggestion",requiredScope:"family_history:queue:work",writes:true,title:"Withdraw your own suggestion",description:"Withdraw only your own open suggestion before the person has acted. Never accept, dismiss or edit-accept.",humanSummary:"Withdraws an untouched suggestion raised by this connection.",implementedBy:"convex/queue.agentWithdrawSuggestion",sunsetNote:ALIAS_SUNSET},
   {
     name: "family_history_get_queue",
     alias: "get_queue",
@@ -391,7 +396,7 @@ export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
     title: "Get Family History Queue",
     description:
       "List a bounded page of Queue directives assigned to a chosen AI, or hydrate one item and its attributable activity. Queue context does not grant domain-record authority.",
-    humanSummary: "Reads the work you assigned to your AI.",
+    humanSummary: "Reads Queue work and this connection’s own suggestions.",
     implementedBy: "convex/queue.agentListQueueItems",
     sunsetNote: ALIAS_SUNSET,
   },
@@ -402,7 +407,7 @@ export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
     writes: true,
     title: "Update Family History Queue",
     description:
-      "Claim, checkpoint, pause for the person, complete, or report failure for work assigned to the OAuth chosen-AI identity. Requires the exact current version and a replay-safe operation ID. When completing saved work, include signed-in product paths such as /app/people/{id} and /app/stories/{id} in resultRefs.",
+      "Claim, checkpoint, pause for the person, complete, or report failure for work assigned to the OAuth chosen-AI identity. Needs your input is a flag: asking keeps the state and releases your claim and lease; only the person can answer or clear it, including after Answered. Archive/restore also require the existing archive power; you cannot archive any flagged item. Requires the exact current version and a replay-safe operation ID. When completing saved work, include signed-in product paths such as /app/people/{id} and /app/stories/{id} in resultRefs.",
     humanSummary: "Moves the work you assigned through its states.",
     implementedBy: "convex/queue.agentClaimQueueItem",
     sunsetNote: ALIAS_SUNSET,
@@ -490,7 +495,7 @@ export function assertFamilyHistoryCatalogContract(): void {
     if (!FAMILY_HISTORY_SCOPE_INFO.some((info) => info.scope === scope)) {
       throw new Error(`Scope ${scope} has no person-facing consent copy`);
     }
-    const usedBy = FAMILY_HISTORY_TOOLS.filter((tool) => tool.requiredScope === scope);
+    const usedBy = FAMILY_HISTORY_TOOLS.filter((tool) => tool.requiredScope === scope || tool.conditionalScopes?.some(conditional=>conditional.scope===scope));
     if (usedBy.length === 0) throw new Error(`Scope ${scope} grants no tool and must not exist`);
     const info = FAMILY_HISTORY_SCOPE_INFO.find((entry) => entry.scope === scope)!;
     if (info.writes !== usedBy.some((tool) => tool.writes)) {

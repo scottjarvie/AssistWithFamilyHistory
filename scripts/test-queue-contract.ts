@@ -21,9 +21,9 @@ import {
   type QueueItemRecord,
 } from "../lib/queue/presentation";
 
-test("Queue exposes exactly the four Core states", () => {
-  assert.deepEqual(QUEUE_STATES, ["needs_you", "working", "waiting_for_your_ai", "done"]);
-  assert.deepEqual(Object.values(QUEUE_STATE_LABELS), ["Needs You", "Working", "Waiting for your AI", "Done"]);
+test("Queue exposes the three Core lifecycle states with a legacy display label", () => {
+  assert.deepEqual(QUEUE_STATES, ["waiting_for_your_ai", "working", "done"]);
+  assert.deepEqual(Object.values(QUEUE_STATE_LABELS), ["Needs your input", "AI working", "Waiting on AI", "Answered"]);
 });
 
 test("waiting handoff says nothing is running", () => {
@@ -68,7 +68,7 @@ test("chosen-AI authority expires even when a longer lease was requested", () =>
   );
 });
 
-test("expiry stays inside Needs You and is inert before the real deadline", () => {
+test("expiry raises input without changing the underlying state and is inert before the real deadline", () => {
   const snapshot = {
     state: "working" as const,
     condition: "active" as const,
@@ -83,24 +83,24 @@ test("expiry stays inside Needs You and is inert before the real deadline", () =
   assert.equal(queueExpiryTransition(snapshot, 79_999), null);
   assert.deepEqual(queueExpiryTransition(snapshot, 80_000), {
     expiresAt: 80_000,
-    state: "needs_you",
+    state: "working",
     condition: "expired",
     requiredAction: "Reconnect or choose an AI for this directive, then return it to Waiting for your AI.",
   });
 });
 
-test("failure stays inside the four-state model", () => {
+test("failure preserves state or releases a scheduled retry", () => {
   const snapshot = { state: "working" as const, condition: "active" as const, version: 1, retryCount: 0, maxRetries: 1 };
   assert.deepEqual(nextStateForFailure(snapshot, true), { state: "waiting_for_your_ai", condition: "retry_scheduled" });
-  assert.deepEqual(nextStateForFailure({ ...snapshot, retryCount: 1 }, true), { state: "needs_you", condition: "failed" });
-  assert.deepEqual(nextStateForFailure(snapshot, false), { state: "needs_you", condition: "failed" });
+  assert.deepEqual(nextStateForFailure({ ...snapshot, retryCount: 1 }, true), { state: "working", condition: "failed" });
+  assert.deepEqual(nextStateForFailure(snapshot, false), { state: "working", condition: "failed" });
 });
 
 test("agent surface is narrow and requires per-operation scope", () => {
   assertNoBroadQueueAgentTools();
   assert.deepEqual(
     QUEUE_AGENT_TOOLS.map((tool) => tool.name),
-    ["list_queue_items", "get_queue_item", "claim_queue_item", "checkpoint_queue_item", "request_user_action", "complete_queue_item", "report_queue_failure"],
+    ["archive_queue_item", "add_queue_item", "withdraw_suggestion", "list_queue_items", "get_queue_item", "claim_queue_item", "checkpoint_queue_item", "request_user_action", "complete_queue_item", "report_queue_failure"],
   );
   const principal = { ownerId: "user:a", actorId: "ai:a", actorKind: "chosen_ai" as const, scopes: ["queue:read"], credentialId: "key:a" };
   assert.doesNotThrow(() => authorizeQueueAgentTool(principal, "list_queue_items"));
@@ -135,8 +135,8 @@ const presentationFixture = (partial: Partial<QueueItemRecord>): QueueItemRecord
   ...partial,
 });
 
-test("Queue presentation retains exactly the four person-facing states", () => {
-  assert.deepEqual(Object.keys(QUEUE_STATE_PRESENTATION), [...QUEUE_STATES]);
+test("Queue presentation retains three lifecycle states and a legacy-only mapping", () => {
+  assert.deepEqual(Object.keys(QUEUE_STATE_PRESENTATION).filter(state=>state!=="needs_you").sort(), [...QUEUE_STATES].sort());
 });
 
 test("disconnected Waiting copy never implies autonomous work", () => {

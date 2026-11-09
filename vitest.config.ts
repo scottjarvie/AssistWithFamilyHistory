@@ -25,6 +25,8 @@ export default defineConfig({
     },
   },
   test: {
+    // Bound worker pressure when several Assist sites share this computer.
+    maxWorkers: 2,
     environment: "edge-runtime",
     include: ["convex/**/*.test.ts", "features/**/*.test.ts"],
     server: {

@@ -2,6 +2,7 @@ import { ChevronDown } from "lucide-react";
 import { SafeLink } from "@/components/layout/SafeLink";
 
 const questions = [
+  {question:"How do Queue requests and AI suggestions differ?",answer:"Requests you ask your AI to add are ordinary Queue items, marked added by your AI. Your AI’s own ideas are AI suggestions in your private Queue, hidden by default with a count; you can edit first, accept or dismiss them. Nothing runs before you accept. Needs your input is a flag on an item, never a state. Family-history conclusions stay on their records as AI proposal until you decide, never in the Queue."},
   { question: "What can my AI do here, and how do I limit it?",
     answer: "When you connect your first AI, it gets full access to your Family History workspace from the start: it can read, save, organise, archive and restore, including tools we add later, with no end date. You can limit it any time: in Settings → AI, or just ask your AI to limit itself (for example, \"only read, don’t change anything\" or \"stop until Friday\"). Your AI can narrow its own access but never widen it. Only you can give access back. A new connection starts with the limits of your most limited AI until you Restore it. It never permanently deletes anything or spends money for you. If you ask, it can publish or share something for you — it checks for private details first, and you can unpublish it any time." },
   {
@@ -30,7 +31,7 @@ const questions = [
   },
   {
     question: "What can I use now?",
-    answer: "The soft-launch workspace includes people and place records, source capture, research operations, a four-state Queue, story drafting and review, and a production-proven MCP foundation for compatible clients.",
+    answer: "The soft-launch workspace includes people and place records, source capture, research operations, a Queue with three work states and a Needs your input flag, story drafting and review, and a production-proven MCP foundation for compatible clients.",
   },
   {
     question: "Where should I start?",

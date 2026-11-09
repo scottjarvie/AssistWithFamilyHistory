@@ -192,6 +192,7 @@ describe("scope to tool matrix", () => {
       "queue:claim",
       "queue:update",
       "queue:complete",
+      "queue:add",
     ]);
   });
 });
@@ -511,7 +512,7 @@ describe("record boundaries", () => {
     const first = await list(null);
     expect(first.page).toEqual([]);
     expect(first.isDone).toBe(false);
-    expect(await t.run((ctx) => ctx.db.get(ordered[0]._id))).toMatchObject({ state: "needs_you" });
+    expect(await t.run((ctx) => ctx.db.get(ordered[0]._id))).toMatchObject({ state: "working", needsInput: expect.objectContaining({actorId:"queue-expiry"}) });
     const second = await list(first.continueCursor);
     expect(second.page.map((item) => item._id)).toEqual([String(ordered[1]._id)]);
     const third = await list(second.continueCursor);
@@ -654,3 +655,18 @@ describe("token audience", () => {
     expect(response.status).toBe(200);
   });
 });
+
+test("new suggestion reads keep selected-person reach through open, dismissed, withdrawn and accepted views",async()=>{
+ vi.stubEnv("TRUST_BOUNDARY_MODE","enforce");const t=withGrantVersions(convexTest(schema,modules));
+ const inside=await t.run(ctx=>ctx.db.insert("persons",{vaultOwnerId:OWNER_A,name:{given:"Allowed",surname:"Synthetic"},sex:"unknown",living:false,researchStatus:"not_started",createdAt:123,updatedAt:123}));
+ const outside=await t.run(ctx=>ctx.db.insert("persons",{vaultOwnerId:OWNER_A,name:{given:"Outside",surname:"Synthetic"},sex:"unknown",living:false,researchStatus:"not_started",createdAt:123,updatedAt:123}));
+ const template=(await t.withIdentity({subject:OWNER_A}).mutation(api.queue.createQueueItem,{vaultOwnerId:OWNER_A,directive:"Suggestion reach template",idempotencyKey:"suggestion-reach-template"})).item;
+ const rows=await t.run(async ctx=>{const {_id,_creationTime,...fields}=(await ctx.db.get(template._id))!;void _id;void _creationTime;const result=[];for(const status of ["open","dismissed","withdrawn","accepted"] as const){for(const personId of [inside,outside]){const allowed=personId===inside;const id=await ctx.db.insert("queueItems",{...fields,addedBy:"ai_suggestion",suggestionStatus:status,raisedByCredentialId:`${ISSUER}#${CLIENT_ID}`,fromRecord:{kind:"person",refId:personId},summary:`${allowed?"Allowed":"Outside"} ${status}`,suggestionReason:`${allowed?"Allowed":"Private outside"} idea`,dismissReason:status==="dismissed"?(allowed?"Allowed dismiss":"Private outside dismiss"):undefined,archivedAt:["dismissed","withdrawn"].includes(status)?123:undefined,updatedAt:allowed?100:200});result.push({id,status,allowed});}}return result;});
+ await seedGrant(t,{vaultOwnerId:OWNER_A,clientId:CLIENT_ID,issuer:ISSUER,boundary:{kind:"selected_people",personIds:[String(inside)]}});
+ for(const filter of [{suggestions:true},{suggestions:true,archived:true},{}]){let cursor:string|null=null;const ids:string[]=[];let done=false;do{const result=await callTool(t,OWNER_A,"family_history_get_queue",{action:"list",...filter,limit:1,cursor});expect(result.isError).toBe(false);const body=result.body as {page:Array<{_id:string}>;continueCursor:string;isDone:boolean};expect(JSON.stringify(body)).not.toContain("Private outside");expect(body.page.every(row=>!rows.some(r=>r.id===row._id&&!r.allowed))).toBe(true);ids.push(...body.page.map(row=>row._id));cursor=body.continueCursor;done=body.isDone;}while(!done);const wanted=rows.filter(row=>row.allowed&&(filter.suggestions?filter.archived?["dismissed","withdrawn"].includes(row.status):row.status==="open":row.status==="accepted")).map(row=>String(row.id));for(const id of wanted)expect(ids).toContain(id);}
+ for(const row of rows){const detail=await callTool(t,OWNER_A,"family_history_get_queue",{action:"detail",queueItemId:String(row.id)});expect(detail.isError).toBe(!row.allowed);if(!row.allowed)expect(JSON.stringify(detail)).not.toContain("Private outside");}
+ const brief=await callTool(t,OWNER_A,"family_history_get_brief",{});expect(JSON.stringify(brief)).not.toContain("Outside accepted");
+});
+
+// Explicit website JWT issuer for synthetic person identities; never an auth bypass.
+beforeEach(()=>vi.stubEnv("CLERK_JWT_ISSUER_DOMAIN","https://convex.test"));

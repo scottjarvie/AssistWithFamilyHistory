@@ -29,6 +29,8 @@
       "family_history_save_records",
       "family_history_add_source_content",
       "family_history_save_complete_result",
+      "family_history_add_queue",
+      "family_history_withdraw_suggestion",
       "family_history_get_queue",
       "family_history_update_queue"
     ],
@@ -41,7 +43,8 @@
         "family_history:story:draft",
         "family_history:queue:read",
         "family_history:queue:work",
-        "family_history:records:archive"
+        "family_history:records:archive",
+        "family_history:queue:suggest"
       ],
       "personApproved": [
         "family_history:context:read",
@@ -51,14 +54,15 @@
         "family_history:story:draft",
         "family_history:queue:read",
         "family_history:queue:work",
-        "family_history:records:archive"
+        "family_history:records:archive",
+        "family_history:queue:suggest"
       ],
       "raisedOutsideOrdinaryApproval": [],
       "reservedNeverIssuable": [
         "Exporting the vault",
         "Permanently deleting anything",
         "Merging or splitting person identities",
-        "Inviting new people or changing another person’s access",
+        "Inviting new people or changing another person\u2019s access",
         "Acting on FamilySearch or any other outside provider",
         "Billing, account, or subscription changes"
       ],
@@ -158,7 +162,7 @@
         "queue:update",
         "queue:complete"
       ],
-      "notes": "Current internal human API. Commands enforce exact four-state semantics, optimistic versioning, idempotency, actor-bound leases, owner-only cancel/reopen/delete, and no implied domain mutation authority. The MCP update_queue tool exposes only claim/checkpoint/question/complete/fail for work assigned to oauth-chosen-ai; provider and named-client deployment proof remains separate."
+      "notes": "Current internal human API. Commands enforce three lifecycle states plus an independent input flag; read-time legacy mapping, person-only suggestion accept/dismiss/edit-first, archive/restore, optimistic versioning, idempotency, actor-bound leases, owner-only cancel/reopen/delete, and no implied domain mutation authority. The MCP update_queue tool exposes claim/checkpoint/question/complete/fail for assigned work and archive/restore under the existing archive power. New suggestion reads retain selected-person and named-Queue reach before pagination. Public Queue decisions and counts require a website person identity; provider and named-client deployment proof remains separate."
     },
     {
       "route": "/api/capabilities",

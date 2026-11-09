@@ -22,6 +22,12 @@ export type QueueContextKind =
   | "provisional_relative";
 
 export type QueueItemRecord = {
+  addedBy?: "person" | "ai_on_request" | "ai_suggestion";
+  suggestionStatus?: "open" | "accepted" | "dismissed" | "withdrawn";
+  suggestionReason?: string; suggestionOptions?: string[]; suggestionEvidence?: string[];
+  aiName?: string; fromRecord?: {kind:string;refId:string}; fromRecordTitle?:string;
+  needsInput?: {question:string;raisedAt:number;actorId:string}; archivedAt?:number; dismissReason?:string;
+  createdByActorKind?: string; createdByActorId?: string;
   _id: string;
   directive: string;
   summary: string;
@@ -41,6 +47,7 @@ export type QueueItemRecord = {
   leftForActorId?: string;
   activeActorKind?: QueueActorKind;
   activeActorId?: string;
+  activeCredentialId?:string;
   leaseExpiresAt?: number;
   handoffExpiresAt?: number;
   requiredAction?: string;
@@ -148,6 +155,9 @@ export function queueConditionLabel(condition: QueueCondition): string {
 }
 
 export function queueHandoffCopy(item: QueueItemRecord): string {
+  if(item.suggestionStatus==="open")return "Your AI suggested this work. Nothing runs until you accept.";
+  if(item.needsInput)return "Needs your input. No AI holds an active claim while your answer is pending.";
+  if(item.state==="working"&&!item.activeActorId)return "The previous claim ended. Your AI must pick this up again before continuing.";
   if (item.state === "working") {
     return item.activeActorKind === "user"
       ? "You picked this up. The claim is time-limited."
@@ -171,6 +181,8 @@ export function queueHandoffCopy(item: QueueItemRecord): string {
 }
 
 export function queueFocusLabel(item: QueueItemRecord): string {
+  if(item.suggestionStatus==="open")return "Your decision";
+  if(item.needsInput)return "Needs your input";
   if (item.state === "needs_you") return "What needs you";
   if (item.state === "working") return "Current step";
   if (item.state === "waiting_for_your_ai") return "Handoff status";
@@ -178,6 +190,8 @@ export function queueFocusLabel(item: QueueItemRecord): string {
 }
 
 export function queueFocusText(item: QueueItemRecord): string {
+  if(item.suggestionStatus==="open")return item.suggestionReason||"Would you like your AI to do this?";
+  if(item.needsInput)return item.needsInput.question;
   if (item.state === "needs_you") {
     return item.requiredAction || item.failureSummary || "Choose how this research should continue.";
   }
@@ -206,12 +220,13 @@ export function queueContextLabel(kind: QueueContextKind): string {
 }
 
 export function canPersonClaim(item: QueueItemRecord, now = Date.now()): boolean {
+  if (item.archivedAt || item.suggestionStatus === "open" || item.needsInput) return false;
   if (item.state !== "waiting_for_your_ai") return false;
   return item.condition !== "retry_scheduled" || item.nextRetryAt === undefined || item.nextRetryAt <= now;
 }
 
 export function canPersonContinue(item: QueueItemRecord): boolean {
-  return item.state === "working" && item.activeActorKind === "user";
+  return !item.archivedAt && item.suggestionStatus !== "open" && !item.needsInput && item.state === "working" && item.activeActorKind === "user";
 }
 
 export function formatQueueDate(value?: number): string {
@@ -229,7 +244,9 @@ export function formatQueueDate(value?: number): string {
 
 /** Availability mirrors the person's visible commands; the backend remains authoritative. */
 export function canPersonRunQueueCommand(item:QueueItemRecord,command:"claim"|"checkpoint"|"resume"|"complete"|"cancel"|"reopen") {
- switch(command){case "claim":return canPersonClaim(item);case "checkpoint":case "complete":return canPersonContinue(item);case "resume":return item.state==="needs_you";case "reopen":return item.state==="done";case "cancel":return item.state!=="done";}
+ if(command==="resume")return !!item.needsInput||item.state==="needs_you";
+ if(item.archivedAt||item.suggestionStatus==="open")return false;
+ switch(command){case "claim":return canPersonClaim(item);case "checkpoint":case "complete":return canPersonContinue(item);case "reopen":return item.state==="done";case "cancel":return item.state!=="done";}
 }
 /** Refreshes can overlap retained older pages; one stored activity ID is shown once. */
 export function mergeQueueActivity(existing:QueueActivityRecord[],incoming:QueueActivityRecord[]) {

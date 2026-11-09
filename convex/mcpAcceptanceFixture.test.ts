@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { beforeEach, afterEach, describe, expect, test, vi } from "vitest";
 import { convexTest } from "convex-test";
 
 import { api, internal } from "./_generated/api";
@@ -398,3 +398,6 @@ describe("Family History joined MCP acceptance cleanup", () => {
     })).rejects.toThrow("a marked connection lacks its visible synthetic acceptance marker");
   });
 });
+
+// Explicit website JWT issuer for synthetic person identities; never an auth bypass.
+beforeEach(()=>vi.stubEnv("CLERK_JWT_ISSUER_DOMAIN","https://convex.test"));

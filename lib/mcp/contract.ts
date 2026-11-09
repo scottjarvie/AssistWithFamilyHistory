@@ -9,6 +9,8 @@ export const FAMILY_HISTORY_MCP_TOOL_NAMES = [
   "save_research_work",
   "save_story_work",
   "save_complete_result",
+  "add_queue",
+  "withdraw_suggestion",
   "get_queue",
   "update_queue",
 ] as const;

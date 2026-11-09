@@ -318,8 +318,13 @@ export function namedRecordsInInput(toolName: string, input: unknown): NamedReco
       }
       break;
     }
+    case "family_history_add_queue": {
+      if(args.fromRecord){const from=args.fromRecord as {kind?:string;refId?:string};if(from.kind==="person")pushId(found.personIds,from.refId);else found.unattributable=true;}
+      break;
+    }
     case "family_history_get_queue":
-    case "family_history_update_queue": {
+    case "family_history_update_queue":
+    case "family_history_withdraw_suggestion": {
       pushId(found.queueItemIds, args.queueItemId);
       break;
     }
@@ -335,6 +340,12 @@ function boundaryPermits(
   named: NamedRecords,
 ): boolean {
   const isQueueTool = tool.requiredScope.startsWith("family_history:queue:");
+  if (tool.name === "family_history_add_queue") {
+    // New tools arrive under the existing grant; optional context must still fit its record boundary.
+    if(boundary.kind==="queue_only"||(boundary.queueItemIds?.length??0)>0)return !named.unattributable&&named.personIds.length===0;
+    if(boundary.kind==="selected_people")return !named.unattributable&&named.personIds.every(id=>(boundary.personIds??[]).includes(id));
+    return true;
+  }
 
   if (boundary.kind === "queue_only") {
     if (!isQueueTool) return false;
@@ -402,10 +413,11 @@ export function decideToolAccess(params: {
 
   if (input !== undefined) {
     const args = (input ?? {}) as Record<string, unknown>;
+    if(tool.name==="family_history_add_queue"&&args.addedBy==="ai_suggestion"&&!effectiveScopes(grant).includes("family_history:queue:suggest"))return {...refusal("SCOPE_NOT_GRANTED"),message:"Missing power: Propose suggestions. Requested work can still use ai_on_request."};
     for (const conditional of tool.conditionalScopes ?? []) {
       const value = args[conditional.whenInputHas];
       const present = Array.isArray(value) ? value.length > 0 : value !== undefined && value !== null;
-      if (present && !effectiveScopes(grant).includes(conditional.scope)) return {
+      if (present && (conditional.whenInputEquals===undefined||value===conditional.whenInputEquals) && !effectiveScopes(grant).includes(conditional.scope)) return {
         ...refusal("SCOPE_NOT_GRANTED"), message: `Missing power: ${conditional.scope}. Only the person can restore it.`,
         recovery: `Only the person can restore this power at ${CONNECTION_SETTINGS_URL}.`,
       };
@@ -445,7 +457,9 @@ export function queueScopesForGrant(scopes: readonly FamilyHistoryScope[]): stri
     queueScopes.push("queue:read");
   }
   if (scopes.includes("family_history:queue:work")) {
-    queueScopes.push("queue:claim", "queue:update", "queue:complete");
+    queueScopes.push("queue:claim", "queue:update", "queue:complete", "queue:add");
   }
+  if (scopes.includes("family_history:queue:suggest")) queueScopes.push("queue:suggest");
+  if(scopes.includes("family_history:records:archive"))queueScopes.push("queue:archive");
   return queueScopes;
 }

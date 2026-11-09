@@ -82,7 +82,7 @@ export function CTASection() {
           <p className="text-xs uppercase tracking-[0.24em] text-[#f2d7af]">Current</p>
           <ul className="mt-5 space-y-4 text-sm leading-6">
             <li>People, places, sources, research operations, and private story drafts.</li>
-            <li>A four-state Queue that preserves directives and results across sessions.</li>
+            <li>A Queue with three work states and a Needs your input flag that preserves directives and results across sessions.</li>
             <li>A bounded remote connection proven with one compatible OAuth client.</li>
           </ul>
           <div className="my-6 h-px bg-[#f3dfbe33]" />

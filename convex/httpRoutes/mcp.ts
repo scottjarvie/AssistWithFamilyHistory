@@ -775,7 +775,7 @@ export function createFamilyHistoryServer(
   registerTool("family_history_get_brief", {
     inputSchema: z.object({}).strict(),
     annotations: readOnly,
-  }, () => read("family_history_get_brief", () => actionCtx.runQuery(mcp.getBrief, { principal })));
+  }, () => read("family_history_get_brief", () => actionCtx.runQuery(mcp.getBrief, { principal,queueRead:!!grant&&effectiveScopes(grant).some(scope=>scope==="family_history:queue:read"||scope==="family_history:queue:work"),queueItemIds:grant?.boundary.queueItemIds?.length?grant.boundary.queueItemIds:undefined,suggestionPersonIds:grant?.boundary.kind==="selected_people"?grant.boundary.personIds??[]:undefined })));
 
   registerTool("family_history_search", {
     inputSchema: z.object({
@@ -1069,9 +1069,26 @@ export function createFamilyHistoryServer(
     credentialId: `${principal.issuer}#${principal.clientId}`,
   };
 
+  const suggestionPersonIds=grant?.boundary.kind==="selected_people"?grant.boundary.personIds??[]:undefined;
+  const assertSuggestionReach=async(queueItemId:string)=>{
+    if(suggestionPersonIds!==undefined&&!await actionCtx.runQuery(queue.suggestionReachInternal,{vaultOwnerId:principal.subject,queueItemId:queueItemId as any,personIds:suggestionPersonIds}))throw new Error("Suggestion is outside this connection's approved reach");
+  };
+
+  registerTool("family_history_add_queue", {
+    inputSchema:z.object({operationId,directive:z.string().min(1).max(4000),addedBy:z.enum(["ai_on_request","ai_suggestion"]).optional().describe("Required: ai_on_request for requested work, ai_suggestion for your own idea."),reason:z.string().max(4000).optional(),options:z.array(z.string().min(1).max(1000)).max(26).optional(),evidence:z.array(z.string().max(1000)).max(20).optional(),fromRecord:z.object({kind:z.enum(["person","relationship","place","event","source","citation","media","context_item","research_task","research_check","story","import_run","provisional_relative"]),refId:id}).optional()}).strict(),annotations:writeSafe,
+  },async(input:any)=>{
+    const decision=decideToolAccess({toolName:"family_history_add_queue",resolution,now:Date.now(),input});if(!decision.allowed)return refusalResult(decision);
+    if(!input.addedBy)return refusalResult({allowed:false,code:"VALIDATION_ERROR",message:"AI adds require addedBy: ai_on_request or ai_suggestion",recovery:"Choose ai_on_request for requested work; ai_suggestion for your own idea."});
+    if(input.addedBy==="ai_suggestion"&&!queuePrincipal.scopes.includes("queue:suggest"))return refusalResult({allowed:false,code:"SCOPE_NOT_GRANTED",message:"Propose suggestions power is off. Requested work can still use ai_on_request.",recovery:"Only the person can restore Propose suggestions in Settings."});
+    return read("family_history_add_queue",()=>actionCtx.runMutation(queue.agentAddQueueItem,{principal:queuePrincipal,connectionId:grantId as any,directive:input.directive,addedBy:input.addedBy,reason:input.reason,options:input.options,evidence:input.evidence,fromRecord:input.fromRecord,idempotencyKey:input.operationId}));
+  });
+  registerTool("family_history_withdraw_suggestion",{inputSchema:z.object({operationId,queueItemId:id,expectedVersion:z.number().int().min(1)}).strict(),annotations:writeSafe},async(input:any)=>{
+    const decision=decideToolAccess({toolName:"family_history_withdraw_suggestion",resolution,now:Date.now(),input});if(!decision.allowed)return refusalResult(decision);
+    return read("family_history_withdraw_suggestion",async()=>{await assertSuggestionReach(input.queueItemId);return actionCtx.runMutation(queue.agentWithdrawSuggestion,{principal:queuePrincipal,queueItemId:input.queueItemId,expectedVersion:input.expectedVersion,idempotencyKey:input.operationId});});
+  });
   registerTool("family_history_get_queue", {
     inputSchema: z.discriminatedUnion("action", [
-      z.object({ action: z.literal("list"), state: z.enum(["needs_you", "working", "waiting_for_your_ai", "done"]).optional(), priority: z.enum(["high", "normal", "low"]).optional(), cursor: z.string().max(500).nullable().optional(), limit: z.number().int().min(1).max(50).default(25) }).strict(),
+      z.object({ action: z.literal("list"), suggestions:z.boolean().optional(), archived:z.boolean().optional(), state: z.enum(["needs_you", "working", "waiting_for_your_ai", "done"]).optional().describe("Filter by one of three work states. Legacy needs_you is an input-flag filter across all states, never a fourth state."), priority: z.enum(["high", "normal", "low"]).optional(), cursor: z.string().max(500).nullable().optional(), limit: z.number().int().min(1).max(50).default(25) }).strict(),
       z.object({ action: z.literal("detail"), queueItemId: id, cursor: z.string().max(500).nullable().optional(), limit: z.number().int().min(1).max(100).default(50) }).strict(),
     ]),
     annotations: readOnly,
@@ -1084,11 +1101,15 @@ export function createFamilyHistoryServer(
           principal: queuePrincipal,
           state: input.state,
           priority: input.priority,
+          suggestions: input.suggestions,
+          suggestionPersonIds,
+          archived: input.archived,
           // A connection narrowed to named Queue items lists only those.
           queueItemIds: grant?.boundary?.queueItemIds?.length ? grant.boundary.queueItemIds : undefined,
           paginationOpts: { numItems: input.limit, cursor: input.cursor ?? null },
         });
       }
+      await assertSuggestionReach(input.queueItemId);
       return await actionCtx.runAction(queue.agentGetQueueItem, {
         principal: queuePrincipal,
         queueItemId: input.queueItemId as any,
@@ -1099,6 +1120,7 @@ export function createFamilyHistoryServer(
 
   registerTool("family_history_update_queue", {
     inputSchema: z.discriminatedUnion("action", [
+      z.object({action:z.enum(["archive","restore"]),operationId,queueItemId:id,expectedVersion:z.number().int().min(1)}).strict(),
       z.object({ action: z.literal("claim"), operationId, queueItemId: id, expectedVersion: z.number().int().min(1), leaseMs: z.number().int().min(60_000).max(1_800_000), nextStep: z.string().min(1).max(1_000) }).strict(),
       z.object({ action: z.literal("checkpoint"), operationId, queueItemId: id, expectedVersion: z.number().int().min(1), leaseMs: z.number().int().min(60_000).max(1_800_000), nextStep: z.string().min(1).max(1_000) }).strict(),
       z.object({ action: z.literal("request_user_action"), operationId, queueItemId: id, expectedVersion: z.number().int().min(1), requiredAction: z.string().min(1).max(1_000) }).strict(),
@@ -1110,7 +1132,9 @@ export function createFamilyHistoryServer(
     const decision = decideToolAccess({ toolName: "family_history_update_queue", resolution, now: Date.now(), input });
     if (!decision.allowed) return refusalResult(decision);
     return read("family_history_update_queue", async () => {
+      await assertSuggestionReach(input.queueItemId);
       const common = { principal: queuePrincipal, queueItemId: input.queueItemId as any, expectedVersion: input.expectedVersion, idempotencyKey: input.operationId };
+      if(input.action==="archive"||input.action==="restore")return await actionCtx.runMutation(queue.agentArchiveQueueItem,{...common,restore:input.action==="restore"});
       if (input.action === "claim") return await actionCtx.runMutation(queue.agentClaimQueueItem, { ...common, leaseMs: input.leaseMs, nextStep: input.nextStep });
       if (input.action === "checkpoint") return await actionCtx.runMutation(queue.agentCheckpointQueueItem, { ...common, leaseMs: input.leaseMs, nextStep: input.nextStep });
       if (input.action === "request_user_action") return await actionCtx.runMutation(queue.agentRequestUserAction, { ...common, requiredAction: input.requiredAction });

@@ -1,0 +1,27 @@
+{
+  "phase": "after",
+  "checks": [
+    "after 1440 /design-council-preview?surface=me-queue",
+    "after 1440 /design-council-preview?surface=person",
+    "after 1440 /design-council-preview?surface=settings-ai",
+    "after 1440 /ai",
+    "after 1440 /",
+    "after 1440 /design-council-preview?surface=research",
+    "1440: input tab shows three questions with Answer and Archive, including Answered",
+    "after 1440 /design-council-preview?surface=queue",
+    "after 1440 /design-council-preview?surface=queue-origin",
+    "after 1440 /",
+    "after 390 /design-council-preview?surface=me-queue",
+    "after 390 /design-council-preview?surface=person",
+    "after 390 /design-council-preview?surface=settings-ai",
+    "after 390 /ai",
+    "after 390 /",
+    "after 390 /design-council-preview?surface=research",
+    "390: input tab shows three questions with Answer and Archive, including Answered",
+    "after 390 /design-council-preview?surface=queue",
+    "after 390 /design-council-preview?surface=queue-origin",
+    "after 390 /"
+  ],
+  "errors": [],
+  "requests": []
+}

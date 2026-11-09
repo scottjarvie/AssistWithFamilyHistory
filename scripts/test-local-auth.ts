@@ -28,3 +28,13 @@ test('public-only adapters failclosed outside exact local mode and endpoint',()=
  for(const wrong of [{NODE_ENV:'production'},{VERCEL:'1'},{CI:'1'},{CLERK_SECRET_KEY:'placeholder'},{NEXT_PUBLIC_CONVEX_URL:'https://wrong.convex.cloud'}])assert.equal(localLiveEnabled({...live,...wrong}),false);
  assert.equal(localSandboxEnabled({...live,LOCAL_DEVELOPMENT_MODE:'sandbox'}),false);
 });
+
+
+test('native Convex website claims allow missing azp and refuse OAuth markers',async()=>{
+ const claims={aud:'convex',exp:now+120,fva:[0,-1],iat:now,iss:LOCAL_SANDBOX_ISSUER,nbf:now-1,sid:'sess_synthetic_native',sts:'active',sub:'user_synthetic_native',v:2};
+ assert.deepEqual(Object.keys(claims).sort(),['aud','exp','fva','iat','iss','nbf','sid','sts','sub','v']);
+ const sign=(extra:Record<string,unknown>={})=>new SignJWT({...claims,...extra}).setProtectedHeader({alg:'RS256'}).sign(pair.privateKey);
+ const session=await verifyLocalSession(await sign(),keys,'sandbox');assert.deepEqual(session,{userId:'user_synthetic_native',sessionId:'sess_synthetic_native'});
+ assert.ok(await verifyLocalConvexToken(await sign(),session,keys,'sandbox'));
+ for(const marker of [{client_id:'oauth-ai'},{scope:'openid'},{scp:['openid']},{azp:'https://foreign.example'}]){assert.equal(await verifyLocalSession(await sign(marker),keys,'sandbox'),null);assert.equal(await verifyLocalConvexToken(await sign(marker),session,keys,'sandbox'),null);}
+});

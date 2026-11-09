@@ -1,5 +1,6 @@
 "use client";
 
+import {QueueNavCounts} from "@/components/queue/QueueNavCounts";
 import type { ReactElement, ReactNode } from "react";
 import { SafeLink } from "@/components/layout/SafeLink";
 import {
@@ -101,6 +102,7 @@ export function AppNavigationList({
                   )}
                 </>
               )}
+              {item.href==="/app/queue"&&!collapsed&&<QueueNavCounts/>}
             </SafeLink>
           );
 

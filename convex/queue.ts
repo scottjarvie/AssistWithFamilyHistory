@@ -1,12 +1,14 @@
+import {queueIdentity,suggestionWithinPeople} from "../lib/queue/identity";
 import { paginationOptsValidator, type PaginationResult } from "convex/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
-import type { ActionCtx, MutationCtx } from "./_generated/server";
+import type { ActionCtx, MutationCtx, QueryCtx } from "./_generated/server";
 import { action, internalAction, internalMutation, internalQuery, mutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import {
+  requireWebsitePerson,
   authorizeTenantAction,
-  authorizeTenantMutation,
+  authorizeTenantMutation as authorizeTenantMutationBase,
   type TenantAccessDecision,
 } from "./access";
 import { matchesVaultOwner } from "./vaultCore";
@@ -24,7 +26,6 @@ import {
   summarizeDirective,
   type QueueActorKind,
   type QueueCommand,
-  type QueueOperation,
 } from "../lib/queue/contract";
 import {
   authorizeQueueAgentTool,
@@ -66,6 +67,20 @@ const principalValidator = v.object({
 });
 
 type QueueItem = Doc<"queueItems">;
+async function queueForPerson(ctx: Pick<QueryCtx,"db">, item:QueueItem, includeTitle=true) {
+ const projected=queueIdentity(item);
+ if (!item.fromRecord) return projected;
+ const tables={person:"persons",relationship:"relationships",place:"places",event:"events",source:"sources",citation:"citations",media:"media",context_item:"contextItems",research_task:"researchTasks",research_check:"researchChecks",story:"stories",import_run:"importRuns",provisional_relative:"provisionalRelatives"} as const;
+ const table=tables[item.fromRecord.kind as keyof typeof tables];
+ if(!table)return {...projected,fromRecord:undefined};
+ const id=ctx.db.normalizeId(table,item.fromRecord.refId);
+ const row=id?await ctx.db.get(id):null;
+ if(!row || !("vaultOwnerId" in row) || !matchesVaultOwner(row.vaultOwnerId,item.vaultOwnerId)) return {...projected,fromRecord:undefined};
+ if(!includeTitle)return projected; // Queue references never grant record-content reads.
+ const data=row as unknown as {title?:string;label?:string;name?:string|{given?:string;surname?:string}};
+ const name=typeof data.name==="string"?data.name:[data.name?.given,data.name?.surname].filter(Boolean).join(" ");
+ return {...projected,fromRecordTitle:data.title||data.label||name||item.fromRecord.kind.replaceAll("_"," ")};
+}
 type QueueContext = QueueItem["context"][number];
 type QueueExpiryReconciliation = { item: QueueItem | null; expired: boolean };
 
@@ -77,11 +92,16 @@ function assertQueueTenantAllowed(
   }
 }
 
+async function authorizeTenantMutation(ctx:MutationCtx,functionName:string,suppliedOwner?:string|null){
+ await requireWebsitePerson(ctx);return authorizeTenantMutationBase(ctx,functionName,suppliedOwner);
+}
+
 async function authorizeQueueTenantAction(
   ctx: ActionCtx,
   functionName: string,
   suppliedOwner?: string | null,
 ) {
+  await requireWebsitePerson(ctx);
   const decision = await authorizeTenantAction(
     ctx,
     functionName,
@@ -100,13 +120,48 @@ function assertItemOwner(item: QueueItem | null, owner: string): asserts item is
   if (!item || !matchesVaultOwner(item.vaultOwnerId, owner)) throw new Error("Queue item not found");
 }
 
-function assertAgentAuthority(item: QueueItem, actor: { kind: QueueActorKind; id: string }, operation: QueueOperation) {
+function assertAgentAuthority(item: QueueItem, actor: { kind: QueueActorKind; id: string; credentialId?:string }, operation: "queue:read" | "queue:claim" | "queue:update" | "queue:complete") {
+  if (item.archivedAt || item.suggestionStatus === "open") throw new Error("Unaccepted suggestions and archived items cannot be worked on");
   if (item.authority.actorKind !== actor.kind || item.authority.actorId !== actor.id) {
     throw new Error("This AI is not assigned to the Queue item");
+  }
+  if(operation!=="queue:claim"&&item.activeActorId){
+    if(item.activeActorId!==actor.id||item.activeActorKind!==actor.kind)throw new Error("Another actor holds the Queue claim");
+    if(item.activeCredentialId&&item.activeCredentialId!==actor.credentialId)throw new Error("Another AI connection holds the Queue claim");
+    if(item.activeActorId==="oauth-chosen-ai"&&!item.activeCredentialId)throw new Error("Legacy claim ownership is ambiguous; let it expire or ask the person to release it");
   }
   if (!item.authority.operations.includes(operation)) {
     throw new Error(`Queue item authority does not include ${operation}`);
   }
+}
+
+/** Incremental person-private counters. Unknown historic totals never masquerade as zero. */
+function contribution(item:QueueItem|null){
+ const zero={suggestions:0,input:0,total:0,waiting:0,working:0,answered:0};
+ if(!item)return zero;
+ const current=queueIdentity(item),counts={...zero,total:1};
+ if(item.archivedAt)return counts;
+ counts.suggestions=item.suggestionStatus==="open"?1:0;
+ counts.input=current.needsInput?1:0;
+ if(item.suggestionStatus!=="open"){
+  counts.waiting=current.state==="waiting_for_your_ai"?1:0;
+  counts.working=current.state==="working"?1:0;
+  counts.answered=current.state==="done"?1:0;
+ }
+ return counts;
+}
+async function ensureCounters(ctx:MutationCtx,owner:string){
+ const existing=await ctx.db.query("queueCounters").withIndex("by_owner",q=>q.eq("vaultOwnerId",owner)).unique();
+ if(existing)return existing;
+ const historic=await ctx.db.query("queueItems").withIndex("by_owner",q=>q.eq("vaultOwnerId",owner)).first();
+ const id=await ctx.db.insert("queueCounters",{vaultOwnerId:owner,openSuggestions:0,needsInput:0,totalRecords:0,waiting:0,working:0,answered:0,ready:!historic,updatedAt:Date.now()});
+ return (await ctx.db.get(id))!;
+}
+async function updateCounters(ctx:MutationCtx,before:QueueItem|null,after:QueueItem|null){
+ const owner=(after??before)!.vaultOwnerId,counter=await ensureCounters(ctx,owner);
+ const previous=before?.counterIncluded?contribution(before):contribution(null),next=contribution(after);
+ await ctx.db.patch(counter._id,{openSuggestions:counter.openSuggestions+next.suggestions-previous.suggestions,needsInput:counter.needsInput+next.input-previous.input,totalRecords:counter.totalRecords+next.total-previous.total,waiting:counter.waiting+next.waiting-previous.waiting,working:counter.working+next.working-previous.working,answered:counter.answered+next.answered-previous.answered,updatedAt:Date.now()});
+ if(after&&!after.counterIncluded)await ctx.db.patch(after._id,{counterIncluded:true});
 }
 
 async function validateContext(ctx: MutationCtx, owner: string, context: QueueContext[]) {
@@ -150,7 +205,7 @@ async function existingReceipt(
   }
   const item = await ctx.db.get(receipt.queueItemId);
   assertItemOwner(item, input.owner);
-  return { item, deduplicated: true as const };
+  return { item:await queueForPerson(ctx,item,input.actor.kind==="user"), deduplicated: true as const };
 }
 
 async function recordCommand(
@@ -205,7 +260,7 @@ function assertFutureHandoffExpiration(value: number | undefined, now: number): 
 }
 
 async function scheduleQueueExpiry(ctx: MutationCtx, item: QueueItem): Promise<void> {
-  const expiresAt = queueExpiryDeadline(item);
+  const expiresAt = queueExpiryDeadline(queueIdentity(item));
   if (expiresAt === undefined || expiresAt <= Date.now()) return;
   await ctx.scheduler.runAt(expiresAt, internal.queue.reconcileQueueItemExpiry, {
     vaultOwnerId: item.vaultOwnerId,
@@ -236,15 +291,22 @@ async function runCommand(
   assertItemOwner(item, input.owner);
   assertVersion(item, input.expectedVersion);
   const now = Date.now();
-  assertCommandAllowed(input.command, item, input.actor, now);
+  const projected = queueIdentity(item);
+  assertCommandAllowed(input.command, projected, input.actor, now);
+  const patch=input.patch(projected,now);
+  if(input.actor.kind!=="user"&&projected.needsInput&&((Object.prototype.hasOwnProperty.call(patch,"needsInput")&&!patch.needsInput)||patch.archivedAt!==undefined))throw new Error('MCP_FAMILY_HISTORY_ERROR:'+JSON.stringify({code:"FORBIDDEN",message:"Only the person can clear Needs your input",recovery:"Ask the person to answer or clear the flag."}));
   const fromState = item.state;
   await ctx.db.patch(item._id, {
-    ...input.patch(item, now),
+    state: projected.state,
+    needsInput: projected.needsInput,
+    ...(input.actor.kind==="user"?{personActedAt:item.personActedAt??now}:{}),
+    ...patch,
     version: item.version + 1,
     updatedAt: now,
   });
   const updated = await ctx.db.get(item._id);
   assertItemOwner(updated, input.owner);
+  await updateCounters(ctx,item,updated);
   await recordCommand(ctx, {
     owner: input.owner,
     idempotencyKey,
@@ -258,7 +320,7 @@ async function runCommand(
     now,
   });
   await scheduleQueueExpiry(ctx, updated);
-  return { item: updated, deduplicated: false as const };
+  return { item: await queueForPerson(ctx,updated,input.actor.kind==="user"), deduplicated: false as const };
 }
 
 export const createQueueItem = mutation({
@@ -269,6 +331,7 @@ export const createQueueItem = mutation({
     priority: v.optional(queuePriorityValidator),
     priorityReason: v.optional(v.string()),
     context: v.optional(v.array(contextValidator)),
+    fromRecord: v.optional(contextValidator),
     chosenAiId: v.optional(v.string()),
     handoffExpiresAt: v.optional(v.number()),
     maxRetries: v.optional(v.number()),
@@ -293,6 +356,7 @@ export const createQueueItem = mutation({
     if (args.priority === "high" && !priorityReason) throw new Error("High priority requires a reason");
     const context = args.context ?? [];
     await validateContext(ctx, owner, context);
+    if(args.fromRecord)await validateContext(ctx,owner,[args.fromRecord]);
     const chosenAiId = normalizeOptionalText(args.chosenAiId, "Chosen AI id", 160);
     const maxRetries = args.maxRetries ?? 3;
     if (!Number.isInteger(maxRetries) || maxRetries < 0 || maxRetries > QUEUE_LIMITS.maxRetries) {
@@ -300,6 +364,7 @@ export const createQueueItem = mutation({
     }
     const now = Date.now();
     assertFutureHandoffExpiration(args.handoffExpiresAt, now);
+    await ensureCounters(ctx,owner);
     const queueItemId = await ctx.db.insert("queueItems", {
       vaultOwnerId: owner,
       directive,
@@ -310,6 +375,7 @@ export const createQueueItem = mutation({
       priority: args.priority ?? "normal",
       priorityReason,
       context,
+      fromRecord:args.fromRecord,
       authority: {
         actorKind: "chosen_ai",
         actorId: chosenAiId ?? "unassigned",
@@ -322,6 +388,7 @@ export const createQueueItem = mutation({
       retryCount: 0,
       maxRetries,
       submittedAt: now,
+      addedBy: "person",
       createdByActorKind: "user",
       createdByActorId: owner,
       version: 1,
@@ -330,6 +397,7 @@ export const createQueueItem = mutation({
     });
     const item = await ctx.db.get(queueItemId);
     assertItemOwner(item, owner);
+    await updateCounters(ctx,null,item);
     await recordCommand(ctx, {
       owner,
       idempotencyKey,
@@ -382,6 +450,7 @@ export const assignQueueItemToAi = mutation({
         leftForActorId: chosenAiId,
         activeActorKind: undefined,
         activeActorId: undefined,
+        activeCredentialId:undefined,
         leaseExpiresAt: undefined,
         handoffExpiresAt: args.handoffExpiresAt,
         requiredAction: undefined,
@@ -426,6 +495,7 @@ export const claimQueueItemAsUser = mutation({
         condition: "active",
         activeActorKind: "user",
         activeActorId: decision.owner,
+        activeCredentialId:undefined,
         pickedUpAt: now,
         leaseExpiresAt: now + args.leaseMs,
         nextStep,
@@ -501,6 +571,7 @@ export const completeQueueItemAsUser = mutation({
         requiredAction: undefined,
         activeActorKind: undefined,
         activeActorId: undefined,
+        activeCredentialId:undefined,
         leaseExpiresAt: undefined,
         handoffExpiresAt: undefined,
       }),
@@ -512,37 +583,33 @@ const listQueueArgs = {
   vaultOwnerId: v.string(),
   state: v.optional(queueStateValidator),
   priority: v.optional(queuePriorityValidator),
+  suggestions: v.optional(v.boolean()),
+  archived: v.optional(v.boolean()),
+  suggestionCredentialId: v.optional(v.string()),
+  suggestionPersonIds:v.optional(v.array(v.string())),
+  originTitles:v.optional(v.boolean()),
+  actionable:v.optional(v.boolean()),
   paginationOpts: paginationOptsValidator,
 };
 
 export const listQueueItemsInternal = internalQuery({
   args: listQueueArgs,
   handler: async (ctx, args) => {
-    const requested = Math.min(args.paginationOpts.numItems, QUEUE_LIMITS.itemPage);
-    const paginationOpts = { ...args.paginationOpts, numItems: requested };
-    if (args.state) {
-      return ctx.db
-        .query("queueItems")
-        .withIndex("by_owner_state_updated", (q) =>
-          q.eq("vaultOwnerId", args.vaultOwnerId).eq("state", args.state!),
-        )
-        .order("desc")
-        .paginate(paginationOpts);
-    }
-    if (args.priority) {
-      return ctx.db
-        .query("queueItems")
-        .withIndex("by_owner_priority_updated", (q) =>
-          q.eq("vaultOwnerId", args.vaultOwnerId).eq("priority", args.priority!),
-        )
-        .order("desc")
-        .paginate(paginationOpts);
-    }
-    return ctx.db
-      .query("queueItems")
-      .withIndex("by_owner_updated", (q) => q.eq("vaultOwnerId", args.vaultOwnerId))
-      .order("desc")
-      .paginate(paginationOpts);
+    let query=ctx.db.query("queueItems").withIndex("by_owner_updated",q=>q.eq("vaultOwnerId",args.vaultOwnerId)).order("desc");
+    query=query.filter(q=>args.archived&&args.state!=="needs_you"?q.neq(q.field("archivedAt"),undefined):q.eq(q.field("archivedAt"),undefined));
+    query=query.filter(q=>args.state==="needs_you"?true:args.suggestions?q.or(q.eq(q.field("suggestionStatus"),"open"),args.archived?q.or(q.eq(q.field("suggestionStatus"),"dismissed"),q.eq(q.field("suggestionStatus"),"withdrawn")):false):args.archived?true:q.neq(q.field("suggestionStatus"),"open"));
+    if(args.suggestionCredentialId)query=query.filter(q=>q.eq(q.field("raisedByCredentialId"),args.suggestionCredentialId));
+    if(args.suggestionPersonIds!==undefined)query=query.filter(q=>q.or(q.and(q.neq(q.field("addedBy"),"ai_suggestion"),q.eq(q.field("suggestionStatus"),undefined)),...args.suggestionPersonIds!.map(id=>q.and(q.eq(q.field("fromRecord.kind"),"person"),q.eq(q.field("fromRecord.refId"),id)))));
+    if(args.actionable)query=query.filter(q=>q.and(q.eq(q.field("needsInput"),undefined),q.neq(q.field("state"),"needs_you")));
+    if(args.priority)query=query.filter(q=>q.eq(q.field("priority"),args.priority));
+    if(args.state)query=query.filter(q=>{
+      if(args.state==="needs_you")return q.or(q.neq(q.field("needsInput"),undefined),q.eq(q.field("state"),"needs_you"));
+      const hasResult=q.and(q.neq(q.field("resultSummary"),undefined),q.neq(q.field("resultSummary"),""));
+      const legacy=args.state==="done"?hasResult:args.state==="working"?q.and(q.not(hasResult),q.neq(q.field("pickedUpAt"),undefined)):q.and(q.not(hasResult),q.eq(q.field("pickedUpAt"),undefined));
+      return q.or(q.eq(q.field("state"),args.state),q.and(q.eq(q.field("state"),"needs_you"),legacy));
+    });
+    const page=await query.paginate({...args.paginationOpts,numItems:Math.min(args.paginationOpts.numItems,QUEUE_LIMITS.itemPage)});
+    return {...page,page:await Promise.all(page.page.map(item=>queueForPerson(ctx,item,!!args.originTitles)))};
   },
 });
 
@@ -560,7 +627,13 @@ export const listAllowedQueueItemsInternal = internalQuery({
       const id = ctx.db.normalizeId("queueItems", raw);
       const item = id ? await ctx.db.get(id) : null;
       if (!item || !matchesVaultOwner(item.vaultOwnerId, args.vaultOwnerId)) continue;
-      if (args.state && item.state !== args.state) continue;
+      if(!!item.archivedAt!==(args.state==="needs_you"?false:!!args.archived))continue;
+      if(args.suggestions){if(item.suggestionStatus!=="open"&&!(args.archived&&["dismissed","withdrawn"].includes(item.suggestionStatus??"")))continue;}
+      else if(!args.archived&&args.state!=="needs_you"&&item.suggestionStatus==="open")continue;
+      if(args.suggestionCredentialId&&item.raisedByCredentialId!==args.suggestionCredentialId)continue;
+      if(!suggestionWithinPeople(item,args.suggestionPersonIds))continue;
+      if(args.actionable&&queueIdentity(item).needsInput)continue;
+      if (args.state && (args.state === "needs_you" ? !queueIdentity(item).needsInput : queueIdentity(item).state !== args.state)) continue;
       if (args.priority && item.priority !== args.priority) continue;
       rows.push(item);
     }
@@ -598,11 +671,12 @@ export const listQueueItems = action({
     const decision = await authorizeQueueTenantAction(ctx, "queue.listQueueItems", args.vaultOwnerId);
     const result = await ctx.runQuery(internal.queue.listQueueItemsInternal, {
       ...args,
+      originTitles:true,
       vaultOwnerId: decision.owner,
     });
     const page: QueueItem[] = [];
     for (const item of result.page) {
-      const transition = queueExpiryTransition(item, Date.now());
+      const transition = queueExpiryTransition(queueIdentity(item), Date.now());
       if (!transition) {
         page.push(item);
         continue;
@@ -615,7 +689,7 @@ export const listQueueItems = action({
         page.push(reconciled.item);
       }
     }
-    return { ...result, page };
+    return { ...result, page: page.map(queueIdentity) };
   },
 });
 
@@ -624,6 +698,7 @@ export const getQueueItemInternal = internalQuery({
     vaultOwnerId: v.string(),
     queueItemId: v.id("queueItems"),
     activityPagination: paginationOptsValidator,
+    originTitles:v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.queueItemId);
@@ -636,7 +711,7 @@ export const getQueueItemInternal = internalQuery({
         ...args.activityPagination,
         numItems: Math.min(args.activityPagination.numItems, QUEUE_LIMITS.activityPage),
       });
-    return { item, activity };
+    return { item: await queueForPerson(ctx,item,!!args.originTitles), activity };
   },
 });
 
@@ -655,7 +730,7 @@ export const getQueueItem = action({
       vaultOwnerId: decision.owner,
       queueItemId: args.queueItemId,
     });
-    return ctx.runQuery(internal.queue.getQueueItemInternal, { ...args, vaultOwnerId: decision.owner });
+    return ctx.runQuery(internal.queue.getQueueItemInternal, { ...args, originTitles:true, vaultOwnerId: decision.owner });
   },
 });
 
@@ -668,7 +743,10 @@ export const agentListQueueItems = internalAction({
     principal: principalValidator,
     state: v.optional(queueStateValidator),
     priority: v.optional(queuePriorityValidator),
+    suggestions: v.optional(v.boolean()),
+    archived: v.optional(v.boolean()),
     paginationOpts: paginationOptsValidator,
+    suggestionPersonIds:v.optional(v.array(v.string())),
     // The grant's named Queue items, when the person narrowed the connection
     // to them. Absent or empty means the grant names no Queue boundary.
     queueItemIds: v.optional(v.array(v.string())),
@@ -679,6 +757,12 @@ export const agentListQueueItems = internalAction({
       vaultOwnerId: actor.ownerId,
       state: args.state,
       priority: args.priority,
+      suggestions: args.suggestions,
+      archived: args.archived,
+      suggestionCredentialId: args.suggestions ? args.principal.credentialId : undefined,
+      originTitles:false,
+      suggestionPersonIds:args.suggestionPersonIds,
+      actionable:!args.suggestions&&!args.archived&&args.state!=="needs_you"&&args.state!=="done",
       paginationOpts: args.paginationOpts,
     };
     const result = args.queueItemIds && args.queueItemIds.length > 0
@@ -686,7 +770,9 @@ export const agentListQueueItems = internalAction({
       : await ctx.runQuery(internal.queue.listQueueItemsInternal, listArgs);
     const page: QueueItem[] = [];
     for (const item of result.page) {
-      const transition = queueExpiryTransition(item, Date.now());
+      if(listArgs.actionable&&queueIdentity(item).needsInput)continue;
+      if (args.suggestions && item.raisedByCredentialId !== args.principal.credentialId) continue;
+      const transition = queueExpiryTransition(queueIdentity(item), Date.now());
       if (!transition) {
         page.push(item);
         continue;
@@ -695,11 +781,11 @@ export const agentListQueueItems = internalAction({
         vaultOwnerId: actor.ownerId,
         queueItemId: item._id,
       });
-      if (reconciled.item && (!args.state || reconciled.item.state === args.state)) {
+      if (reconciled.item && !(listArgs.actionable&&queueIdentity(reconciled.item).needsInput) && (!args.state || reconciled.item.state === args.state)) {
         page.push(reconciled.item);
       }
     }
-    return { ...result, page };
+    return { ...result, page: page.map(queueIdentity) };
   },
 });
 
@@ -739,7 +825,7 @@ export const agentClaimQueueItem = internalMutation({
     const actor = verifyPrincipal(args.principal, "claim_queue_item");
     const item = await ctx.db.get(args.queueItemId);
     assertItemOwner(item, actor.ownerId);
-    assertAgentAuthority(item, { kind: actor.actorKind, id: actor.actorId }, "queue:claim");
+    assertAgentAuthority(item, { kind: actor.actorKind, id: actor.actorId,credentialId:args.principal.credentialId }, "queue:claim");
     assertLeaseDuration(args.leaseMs);
     const nextStep = normalizeRequiredText(args.nextStep, "Next step", QUEUE_LIMITS.nextStep);
     return runCommand(ctx, {
@@ -757,6 +843,7 @@ export const agentClaimQueueItem = internalMutation({
         condition: "active",
         activeActorKind: actor.actorKind,
         activeActorId: actor.actorId,
+        activeCredentialId:args.principal.credentialId,
         pickedUpAt: now,
         leaseExpiresAt: leaseExpiresAtForActor(current, { kind: actor.actorKind, id: actor.actorId }, now, args.leaseMs),
         nextStep,
@@ -780,7 +867,7 @@ export const agentCheckpointQueueItem = internalMutation({
     const actor = verifyPrincipal(args.principal, "checkpoint_queue_item");
     const item = await ctx.db.get(args.queueItemId);
     assertItemOwner(item, actor.ownerId);
-    assertAgentAuthority(item, { kind: actor.actorKind, id: actor.actorId }, "queue:update");
+    assertAgentAuthority(item, { kind: actor.actorKind, id: actor.actorId,credentialId:args.principal.credentialId }, "queue:update");
     assertLeaseDuration(args.leaseMs);
     const nextStep = normalizeRequiredText(args.nextStep, "Next step", QUEUE_LIMITS.nextStep);
     return runCommand(ctx, {
@@ -818,7 +905,9 @@ export const agentRequestUserAction = internalMutation({
     const actor = verifyPrincipal(args.principal, "request_user_action");
     const item = await ctx.db.get(args.queueItemId);
     assertItemOwner(item, actor.ownerId);
-    assertAgentAuthority(item, { kind: actor.actorKind, id: actor.actorId }, "queue:update");
+    assertAgentAuthority(item, { kind: actor.actorKind, id: actor.actorId,credentialId:args.principal.credentialId }, "queue:update");
+    if(item.condition==="canceled")throw new Error("Canceled work cannot be flagged");
+    if(item.handoffExpiresAt!==undefined&&item.handoffExpiresAt<=Date.now())throw new Error("Queue handoff expired; ask the person to reconnect or reassign it");
     const requiredAction = normalizeRequiredText(
       args.requiredAction,
       "Required action",
@@ -834,14 +923,10 @@ export const agentRequestUserAction = internalMutation({
       eventType: "needs_you",
       summary: "Chosen AI paused for a specific user action.",
       detail: requiredAction,
-      patch: () => ({
-        state: "needs_you",
-        condition: "awaiting_user",
+      patch: (_current, now) => ({
+        needsInput: {question:requiredAction,raisedAt:now,actorId:args.principal.credentialId},
+        activeActorKind:undefined,activeActorId:undefined,activeCredentialId:undefined,leaseExpiresAt:undefined,
         requiredAction,
-        nextStep: undefined,
-        activeActorKind: undefined,
-        activeActorId: undefined,
-        leaseExpiresAt: undefined,
       }),
     });
   },
@@ -860,7 +945,7 @@ export const agentCompleteQueueItem = internalMutation({
     const actor = verifyPrincipal(args.principal, "complete_queue_item");
     const item = await ctx.db.get(args.queueItemId);
     assertItemOwner(item, actor.ownerId);
-    assertAgentAuthority(item, { kind: actor.actorKind, id: actor.actorId }, "queue:complete");
+    assertAgentAuthority(item, { kind: actor.actorKind, id: actor.actorId,credentialId:args.principal.credentialId }, "queue:complete");
     const resultSummary = normalizeRequiredText(args.resultSummary, "Result", QUEUE_LIMITS.resultSummary);
     const resultRefs = (args.resultRefs ?? []).map((ref) => normalizeRequiredText(ref, "Result reference", 500));
     if (resultRefs.length > QUEUE_LIMITS.resultRefs) {
@@ -886,6 +971,7 @@ export const agentCompleteQueueItem = internalMutation({
         requiredAction: undefined,
         activeActorKind: undefined,
         activeActorId: undefined,
+        activeCredentialId:undefined,
         leaseExpiresAt: undefined,
         handoffExpiresAt: undefined,
       }),
@@ -916,8 +1002,8 @@ export const resumeQueueItem = mutation({
       summary: "User answered the blocker and returned the directive to the chosen AI.",
       detail: answerSummary,
       patch: (current, now) => ({
-        state: "waiting_for_your_ai",
-        condition: current.authority.actorId === "unassigned" ? "disconnected" : "ready",
+        needsInput: undefined,
+        condition: current.state==="waiting_for_your_ai"?(current.authority.actorId==="unassigned"?"disconnected":"ready"):current.state==="working"?((current.leaseExpiresAt??0)>now?"active":"expired"):current.condition,
         requiredAction: undefined,
         failureCode: undefined,
         failureSummary: undefined,
@@ -965,6 +1051,7 @@ export const cancelQueueItem = mutation({
         requiredAction: undefined,
         activeActorKind: undefined,
         activeActorId: undefined,
+        activeCredentialId:undefined,
         leaseExpiresAt: undefined,
         handoffExpiresAt: undefined,
       }),
@@ -1025,7 +1112,7 @@ export const agentFailQueueItem = internalMutation({
     const actor = verifyPrincipal(args.principal, "report_queue_failure");
     const item = await ctx.db.get(args.queueItemId);
     assertItemOwner(item, actor.ownerId);
-    assertAgentAuthority(item, { kind: actor.actorKind, id: actor.actorId }, "queue:update");
+    assertAgentAuthority(item, { kind: actor.actorKind, id: actor.actorId,credentialId:args.principal.credentialId }, "queue:update");
     const failureCode = normalizeRequiredText(args.failureCode, "Failure code", 120);
     const failureSummary = normalizeRequiredText(args.failureSummary, "Failure summary", 1_000);
     const result = nextStateForFailure(item, args.retryable);
@@ -1047,17 +1134,19 @@ export const agentFailQueueItem = internalMutation({
       detail: failureSummary,
       patch: () => ({
         state: result.state,
+        needsInput: result.condition === "failed" ? {question:`Choose how to continue after ${failureCode}: ${failureSummary}`,raisedAt:Date.now(),actorId:args.principal.credentialId} : queueIdentity(item).needsInput,
         condition: result.condition,
         failureCode,
         failureSummary,
         retryCount: item.retryCount + 1,
         nextRetryAt: result.condition === "retry_scheduled" ? args.nextRetryAt : undefined,
         requiredAction:
-          result.state === "needs_you"
+          result.condition === "failed"
             ? `Choose how to continue after ${failureCode}: ${failureSummary}`
-            : undefined,
+            : item.requiredAction,
         activeActorKind: undefined,
         activeActorId: undefined,
+        activeCredentialId:undefined,
         leaseExpiresAt: undefined,
         nextStep: undefined,
       }),
@@ -1075,7 +1164,7 @@ export const expireQueueHandoff = internalMutation({
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.queueItemId);
     assertItemOwner(item, args.vaultOwnerId);
-    const transition = queueExpiryTransition(item, Date.now());
+    const transition = queueExpiryTransition(queueIdentity(item), Date.now());
     if (!transition) throw new Error("Queue handoff has not expired");
     return runCommand(ctx, {
       owner: args.vaultOwnerId,
@@ -1089,10 +1178,12 @@ export const expireQueueHandoff = internalMutation({
       detail: "Reconnect or choose an AI for this directive, then return it to Waiting for your AI.",
       patch: () => ({
         state: transition.state,
+        needsInput: {question:transition.requiredAction,raisedAt:Date.now(),actorId:"queue-expiry"},
         condition: transition.condition,
         requiredAction: transition.requiredAction,
         activeActorKind: undefined,
         activeActorId: undefined,
+        activeCredentialId:undefined,
         leaseExpiresAt: undefined,
         nextStep: undefined,
       }),
@@ -1109,7 +1200,7 @@ export const reconcileQueueItemExpiry = internalMutation({
     const item = await ctx.db.get(args.queueItemId);
     if (!item) return { item: null, expired: false };
     assertItemOwner(item, args.vaultOwnerId);
-    const transition = queueExpiryTransition(item, Date.now());
+    const transition = queueExpiryTransition(queueIdentity(item), Date.now());
     if (!transition) return { item, expired: false as const };
     const result = await runCommand(ctx, {
       owner: args.vaultOwnerId,
@@ -1123,10 +1214,12 @@ export const reconcileQueueItemExpiry = internalMutation({
       detail: transition.requiredAction,
       patch: () => ({
         state: transition.state,
+        needsInput: {question:transition.requiredAction,raisedAt:Date.now(),actorId:"queue-expiry"},
         condition: transition.condition,
         requiredAction: transition.requiredAction,
         activeActorKind: undefined,
         activeActorId: undefined,
+        activeCredentialId:undefined,
         leaseExpiresAt: undefined,
         nextStep: undefined,
       }),
@@ -1154,6 +1247,7 @@ export const deleteQueueItemBatch = internalMutation({
         .take(remaining);
       for (const row of receipts) await ctx.db.delete(row._id);
       if (activity.length === 0 && receipts.length === 0) {
+        await updateCounters(ctx,item,null);
         await ctx.db.delete(item._id);
         return { done: true, deleted: 1 };
       }
@@ -1182,4 +1276,158 @@ export const deleteQueueItem = action({
     }
     throw new Error("Queue deletion exceeded its bounded batch limit");
   },
+});
+
+/** AWL-0016: person-private suggestions share the Queue but are never actionable. */
+export const queueCounts = mutation({
+  args:{vaultOwnerId:v.string()},
+  handler:async(ctx,args)=>{
+    const decision=await authorizeTenantMutation(ctx,"queue.queueCounts",args.vaultOwnerId);assertQueueTenantAllowed(decision);
+    const counter=await ctx.db.query("queueCounters").withIndex("by_owner",q=>q.eq("vaultOwnerId",decision.owner)).unique();
+    if(counter)return counter.ready?{available:true,suggestions:counter.openSuggestions,needsInput:counter.needsInput}:{available:false,suggestions:null,needsInput:null};
+    const item=await ctx.db.query("queueItems").withIndex("by_owner",q=>q.eq("vaultOwnerId",decision.owner)).first();
+    return item?{available:false,suggestions:null,needsInput:null}:{available:true,suggestions:0,needsInput:0};
+  },
+});
+
+export const agentAddQueueItem = internalMutation({
+ args:{principal:principalValidator,connectionId:v.optional(v.id("mcpGrants")),directive:v.string(),addedBy:v.optional(v.union(v.literal("ai_on_request"),v.literal("ai_suggestion"))),reason:v.optional(v.string()),options:v.optional(v.array(v.string())),evidence:v.optional(v.array(v.string())),fromRecord:v.optional(contextValidator),idempotencyKey:v.string()},
+ handler:async(ctx,args)=>{
+  const actor=verifyPrincipal(args.principal,"add_queue_item");
+  if(!args.addedBy) throw new Error("AI adds require addedBy: ai_on_request or ai_suggestion");
+  if(args.addedBy==="ai_suggestion"&&!args.principal.scopes.includes("queue:suggest"))throw new Error("Propose suggestions power is off");
+  const replay=await existingReceipt(ctx,{owner:actor.ownerId,idempotencyKey:args.idempotencyKey,command:"add",actor:{kind:actor.actorKind,id:args.principal.credentialId}});if(replay)return replay;
+  if(args.fromRecord)await validateContext(ctx,actor.ownerId,[args.fromRecord]);
+  const directive=normalizeRequiredText(args.directive,"Directive",QUEUE_LIMITS.directive);
+  const reason=args.addedBy==="ai_suggestion"?normalizeRequiredText(args.reason??"","Suggestion reason",4000):args.reason;
+  const ideaKey=args.addedBy==="ai_suggestion"?Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(JSON.stringify([directive,reason]))))).map(byte=>byte.toString(16).padStart(2,"0")).join(""):undefined;
+  const options=args.options?.map(o=>normalizeRequiredText(o,"Option",1000));if((options?.length??0)>26)throw new Error("At most 26 options");
+  const evidence=args.evidence?.map(e=>normalizeRequiredText(e,"Evidence",1000));if((evidence?.length??0)>20)throw new Error("At most 20 evidence entries");
+  // A dismissed idea requires a materially new explanation, not a retry under a new key.
+  if(args.addedBy==="ai_suggestion"){
+   const previous=await ctx.db.query("queueItems").withIndex("by_owner_idea",q=>q.eq("vaultOwnerId",actor.ownerId).eq("suggestionIdeaKey",ideaKey).eq("wasDismissed",true)).first();
+   if(previous)throw new Error("This idea was dismissed; provide a new reason");
+  }
+  // Display attribution only: names never participate in grant authority.
+  const connection=args.connectionId?await ctx.db.get(args.connectionId):null;
+  const aiName=connection&&matchesVaultOwner(connection.vaultOwnerId,actor.ownerId)&&`${connection.issuer}#${connection.clientId}`===args.principal.credentialId?connection.label:"Your AI";
+  const now=Date.now();
+  await ensureCounters(ctx,actor.ownerId);
+  const id=await ctx.db.insert("queueItems",{vaultOwnerId:actor.ownerId,directive,summary:summarizeDirective(directive),addedBy:args.addedBy,suggestionIdeaKey:ideaKey,suggestionStatus:args.addedBy==="ai_suggestion"?"open":undefined,suggestionReason:reason,suggestionOptions:options,suggestionEvidence:evidence,fromRecord:args.fromRecord,raisedByCredentialId:args.principal.credentialId,aiName,state:"waiting_for_your_ai",condition:"ready",priority:"normal",context:[],authority:{actorKind:actor.actorKind,actorId:actor.actorId,operations:["queue:read","queue:claim","queue:update","queue:complete"],scopeNote:"Queue work only; no domain authority."},leftForActorKind:"chosen_ai",leftForActorId:actor.actorId,retryCount:0,maxRetries:3,submittedAt:now,createdByActorKind:actor.actorKind,createdByActorId:args.principal.credentialId,version:1,createdAt:now,updatedAt:now});
+  const item=await ctx.db.get(id);assertItemOwner(item,actor.ownerId);
+  await updateCounters(ctx,null,item);
+  await recordCommand(ctx,{owner:actor.ownerId,idempotencyKey:args.idempotencyKey,command:"add",actor:{kind:actor.actorKind,id:args.principal.credentialId},item,eventType:"created",detail:directive,summary:args.addedBy==="ai_suggestion"?"AI suggestion awaiting the person's decision.":"Added by your AI on request.",now});return {item,deduplicated:false};
+ }
+});
+
+const reviewAction=v.union(v.literal("accept"),v.literal("dismiss"),v.literal("archive"),v.literal("restore"),v.literal("clear_input"),v.literal("edit"));
+export const reviewQueueItem = mutation({
+ args:{vaultOwnerId:v.string(),queueItemId:v.id("queueItems"),expectedVersion:v.number(),idempotencyKey:v.string(),action:reviewAction,directive:v.optional(v.string()),reason:v.optional(v.string()),optionIndex:v.optional(v.number())},
+ handler:async(ctx,args)=>{
+  const decision=await authorizeTenantMutation(ctx,"queue.reviewQueueItem",args.vaultOwnerId);assertQueueTenantAllowed(decision);
+  const actor=actorForUser(decision.owner),command=`review:${args.action}`;
+  const replay=await existingReceipt(ctx,{owner:decision.owner,idempotencyKey:args.idempotencyKey,command,actor});if(replay)return replay;
+  const raw=await ctx.db.get(args.queueItemId);assertItemOwner(raw,decision.owner);assertVersion(raw,args.expectedVersion);const item=queueIdentity(raw),now=Date.now();
+  const patch:Partial<QueueItem>={state:item.state,needsInput:item.needsInput,version:item.version+1,updatedAt:now,personActedAt:item.personActedAt??now};
+  if(args.action==="accept"){
+   if(item.suggestionStatus!=="open"||item.archivedAt)throw new Error("Only open suggestions can be accepted");
+   let directive=args.directive??item.directive;
+   if(args.optionIndex!==undefined){if(!Number.isInteger(args.optionIndex)||!item.suggestionOptions?.[args.optionIndex])throw new Error("Choose an available option");directive=args.directive??`${item.directive}\nChosen option: ${item.suggestionOptions[args.optionIndex]}`;}
+   directive=normalizeRequiredText(directive,"Directive",QUEUE_LIMITS.directive);
+   Object.assign(patch,{directive,summary:summarizeDirective(directive),suggestionStatus:"accepted",state:"waiting_for_your_ai",condition:"ready"});
+  }else if(args.action==="dismiss"){
+   if(item.suggestionStatus!=="open"||item.archivedAt)throw new Error("Only open suggestions can be dismissed");
+   if((args.reason?.length??0)>4000)throw new Error("Dismiss reason too long");
+   Object.assign(patch,{wasDismissed:true,suggestionStatus:"dismissed",archivedAt:now,archivedBy:decision.owner,dismissReason:args.reason});
+  }else if(args.action==="archive")Object.assign(patch,{...(item.suggestionStatus==="open"?{suggestionStatus:"dismissed",wasDismissed:true}:{}),archivedAt:now,archivedBy:decision.owner,activeActorId:undefined,activeActorKind:undefined,activeCredentialId:undefined,leaseExpiresAt:undefined});
+  else if(args.action==="restore"){
+   if(!item.archivedAt)throw new Error("Item is not archived");
+   Object.assign(patch,{archivedAt:undefined,archivedBy:undefined,suggestionStatus:["dismissed","withdrawn"].includes(item.suggestionStatus??"")?"open":item.suggestionStatus});
+  }else if(args.action==="clear_input")Object.assign(patch,{needsInput:undefined,requiredAction:undefined});
+  await ctx.db.patch(item._id,patch);const updated=await ctx.db.get(item._id);assertItemOwner(updated,decision.owner);
+  await updateCounters(ctx,raw,updated);
+  await recordCommand(ctx,{owner:decision.owner,idempotencyKey:args.idempotencyKey,command,actor,item:updated,eventType:"reviewed",summary:`Person: ${args.action}`,detail:args.reason,now});return {item:await queueForPerson(ctx,updated),deduplicated:false};
+ }
+});
+
+export const agentWithdrawSuggestion = internalMutation({
+ args:{principal:principalValidator,queueItemId:v.id("queueItems"),expectedVersion:v.number(),idempotencyKey:v.string()},
+ handler:async(ctx,args)=>{
+  const actor=verifyPrincipal(args.principal,"withdraw_suggestion"),command="withdraw";
+  const receiptActor={kind:actor.actorKind,id:args.principal.credentialId};
+  const item=await ctx.db.get(args.queueItemId);assertItemOwner(item,actor.ownerId);
+  if(queueIdentity(item).needsInput)throw new Error('MCP_FAMILY_HISTORY_ERROR:'+JSON.stringify({code:"FORBIDDEN",message:"Only the person can clear Needs your input",recovery:"Ask the person to answer or clear the flag."}));
+  if(item.personActedAt!==undefined)throw new Error("Only your own suggestion, before the person acts, can be withdrawn");
+  const replay=await existingReceipt(ctx,{owner:actor.ownerId,idempotencyKey:args.idempotencyKey,command,actor:receiptActor});if(replay)return replay;
+  assertVersion(item,args.expectedVersion);
+  if(item.suggestionStatus!=="open"||item.personActedAt||item.archivedAt||item.raisedByCredentialId!==args.principal.credentialId)throw new Error("Only your own suggestion, before the person acts, can be withdrawn");
+  const now=Date.now();await ctx.db.patch(item._id,{suggestionStatus:"withdrawn",archivedAt:now,archivedBy:args.principal.credentialId,updatedAt:now,version:item.version+1});
+  const updated=await ctx.db.get(item._id);assertItemOwner(updated,actor.ownerId);
+  await updateCounters(ctx,item,updated);
+  await recordCommand(ctx,{owner:actor.ownerId,idempotencyKey:args.idempotencyKey,command,actor:receiptActor,item:updated,eventType:"reviewed",summary:"AI withdrew its own suggestion.",now});return {item:await queueForPerson(ctx,updated,false),deduplicated:false};
+ }
+});
+
+/** Person-only origin read. Some FH building blocks have no standalone record route. */
+export const getQueueOrigin = mutation({
+ args:{vaultOwnerId:v.string(),queueItemId:v.id("queueItems")},
+ handler:async(ctx,args)=>{
+  const decision=await authorizeTenantMutation(ctx,"queue.getQueueOrigin",args.vaultOwnerId);assertQueueTenantAllowed(decision);
+  const item=await ctx.db.get(args.queueItemId);assertItemOwner(item,decision.owner);
+  if(!item.fromRecord)return null;
+  const tables={person:"persons",relationship:"relationships",place:"places",event:"events",source:"sources",citation:"citations",media:"media",context_item:"contextItems",research_task:"researchTasks",research_check:"researchChecks",story:"stories",import_run:"importRuns",provisional_relative:"provisionalRelatives"} as const;
+  const table=tables[item.fromRecord.kind as keyof typeof tables];
+  const id=table?ctx.db.normalizeId(table,item.fromRecord.refId):null;const row=id?await ctx.db.get(id):null;
+  if(!row || !("vaultOwnerId" in row) || !matchesVaultOwner(row.vaultOwnerId,decision.owner))return null;
+  const projected=await queueForPerson(ctx,item);
+  const text=row as unknown as {description?:string;summary?:string;label?:string;value?:string;status?:string;updatedAt?:number;personId?:string};
+  const direct={person:"people",place:"places",story:"stories"} as Record<string,string>;
+  const href=direct[item.fromRecord.kind]?`/app/${direct[item.fromRecord.kind]}/${encodeURIComponent(item.fromRecord.refId)}`:text.personId?`/app/people/${encodeURIComponent(text.personId)}`:null;
+  return {title:"fromRecordTitle" in projected?String(projected.fromRecordTitle):item.fromRecord.kind,kind:item.fromRecord.kind,description:text.description||text.summary||text.label||null,value:text.value??null,status:text.status??null,updatedAt:text.updatedAt??null,href};
+ }
+});
+
+/** Ship-time only, person by person. Dry runs report counts; live runs add counters only.
+ * Marker writes make retries and concurrent ordinary Queue edits idempotent. Never maps state in storage. */
+export const backfillQueueCounters = internalMutation({
+ args:{vaultOwnerId:v.string(),cursor:v.union(v.string(),v.null()),dryRun:v.boolean()},
+ handler:async(ctx,args)=>{
+  const counter=args.dryRun?null:await ensureCounters(ctx,args.vaultOwnerId);
+  if(counter?.lastBackfillResult&&counter.lastBackfillCursor===args.cursor)return counter.lastBackfillResult;
+  if(counter&&args.cursor!==(counter.backfillCursor??null))throw new Error("Resume counter backfill from its recorded cursor, or restart at null after completion");
+  const page=await ctx.db.query("queueItems").withIndex("by_owner",q=>q.eq("vaultOwnerId",args.vaultOwnerId)).paginate({numItems:100,cursor:args.cursor});
+  let suggestions=0,needsInput=0,changed=0;
+  for(const item of page.page){const value=contribution(item);suggestions+=value.suggestions;needsInput+=value.input;if(!item.counterIncluded){changed++;if(!args.dryRun)await updateCounters(ctx,null,item);}}
+  const result={scanned:page.page.length,changed,suggestions,needsInput,isDone:page.isDone,continueCursor:page.continueCursor};
+  if(counter)await ctx.db.patch(counter._id,{ready:page.isDone||counter.ready,backfillCursor:page.isDone?null:page.continueCursor,lastBackfillCursor:args.cursor,lastBackfillResult:result});
+  return result;
+ }
+});
+
+/** Reversible Queue archive uses the existing archive power, never a flag-clearing escape. */
+export const agentArchiveQueueItem = internalMutation({
+ args:{principal:principalValidator,queueItemId:v.id("queueItems"),expectedVersion:v.number(),idempotencyKey:v.string(),restore:v.optional(v.boolean())},
+ handler:async(ctx,args)=>{
+  const actor=verifyPrincipal(args.principal,"get_queue_item");
+  const item=await ctx.db.get(args.queueItemId);assertItemOwner(item,actor.ownerId);
+  if(!args.restore&&queueIdentity(item).needsInput)throw new Error('MCP_FAMILY_HISTORY_ERROR:'+JSON.stringify({code:"FORBIDDEN",message:"Only the person can clear Needs your input",recovery:"Ask the person to answer or clear the flag."}));
+  verifyPrincipal(args.principal,"archive_queue_item");
+  if(item.suggestionStatus==="open"||["dismissed","withdrawn"].includes(item.suggestionStatus??""))throw new Error("Only the person can review suggestions; withdraw only your own untouched suggestion");
+  if(item.authority.actorId!==actor.actorId||item.authority.actorKind!==actor.actorKind)throw new Error("This AI is not assigned to the Queue item");
+  if(!item.authority.operations.includes("queue:update"))throw new Error("Queue item authority does not include queue:update");
+  if(!args.restore)assertAgentAuthority(item,{kind:actor.actorKind,id:actor.actorId,credentialId:args.principal.credentialId},"queue:update");
+  const command=args.restore?"ai-restore":"ai-archive",receiptActor={kind:actor.actorKind,id:args.principal.credentialId};
+  const replay=await existingReceipt(ctx,{owner:actor.ownerId,idempotencyKey:args.idempotencyKey,command,actor:receiptActor});if(replay)return replay;
+  assertVersion(item,args.expectedVersion);const now=Date.now();
+  await ctx.db.patch(item._id,{archivedAt:args.restore?undefined:now,archivedBy:args.restore?undefined:args.principal.credentialId,...(!args.restore?{activeActorId:undefined,activeActorKind:undefined,activeCredentialId:undefined,leaseExpiresAt:undefined}:{}),version:item.version+1,updatedAt:now});
+  const updated=await ctx.db.get(item._id);assertItemOwner(updated,actor.ownerId);await updateCounters(ctx,item,updated);
+  await recordCommand(ctx,{owner:actor.ownerId,idempotencyKey:args.idempotencyKey,command,actor:receiptActor,item:updated,eventType:"reviewed",summary:args.restore?"AI restored the Queue item.":"AI archived the Queue item.",now});
+  return {item:await queueForPerson(ctx,updated,false),deduplicated:false};
+ }
+});
+
+/** Read/write preflight for new suggestion rows only; ordinary AWL-0015 Queue reach is unchanged. */
+export const suggestionReachInternal=internalQuery({
+ args:{vaultOwnerId:v.string(),queueItemId:v.id("queueItems"),personIds:v.array(v.string())},
+ handler:async(ctx,args)=>{const item=await ctx.db.get(args.queueItemId);return !!item&&matchesVaultOwner(item.vaultOwnerId,args.vaultOwnerId)&&suggestionWithinPeople(item,args.personIds);}
 });

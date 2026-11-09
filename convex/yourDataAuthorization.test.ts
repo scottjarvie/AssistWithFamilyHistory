@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { beforeEach, afterEach, describe, expect, test, vi } from "vitest";
 import { convexTest } from "convex-test";
 import schema from "./schema";
 import { api } from "./_generated/api";
@@ -55,3 +55,6 @@ test("recent AI saves include the newest activity beyond the cap", async () => {
   await expect(t.withIdentity({ subject: OWNER }).action(api.yourData.getYourStats, { vaultOwnerId: OWNER }))
     .resolves.toMatchObject({ ai: { savesLast30Days: 1, savesCapped: true } });
 });
+
+// Explicit website JWT issuer for synthetic person identities; never an auth bypass.
+beforeEach(()=>vi.stubEnv("CLERK_JWT_ISSUER_DOMAIN","https://convex.test"));

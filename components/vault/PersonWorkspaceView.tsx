@@ -91,6 +91,7 @@ export function PersonWorkspaceView({workspace,personId,documents,documentsError
                 <CardContent className="grid gap-3 md:grid-cols-2">
                   {(sourceFacts as Array<{
                     _id: string;
+                    importKey?: string;
                     factType: string;
                     label: string;
                     value: string;
@@ -101,7 +102,7 @@ export function PersonWorkspaceView({workspace,personId,documents,documentsError
                     <div id={firstFactByKind.get(fact.factType)===index?`record-source-facts-${fact.factType}`:undefined} key={fact._id} className="rounded-md border border-border bg-card px-4 py-3">
                       <div className="flex items-start justify-between gap-3">
                         <p className="font-medium text-foreground">{fact.factType.replace(/_/g, " ")}</p>
-                        <Badge variant={fact.status === "conflict" ? "destructive" : "secondary"}>{fact.status}</Badge>
+                        <Badge variant={fact.status === "conflict" ? "destructive" : "secondary"}>{fact.importKey?.startsWith("mcp:")&&fact.status!=="accepted"?`AI proposal · ${fact.status}`:fact.status}</Badge>
                       </div>
                       <p className="mt-2 text-sm text-muted-foreground">{fact.label}: {fact.value}</p>
                       <p className="mt-1 text-xs text-muted-foreground">Confidence: {fact.confidence}</p>
