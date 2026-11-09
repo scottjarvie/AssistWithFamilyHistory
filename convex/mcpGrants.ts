@@ -226,7 +226,7 @@ export const resolveForRequest = internalMutation({
     const observedName = registeredName ?? trimmed(args.observedClientName, 120);
     const carried = await prepareCarriedRestrictions(ctx, owner);
     if (!carried.ready) return { state: "pending", at: Date.now(), reason: "Earlier connection limits are being prepared automatically. No new approval is required." };
-    const aliased = await resolveClientAlias(ctx, owner, clientId, args.issuer, observedName, carried);
+    const aliased = await callingGrant(ctx, { subject: owner, clientId, issuer: args.issuer });
     const current = aliased;
     if (current) {
       if (observedName && current.observedClientName !== observedName && !current.linkedByName) {
@@ -296,12 +296,19 @@ export const resolveForRequest = internalMutation({
       requestedAt: now,
       useCount: 0,
       ...fields,
+      ...(carried.entries.length ? { ...narrowestAuthority(carried.entries.map(e => ({
+        ...fields, withheldScopes: e.withheld, scopeChoice: "chosen" as const, boundary: e.boundary,
+        pausedAt: e.pausedAt, status: e.revoked ? "revoked" as const : e.pending ? "pending" as const : "active" as const,
+        expiresAt: e.endsAt, expiryChoice: e.endsAt === undefined ? "none" as const : "chosen" as const,
+      })) as Doc<"mcpGrants">[]), startedAtFloor: true, inheritedRestrictions: carried.entries.map(e => ({ sourceGrantId: e.sourceGrantId, sourceRevision: e.sourceRevision })) } : {}),
     });
+    const oldAlias = await ctx.db.query("mcpClientAliases").withIndex("by_owner_client_issuer", q => q.eq("vaultOwnerId", owner).eq("clientId", clientId).eq("issuer", args.issuer)).unique();
+    if (oldAlias) await ctx.db.delete(oldAlias._id);
     await ctx.db.insert("mcpClientAliases", { vaultOwnerId: owner, issuer: args.issuer, clientId, grantId: id });
-    if (observedName) await rememberClientName(ctx, owner, args.issuer, observedName, id);
+
     const created = (await ctx.db.get(id))!;
-    await appendHistory(ctx, created, null, "system", "Connected with full access and no end date.", `connect:${id}`, "connect");
-    return { state: "active", grant: toResolvedGrant(created) };
+    await appendHistory(ctx, created, null, "system", created.startedAtFloor ? "Started with the limits of your most limited AI." : "Connected with full access and no end date.", `connect:${id}`, "connect");
+    return resolutionForRow(created);
   },
 });
 
@@ -402,7 +409,7 @@ export async function assertGrantPermits(
   if (!carried?.ready) machineError("GRANT_REQUIRED", "Earlier connection limits are being prepared.", "Retry after the background preparation finishes; no sign-in or approval is needed.");
   const authority = await callingGrant(ctx, { subject: params.owner, issuer: row.issuer, clientId: row.clientId });
   if (!authority || authority._id !== row._id) machineError("GRANT_REVOKED", "This approval has been superseded.", `Only the person can restore access at ${AI_SETTINGS_URL}.`);
-  const projected = projectCarriedAccess(row, carried);
+  const projected = row;
   const resolution: GrantResolution = projected.status === "revoked" || projected.status === "denied" ? { state: projected.status, at: projected.revokedAt }
     : projected.status === "pending" ? { state: "pending" }
     : projected.pausedAt ? { state: "paused", at: projected.pausedAt }
@@ -487,7 +494,7 @@ async function connectionsFromRows(ctx: QueryCtx, rows: Doc<"mcpGrants">[]) {
   const carried = rows[0] ? await carriedForOwner(ctx, rows[0].vaultOwnerId) : null;
   for (const row of rows) {
     const authority = await callingGrant(ctx, { subject: row.vaultOwnerId, issuer: row.issuer, clientId: row.clientId });
-    if (row.hiddenAt === undefined && authority?._id === row._id) connections.push({ ...await connectionWithHistory(ctx, carried?.ready ? projectCarriedAccess(row, carried) : row), carriedRevision: carried?.revision ?? 0, inheritedLimits: carried?.entries.some(e => e.issuer === row.issuer && e.lineageGrantId !== row._id) ?? false });
+    if (row.hiddenAt === undefined && authority?._id === row._id) connections.push({ ...await connectionWithHistory(ctx, carried?.ready ? projectCarriedAccess(row, carried) : row), carriedRevision: carried?.revision ?? 0, inheritedLimits: !!row.startedAtFloor });
     else if (authority && authority._id !== row._id) supersededConnections.push(await connectionWithHistory(ctx, row));
   }
   return { scopeInfo: FAMILY_HISTORY_SCOPE_INFO, neverExposed: NEVER_EXPOSED, neverPermitted: NEVER_PERMITTED, connections, supersededConnections, preparing: rows.length > 0 && !carried?.ready };
@@ -878,10 +885,6 @@ async function appendHistory(ctx: MutationCtx, after: Doc<"mcpGrants">, before: 
     sentence: safeSentence(sentence), at: Date.now(), opId, request, revision: after.revision ?? 0 });
 }
 
-function normalizedClientName(name?: string): string | undefined {
-  return name?.trim().replace(/\s+/g, " ").toLowerCase() || undefined;
-}
-
 /** A predecessor is unresolved only while its CURRENT authority is limited.
  * Grouping history by client and following aliases excludes old revokes that
  * the person has since restored or explicitly reapproved. Hidden rows count. */
@@ -905,6 +908,7 @@ async function authorityForId(ctx: QueryCtx | MutationCtx, id: Id<"mcpGrants">):
     seen.add(String(row._id));
     const parent: Doc<"mcpGrants"> | null = await ctx.db.get(row.authorityGrantId);
     if (!parent || parent.vaultOwnerId !== owner || parent.issuer !== issuer) throw new Error("Invalid connection authority");
+    if (parent.clientId !== row.clientId) return row; // v1 cross-client links are retired by bootstrap.
     row = parent;
   }
   return row;
@@ -943,58 +947,24 @@ function narrowestAuthority(candidates: Doc<"mcpGrants">[]) {
     revokedAt: refusal ? refusal.revokedAt ?? refusal.updatedAt : anchor.revokedAt };
 }
 function projectCarriedAccess(row: Doc<"mcpGrants">, carried: Doc<"mcpCarriedRestrictions">) {
-  const entries = carried.entries.filter(e => e.issuer === row.issuer);
-  if (!entries.length) return row;
-  const policies = entries.map(e => ({ ...row, withheldScopes: e.withheld, boundary: e.boundary,
-    scopeChoice: "chosen" as const, expiryChoice: e.endsAt === undefined ? "none" as const : "chosen" as const,
-    expiresAt: e.endsAt, pausedAt: e.pausedAt, status: e.revoked ? "revoked" as const : e.pending ? "pending" as const : "active" as const }));
-  return { ...row, ...narrowestAuthority([row, ...policies]) };
+  void carried;
+  return row;
 }
 
-/** One carried-record read: unknown/new names cannot exclude a restriction. */
-async function resolveClientAlias(ctx: MutationCtx, owner: string, clientId: string, issuer: string, name: string | undefined, carried: Doc<"mcpCarriedRestrictions">) {
-  const alias = await ctx.db.query("mcpClientAliases").withIndex("by_owner_client_issuer", q => q.eq("vaultOwnerId", owner).eq("clientId", clientId).eq("issuer", issuer)).unique();
-  const own = alias ? await authorityForId(ctx, alias.grantId) : null;
-  const key = normalizedClientName(name);
-  const named = key ? carried.names.find(n => n.issuer === issuer && n.name === key) : undefined;
-  const namedAuthority = named ? await authorityForId(ctx, named.grantId) : null;
-  const ids = new Set(carried.entries.filter(e => e.issuer === issuer).map(e => e.lineageGrantId));
-  if (namedAuthority) ids.add(namedAuthority._id);
-  if (own) ids.add(own._id);
-  const candidates = [...new Map((await Promise.all([...ids].map(id => authorityForId(ctx, id)))).map(row => [String(row._id), row])).values()].sort((a,b) => a._creationTime - b._creationTime || (a._id < b._id ? -1 : 1));
-  if (!candidates.length) return null;
-  const anchor = candidates[0];
-  const linkedByName = candidates.some(row => row.linkedByName) || (namedAuthority !== null && (!own || namedAuthority._id !== own._id));
-  if (own && candidates.length === 1) {
-    if (name) await rememberClientName(ctx, owner, issuer, name, own._id);
-    return own;
-  }
-  const now = Date.now();
-  await ctx.db.patch(anchor._id, { ...narrowestAuthority(candidates), linkedByName,
-    revision: (anchor.revision ?? 0) + 1, updatedAt: now });
-  const candidateIds = new Set(candidates.map(row => String(row._id)));
-  for (const row of candidates.slice(1)) {
-    await ctx.db.patch(row._id, { authorityGrantId: anchor._id, hiddenAt: now });
-  }
-  if (!alias) await ctx.db.insert("mcpClientAliases", { vaultOwnerId: owner, issuer, clientId, grantId: anchor._id });
-  // Existing members keep their aliases: all gates and touches follow parent
-  // pointers to this root. No alias/history scan and no independent old authority.
-  await ctx.db.patch(carried._id, {
-    entries: carried.entries.map(e => candidateIds.has(String(e.lineageGrantId)) ? { ...e, lineageGrantId: anchor._id } : e),
-    names: carried.names.map(n => candidateIds.has(String(n.grantId)) ? { ...n, grantId: anchor._id } : n),
-  });
-  if (name) await rememberClientName(ctx, owner, issuer, name, anchor._id);
-  const after = (await ctx.db.get(anchor._id))!;
-  await syncCarriedRestrictions(ctx, after);
-  await appendHistory(ctx, after, anchor, "system", linkedByName ? "Connections linked by name; separate installations share the narrowest limits." : "Unrecognised registration inherited unresolved earlier connection limits.", `alias:${clientId}`, "alias");
-  return after;
+function resolutionForRow(row: Doc<"mcpGrants">): GrantResolution {
+  if (row.status === "revoked" || row.status === "denied" || row.status === "pending") return { state: row.status };
+  if (row.pausedAt !== undefined) return { state: "paused", at: row.pausedAt };
+  if (isGrantExpired(row, Date.now())) return { state: "expired", at: effectiveExpiry(row) };
+  return { state: "active", grant: toResolvedGrant(row) };
 }
 
 const callingIdentityArgs = { subject: v.string(), issuer: v.string(), clientId: v.string() };
 async function callingGrant(ctx: QueryCtx | MutationCtx, args: { subject: string; issuer: string; clientId: string }) {
   if (!args.subject.trim() || !args.issuer.trim() || !args.clientId.trim()) throw new Error("Verified connection identity required");
   const alias = await ctx.db.query("mcpClientAliases").withIndex("by_owner_client_issuer", q => q.eq("vaultOwnerId", args.subject).eq("clientId", args.clientId).eq("issuer", args.issuer)).unique();
-  return alias ? authorityForId(ctx, alias.grantId) : null;
+  if (!alias) return null;
+  const row = await ctx.db.get(alias.grantId);
+  return row?.clientId === args.clientId ? authorityForId(ctx, row._id) : null;
 }
 function describeConnection(row: Doc<"mcpGrants"> | null) {
   const state = !row ? "absent" : row.status === "revoked" || row.status === "denied" || row.status === "pending" ? row.status
@@ -1061,7 +1031,11 @@ async function changeConnection(ctx: MutationCtx, row: Doc<"mcpGrants">, change:
     if (row.status === "revoked" || row.status === "denied") throw new Error("Restore the revoked connection first");
     patch.pausedAt = undefined;
   } else if (action === "restore") {
-    if (row.status === "revoked" || row.status === "denied") {
+    if (row.inheritedRestrictions?.length) {
+      patch.status = "active"; patch.withheldScopes = []; patch.boundary = { kind: "whole_workspace" };
+      patch.pausedAt = undefined; // A chosen end date is preserved; expiry has its own control.
+      patch.revokedAt = undefined; patch.revokedReason = undefined;
+    } else if (row.status === "revoked" || row.status === "denied") {
       // Restore exactly the pre-revoke powers, boundary, pause and chosen date.
       patch.status = "active"; patch.revokedAt = undefined; patch.revokedReason = undefined;
       patch.consentedAt = Date.now();
@@ -1091,9 +1065,10 @@ async function changeConnection(ctx: MutationCtx, row: Doc<"mcpGrants">, change:
   patch.scopeChoice = patch.withheldScopes!.length ? "chosen" : "full";
   // Capture legacy automatic expiry as unlimited before storing a deliberate choice.
   if (!patch.expiryChoice && effectiveExpiry(row) === undefined) { patch.expiryChoice = "none"; patch.expiresAt = undefined; }
+  if (actor === "person" && ["restore", "resume", "expiry", "approve"].includes(action)) patch.inheritedRestrictions = undefined;
   await ctx.db.patch(row._id, patch);
   const after = (await ctx.db.get(row._id))!;
-  await syncCarriedRestrictions(ctx, after, actor === "person" && ["restore", "resume", "expiry", "approve"].includes(action));
+  await syncCarriedRestrictions(ctx, after, actor === "person" && ["restore", "resume", "expiry", "approve", "remove"].includes(action), action === "remove" ? [] : row.inheritedRestrictions ?? [], action === "remove");
   await appendHistory(ctx, after, row, actor, `${actor === "ai" ? "Your AI" : "You"} ${({ limit: "narrowed", reduce: "narrowed", pause: "paused", revoke: "revoked", deny: "declined", resume: "resumed", restore: "restored", expiry: "changed the end date for", approve: "approved", remove: "hid" } as Record<string,string>)[action]} the connection.${change.reason ? ` ${change.reason}` : ""}`, change.opId, request);
   return { id: after._id, connection: await connectionWithHistory(ctx, after), ...compatibilityFields(after), ...describeConnection(after), removed: action === "remove" };
 }
@@ -1109,7 +1084,7 @@ async function personChange(ctx: MutationCtx, args: Change & { vaultOwnerId: str
     const replay = await ctx.db.query("mcpGrantHistory").withIndex("by_grant_op", q => q.eq("grantId", governing._id).eq("opId", args.opId!)).unique();
     if (replay) return changeConnection(ctx, governing, args, "person");
   }
-  if (["restore", "approve", "resume", "expiry"].includes(args.action)) {
+  if (["restore", "approve", "resume", "expiry", "remove"].includes(args.action)) {
     const carried = await carriedForOwner(ctx, decision.owner);
     if (!carried?.ready) throw new Error("Earlier connection limits are being prepared; retry shortly");
     if (args.carriedRevision !== carried.revision) throw new Error("STALE_VERSION: earlier connection limits changed; refresh before restoring access");
@@ -1119,12 +1094,11 @@ async function personChange(ctx: MutationCtx, args: Change & { vaultOwnerId: str
     if (replay) return changeConnection(ctx, governing!, args, "person");
     throw new Error("This approval has been superseded. Reload the connection list.");
   }
-  if (["restore", "approve", "resume", "expiry"].includes(args.action)) {
+  if (["restore", "approve", "resume", "expiry", "remove"].includes(args.action)) {
     if (args.revision !== (row.revision ?? 0)) throw new Error("STALE_VERSION: read the current connection revision");
     const carried = await prepareCarriedRestrictions(ctx, decision.owner);
     if (!carried.ready) throw new Error("Earlier connection limits are being prepared; retry when preparation finishes");
-    const joined = await resolveClientAlias(ctx, decision.owner, row.clientId, row.issuer, row.observedClientName, carried);
-    if (joined) return changeConnection(ctx, joined, args, "person", joined.revision ?? 0);
+
   }
   return changeConnection(ctx, row, args, "person");
 }
@@ -1224,9 +1198,14 @@ async function carriedForOwner(ctx: QueryCtx | MutationCtx, owner: string) {
 }
 async function prepareCarriedRestrictions(ctx: MutationCtx, owner: string): Promise<Carried> {
   const existing = await carriedForOwner(ctx, owner);
-  if (existing) return existing;
+  if (existing?.policyVersion === 2) return existing;
+  if (existing) {
+    await ctx.db.patch(existing._id, { policyVersion: 2, ready: false, entries: [], names: [], bootstrapPhase: "scan", bootstrapCursor: null, bootstrapClients: "{}", bootstrapIndex: 0 });
+    await ctx.scheduler.runAfter(0, internal.mcpGrants.bootstrapOwnerConnections, { vaultOwnerId: owner });
+    return (await ctx.db.get(existing._id))!;
+  }
   const legacy = await ctx.db.query("mcpGrants").withIndex("by_owner", q => q.eq("vaultOwnerId", owner)).first();
-  const id = await ctx.db.insert("mcpCarriedRestrictions", { vaultOwnerId: owner, ready: !legacy, revision: 0, entries: [], names: [],
+  const id = await ctx.db.insert("mcpCarriedRestrictions", { vaultOwnerId: owner, policyVersion: 2, ready: !legacy, revision: 0, entries: [], names: [],
     ...(legacy ? { bootstrapPhase: "scan" as const, bootstrapCursor: null, bootstrapClients: "{}", bootstrapIndex: 0 } : {}) });
   if (legacy) await ctx.scheduler.runAfter(0, internal.mcpGrants.bootstrapOwnerConnections, { vaultOwnerId: owner });
   return (await ctx.db.get(id))!;
@@ -1258,7 +1237,25 @@ export const bootstrapOwnerConnections = internalMutation({
     if (carried.bootstrapPhase === "scan") {
       const page = await ctx.db.query("mcpGrants").withIndex("by_owner", q => q.eq("vaultOwnerId", vaultOwnerId))
         .paginate({ cursor: carried.bootstrapCursor ?? null, numItems: 100 });
-      for (const row of page.page) {
+      for (let row of page.page) {
+        if (row.authorityGrantId) {
+          let parent = await ctx.db.get(row.authorityGrantId);
+          const crossed = parent?.clientId !== row.clientId;
+          const seen = new Set<string>([String(row._id)]);
+          while (parent?.authorityGrantId) {
+            if (seen.has(String(parent._id))) throw new Error("Legacy authority cycle");
+            seen.add(String(parent._id));
+            if (parent.vaultOwnerId !== row.vaultOwnerId || parent.issuer !== row.issuer) throw new Error("Invalid legacy connection authority");
+            parent = await ctx.db.get(parent.authorityGrantId);
+          }
+          if (parent && (parent.vaultOwnerId !== row.vaultOwnerId || parent.issuer !== row.issuer)) throw new Error("Invalid legacy connection authority");
+          if (parent && crossed) {
+            // Copy the actual v1 authority, including any person restoration;
+            // stale pre-merge row fields must not resurrect a released revoke.
+            await ctx.db.patch(row._id, { ...narrowestAuthority([parent]), authorityGrantId: undefined, hiddenAt: undefined, revision: (row.revision ?? 0) + 1 });
+            row = (await ctx.db.get(row._id))!;
+          }
+        }
         const key = JSON.stringify([row.issuer, row.clientId]);
         const summary = clients[key] ?? {};
         const kind = isRefusal(row) ? "refusal" : row.status === "pending" ? "pending" : "approval";
@@ -1280,15 +1277,16 @@ export const bootstrapOwnerConnections = internalMutation({
         const chosen = s.refusal ?? s.approval ?? s.pending;
         if (!chosen) continue;
         const alias = await ctx.db.query("mcpClientAliases").withIndex("by_owner_client_issuer", q => q.eq("vaultOwnerId", vaultOwnerId).eq("clientId", clientId).eq("issuer", issuer)).unique();
-        const row = await authorityForId(ctx, alias?.grantId ?? chosen.id);
+        const aliasRow = alias ? await ctx.db.get(alias.grantId) : null;
+        const row = await authorityForId(ctx, aliasRow?.clientId === clientId ? aliasRow._id : chosen.id);
         if (!alias) for (const sourceId of s.restricted ?? []) {
           const source = await authorityForId(ctx, sourceId);
           if (hasUnresolvedLimit(source) && !entries.some(e => e.sourceGrantId === source._id)) entries.push(carriedEntry(source));
         }
         if (!alias) await ctx.db.insert("mcpClientAliases", { vaultOwnerId, clientId, issuer, grantId: row._id });
+        else if (aliasRow?.clientId !== clientId) await ctx.db.patch(alias._id, { grantId: row._id });
         if (hasUnresolvedLimit(row) && !entries.some(e => e.sourceGrantId === row._id)) entries.push(carriedEntry(row));
-        const name = normalizedClientName(row.observedClientName);
-        if (name && name !== normalizedClientName(clientId) && !names.some(n => n.issuer === issuer && n.name === name)) names.push({ issuer, name, grantId: row._id });
+
       }
       const done = start + 50 >= keys.length;
       await ctx.db.patch(carried._id, { entries, names, revision: carried.revision + 1, bootstrapIndex: start + 50,
@@ -1298,21 +1296,14 @@ export const bootstrapOwnerConnections = internalMutation({
   },
 });
 
-async function rememberClientName(ctx: MutationCtx, owner: string, issuer: string, name: string, id: Id<"mcpGrants">) {
-  const carried = (await carriedForOwner(ctx, owner))!;
-  const key = normalizedClientName(name);
-  if (!key || carried.names.some(n => n.issuer === issuer && n.name === key)) return;
-  await ctx.db.patch(carried._id, { names: [...carried.names, { issuer, name: key, grantId: id }] });
-}
-
 /** Clearing a lineage's entries is allowed ONLY in the same transaction as a
  * revision-checked person change. No permanent release flag: a later restriction
  * always writes a new source revision, even immediately after Restore. */
-async function syncCarriedRestrictions(ctx: MutationCtx, row: Doc<"mcpGrants">, personRelease = false) {
+async function syncCarriedRestrictions(ctx: MutationCtx, row: Doc<"mcpGrants">, personRelease = false, inherited: Array<{ sourceGrantId: Id<"mcpGrants">; sourceRevision: number }> = [], forget = false) {
   const carried = await prepareCarriedRestrictions(ctx, row.vaultOwnerId);
   if (personRelease && !carried.ready) throw new Error("Earlier connection limits are being prepared; retry when preparation finishes");
-  let entries = personRelease ? carried.entries.filter(e => e.lineageGrantId !== row._id) : [...carried.entries];
-  if (hasUnresolvedLimit(row)) {
+  let entries = personRelease ? carried.entries.filter(e => !(e.lineageGrantId === row._id && e.sourceRevision <= (row.revision ?? 0)) && !inherited.some(i => i.sourceGrantId === e.sourceGrantId && i.sourceRevision === e.sourceRevision)) : [...carried.entries];
+  if (!forget && hasUnresolvedLimit(row)) {
     entries = entries.filter(e => e.sourceGrantId !== row._id);
     entries.push(carriedEntry(row));
   }
@@ -1339,7 +1330,7 @@ async function revisionedLegacyChange<T extends { id: Id<"mcpGrants"> }>(ctx: Mu
   if (args.revision !== (before.revision ?? 0)) throw new Error("STALE_VERSION: read the current connection revision");
   const carried = await prepareCarriedRestrictions(ctx, decision.owner);
   if (!carried.ready) throw new Error("Earlier connection limits are being prepared; retry shortly");
-  if (["approve", "expiry"].includes(kind) && args.carriedRevision !== carried.revision) throw new Error("STALE_VERSION: earlier connection limits changed; refresh before restoring access");
+  if (["approve", "expiry", "remove"].includes(kind) && args.carriedRevision !== carried.revision) throw new Error("STALE_VERSION: earlier connection limits changed; refresh before restoring access");
   const result = await work();
   const after = (await ctx.db.get(result.id))!;
   const changedScopes = JSON.stringify(before.scopes) !== JSON.stringify(after.scopes) || before._id !== after._id;
@@ -1353,7 +1344,7 @@ async function revisionedLegacyChange<T extends { id: Id<"mcpGrants"> }>(ctx: Mu
     });
   }
   const updated = (await ctx.db.get(result.id))!;
-  if (root._id === before._id) await syncCarriedRestrictions(ctx, updated, ["approve", "expiry"].includes(kind));
+  if (root._id === before._id) await syncCarriedRestrictions(ctx, updated, ["approve", "expiry", "remove"].includes(kind), kind === "remove" ? [] : before.inheritedRestrictions ?? [], kind === "remove");
   await appendHistory(ctx, updated, before, "person", `You ${kind === "reduce" ? "narrowed" : kind === "revoke" ? "revoked" : "changed"} this connection in Settings.`, args.opId, await hashMcpInput(args));
   return result;
 }

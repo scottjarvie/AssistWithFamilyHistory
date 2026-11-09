@@ -305,7 +305,7 @@ const closedMarkup = decode(renderToStaticMarkup(React.createElement(AiConnectio
 assert.match(closedMarkup, /Review and approve again/);
 assert.match(closedMarkup, /stays off until you approve/);
 assert.match(closedMarkup, /Approve exactly this/);
-assert.match(closedMarkup, /Remove from this list/);
+assert.match(closedMarkup, /Forget/);
 assert.match(closedMarkup, /synthetic-person/);
 for (const scope of FAMILY_HISTORY_SCOPES) {
   const checked = new RegExp(`id="approve-${closed.id}-${scope}"[^>]*checked`).test(closedMarkup);
@@ -329,7 +329,7 @@ for (const text of ["Narrowed by your AI on", "Resume", "Restore", "Connection h
 assert.ok(!pausedMarkup.includes("Only you can approve, narrow or turn off"));
 
 const linkedMarkup = decode(renderToStaticMarkup(React.createElement(AiConnectionCenter, {
-  initialConnections: [{ ...active, linkedByName: true }], initialActivity: [],
+  initialConnections: [{ ...active, inheritedLimits: true }], initialActivity: [],
 })));
-assert.ok(linkedMarkup.includes("Linked by name."));
-assert.ok(linkedMarkup.includes("Separate installations reporting the same name"));
+assert.ok(linkedMarkup.includes("Started with the limits of your most limited AI"));
+assert.ok(linkedMarkup.includes("Restore"));

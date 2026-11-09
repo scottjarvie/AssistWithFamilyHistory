@@ -66,19 +66,15 @@ describe("AWL-0015 revisioned connection authority", () => {
     expect(JSON.stringify(history)).not.toContain("sk_test_abcdefghijk");
     expect(history.map(h => h.actor)).toEqual(["system", "ai", "ai", "ai", "person", "person"]);
   });
-  test("re-registration aliases inherit a revoke and later changes affect both registrations", async () => {
+  test("new registrations copy the floor without sharing later authority", async () => {
     const { t, limit, person, describe } = await fixture();
     await limit({ action: "revoke", revision: 0, opId: "off" });
     const newer = { ...identity, clientId: "new-registration" };
-    expect((await t.mutation(internal.mcpGrants.resolveForRequest, { ...newer, observedClientName: "  SYNTHETIC Research AI  " })).state).toBe("revoked");
-    expect(await t.query(internal.mcpGrants.describeCallingConnection, newer)).toEqual(await describe());
-    expect(await t.run(ctx => ctx.db.query("mcpGrants").collect())).toHaveLength(1);
-    await person({ action: "restore", revision: 2, opId: "website-restore" });
-    expect((await t.mutation(internal.mcpGrants.resolveForRequest, newer)).state).toBe("active");
-    await t.mutation(internal.mcpGrants.limitCallingConnection, { ...newer, action: "pause", revision: 3, opId: "off-new-id" });
-    expect((await t.mutation(internal.mcpGrants.resolveForRequest, identity)).state).toBe("paused");
-    // A matching name in another owner's vault has no effect.
-    expect((await t.mutation(internal.mcpGrants.resolveForRequest, { ...newer, subject: "user_another_owner", observedClientName: "Synthetic Research AI" })).state).toBe("active");
+    expect((await t.mutation(internal.mcpGrants.resolveForRequest, newer)).state).toBe("revoked");
+    expect(await t.run(ctx => ctx.db.query("mcpGrants").collect())).toHaveLength(2);
+    await person({ action: "restore", revision: 1, opId: "website-restore" });
+    expect((await describe()).state).toBe("active");
+    expect((await t.mutation(internal.mcpGrants.resolveForRequest, newer)).state).toBe("revoked");
   });
   test("website authority rejects a delegated token, foreign owner and missing revisions", async () => {
     const { t, row } = await fixture();

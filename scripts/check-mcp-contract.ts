@@ -209,10 +209,12 @@ assert.ok(!transport.includes('headers.get("user-agent")'));
 const grantSource = readFileSync("convex/mcpGrants.ts", "utf8");
 assert.ok(grantSource.includes("registeredName ?? trimmed(args.observedClientName"));
 const connectSource = grantSource.slice(grantSource.indexOf("export const resolveForRequest"), grantSource.indexOf("export const touchGrantUse"));
-const aliasSource = grantSource.slice(grantSource.indexOf("async function resolveClientAlias"), grantSource.indexOf("const callingIdentityArgs"));
+assert.ok(!grantSource.includes("resolveClientAlias"));
+assert.ok(!grantSource.includes("normalizedClientName"));
+assert.ok(connectSource.includes("carried.entries.map"));
 assert.ok(connectSource.includes("prepareCarriedRestrictions"));
 assert.ok(!connectSource.includes('query("mcpGrants")'));
-assert.ok(!aliasSource.includes('query("mcpGrants")'));
+
 assert.ok(!grantSource.includes("MAX_CLIENT_GRANTS"));
 assert.ok(grantSource.includes("sourceRevision: row.revision ?? 0"));
 

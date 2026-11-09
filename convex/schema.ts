@@ -1947,7 +1947,7 @@ export default defineSchema({
    * client never supplies an owner, a vault, or a grant selector.
    */
   mcpCarriedRestrictions: defineTable({
-    vaultOwnerId: v.string(), ready: v.boolean(), revision: v.number(),
+    vaultOwnerId: v.string(), ready: v.boolean(), revision: v.number(), policyVersion: v.optional(v.number()),
     entries: v.array(v.object({
       issuer: v.string(), sourceGrantId: v.id("mcpGrants"), sourceRevision: v.number(), lineageGrantId: v.id("mcpGrants"),
       withheld: v.array(v.string()), pausedAt: v.optional(v.number()), revoked: v.boolean(), pending: v.boolean(), endsAt: v.optional(v.number()),
@@ -1982,6 +1982,8 @@ export default defineSchema({
     scopes: v.array(v.string()),
     scopeChoice: v.optional(v.union(v.literal("full"), v.literal("chosen"))),
     withheldScopes: v.optional(v.array(v.string())),
+    startedAtFloor: v.optional(v.boolean()),
+    inheritedRestrictions: v.optional(v.array(v.object({ sourceGrantId: v.id("mcpGrants"), sourceRevision: v.number() }))),
     authorityGrantId: v.optional(v.id("mcpGrants")),
     linkedByName: v.optional(v.boolean()),
     revision: v.optional(v.number()), pausedAt: v.optional(v.number()),

@@ -71,7 +71,7 @@ describe("your data", () => {
       });
     });
     const stats = await t.query(internal.yourData.getYourStatsInternal, { vaultOwnerId: OWNER });
-    expect(stats.ai.activeConnections).toBe(0); // unresolved same-issuer revoke applies to all unproven lineages
+    expect(stats.ai.activeConnections).toBe(2); // existing connections are independent; revoke applies to all unproven lineages
   });
   test("stats count only the owner's records", async () => {
     const t = convexTest(schema, modules);

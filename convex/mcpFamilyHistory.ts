@@ -1,3 +1,5 @@
+import { assertSafePublication } from "../lib/stories/sensitiveInfo";
+import { buildStoryPublicSlug } from "../lib/stories/slug";
 import { authorizeTenantMutation } from "./access";
 /* eslint-disable @typescript-eslint/no-explicit-any -- Internal inputs are validated by the public MCP Zod schemas before dispatch. */
 import { v } from "convex/values";
@@ -288,7 +290,28 @@ async function operation(
   const operationId = cleanText(args.operationId, "operationId", FAMILY_HISTORY_MCP_LIMITS.operationId, true)!;
   const replay = await replayReceipt(ctx, owner, operationId, args.toolName, args.requestHash);
   if (replay) return replay;
+  const publishing = [];
+  const storyInputs = args.toolName.includes("save_story_work") ? [args.input] : args.input.stories ?? [];
+  for (const item of storyInputs) {
+    const existing = item.mode === "update" ? await owned(ctx, "stories", item.storyId, owner, "Story") : null;
+    if ((item.status ?? existing?.status) === "published") {
+      const title = item.title ?? existing?.title;
+      const body = item.content ?? existing?.content;
+      if (typeof title !== "string" || typeof body !== "string") machineError("PUBLICATION_UNSCANNABLE", "The stored publication body is not readable inline text.", "Provide a scanned text body; an acknowledgement cannot waive the secret check.");
+      // Stories have inline bodies only (no file-body schema or URL fetch).
+      // Read the stored body and version in this mutation, not a transport cache.
+      if (existing) assertFresh(existing, item.expectedUpdatedAt, "Story");
+      publishing.push(`${title}\n${body}`);
+    }
+  }
+  let publicationContactDetails;
+  if (publishing.length) {
+    try { publicationContactDetails = assertSafePublication(publishing.join("\n\n"), args.input.acknowledgeContactDetails); }
+    catch (error) { const message = error instanceof Error ? error.message : "Publication check failed";
+      machineError(message.startsWith("PUBLICATION_SECRET") ? "PUBLICATION_SECRET" : "PUBLICATION_CONTACT_DETAILS", message, "Remove the person's own private details. Business contacts are expected. One acknowledgeContactDetails count object covers the whole batch; secrets cannot be overridden."); }
+  }
   const completed = await work(owner, mcpProvenance(args.principal, operationId));
+  if (publicationContactDetails) completed.result.publicationContactDetails = publicationContactDetails;
   return finishOperation(ctx, { ...args, owner, operationId, ...completed });
 }
 
@@ -755,15 +778,19 @@ async function saveResearchRecord(ctx: MutationCtx, owner: string, input: any, p
   return result;
 }
 
-async function saveStoryRecord(ctx: MutationCtx, owner: string, input: any) {
+async function saveStoryRecord(ctx: MutationCtx, owner: string, input: any, provenance: McpProvenance) {
   const now = Date.now();
-  if (input.status === "published") machineError("FORBIDDEN", "MCP cannot publish a Family History story.", "Save a draft or request review, then use the human publish gates in the web app.");
+
   if (input.personId) await owned(ctx, "persons", input.personId, owner, "Story person");
   if (input.relationshipId) await owned(ctx, "relationships", input.relationshipId, owner, "Story relationship");
   for (const citationId of input.citationIds ?? []) await owned(ctx, "citations", citationId, owner, "Story citation");
   for (const sourceFactId of input.sourceFactIds ?? []) await owned(ctx, "sourceFacts", sourceFactId, owner, "Story source fact");
   for (const contextPackId of input.contextPackIds ?? []) await owned(ctx, "historicalContext", contextPackId, owner, "Story context pack");
   if (input.mode === "create") {
+    if (input.status === "published") {
+      const person = input.personId ? await owned(ctx, "persons", input.personId, owner, "Story person") : null;
+      if (!person || person.living) machineError("LIVING_PERSON_PROTECTED", "Public stories must be attached to a deceased person.", "Keep living-person material private.");
+    }
     const key = cleanKey(input.createKey, "createKey");
     const mapping = await mappedRecord(ctx, owner, "story", key);
     if (mapping) {
@@ -784,27 +811,37 @@ async function saveStoryRecord(ctx: MutationCtx, owner: string, input: any) {
       generatedBy: "ai",
       promptUsed: input.promptUsed,
       modelUsed: input.modelUsed,
-      publicIndexing: "noindex",
+      publicIndexing: input.publicIndexing ?? "noindex",
       tags: input.tags,
       createdAt: now,
       updatedAt: now,
     });
+    if (input.status === "published") await ctx.db.patch(id, { publicSlug: buildStoryPublicSlug({ storyId: String(id), title: input.title }), lastPublishedAt: now });
+    await ctx.db.insert("storyReviewEvents", { vaultOwnerId: owner, storyId: id, personId: input.personId,
+      eventType: "status_change", toStatus: input.status ?? "draft", actorRole: "story_writer", actorName: `Your AI via MCP (${provenance.actorId})`, createdAt: now, updatedAt: now });
     await rememberRecord(ctx, owner, "story", key, String(id));
     return { id, created: true, updatedAt: now, createKey: key };
   }
   const row = await owned(ctx, "stories", input.storyId, owner, "Story");
   assertFresh(row, input.expectedUpdatedAt, "Story");
-  if (row.status === "published") machineError("FORBIDDEN", "Published stories cannot be edited through MCP.", "Unpublish or create a new draft through the human review workflow.");
-  const patch = pickDefined(input, ["personId", "relationshipId", "type", "title", "content", "citationIds", "sourceFactIds", "contextPackIds", "status", "promptUsed", "modelUsed", "tags"]);
+  if ((input.status ?? row.status) === "published") {
+    const personId = input.personId ?? row.personId;
+    const person = personId ? await owned(ctx, "persons", personId, owner, "Story person") : null;
+    if (!person || person.living) machineError("LIVING_PERSON_PROTECTED", "Public stories must be attached to a deceased person.", "Keep living-person material private.");
+  }
+
+  const patch = pickDefined(input, ["personId", "relationshipId", "type", "title", "content", "citationIds", "sourceFactIds", "contextPackIds", "status", "publicIndexing", "promptUsed", "modelUsed", "tags"]);
   if (patch.content !== undefined) patch.content = cleanText(patch.content, "story content", FAMILY_HISTORY_MCP_LIMITS.story, true);
+  if ((input.status ?? row.status) === "published") { patch.publicSlug = row.publicSlug ?? buildStoryPublicSlug({ storyId: String(row._id), title: input.title ?? row.title }); patch.lastPublishedAt = now; }
   await ctx.db.patch(row._id, { ...patch, generatedBy: row.generatedBy === "human" ? "ai_edited" : row.generatedBy, updatedAt: now });
   await ctx.db.insert("storyReviewEvents", {
     vaultOwnerId: owner,
     storyId: row._id,
     personId: (patch.personId ?? row.personId) as Id<"persons"> | undefined,
-    eventType: "draft_edit",
+    eventType: input.status && input.status !== row.status ? "status_change" : "draft_edit",
+    fromStatus: row.status, toStatus: input.status ?? row.status,
     actorRole: "story_writer",
-    actorName: "Your AI via MCP",
+    actorName: `Your AI via MCP (${provenance.actorId})`,
     createdAt: now,
     updatedAt: now,
   });
@@ -1467,7 +1504,7 @@ export const saveResearchWork = internalMutation({
 
 export const saveStoryWork = internalMutation({
   args: { principal: principalValidator, grantId: v.optional(v.string()), operationId: v.string(), requestHash: v.string(), input: v.any() },
-  handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_story_work" }, async (owner) => ({ result: { story: await saveStoryRecord(ctx, owner, args.input) }, detail: "Saved private story work through MCP." })),
+  handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_story_work" }, async (owner, provenance) => ({ result: { story: await saveStoryRecord(ctx, owner, args.input, provenance) }, detail: "Saved story work and publication choices through MCP." })),
 });
 
 export const saveCompleteResult = internalMutation({
@@ -1493,7 +1530,7 @@ export const saveCompleteResult = internalMutation({
     results.evidence = evidence;
     if (args.input.research) results.research = await saveResearchRecord(ctx, owner, args.input.research, provenance);
     const stories = [];
-    for (const item of args.input.stories ?? []) stories.push(await saveStoryRecord(ctx, owner, item));
+    for (const item of args.input.stories ?? []) stories.push(await saveStoryRecord(ctx, owner, item, provenance));
     results.stories = stories;
     return { result: { saved: results, summary: cleanText(args.input.summary, "complete result summary", 1_000, true) }, detail: "Saved one complete Family History result atomically through MCP." };
   }),
@@ -1713,7 +1750,7 @@ async function saveOneBatchItem(
         resolved.personId = await resolveBatchPerson(ctx, owner, maps.people, { id: item.personId, createKey: item.personCreateKey }, "story.personId");
       }
       delete resolved.personCreateKey;
-      const saved = await saveStoryRecord(ctx, owner, resolved);
+      const saved = await saveStoryRecord(ctx, owner, resolved, provenance);
       if (createKey) maps.stories.set(createKey, String(saved.id));
       return { id: String(saved.id), status: statusOf(saved.created, item) };
     }

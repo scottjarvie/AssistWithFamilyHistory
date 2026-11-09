@@ -93,11 +93,11 @@ export const FAMILY_HISTORY_SCOPE_INFO: readonly ScopeInfo[] = [
   },
   {
     scope: "family_history:story:draft",
-    label: "Write private story drafts",
+    label: "Write and publish stories",
     grants:
-      "Create and correct private story drafts and move a draft to your review queue.",
+      "Create, correct, publish or unpublish stories, including unlisted links.",
     writes: true,
-    limit: "Draft and review only. It can never publish or edit a published story.",
+    limit: "Draft, edit, publish or unpublish stories. Scrub sensitive information before publishing; secrets are refused and contact details get one count summary and one batch acknowledgement, accepted on the first call. Remove only the person’s own private details; business contacts are expected.",
   },
   {
     scope: "family_history:queue:read",
@@ -118,7 +118,7 @@ export const FAMILY_HISTORY_SCOPE_INFO: readonly ScopeInfo[] = [
   },
   { scope: "family_history:records:archive", label: "Archive and restore research records", writes: true,
     grants: "Move records into Archive and recover them, preserving their evidence and AI attribution.",
-    limit: "Reversible only. Never permanently deletes or purges records or files; published stories stay website-only." },
+    limit: "Reversible only. Never permanently deletes or purges records or files; unpublish a story before archiving it." },
 ];
 
 /* ---------------------------------------------------------- the never lists */
@@ -139,9 +139,8 @@ export const NEVER_EXPOSED: readonly string[] = [
 export const NEVER_PERMITTED: readonly string[] = [
   "Exporting the vault",
   "Permanently deleting anything",
-  "Publishing a story or any other public action",
   "Merging or splitting person identities",
-  "Inviting new people, creating public links, or changing another person’s access",
+  "Inviting new people or changing another person’s access",
   "Acting on FamilySearch or any other outside provider",
   "Billing, account, or subscription changes",
 ];
@@ -185,7 +184,7 @@ const ALIAS_SUNSET =
 
 export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
   { name: "family_history_archive_record", requiredScope: "family_history:records:archive", writes: true,
-    title: "Archive or restore a record", description: "Move a record into Archive or restore it. This is a reversible soft delete; never purges records, files or evidence. Use context to read updatedAt first. Published stories require the website.",
+    title: "Archive or restore a record", description: "Move a record into Archive or restore it. This is a reversible soft delete; never purges records, files or evidence. Use context to read updatedAt first. Unpublish a story before archiving it.",
     humanSummary: "Archives or restores a research record without permanently deleting it.", implementedBy: "convex/mcpFamilyHistory.archiveRecord" },
   {
     name: "family_history_get_brief",
@@ -320,8 +319,8 @@ export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
     writes: true,
     title: "Save story work",
     description:
-      "Create or optimistically correct a private draft, or move it to human review. This surface cannot publish or edit a published story.",
-    humanSummary: "Writes or corrects a private story draft.",
+      "Create, edit, publish or unpublish a story. Set status published and publicIndexing noindex for unlisted, or index for public. Remove the person’s own private details first; business contacts are expected. Contact details get one batch count summary; acknowledgeContactDetails: { emails, phones, addresses } covers the whole batch, also accepted on the first call. Secrets cannot be overridden. All changes are attributed to your AI and recorded in history.",
+    humanSummary: "Writes, publishes or unpublishes a story.",
     implementedBy: "convex/mcpFamilyHistory.saveStoryWork",
     sunsetNote: ALIAS_SUNSET,
   },
@@ -332,13 +331,13 @@ export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
       {
         whenInputHas: "stories",
         scope: "family_history:story:draft",
-        because: "the batch includes story drafts",
+        because: "the batch includes story writing or publishing",
       },
     ],
     writes: true,
     title: "Save Family History records in one batch",
     description:
-      "BATCH, PREFERRED FOR REAL SOURCES. One call, one approval, one transaction, per-item results. Store the ORIGINAL first: each evidence item can carry the record's own content (contents: indexed fields, transcription, extract, full text, translation; each says who made it) and the people exactly as the record names them (personas, with role and every field as written). Claims (facts) quote originalText and may name the personaKey they were read from. Save places (countries down to a church, cemetery, farm or house; nest them with parentCreateKey), topics (a religion, ceremony, custom, occupation, migration, war, community) and typed connections in the same call. Any place reference may use placeCreateKey; relationship, event, persona and connection items may name records created earlier in the SAME call by createKey. Your own interpretation goes in a content of kind ai_reading or in family_history_save_research_work, never in place of the original. Links you propose (persona to person, connections) stay proposed until the person accepts them. A row that fails comes back as status \"failed\" with a reason; the rest of the pass is still saved.",
+      "BATCH, PREFERRED FOR REAL SOURCES. One call, one approval, one transaction, per-item results. Store the ORIGINAL first: each evidence item can carry the record's own content (contents: indexed fields, transcription, extract, full text, translation; each says who made it) and the people exactly as the record names them (personas, with role and every field as written). Claims (facts) quote originalText and may name the personaKey they were read from. Save places (countries down to a church, cemetery, farm or house; nest them with parentCreateKey), topics (a religion, ceremony, custom, occupation, migration, war, community) and typed connections in the same call. Any place reference may use placeCreateKey; relationship, event, persona and connection items may name records created earlier in the SAME call by createKey. Your own interpretation goes in a content of kind ai_reading or in family_history_save_research_work, never in place of the original. Links you propose (persona to person, connections) stay proposed until the person accepts them. A row that fails comes back as status \"failed\" with a reason; the rest of the pass is still saved. For publishing stories, remove the person’s own private details; business contacts are expected. Secrets refuse. One top-level acknowledgeContactDetails count object covers the whole publishing batch and may be sent on the first call.",
     humanSummary:
       "Saves a whole source's worth of proposed records at once, telling you exactly which rows worked.",
     implementedBy: "convex/mcpFamilyHistory.saveRecords",
@@ -367,7 +366,7 @@ export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
     writes: true,
     title: "Save one complete Family History result",
     description:
-      "ATOMIC ALTERNATIVE. Save one finished research pass all-or-nothing: optional person correction, relationships, events, source evidence, task/finding state, and private story work. Any single failure discards the whole call. Use family_history_save_records instead when you would rather keep the rows that succeeded and see exactly which ones did not.",
+      "ATOMIC ALTERNATIVE. Save one finished research pass all-or-nothing: optional person correction, relationships, events, source evidence, task/finding state, and story work including publication or unpublication. Remove the person’s own private details before publishing; business contacts are expected. Secrets refuse. One top-level acknowledgeContactDetails count object covers the whole batch and is accepted on the first call. Any single failure discards the whole call. Use family_history_save_records instead when you would rather keep the rows that succeeded and see exactly which ones did not.",
     humanSummary: "Saves one finished research pass, all of it or none of it.",
     implementedBy: "convex/mcpFamilyHistory.saveCompleteResult",
     sunsetNote: ALIAS_SUNSET,

@@ -56,9 +56,8 @@
       "reservedNeverIssuable": [
         "Exporting the vault",
         "Permanently deleting anything",
-        "Publishing a story or any other public action",
         "Merging or splitting person identities",
-        "Inviting new people, creating public links, or changing another person’s access",
+        "Inviting new people or changing another person’s access",
         "Acting on FamilySearch or any other outside provider",
         "Billing, account, or subscription changes"
       ],
