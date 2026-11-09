@@ -65,8 +65,11 @@ Resume and widening use its own policy. Shorter dates and no-op saves release
 nothing and retain inherited provenance. Exact source/revision pairs still protect
 later restrictions on the original source.
 
-Every MCP mutation compares its final public story projections with their prior
-projections. Creating, editing, attaching related people or visible metadata, and
+Every MCP mutation resolves the records it changes through indexed reverse
+links, then compares only the affected stories’ final public projections with
+their prior projections. Direct story edits hydrate only that story; private
+writes with no public effect hydrate no publication views. Unrelated stories
+are never scanned or hydrated for these comparisons. Creating, editing, attaching related people or visible metadata, and
 reactivating archived public content all repeat current publish-power validation,
 the stored/version-bound sensitive-info check, shared story readiness (including
 living-person evidence), and the pending-second-review gate in the committing
@@ -77,10 +80,16 @@ exposes titles only, not file bytes or storage links. Unsupported file-backed st
 bodies refuse. A restore failure offers `restoreAsPrivate: true`, which restores
 without reactivating public links, unpublishing affected stories if needed.
 
-Credential-shaped assignments require a quoted key or no space before the colon
-or equals, and a non-space value of at least eight characters. JSON escaping,
+Credential-shaped assignments require a non-space value of at least eight
+characters. Quoted credential keys still refuse. In the unquoted form there
+must be no space before the colon or equals, and either a code-style key
+(snake_case or ALL_CAPS) or a token-like value (mixed letters/digits or symbols).
+Plain words in story prose are not credentials. JSON escaping,
 snake_case prefixes, next-line values, credential URLs, common provider token
 prefixes and Luhn-valid card numbers are checked. Ordinary story prose is not a
 credential. Contact acknowledgements must exactly match every category, including
 zero. The human website path retains its normal readiness/review gates and does
 not enforce the AI credential scanner; restoration may return advisory warnings.
+
+Unpublishing a draft or review story is a no-op, preserving its exact record and
+review history. It does not turn review work back into a draft.

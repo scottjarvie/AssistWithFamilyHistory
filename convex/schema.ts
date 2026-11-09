@@ -206,7 +206,9 @@ export default defineSchema({
     .index("by_fsId", ["fsId"])
     .index("by_surname", ["name.surname"])
     .index("by_research_status", ["researchStatus"])
-    .index("by_living", ["living"]),
+    .index("by_living", ["living"])
+    .index("by_birth_place", ["vaultOwnerId", "birth.place.placeId"])
+    .index("by_death_place", ["vaultOwnerId", "death.place.placeId"]),
 
   /**
    * RELATIONSHIPS
@@ -1647,6 +1649,7 @@ export default defineSchema({
     .index("by_person", ["personId"])
     .index("by_relationship", ["relationshipId"])
     .index("by_status", ["status"])
+    .index("by_owner_person_status", ["vaultOwnerId", "personId", "status", "archivedAt"])
     .index("by_public_slug", ["publicSlug"])
     .index("by_type", ["type"]),
 

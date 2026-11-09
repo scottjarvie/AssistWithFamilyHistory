@@ -267,8 +267,95 @@ function mcpProvenance(principal: McpPrincipal, operationId: string): McpProvena
   };
 }
 
-async function publicExposures(ctx: MutationCtx, owner: string) {
-  const rows = await ctx.db.query("stories").withIndex("by_owner", q => q.eq("vaultOwnerId", owner)).collect();
+/** Resolve only records this write changes and public stories depending on
+ * them. Indexed reverse links avoid scanning/hydrating the owner's other stories. */
+async function affectedStoryIds(ctx: MutationCtx, owner: string, toolName: string, input: any, result?: Record<string, any>) {
+  const stories = new Set<string>(), anchors = new Set<string>();
+  const queue: Array<{ kind: string; id: string }> = [], seen = new Set<string>();
+  const tables: Record<string, TableNames> = { person: "persons", anchor: "persons", relationship: "relationships", event: "events", source: "sources", citation: "citations", story: "stories", place: "places", media: "media" };
+  const add = (kind: string, id: unknown) => { if (typeof id === "string" && tables[kind]) queue.push({ kind, id }); };
+  const ref = async (kind: string, id: unknown, key: unknown, recordType: RecordType) => {
+    add(kind, id);
+    if (typeof key === "string") { const mapped = await mappedRecord(ctx, owner, recordType, key); if (mapped) add(kind, mapped.recordId); }
+  };
+  const person = async (item: any) => { if (item?.mode === "update" && ["name","living","birth","death"].some(key=>item[key] !== undefined)) add("person",item.personId); };
+  const story = async (item: any) => { if (item) await ref("story", item.storyId, item.mode === "create" ? item.createKey : undefined, "story"); };
+  const relationship = async (item: any) => {
+    if (!item) return; add("relationship", item.relationshipId);
+    await ref("anchor", item.person1, item.person1CreateKey, "person"); await ref("anchor", item.person2, item.person2CreateKey, "person");
+  };
+  const event = async (item: any) => {
+    if (!item) return; add("event", item.eventId);
+    for (const role of item.personRoles ?? []) await ref("anchor", role.personId, role.personCreateKey, "person");
+  };
+  const evidence = async (item: any) => {
+    if (!item) return;
+    if (item.source?.mode === "update" && item.source.title !== undefined) add("source", item.source.sourceId);
+    for (const link of item.links ?? []) {
+      if (link.targetType === "person") await ref("anchor", link.targetId, link.targetCreateKey, "person");
+      if (link.targetType === "event") add("event", link.targetId);
+    }
+  };
+  const name=toolName.replace(/^family_history_/, "");
+  if (name === "save_person") await person(input);
+  if (name === "save_relationship") await relationship(input);
+  if (name === "save_event") await event(input);
+  if (name === "save_source_evidence") await evidence(input);
+  if (name === "save_story_work") await story(input);
+  if (name === "archive_record") {
+    const kind=tables[input.kind] ? input.kind : Object.keys(tables).find(key=>tables[key]===input.kind);
+    if (kind) add(kind,input.id);
+  }
+  if (name === "save_records" || name === "save_complete_result") {
+    await person(input.person);
+    for(const item of input.people ?? []) await person(item);
+    for(const item of input.relationships ?? []) await relationship(item);
+    for(const item of input.events ?? []) await event(item);
+    for(const item of input.evidence ?? []) await evidence(item);
+    for(const item of input.stories ?? []) await story(item);
+    for(const item of input.places ?? []) if(item.mode === "update") add("place",item.placeId);
+  }
+  // New IDs and resolved createKey references are available after the write.
+  if (result) {
+    const saved=result.saved ?? result.results ?? result;
+    for(const [key,kind] of Object.entries({relationship:"relationship",relationships:"relationship",event:"event",events:"event",story:"story",stories:"story"})) {
+      const values=Array.isArray(saved[key]) ? saved[key] : saved[key] ? [saved[key]] : [];
+      for(const value of values) if(value.status!=="failed") add(kind,value.id);
+    }
+  }
+  for(let i=0;i<queue.length;i++) {
+    const {kind,id}=queue[i], key=`${kind}:${id}`;
+    if(seen.has(key)) continue; seen.add(key);
+    const normalized=ctx.db.normalizeId(tables[kind],id); if(!normalized)continue;
+    const row: any=await ctx.db.get(normalized); if(!row || !matchesVaultOwner(row.vaultOwnerId,owner))continue;
+    if(kind === "story") { stories.add(String(row._id)); continue; }
+    if(kind === "anchor" || kind === "person") anchors.add(String(row._id));
+    if(kind === "person") {
+      const relations=[...await ctx.db.query("relationships").withIndex("by_person1",q=>q.eq("person1",row._id)).collect(), ...await ctx.db.query("relationships").withIndex("by_person2",q=>q.eq("person2",row._id)).collect()];
+      for(const rel of relations) if(matchesVaultOwner(rel.vaultOwnerId,owner)) { add("anchor",rel.person1);add("anchor",rel.person2); }
+    }
+    if(kind === "relationship") { add("anchor",row.person1);add("anchor",row.person2); }
+    if(kind === "event") for(const link of await ctx.db.query("personEvents").withIndex("by_event",q=>q.eq("eventId",row._id)).collect()) if(matchesVaultOwner(link.vaultOwnerId,owner))add("anchor",link.personId);
+    if(kind === "source") for(const citation of await ctx.db.query("citations").withIndex("by_source",q=>q.eq("sourceId",row._id)).collect()) if(matchesVaultOwner(citation.vaultOwnerId,owner))add("citation",citation._id);
+    if(kind === "citation") for(const link of await ctx.db.query("citationLinks").withIndex("by_citation",q=>q.eq("citationId",row._id)).collect()) {
+      if(!matchesVaultOwner(link.vaultOwnerId,owner))continue;
+      if(link.targetType === "person")add("anchor",link.targetId);
+      if(link.targetType === "event")add("event",link.targetId);
+    }
+    if(kind === "place") {
+      for(const row of await ctx.db.query("persons").withIndex("by_birth_place",q=>q.eq("vaultOwnerId",owner).eq("birth.place.placeId",normalized as Id<"places">)).collect())add("anchor",row._id);
+      for(const row of await ctx.db.query("persons").withIndex("by_death_place",q=>q.eq("vaultOwnerId",owner).eq("death.place.placeId",normalized as Id<"places">)).collect())add("anchor",row._id);
+      for(const event of await ctx.db.query("events").withIndex("by_place",q=>q.eq("place.placeId",normalized as Id<"places">)).collect())if(matchesVaultOwner(event.vaultOwnerId,owner))add("event",event._id);
+    }
+    if(kind === "media") for(const personId of row.personIds ?? [])add("anchor",personId);
+  }
+  for(const id of anchors) for(const story of await ctx.db.query("stories").withIndex("by_owner_person_status",q=>q.eq("vaultOwnerId",owner).eq("personId",id as Id<"persons">).eq("status","published").eq("archivedAt",undefined)).collect()) stories.add(String(story._id));
+  return stories;
+}
+
+async function publicExposures(ctx: MutationCtx, owner: string, storyIds: Iterable<string>) {
+  const rows: Doc<"stories">[] = [];
+  for(const id of storyIds) { const normalized=ctx.db.normalizeId("stories",id); const row=normalized ? await ctx.db.get(normalized) : null; if(row && matchesVaultOwner(row.vaultOwnerId,owner))rows.push(row); }
   const result = new Map<string, { row: Doc<"stories">; signature: string; text: string; visible: boolean }>();
   for (const row of rows) {
     if (row.status !== "published" || row.archivedAt !== undefined) continue;
@@ -317,7 +404,8 @@ async function operation(
   const operationId = cleanText(args.operationId, "operationId", FAMILY_HISTORY_MCP_LIMITS.operationId, true)!;
   const replay = await replayReceipt(ctx, owner, operationId, args.toolName, args.requestHash);
   if (replay) return replay;
-  const beforeExposure = await publicExposures(ctx, owner);
+  const beforeIds = await affectedStoryIds(ctx,owner,args.toolName,args.input);
+  const beforeExposure = await publicExposures(ctx, owner, beforeIds);
   const reviewStates = new Map<string, Doc<"stories">["status"]>();
   const storyInputs = args.toolName.includes("save_story_work") ? [args.input] : args.input.stories ?? [];
   for (const item of storyInputs) {
@@ -334,7 +422,8 @@ async function operation(
     }
   }
   const completed = await work(owner, mcpProvenance(args.principal, operationId));
-  const afterExposure = await publicExposures(ctx, owner);
+  const afterIds = await affectedStoryIds(ctx,owner,args.toolName,args.input,completed.result);
+  const afterExposure = await publicExposures(ctx, owner, new Set([...beforeIds,...afterIds]));
   const direct = new Set(storyInputs.flatMap((item: any) => item.storyId ? [String(item.storyId)] : []));
   let changed = [...afterExposure.values()].filter(entry => !beforeExposure.has(String(entry.row._id)) || ((entry.visible || direct.has(String(entry.row._id))) && beforeExposure.get(String(entry.row._id))?.signature !== entry.signature));
   if (changed.length && args.toolName === "family_history_archive_record" && args.input.action === "restore" && args.input.restoreAsPrivate === true) {
@@ -1563,6 +1652,7 @@ export const unpublishStory = internalMutation({
   handler: (ctx, args) => operation(ctx, { ...args, toolName: "family_history_unpublish_story" }, async owner => {
     const row = await owned(ctx, "stories", args.input.storyId, owner, "Story");
     assertFresh(row, args.input.expectedUpdatedAt, "Story");
+    if (row.status !== "published") return { result: { unchanged: true }, detail: "Story is not published; no state changed." };
     const now = Date.now();
     await ctx.db.patch(row._id, { status: "draft", updatedAt: now });
     await ctx.db.insert("storyReviewEvents", { vaultOwnerId: owner, storyId: row._id, personId: row.personId,
@@ -2028,12 +2118,14 @@ export const restoreArchivedRecord = mutation({
   handler: async (ctx, args) => {
     const decision = await authorizeTenantMutation(ctx, "mcpFamilyHistory.restoreArchivedRecord", args.vaultOwnerId);
     if (!decision.allowed) throw new Error("Record not found");
-    const before = await publicExposures(ctx, decision.owner);
+    const beforeIds = await affectedStoryIds(ctx,decision.owner,"archive_record",{kind:args.table,id:args.id});
+    const before = await publicExposures(ctx, decision.owner, beforeIds);
     const row = await owned(ctx, args.table, args.id, decision.owner, "Archived record");
     assertFresh(row, args.expectedUpdatedAt, "Archived record");
     if (args.table === "stories" && args.restoreAsPrivate) await ctx.db.patch(row._id, { status: "draft" });
     await ctx.db.patch(row._id, { archivedAt: undefined, archivedBy: undefined, updatedAt: Date.now() });
-    const after = await publicExposures(ctx, decision.owner);
+    const afterIds = await affectedStoryIds(ctx,decision.owner,"archive_record",{kind:args.table,id:args.id});
+    const after = await publicExposures(ctx, decision.owner,new Set([...beforeIds,...afterIds]));
     const warnings: string[] = [];
     for (const entry of after.values()) {
       if (before.get(String(entry.row._id))?.signature === entry.signature) continue;

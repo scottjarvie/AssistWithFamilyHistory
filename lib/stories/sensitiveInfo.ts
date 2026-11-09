@@ -26,7 +26,13 @@ export function assertSafePublication(text: unknown, acknowledgement?: ContactCo
  // Match credential keys directly. A generic JSON key must not consume and
  // conceal a credential-shaped assignment inside its string value.
  const credentials=new RegExp(String.raw`(?:["'](${credentialKey})["']\s*[:=]|\b(${snakeKey})[:=])\s*(?:["']([^\s"']{8,})["']|([^\s"',}\]]{8,}))`,"gi");
- for (const match of normalized.matchAll(credentials)) refuse("credential",match.index!);
+ for (const match of normalized.matchAll(credentials)) {
+  const key=match[1] ?? match[2];
+  const value=match[3] ?? match[4];
+  const codeKey=key.includes("_") || /^[A-Z][A-Z0-9_]*$/.test(key);
+  const tokenValue=(/\p{L}/u.test(value) && /\p{N}/u.test(value)) || /[^\p{L}\p{N}]/u.test(value);
+  if (match[1] || codeKey || tokenValue) refuse("credential",match.index!);
+ }
  const secrets = [
   [/\b(?:sk-[A-Za-z0-9_-]{16,}|[rs]k_(?:live|test)_[A-Za-z0-9_-]{8,}|gh[pousr]_[A-Za-z0-9]{20,}|AKIA[A-Z0-9]{16}|xox[abpr]-[A-Za-z0-9-]{8,}|access-(?:production|sandbox|development)-[A-Za-z0-9-]{8,})\b/, "API token"],
   [/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/, "private key"],

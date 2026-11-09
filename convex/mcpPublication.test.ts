@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
+import * as storyVault from "./vault";
 import { convexTest } from "convex-test";
 import schema from "./schema";
 import { api, internal } from "./_generated/api";
@@ -184,4 +185,39 @@ test("editing a public source repeats secret and publish-power checks before com
  await t.mutation(internal.mcpGrants.limitCallingConnection,{subject:owner,issuer:principal.issuer,clientId:principal.clientId,action:"limit",removeScopes:["family_history:story:draft"],revision:before.revision,opId:"remove-publish-for-source"});
  await expect(t.mutation(internal.mcpFamilyHistory.saveSourceEvidence,{principal,grantId,operationId:"source-no-publish",requestHash:"source-no-publish",input:{...input,source:{...input.source,title:"Renamed public source"}}})).rejects.toThrow('SCOPE_NOT_GRANTED');
  expect((await t.run(ctx=>ctx.db.get(source._id)))!.title).toBe(source.title);
+});
+test("the three story-prose sentences pass without weakening credential detection",()=>{
+ for(const text of ['The family secret: grandfather was adopted in 1890.','Her only token: photographs of the farm.','The secret: everyone knew.']) expect(()=>assertSafePublication(text)).not.toThrow();
+ for(const text of ['auth_token:grandfather','SECRET:grandfather','token:abc123def456','secret:abc-def-ghi','{"token":"grandfather"}']) expect(()=>assertSafePublication(text)).toThrow('PUBLICATION_SECRET');
+});
+test("unpublish leaves review and draft stories exactly as they are",async()=>{
+ const {t,grantId,personId}=await setup();
+ for(const status of ['review','draft'] as const) {
+  const storyId=await t.run(ctx=>ctx.db.insert("stories",{vaultOwnerId:owner,personId,type:"biography",title:"Not public",content:narrative,citationIds:[],status,generatedBy:"human",createdAt:1,updatedAt:1}));
+  const before=await t.run(ctx=>ctx.db.get(storyId));
+  const history=await t.run(ctx=>ctx.db.query("storyReviewEvents").collect());
+  const result=await t.mutation(internal.mcpFamilyHistory.unpublishStory,{principal,grantId,operationId:`unpublish-${status}`,requestHash:`unpublish-${status}`,input:{storyId,expectedUpdatedAt:1}});
+  expect(result.unchanged).toBe(true);expect(await t.run(ctx=>ctx.db.get(storyId))).toEqual(before);
+  expect(await t.run(ctx=>ctx.db.query("storyReviewEvents").collect())).toEqual(history);
+ }
+});
+test("private writes and a direct public-story edit never hydrate unrelated public stories",async()=>{
+ const {t,grantId,personId,story}=await publishFixture();
+ const unrelated=new Set<string>();
+ await t.run(async ctx=>{
+  const otherPerson=await ctx.db.insert("persons",{vaultOwnerId:owner,name:{given:"Other",surname:"Person"},sex:"unknown",living:false,researchStatus:"in_progress",createdAt:1,updatedAt:1});
+  for(let i=0;i<200;i++) unrelated.add(String(await ctx.db.insert("stories",{vaultOwnerId:owner,personId:otherPerson,type:"biography",title:`Broken ${i}`,content:narrative,citationIds:[],status:"published",generatedBy:"human",secondReviewRequired:true,createdAt:1,updatedAt:1})));
+ });
+ const original=storyVault.loadStoryScopedSnapshot;
+ const seen:string[]=[];
+ const spy=vi.spyOn(storyVault,"loadStoryScopedSnapshot").mockImplementation(async(ctx,vaultOwner,id)=>{
+  if(unrelated.has(String(id)))throw new Error("Unrelated publication must not be loaded");
+  seen.push(String(id));return original(ctx,vaultOwner,id);
+ });
+ try {
+  await t.mutation(internal.mcpFamilyHistory.saveStoryWork,{principal,grantId,operationId:"private-write-isolated",requestHash:"private-write-isolated",input:{mode:"create",createKey:"isolated-private",personId,type:"biography",title:"Private draft",content:"Private text",status:"draft"}});
+  expect(seen).toEqual([]);
+  await t.mutation(internal.mcpFamilyHistory.saveStoryWork,{principal,grantId,operationId:"public-edit-isolated",requestHash:"public-edit-isolated",input:{mode:"update",storyId:story._id,expectedUpdatedAt:story.updatedAt,content:narrative+"A checked addition."}});
+  expect(seen.length).toBeGreaterThan(0);expect(seen.every(id=>id===String(story._id))).toBe(true);
+ } finally {spy.mockRestore();}
 });
