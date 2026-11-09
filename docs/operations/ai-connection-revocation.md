@@ -52,3 +52,35 @@ coordinated Convex deployment followed by the frontend. Never deploy Convex manu
 requires an active, unpaused, unexpired grant and ownership; all publish powers may
 be removed. It cannot edit content or increase visibility. Contact acknowledgement
 counts must equal every category found, including zero; blanket high counts refuse.
+
+## Opus and cross-site audit follow-up
+
+Each restricted new connection immediately writes its own carried entry. Forget
+releases only that connection's entries. Bootstrap selects current connections,
+excluding same-client replaced/rotated history; explicit person reapproval is
+ordered by immutable paginated insertion order rather than caller timestamps.
+A floor-started connection stores its own access separately from inherited access.
+Restore removes inherited powers/boundary while preserving its own restrictions;
+Resume and widening use its own policy. Shorter dates and no-op saves release
+nothing and retain inherited provenance. Exact source/revision pairs still protect
+later restrictions on the original source.
+
+Every MCP mutation compares its final public story projections with their prior
+projections. Creating, editing, attaching related people or visible metadata, and
+reactivating archived public content all repeat current publish-power validation,
+the stored/version-bound sensitive-info check, shared story readiness (including
+living-person evidence), and the pending-second-review gate in the committing
+transaction. The AI may move a draft into review; it never supplies the website's
+human confirmation. Changed public stories receive verified AI history. Publication
+checks inspect public text fields before public redaction. Media in the public DTO
+exposes titles only, not file bytes or storage links. Unsupported file-backed story
+bodies refuse. A restore failure offers `restoreAsPrivate: true`, which restores
+without reactivating public links, unpublishing affected stories if needed.
+
+Credential-shaped assignments require a quoted key or no space before the colon
+or equals, and a non-space value of at least eight characters. JSON escaping,
+snake_case prefixes, next-line values, credential URLs, common provider token
+prefixes and Luhn-valid card numbers are checked. Ordinary story prose is not a
+credential. Contact acknowledgements must exactly match every category, including
+zero. The human website path retains its normal readiness/review gates and does
+not enforce the AI credential scanner; restoration may return advisory warnings.

@@ -1983,6 +1983,12 @@ export default defineSchema({
     scopeChoice: v.optional(v.union(v.literal("full"), v.literal("chosen"))),
     withheldScopes: v.optional(v.array(v.string())),
     startedAtFloor: v.optional(v.boolean()),
+    ownAccess: v.optional(v.object({
+      withheldScopes: v.array(v.string()),
+      boundary: v.object({ kind: v.union(v.literal("whole_workspace"), v.literal("selected_people"), v.literal("queue_only")), personIds: v.optional(v.array(v.string())), queueItemIds: v.optional(v.array(v.string())) }),
+      status: v.union(v.literal("active"), v.literal("revoked"), v.literal("denied")),
+      pausedAt: v.optional(v.number()), expiresAt: v.optional(v.number()), revokedAt: v.optional(v.number()),
+    })),
     inheritedRestrictions: v.optional(v.array(v.object({ sourceGrantId: v.id("mcpGrants"), sourceRevision: v.number() }))),
     authorityGrantId: v.optional(v.id("mcpGrants")),
     linkedByName: v.optional(v.boolean()),

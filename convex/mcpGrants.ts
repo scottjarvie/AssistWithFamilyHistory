@@ -300,13 +300,14 @@ export const resolveForRequest = internalMutation({
         ...fields, withheldScopes: e.withheld, scopeChoice: "chosen" as const, boundary: e.boundary,
         pausedAt: e.pausedAt, status: e.revoked ? "revoked" as const : e.pending ? "pending" as const : "active" as const,
         expiresAt: e.endsAt, expiryChoice: e.endsAt === undefined ? "none" as const : "chosen" as const,
-      })) as Doc<"mcpGrants">[]), startedAtFloor: true, inheritedRestrictions: carried.entries.map(e => ({ sourceGrantId: e.sourceGrantId, sourceRevision: e.sourceRevision })) } : {}),
+      })) as Doc<"mcpGrants">[]), startedAtFloor: true, ownAccess: { withheldScopes: [], boundary: { kind: "whole_workspace" as const }, status: "active" as const }, inheritedRestrictions: carried.entries.map(e => ({ sourceGrantId: e.sourceGrantId, sourceRevision: e.sourceRevision })) } : {}),
     });
     const oldAlias = await ctx.db.query("mcpClientAliases").withIndex("by_owner_client_issuer", q => q.eq("vaultOwnerId", owner).eq("clientId", clientId).eq("issuer", args.issuer)).unique();
     if (oldAlias) await ctx.db.delete(oldAlias._id);
     await ctx.db.insert("mcpClientAliases", { vaultOwnerId: owner, issuer: args.issuer, clientId, grantId: id });
 
     const created = (await ctx.db.get(id))!;
+    if (hasUnresolvedLimit(created)) await syncCarriedRestrictions(ctx, created);
     await appendHistory(ctx, created, null, "system", created.startedAtFloor ? "Started with the limits of your most limited AI." : "Connected with full access and no end date.", `connect:${id}`, "connect");
     return resolutionForRow(created);
   },
@@ -995,6 +996,25 @@ function compatibilityFields(row: Doc<"mcpGrants">) {
   return { status: row.status, scopes: effectiveScopes(row), scopeChoice: effectiveWithheldScopes(row).length ? "chosen" as const : "full" as const,
     boundary: row.boundary, expiresAt: effectiveExpiry(row) ?? null };
 }
+function accessWidens(before: Doc<"mcpGrants">, after: Doc<"mcpGrants">) {
+  const oldWithheld = effectiveWithheldScopes(before);
+  if (effectiveScopes(after).some(s => oldWithheld.includes(s))) return true;
+  if ((effectiveExpiry(after) ?? Infinity) > (effectiveExpiry(before) ?? Infinity)) return true;
+  if (before.pausedAt !== undefined && after.pausedAt === undefined) return true;
+  if (["revoked", "denied", "pending"].includes(before.status) && after.status === "active") return true;
+  const a = before.boundary, b = after.boundary;
+  if (a.kind !== "whole_workspace" && b.kind === "whole_workspace") return true;
+  if (a.kind === "queue_only" && b.kind !== "queue_only") return true;
+  if (a.kind === "selected_people" && b.kind === "selected_people" && b.personIds?.some(id => !a.personIds?.includes(id))) return true;
+  if (a.queueItemIds?.length && (!b.queueItemIds?.length || b.queueItemIds.some(id => !a.queueItemIds!.includes(id)))) return true;
+  return false;
+}
+function ownAccessPatch(own: NonNullable<Doc<"mcpGrants">["ownAccess"]>): Partial<Doc<"mcpGrants">> {
+  return { withheldScopes: [...own.withheldScopes], boundary: own.boundary, status: own.status,
+    pausedAt: own.pausedAt, expiresAt: own.expiresAt, expiryChoice: own.expiresAt === undefined ? "none" : "chosen",
+    revokedAt: own.revokedAt, revokedReason: own.status === "active" ? undefined : "Connection turned off." };
+}
+
 async function changeConnection(ctx: MutationCtx, row: Doc<"mcpGrants">, change: Change, actor: "ai" | "person", expectedRevision = change.revision) {
   if (!change.opId || change.opId.length > 160 || safeSentence(change.opId) !== change.opId) throw new Error("A non-secret opId of at most 160 characters is required");
   const request = await hashMcpInput({ actor, ...change });
@@ -1006,6 +1026,7 @@ async function changeConnection(ctx: MutationCtx, row: Doc<"mcpGrants">, change:
   if (!Number.isInteger(expectedRevision) || expectedRevision !== (row.revision ?? 0)) throw new Error("STALE_VERSION: read the current connection revision before changing it");
   const patch: Partial<Doc<"mcpGrants">> = { revision: (row.revision ?? 0) + 1, updatedAt: Date.now(), withheldScopes: effectiveWithheldScopes(row) };
   const action = change.action;
+  const own = row.ownAccess ? { ...row.ownAccess, withheldScopes: [...row.ownAccess.withheldScopes] } : undefined;
   if (actor === "ai" && action !== "limit" && (change.removeScopes?.length || change.endsAt !== undefined)) throw new Error("Use the limit action to remove powers or set an end date before pausing or revoking");
   if (actor === "ai" && !["limit", "pause", "revoke"].includes(action)) throw new Error(`Only the person can restore access at ${AI_SETTINGS_URL}`);
   if (actor === "ai" && (change.scopes || change.boundary || change.expiresInDays !== undefined)) throw new Error("AI connection changes can only remove powers and shorten an end date");
@@ -1015,26 +1036,29 @@ async function changeConnection(ctx: MutationCtx, row: Doc<"mcpGrants">, change:
     if (removed.some(s => !FAMILY_HISTORY_SCOPES.includes(s as FamilyHistoryScope))) throw new Error("Unknown power");
     if (action === "reduce" && change.scopes?.some(s => !current.includes(s as FamilyHistoryScope))) throw new Error("Widening requires the person to restore access on the website");
     patch.withheldScopes = [...new Set([...effectiveWithheldScopes(row), ...removed])];
+    if (own) own.withheldScopes = [...new Set([...own.withheldScopes, ...removed])];
     if (change.endsAt !== undefined) {
       const oldEnd = effectiveExpiry(row);
       if (!Number.isFinite(change.endsAt) || change.endsAt <= Date.now() || (oldEnd !== undefined && change.endsAt > oldEnd)) throw new Error("An end date must be in the future and may only be shortened");
       patch.expiresAt = change.endsAt; patch.expiryChoice = "chosen";
+      if (own) own.expiresAt = change.endsAt;
     }
     patch.limitedAt = Date.now(); patch.limitedBy = actor;
   } else if (action === "pause") {
+    if (own) own.pausedAt = own.pausedAt ?? Date.now();
     patch.pausedAt = row.pausedAt ?? Date.now(); patch.limitedAt = Date.now(); patch.limitedBy = actor;
   } else if (action === "revoke" || action === "deny") {
     patch.status = action === "deny" ? "denied" : "revoked";
+    if (own) { own.status = action === "deny" ? "denied" : "revoked"; own.revokedAt = Date.now(); }
     patch.revokedAt = Date.now(); patch.revokedReason = safeSentence(change.reason ?? "Connection turned off.");
     patch.limitedAt = Date.now(); patch.limitedBy = actor;
   } else if (action === "resume") {
     if (row.status === "revoked" || row.status === "denied") throw new Error("Restore the revoked connection first");
-    patch.pausedAt = undefined;
+    if (own) { own.pausedAt = undefined; Object.assign(patch, ownAccessPatch(own)); }
+    else patch.pausedAt = undefined;
   } else if (action === "restore") {
-    if (row.inheritedRestrictions?.length) {
-      patch.status = "active"; patch.withheldScopes = []; patch.boundary = { kind: "whole_workspace" };
-      patch.pausedAt = undefined; // A chosen end date is preserved; expiry has its own control.
-      patch.revokedAt = undefined; patch.revokedReason = undefined;
+    if (row.inheritedRestrictions?.length && own) {
+      Object.assign(patch, ownAccessPatch(own));
     } else if (row.status === "revoked" || row.status === "denied") {
       // Restore exactly the pre-revoke powers, boundary, pause and chosen date.
       patch.status = "active"; patch.revokedAt = undefined; patch.revokedReason = undefined;
@@ -1047,6 +1071,7 @@ async function changeConnection(ctx: MutationCtx, row: Doc<"mcpGrants">, change:
   } else if (action === "expiry") {
     patch.expiresAt = chosenExpiry(change.expiresInDays, Date.now());
     patch.expiryChoice = patch.expiresAt === undefined ? "none" : "chosen";
+    if (own) own.expiresAt = patch.expiresAt;
     if (row.status === "expired") patch.status = "active";
   } else if (action === "approve") {
     if (row.status === "active" && !isGrantExpired(row, Date.now())) throw new Error("This connection is already approved");
@@ -1065,10 +1090,16 @@ async function changeConnection(ctx: MutationCtx, row: Doc<"mcpGrants">, change:
   patch.scopeChoice = patch.withheldScopes!.length ? "chosen" : "full";
   // Capture legacy automatic expiry as unlimited before storing a deliberate choice.
   if (!patch.expiryChoice && effectiveExpiry(row) === undefined) { patch.expiryChoice = "none"; patch.expiresAt = undefined; }
-  if (actor === "person" && ["restore", "resume", "expiry", "approve"].includes(action)) patch.inheritedRestrictions = undefined;
+  if (own) patch.ownAccess = own;
+  const candidate = { ...row, ...patch } as Doc<"mcpGrants">;
+  const release = actor === "person" && (["restore", "resume", "expiry", "approve"].includes(action) && accessWidens(row, candidate));
+  if (release && own && action === "expiry") Object.assign(patch, ownAccessPatch(own));
+  if (release) { patch.inheritedRestrictions = undefined; patch.ownAccess = undefined; }
+  patch.scopes = FAMILY_HISTORY_SCOPES.filter(s => !patch.withheldScopes!.includes(s));
+  patch.scopeChoice = patch.withheldScopes!.length ? "chosen" : "full";
   await ctx.db.patch(row._id, patch);
   const after = (await ctx.db.get(row._id))!;
-  await syncCarriedRestrictions(ctx, after, actor === "person" && ["restore", "resume", "expiry", "approve", "remove"].includes(action), action === "remove" ? [] : row.inheritedRestrictions ?? [], action === "remove");
+  await syncCarriedRestrictions(ctx, after, release || (actor === "person" && action === "remove"), action === "remove" ? [] : row.inheritedRestrictions ?? [], action === "remove");
   await appendHistory(ctx, after, row, actor, `${actor === "ai" ? "Your AI" : "You"} ${({ limit: "narrowed", reduce: "narrowed", pause: "paused", revoke: "revoked", deny: "declined", resume: "resumed", restore: "restored", expiry: "changed the end date for", approve: "approved", remove: "hid" } as Record<string,string>)[action]} the connection.${change.reason ? ` ${change.reason}` : ""}`, change.opId, request);
   return { id: after._id, connection: await connectionWithHistory(ctx, after), ...compatibilityFields(after), ...describeConnection(after), removed: action === "remove" };
 }
@@ -1215,9 +1246,9 @@ export const prepareOwnerConnections = internalMutation({
   handler: async (ctx, args): Promise<{ ready: boolean }> => ({ ready: (await prepareCarriedRestrictions(ctx, args.vaultOwnerId)).ready }),
 });
 
-type LegacyClientSummary = { restricted?: Id<"mcpGrants">[]; approval?: { id: Id<"mcpGrants">; at: number; created: number }; refusal?: { id: Id<"mcpGrants">; at: number; created: number }; pending?: { id: Id<"mcpGrants">; at: number; created: number } };
-function laterLegacyEvent(a: { id: Id<"mcpGrants">; at: number; created: number } | undefined, b: { id: Id<"mcpGrants">; at: number; created: number }) {
-  return !a || b.at > a.at || (b.at === a.at && (b.created > a.created || (b.created === a.created && b.id > a.id)));
+type LegacyClientSummary = { approval?: { id: Id<"mcpGrants">; at: number; created: number; order?: number }; refusal?: { id: Id<"mcpGrants">; at: number; created: number; order?: number }; pending?: { id: Id<"mcpGrants">; at: number; created: number; order?: number } };
+function laterLegacyEvent(a: { id: Id<"mcpGrants">; at: number; created: number; order?: number } | undefined, b: { id: Id<"mcpGrants">; at: number; created: number; order?: number }) {
+  return !a || (b.order ?? 0) > (a.order ?? 0); // Immutable paginated insertion order, not a caller clock.
 }
 function carriedEntry(row: Doc<"mcpGrants">): Carried["entries"][number] {
   return { issuer: row.issuer, sourceGrantId: row._id, sourceRevision: row.revision ?? 0, lineageGrantId: row._id,
@@ -1237,6 +1268,7 @@ export const bootstrapOwnerConnections = internalMutation({
     if (carried.bootstrapPhase === "scan") {
       const page = await ctx.db.query("mcpGrants").withIndex("by_owner", q => q.eq("vaultOwnerId", vaultOwnerId))
         .paginate({ cursor: carried.bootstrapCursor ?? null, numItems: 100 });
+      let scanOrder = carried.bootstrapIndex ?? 0;
       for (let row of page.page) {
         if (row.authorityGrantId) {
           let parent = await ctx.db.get(row.authorityGrantId);
@@ -1249,6 +1281,7 @@ export const bootstrapOwnerConnections = internalMutation({
             parent = await ctx.db.get(parent.authorityGrantId);
           }
           if (parent && (parent.vaultOwnerId !== row.vaultOwnerId || parent.issuer !== row.issuer)) throw new Error("Invalid legacy connection authority");
+          if (parent && !crossed) continue; // Same-client replaced/rotated receipt, not a connection.
           if (parent && crossed) {
             // Copy the actual v1 authority, including any person restoration;
             // stale pre-merge row fields must not resurrect a released revoke.
@@ -1259,12 +1292,11 @@ export const bootstrapOwnerConnections = internalMutation({
         const key = JSON.stringify([row.issuer, row.clientId]);
         const summary = clients[key] ?? {};
         const kind = isRefusal(row) ? "refusal" : row.status === "pending" ? "pending" : "approval";
-        const event = { id: row._id, at: kind === "refusal" ? refusalTime(row) : approvalTime(row), created: row._creationTime };
+        const event = { id: row._id, at: kind === "refusal" ? refusalTime(row) : approvalTime(row), created: row._creationTime, order: scanOrder++ };
         if (laterLegacyEvent(summary[kind], event)) summary[kind] = event;
-        if (hasUnresolvedLimit(row)) summary.restricted = [...(summary.restricted ?? []), row._id];
         clients[key] = summary;
       }
-      await ctx.db.patch(carried._id, { bootstrapClients: JSON.stringify(clients), bootstrapCursor: page.continueCursor,
+      await ctx.db.patch(carried._id, { bootstrapClients: JSON.stringify(clients), bootstrapCursor: page.continueCursor, bootstrapIndex: scanOrder,
         ...(page.isDone ? { bootstrapPhase: "index" as const, bootstrapIndex: 0 } : {}) });
     } else {
       const keys = Object.keys(clients), start = carried.bootstrapIndex ?? 0;
@@ -1274,18 +1306,23 @@ export const bootstrapOwnerConnections = internalMutation({
         const s = clients[key];
         // Unmarked legacy timestamps never prove that the person released an
         // earlier restriction. Only a durable alias/parent authority does.
-        const chosen = s.refusal ?? s.approval ?? s.pending;
+        let chosen = s.refusal ?? s.approval ?? s.pending;
+        let provenReplacement = false;
+        if (s.refusal && s.approval) {
+          const refusal = await ctx.db.get(s.refusal.id);
+          const approval = await ctx.db.get(s.approval.id);
+          let personApproval = false;
+          try { personApproval = JSON.parse(approval?.consentSnapshot ?? "{}").approvedBy === "settings"; } catch { /* ambiguous is not a release */ }
+          if (personApproval && ((s.approval.order ?? 0) > (s.refusal.order ?? 0) || (refusal?.hiddenAt !== undefined && /replaced|superseded|rotated/i.test(refusal.revokedReason ?? "")))) { chosen = s.approval; provenReplacement = true; }
+        }
         if (!chosen) continue;
         const alias = await ctx.db.query("mcpClientAliases").withIndex("by_owner_client_issuer", q => q.eq("vaultOwnerId", vaultOwnerId).eq("clientId", clientId).eq("issuer", issuer)).unique();
         const aliasRow = alias ? await ctx.db.get(alias.grantId) : null;
-        const row = await authorityForId(ctx, aliasRow?.clientId === clientId ? aliasRow._id : chosen.id);
-        if (!alias) for (const sourceId of s.restricted ?? []) {
-          const source = await authorityForId(ctx, sourceId);
-          if (hasUnresolvedLimit(source) && !entries.some(e => e.sourceGrantId === source._id)) entries.push(carriedEntry(source));
-        }
+        const retiredAlias = (provenReplacement && aliasRow?._id !== chosen.id) || aliasRow?.hiddenAt !== undefined && /replaced|superseded|rotated/i.test(aliasRow.revokedReason ?? "") && chosen.id !== aliasRow._id;
+        const row = await authorityForId(ctx, !retiredAlias && aliasRow?.clientId === clientId ? aliasRow._id : chosen.id);
         if (!alias) await ctx.db.insert("mcpClientAliases", { vaultOwnerId, clientId, issuer, grantId: row._id });
-        else if (aliasRow?.clientId !== clientId) await ctx.db.patch(alias._id, { grantId: row._id });
-        if (hasUnresolvedLimit(row) && !entries.some(e => e.sourceGrantId === row._id)) entries.push(carriedEntry(row));
+        else if (aliasRow?.clientId !== clientId || retiredAlias) await ctx.db.patch(alias._id, { grantId: row._id });
+        if (row.hiddenAt === undefined && hasUnresolvedLimit(row) && !entries.some(e => e.sourceGrantId === row._id)) entries.push(carriedEntry(row));
 
       }
       const done = start + 50 >= keys.length;
@@ -1343,8 +1380,21 @@ async function revisionedLegacyChange<T extends { id: Id<"mcpGrants"> }>(ctx: Mu
       names: carried.names.map(n => n.grantId === before._id ? { ...n, grantId: result.id } : n),
     });
   }
-  const updated = (await ctx.db.get(result.id))!;
-  if (root._id === before._id) await syncCarriedRestrictions(ctx, updated, ["approve", "expiry", "remove"].includes(kind), kind === "remove" ? [] : before.inheritedRestrictions ?? [], kind === "remove");
+  let updated = (await ctx.db.get(result.id))!;
+  const widened = ["approve", "expiry"].includes(kind) && accessWidens(before, updated);
+  if (before.ownAccess) {
+    const own = { ...before.ownAccess, withheldScopes: [...before.ownAccess.withheldScopes] };
+    if (kind === "reduce") own.withheldScopes = [...new Set([...own.withheldScopes, ...effectiveScopes(before).filter(s => !effectiveScopes(updated).includes(s))])];
+    if (kind === "expiry") own.expiresAt = effectiveExpiry(updated);
+    if (kind === "revoke" || kind === "deny") { own.status = kind === "deny" ? "denied" : "revoked"; own.revokedAt = updated.revokedAt; }
+    if (widened) {
+      const patch = kind === "expiry" ? ownAccessPatch(own) : {};
+      await ctx.db.patch(updated._id, { ...patch, inheritedRestrictions: undefined, ownAccess: undefined,
+        ...(patch.withheldScopes ? { scopes: FAMILY_HISTORY_SCOPES.filter(s => !patch.withheldScopes!.includes(s)), scopeChoice: patch.withheldScopes.length ? "chosen" as const : "full" as const } : {}) });
+    } else await ctx.db.patch(updated._id, { ownAccess: own });
+    updated = (await ctx.db.get(result.id))!;
+  }
+  if (root._id === before._id) await syncCarriedRestrictions(ctx, updated, kind === "remove" || widened, kind === "remove" ? [] : before.inheritedRestrictions ?? [], kind === "remove");
   await appendHistory(ctx, updated, before, "person", `You ${kind === "reduce" ? "narrowed" : kind === "revoke" ? "revoked" : "changed"} this connection in Settings.`, args.opId, await hashMcpInput(args));
   return result;
 }

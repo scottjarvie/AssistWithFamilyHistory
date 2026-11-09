@@ -118,7 +118,7 @@ export const FAMILY_HISTORY_SCOPE_INFO: readonly ScopeInfo[] = [
   },
   { scope: "family_history:records:archive", label: "Archive and restore research records", writes: true,
     grants: "Move records into Archive and recover them, preserving their evidence and AI attribution.",
-    limit: "Reversible only. Never permanently deletes or purges records or files; unpublish a story before archiving it." },
+    limit: "Reversible only. Never permanently deletes or purges records or files; public restoration repeats publishing checks; restoreAsPrivate recovers without public exposure." },
 ];
 
 /* ---------------------------------------------------------- the never lists */
@@ -186,7 +186,7 @@ const ALIAS_SUNSET =
 
 export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
   { name: "family_history_archive_record", requiredScope: "family_history:records:archive", writes: true,
-    title: "Archive or restore a record", description: "Move a record into Archive or restore it. This is a reversible soft delete; never purges records, files or evidence. Use context to read updatedAt first. Unpublish a story before archiving it.",
+    title: "Archive or restore a record", description: "Move a record into Archive or restore it. This is a reversible soft delete; never purges records, files or evidence. Use context to read updatedAt first. Restoring a public item repeats publishing checks, including current publish power. Use restoreAsPrivate: true to recover without exposing it.",
     humanSummary: "Archives or restores a research record without permanently deleting it.", implementedBy: "convex/mcpFamilyHistory.archiveRecord" },
   {
     name: "family_history_get_brief",
@@ -321,7 +321,7 @@ export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
     writes: true,
     title: "Save story work",
     description:
-      "Create, edit, publish or unpublish a story. Set status published and publicIndexing noindex for unlisted, or index for public. Remove the person’s own private details first; business contacts are expected. Contact details get one batch count summary; acknowledgeContactDetails: { emails, phones, addresses } covers the whole batch, also accepted on the first call. Secrets cannot be overridden. All changes are attributed to your AI and recorded in history.",
+      "Create or edit a story; move a draft into review before publishing. Publishing and edits to public stories repeat the living-person/readiness and second-review gates. Unpublish with family_history_unpublish_story, which needs only an active grant. Set status published and publicIndexing noindex for unlisted, or index for public. Remove the person’s own private details first; business contacts are expected. Contact details get one batch count summary; acknowledgeContactDetails: { emails, phones, addresses } covers the whole batch, also accepted on the first call. Secrets cannot be overridden. All changes are attributed to your AI and recorded in history.",
     humanSummary: "Writes, publishes or unpublishes a story.",
     implementedBy: "convex/mcpFamilyHistory.saveStoryWork",
     sunsetNote: ALIAS_SUNSET,

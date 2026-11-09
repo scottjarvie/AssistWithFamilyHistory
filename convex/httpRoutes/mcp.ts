@@ -768,7 +768,7 @@ export function createFamilyHistoryServer(
   const writeSafe = { readOnlyHint: false, destructiveHint: false, idempotentHint: true };
 
   registerTool("family_history_archive_record", {
-    inputSchema: z.object({ operationId, kind: z.enum(["person", "relationship", "event", "source", "place", "topic", "story", "research_task", "research_finding"]), id, expectedUpdatedAt: z.number(), action: z.enum(["archive", "restore"]) }).strict(),
+    inputSchema: z.object({ operationId, acknowledgeContactDetails: contactAcknowledgement.optional(), restoreAsPrivate: z.boolean().optional(), kind: z.enum(["person", "relationship", "event", "source", "place", "topic", "story", "research_task", "research_finding"]), id, expectedUpdatedAt: z.number(), action: z.enum(["archive", "restore"]) }).strict(),
     annotations: writeSafe,
   }, (input) => write("family_history_archive_record", mcp.archiveRecord, input));
 

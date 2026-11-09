@@ -834,7 +834,8 @@ export function buildStoryBundle(
 // add a narrowly-scoped field here with a comment explaining why it's safe.
 export function buildPublicStoryBundle(
   snapshot: VaultSnapshot,
-  story: Doc<"stories">
+  story: Doc<"stories">,
+  publicText: typeof redactPublicText = redactPublicText
 ) {
   const person = story.personId
     ? snapshot.people.find((entry) => entry._id === story.personId) ?? null
@@ -863,8 +864,8 @@ export function buildPublicStoryBundle(
     // workflow fields like `publishWarnings`, `lastReviewerNote`, etc.
     story: {
       _id: story._id,
-      title: redactPublicText(story.title),
-      content: redactPublicText(story.content),
+      title: publicText(story.title),
+      content: publicText(story.content),
       status: story.status,
       publicSlug,
       publicIndexing: story.publicIndexing ?? "noindex" as const,
@@ -874,8 +875,8 @@ export function buildPublicStoryBundle(
     person: person
       ? {
           _id: person._id,
-          displayName: redactPublicText(formatPersonName(person)),
-          lifespan: redactPublicText(getPersonLifespan(person)),
+          displayName: publicText(formatPersonName(person)),
+          lifespan: publicText(getPersonLifespan(person)),
         }
       : null,
     // Evidence — source title + citation count only. NOT raw citation text,
@@ -883,7 +884,7 @@ export function buildPublicStoryBundle(
     evidence: sourceRecords.groupedSources.slice(0, 8).map((entry) => ({
       source: {
         _id: entry.source._id,
-        title: redactPublicText(entry.source.title),
+        title: publicText(entry.source.title),
       },
       citations: entry.citations.slice(0, 3).map((citation) => ({
         _id: citation._id,
@@ -900,13 +901,13 @@ export function buildPublicStoryBundle(
         type: event.type,
         date: event.date
           ? {
-              original: redactPublicText(event.date.original),
+              original: publicText(event.date.original),
               year: event.date.year,
             }
           : undefined,
         endDate: event.endDate
           ? {
-              original: redactPublicText(event.endDate.original),
+              original: publicText(event.endDate.original),
               year: event.endDate.year,
             }
           : undefined,
@@ -918,8 +919,8 @@ export function buildPublicStoryBundle(
       .slice(0, 8)
       .map((place) => ({
       _id: place._id,
-      fullName: redactPublicText(place.fullName),
-      name: redactPublicText(place.name),
+      fullName: publicText(place.fullName),
+      name: publicText(place.name),
       type: place.type,
     })),
     // Media — public-gated subset, title only. NOT URLs, descriptions,
@@ -928,7 +929,7 @@ export function buildPublicStoryBundle(
       (operations?.relatedMedia ?? []).filter(isPublicStoryMedia)
     ).slice(0, 6).map((item) => ({
       _id: item._id,
-      title: redactPublicText(item.title),
+      title: publicText(item.title),
     })),
     // Relationships — `relatedName` only, no full `relatedPerson` Doc.
     // The public page only needs the display string.
@@ -940,7 +941,7 @@ export function buildPublicStoryBundle(
         ? {
             _id: relationship._id,
             type: relationship.type,
-            relatedName: redactPublicText(formatPersonName(relatedPerson)),
+            relatedName: publicText(formatPersonName(relatedPerson)),
           }
         : null;
     }).filter((entry): entry is NonNullable<typeof entry> => entry !== null),
@@ -949,10 +950,10 @@ export function buildPublicStoryBundle(
     // sources arrays.
     historicalContext: (contextCoverage?.publishableEntries ?? []).slice(0, 8).map((entry) => ({
       _id: entry._id,
-      title: redactPublicText(entry.title),
-      topic: redactPublicText(entry.topic),
+      title: publicText(entry.title),
+      topic: publicText(entry.topic),
       timePeriod: entry.timePeriod,
-      content: redactPublicText(entry.content),
+      content: publicText(entry.content),
     })),
   };
 }
@@ -1694,7 +1695,7 @@ export const getPublishedStoryByIdentifier = query({
     const normalizedStoryId = ctx.db.normalizeId("stories", identifier);
     const idMatch = normalizedStoryId ? await ctx.db.get(normalizedStoryId) : null;
     const candidate = slugMatch ?? idMatch;
-    if (!candidate || candidate.status !== "published") return null;
+    if (!candidate || candidate.status !== "published" || candidate.archivedAt !== undefined) return null;
 
     const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(candidate.vaultOwnerId));
     const ownedStory = snapshot.stories.find((entry) => entry._id === candidate._id);

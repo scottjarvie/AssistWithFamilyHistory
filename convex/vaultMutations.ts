@@ -1,4 +1,3 @@
-import { assertSafePublication, countContactDetails } from "../lib/stories/sensitiveInfo";
 import { v } from "convex/values";
 import { mutation, type MutationCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
@@ -1604,7 +1603,6 @@ export const updateStoryStatus = mutation({
 
     let publishReadiness: ReturnType<typeof getBackendPublishReadiness> | undefined;
     if (args.status === "published") {
-      assertSafePublication(`${story.title}\n${story.content}`, args.humanReviewConfirmed === true ? countContactDetails(`${story.title}\n${story.content}`) : undefined);
       const snapshot = await loadStoryScopedSnapshot(ctx, vaultOwnerId, args.storyId);
       const currentStory = snapshot?.stories.find((entry) => entry._id === args.storyId);
       if (!snapshot || !currentStory) throw new Error("Story not found");

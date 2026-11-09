@@ -109,3 +109,51 @@ test("Forget on an inherited connection does not release its original source",as
  const {connect,limit,person}=await setup();await limit("revoke");await connect("second");await person("second","remove");
  expect((await connect("third")).state).toBe("revoked");
 });
+test("Restore releases inherited limits but preserves a floor connection's own powers and pause",async()=>{
+ const {t,connect,limit,person,read}=await setup();
+ await limit("limit",{removeScopes:["family_history:research:write"]});await connect("second");
+ await limit("limit",{removeScopes:["family_history:story:draft"]},"second");await limit("pause",{},"second");
+ await person("second","restore");
+ expect(await read("second")).toMatchObject({state:"paused",powers:FAMILY_HISTORY_SCOPES.filter(s=>s!=="family_history:story:draft")});
+ expect((await read()).powers).not.toContain("family_history:research:write");
+ await connect("third");expect(await read("third")).toMatchObject({state:"paused",powers:FAMILY_HISTORY_SCOPES.filter(s=>s!=="family_history:story:draft")});
+ const second=(await t.run(ctx=>ctx.db.query("mcpGrants").collect())).find(row=>row.clientId==="second")!;
+ expect(second.inheritedRestrictions).toBeUndefined();
+});
+test("each floor-started connection counts even after its source is Forgotten",async()=>{
+ const {t,connect,limit,person}=await setup();await limit("revoke");await connect("second");
+ const second=(await t.run(ctx=>ctx.db.query("mcpGrants").collect())).find(row=>row.clientId==="second")!;
+ const carry=(await t.run(ctx=>ctx.db.query("mcpCarriedRestrictions").collect()))[0];
+ expect(carry.entries).toContainEqual(expect.objectContaining({sourceGrantId:second._id,sourceRevision:second.revision,revoked:true}));
+ await person(identity.clientId,"remove");expect((await connect("third")).state).toBe("revoked");
+});
+test("shortening and no-op expiry saves retain inherited provenance; Restore preserves the own end date",async()=>{
+ const clock=vi.spyOn(Date,"now").mockReturnValue(2000000);
+ try {
+ const {t,connect,limit,person,read}=await setup();const sourceEnd=Date.now()+10*86400000;
+ await limit("limit",{endsAt:sourceEnd});await connect("second");
+ const saveExpiry=async(days:number)=>{
+  const list=await t.withIdentity({subject:identity.subject}).action(api.mcpGrants.listConnections,{vaultOwnerId:identity.subject});const row=list.connections.find(r=>r.clientId==="second")!;
+  await t.withIdentity({subject:identity.subject}).mutation(api.mcpGrants.controlGrant,{vaultOwnerId:identity.subject,grantId:row.id,action:"expiry",expiresInDays:days,revision:row.revision??0,carriedRevision:row.carriedRevision,opId:crypto.randomUUID()});
+ };
+ await saveExpiry(10);await saveExpiry(1);
+ const rows=await t.run(ctx=>ctx.db.query("mcpGrants").collect());const second=rows.find(r=>r.clientId==="second")!;const source=rows.find(r=>r.clientId===identity.clientId)!;
+ expect(second.inheritedRestrictions).toContainEqual({sourceGrantId:source._id,sourceRevision:source.revision});
+ const carry=(await t.run(ctx=>ctx.db.query("mcpCarriedRestrictions").collect()))[0];expect(carry.entries.some(e=>e.sourceGrantId===source._id)).toBe(true);
+ await person("second","restore");expect((await read("second")).endsAt).toBe(2000000+86400000);
+ } finally {clock.mockRestore();}
+});
+test("bootstrap excludes replaced connection history, with and without a legacy authority pointer",async()=>{
+ for (const pointer of [true,false]) {
+  const t=convexTest(schema,modules);
+  await t.run(async ctx=>{
+   const fields={vaultOwnerId:identity.subject,issuer:identity.issuer,clientId:"rotated",label:"Rotated",clientProvenance:"manual" as const,scopes:[...FAMILY_HISTORY_SCOPES],scopeChoice:"full" as const,expiryChoice:"none" as const,boundary:{kind:"whole_workspace" as const},requestedAt:1,updatedAt:1,useCount:0};
+   const retired=await ctx.db.insert("mcpGrants",{...fields,status:"revoked",revokedReason:"Replaced by a newer grant",hiddenAt:1});
+   const current=await ctx.db.insert("mcpGrants",{...fields,status:"active",consentSnapshot:JSON.stringify({approvedBy:"settings"})});
+   if(pointer)await ctx.db.patch(retired,{authorityGrantId:current});
+  });
+  await prepareLegacyOwner(t,identity.subject);
+  expect((await t.mutation(internal.mcpGrants.resolveForRequest,{...identity,clientId:"new-after-rotation"})).state).toBe("active");
+  const carry=(await t.run(ctx=>ctx.db.query("mcpCarriedRestrictions").collect()))[0];expect(carry.entries).toEqual([]);
+ }
+});
