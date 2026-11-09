@@ -201,17 +201,20 @@ assert.ok(transport.includes("FAMILY_HISTORY_CONTROL_TOOLS"));
 assert.ok(transport.includes("describeCallingConnection"));
 assert.ok(transport.includes("limitCallingConnection"));
 
-// The connection label must come from the client's own clientInfo, not from the
-// Mcp-Name header — that header carries the tool being called, so reading it
-// labelled a person's connection with something like "save_person".
-assert.ok(
-  transport.includes("io.modelcontextprotocol/clientInfo"),
-  "observedClientName must read the client's declared clientInfo",
-);
-assert.ok(
-  !/observedClientName[\s\S]{0,400}headers\.get\("mcp-name"\)/.test(transport),
-  "observedClientName must not read the Mcp-Name header; that header names the tool",
-);
+// Only initialize contributes clientInfo; neither per-request metadata nor a
+// User-Agent is a connection identity. The backend prefers its registration.
+assert.ok(transport.includes('message?.method !== "initialize"'));
+assert.ok(transport.includes("message.params?.clientInfo?.name"));
+assert.ok(!transport.includes('headers.get("user-agent")'));
+const grantSource = readFileSync("convex/mcpGrants.ts", "utf8");
+assert.ok(grantSource.includes("registeredName ?? trimmed(args.observedClientName"));
+const connectSource = grantSource.slice(grantSource.indexOf("export const resolveForRequest"), grantSource.indexOf("export const touchGrantUse"));
+const aliasSource = grantSource.slice(grantSource.indexOf("async function resolveClientAlias"), grantSource.indexOf("const callingIdentityArgs"));
+assert.ok(connectSource.includes("prepareCarriedRestrictions"));
+assert.ok(!connectSource.includes('query("mcpGrants")'));
+assert.ok(!aliasSource.includes('query("mcpGrants")'));
+assert.ok(!grantSource.includes("MAX_CLIENT_GRANTS"));
+assert.ok(grantSource.includes("sourceRevision: row.revision ?? 0"));
 
 /* ------------------------------------------------- published guidance parity */
 

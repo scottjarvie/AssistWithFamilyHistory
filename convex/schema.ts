@@ -1946,6 +1946,17 @@ export default defineSchema({
    * The owner is always server-derived from the verified OAuth subject. A
    * client never supplies an owner, a vault, or a grant selector.
    */
+  mcpCarriedRestrictions: defineTable({
+    vaultOwnerId: v.string(), ready: v.boolean(), revision: v.number(),
+    entries: v.array(v.object({
+      issuer: v.string(), sourceGrantId: v.id("mcpGrants"), sourceRevision: v.number(), lineageGrantId: v.id("mcpGrants"),
+      withheld: v.array(v.string()), pausedAt: v.optional(v.number()), revoked: v.boolean(), pending: v.boolean(), endsAt: v.optional(v.number()),
+      boundary: v.object({ kind: v.union(v.literal("whole_workspace"), v.literal("selected_people"), v.literal("queue_only")), personIds: v.optional(v.array(v.string())), queueItemIds: v.optional(v.array(v.string())) }),
+    })),
+    names: v.array(v.object({ issuer: v.string(), name: v.string(), grantId: v.id("mcpGrants") })),
+    bootstrapPhase: v.optional(v.union(v.literal("scan"), v.literal("index"))),
+    bootstrapCursor: v.optional(v.union(v.string(), v.null())), bootstrapClients: v.optional(v.string()), bootstrapIndex: v.optional(v.number()),
+  }).index("by_owner", ["vaultOwnerId"]),
   mcpGrantHistory: defineTable({
     vaultOwnerId: v.string(), grantId: v.id("mcpGrants"),
     actor: v.union(v.literal("person"), v.literal("ai"), v.literal("system")),
@@ -1971,6 +1982,8 @@ export default defineSchema({
     scopes: v.array(v.string()),
     scopeChoice: v.optional(v.union(v.literal("full"), v.literal("chosen"))),
     withheldScopes: v.optional(v.array(v.string())),
+    authorityGrantId: v.optional(v.id("mcpGrants")),
+    linkedByName: v.optional(v.boolean()),
     revision: v.optional(v.number()), pausedAt: v.optional(v.number()),
     limitedBy: v.optional(v.union(v.literal("person"), v.literal("ai"))),
     limitedAt: v.optional(v.number()),

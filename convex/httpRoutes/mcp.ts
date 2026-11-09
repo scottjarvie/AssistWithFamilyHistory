@@ -653,8 +653,8 @@ export function createFamilyHistoryServer(
   const grantId = grant?.grantId;
 
   const identity = { subject: principal.subject, issuer: principal.issuer, clientId: principal.clientId };
-  const connection = { state: resolution.state, changedAt: "at" in resolution ? resolution.at : null, endsAt: grant?.expiresAt };
-  const instructions = `${AI_ACCESS_INSTRUCTIONS} Actual connection: ${connection.state}${connection.changedAt ? `; changed ${new Date(connection.changedAt).toISOString()}` : ""}; end date ${connection.endsAt ? new Date(connection.endsAt).toISOString() : "none"}. Call family_history_connection for current details. Start research with family_history_get_brief, search, then hydrate stable IDs before editing.`;
+  const connection = { state: resolution.state, reason: "reason" in resolution ? resolution.reason : resolution.state, changedAt: "at" in resolution ? resolution.at : null, endsAt: grant?.expiresAt };
+  const instructions = `${AI_ACCESS_INSTRUCTIONS} Actual connection: ${connection.state}; reason: ${connection.reason}${connection.changedAt ? `; changed ${new Date(connection.changedAt).toISOString()}` : ""}; end date ${connection.endsAt ? new Date(connection.endsAt).toISOString() : "none"}. Call family_history_connection for current details. Start research with family_history_get_brief, search, then hydrate stable IDs before editing.`;
 
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, {
     instructions,
@@ -1202,7 +1202,7 @@ async function handleMcp(actionCtx: ActionCtx, request: Request) {
     issuer: principalIssuer,
     subject,
     clientId: auth.clientId,
-    observedClientName: observedClientName(parsedBody, request),
+    observedClientName: observedClientName(parsedBody),
   });
 
   const refusal = grantRefusalResponse(parsedBody, resolution);
@@ -1240,30 +1240,14 @@ async function handleMcp(actionCtx: ActionCtx, request: Request) {
   return await handler.fetch(request, { authInfo: auth });
 }
 
-/**
- * What the client called itself. It is stored as a LABEL for the person to
- * recognise, never as authority: the only identity that decides anything is the
- * verified client_id.
- *
- * It is read from the request body's `clientInfo`, which protocol revision
- * 2026-07-28 repeats on every message precisely so a stateless server can see it
- * without a session. The `Mcp-Name` header is NOT the client's name — that
- * header carries the tool being called — so reading it here labelled a person's
- * connection with something like "save_person". The user-agent is the last
- * resort, and an empty name is better than a wrong one.
- */
-function observedClientName(body: unknown, request: Request): string | undefined {
-  const params = (body as { params?: Record<string, unknown> } | null)?.params;
-  const meta = params?._meta as Record<string, unknown> | undefined;
-  const fromMeta = (meta?.["io.modelcontextprotocol/clientInfo"] as { name?: unknown } | undefined)?.name;
-  const fromInitialize = (params?.clientInfo as { name?: unknown } | undefined)?.name;
-  const raw =
-    (typeof fromMeta === "string" ? fromMeta : undefined) ??
-    (typeof fromInitialize === "string" ? fromInitialize : undefined) ??
-    request.headers.get("user-agent") ??
-    undefined;
-  const trimmed = raw?.trim();
-  return trimmed ? trimmed.slice(0, 120) : undefined;
+/** Only initialize may supply a reported name. Per-request metadata, tool
+ * arguments and User-Agent are not a connection identity. The grant resolver
+ * prefers a validated server-side OAuth registration name when available. */
+function observedClientName(body: unknown): string | undefined {
+  const message = body as { method?: unknown; params?: { clientInfo?: { name?: unknown } } } | null;
+  if (message?.method !== "initialize") return undefined;
+  const name = message.params?.clientInfo?.name;
+  return typeof name === "string" ? name.trim().slice(0, 120) || undefined : undefined;
 }
 
 export function registerMcpRoutes(http: HttpRouter) {

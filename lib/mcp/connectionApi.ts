@@ -34,6 +34,9 @@ export type ConnectionRow = {
   clientMetadataUrl: string | null;
   scopes: FamilyHistoryScope[];
   scopeChoice?: "full" | "chosen";
+  carriedRevision?: number;
+  linkedByName?: boolean;
+  inheritedLimits?: boolean;
   withheldScopes?: string[]; revision?: number; pausedAt?: number | null;
   limitedBy?: "person" | "ai" | null; limitedAt?: number | null;
   history?: { actor: "person" | "ai" | "system"; at: number; sentence: string; revision: number }[];
@@ -57,6 +60,8 @@ export type ConnectionListing = {
   neverExposed: readonly string[];
   neverPermitted: readonly string[];
   connections: ConnectionRow[];
+  supersededConnections?: ConnectionRow[];
+  preparing?: boolean;
 };
 
 /** One safe activity line. `tool` is a tool name; never record content. */
@@ -124,6 +129,6 @@ export const updateGrantExpiryRef = makeFunctionReference<
 >("mcpGrants:updateGrantExpiry");
 
 export const controlGrantRef = makeFunctionReference<"mutation", {
-  vaultOwnerId: string; grantId: string; action: string; revision: number; opId: string;
+  vaultOwnerId: string; grantId: string; action: string; revision: number; carriedRevision?: number; opId: string;
   scopes?: string[]; expiresInDays?: number; label?: string; reason?: string; boundary?: ConnectionBoundary;
 }, { id: string; connection: ConnectionRow; removed?: boolean }>("mcpGrants:controlGrant");

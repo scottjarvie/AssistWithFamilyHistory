@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- Test-only adapters preserve convex-test overloaded contexts and function references. */
+import { internal } from "../../convex/_generated/api";
 /**
  * Test-only helpers for the Family History MCP grant model.
  *
@@ -51,28 +53,46 @@ export async function seedGrant(t: RunnableTest, options: SeedGrantOptions): Pro
       updatedAt: now,
     }),
   );
+  await prepareLegacyOwner(t, options.vaultOwnerId, true);
   return String(id);
 }
 
 /** Legacy lifecycle fixtures now send a fresh revision and operation id exactly
  * as Settings does. New concurrency/replay tests call convexTest directly. */
 export function withGrantVersions<T extends object>(test: T): T {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Preserve convex-test's generic overloaded API through a test-only proxy.
   const root = test as any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Test adapter for overloaded function references.
   const wrap = (target: any): any => new Proxy(target, { get(object, key) {
     if (key === "withIdentity") return (...args: unknown[]) => wrap(object.withIdentity(...args));
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Convex resolves and validates the real reference and args.
     if (key === "mutation") return async (reference: any, args: any) => {
       const { getFunctionName } = await import("convex/server");
+      if (getFunctionName(reference) === "mcpGrants:resolveForRequest") await prepareLegacyOwner(root, args.subject, true);
       if (getFunctionName(reference).startsWith("mcpGrants:") && args?.grantId && args.opId === undefined) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- The root's db context is supplied by convex-test.
+        await prepareLegacyOwner(root, args.vaultOwnerId);
         const row = await root.run((ctx: any) => ctx.db.get(args.grantId));
-        args = { ...args, revision: row?.revision ?? 0, opId: crypto.randomUUID() };
+        const carry = await root.run((ctx: any) => ctx.db.query("mcpCarriedRestrictions").withIndex("by_owner", (q: any) => q.eq("vaultOwnerId", args.vaultOwnerId)).unique());
+        args = { ...args, revision: row?.revision ?? 0, carriedRevision: carry?.revision ?? 0, opId: crypto.randomUUID() };
       }
       return object.mutation(reference, args);
     };
     return object[key];
   } });
   return wrap(test);
+}
+
+/** Simulate the one-time background conversion for fixtures that deliberately
+ * insert legacy rows directly. This adapter is never imported by product code. */
+export async function prepareLegacyOwner(test: object, owner: string, reset = false) {
+  const t = test as any;
+  if (reset) await t.run(async (ctx: any) => {
+    for (const table of ["mcpCarriedRestrictions", "mcpClientAliases"]) {
+      const rows = await ctx.db.query(table).withIndex("by_owner", (q: any) => q.eq("vaultOwnerId", owner)).collect();
+      for (const row of rows) await ctx.db.delete(row._id);
+    }
+  });
+  await t.mutation(internal.mcpGrants.prepareOwnerConnections, { vaultOwnerId: owner });
+  for (;;) {
+    const state = await t.run((ctx: any) => ctx.db.query("mcpCarriedRestrictions").withIndex("by_owner", (q: any) => q.eq("vaultOwnerId", owner)).unique());
+    if (state.ready) break;
+    await t.mutation(internal.mcpGrants.bootstrapOwnerConnections, { vaultOwnerId: owner });
+  }
 }

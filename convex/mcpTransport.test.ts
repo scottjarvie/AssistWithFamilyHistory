@@ -693,3 +693,41 @@ describe("AWL-0015 controls through the authenticated wire", () => {
     expect(selfRestore?.isError).toBe(true);
   });
 });
+
+describe("Decision 4: reported identity is initialize-only", () => {
+  test("no name, a Claude User-Agent and per-request clientInfo cannot evade a revoked predecessor", async () => {
+    const t = convexTest(schema, modules);
+    await seedGrant(t, { vaultOwnerId: SUBJECT, issuer: ISSUER, clientId: "revoked-claude", observedClientName: "Claude", status: "revoked", expiresAt: null });
+    const token = await accessToken("anonymous-registration");
+    const request = modernRequest("tools/call", token, { name: "family_history_save_person", arguments: { operationId: "must-not-save" } }, "family_history_save_person");
+    request.headers = { ...request.headers, "user-agent": "Claude-User/1.0" };
+    const response = await t.fetch("/mcp", request);
+    const body = await response.json();
+    expect(body.result.structuredContent.error.code).toBe("GRANT_REVOKED");
+    const grants = await t.run(ctx => ctx.db.query("mcpGrants").collect());
+    expect(grants).toHaveLength(1);
+    expect(grants[0].observedClientName).toBe("Claude");
+  });
+
+  test("tool arguments and per-request names never merge otherwise unrestricted installations", async () => {
+    const t = convexTest(schema, modules);
+    await seedGrant(t, { vaultOwnerId: SUBJECT, issuer: ISSUER, clientId: "named-full-client", observedClientName: "family-history-synthetic-client", expiresAt: null });
+    const token = await accessToken("new-full-client");
+    const request = modernRequest("tools/call", token, { name: "family_history_connection", arguments: {} }, "family_history_connection");
+    request.headers = { ...request.headers, "user-agent": "family-history-synthetic-client" };
+    const response = await t.fetch("/mcp", request);
+    expect((await response.json()).result.structuredContent.powers).toEqual([...FAMILY_HISTORY_SCOPES]);
+    const separate = await t.run(ctx => ctx.db.query("mcpClientAliases").collect());
+    expect(new Set(separate.map(row => row.grantId)).size).toBe(2);
+    const unnamed = (await t.run(ctx => ctx.db.query("mcpGrants").collect())).find(row => row.clientId === "new-full-client")!;
+    expect(unnamed.observedClientName).toBeUndefined();
+    // A later actual initialize may contribute the name, even with an existing row.
+    const initialize = modernRequest("initialize", token, { protocolVersion: PROTOCOL_VERSION, capabilities: {}, clientInfo: { name: "family-history-synthetic-client", version: "1.0" } });
+    await t.fetch("/mcp", initialize);
+    const aliases = await t.run(ctx => ctx.db.query("mcpClientAliases").collect());
+    expect(aliases.map(row => row.clientId).sort()).toEqual(["named-full-client", "new-full-client"]);
+    const named = await t.withIdentity({ subject: SUBJECT }).action(api.mcpGrants.listConnections, { vaultOwnerId: SUBJECT });
+    expect(named.connections).toHaveLength(1);
+    expect(named.connections[0].linkedByName).toBe(true);
+  });
+});

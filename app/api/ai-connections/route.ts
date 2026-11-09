@@ -15,7 +15,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { controlGrantRef } from "@/lib/mcp/connectionApi";
+import { controlGrantRef, listConnectionsRef } from "@/lib/mcp/connectionApi";
 import { FAMILY_HISTORY_SCOPES } from "@/lib/mcp/catalog";
 import { getAuthedConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
 import { getVaultAccessContext } from "@/lib/vault/server";
@@ -57,7 +57,7 @@ const ActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.enum(["pause", "resume", "restore"]), grantId: z.string().min(1) }),
 ]);
 
-const RequestSchema = z.intersection(ActionSchema, z.object({ revision: z.number().int().nonnegative(), opId: z.string().min(1).max(160) }));
+const RequestSchema = z.intersection(ActionSchema, z.object({ revision: z.number().int().nonnegative(), carriedRevision: z.number().int().nonnegative(), opId: z.string().min(1).max(160) }));
 
 /**
  * Convex throws a plain Error for a refused lifecycle change ("Connection not
@@ -100,7 +100,8 @@ export async function POST(request: NextRequest) {
     const client = await getAuthedConvexClient();
     const { grantId, ...change } = body;
     const result = await client.mutation(controlGrantRef, { vaultOwnerId, grantId, ...change });
-    return NextResponse.json({ success: true, ...result });
+    const listing = await client.action(listConnectionsRef, { vaultOwnerId });
+    return NextResponse.json({ success: true, ...result, connections: listing.connections, supersededConnections: listing.supersededConnections });
   } catch (error) {
     return NextResponse.json({ error: personFacingMessage(error) }, { status: 400 });
   }

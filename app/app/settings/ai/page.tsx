@@ -55,12 +55,16 @@ export default async function AiConnectionsPage() {
   let operator=false;
   let connections: ConnectionRow[] = [];
   let activity: ConnectionActivityRow[] = [];
+  let supersededConnections: ConnectionRow[] = [];
+  let preparing = false;
   try {
     const { vaultOwnerId,userId } = await getVaultAccessContext();
     ownerKey=vaultOwnerId;operator=isAdminUser(userId);
     const client = await getAuthedConvexClient();
     const listing = await client.action(listConnectionsRef, { vaultOwnerId });
     connections = listing.connections;
+    supersededConnections = listing.supersededConnections ?? [];
+    preparing = listing.preparing ?? false;
     activity = await client.action(recentConnectionActivityRef, { vaultOwnerId, limit: 25 });
   } catch (error) {
     const issue = getConvexRuntimeIssue(error);
@@ -71,5 +75,5 @@ export default async function AiConnectionsPage() {
     );
   }
 
-  return <AiConnectionsView connections={connections} activity={activity} ownerKey={ownerKey} operator={operator}/>;
+  return <AiConnectionsView connections={connections} activity={activity} supersededConnections={supersededConnections} preparing={preparing} ownerKey={ownerKey} operator={operator}/>;
 }
