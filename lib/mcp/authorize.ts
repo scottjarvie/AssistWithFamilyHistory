@@ -393,6 +393,8 @@ export function decideToolAccess(params: {
   // Unknown tool names receive a generic refusal; known public tools name the
   // missing power so the person can understand and restore the right limit.
   if (!tool) return refusal("SCOPE_NOT_GRANTED");
+  // Only the fixed-shape exposure-reduction operation has this exemption.
+  if (tool.activeGrantOnly) return { allowed: true, tool };
   if (!effectiveScopes(grant).includes(tool.requiredScope)) return {
     ...refusal("SCOPE_NOT_GRANTED"), message: `Missing power: ${tool.requiredScope}. Only the person can restore it.`,
     recovery: `Only the person can restore this power at ${CONNECTION_SETTINGS_URL}.`,

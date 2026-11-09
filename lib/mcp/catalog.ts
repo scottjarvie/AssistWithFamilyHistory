@@ -97,7 +97,7 @@ export const FAMILY_HISTORY_SCOPE_INFO: readonly ScopeInfo[] = [
     grants:
       "Create, correct, publish or unpublish stories, including unlisted links.",
     writes: true,
-    limit: "Draft, edit, publish or unpublish stories. Scrub sensitive information before publishing; secrets are refused and contact details get one count summary and one batch acknowledgement, accepted on the first call. Remove only the person’s own private details; business contacts are expected.",
+    limit: "Draft, edit, publish or unpublish stories. Scrub sensitive information before publishing; secrets are refused and contact details get one count summary and one batch acknowledgement, accepted on the first call. Remove only the person’s own private details; business contacts are expected. Unpublishing needs only an active connection.",
   },
   {
     scope: "family_history:queue:read",
@@ -165,6 +165,8 @@ export type CatalogTool = {
    */
   alias?: string;
   requiredScope: FamilyHistoryScope;
+  /** Exposure reduction only: active grant and ownership suffice. */
+  activeGrantOnly?: boolean;
   /** Extra scopes required only when the call carries certain input. */
   conditionalScopes?: readonly ConditionalScope[];
   writes: boolean;
@@ -325,6 +327,16 @@ export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
     sunsetNote: ALIAS_SUNSET,
   },
   {
+    name: "family_history_unpublish_story",
+    requiredScope: "family_history:story:draft",
+    activeGrantOnly: true,
+    writes: true,
+    title: "Unpublish a story",
+    description: "Unpublish one of this person's stories by setting it to a private draft. Requires only an active connection, not the story or publish power. Pass the storyId and current expectedUpdatedAt. Cannot edit content or publish anything.",
+    humanSummary: "Takes a story out of public view without changing its content.",
+    implementedBy: "convex/mcpFamilyHistory.unpublishStory",
+  },
+  {
     name: "family_history_save_records",
     requiredScope: "family_history:research:write",
     conditionalScopes: [
@@ -366,7 +378,7 @@ export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
     writes: true,
     title: "Save one complete Family History result",
     description:
-      "ATOMIC ALTERNATIVE. Save one finished research pass all-or-nothing: optional person correction, relationships, events, source evidence, task/finding state, and story work including publication or unpublication. Remove the person’s own private details before publishing; business contacts are expected. Secrets refuse. One top-level acknowledgeContactDetails count object covers the whole batch and is accepted on the first call. Any single failure discards the whole call. Use family_history_save_records instead when you would rather keep the rows that succeeded and see exactly which ones did not.",
+      "ATOMIC ALTERNATIVE. Save one finished research pass all-or-nothing: optional person correction, relationships, events, source evidence, task/finding state, and story work including publication or unpublication. Remove the person’s own private details before publishing; business contacts are expected. Secrets refuse. One top-level acknowledgeContactDetails exact count object covers the whole batch and is accepted on the first call. Any single failure discards the whole call. Use family_history_save_records instead when you would rather keep the rows that succeeded and see exactly which ones did not.",
     humanSummary: "Saves one finished research pass, all of it or none of it.",
     implementedBy: "convex/mcpFamilyHistory.saveCompleteResult",
     sunsetNote: ALIAS_SUNSET,
@@ -417,7 +429,7 @@ export function findTool(name: string): CatalogTool | undefined {
   return BY_NAME.get(name);
 }
 
-/** The scope a name needs, or null when the name is not in the catalog at all. */
+/** Power grouping for a known tool. activeGrantOnly tools do not require it. */
 export function scopeForTool(name: string): FamilyHistoryScope | null {
   return BY_NAME.get(name)?.requiredScope ?? null;
 }
@@ -446,9 +458,10 @@ export function assertFamilyHistoryCatalogContract(): void {
     if (!tool.name.startsWith("family_history_")) {
       throw new Error(`Canonical tool must be Family History namespaced: ${tool.name}`);
     }
-    if (forbidden.test(tool.name)) {
+    if (tool.name !== "family_history_unpublish_story" && forbidden.test(tool.name)) {
       throw new Error(`Tool name implies an action outside the scope ceiling: ${tool.name}`);
     }
+    if (tool.activeGrantOnly && tool.name !== "family_history_unpublish_story") throw new Error("Only unpublishing may bypass removed powers");
     if (!isFamilyHistoryScope(tool.requiredScope)) {
       throw new Error(`Tool ${tool.name} requires a scope outside the ceiling`);
     }

@@ -1011,6 +1011,11 @@ export function createFamilyHistoryServer(
     annotations: writeSafe,
   }, (input: any) => write("family_history_save_story_work", mcp.saveStoryWork, input));
 
+  registerTool("family_history_unpublish_story", {
+    inputSchema: z.object({ operationId, storyId: id, expectedUpdatedAt: z.number() }).strict(),
+    annotations: writeSafe,
+  }, (input: any) => write("family_history_unpublish_story", mcp.unpublishStory, input));
+
   registerTool("family_history_save_records", {
     inputSchema: z.object({
       operationId,

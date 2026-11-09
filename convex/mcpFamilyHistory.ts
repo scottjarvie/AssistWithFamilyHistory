@@ -1507,6 +1507,22 @@ export const saveStoryWork = internalMutation({
   handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_story_work" }, async (owner, provenance) => ({ result: { story: await saveStoryRecord(ctx, owner, args.input, provenance) }, detail: "Saved story work and publication choices through MCP." })),
 });
 
+/** Fixed-shape reduction of exposure. Grant activity and ownership are checked
+ * in this same mutation; no caller-supplied content or target status is accepted. */
+export const unpublishStory = internalMutation({
+  args: { principal: principalValidator, grantId: v.optional(v.string()), operationId: v.string(), requestHash: v.string(), input: v.object({ storyId: v.id("stories"), expectedUpdatedAt: v.number() }) },
+  handler: (ctx, args) => operation(ctx, { ...args, toolName: "family_history_unpublish_story" }, async owner => {
+    const row = await owned(ctx, "stories", args.input.storyId, owner, "Story");
+    assertFresh(row, args.input.expectedUpdatedAt, "Story");
+    const now = Date.now();
+    await ctx.db.patch(row._id, { status: "draft", updatedAt: now });
+    await ctx.db.insert("storyReviewEvents", { vaultOwnerId: owner, storyId: row._id, personId: row.personId,
+      eventType: "status_change", fromStatus: row.status, toStatus: "draft", actorRole: "story_writer",
+      actorName: `Your AI via MCP (${args.principal.clientId})`, createdAt: now, updatedAt: now });
+    return { result: { story: { id: row._id, status: "draft", updatedAt: now } }, detail: "Unpublished story through MCP." };
+  }),
+});
+
 export const saveCompleteResult = internalMutation({
   args: { principal: principalValidator, grantId: v.optional(v.string()), operationId: v.string(), requestHash: v.string(), input: v.any() },
   handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_complete_result" }, async (owner, provenance) => {

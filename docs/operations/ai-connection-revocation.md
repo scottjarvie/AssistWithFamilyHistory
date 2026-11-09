@@ -36,7 +36,7 @@ or file-backed body inputs refuse rather than bypass scanning. Secrets always re
 a category and location, never matched values, including JSON-quoted credentials.
 Contact matches use horizontal separators and never span lines or merge adjacent values. Contact details return one aggregate
 summary with counts. A single top-level `acknowledgeContactDetails: { emails, phones,
-addresses }` covering at least those counts allows the whole batch and is accepted
+addresses }` equal to those exact counts allows the whole batch and is accepted
 on the first call. Business contacts are expected; tools and /ai tell the AI to
 remove only the person's own private details. Publication and unpublication retain
 verified AI attribution and story history; the person can also unpublish. Inviting
@@ -47,3 +47,8 @@ owner count requested by the campaign: a restricted, unreleased predecessor and 
 later unaliased different client ID from the same issuer. Audit scans are uncapped
 and read-only; authorization never scans history. Production release remains Vercel's
 coordinated Convex deployment followed by the frontend. Never deploy Convex manually.
+
+`family_history_unpublish_story` accepts only a story id and expected version. It
+requires an active, unpaused, unexpired grant and ownership; all publish powers may
+be removed. It cannot edit content or increase visibility. Contact acknowledgement
+counts must equal every category found, including zero; blanket high counts refuse.

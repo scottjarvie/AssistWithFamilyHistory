@@ -24,7 +24,7 @@ export function assertSafePublication(text: unknown, acknowledgement?: ContactCo
   }
  }
  const counts=countContactDetails(text);
- if (Object.entries(counts).some(([key,n]) => n > 0 && (!acknowledgement || !Number.isSafeInteger(acknowledgement[key as keyof ContactCounts]) || acknowledgement[key as keyof ContactCounts] < n))) {
+ if (Object.entries(counts).some(([key,n]) => (acknowledgement !== undefined || n > 0) && (!acknowledgement || !Number.isSafeInteger(acknowledgement[key as keyof ContactCounts]) || acknowledgement[key as keyof ContactCounts] !== n))) {
   throw new Error(`PUBLICATION_CONTACT_DETAILS: This contains ${counts.emails} email addresses, ${counts.phones} phone numbers and ${counts.addresses} street addresses. Publish anyway? Send acknowledgeContactDetails: ${JSON.stringify(counts)} once for the whole batch (also accepted on the first call). Remove only the person's own private details; business contacts are expected.`);
  }
  return counts;

@@ -3,6 +3,8 @@ import { expect, test } from "vitest";
 import { convexTest } from "convex-test";
 import schema from "./schema";
 import { api, internal } from "./_generated/api";
+import { FAMILY_HISTORY_SCOPES } from "../lib/mcp/catalog";
+import { permittedTools } from "../lib/mcp/authorize";
 import { seedGrant } from "../lib/mcp/testSupport";
 import { assertSafePublication } from "../lib/stories/sensitiveInfo";
 const modules=import.meta.glob("./**/*.ts");
@@ -67,4 +69,37 @@ test.each(['single','batch','complete'] as const)("%s publishing rechecks the cu
  const fn=kind==='single'?internal.mcpFamilyHistory.saveStoryWork:kind==='batch'?internal.mcpFamilyHistory.saveRecords:internal.mcpFamilyHistory.saveCompleteResult;
  await expect(t.mutation(fn,{principal,grantId,operationId:`publish-${kind}`,requestHash:`publish-${kind}`,input:kind==='single'?story:{summary:"Publish batch",stories:[story]}})).rejects.toThrow('SCOPE_NOT_GRANTED');
  expect(await t.run(ctx=>ctx.db.query("stories").collect())).toHaveLength(0);
+});
+test("blanket and extra-category acknowledgements cannot skip the exact summary",()=>{
+ const text='shop@example.test';
+ for (const counts of [{emails:999,phones:999,addresses:999},{emails:2,phones:0,addresses:0},{emails:1,phones:1,addresses:0}]) expect(()=>assertSafePublication(text,counts)).toThrow('1 email addresses, 0 phone numbers and 0 street addresses');
+ expect(()=>assertSafePublication('No contacts',{emails:999,phones:999,addresses:999})).toThrow('0 email addresses, 0 phone numbers and 0 street addresses');
+ expect(assertSafePublication(text,{emails:1,phones:0,addresses:0})).toEqual({emails:1,phones:0,addresses:0});
+});
+test("an active grant with all powers removed can only unpublish, with ownership and history",async()=>{
+ const {t,grantId,personId}=await setup();
+ const saved=await t.mutation(internal.mcpFamilyHistory.saveStoryWork,{principal,grantId,operationId:"before-limit",requestHash:"before-limit",input:{mode:"create",createKey:"unpublish-only",personId,type:"biography",title:"Public ancestor",content:"Public text",status:"published"}});
+ const story=await t.run(ctx=>ctx.db.get(saved.story.id));
+ const before=await t.query(internal.mcpGrants.describeCallingConnection,{subject:owner,issuer:principal.issuer,clientId:principal.clientId});
+ await t.mutation(internal.mcpGrants.limitCallingConnection,{subject:owner,issuer:principal.issuer,clientId:principal.clientId,action:"limit",removeScopes:[...FAMILY_HISTORY_SCOPES],revision:before.revision,opId:"remove-every-power"});
+ const resolved=await t.mutation(internal.mcpGrants.resolveForRequest,{subject:owner,issuer:principal.issuer,clientId:principal.clientId});
+ expect(permittedTools(resolved,Date.now()).map(tool=>tool.name)).toEqual(["family_history_unpublish_story"]);
+ const args={principal,grantId,operationId:"active-only-unpublish",requestHash:"active-only-unpublish",input:{storyId:story!._id,expectedUpdatedAt:story!.updatedAt}};
+ await expect(t.mutation(internal.mcpFamilyHistory.unpublishStory,{...args,input:{...args.input,content:"Injected edit"}} as never)).rejects.toThrow(/Validator|Extra field/);
+ await t.mutation(internal.mcpFamilyHistory.unpublishStory,args);
+ const after=await t.run(ctx=>ctx.db.get(story!._id));expect(after).toMatchObject({status:"draft",content:story!.content});
+ expect(await t.query(api.vault.getPublishedStoryByIdentifier,{storyIdentifier:story!.publicSlug!})).toBeNull();
+ await expect(t.mutation(internal.mcpFamilyHistory.saveStoryWork,{principal,grantId,operationId:"cannot-republish",requestHash:"cannot-republish",input:{mode:"update",storyId:story!._id,expectedUpdatedAt:after!.updatedAt,status:"published"}})).rejects.toThrow('SCOPE_NOT_GRANTED');
+ const foreignId=await t.run(ctx=>ctx.db.insert("stories",{vaultOwnerId:"user_other_owner",type:"biography",title:"Foreign",content:"Foreign",status:"published",generatedBy:"human",citationIds:[],createdAt:1,updatedAt:1}));
+ await expect(t.mutation(internal.mcpFamilyHistory.unpublishStory,{...args,operationId:"foreign-denied",requestHash:"foreign-denied",input:{storyId:foreignId,expectedUpdatedAt:1}})).rejects.toThrow('NOT_FOUND');
+ expect((await t.run(ctx=>ctx.db.query("storyReviewEvents").collect())).at(-1)).toMatchObject({fromStatus:"published",toStatus:"draft",actorRole:"story_writer"});
+});
+test.each(['paused','expired','revoked'] as const)("%s grants cannot unpublish",async state=>{
+ const {t,grantId,personId}=await setup();
+ const storyId=await t.run(async ctx=>{
+  await ctx.db.patch(grantId as never,state==='paused'?{pausedAt:1}:state==='expired'?{expiryChoice:"chosen",expiresAt:Date.now()-1}:{status:"revoked"});
+  return ctx.db.insert("stories",{vaultOwnerId:owner,personId,type:"biography",title:"Public",content:"Public",status:"published",generatedBy:"human",citationIds:[],createdAt:1,updatedAt:1});
+ });
+ await expect(t.mutation(internal.mcpFamilyHistory.unpublishStory,{principal,grantId,operationId:`denied-${state}`,requestHash:`denied-${state}`,input:{storyId,expectedUpdatedAt:1}})).rejects.toThrow(state==='expired'?'GRANT_EXPIRED':'GRANT_REVOKED');
+ expect((await t.run(ctx=>ctx.db.get(storyId)))!.status).toBe('published');
 });

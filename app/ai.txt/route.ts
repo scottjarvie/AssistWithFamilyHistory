@@ -44,7 +44,7 @@ export function GET() {
     ...FAMILY_HISTORY_CONTROL_TOOLS.map(tool => `- ${tool.name} (no permission required) — ${tool.humanSummary}`),
     ...FAMILY_HISTORY_TOOLS.map(
       (tool) =>
-        `- ${tool.name} (${tool.requiredScope}${tool.writes ? ", writes" : ", read-only"})${tool.alias ? ` [alias: ${tool.alias}]` : ""} — ${tool.humanSummary}`,
+        `- ${tool.name} (${tool.activeGrantOnly ? "active connection only; no publish power required" : tool.requiredScope}${tool.writes ? ", writes" : ", read-only"})${tool.alias ? ` [alias: ${tool.alias}]` : ""} — ${tool.humanSummary}`,
     ),
     "",
     "## Never available through this connection",
