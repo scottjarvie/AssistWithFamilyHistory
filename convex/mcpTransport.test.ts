@@ -705,8 +705,8 @@ describe("Decision 4: reported identity is initialize-only", () => {
     const body = await response.json();
     expect(body.result.structuredContent.error.code).toBe("GRANT_REVOKED");
     const grants = await t.run(ctx => ctx.db.query("mcpGrants").collect());
-    expect(grants).toHaveLength(1);
-    expect(grants[0].observedClientName).toBe("Claude");
+    expect(grants).toHaveLength(2);
+    expect(grants.find(g => g.observedClientName === "Claude")).toBeDefined();
   });
 
   test("tool arguments and per-request names never merge otherwise unrestricted installations", async () => {
@@ -727,7 +727,7 @@ describe("Decision 4: reported identity is initialize-only", () => {
     const aliases = await t.run(ctx => ctx.db.query("mcpClientAliases").collect());
     expect(aliases.map(row => row.clientId).sort()).toEqual(["named-full-client", "new-full-client"]);
     const named = await t.withIdentity({ subject: SUBJECT }).action(api.mcpGrants.listConnections, { vaultOwnerId: SUBJECT });
-    expect(named.connections).toHaveLength(1);
-    expect(named.connections[0].linkedByName).toBe(true);
+    expect(named.connections).toHaveLength(2);
+    expect(named.connections.every(row => !row.linkedByName)).toBe(true);
   });
 });

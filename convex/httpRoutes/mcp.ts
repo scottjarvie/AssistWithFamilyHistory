@@ -419,10 +419,11 @@ const findingSave = z.discriminatedUnion("mode", [
 ]);
 const researchSave = z.object({ task: researchTaskSave.optional(), finding: findingSave.optional() }).strict().refine((value) => value.task || value.finding, { message: "Provide a research task, finding, or both." });
 
+const contactAcknowledgement = z.object({ emails: z.number().int().nonnegative(), phones: z.number().int().nonnegative(), addresses: z.number().int().nonnegative() }).strict();
 const storyFields = {
   personId: id.optional(), relationshipId: id.optional(), type: z.enum(["biography", "day_in_life", "historical_context", "migration_story", "family_narrative", "anecdote", "timeline", "letter", "interview", "research_summary", "custom"]).optional(),
   title: z.string().min(1).max(500).optional(), content: z.string().min(1).max(FAMILY_HISTORY_MCP_LIMITS.story).optional(), citationIds: z.array(id).max(100).optional(),
-  sourceFactIds: z.array(id).max(100).optional(), contextPackIds: z.array(id).max(30).optional(), status: z.enum(["draft", "review"]).optional(),
+  sourceFactIds: z.array(id).max(100).optional(), contextPackIds: z.array(id).max(30).optional(), status: z.enum(["draft", "review", "published"]).optional(), publicIndexing: z.enum(["index", "noindex"]).optional(), acknowledgeContactDetails: contactAcknowledgement.optional(),
   promptUsed: z.string().max(4_000).optional(), modelUsed: z.string().max(160).optional(), tags: z.array(z.string().max(80)).max(30).optional(),
 };
 const storySave = z.discriminatedUnion("mode", [
@@ -767,7 +768,7 @@ export function createFamilyHistoryServer(
   const writeSafe = { readOnlyHint: false, destructiveHint: false, idempotentHint: true };
 
   registerTool("family_history_archive_record", {
-    inputSchema: z.object({ operationId, kind: z.enum(["person", "relationship", "event", "source", "place", "topic", "story", "research_task", "research_finding"]), id, expectedUpdatedAt: z.number(), action: z.enum(["archive", "restore"]) }).strict(),
+    inputSchema: z.object({ operationId, acknowledgeContactDetails: contactAcknowledgement.optional(), restoreAsPrivate: z.boolean().optional(), kind: z.enum(["person", "relationship", "event", "source", "place", "topic", "story", "research_task", "research_finding"]), id, expectedUpdatedAt: z.number(), action: z.enum(["archive", "restore"]) }).strict(),
     annotations: writeSafe,
   }, (input) => write("family_history_archive_record", mcp.archiveRecord, input));
 
@@ -1010,6 +1011,11 @@ export function createFamilyHistoryServer(
     annotations: writeSafe,
   }, (input: any) => write("family_history_save_story_work", mcp.saveStoryWork, input));
 
+  registerTool("family_history_unpublish_story", {
+    inputSchema: z.object({ operationId, storyId: id, expectedUpdatedAt: z.number() }).strict(),
+    annotations: writeSafe,
+  }, (input: any) => write("family_history_unpublish_story", mcp.unpublishStory, input));
+
   registerTool("family_history_save_records", {
     inputSchema: z.object({
       operationId,
@@ -1018,6 +1024,7 @@ export function createFamilyHistoryServer(
       relationships: z.array(batchRelationshipSave).max(FAMILY_HISTORY_MCP_LIMITS.batchRelationships).optional(),
       events: z.array(batchEventSave).max(FAMILY_HISTORY_MCP_LIMITS.batchEvents).optional(),
       evidence: z.array(batchEvidenceSave).max(FAMILY_HISTORY_MCP_LIMITS.batchEvidence).optional(),
+      acknowledgeContactDetails: contactAcknowledgement.optional(),
       stories: z.array(batchStorySave).max(FAMILY_HISTORY_MCP_LIMITS.batchStories).optional(),
       places: z.array(placeSave).max(FAMILY_HISTORY_MCP_LIMITS.batchPlaces).optional(),
       topics: z.array(topicSave).max(FAMILY_HISTORY_MCP_LIMITS.batchTopics).optional(),
@@ -1045,6 +1052,7 @@ export function createFamilyHistoryServer(
       events: z.array(eventSave).max(FAMILY_HISTORY_MCP_LIMITS.completeResultRowsPerKind).optional(),
       evidence: z.array(evidenceSave).max(FAMILY_HISTORY_MCP_LIMITS.completeResultRowsPerKind).optional(),
       research: researchSave.optional(),
+      acknowledgeContactDetails: contactAcknowledgement.optional(),
       stories: z.array(storySave).max(FAMILY_HISTORY_MCP_LIMITS.completeResultRowsPerKind).optional(),
     }).strict(),
     annotations: writeSafe,

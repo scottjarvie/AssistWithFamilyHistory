@@ -772,14 +772,14 @@ export function AiConnectionCenter({
 
   function renderConnectionEditor(connection:ConnectionRow) {
     const controls = <div className="space-y-3 p-3">
-      {connection.inheritedLimits && <p className="text-sm text-muted-foreground">Unresolved earlier connection limits also apply here. Restore joins this connection’s lineage before giving access back.</p>}
-      {connection.linkedByName && <p className="text-sm text-muted-foreground">Linked by name. Separate installations reporting the same name share this connection’s limits. Only you can restore access.</p>}
+      {connection.inheritedLimits && <p className="text-sm text-muted-foreground">Started with the limits of your most limited AI. Restore gives this connection access back.</p>}
+
       {connection.limitedBy === "ai" && connection.limitedAt && <p>Narrowed by your AI on {formatDateTime(connection.limitedAt)}</p>}
       <div className="flex flex-wrap gap-2">
         {connection.status === "active" && <Button disabled={busyId === connection.id} variant="outline" onClick={() => send(connection.id, {action:"pause"}, "Paused.")}>Pause</Button>}
         {connection.status === "paused" && <Button variant="outline" disabled={busyId === connection.id} onClick={() => requestRevoke(connection)}>Revoke…</Button>}
         {connection.status === "paused" && <Button disabled={busyId === connection.id} onClick={() => send(connection.id, {action:"resume"}, "Resumed with the same limits.")}>Resume</Button>}
-        <Button disabled={busyId === connection.id} variant="outline" onClick={() => send(connection.id, {action:"restore"}, "Access restored. Other limits and the end date are preserved.")}>Restore</Button>
+        <Button disabled={busyId === connection.id} variant="outline" onClick={() => send(connection.id, {action:"restore"}, "Restored. Chosen end dates are preserved.")}>Restore</Button>
       </div>
       <details><summary>Connection history</summary><ol className="space-y-2 py-3">{connection.history?.map((entry, index) => <li key={`${entry.revision}-${index}`} className="text-sm">{formatDateTime(entry.at)} · {entry.actor === "ai" ? "by your AI" : entry.actor === "person" ? "by you" : "by the system"} · {entry.sentence}</li>)}</ol></details>
     </div>;
@@ -921,11 +921,11 @@ export function AiConnectionCenter({
                   variant="outline"
                   disabled={busyId === connection.id}
                   onClick={() =>
-                    send(connection.id, { action: "remove" }, "Removed from this list.")
+                    send(connection.id, { action: "remove" }, "Forgotten. This connection no longer contributes to new connections’ limits.")
                   }
                   className="min-h-11 shrink-0 sm:w-auto"
                 >
-                  <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" /> Remove from this list
+                  <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" /> Forget
                 </Button>
               </div></details>);
   }
@@ -933,9 +933,9 @@ export function AiConnectionCenter({
   return (
     <div className="settings-connection-center space-y-8">
       {preparing && <p role="status">Preparing earlier connection limits automatically. Access stays paused until this finishes. <button type="button" className="min-h-11 underline" onClick={() => window.location.reload()}>Refresh connections</button></p>}
-      {supersededConnections.length > 0 && <details><summary className="min-h-11 cursor-pointer">Superseded connection history</summary><ul className="space-y-2">{supersededConnections.map(row => <li key={row.id} className="text-sm text-muted-foreground">{row.label} · last used {formatDateTime(row.lastUsedAt)} · superseded; shares its current lineage’s authority</li>)}</ul></details>}
+      {supersededConnections.length > 0 && <details><summary className="min-h-11 cursor-pointer">Superseded connection history</summary><ul className="space-y-2">{supersededConnections.map(row => <li key={row.id} className="text-sm text-muted-foreground">{row.label} · last used {formatDateTime(row.lastUsedAt)} · superseded; an earlier approval for this client</li>)}</ul></details>}
       <nav aria-label="AI settings sections" className="sticky top-14 z-20 -mx-1 flex gap-1 overflow-x-auto border-b border-border bg-background px-1">{[["connection-matrix","Connections"],["ceiling-heading","Permissions"],["activity-heading","History"],["manual-heading","Manual brief"]].map(([id,label])=><a key={id} href={`#${id}`} className="inline-flex min-h-11 shrink-0 items-center px-3 text-sm text-primary hover:bg-muted">{label}</a>)}</nav>
-      <div id="connection-matrix" className="scroll-mt-28"><ConnectionMatrix connections={connections} busyId={busyId} onEdit={editConnection} onRevoke={connection=>requestRevoke(connection)} onRemove={connection=>{void send(connection.id,{action:"remove"},"Removed from this list.");}} renderEditor={renderConnectionEditor}/></div>
+      <div id="connection-matrix" className="scroll-mt-28"><ConnectionMatrix connections={connections} busyId={busyId} onEdit={editConnection} onRevoke={connection=>requestRevoke(connection)} onRemove={connection=>{void send(connection.id,{action:"remove"},"Forgotten. This connection no longer contributes to new connections’ limits.");}} renderEditor={renderConnectionEditor}/></div>
       <p className="text-sm leading-6 text-muted-foreground">You or your AI can limit a connection. Only you can restore access, resume it or extend its end date. Turning it off takes effect on its very next request, not whenever its sign-in happens to run out.</p>
       <Dialog open={revokeRequest!==null} onOpenChange={open=>{if(!open)setRevokeRequest(null);}}><DialogContent onCloseAutoFocus={event=>{event.preventDefault();if(revokeOrigin.current?.isConnected)revokeOrigin.current.focus();else revokeRow.current?.focus();}}><DialogHeader><DialogTitle>Revoke {revokeRequest?.connection.label}?</DialogTitle><DialogDescription>This takes effect on its very next request. Its past research stays in your vault. Review and approve again here if you want to reconnect it later.</DialogDescription></DialogHeader><label className="text-sm">Reason for your own record (optional)<Input className="mt-2 min-h-11" maxLength={300} value={revokeRequest?.reason||""} onChange={event=>setRevokeRequest(current=>current?{...current,reason:event.target.value}:null)}/></label><DialogFooter><MatrixButton variant="outline" disabled={busyId===revokeRequest?.connection.id} onClick={()=>setRevokeRequest(null)}>Cancel</MatrixButton><MatrixButton variant="destructive" disabled={busyId===revokeRequest?.connection.id} onClick={async()=>{if(revokeRequest&&await send(revokeRequest.connection.id,{action:"revoke",reason:revokeRequest.reason.trim()||undefined},"Turned off. Its very next request is refused."))setRevokeRequest(null);}}>Revoke connection</MatrixButton></DialogFooter></DialogContent></Dialog>
       {pending.length===0&&<p className="text-sm text-muted-foreground">Nothing is waiting. An AI you sign in is approved for ordinary research work straight away and shows above; connections from before that change may still wait here.</p>}

@@ -199,8 +199,8 @@ describe("stateless Family History MCP durable operations", () => {
       principal: principal(), grantId, operationId: "operation-forbidden-publish", requestHash: "hash-forbidden-publish",
       input: {
         mode: "create", createKey: "story:forbidden:publish", personId: person.person.id,
-        type: "biography", title: "Must remain private", content: "Private draft", status: "published",
+        type: "biography", title: "Must scrub secrets", content: "password=unsafe-secret-value", status: "published",
       },
-    })).rejects.toThrow(/FORBIDDEN/);
+    })).rejects.toThrow(/PUBLICATION_SECRET/);
   });
 });

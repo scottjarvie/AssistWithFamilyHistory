@@ -3,7 +3,7 @@ import { SafeLink } from "@/components/layout/SafeLink";
 
 const questions = [
   { question: "What can my AI do here, and how do I limit it?",
-    answer: "When you connect your AI, it gets full access to your Family History workspace from the start: it can read, save, organise, archive and restore, including tools we add later, with no end date. You can limit it any time: in Settings → AI, or just ask your AI to limit itself (for example, \"only read, don’t change anything\" or \"stop until Friday\"). Your AI can narrow its own access but never widen it. Only you can give access back. It never permanently deletes anything, spends money or publishes for you. Media review and living-person protections still apply." },
+    answer: "When you connect your first AI, it gets full access to your Family History workspace from the start: it can read, save, organise, archive and restore, including tools we add later, with no end date. You can limit it any time: in Settings → AI, or just ask your AI to limit itself (for example, \"only read, don’t change anything\" or \"stop until Friday\"). Your AI can narrow its own access but never widen it. Only you can give access back. A new connection starts with the limits of your most limited AI until you Restore it. It never permanently deletes anything or spends money for you. If you ask, it can publish or share something for you — it checks for private details first, and you can unpublish it any time." },
   {
     question: "Is this another family-tree site?",
     answer: "A tree can be one view, but the workspace is built for the trail behind it: sources, relationships, events, uncertainty, research questions, context, and stories.",

@@ -191,9 +191,10 @@ describe("chosen-AI lifecycle ladder (locally provable rungs)", () => {
     expect(names.length).toBeGreaterThan(0);
     for (const name of names.filter(name => !FAMILY_HISTORY_CONTROL_TOOLS.some(t => t.name === name))) {
       expect(findTool(name), `${name} must be in the catalog`).toBeTruthy();
-      expect(findTool(name)!.requiredScope).toBe("family_history:context:read");
+      if (name === "family_history_unpublish_story") expect(findTool(name)!.activeGrantOnly).toBe(true);
+      else expect(findTool(name)!.requiredScope).toBe("family_history:context:read");
     }
-    // A read-only grant reaches no write tool at all.
+    // Read-only power cannot save records; active grants can still unpublish.
     expect(names).not.toContain("family_history_save_records");
   });
 

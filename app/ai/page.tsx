@@ -80,7 +80,7 @@ const ALIAS_COUNT = FAMILY_HISTORY_TOOLS.filter((tool) => tool.alias).length;
  */
 const currentInSource = [
   `${TOOL_COUNT} Family History tools share one stateless connection address, with ${ALIAS_COUNT} older names kept working as aliases.`,
-  "Signing in approves full access to current and future tools with no end date by default. You can deliberately limit the scope or set an end date in Settings; publishing, permanent deletion, merging, invitations, public sharing and exporting are never available to a connection. Every request re-checks the permission, so narrowing it or turning it off works at once.",
+  "Signing in approves full access to current and future tools with no end date by default. You can deliberately limit the scope or set an end date in Settings; permanent deletion, merging, invitations and exporting are never available to a connection. Your AI may publish or unpublish stories after checking for sensitive information. Remove only your own private details; business contacts are expected. One acknowledgeContactDetails exact count object covers the whole batch and may be sent on the first call. Every request re-checks the permission, so narrowing it or turning it off works at once.",
   "Turning a connection off takes effect on its very next request, because the permission is re-checked every time rather than waiting for a sign-in to expire.",
   "A whole source's worth of records saves in one call, reporting each row's own outcome instead of discarding the pass.",
   "Reviewed, AI-allowed files are delivered through the connection itself; a storage link is never handed to a model.",
@@ -134,7 +134,7 @@ export default function AiSetupPage() {
               </div>
               <p className="mt-7 flex gap-2 border-t border-[#d8cfbd] pt-5 text-xs leading-5 text-[#687169]">
                 <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0 text-[#245a43]" aria-hidden="true" />
-                Connecting signs into the same private account. No research runs automatically, and no tool can publish or permanently delete family records.
+                Connecting signs into the same private account. No research runs automatically, and your AI may publish stories after scrubbing secrets and confirming contact details; permanent deletion stays unavailable.
               </p>
               <p className="mt-4 text-sm leading-6">{AI_ACCESS_INSTRUCTIONS}</p>
               <ul className="mt-3 text-sm">{FAMILY_HISTORY_CONTROL_TOOLS.map(tool => <li key={tool.name}><code>{tool.name}</code> — {tool.humanSummary}</li>)}</ul>
@@ -192,11 +192,11 @@ export default function AiSetupPage() {
             <div className="rounded-[2rem] bg-[#24312c] p-6 text-[#fffaf2] sm:p-8">
               <p className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-[#d8b16d]"><Bot className="h-4 w-4" aria-hidden="true" /> First-session instruction</p>
               <blockquote className="mt-6 border-l border-[#d8b16d] pl-5 font-[family-name:var(--font-cormorant-garamond)] text-2xl leading-9">
-                “Start with my Family History brief. Search before creating duplicates, hydrate stable IDs before corrections, preserve source provenance and uncertainty, prefer the complete-result save for a finished pass, and never publish or permanently delete.”
+                “Start with my Family History brief. Search before creating duplicates, hydrate stable IDs before corrections, preserve source provenance and uncertainty, prefer the complete-result save for a finished pass, and scrub sensitive information before publishing and never permanently delete.”
               </blockquote>
               <div className="mt-8 grid gap-3 border-t border-[#53635d] pt-6 sm:grid-cols-2">
                 {[
-                  [Fingerprint, "Server-derived vault"], [Braces, "Replay-safe writes"], [GitBranch, "Evidence stays linked"], [ShieldCheck, "Human publish gate"],
+                  [Fingerprint, "Server-derived vault"], [Braces, "Replay-safe writes"], [GitBranch, "Evidence stays linked"], [ShieldCheck, "Sensitive-info check"],
                 ].map(([Icon, label]) => {
                   const ItemIcon = Icon as typeof Fingerprint;
                   return <p key={label as string} className="flex items-center gap-2 text-xs text-[#d8e1da]"><ItemIcon className="h-4 w-4 text-[#d8b16d]" aria-hidden="true" />{label as string}</p>;
@@ -285,7 +285,7 @@ export default function AiSetupPage() {
             <article className="rounded-3xl border border-[#ccb7ad] bg-[#f8efeb] p-7">
               <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#9f5a2d]">Later, not implied</p>
               <p className="mt-5 text-sm leading-7 text-[#5f665f]">
-                Publishing, deletion, identity merges, export, sharing changes, acting on FamilySearch
+                Permanent deletion, identity merges, export, invitations, acting on FamilySearch
                 or any other outside site, and cross-family collaboration are outside this connection
                 entirely. They have no tool and no permission that could turn them on.
               </p>

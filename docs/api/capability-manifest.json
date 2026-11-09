@@ -25,6 +25,7 @@
       "family_history_save_source_evidence",
       "family_history_save_research_work",
       "family_history_save_story_work",
+      "family_history_unpublish_story",
       "family_history_save_records",
       "family_history_add_source_content",
       "family_history_save_complete_result",
@@ -56,9 +57,8 @@
       "reservedNeverIssuable": [
         "Exporting the vault",
         "Permanently deleting anything",
-        "Publishing a story or any other public action",
         "Merging or splitting person identities",
-        "Inviting new people, creating public links, or changing another person’s access",
+        "Inviting new people or changing another person’s access",
         "Acting on FamilySearch or any other outside provider",
         "Billing, account, or subscription changes"
       ],

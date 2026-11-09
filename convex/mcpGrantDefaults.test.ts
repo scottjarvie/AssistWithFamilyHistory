@@ -43,7 +43,7 @@ describe("durable full access", () => {
     const full = { state: "active" as const, grant };
     expect(permittedTools(full, Date.now()).length).toBeGreaterThan(0);
     expect(decideToolAccess({ resolution: full, toolName: "family_history_save_records", input: {}, now: Date.now() }).allowed).toBe(true);
-    expect(permittedTools({ state: "active", grant: { ...grant, scopeChoice: "chosen" } }, Date.now()).map(t => t.name)).toEqual(["family_history_archive_record"]);
+    expect(permittedTools({ state: "active", grant: { ...grant, scopeChoice: "chosen" } }, Date.now()).map(t => t.name)).toEqual(["family_history_archive_record", "family_history_unpublish_story"]);
     expect(effectiveScopes({ scopes: [...LEGACY_FULL_SCOPE_BASELINE], scopeChoice: "chosen" })).toEqual([...FAMILY_HISTORY_SCOPES]);
   });
 

@@ -206,7 +206,9 @@ export default defineSchema({
     .index("by_fsId", ["fsId"])
     .index("by_surname", ["name.surname"])
     .index("by_research_status", ["researchStatus"])
-    .index("by_living", ["living"]),
+    .index("by_living", ["living"])
+    .index("by_birth_place", ["vaultOwnerId", "birth.place.placeId"])
+    .index("by_death_place", ["vaultOwnerId", "death.place.placeId"]),
 
   /**
    * RELATIONSHIPS
@@ -1647,6 +1649,7 @@ export default defineSchema({
     .index("by_person", ["personId"])
     .index("by_relationship", ["relationshipId"])
     .index("by_status", ["status"])
+    .index("by_owner_person_status", ["vaultOwnerId", "personId", "status", "archivedAt"])
     .index("by_public_slug", ["publicSlug"])
     .index("by_type", ["type"]),
 
@@ -1947,7 +1950,7 @@ export default defineSchema({
    * client never supplies an owner, a vault, or a grant selector.
    */
   mcpCarriedRestrictions: defineTable({
-    vaultOwnerId: v.string(), ready: v.boolean(), revision: v.number(),
+    vaultOwnerId: v.string(), ready: v.boolean(), revision: v.number(), policyVersion: v.optional(v.number()),
     entries: v.array(v.object({
       issuer: v.string(), sourceGrantId: v.id("mcpGrants"), sourceRevision: v.number(), lineageGrantId: v.id("mcpGrants"),
       withheld: v.array(v.string()), pausedAt: v.optional(v.number()), revoked: v.boolean(), pending: v.boolean(), endsAt: v.optional(v.number()),
@@ -1982,6 +1985,14 @@ export default defineSchema({
     scopes: v.array(v.string()),
     scopeChoice: v.optional(v.union(v.literal("full"), v.literal("chosen"))),
     withheldScopes: v.optional(v.array(v.string())),
+    startedAtFloor: v.optional(v.boolean()),
+    ownAccess: v.optional(v.object({
+      withheldScopes: v.array(v.string()),
+      boundary: v.object({ kind: v.union(v.literal("whole_workspace"), v.literal("selected_people"), v.literal("queue_only")), personIds: v.optional(v.array(v.string())), queueItemIds: v.optional(v.array(v.string())) }),
+      status: v.union(v.literal("active"), v.literal("revoked"), v.literal("denied")),
+      pausedAt: v.optional(v.number()), expiresAt: v.optional(v.number()), revokedAt: v.optional(v.number()),
+    })),
+    inheritedRestrictions: v.optional(v.array(v.object({ sourceGrantId: v.id("mcpGrants"), sourceRevision: v.number() }))),
     authorityGrantId: v.optional(v.id("mcpGrants")),
     linkedByName: v.optional(v.boolean()),
     revision: v.optional(v.number()), pausedAt: v.optional(v.number()),

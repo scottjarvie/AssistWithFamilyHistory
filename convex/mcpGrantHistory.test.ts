@@ -100,11 +100,6 @@ describe("revoke after grant (persisted legacy partial revocation)", () => {
     for (const id of others) {
       const row = (await t.run((ctx) => ctx.db.get(id)))!;
       const resolved = await t.mutation(internal.mcpGrants.resolveForRequest, { subject: row.vaultOwnerId, clientId: row.clientId, issuer: row.issuer });
-      if (row.vaultOwnerId === owner && row.issuer === issuer) {
-        expect(resolved.state).toBe("revoked");
-        await refuses(t, id, "GRANT_REVOKED");
-        continue;
-      }
       expect(resolved).toMatchObject({ state: "active", grant: { grantId: String(id) } });
       await expect(t.run((ctx) => assertGrantPermits(ctx, { owner: row.vaultOwnerId, grantId: String(id), ...read }))).resolves.not.toBeNull();
     }
