@@ -5,7 +5,7 @@ name: CI
 #   - Code review covers logic, privacy, and product intent.
 #   - Local `pnpm verify` proves the build before a push; Vercel builds only
 #     main and preview/* branches (Core Philosophy §16.6) and deploys
-#     production on merge, so this workflow does not build or start the app.
+#     production on merge, so GitHub-hosted runs do not build or start the app (the Mac mini runner does build).
 #   - This workflow runs the fast contract checks once, when a PR is ready.
 # It does not run on pushes to main: the same commit already passed on its PR.
 # Draft PRs skip it; marking the PR ready (or running it by hand) triggers it.
@@ -31,7 +31,7 @@ jobs:
     # Runs on the Mac mini's own runner (free minutes) when the repo variable
     # CI_RUNNER is "mini". Delete that variable to fall back to GitHub's machines.
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -75,8 +75,10 @@ jobs:
         if: steps.classify.outputs.code == 'true'
         run: pnpm install --frozen-lockfile
 
-      - name: Verify (typecheck + lint + test + checks; Vercel owns the build)
+      # GitHub-hosted runners skip the build (Vercel owns it there). The Mini's
+      # minutes are free, so PRs also prove the production build on the Mini.
+      - name: Verify (typecheck + lint + test + checks; build on the Mini only)
         if: steps.classify.outputs.code == 'true'
         run: pnpm verify
         env:
-          VERIFY_SKIP_BUILD: "1"
+          VERIFY_SKIP_BUILD: ${{ runner.environment == 'github-hosted' && '1' || '' }}
