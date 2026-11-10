@@ -61,7 +61,7 @@ const toolGroups = [
     label: "Continue",
     icon: ScrollText,
     scopes: ["family_history:story:draft", "family_history:queue:work"] as const,
-    copy: "A whole source's worth of records saves in one call with per-item results, while private drafts and the four-state Queue keep long work understandable across sessions.",
+    copy: "A whole source's worth of records saves in one call with per-item results, while private drafts and the Queue’s three work states and Needs your input flag keep long work understandable across sessions.",
   },
 ] as const;
 

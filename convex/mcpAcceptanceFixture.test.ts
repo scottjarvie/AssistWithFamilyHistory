@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { beforeEach, afterEach, describe, expect, test, vi } from "vitest";
 import { convexTest } from "convex-test";
 
 import { api, internal } from "./_generated/api";
@@ -397,4 +397,19 @@ describe("Family History joined MCP acceptance cleanup", () => {
       confirmation: FAMILY_HISTORY_ACCEPTANCE_CONFIRMATION,
     })).rejects.toThrow("a marked connection lacks its visible synthetic acceptance marker");
   });
+});
+
+// Explicit website JWT issuer for synthetic person identities; never an auth bypass.
+beforeEach(()=>vi.stubEnv("CLERK_JWT_ISSUER_DOMAIN","https://convex.test"));
+
+
+test("acceptance cleanup returns every Queue counter to its pre-run value",async()=>{
+ vi.stubEnv("CONVEX_CLOUD_URL","https://accomplished-dodo-308.convex.cloud");vi.stubEnv("TRUST_BOUNDARY_MODE","enforce");
+ const t=convexTest(schema,modules),owner=t.withIdentity({subject:OWNER});
+ await owner.mutation(api.queue.createQueueItem,{vaultOwnerId:OWNER,directive:"Unrelated retained directive",idempotencyKey:"retained-counter-baseline"});
+ const counters=()=>t.run(async ctx=>{const row=await ctx.db.query("queueCounters").withIndex("by_owner",q=>q.eq("vaultOwnerId",OWNER)).unique();return row&&{total:row.totalRecords,waiting:row.waiting,working:row.working,answered:row.answered,input:row.needsInput,suggestions:row.openSuggestions,ready:row.ready};});
+ const before=await counters();await saveJoinedFixture(t);expect((await counters())?.total).toBe(before!.total+1);
+ await owner.mutation(api.mcpAcceptanceFixture.clear,{vaultOwnerId:OWNER,runKey:RUN_KEY,confirmation:FAMILY_HISTORY_ACCEPTANCE_CONFIRMATION});
+ expect(await counters()).toEqual(before);
+ await owner.mutation(api.mcpAcceptanceFixture.clear,{vaultOwnerId:OWNER,runKey:RUN_KEY,confirmation:FAMILY_HISTORY_ACCEPTANCE_CONFIRMATION});expect(await counters()).toEqual(before);
 });

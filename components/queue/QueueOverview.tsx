@@ -1,0 +1,9 @@
+import {Card,CardContent,CardDescription,CardHeader,CardTitle} from "@/components/ui/card";
+import {SafeLink} from "@/components/layout/SafeLink";
+export type QueueOverviewStats={count:number|null;needsInput:number|null;suggestions:number|null;byState:Record<string,number|null>};
+const labels=[['waiting_for_your_ai','Waiting on AI'],['working','AI working'],['done','Answered']] as const;
+const value=(number:number|null|undefined)=>number==null?"Unavailable":number.toLocaleString("en-US");
+export function QueueOverview({queue}:{queue:QueueOverviewStats}){
+ const states=labels.map(([key])=>queue.byState[key]);const archived=queue.count!==null&&queue.suggestions!==null&&states.every(n=>n!=null)?queue.count-queue.suggestions-states.reduce<number>((total,n)=>total+(n??0),0):null;
+ return <Card><CardHeader><CardTitle>Your Queue</CardTitle><CardDescription>Three work states. Needs your input is a flag across all states, including Answered.</CardDescription></CardHeader><CardContent><ul className="space-y-2 text-sm text-stone-700">{labels.map(([state,label])=><li key={state} className="flex justify-between gap-4"><SafeLink className="text-primary underline" href={`/app/queue?state=${state}`}>{label}</SafeLink><span className="font-medium">{value(queue.byState[state])}</span></li>)}<li className="flex justify-between gap-4 border-t border-border pt-2"><SafeLink className="text-primary underline" href="/app/queue?state=needs_you">Needs your input</SafeLink><span className="font-medium">{value(queue.needsInput)}</span></li><li className="flex justify-between gap-4"><SafeLink className="text-primary underline" href="/app/queue?suggestions=true">AI suggestions</SafeLink><span>{value(queue.suggestions)}</span></li><li className="flex justify-between gap-4"><SafeLink className="text-primary underline" href="/app/queue?archived=true">Archived</SafeLink><span>{value(archived)}</span></li></ul></CardContent></Card>;
+}

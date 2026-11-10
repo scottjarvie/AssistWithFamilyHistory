@@ -40,11 +40,12 @@ export async function verifyLocalSession(token: string | undefined, keys: JWTVer
   try {
     const { payload } = await jwtVerify(token, keys, {
       algorithms: ["RS256"], issuer: mode === "sandbox" ? LOCAL_SANDBOX_ISSUER : LOCAL_LIVE_ISSUER,
-      requiredClaims: ["exp", "nbf", "iat", "sub", "sid", "azp"],
+      requiredClaims: ["exp", "nbf", "iat", "sub", "sid"],
     });
     if (typeof payload.sub !== "string" || !payload.sub.startsWith("user_")
       || typeof payload.sid !== "string" || !payload.sid.startsWith("sess_")
-      || !(mode === "sandbox" ? LOCAL_SANDBOX_ORIGINS : LOCAL_LIVE_ORIGINS).some(origin => origin === payload.azp)
+      || (payload.azp!==undefined&&!(mode === "sandbox" ? LOCAL_SANDBOX_ORIGINS : LOCAL_LIVE_ORIGINS).some(origin => origin === payload.azp))
+      || ["client_id","scope","scp"].some(key=>payload[key]!==undefined)
       || payload.sts === "pending") return null;
     return { userId: payload.sub, sessionId: payload.sid };
   } catch {
@@ -103,7 +104,7 @@ export async function verifyLocalConvexToken(token: string | undefined, session:
  if (!token || !session) return null;
  try {
   const {payload}=await jwtVerify(token,keys,{algorithms:["RS256"],issuer:mode==="sandbox"?LOCAL_SANDBOX_ISSUER:LOCAL_LIVE_ISSUER,audience:"convex",requiredClaims:["exp","nbf","iat","sub"]});
-  if (payload.sub!==session.userId || payload.sts==="pending") return null;
+  if (payload.sub!==session.userId || payload.sts==="pending" || ["client_id","scope","scp"].some(key=>payload[key]!==undefined)) return null;
   if (payload.azp!==undefined && !(mode==="sandbox"?LOCAL_SANDBOX_ORIGINS:LOCAL_LIVE_ORIGINS).some(origin=>origin===payload.azp)) return null;
   return {token,expiresAt:payload.exp!};
  } catch {return null;}

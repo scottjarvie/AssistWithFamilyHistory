@@ -6,7 +6,7 @@ import {effectiveScopeChoice} from "@/lib/mcp/grantDefaults";
 import {FAMILY_HISTORY_SCOPE_INFO,type FamilyHistoryScope} from "@/lib/mcp/catalog";
 import type {ConnectionRow} from "@/lib/mcp/connectionApi";
 
-const short:Record<FamilyHistoryScope,[string,string]>={"family_history:records:archive":["Keep","Archive"],"family_history:context:read":["Read","Context"],"family_history:evidence:read":["Read","Evidence"],"family_history:evidence:write":["Save","Evidence"],"family_history:research:write":["Save","Research"],"family_history:story:draft":["Draft","Stories"],"family_history:queue:read":["Read","Queue"],"family_history:queue:work":["Work","Queue"]};
+const short:Record<FamilyHistoryScope,[string,string]>={"family_history:queue:suggest":["Propose","Suggestions"],"family_history:records:archive":["Keep","Archive"],"family_history:context:read":["Read","Context"],"family_history:evidence:read":["Read","Evidence"],"family_history:evidence:write":["Save","Evidence"],"family_history:research:write":["Save","Research"],"family_history:story:draft":["Draft","Stories"],"family_history:queue:read":["Read","Queue"],"family_history:queue:work":["Work","Queue"]};
 const status:Record<ConnectionRow["status"],string>={paused:"Paused",active:"Approved",pending:"Waiting for you",revoked:"Turned off",denied:"Declined",expired:"Ran out"};
 const date=(value:number|null)=>value?new Date(value).toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"}):"Never";
 function summary(row:ConnectionRow) {

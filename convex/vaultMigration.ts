@@ -50,6 +50,7 @@ const OWNED_TABLES = [
   "familySearchSync",
   "researchTasks",
   "researchLog",
+  "queueCounters",
   "queueItems",
   "queueActivity",
   "queueCommandReceipts",

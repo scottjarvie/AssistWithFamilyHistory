@@ -27,6 +27,7 @@ const CreateQueueItemSchema = z.object({
   priority: z.enum(["high", "normal", "low"]).optional(),
   priorityReason: z.string().max(500).optional(),
   context: z.array(ContextSchema).max(20).optional(),
+  fromRecord: ContextSchema.optional(),
   chosenAiId: z.string().max(160).optional(),
   handoffExpiresAt: z.number().int().positive().optional(),
   maxRetries: z.number().int().min(0).max(10).optional(),
@@ -55,8 +56,11 @@ export async function GET(request: NextRequest) {
     const parsedLimit = Number.parseInt(request.nextUrl.searchParams.get("limit") ?? "25", 10);
     const limit = Number.isFinite(parsedLimit) ? Math.max(1, Math.min(parsedLimit, 50)) : 25;
     const client = await getAuthedConvexClient();
+    if(request.nextUrl.searchParams.get("counts")==="true")return NextResponse.json({success:true,counts:await client.mutation(api.queue.queueCounts,{vaultOwnerId})});
     const page = await client.action(api.queue.listQueueItems, {
       vaultOwnerId,
+      suggestions: request.nextUrl.searchParams.get("suggestions")==="true",
+      archived: request.nextUrl.searchParams.get("archived")==="true",
       state:
         state === "needs_you" || state === "working" || state === "waiting_for_your_ai" || state === "done"
           ? state
@@ -67,7 +71,9 @@ export async function GET(request: NextRequest) {
         cursor: request.nextUrl.searchParams.get("cursor"),
       },
     });
+    const counts=await client.mutation(api.queue.queueCounts,{vaultOwnerId});
     return NextResponse.json({
+      counts,
       success: true,
       surfaceState: page.page.length === 0 ? "empty" : "ready",
       ...page,
@@ -114,6 +120,7 @@ export async function POST(request: NextRequest) {
     const result = await client.mutation(api.queue.createQueueItem, {
       vaultOwnerId,
       ...input,
+      fromRecord: input.fromRecord as Parameters<typeof client.mutation<typeof api.queue.createQueueItem>>[1]["fromRecord"],
       context,
     });
     return NextResponse.json({ success: true, surfaceState: "ready", ...result }, { status: result.deduplicated ? 200 : 201 });

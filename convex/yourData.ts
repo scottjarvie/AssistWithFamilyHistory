@@ -10,7 +10,7 @@ import type { FunctionReference } from "convex/server";
 import type { Doc, TableNames } from "./_generated/dataModel";
 import { action, internalQuery, type QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { authorizeTenantAction, type TrustBoundaryShadowEntry } from "./access";
+import { requireWebsitePerson, authorizeTenantAction, type TrustBoundaryShadowEntry } from "./access";
 import { EXPORT_TABLES, type ExportTable } from "../lib/vault/exportTables";
 import { readConnections } from "./mcpGrants";
 
@@ -54,6 +54,13 @@ function tally<T>(rows: T[], key: (row: T) => string) {
 
 export type YourStats = Awaited<ReturnType<typeof readYourStats>>;
 
+async function queueTotals(ctx:QueryCtx,owner:string){
+ const counter=await ctx.db.query("queueCounters").withIndex("by_owner",q=>q.eq("vaultOwnerId",owner)).unique();
+ const empty=!counter&&!await ctx.db.query("queueItems").withIndex("by_owner",q=>q.eq("vaultOwnerId",owner)).first();
+ const available=!!counter?.ready||empty;
+ return {available,count:available?counter?.totalRecords??0:null,more:false,needsInput:available?counter?.needsInput??0:null,suggestions:available?counter?.openSuggestions??0:null,byState:{waiting_for_your_ai:available?counter?.waiting??0:null,working:available?counter?.working??0:null,done:available?counter?.answered??0:null} as Record<string,number|null>};
+}
+
 async function readYourStats(ctx: QueryCtx, owner: string) {
   const [people, relationships, sources, citations, stories, queue, grants, activity] = await Promise.all([
     ownedRows(ctx, "persons", owner, PEOPLE_CAP),
@@ -61,7 +68,7 @@ async function readYourStats(ctx: QueryCtx, owner: string) {
     ownedRows(ctx, "sources", owner, SMALL_CAP),
     ownedRows(ctx, "citations", owner, SMALL_CAP),
     ownedRows(ctx, "stories", owner, SMALL_CAP),
-    ownedRows(ctx, "queueItems", owner, SMALL_CAP),
+    queueTotals(ctx,owner),
     readConnections(ctx, owner),
     ownedRows(ctx, "agentActivity", owner, SMALL_CAP, "desc"),
   ]);
@@ -79,7 +86,7 @@ async function readYourStats(ctx: QueryCtx, owner: string) {
     sources: { count: sources.rows.length, more: sources.more },
     citations: { count: citations.rows.length, more: citations.more },
     stories: { count: stories.rows.length, more: stories.more, byStatus: tally(stories.rows, (row) => String(row.status)) },
-    queue: { count: queue.rows.length, more: queue.more, byState: tally(queue.rows, (row) => String(row.state)) },
+    queue,
     ai: {
       activeConnections: new Set(grants.connections
         .filter((row) => row.status === "active")
@@ -180,6 +187,7 @@ async function authorizedOwner(ctx: Parameters<typeof authorizeTenantAction>[0] 
 export const getYourStats = action({
   args: { vaultOwnerId: v.string() },
   handler: async (ctx, args): Promise<YourStats> => {
+    await requireWebsitePerson(ctx);
     const vaultOwnerId = await authorizedOwner(ctx, "yourData.getYourStats", args.vaultOwnerId);
     await ctx.runMutation(internal.mcpGrants.prepareOwnerConnections, { vaultOwnerId });
     return ctx.runQuery(self.getYourStatsInternal, { vaultOwnerId });

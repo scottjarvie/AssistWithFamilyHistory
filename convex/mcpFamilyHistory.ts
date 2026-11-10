@@ -1,3 +1,4 @@
+import {queueIdentity,suggestionWithinPeople} from "../lib/queue/identity";
 import { loadStoryScopedSnapshot, buildStoryBundle, buildPublicStoryBundle } from "./vault";
 import { assessStoryPublishReadiness } from "../lib/stories/publishSafety";
 import { assertSafePublication } from "../lib/stories/sensitiveInfo";
@@ -1390,19 +1391,31 @@ async function connectionsFor(ctx: QueryCtx, owner: string, kind: string, id: st
 }
 
 export const getBrief = internalQuery({
-  args: { principal: principalValidator },
-  handler: async (ctx, { principal }) => {
+  args: { principal: principalValidator,queueRead:v.optional(v.boolean()),queueItemIds:v.optional(v.array(v.id("queueItems"))),suggestionPersonIds:v.optional(v.array(v.string())) },
+  handler: async (ctx, { principal,queueRead=false,queueItemIds,suggestionPersonIds }) => {
     const owner = ownerFromPrincipal(principal);
     const limit = FAMILY_HISTORY_MCP_LIMITS.briefRows;
     const researchScan = FAMILY_HISTORY_MCP_LIMITS.searchScanPerType;
-    const [people, stories, tasks, findings, queueGroups] = await Promise.all([
+    const [people, stories, tasks, findings, queueView] = await Promise.all([
       ctx.db.query("persons").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(limit + 1),
       ctx.db.query("stories").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(limit + 1),
       ctx.db.query("researchTasks").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(researchScan + 1),
       ctx.db.query("researchLog").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(limit + 1),
-      Promise.all(["needs_you", "working", "waiting_for_your_ai", "done"].map((state) =>
-        ctx.db.query("queueItems").withIndex("by_owner_state_updated", (q) => q.eq("vaultOwnerId", owner).eq("state", state as any)).order("desc").take(4),
-      )),
+      (async()=>{
+        if(queueRead===false)return {work:[],questions:[],truncated:false};
+        const allowed=(item:Doc<"queueItems">)=>item.vaultOwnerId===owner&&!item.archivedAt&&suggestionWithinPeople(item,suggestionPersonIds);
+        if(queueItemIds?.length){
+          const rows=(await Promise.all(queueItemIds.map(id=>ctx.db.get(id)))).filter((row):row is Doc<"queueItems">=>!!row&&allowed(row)).map(queueIdentity).sort((a,b)=>b.updatedAt-a.updatedAt);
+          const work=rows.filter(item=>item.suggestionStatus!=="open"&&!item.needsInput),questions=rows.filter(item=>!!item.needsInput);
+          return {work:work.slice(0,limit),questions:questions.slice(0,limit),truncated:work.length>limit||questions.length>limit};
+        }
+        const base=()=>{let query=ctx.db.query("queueItems").withIndex("by_owner_updated",q=>q.eq("vaultOwnerId",owner)).order("desc");if(suggestionPersonIds!==undefined)query=query.filter(q=>q.or(q.and(q.neq(q.field("addedBy"),"ai_suggestion"),q.eq(q.field("suggestionStatus"),undefined)),...suggestionPersonIds.map(id=>q.and(q.eq(q.field("fromRecord.kind"),"person"),q.eq(q.field("fromRecord.refId"),id)))));return query;};
+        const [work,questions]=await Promise.all([
+          base().filter(q=>q.and(q.eq(q.field("archivedAt"),undefined),q.neq(q.field("suggestionStatus"),"open"),q.eq(q.field("needsInput"),undefined),q.neq(q.field("state"),"needs_you"))).take(limit+1),
+          base().filter(q=>q.and(q.eq(q.field("archivedAt"),undefined),q.or(q.neq(q.field("needsInput"),undefined),q.eq(q.field("state"),"needs_you")))).take(limit+1),
+        ]);
+        return {work:work.slice(0,limit).map(queueIdentity),questions:questions.slice(0,limit).map(queueIdentity),truncated:work.length>limit||questions.length>limit};
+      })(),
     ]);
     const personSummary = (person: Doc<"persons">) => ({
       id: person._id,
@@ -1419,8 +1432,10 @@ export const getBrief = internalQuery({
       recentStories: stories.slice(0, limit).map((story) => ({ id: story._id, title: story.title, type: story.type, status: story.status, personId: story.personId, updatedAt: story.updatedAt })),
       openResearchTasks: tasks.filter((task) => task.status !== "done").slice(0, limit).map((task) => ({ id: task._id, title: task.title, type: task.type, status: task.status, priority: task.priority, personId: task.personId, updatedAt: task.updatedAt })),
       recentFindings: findings.slice(0, limit).map((finding) => ({ id: finding._id, entityType: finding.entityType, entityId: finding.entityId, status: finding.status, summary: finding.summary, updatedAt: finding.updatedAt })),
-      queue: queueGroups.flat().sort((a, b) => b.updatedAt - a.updatedAt).slice(0, limit).map((item) => ({ id: item._id, state: item.state, condition: item.condition, priority: item.priority, summary: item.summary, version: item.version, updatedAt: item.updatedAt })),
-      truncated: people.length > limit || stories.length > limit || tasks.filter((task) => task.status !== "done").length > limit || tasks.length > researchScan || findings.length > limit,
+      queue: queueView.work.map((item) => ({ id: item._id, state: item.state, condition: item.condition, priority: item.priority, summary: item.summary, version: item.version, updatedAt: item.updatedAt })),
+      queueAvailable:queueRead!==false,
+      questionsForPerson:queueView.questions.map(item=>({id:item._id,state:item.state,question:item.needsInput!.question,url:`/app/queue?item=${encodeURIComponent(item._id)}`,personActions:["Answer","Archive"]})),
+      truncated: queueView.truncated || people.length > limit || stories.length > limit || tasks.filter((task) => task.status !== "done").length > limit || tasks.length > researchScan || findings.length > limit,
       nextRecommendedTool: "search_family_history",
     };
   },

@@ -1,6 +1,9 @@
 import type { QueueOperation } from "./contract";
 
 export const QUEUE_AGENT_TOOLS = [
+ {name:"archive_queue_item",description:"Archive unflagged assigned work or restore it, using the existing archive power.",requiredScope:"queue:archive",mutates:true},
+  {name:"add_queue_item",description:"Add requested work or explicitly classified AI suggestions.",requiredScope:"queue:add",mutates:true},
+  {name:"withdraw_suggestion",description:"Withdraw an untouched own AI suggestion.",requiredScope:"queue:add",mutates:true},
   {
     name: "list_queue_items",
     description: "List a bounded page of the signed-in owner's Queue items without reading unrelated vault records.",

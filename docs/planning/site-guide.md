@@ -96,7 +96,7 @@ A **building block** is a named kind of information the person and their AI can 
 - **Lists** — the person's own gatherings (*Ancestors missing a birth record · Graves to photograph · Photos to identify · Brick walls*). Entries point at real records; one person can be on many Lists.
 - **Library** — shelves **Research · Sources · Instructions · Stories**. The Sources shelf is a flag on the sources the person returns to most (the family Bible, a grandfather's journal), not a copy of every source.
 - **Preferences** — how the person wants help: research depth, citation style, original records over indexes, which lines matter most, story tone, what to do about living relatives. Preferences guide; they never grant permission.
-- **Queue** and **AI Suggestions** — see [The Queue](#the-queue).
+- **Queue**, including its filtered **AI suggestions** view — see [The Queue](#the-queue).
 
 ## How the blocks fit together
 
@@ -169,7 +169,7 @@ The Queue is how the person hands work to their AI. Family History follows the f
 - **Lifecycle and order** follow Core: **Waiting on AI · AI working · Needs your input · Answered · Everything**, with *Needs your input* as a flag. Record states — proposed, disputed, needs review, publishable — are never Queue states.
 - **A directive never widens authority.** It cannot give the AI access to a person or source it may not read, or authorize a new objective, permanent deletion, an identity merge, accepting a disputed claim. When something only the person can supply is missing, the item asks the smallest exact question.
 - **Priority is the person's.** The AI never sets it.
-- **AI Suggestions** are where the AI parks ideas the person did not ask for (*these two Johns may be one person*, *nobody has looked for a burial record*). Accepting one creates a Queue item.
+- Requests you ask your AI to add are ordinary Queue items, marked added by your AI. Your AI’s own ideas are AI suggestions in your private Queue, hidden by default with a count; you can edit first, accept or dismiss them. Nothing runs before you accept. Needs your input is a flag on an item, never a state. Family-history conclusions stay on their records as AI proposal until you decide, never in the Queue.
 - **The Queue is not the build tracker** (`docs/tracker/`) and not a research-task list; it carries a person's directives inside the product.
 
 ## The AI connection and tools
@@ -187,7 +187,7 @@ What the AI must be able to do, by job:
 3. **Read** — one record with its connected context in manageable amounts: a person with claims, relationships, events and sources; a source with its file, transcription and claims; a question with its plan and log.
 4. **Look at the evidence** — the actual image, scan or audio the person allows.
 5. **Save** — people, relationships, events, places, sources with files, connections and photo tags as suggestions, proposed claims, possible matches, research, projects, plans and log entries, topics, stories and versions, notes the person dictates, and lists — in batches with per-item results.
-6. **Work the Queue** — pick up, report progress, ask the person a question, answer, add attributed follow-ups, and park unrequested ideas in AI Suggestions.
+6. **Work the Queue** — pick up, report progress, ask the person a question, answer, add attributed follow-ups, and park unrequested work ideas in the Queue’s AI suggestions view.
 7. **Switch trees** — only when the person asks or names a tree.
 
 ## Language

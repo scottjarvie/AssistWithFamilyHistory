@@ -5,9 +5,11 @@
  * Tells an agent where to learn how this platform works. Served at the site
  * root (NOT under /api) so it is publicly reachable. No vault data.
  */
+import {QUEUE_AI_INSTRUCTIONS} from "@/lib/mcp/accessCopy";
 import { SUPPORT_DESK_URL } from "@/lib/site/supportDesk";
 
 const BODY = [
+  QUEUE_AI_INSTRUCTIONS,
   "# Assist With Family History",
   "A family-history AI platform. Point your AI agent here to help gather, organize, and tell your family's story.",
   "",

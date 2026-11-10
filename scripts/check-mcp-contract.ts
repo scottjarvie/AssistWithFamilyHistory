@@ -129,7 +129,7 @@ assert.deepEqual(
 );
 assert.deepEqual(
   queueScopesForGrant(["family_history:queue:work"]),
-  ["queue:read", "queue:claim", "queue:update", "queue:complete"],
+  ["queue:read", "queue:claim", "queue:update", "queue:complete", "queue:add"],
   "queue:work must produce the claim/update/complete set",
 );
 

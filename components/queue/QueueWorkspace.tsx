@@ -1,4 +1,6 @@
 "use client";
+import {queueIdentity} from "@/lib/queue/identity";
+import {QueueReview,QueueOrigin} from "./QueueReview";
 
 import {
   Archive,
@@ -113,7 +115,7 @@ function problemFromResponse(response: Response, payload: Partial<QueueListRespo
 }
 
 function StateStamp({ item, compact = false }: { item: QueueItemRecord; compact?: boolean }) {
-  const presentation = QUEUE_STATE_PRESENTATION[item.state];
+  const presentation = item.suggestionStatus==="open"?{...QUEUE_STATE_PRESENTATION[item.state],label:"Awaiting review"}:QUEUE_STATE_PRESENTATION[item.state];
   const Icon = stateIcons[item.state];
   return (
     <span
@@ -345,13 +347,13 @@ function QueueDetail({
         <div className="flex flex-wrap items-center gap-2">
           <StateStamp item={item} />
           <Badge variant="outline" className="border-border bg-card/70 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-            {queueConditionLabel(item.condition)}
+            {item.suggestionStatus==="open"?"Awaiting your decision":queueConditionLabel(item.condition)}
           </Badge>
           <Badge variant="outline" className="border-border bg-card/70 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
             {item.priority} priority
           </Badge>
         </div>
-        <h2 id="queue-detail-title" className="mt-5 text-3xl font-semibold leading-tight text-foreground sm:text-4xl">{item.summary}</h2>
+        <QueueOrigin item={item}/><h2 id="queue-detail-title" className="mt-5 text-3xl font-semibold leading-tight text-foreground sm:text-4xl">{item.summary}</h2>
       </header>
 
       <div className="grid min-w-0 gap-0 xl:grid-cols-[minmax(0,1fr)_13rem]">
@@ -382,15 +384,16 @@ function QueueDetail({
             ) : null}
           </section>
 
+          <QueueReview item={item} readonlyPreview={readonlyPreview} onChanged={onChanged}/>
           <div className="mt-5 flex flex-wrap gap-2">
             {canPersonClaim(item) ? (
               <Button onClick={() => setAction("claim")} className="bg-primary text-primary-foreground hover:bg-primary/90">
                 <UserRound aria-hidden="true" /> Work on this myself
               </Button>
             ) : null}
-            {item.state === "needs_you" ? (
+            {item.needsInput ? (
               <Button onClick={() => setAction("resume")} className="bg-primary text-primary-foreground hover:bg-primary/90">
-                <ArrowRight aria-hidden="true" /> Answer and resume
+                <ArrowRight aria-hidden="true" /> Answer
               </Button>
             ) : null}
             {canPersonContinue(item) ? (
@@ -403,12 +406,12 @@ function QueueDetail({
                 </Button>
               </>
             ) : null}
-            {item.state === "done" ? (
+            {!item.archivedAt && item.suggestionStatus!=="open" && item.state === "done" ? (
               <Button onClick={() => setAction("reopen")} variant="outline" className="border-border bg-card">
                 <RotateCcw aria-hidden="true" /> Reopen
               </Button>
             ) : null}
-            {item.state !== "done" ? (
+            {!item.archivedAt && item.suggestionStatus!=="open" && item.state !== "done" ? (
               <Button onClick={() => setAction("cancel")} variant="ghost" className="text-destructive">
                 <X aria-hidden="true" /> Cancel handoff
               </Button>
@@ -422,7 +425,7 @@ function QueueDetail({
             <div className="mt-4"><InlineAction item={item} command="checkpoint" label="Update the current step" prompt="Leave a readable next step so the thread survives this session." placeholder="Check the neighboring census page for the missing surname variation." submitLabel="Save progress" onDone={actionDone} onReload={onReload} onCancel={() => setAction(null)} /></div>
           ) : null}
           {action === "resume" ? (
-            <div className="mt-4"><InlineAction item={item} command="resume" label="Answer and resume" prompt="Record the answer or decision that unblocks the handoff. It returns to Waiting for your AI; nothing runs automatically." placeholder="Use the 1880 household as the working family group, but retain the date conflict." submitLabel="Return to Waiting" onDone={actionDone} onReload={onReload} onCancel={() => setAction(null)} /></div>
+            <div className="mt-4"><InlineAction item={item} command="resume" label="Answer" prompt="Record the answer or decision that unblocks the handoff. Your answer clears the flag and keeps the item’s state." placeholder="Use the 1880 household as the working family group, but retain the date conflict." submitLabel="Save answer" onDone={actionDone} onReload={onReload} onCancel={() => setAction(null)} /></div>
           ) : null}
           {action === "complete" ? (
             <div className="mt-4"><InlineAction item={item} command="complete" label="Record the result" prompt="Summarize what was learned, what evidence supports it, and any uncertainty that remains." placeholder="The two households are probably the same family because… Remaining uncertainty…" submitLabel="Mark Done" onDone={actionDone} onReload={onReload} onCancel={() => setAction(null)} /></div>
@@ -434,7 +437,7 @@ function QueueDetail({
             <div className="mt-4"><InlineAction item={item} command="reopen" label="Reopen this handoff" prompt="Explain why the result needs another pass. It returns to Waiting for your AI; nothing runs automatically." placeholder="A new source changes the household interpretation." submitLabel="Reopen in Waiting" onDone={actionDone} onReload={onReload} onCancel={() => setAction(null)} /></div>
           ) : null}
 
-          </section><section aria-label="Original directive" className="order-2 border-b border-border px-5 py-5 sm:px-8 lg:order-1"><p className="mb-3 font-mono text-xs uppercase tracking-wider text-annotation">You asked</p>        <p className="mt-4 whitespace-pre-wrap text-[15px] leading-7 text-foreground">{item.directive}</p>
+          </section><section aria-label="Original directive" className="order-2 border-b border-border px-5 py-5 sm:px-8 lg:order-1"><p className="mb-3 font-mono text-xs uppercase tracking-wider text-annotation">{item.suggestionStatus==="open"?"AI suggested":"You asked"}</p>        <p className="mt-4 whitespace-pre-wrap text-[15px] leading-7 text-foreground">{item.directive}</p>
         {item.requestedOutcome ? (
           <div className="mt-5 border-l-2 border-annotation pl-4">
             <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-annotation">Useful result</p>
@@ -535,7 +538,11 @@ function QueueDetail({
 
 export type QueuePreview={items:QueueItemRecord[];activity:Record<string,QueueActivityRecord[]>;pageSize?:number;activityPageSize?:number;now?:number;problem?:QueueProblem;detailProblem?:QueueProblem};
 type QueueWorkspaceProps={preferenceKey:string;initialFilters?:QueueFilterInput;preview?:QueuePreview};
-export function QueueWorkspace(props:QueueWorkspaceProps){return <QueueDrafts readonlyPreview={Boolean(props.preview)}><QueueController {...props}/></QueueDrafts>;}
+export function QueueWorkspace(props:QueueWorkspaceProps){
+ const serialized=props.preview?JSON.stringify(props.preview):null;
+ const preview=useMemo(()=>serialized?JSON.parse(serialized) as QueuePreview:undefined,[serialized]);
+ return <QueueDrafts readonlyPreview={Boolean(preview)}><QueueController {...props} preview={preview}/></QueueDrafts>;
+}
 function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspaceProps) {
   const snapshot=useSyncExternalStore(subscribeQueueURL,queueSnapshot,()=>initialQueueSnapshot(initialFilters));
   const filters=useMemo(()=>JSON.parse(snapshot) as QueueFilters,[snapshot]);
@@ -551,6 +558,7 @@ function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspac
   const setSelectedId=(id:string|null)=>{if(id)navigateQueue({item:id});else closeSelection();};
   const applyFilters=(next:Record<string,string>)=>{const normalized=normalizeQueueFilters(next);navigateQueue({...normalized,item:normalized.state!==filters.state?"":filters.item});};
   const selectItem=(item:QueueItemRecord)=>{if(!filters.item){origin.current=document.activeElement instanceof HTMLElement?document.activeElement:null;navigateQueue({item:item._id},false);}else navigateQueue({item:item._id});};
+  const [serverCounts,setServerCounts]=useState<{suggestions:number;needsInput:number}|null>(null);
   const [items, setItems] = useState<QueueItemRecord[]>([]);
   const visibleItems=useMemo(()=>items.filter(item=>queueMatchesView(item,filters,preview?.now??Date.now())),[items,filters,preview?.now]);
   const selectedId=filters.item||null;
@@ -570,6 +578,7 @@ function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspac
   const [listDone, setListDone] = useState(true);
   const [showNew, setShowNew] = useState(false);
 
+  useEffect(()=>{if(serverCounts)window.dispatchEvent(new CustomEvent("queue-counts",{detail:serverCounts}));},[serverCounts]);
   const loadItems = useCallback(async (append = false, cursor?: string | null) => {
     const request=++listRequest.current;
     if (append) setLoadingMore(true);
@@ -578,18 +587,24 @@ function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspac
     try {
       if(preview){
         if(preview.problem){setProblem(preview.problem);setItems([]);return;}
-        const matching=preview.items.filter(item=>stateFilter==="all"||item.state===stateFilter);
+        const projected=preview.items.map(queueIdentity);
+        setServerCounts({suggestions:projected.filter(i=>i.suggestionStatus==="open"&&!i.archivedAt).length,needsInput:projected.filter(i=>!!i.needsInput&&!i.archivedAt).length});
+        const matching=projected.filter(item=>!!item.archivedAt===!!filters.archived&&(stateFilter==="needs_you"?true:filters.suggestions?item.addedBy==="ai_suggestion":!["open","dismissed","withdrawn"].includes(item.suggestionStatus??""))&&(stateFilter==="all"||(stateFilter==="needs_you"?!!item.needsInput:item.state===stateFilter)));
         const start=Number(cursor||0),end=start+(preview.pageSize||25),page=matching.slice(start,end);
         setItems(current=>append?[...current,...page]:page);setLoadedState(stateFilter);setListCursor(end<matching.length?String(end):null);setListDone(end>=matching.length);
         return;
       }
       const params = new URLSearchParams({ limit: "25" });
       if (stateFilter !== "all") params.set("state", stateFilter);
+      if(filters.suggestions)params.set("suggestions","true");
+      if(filters.archived)params.set("archived","true");
       if (cursor) params.set("cursor", cursor);
       const response = await fetch(`/api/queue?${params}`, { cache: "no-store" });
       const payload = (await response.json()) as QueueListResponse;
       if (!response.ok || !payload.success) throw problemFromResponse(response, payload);
       if(request!==listRequest.current)return;
+      const totals=(payload as QueueListResponse & {counts?:{available:boolean;suggestions:number;needsInput:number}}).counts;
+      setServerCounts(totals?.available?totals:null);
       setItems((current) => append ? [...current, ...payload.page] : payload.page);
       setLoadedState(stateFilter);
       setListCursor(payload.continueCursor || null);
@@ -605,7 +620,7 @@ function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspac
     } finally {
       if(request===listRequest.current){setHasLoaded(true);setLoading(false);setLoadingMore(false);}
     }
-  }, [stateFilter,preview]);
+  }, [stateFilter,filters.suggestions,filters.archived,preview]);
 
   const loadDetail = useCallback(async (id: string, appendActivity = false, cursor?: string | null, quiet = false) => {
     const request=++detailRequest.current;
@@ -616,7 +631,7 @@ function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspac
     }
     try {
       if(preview){
-        const item=preview.items.find(item=>item._id===id);
+        const item=preview.items.map(queueIdentity).find(item=>item._id===id);
         if(preview.detailProblem||!item){setDetailProblem(preview.detailProblem||{title:"Queue item unavailable",detail:"This invented item is not in the fixture.",surfaceState:"error"});return;}
         const all=preview.activity[id]||[],start=Number(cursor||0),end=start+(preview.activityPageSize||50),page=all.slice(start,end);
         const payload={success:true,surfaceState:"ready",item,activity:{page,isDone:end>=all.length,continueCursor:end<all.length?String(end):""}};
@@ -656,21 +671,24 @@ function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspac
 
   const counts = useMemo(() => {
     const result: Record<QueueState, number> = { needs_you: 0, working: 0, waiting_for_your_ai: 0, done: 0 };
-    for (const item of items) result[item.state] += 1;
+    for (const item of items) if(!item.archivedAt&&item.suggestionStatus!=="open")result[item.state] += 1;
     return result;
   }, [items]);
 
   useEffect(()=>{threadScroll.current?.scrollTo({top:0});},[selectedId]);
   function updateLoadedItem(item:QueueItemRecord) {
-    const leavesState=stateFilter!=="all"&&stateFilter!==item.state;
+    const leavesState=stateFilter!=="all"&&(stateFilter==="needs_you"?!item.needsInput:stateFilter!==item.state);
     setItems(current=>leavesState?current.filter(entry=>entry._id!==item._id):current.map(entry=>entry._id===item._id?item:entry));
   }
   function replaceItem(item: QueueItemRecord) {
+    void loadItems();
+    window.dispatchEvent(new Event("queue-changed"));
     updateLoadedItem(item);
     if(item._id===selectedId){setDetail(current=>current?{...current,item}:current);void loadDetail(item._id,false,null,true);}
   }
 
   function handleCreated(item: QueueItemRecord) {
+    void loadItems();
     origin.current=null;returnItem.current=item._id;
     setShowNew(false);
     if (stateFilter !== "all" && stateFilter !== item.state) navigateQueue({state:"",view:"",actor:""});
@@ -684,7 +702,7 @@ function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspac
   }
   async function reloadRow(id:string) {
     try {
-      if(preview){const item=preview.items.find(row=>row._id===id);if(item)latestHandlers.current.changed(item);return Boolean(item);}
+      if(preview){const item=preview.items.map(queueIdentity).find(row=>row._id===id);if(item)latestHandlers.current.changed(item);return Boolean(item);}
       const response=await fetch(`/api/queue/${encodeURIComponent(id)}?limit=50`,{cache:"no-store"});
       const payload=await response.json() as QueueDetailResponse;
       if(!response.ok||!payload.success)throw problemFromResponse(response,payload);
@@ -708,17 +726,17 @@ function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspac
     {preview&&<p className="mb-4 text-xs text-annotation">Synthetic preview: all writes are disabled; no backend connected.</p>}
     {loading&&!hasLoaded?<QueueLoading/>:problem?<QueueProblemCard problem={problem} onRetry={()=>void loadItems()}/>:<>
       {!loading&&items.length===0&&<section className="mb-5 rounded-lg border border-dashed border-border bg-card p-6"><h2 className="text-2xl font-semibold">Nothing needs carrying forward.</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">Leave a directive when a research question, review, or story thread should survive this session.</p><Button onClick={()=>setShowNew(true)} className="mt-3 min-h-11"><Plus/>Leave the first directive</Button></section>}
-      <div ref={collection} tabIndex={-1} aria-label="Queue items" className="min-w-0 scroll-mt-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><QueueCollection items={visibleItems} loadedItems={items} loadedState={loadedState} filters={filters} selectedId={selectedId} preferenceKey={preferenceKey} onFilters={applyFilters} onSelect={selectItem} onChanged={itemChanged} onReload={reloadRow} onOrderChange={acceptOrder}/>{loading&&<p role="status" className="text-sm text-muted-foreground">Loading matching handoffs…</p>}{!listDone&&<Button variant="outline" className="mt-4 min-h-11" onClick={()=>void loadItems(true,listCursor)} disabled={loadingMore}>{loadingMore?<LoaderCircle className="animate-spin"/>:<ChevronDown/>}Load more handoffs</Button>}</div>
+      <div ref={collection} tabIndex={-1} aria-label="Queue items" className="min-w-0 scroll-mt-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><QueueCollection items={visibleItems} loadedItems={items} loadedState={loadedState} counts={serverCounts} filters={filters} selectedId={selectedId} preferenceKey={preferenceKey} onFilters={applyFilters} onSelect={selectItem} onChanged={itemChanged} onReload={reloadRow} onOrderChange={acceptOrder}/>{loading&&<p role="status" className="text-sm text-muted-foreground">Loading matching handoffs…</p>}{!listDone&&<Button variant="outline" className="mt-4 min-h-11" onClick={()=>void loadItems(true,listCursor)} disabled={loadingMore}>{loadingMore?<LoaderCircle className="animate-spin"/>:<ChevronDown/>}Load more handoffs</Button>}</div>
 
     </>}
-    <Dialog open={Boolean(selectedId)} onOpenChange={open=>{if(!open)setSelectedId(null);}}><DialogContent ref={threadScroll} data-queue-scroll showCloseButton={false} onOpenAutoFocus={event=>{event.preventDefault();threadScroll.current?.focus();}} onCloseAutoFocus={event=>{event.preventDefault();const row=[...(collection.current?.querySelectorAll<HTMLButtonElement>("[data-queue-item]")||[])].find(button=>button.dataset.queueItem===returnItem.current&&button.getClientRects().length>0);if(row){row.scrollIntoView({block:"nearest"});row.focus({preventScroll:true});}else if(origin.current?.isConnected)origin.current.focus({preventScroll:true});else collection.current?.focus({preventScroll:true});origin.current=null;returnItem.current=null;}} tabIndex={-1} id="queue-selected" className="left-0 top-0 block h-[100dvh] max-w-none translate-x-0 translate-y-0 overflow-y-auto rounded-none border-0 p-0 sm:max-w-none lg:left-auto lg:right-0 lg:w-[48rem] lg:max-w-[calc(100vw-3rem)] lg:border-l">
+    <Dialog open={Boolean(selectedId)} onOpenChange={open=>{if(!open)setSelectedId(null);}}><DialogContent ref={threadScroll} data-queue-scroll showCloseButton={false} onOpenAutoFocus={event=>{event.preventDefault();threadScroll.current?.focus();}} onCloseAutoFocus={event=>{event.preventDefault();const row=[...(collection.current?.querySelectorAll<HTMLButtonElement>("[data-queue-item]")||[])].find(button=>button.dataset.queueItem===returnItem.current&&button.getClientRects().length>0);if(row){row.scrollIntoView({block:"nearest"});row.focus({preventScroll:true});}else if(origin.current?.isConnected)origin.current.focus({preventScroll:true});else collection.current?.focus({preventScroll:true});origin.current=null;returnItem.current=null;}} tabIndex={-1} id="queue-selected" className="scroll-pt-24 left-0 top-0 block h-[100dvh] max-w-none translate-x-0 translate-y-0 overflow-y-auto rounded-none border-0 p-0 sm:max-w-none lg:left-auto lg:right-0 lg:w-[48rem] lg:max-w-[calc(100vw-3rem)] lg:border-l">
       <div className="sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-border bg-background px-4 py-2">
         <div className="max-sm:sr-only"><DialogTitle className="font-sans text-sm">Selected thread</DialogTitle><DialogDescription className="mt-1 text-xs">{navigationIndex>=0?"Previous/Next follow the visible rows":"Outside this loaded view"}</DialogDescription></div><div className="sm:hidden"><Button variant="ghost" className="min-h-11 px-2" aria-label="Back to loaded handoffs" onClick={closeSelection}><ArrowLeft/>Back</Button></div>
         <div className="flex gap-1"><Button variant="ghost" className="min-h-11 px-3" disabled={navigationIndex<=0} onClick={()=>{if(navigationIndex>0)navigateQueue({item:navigationItems[navigationIndex-1]._id});}} aria-label="Previous loaded handoff"><ArrowUp/><span className="hidden sm:inline"> Previous</span></Button><Button variant="ghost" className="min-h-11 px-3" disabled={navigationIndex<0||navigationIndex>=navigationItems.length-1} onClick={()=>{if(navigationIndex>=0&&navigationIndex<navigationItems.length-1)navigateQueue({item:navigationItems[navigationIndex+1]._id});}} aria-label="Next loaded handoff"><span className="hidden sm:inline">Next </span><ArrowDown/></Button><Button variant="outline" className="hidden min-h-11 sm:inline-flex" onClick={closeSelection}>Back to loaded handoffs</Button></div>
       </div>
       {selectedId&&(detailProblem?<QueueProblemCard problem={detailProblem} onRetry={()=>void loadDetail(selectedId)}/>:detailLoading||!detail||detail.item._id!==selectedId?<div className="h-80 animate-pulse border border-border bg-muted" aria-label="Loading selected Queue item"/>:<QueueDetail key={detail.item._id} item={detail.item} activity={detail.activity.page} activityDone={detail.activity.isDone} activityLoading={activityLoading} onLoadMoreActivity={()=>void loadDetail(detail.item._id,true,detail.activity.continueCursor)} onChanged={itemChanged} onDeleted={itemDeleted} onReload={()=>loadDetail(selectedId,false,null,true)}/>)}
     </DialogContent></Dialog>
-    <section className="mt-6 rounded-lg border border-border bg-card px-4 py-2" aria-label="Queue state summary"><p className="mt-2 text-xs text-muted-foreground">State meanings · counts in the current load</p><dl className="grid gap-x-6 sm:grid-cols-2">{QUEUE_STATES.map(state=><div key={state} className="border-b border-border py-2 last:border-0"><dt><button type="button" aria-pressed={stateFilter===state} onClick={()=>applyFilters({...filters,state:stateFilter===state?"":state,view:"",actor:""})} className="flex min-h-11 w-full items-center justify-between gap-3 text-left text-sm font-semibold text-primary"><span className="flex items-center gap-2">{stateIcons[state]({className:"h-4 w-4"})}{QUEUE_STATE_PRESENTATION[state].label}</span><span className="font-mono text-xs text-muted-foreground">{problem?"Unavailable":loading?"Loading…":stateFilter==="all"||stateFilter===state?counts[state]:"Not in this load"}</span></button></dt><dd className="pb-2 text-xs leading-5 text-muted-foreground">{QUEUE_STATE_PRESENTATION[state].short}</dd></div>)}</dl></section>
-    <footer className="mt-8 flex flex-wrap justify-between gap-3 border-t border-border py-5 text-xs leading-5 text-muted-foreground"><p className="flex items-start gap-2"><ShieldCheck className="mt-1 h-4 w-4 shrink-0 text-evidence"/>Queue directives and activity stay private to this vault and share the item&apos;s deletion lifecycle.</p><p className="font-mono">Four states · no autonomous runner</p></footer>
+    {!filters.suggestions&&!filters.archived&&<section className="mt-6 rounded-lg border border-border bg-card px-4 py-2" aria-label="Queue state summary"><p className="mt-2 text-xs text-muted-foreground">Open-work state counts · current load</p><dl className="grid gap-x-6 sm:grid-cols-2">{QUEUE_STATES.map(state=><div key={state} className="border-b border-border py-2 last:border-0"><dt><button type="button" aria-pressed={stateFilter===state} onClick={()=>applyFilters({...filters,state:stateFilter===state?"":state,view:"",actor:""})} className="flex min-h-11 w-full items-center justify-between gap-3 text-left text-sm font-semibold text-primary"><span className="flex items-center gap-2">{stateIcons[state]({className:"h-4 w-4"})}{QUEUE_STATE_PRESENTATION[state].label}</span><span className="font-mono text-xs text-muted-foreground">{problem?"Unavailable":loading?"Loading…":stateFilter==="all"||stateFilter===state?counts[state]:"Not in this load"}</span></button></dt><dd className="pb-2 text-xs leading-5 text-muted-foreground">{QUEUE_STATE_PRESENTATION[state].short}</dd></div>)}</dl></section>}
+    <footer className="mt-8 flex flex-wrap justify-between gap-3 border-t border-border py-5 text-xs leading-5 text-muted-foreground"><p className="flex items-start gap-2"><ShieldCheck className="mt-1 h-4 w-4 shrink-0 text-evidence"/>Queue directives and activity stay private to this vault and share the item&apos;s deletion lifecycle.</p><p className="font-mono">Three states · input is a flag</p></footer>
   </div>;
 }

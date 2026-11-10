@@ -1402,9 +1402,32 @@ export default defineSchema({
    * This is intentionally distinct from researchTasks and from the derived
    * research-operations view. `state` is the complete product state set;
    * failure, retry, cancellation, and handoff expiry are conditions within
-   * those four states, never additional user-facing states.
+   * the three lifecycle states plus the independent input flag. The old needs_you literal is retained only for read-time compatibility.
    */
+  queueCounters: defineTable({
+    vaultOwnerId:v.string(), openSuggestions:v.number(), needsInput:v.number(), totalRecords:v.number(), waiting:v.number(), working:v.number(), answered:v.number(), ready:v.boolean(), updatedAt:v.number(),
+    backfillCursor:v.optional(v.union(v.string(),v.null())),
+    lastBackfillCursor:v.optional(v.union(v.string(),v.null())),
+    lastBackfillResult:v.optional(v.object({scanned:v.number(),changed:v.number(),suggestions:v.number(),needsInput:v.number(),isDone:v.boolean(),continueCursor:v.string()})),
+  }).index("by_owner",["vaultOwnerId"]),
   queueItems: defineTable({
+    counterIncluded:v.optional(v.boolean()),
+    wasDismissed:v.optional(v.boolean()),
+    suggestionIdeaKey:v.optional(v.string()),
+    addedBy: v.optional(v.union(v.literal("person"), v.literal("ai_on_request"), v.literal("ai_suggestion"))),
+    suggestionStatus: v.optional(v.union(v.literal("open"), v.literal("accepted"), v.literal("dismissed"), v.literal("withdrawn"))),
+    suggestionReason: v.optional(v.string()),
+    suggestionOptions: v.optional(v.array(v.string())),
+    suggestionEvidence: v.optional(v.array(v.string())),
+    raisedByCredentialId: v.optional(v.string()),
+    aiName: v.optional(v.string()),
+    fromRecord: v.optional(v.object({kind: v.string(), refId: v.string()})),
+    needsInput: v.optional(v.object({question:v.string(), raisedAt:v.number(), actorId:v.string()})),
+    archivedAt: v.optional(v.number()),
+    archivedBy: v.optional(v.string()),
+    dismissReason: v.optional(v.string()),
+    personActedAt: v.optional(v.number()),
+
     vaultOwnerId: v.string(),
     directive: v.string(),
     summary: v.string(),
@@ -1469,6 +1492,7 @@ export default defineSchema({
       v.union(v.literal("user"), v.literal("chosen_ai"), v.literal("first_party_ai"), v.literal("system")),
     ),
     activeActorId: v.optional(v.string()),
+    activeCredentialId:v.optional(v.string()),
     leaseExpiresAt: v.optional(v.number()),
     handoffExpiresAt: v.optional(v.number()),
     requiredAction: v.optional(v.string()),
@@ -1495,6 +1519,7 @@ export default defineSchema({
   })
     .index("by_owner", ["vaultOwnerId"])
     .index("by_owner_updated", ["vaultOwnerId", "updatedAt"])
+    .index("by_owner_idea", ["vaultOwnerId", "suggestionIdeaKey", "wasDismissed"])
     .index("by_owner_state_updated", ["vaultOwnerId", "state", "updatedAt"])
     .index("by_owner_priority_updated", ["vaultOwnerId", "priority", "updatedAt"]),
 
@@ -1504,6 +1529,7 @@ export default defineSchema({
     vaultOwnerId: v.string(),
     queueItemId: v.id("queueItems"),
     eventType: v.union(
+      v.literal("reviewed"),
       v.literal("created"),
       v.literal("claimed"),
       v.literal("checkpointed"),

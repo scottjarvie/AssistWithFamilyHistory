@@ -2,20 +2,21 @@
 
 Status: backend Queue-local authority and expiry repair merged through protected PR #32 and is present in the matching Ready Vercel production build. This document is a behavior and integration contract, not a claim that the production Convex deploy branch, a final Queue screen, external AI connection, or authenticated production journey is proven.
 
+Current AWL-0016 implementation details, counter backfill and evidence: [implementation](../tracker/cards/AWL-0016-evidence/IMPLEMENTATION.md). Historic tracker/work-order receipts retain the wording of their original revisions.
+
 ## Product boundary
 
 The Family History Queue preserves a person's directive across sessions. It is not the internal Cards / Work Orders tracker, the research-operations readiness table, a generic todo list, or an autonomous task runner.
 
-The product exposes exactly four Queue states:
+The product exposes three Queue states plus an independent **Needs your input** flag (AWL-0016, Core 1.24.0 §4):
 
 | State | Meaning | Required visible content |
 | --- | --- | --- |
-| **Needs You** | Work is stopped on one decision, fact, file, review, or authority only the person can provide | The smallest exact question or action |
-| **Working** | An authorized person or AI has an unexpired claim and is actively doing bounded work | The current genealogy-language step and who picked it up |
-| **Waiting for your AI** | The directive is saved but nothing is running | Who it was left for, when, and connection/retry truth |
-| **Done** | The result or cancellation is recorded and traceable | Readable result, references, provenance, and remaining uncertainty |
+| **AI working** | An authorized person or AI has an unexpired claim and is actively doing bounded work | The current genealogy-language step and who picked it up |
+| **Waiting on AI** | The directive is saved but nothing is running | Who it was left for, when, and connection/retry truth |
+| **Answered** | The result or cancellation is recorded and traceable | Readable result, references, provenance, and remaining uncertainty |
 
-Failure, retry, disconnection, cancellation, completion, and handoff expiry are conditions inside those states. They are not a fifth state. A retryable failure returns to **Waiting for your AI** because nothing is running. An exhausted failure or expired handoff becomes **Needs You** with an exact action. A cancellation is **Done** with its reason retained.
+Failure, retry, disconnection, cancellation, completion, and handoff expiry are conditions inside those states. They are not additional lifecycle states. A retryable failure returns to **Waiting on AI** because nothing is running. An exhausted failure or expired handoff keeps its underlying state and raises the input flag with an exact question, releasing the claim. A cancellation is **Answered** with its reason retained.
 
 ## Audit of existing work and status surfaces
 
@@ -84,13 +85,13 @@ MCP or a public credential resolver.
 | Assign | Verified owner; any non-Done item | Waiting for the named AI |
 | Claim | Assigned AI or owner; Waiting, or an expired Working lease | Working with bounded lease and current step; an AI lease cannot outlive its handoff authority |
 | Checkpoint | Current actor with an unexpired lease | Working; advances version and lease |
-| Request user action | Current assigned AI with unexpired lease | Needs You with exact action |
-| Resume | Verified owner; Needs You | Waiting for your AI |
-| Failure | Current assigned AI with unexpired lease | Waiting with scheduled retry, or Needs You after exhaustion/non-retryable failure |
+| Request user action | Current assigned AI with unexpired lease | Same state with the Needs your input flag and exact question |
+| Answer | Verified person; input flag | Same state; clears the flag and keeps the answer |
+| Failure | Current assigned AI with unexpired lease | Waiting with scheduled retry, or the input flag after exhaustion/non-retryable failure |
 | Complete | Current actor with unexpired lease | Done with readable result |
 | Cancel | Verified owner; non-Done | Done with cancellation result/reason |
 | Reopen | Verified owner; Done | Waiting for your AI |
-| Expire | Scheduled and read-reconciled internal boundary after a real lease/handoff deadline | Needs You with reconnect/reassign action and one attributable, idempotent expiry event |
+| Expire | Scheduled and read-reconciled internal boundary after a real lease/handoff deadline | Same state with the input flag and reconnect/reassign question and one attributable, idempotent expiry event |
 | Delete | Verified owner plus exact destructive confirmation | Hard-delete item, content-bearing activity, and command receipts in bounded batches |
 
 All mutations are atomic Convex transactions. Stale versions return a retryable conflict instead of overwriting newer work. Claims are actor-bound and time-bounded. A chosen AI cannot checkpoint, fail, request user action, or complete after handoff authority expires even if a nominal lease was longer. Reassigning an expired item clears the stale deadline unless the person supplies a new future deadline; resuming an expired item also removes the expired deadline, and reopening disconnected work remains honestly disconnected. No Queue command changes a person, relationship, source, claim, story publication state, identity, access grant, or provider account.
@@ -134,7 +135,7 @@ The repository still lacks incoming API-key resolution to a server-trusted princ
 Claude Design may decide final page composition, card layout, responsive information hierarchy, motion, and visual treatment. It must preserve these behavior slots and truths:
 
 - Directive, product state, and handoff line are always available.
-- **Working** shows the current step; **Needs You** shows the exact question/action.
+- **AI working** shows the current step; the **Needs your input** flag shows the exact question with Answer and Archive.
 - Optional context is grouped by research subject, evidence, and work thread.
 - Result and activity are readable without reopening the originating AI conversation.
 - Waiting copy says nothing is running; disconnected and retry-scheduled conditions are not rendered as Working.
@@ -147,7 +148,7 @@ Claude Design may decide final page composition, card layout, responsive informa
 
 ## Verification boundary
 
-Source verification covers pure state/authority contracts and real Convex-runtime fixtures for Queue-local fail-closed anonymous/cross-owner denial even in legacy shadow mode, owner isolation, foreign-reference rejection, directive-only creation, pagination, handoff-capped claim leases, automatic and read-time expiry, expired-authority rejection, idempotent recovery/reassignment, actor authority, optimistic concurrency, Needs You/resume, retry/exhaustion, completion/activity attribution, human-only operation, and hard deletion.
+Source verification covers pure state/authority contracts and real Convex-runtime fixtures for Queue-local fail-closed anonymous/cross-owner denial even in legacy shadow mode, owner isolation, foreign-reference rejection, directive-only creation, pagination, handoff-capped claim leases, automatic and read-time expiry, expired-authority rejection, idempotent recovery/reassignment, actor authority, optimistic concurrency, Needs your input flag/answer, retry/exhaustion, completion/activity attribution, human-only operation, and hard deletion.
 
 Exact-main CI and the matching Vercel production application deployment are
 proven for main commit `1a82a03ed207c8cd3c9e99f0dd4b6d4720c282cd`.

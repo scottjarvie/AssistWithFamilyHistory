@@ -731,3 +731,39 @@ describe("Decision 4: reported identity is initialize-only", () => {
     expect(named.connections.every(row => !row.linkedByName)).toBe(true);
   });
 });
+
+// AWL-0016: aliases and canonical names enter the same real transport handlers.
+test("Queue suggestion authority holds through canonical MCP and compatibility aliases",async()=>{
+ const t=convexTest(schema,modules);await approvedConnection(t);const token=await accessToken();
+ async function call(name:string,args:Record<string,unknown>){const response=await t.fetch("/mcp",modernRequest("tools/call",token,{name,arguments:args},name));const body=await response.json();return body.result;}
+ for(const name of ["family_history_add_queue","add_queue"]){
+  const missing=await call(name,{operationId:`missing-${name}`,directive:"Research a gap"});expect(missing.isError).toBe(true);expect(JSON.stringify(missing)).toContain("addedBy");
+ }
+ const created=await call("family_history_add_queue",{operationId:"suggestion-add",directive:"Research a gap",addedBy:"ai_suggestion",reason:"A record is missing"});expect(created.isError).not.toBe(true);
+ const data=created.structuredContent??JSON.parse(created.content[0].text),item=data.item;
+ for(const name of ["family_history_update_queue","update_queue"]){
+  for(const [action,extra] of [["claim",{leaseMs:60000,nextStep:"Start"}],["checkpoint",{leaseMs:60000,nextStep:"Work"}],["complete",{resultSummary:"Done"}],["request_user_action",{requiredAction:"Which?"}],["fail",{failureCode:"STOP",failureSummary:"No",retryable:false}]] as const){
+   const result=await call(name,{action,operationId:`${name}-${action}`,queueItemId:item._id,expectedVersion:1,...extra});expect(result.isError).toBe(true);
+  }
+  for(const action of ["accept","dismiss","edit_accept"]){const result=await call(name,{action,operationId:`${name}-${action}`,queueItemId:item._id,expectedVersion:1,directive:"Edit"});expect(result.isError).toBe(true);}
+ }
+ const list=await call("get_queue",{action:"list"});expect((list.structuredContent??JSON.parse(list.content[0].text)).page).toHaveLength(0);
+ const own=await call("family_history_get_queue",{action:"list",suggestions:true});expect((own.structuredContent??JSON.parse(own.content[0].text)).page[0]._id).toBe(item._id);
+});
+
+test("AI cannot clear input or hide it through canonical, alias or generic archive calls",async()=>{
+ const t=convexTest(schema,modules);await approvedConnection(t);const token=await accessToken();
+ async function call(name:string,args:Record<string,unknown>){const r=await t.fetch("/mcp",modernRequest("tools/call",token,{name,arguments:args},name));return (await r.json()).result;}
+ const added=await call("family_history_add_queue",{operationId:"flag-archive-create",directive:"Research what the person asked",addedBy:"ai_on_request"});const item=(added.structuredContent??JSON.parse(added.content[0].text)).item;
+ const asked=await call("family_history_update_queue",{action:"request_user_action",operationId:"flag-archive-question",queueItemId:item._id,expectedVersion:1,requiredAction:"Which source?"});expect(asked.isError).not.toBe(true);
+ for(const name of ["family_history_update_queue","update_queue"]){
+  const archive=await call(name,{action:"archive",operationId:`flag-archive-${name}`,queueItemId:item._id,expectedVersion:2});expect(archive.isError).toBe(true);expect(JSON.stringify(archive)).toContain("Only the person can clear Needs your input");
+  const clear=await call(name,{action:"clear_input",operationId:`flag-clear-${name}`,queueItemId:item._id,expectedVersion:2});expect(clear.isError).toBe(true);
+  const revise=await call(name,{action:"checkpoint",operationId:`flag-revise-${name}`,queueItemId:item._id,expectedVersion:2,leaseMs:60000,nextStep:"Revise",needsInput:false,archivedAt:123});expect(revise.isError).toBe(true);
+ }
+ for(const name of ["family_history_archive_record","archive_record"]){const generic=await call(name,{operationId:`flag-generic-${name}`,kind:"queue",id:item._id,action:"archive",expectedUpdatedAt:123});expect(generic.isError).toBe(true);}
+ const saved=await t.run(ctx=>ctx.db.get(item._id));expect(saved?.needsInput?.question).toBe("Which source?");expect(saved?.archivedAt).toBeUndefined();
+});
+
+// Explicit website JWT issuer for synthetic person identities; never an auth bypass.
+beforeEach(()=>vi.stubEnv("CLERK_JWT_ISSUER_DOMAIN","https://convex.test"));

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { beforeEach, afterEach, describe, expect, test, vi } from "vitest";
 import { convexTest } from "convex-test";
 import schema from "./schema";
 import { api, internal } from "./_generated/api";
@@ -217,14 +217,16 @@ describe("product Queue foundation", () => {
       requiredAction: "Upload page two of the record so the household can be compared.",
       idempotencyKey: "needs-user",
     });
-    expect(blocked.item.state).toBe("needs_you");
+    expect(blocked.item.state).toBe("working");
+    expect(blocked.item.needsInput?.question).toContain("Upload page two");
     expect(blocked.item.requiredAction).toContain("Upload page two");
 
     const resumed = await t.withIdentity({ subject: OWNER_A }).mutation(api.queue.resumeQueueItem, {
       vaultOwnerId: OWNER_A, queueItemId: created.item._id, expectedVersion: blocked.item.version,
       answerSummary: "Page two is now attached to the source record.", idempotencyKey: "resume-1",
     });
-    expect(resumed.item.state).toBe("waiting_for_your_ai");
+    expect(resumed.item.state).toBe("working");
+    expect(resumed.item.needsInput).toBeUndefined();
     expect(resumed.item.requiredAction).toBeUndefined();
   });
 
@@ -258,7 +260,8 @@ describe("product Queue foundation", () => {
       failureCode: "permission_required", failureSummary: "The source requires a permission only the user can grant.",
       retryable: true, nextRetryAt: Date.now() + 60_000, idempotencyKey: "fail-exhausted",
     });
-    expect(exhausted.item.state).toBe("needs_you");
+    expect(exhausted.item.state).toBe("working");
+    expect(exhausted.item.needsInput).toBeDefined();
     expect(exhausted.item.condition).toBe("failed");
   });
 
@@ -344,7 +347,8 @@ describe("product Queue foundation", () => {
       queueItemId: created.item._id,
       activityPagination: { numItems: 20, cursor: null },
     });
-    expect(detail?.item.state).toBe("needs_you");
+    expect(detail?.item.state).toBe("waiting_for_your_ai");
+    expect(detail?.item.needsInput).toBeDefined();
     expect(detail?.item.condition).toBe("expired");
     expect(detail?.item.requiredAction).toMatch(/Reconnect or choose an AI/);
     expect(detail?.activity.page[0].eventType).toBe("expired");
@@ -376,7 +380,8 @@ describe("product Queue foundation", () => {
     vi.advanceTimersByTime(60_001);
     await t.finishInProgressScheduledFunctions();
     const expired = await t.run((ctx) => ctx.db.get(created.item._id));
-    expect(expired?.state).toBe("needs_you");
+    expect(expired?.state).toBe("waiting_for_your_ai");
+    expect(expired?.needsInput).toBeDefined();
     expect(expired?.condition).toBe("expired");
     expect(expired?.version).toBe(2);
 
@@ -391,6 +396,8 @@ describe("product Queue foundation", () => {
     expect(assigned.item.condition).toBe("ready");
     expect(assigned.item.handoffExpiresAt).toBeUndefined();
 
+    expect(assigned.item.needsInput).toBeUndefined();
+    expect(assigned.item.requiredAction).toBeUndefined();
     const claimed = await t.mutation(internal.queue.agentClaimQueueItem, {
       principal: principal(),
       queueItemId: created.item._id,
@@ -440,7 +447,8 @@ describe("product Queue foundation", () => {
       queueItemId: created.item._id,
       activityPagination: { numItems: 20, cursor: null },
     });
-    expect(detail?.item.state).toBe("needs_you");
+    expect(detail?.item.state).toBe("working");
+    expect(detail?.item.needsInput).toBeDefined();
     expect(detail?.item.condition).toBe("expired");
   });
 
@@ -507,3 +515,6 @@ describe("product Queue foundation", () => {
     expect(rows).toEqual({ item: null, activity: [], receipts: [] });
   });
 });
+
+// Explicit website JWT issuer for synthetic person identities; never an auth bypass.
+beforeEach(()=>vi.stubEnv("CLERK_JWT_ISSUER_DOMAIN","https://convex.test"));
