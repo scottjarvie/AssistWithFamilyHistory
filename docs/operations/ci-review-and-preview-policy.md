@@ -20,7 +20,7 @@ paid checks for the moment a change is about to ship.
 | Local `pnpm verify` | Typecheck, lint, tests, every contract check, build (the build check for PR branches) | Before an agent pushes | Free |
 | Code review | Logic, privacy and trust boundaries, product intent, whether the right test exists | Every PR before merge | Free |
 | Vercel preview build | `next build` succeeds (and the Convex preview deploy, when a preview key is set) | Pushes to `preview/*` branches only, except docs-only | Vercel build minutes |
-| GitHub CI (`.github/workflows/ci.yml`) | `pnpm verify` without the build | Ready (non-draft) PR pushes, or by hand | GitHub minutes, about 1 minute a run |
+| GitHub CI (`.github/workflows/ci.yml`) | `pnpm verify` (without the build on GitHub-hosted runners; with it on the Mac mini runner) | Ready (non-draft) PR pushes, or by hand | GitHub minutes, about 1 minute a run |
 | Vercel production build | Convex deploy then build, on merge | Every merge to `main`, except docs-only | Vercel build minutes |
 
 ## The rules
@@ -32,7 +32,7 @@ paid checks for the moment a change is about to ship.
    `build-and-smoke` check after a path check, without installing or verifying;
    `eslint` ignores `docs/**` so archived scripts there cannot break `main`.
 2. **No CI on `main`.** The merged commit already passed on its PR.
-3. **CI does not build or start the app.** Local `pnpm verify` is the build
+3. **GitHub-hosted CI does not build or start the app** (the Mac mini runner does build). Local `pnpm verify` is the build
    check for ordinary PR branches; Vercel builds only `main` and `preview/*`
    (push to `preview/<name>` when someone wants a hosted link). The route
    smoke test moved to the local preview.
