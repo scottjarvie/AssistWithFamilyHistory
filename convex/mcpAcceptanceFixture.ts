@@ -1,3 +1,4 @@
+import {removeQueueItemFromCounters} from "./queue";
 /* eslint-disable @typescript-eslint/no-explicit-any -- The fixture guard normalizes mapped IDs across a fixed table allowlist. */
 import { v } from "convex/values";
 import type { FunctionReference } from "convex/server";
@@ -394,7 +395,10 @@ export const clear = mutation({
     const removed = counts(graph);
     for (const row of graph.queueActivity) await ctx.db.delete(row._id);
     for (const row of graph.queueReceipts) await ctx.db.delete(row._id);
-    for (const row of graph.queueItems) await ctx.db.delete(row._id);
+    for (const row of graph.queueItems) {
+      await removeQueueItemFromCounters(ctx,row);
+      await ctx.db.delete(row._id);
+    }
     for (const row of graph.storyReviewEvents) await ctx.db.delete(row._id);
     for (const row of graph.stories) await ctx.db.delete(row._id);
     for (const row of graph.researchLog) await ctx.db.delete(row._id);

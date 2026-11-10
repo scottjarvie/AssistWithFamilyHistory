@@ -67,11 +67,12 @@ const principalValidator = v.object({
 });
 
 type QueueItem = Doc<"queueItems">;
+const queueContextTables={person:"persons",relationship:"relationships",place:"places",event:"events",source:"sources",citation:"citations",media:"media",context_item:"contextItems",research_task:"researchTasks",research_check:"researchChecks",story:"stories",import_run:"importRuns",provisional_relative:"provisionalRelatives"} as const;
 async function queueForPerson(ctx: Pick<QueryCtx,"db">, item:QueueItem, includeTitle=true) {
  const projected=queueIdentity(item);
  if (!item.fromRecord) return projected;
- const tables={person:"persons",relationship:"relationships",place:"places",event:"events",source:"sources",citation:"citations",media:"media",context_item:"contextItems",research_task:"researchTasks",research_check:"researchChecks",story:"stories",import_run:"importRuns",provisional_relative:"provisionalRelatives"} as const;
- const table=tables[item.fromRecord.kind as keyof typeof tables];
+
+ const table=queueContextTables[item.fromRecord.kind as keyof typeof queueContextTables];
  if(!table)return {...projected,fromRecord:undefined};
  const id=ctx.db.normalizeId(table,item.fromRecord.refId);
  const row=id?await ctx.db.get(id):null;
@@ -164,6 +165,11 @@ async function updateCounters(ctx:MutationCtx,before:QueueItem|null,after:QueueI
  if(after&&!after.counterIncluded)await ctx.db.patch(after._id,{counterIncluded:true});
 }
 
+/** Shared by every deletion path, including marked acceptance cleanup. */
+export async function removeQueueItemFromCounters(ctx:MutationCtx,item:QueueItem){
+ await updateCounters(ctx,item,null);
+}
+
 async function validateContext(ctx: MutationCtx, owner: string, context: QueueContext[]) {
   if (context.length > QUEUE_LIMITS.contextRefs) {
     throw new Error(`Queue context is limited to ${QUEUE_LIMITS.contextRefs} references`);
@@ -173,7 +179,9 @@ async function validateContext(ctx: MutationCtx, owner: string, context: QueueCo
     const key = `${ref.kind}:${ref.refId}`;
     if (seen.has(key)) throw new Error("Queue context contains a duplicate reference");
     seen.add(key);
-    const row = await ctx.db.get(ref.refId);
+    const id=ctx.db.normalizeId(queueContextTables[ref.kind],ref.refId);
+    if(!id)throw new Error("Queue context kind does not match its record table");
+    const row = await ctx.db.get(id);
     if (!row || !("vaultOwnerId" in row) || !matchesVaultOwner(row.vaultOwnerId, owner)) {
       throw new Error("Queue context reference not found");
     }
@@ -453,7 +461,8 @@ export const assignQueueItemToAi = mutation({
         activeCredentialId:undefined,
         leaseExpiresAt: undefined,
         handoffExpiresAt: args.handoffExpiresAt,
-        requiredAction: undefined,
+        needsInput: _current.needsInput?.actorId==="queue-expiry"?undefined:_current.needsInput,
+        requiredAction: _current.needsInput?.actorId==="queue-expiry"?undefined:_current.requiredAction,
         nextStep: undefined,
         failureCode: undefined,
         failureSummary: undefined,
@@ -1247,7 +1256,7 @@ export const deleteQueueItemBatch = internalMutation({
         .take(remaining);
       for (const row of receipts) await ctx.db.delete(row._id);
       if (activity.length === 0 && receipts.length === 0) {
-        await updateCounters(ctx,item,null);
+        await removeQueueItemFromCounters(ctx,item);
         await ctx.db.delete(item._id);
         return { done: true, deleted: 1 };
       }
@@ -1375,8 +1384,7 @@ export const getQueueOrigin = mutation({
   const decision=await authorizeTenantMutation(ctx,"queue.getQueueOrigin",args.vaultOwnerId);assertQueueTenantAllowed(decision);
   const item=await ctx.db.get(args.queueItemId);assertItemOwner(item,decision.owner);
   if(!item.fromRecord)return null;
-  const tables={person:"persons",relationship:"relationships",place:"places",event:"events",source:"sources",citation:"citations",media:"media",context_item:"contextItems",research_task:"researchTasks",research_check:"researchChecks",story:"stories",import_run:"importRuns",provisional_relative:"provisionalRelatives"} as const;
-  const table=tables[item.fromRecord.kind as keyof typeof tables];
+  const table=queueContextTables[item.fromRecord.kind as keyof typeof queueContextTables];
   const id=table?ctx.db.normalizeId(table,item.fromRecord.refId):null;const row=id?await ctx.db.get(id):null;
   if(!row || !("vaultOwnerId" in row) || !matchesVaultOwner(row.vaultOwnerId,decision.owner))return null;
   const projected=await queueForPerson(ctx,item);

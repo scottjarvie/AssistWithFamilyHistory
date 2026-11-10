@@ -1,6 +1,6 @@
 # AWL-0016 lesson 17: website token inspection
 
-Status: **actual issued-token claim names not observed**. Do not count the fixture as an actual-token inspection.
+Status: **skipped by Scott after the Opus audit of PR #136**. Plants and Homes supplied real native-token evidence; Homes also verified that a browser session can add azp equal to its page origin. No further FH sign-in is requested. The account below is retained as historical evidence; do not count the fixture as an actual-token inspection.
 
 The checked-in Sandbox binding was verified before opening the development website: development Clerk role, the registered Family History Sandbox hostname and a separate local backend binding. Only the frontend was started; no backend was started or pushed. No production sign-in, keys or session were used.
 

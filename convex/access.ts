@@ -204,7 +204,9 @@ export async function requireWebsitePerson(ctx:Pick<ActionCtx|MutationCtx,"auth"
  // The platform verifies signature and aud=convex before exposing this identity.
  // Check exposed audience claims too, so alternate future providers fail closed.
  const origins=new Set(["https://assistwithfamilyhistory.com","https://www.assistwithfamilyhistory.com","https://local.assistwithfamilyhistory.com","http://localhost:3444","http://127.0.0.1:3444","http://family-history.localhost:3443"]);
- for(const azp of [identity.azp,identity.authorizedParty])if(azp!==undefined&&(typeof azp!=="string"||!origins.has(azp)))throw new Error("Website person session required: foreign authorized party");
+ // Vercel deployment hashes and git aliases for this project/team only.
+ const preview=/^https:\/\/assistwithfamilyhistory-(?:[a-z0-9]+|git-[a-z0-9-]+)-jarvies-projects\.vercel\.app$/;
+ for(const azp of [identity.azp,identity.authorizedParty])if(azp!==undefined&&(typeof azp!=="string"||(!origins.has(azp)&&!preview.test(azp))))throw new Error("Website person session required: foreign authorized party");
  const audience=identity.audience??identity.aud;
  if(audience!==undefined&&audience!=="convex"&&!(Array.isArray(audience)&&audience.length===1&&audience[0]==="convex"))throw new Error("Website person session required");
  return identity;

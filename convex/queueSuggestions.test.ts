@@ -246,3 +246,17 @@ test("native Clerk Convex website claims without azp can review; OAuth markers a
  for(const marker of [{client_id:"oauth-ai"},{scope:"openid"},{scp:["openid"]},{azp:"https://foreign.example"}]){const machine=t.withIdentity({...claims,...marker,issuer:claims.iss,subject:claims.sub});await expect(machine.mutation(api.queue.queueCounts,{vaultOwnerId:owner})).rejects.toThrow(/person session/);await expect(machine.mutation(api.queue.reviewQueueItem,{vaultOwnerId:owner,queueItemId:item._id,expectedVersion:accepted.item.version,idempotencyKey:crypto.randomUUID(),action:"archive"})).rejects.toThrow(/person session/);}
  const matching=t.withIdentity({...claims,issuer:claims.iss,subject:claims.sub,azp:"https://assistwithfamilyhistory.com"});await expect(matching.mutation(api.queue.queueCounts,{vaultOwnerId:owner})).resolves.toMatchObject({available:true});
 });
+
+
+test("assignment retains a real AI question and rejects mismatched From kinds",async()=>{
+ const t=setup(),{item}=await add(t,"reassign-question",{addedBy:"ai_on_request"});
+ const asked=await t.mutation(internal.queue.agentRequestUserAction,{principal,queueItemId:item._id,expectedVersion:1,idempotencyKey:"ask-before-assign",requiredAction:"Which parish?"});
+ const assigned=await t.withIdentity({subject:owner}).mutation(api.queue.assignQueueItemToAi,{vaultOwnerId:owner,queueItemId:item._id,expectedVersion:asked.item.version,idempotencyKey:"reassign-with-question",chosenAiId:"new-ai"});expect(assigned.item.needsInput).toEqual(asked.item.needsInput);expect(assigned.item.requiredAction).toBe("Which parish?");
+ const personId=await t.run(ctx=>ctx.db.insert("persons",{vaultOwnerId:owner,name:{given:"Synthetic",surname:"Kind"},sex:"unknown",living:false,researchStatus:"not_started",createdAt:123,updatedAt:123}));
+ await expect(add(t,"wrong-from-kind",{fromRecord:{kind:"source",refId:personId}})).rejects.toThrow();
+});
+
+test("website origins cover FH production, local and its project/team previews only",async()=>{
+ const t=setup();for(const azp of ["https://assistwithfamilyhistory.com","https://www.assistwithfamilyhistory.com","https://local.assistwithfamilyhistory.com","http://family-history.localhost:3443","https://assistwithfamilyhistory-a1b2c3d4e-jarvies-projects.vercel.app","https://assistwithfamilyhistory-git-awl-0016-queue-suggestions-jarvies-projects.vercel.app"]){await expect(t.withIdentity({subject:owner,azp}).mutation(api.queue.queueCounts,{vaultOwnerId:owner})).resolves.toMatchObject({available:true});}
+ for(const azp of ["https://otherproject-a1b2c3d4e-jarvies-projects.vercel.app","https://assistwithfamilyhistory-a1b2c3d4e-other-team.vercel.app","https://attacker.vercel.app","https://assistwithfamilyhistory-a1b2c3d4e-jarvies-projects.vercel.app.attacker.example","http://assistwithfamilyhistory-a1b2c3d4e-jarvies-projects.vercel.app"]){await expect(t.withIdentity({subject:owner,azp}).mutation(api.queue.queueCounts,{vaultOwnerId:owner})).rejects.toThrow(/foreign/);}
+});

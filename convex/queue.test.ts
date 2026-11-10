@@ -396,12 +396,12 @@ describe("product Queue foundation", () => {
     expect(assigned.item.condition).toBe("ready");
     expect(assigned.item.handoffExpiresAt).toBeUndefined();
 
-    expect(assigned.item.needsInput).toBeDefined();
-    const cleared=await t.withIdentity({subject:OWNER_A}).mutation(api.queue.reviewQueueItem,{vaultOwnerId:OWNER_A,queueItemId:created.item._id,expectedVersion:assigned.item.version,idempotencyKey:"clear-expiry-after-reassignment",action:"clear_input"});
+    expect(assigned.item.needsInput).toBeUndefined();
+    expect(assigned.item.requiredAction).toBeUndefined();
     const claimed = await t.mutation(internal.queue.agentClaimQueueItem, {
       principal: principal(),
       queueItemId: created.item._id,
-      expectedVersion: cleared.item.version,
+      expectedVersion: assigned.item.version,
       leaseMs: 120_000,
       nextStep: "Continue after the explicit reassignment.",
       idempotencyKey: "claim-after-expiry-recovery",
