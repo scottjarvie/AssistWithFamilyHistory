@@ -45,6 +45,14 @@ paid checks for the moment a change is about to ship.
 5. **Agents iterate locally and push in batches.** Run `pnpm verify` before
    pushing, keep the PR a draft while iterating, and mark it ready once.
 
+### Where CI runs
+
+The `build-and-smoke` job runs on Scott's Mac mini (self-hosted runner
+`minijarv-familyhistory`, label `mini`) while the repo variable `CI_RUNNER` is
+`mini`, so it uses no GitHub minutes. To fall back to GitHub's machines, run
+`gh variable delete CI_RUNNER -R scottjarvie/AssistWithFamilyHistory` and
+re-run the check.
+
 Before this change (2026-10-06): every PR push and every merge ran install,
 the full suite, a production build, and a route smoke test, about 2 to 2.5
 minutes each, so a typical one-push PR cost about 4.5 minutes and a docs-only

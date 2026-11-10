@@ -28,7 +28,9 @@ jobs:
   # check keeps matching. It no longer builds or smoke-tests; see above.
   build-and-smoke:
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
+    # Runs on the Mac mini's own runner (free minutes) when the repo variable
+    # CI_RUNNER is "mini". Delete that variable to fall back to GitHub's machines.
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 10
 
     steps:
@@ -57,13 +59,17 @@ jobs:
       - name: Setup pnpm
         if: steps.classify.outputs.code == 'true'
         uses: pnpm/action-setup@v4
+        with:
+          # Per-runner folder: the Mini runs several runners that would collide on a shared one.
+          dest: ${{ runner.temp }}/setup-pnpm
 
       - name: Setup Node.js
         if: steps.classify.outputs.code == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 22.23.4
-          cache: pnpm
+          # The Mini keeps its pnpm store between runs; only GitHub's fresh machines need the cache.
+          cache: ${{ runner.environment == 'github-hosted' && 'pnpm' || '' }}
 
       - name: Install dependencies
         if: steps.classify.outputs.code == 'true'
