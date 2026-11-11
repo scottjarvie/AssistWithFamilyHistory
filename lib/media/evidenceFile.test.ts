@@ -41,7 +41,7 @@ describe("non-image evidence originals", () => {
     expect(() => assertEvidenceUploadShape("application/pdf", 512 * 1024 * 1024)).not.toThrow();
     expect(() => assertEvidenceUploadShape("application/pdf", 512 * 1024 * 1024 + 1)).toThrow();
     expect(() => assertEvidenceUploadShape("image/jpeg", 20 * 1024 * 1024)).not.toThrow();
-    expect(() => assertEvidenceUploadShape("image/jpeg", 20 * 1024 * 1024 + 1)).toThrow(/20 MiB/);
+    expect(() => assertEvidenceUploadShape("image/jpeg", 20 * 1024 * 1024 + 1)).toThrow(/21 MB/);
     expect(() => assertEvidenceUploadShape("application/zip", 10)).toThrow();
   });
 

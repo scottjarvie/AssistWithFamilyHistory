@@ -1,3 +1,4 @@
+import {formatBytes} from "../../convex/lib/usageLimits/core";
 import { siteDefaults } from "./siteDefaults";
 /**
  * Provider-free rules for durable family-history evidence bytes.
@@ -264,7 +265,7 @@ export function assertEvidenceUploadShape(contentType: string, sizeBytes: number
   const max = cap ?? (isRenderedEvidenceImage(contentType) ? EVIDENCE_ORIGINAL_MAX_BYTES : EVIDENCE_LARGE_ORIGINAL_MAX_BYTES);
   if (!Number.isSafeInteger(sizeBytes) || sizeBytes < 1 || sizeBytes > max) {
     throw new Error(
-      `Evidence size is outside the allowed range (up to ${max / (1024*1024)} MiB).`,
+      `Evidence size is outside the allowed range (up to ${formatBytes(max)}).`,
     );
   }
 }

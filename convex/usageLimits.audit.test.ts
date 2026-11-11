@@ -132,5 +132,6 @@ test("L11/L12/36/55/69: upload descriptions keep their introductions, append the
  expect(begin.description).toMatch(/^Authorize one replay-safe upload/);expect(finish.description).toMatch(/^Join any uploaded parts/);
  for(const tool of [begin,finish])expect(tool.description.endsWith(AI_STORAGE_NOTE)).toBe(true);
  const guide=await aiGuide().text();expect(guide).not.toMatch(/photos up to 20 MiB|originals up to 512 MiB|make room before retrying/);expect(guide).toContain("uploadFileCaps.original");
+ expect(begin.description).toContain(formatBytes(EVIDENCE_RELAY_BODY_BYTES));
  expect(EVIDENCE_RELAY_BODY_BYTES).toBe(20*1024*1024);expect(isMultipartEvidenceUpload(EVIDENCE_RELAY_BODY_BYTES+1)).toBe(true);
 });

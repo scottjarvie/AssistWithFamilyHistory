@@ -1,4 +1,5 @@
-import { AI_STORAGE_NOTE } from "../../convex/lib/usageLimits/core";
+import { EVIDENCE_RELAY_BODY_BYTES,EVIDENCE_PART_BYTES } from "../media/evidenceStandard";
+import { AI_STORAGE_NOTE, formatBytes } from "../../convex/lib/usageLimits/core";
 /**
  * Family History MCP catalog — PURE DATA, no Convex imports.
  *
@@ -244,7 +245,7 @@ export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
     writes: true,
     title: "Begin a private evidence upload",
     description:
-      "Authorize one replay-safe upload for a person inside this connection's boundary: a JPEG, PNG or WebP photo within uploadFileCaps.image (display copies are made), or an original kept exact with no copies within uploadFileCaps.original (PDF such as a scanned book, TIFF scan, HEIC/HEIF photo, MP3/M4A/WAV recording, or plain-text transcription). Pass sourceId to file it inside the Source it belongs to. Returns a short-lived PUT capability on the Family History upload relay, never a private storage URL; a file over 20 MiB comes back with upload.mode \"parts\" and one URL per 16 MiB part, which you PUT in any order and may re-send. Supply the exact byte length and SHA-256 of the whole file, then call family_history_finish_evidence_upload with the same operationId and uploadRef. " + AI_STORAGE_NOTE,
+      "Authorize one replay-safe upload for a person inside this connection's boundary: a JPEG, PNG or WebP photo within uploadFileCaps.image (display copies are made), or an original kept exact with no copies within uploadFileCaps.original (PDF such as a scanned book, TIFF scan, HEIC/HEIF photo, MP3/M4A/WAV recording, or plain-text transcription). Pass sourceId to file it inside the Source it belongs to. Returns a short-lived PUT capability on the Family History upload relay, never a private storage URL; a file over " + formatBytes(EVIDENCE_RELAY_BODY_BYTES) + " comes back with upload.mode \"parts\" and one URL per " + formatBytes(EVIDENCE_PART_BYTES) + " part, which you PUT in any order and may re-send. Supply the exact byte length and SHA-256 of the whole file, then call family_history_finish_evidence_upload with the same operationId and uploadRef. " + AI_STORAGE_NOTE,
     humanSummary: "Starts a private, checksum-bound evidence upload for your review.",
     implementedBy: "convex/mediaEvidenceStorage.beginMcpEvidenceUpload",
   },
