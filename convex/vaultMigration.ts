@@ -9,8 +9,8 @@
  * This file provides a single mutation that re-tags every owner-scoped row
  * from a guest UUID to a Clerk user id. The destination must equal the
  * authenticated Convex identity. The raw guest UUID is not a signed principal,
- * so shadow mode logs and permits this legacy migration while enforce mode
- * denies it until a signed guest capability exists.
+ * so this public endpoint refuses it in every mode until a signed guest
+ * capability exists. No caller can lower readiness or move unproven guest data.
  *
  * Structural checks:
  *   - `fromVaultOwnerId` MUST match `guest_*` (the cookie format from proxy.ts).
@@ -23,11 +23,10 @@
  * Counts are returned per-table so the caller can show "we brought back N
  * entries" and so tests can assert exact behavior.
  */
-import {emptyCounters} from "./lib/usageLimits/core";
 import { v } from "convex/values";
 import { mutation } from "./_generated/server";
 import type { TableNames } from "./_generated/dataModel";
-import { authorizeTenantMutation, handlePolicyViolationMutation } from "./access";
+import { authorizeTenantMutation } from "./access";
 
 // All tables with a `by_owner` index in schema.ts. If a new owner-scoped table
 // is added, append it here.
@@ -120,7 +119,8 @@ export type RetagDb = {
 /**
  * Pure decision/loop for the migration: for each owned table, re-tag the rows
  * owned by `fromVaultOwnerId` to `toVaultOwnerId` and tally counts. No guards
- * here — callers must run `assertMigrationOwners` first. Exported so tests can
+ * here — callers must prove source ownership and transfer counted usage in the
+ * same transaction. The public endpoint refuses unsigned sources. Exported so tests can
  * drive it with a fake db and assert exact per-table counts and the total.
  */
 export async function retagGuestRows(
@@ -148,44 +148,13 @@ export async function retagGuestRows(
   return { total, perTable };
 }
 
-/** Usage counters, overrides and reservations use ownerId rather than vaultOwnerId.
- * This legacy remap requires a target recount before enforcement. */
+/** A raw guest identifier proves no ownership. Until a verified source capability
+ * exists, this public endpoint cannot remap records or change usage in any mode. */
 export const migrateGuestVault = mutation({
-  args: {
-    fromVaultOwnerId: v.string(),
-    toVaultOwnerId: v.string(),
-  },
-  handler: async (ctx, { fromVaultOwnerId, toVaultOwnerId }) => {
-    const { owner: authenticatedDestination } = await authorizeTenantMutation(
-      ctx,
-      "vaultMigration.migrateGuestVault",
-      toVaultOwnerId,
-    );
-    assertMigrationOwners(fromVaultOwnerId, authenticatedDestination);
-    // Media ownership changes require an honest target recount before limits apply.
-    for(const ownerId of [fromVaultOwnerId,authenticatedDestination]){
-      const counter=await ctx.db.query("usageCounters").withIndex("by_owner",q=>q.eq("ownerId",ownerId)).unique();
-      if(counter)await ctx.db.patch(counter._id,{ready:false,revision:counter.revision+1});
-      else await ctx.db.insert("usageCounters",{ownerId,...emptyCounters(Date.now()),ready:false,revision:1,updatedAt:Date.now()});
-    }
-
-
-    // A raw guest UUID is not a verified principal. Shadow mode records any
-    // legitimate reliance on this legacy migration path; enforce mode denies
-    // it until the guest supplies a signed Convex-verifiable capability.
-    await handlePolicyViolationMutation(
-      ctx,
-      "vaultMigration.migrateGuestVault",
-      "guest_source_unverified",
-    );
-
-    // ctx.db structurally satisfies RetagDb; the casts keep the index/table
-    // names loose the same way the original inline loop did.
-    return retagGuestRows(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ctx.db as any,
-      fromVaultOwnerId,
-      authenticatedDestination,
-    );
+  args: {fromVaultOwnerId:v.string(),toVaultOwnerId:v.string()},
+  handler:async(ctx,{fromVaultOwnerId,toVaultOwnerId}):Promise<MigrationResult>=>{
+    const {owner:authenticatedDestination}=await authorizeTenantMutation(ctx,"vaultMigration.migrateGuestVault",toVaultOwnerId);
+    assertMigrationOwners(fromVaultOwnerId,authenticatedDestination);
+    throw new Error("Trust boundary denied: guest_source_unverified (verified source ownership is required)");
   },
 });

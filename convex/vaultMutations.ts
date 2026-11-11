@@ -1200,6 +1200,8 @@ export const attachMediaFile = mutation({
     personIds: v.optional(v.array(v.id("persons"))),
   },
   handler: async (ctx, args) => {
+    const person=await requireWebsitePerson(ctx);
+    if(person.subject!==args.vaultOwnerId)throw new Error("Trust boundary denied: owner_mismatch");
     const { owner: vaultOwnerId } = await authorizeTenantMutation(
       ctx,
       "vaultMutations.attachMediaFile",
@@ -1215,6 +1217,8 @@ export const attachMediaFile = mutation({
       );
     }
 
+    const another=await ctx.db.query("media").withIndex("by_storage",q=>q.eq("storageId",args.storageId)).filter(q=>q.neq(q.field("_id"),args.mediaId)).first();
+    if(another)throw new Error("This stored file is already attached to another media item");
     const metadata=await ctx.db.system.get(args.storageId);
     if(!metadata) throw new Error("Stored file not found");
     await assertFileSize(ctx,vaultOwnerId,"web",metadata.size);

@@ -10,9 +10,10 @@ import type { Id } from "./_generated/dataModel";
 import { seedGrant } from "../lib/mcp/testSupport";
 
 const modules = import.meta.glob("./**/*.ts");
+const WEBSITE_ISSUER="https://identity.example.test";
 const OWNER = "user_replace_owner_AAAAAAAAAAA";
 
-beforeEach(() => vi.stubEnv("TRUST_BOUNDARY_MODE", "enforce"));
+beforeEach(() => {vi.stubEnv("CLERK_JWT_ISSUER_DOMAIN",WEBSITE_ISSUER); vi.stubEnv("TRUST_BOUNDARY_MODE", "enforce");});
 afterEach(() => vi.unstubAllEnvs());
 
 function manifest(name: string, contentType = "image/jpeg") {
@@ -76,7 +77,7 @@ describe("replacing a B2-backed file", () => {
     const { mediaId } = await seedB2Media(t);
     const storageId = await t.run(async (ctx) => ctx.storage.store(new Blob([new Uint8Array([4, 2])], { type: "application/pdf" })));
 
-    await t.withIdentity({ subject: OWNER }).mutation(api.vaultMutations.attachMediaFile, {
+    await t.withIdentity({ subject: OWNER, issuer:WEBSITE_ISSUER }).mutation(api.vaultMutations.attachMediaFile, {
       vaultOwnerId: OWNER,
       mediaId,
       storageId,
@@ -112,7 +113,7 @@ describe("replacing a B2-backed file", () => {
     expect(beforeReview.skipped).toEqual([expect.objectContaining({ reason: "NOT_REVIEWED" })]);
 
     // The actual owner review path unlocks only the new file, never history.
-    await t.withIdentity({ subject: OWNER }).mutation(api.vaultMutations.reviewMedia, {
+    await t.withIdentity({ subject: OWNER, issuer:WEBSITE_ISSUER }).mutation(api.vaultMutations.reviewMedia, {
       vaultOwnerId: OWNER, mediaId, reviewStatus: "reviewed", aiUseAllowed: true,
       privacyLevel: "private", rightsStatus: "owned",
     });
@@ -142,7 +143,7 @@ async function uploaded(t: ReturnType<typeof convexTest>, value = 42) {
 }
 
 function replace(t: ReturnType<typeof convexTest>, mediaId: Id<"media">, storageId: Id<"_storage">, owner = OWNER, personIds?: Id<"persons">[]) {
-  return t.withIdentity({ subject: owner }).mutation(api.vaultMutations.attachMediaFile, {
+  return t.withIdentity({ subject: owner, issuer:WEBSITE_ISSUER }).mutation(api.vaultMutations.attachMediaFile, {
     vaultOwnerId: owner, mediaId, storageId, title: "Synthetic replacement", type: "document", mimeType: "application/pdf", sizeBytes: 1, personIds,
   });
 }
@@ -150,7 +151,7 @@ function replace(t: ReturnType<typeof convexTest>, mediaId: Id<"media">, storage
 describe("replacement boundaries and provenance", () => {
   test.each(["accepted", "declined"] as const)("retains the original's %s camera/GPS decision without applying it to the replacement", async decision => {
     const t = convexTest(schema, modules); const { mediaId } = await seedB2Media(t);
-    await t.withIdentity({ subject: OWNER }).mutation(api.vaultMutations.reviewMedia, {
+    await t.withIdentity({ subject: OWNER, issuer:WEBSITE_ISSUER }).mutation(api.vaultMutations.reviewMedia, {
       vaultOwnerId: OWNER, mediaId, privacyLevel: "private", reviewStatus: "reviewed", rightsStatus: "owned", aiUseAllowed: true, metadataDecision: decision,
     });
     const original = await t.run(ctx => ctx.db.get(mediaId));
@@ -188,7 +189,7 @@ describe("replacement boundaries and provenance", () => {
     const t = convexTest(schema, modules); const { mediaId } = await seedB2Media(t); const old = await uploaded(t, 3);
     await t.run(ctx => ctx.db.patch(mediaId, { storageId: old }));
     const before = await t.run(ctx => ctx.db.get(mediaId)); const next = await uploaded(t, 4);
-    await expect(t.withIdentity({ subject: "other_synthetic_owner" }).mutation(api.vaultMutations.attachMediaFile, {
+    await expect(t.withIdentity({ subject: "other_synthetic_owner", issuer:WEBSITE_ISSUER }).mutation(api.vaultMutations.attachMediaFile, {
       vaultOwnerId: suppliedOwner, mediaId, storageId: next, title: "Refused", type: "document", mimeType: "application/pdf", sizeBytes: 1,
     })).rejects.toThrow(/owner_mismatch/);
     expect(await t.run(ctx => ctx.db.get(mediaId))).toEqual(before); expect(await storedBytes(t, old)).not.toBeNull();
@@ -215,8 +216,8 @@ describe("replacement boundaries and provenance", () => {
 test("reviewing replacement bytes does not export the old original's private history in JSON context", async () => {
   const t = convexTest(schema, modules); const { personId, mediaId } = await seedB2Media(t);
   await replace(t, mediaId, await uploaded(t));
-  await t.withIdentity({ subject: OWNER }).mutation(api.vaultMutations.reviewMedia, { vaultOwnerId: OWNER, mediaId, reviewStatus: "reviewed", aiUseAllowed: true, privacyLevel: "family_review", rightsStatus: "owned" });
-  const pack = await t.withIdentity({ subject: OWNER }).action(api.vaultReads.getContextPack, { vaultOwnerId: OWNER, personIdentifier: String(personId) });
+  await t.withIdentity({ subject: OWNER, issuer:WEBSITE_ISSUER }).mutation(api.vaultMutations.reviewMedia, { vaultOwnerId: OWNER, mediaId, reviewStatus: "reviewed", aiUseAllowed: true, privacyLevel: "family_review", rightsStatus: "owned" });
+  const pack = await t.withIdentity({ subject: OWNER, issuer:WEBSITE_ISSUER }).action(api.vaultReads.getContextPack, { vaultOwnerId: OWNER, personIdentifier: String(personId) });
   expect(pack.structured.memories).toEqual([expect.objectContaining({ _id: mediaId, title: "Synthetic replacement", aiUseAllowed: true })]);
   const text = JSON.stringify(pack); expect(text).not.toContain("replacedB2Files"); expect(text).not.toContain("evidence/old/"); expect(text).not.toContain("exact_private");
   expect((await t.run(ctx => ctx.db.get(mediaId)))?.replacedB2Files?.[0].metadataProposal?.location?.latitude).toBe(1.25);

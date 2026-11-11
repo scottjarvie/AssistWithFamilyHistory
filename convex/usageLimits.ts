@@ -210,15 +210,15 @@ const STORED_TABLES = ["media", "mediaUploadSessions"] as const;
 async function storedPage(ctx: Ctx, table: (typeof STORED_TABLES)[number], ownerId: string, cursor: string | null) {
   if(table==="mediaUploadSessions") {
     const page=await ctx.db.query("mediaUploadSessions").withIndex("by_owner",q=>q.eq("vaultOwnerId",ownerId)).paginate({numItems:RECOMPUTE_PAGE,cursor});
-    return {bytes:page.page.reduce((n,r)=>n+(r.orphanedBytes ?? 0),0),files:page.page.length,unknownSizeFiles:0,cursor:page.continueCursor,isDone:page.isDone};
+    return {bytes:page.page.reduce((n,r)=>n+(r.orphanedBytes ?? 0),0),files:page.page.length,unknownSizeFiles:0,missingObjects:0,cursor:page.continueCursor,isDone:page.isDone};
   }
   // Every retained original and display copy counts, including replacements.
   const page = await ctx.db.query(table).withIndex("by_owner", (q) => q.eq("vaultOwnerId", ownerId))
     .paginate({ numItems: RECOMPUTE_PAGE, cursor });
-  let unknownSizeFiles=0;
-  const sizes=await Promise.all(page.page.map(async row=>{const stored=row.storageId ? await ctx.db.system.get(row.storageId) : null;if(row.storageId&&!stored)unknownSizeFiles++;return mediaBytes(row) - (row.storageId ? row.sizeBytes ?? 0 : 0) + (stored?.size ?? 0);}));
+  let missingObjects=0;
+  const sizes=await Promise.all(page.page.map(async row=>{const stored=row.storageId ? await ctx.db.system.get(row.storageId) : null;if(row.storageId&&!stored)missingObjects++;return mediaBytes(row) - (row.storageId ? row.sizeBytes ?? 0 : 0) + (stored?.size ?? 0);}));
   return {
-    unknownSizeFiles,
+    unknownSizeFiles:0,missingObjects,
     bytes: sizes.reduce((sum, bytes) => sum + bytes, 0),
     files: page.page.length,
     cursor: page.continueCursor,
@@ -237,14 +237,14 @@ export const dryRunPage = internalQuery({
  * A stored-bytes change during the recompute bumps the revision and restarts it,
  * and the final write shares the transaction of its last read.
  */
-export async function recomputeOwner(ctx:MutationCtx,ownerId:string):Promise<{done:boolean;restarts:number}> {
+export async function recomputeOwner(ctx:MutationCtx,ownerId:string):Promise<{done:boolean;restarts:number;missingObjects?:number}> {
     const now = Date.now();
     let row = await counterRow(ctx, ownerId);
     if (!row) {
       const id = await ctx.db.insert("usageCounters", { ownerId: ownerId, ...emptyCounters(now), ready: false, revision: 1, updatedAt: now });
       row = (await ctx.db.get(id))!;
     }
-    const repair = row.repair ?? { phase: 0, cursor: null, bytes: 0, revision: row.revision, restarts: 0 };
+    const repair = row.repair?.missingObjects!==undefined ? row.repair : { phase: 0, cursor: null, bytes: 0, revision: row.revision, restarts: row.repair?.restarts ?? 0, missingObjects:0 };
     if (repair.revision !== row.revision) {
       await ctx.db.patch(row._id, { repair: { phase: 0, cursor: null, bytes: 0, revision: row.revision, restarts: repair.restarts + 1 } });
       return { done: false, restarts: repair.restarts + 1 };
@@ -252,16 +252,17 @@ export async function recomputeOwner(ctx:MutationCtx,ownerId:string):Promise<{do
     const page = await storedPage(ctx, STORED_TABLES[repair.phase], ownerId, repair.cursor);
     const bytes = repair.bytes + page.bytes;
     const unknownSizeFiles=(repair.unknownSizeFiles ?? 0)+page.unknownSizeFiles;
+    const missingObjects=(repair.missingObjects ?? 0)+page.missingObjects;
     if (!page.isDone) {
-      await ctx.db.patch(row._id, { repair: { ...repair, cursor: page.cursor, bytes, unknownSizeFiles } });
+      await ctx.db.patch(row._id, { repair: { ...repair, cursor: page.cursor, bytes, unknownSizeFiles, missingObjects } });
       return { done: false, restarts: repair.restarts };
     }
     if (repair.phase + 1 < STORED_TABLES.length) {
-      await ctx.db.patch(row._id, { repair: { ...repair, phase: repair.phase + 1, cursor: null, bytes, unknownSizeFiles } });
+      await ctx.db.patch(row._id, { repair: { ...repair, phase: repair.phase + 1, cursor: null, bytes, unknownSizeFiles, missingObjects } });
       return { done: false, restarts: repair.restarts };
     }
     await ctx.db.patch(row._id, { storedBytes: unknownSizeFiles ? row.storedBytes : bytes, ready: !unknownSizeFiles, repair: undefined, revision: row.revision + 1, updatedAt: now });
-    return { done: true, restarts: repair.restarts };
+    return { done: true, restarts: repair.restarts,missingObjects };
 
 }
 export const recomputeStep=internalMutation({args:{ownerId:v.string()},handler:(ctx,a)=>recomputeOwner(ctx,a.ownerId)});
@@ -486,7 +487,9 @@ export async function addCopies(ctx:MutationCtx,ownerId:string,bytes:number) {
 /** Release empty abandoned web sessions. Provider sessions release only after confirmed cleanup. */
 export const expireReservations = internalMutation({args:{},handler:async(ctx)=>{
   const rows=await ctx.db.query("uploadReservations").withIndex("by_source_expiry",q=>q.eq("source","web").eq("status","reserved").lt("expiresAt",Date.now())).take(100);
-  for(const row of rows)await releaseExpiredWeb(ctx,row);
+  let released=0,failed=0;
+  for(const row of rows){try{await releaseExpiredWeb(ctx,row);released++;}catch{failed++;}}
+  return {released,failed};
 }});
 
 export const ownerStorage = action({args:{},handler:async(ctx):Promise<import("./lib/usageLimits/core").AiStorage|null>=>{
@@ -524,8 +527,11 @@ export function mergeByteTable(current:Record<string,number>|undefined,patch:Rec
 
 /** Never remove a staged object that a live media row still references. */
 export async function releaseExpiredWeb(ctx:MutationCtx,row:Doc<"uploadReservations">,dryRun=false) {
- if(row.storageId && await ctx.db.query("media").withIndex("by_storage",q=>q.eq("storageId",row.storageId)).first())return false;
- if(!dryRun){if(row.storageId)await ctx.storage.delete(row.storageId);await releaseOperation(ctx,row.ownerId,row.operationId);}
+ const referenced=row.storageId ? await ctx.db.query("media").withIndex("by_storage",q=>q.eq("storageId",row.storageId)).first() : null;
+ if(!dryRun){
+  if(row.storageId&&!referenced&&await ctx.db.system.get(row.storageId))await ctx.storage.delete(row.storageId);
+  await releaseOperation(ctx,row.ownerId,row.operationId);
+ }
  return true;
 }
 /** Read-only by default. System storage enumeration recovers a lost upload receipt. */

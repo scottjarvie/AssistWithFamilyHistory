@@ -39,7 +39,7 @@ export const nullableLimitPatch = v.object({
 });
 
 export const usageLimitTables = {
-  usageRecountJobs:defineTable({dryRun:v.boolean(),phase:v.number(),cursor:v.union(v.string(),v.null()),accountsSeen:v.number(),bytes:v.number(),files:v.number(),unknownSizeFiles:v.number(),unattributedFiles:v.number(),notReady:v.number(),done:v.boolean(),startedAt:v.number()}),
+  usageRecountJobs:defineTable({dryRun:v.boolean(),phase:v.number(),cursor:v.union(v.string(),v.null()),accountsSeen:v.number(),bytes:v.number(),files:v.number(),unknownSizeFiles:v.number(),missingObjects:v.optional(v.number()),unattributedFiles:v.number(),notReady:v.number(),done:v.boolean(),startedAt:v.number()}),
   usageRecountOwners:defineTable({jobId:v.id("usageRecountJobs"),ownerId:v.string()}).index("by_job_owner",["jobId","ownerId"]),
   uploadReservations: defineTable({ownerId:v.string(), operationId:v.string(), storageId:v.optional(v.id("_storage")), bytes:v.number(), day:v.string(), source:v.string(), status:v.union(v.literal("reserved"),v.literal("committed"),v.literal("released")), expiresAt:v.number(), attemptId:v.optional(v.string()), mediaId:v.optional(v.id("media"))}).index("by_owner_operation",["ownerId","operationId"]).index("by_storage",["storageId"]).index("by_expiry",["status","expiresAt"]).index("by_source_expiry",["source","status","expiresAt"]),
   /** One row, key "site". Absent row = family defaults with enforcement off. */
@@ -92,7 +92,7 @@ export const usageLimitTables = {
     revision: v.number(),
     updatedAt: v.number(),
     repair: v.optional(v.object({
-      unknownSizeFiles:v.optional(v.number()),
+      unknownSizeFiles:v.optional(v.number()),missingObjects:v.optional(v.number()),
       phase: v.number(),
       cursor: v.union(v.string(), v.null()),
       bytes: v.number(),

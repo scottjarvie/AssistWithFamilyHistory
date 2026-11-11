@@ -22,7 +22,7 @@ or enforcement change was performed while building this draft.
 Use an explicitly selected, reviewed deployment. This resumable driver discovers
 owners from media, upload sessions, counters, reservations and overrides, and
 checks the Convex system storage inventory for unregistered blobs. It
-reports accounts seen, bytes, file references, unknown sizes and missing owners.
+reports accounts seen, bytes, file references, unknown sizes, missing objects and missing owners.
 The dry run writes only its job metadata; it changes no counters, settings or files.
 The existing `usageLimits:dryRunPage` remains a fully read-only query.
 
@@ -43,8 +43,10 @@ After discovery, counting and validation, its final step records
 `backfillCompletedAt`. It refuses completion if any source has no owner or an
 unknown size, or any counter remains unready. Fix unresolved records under a
 separate review and start a fresh job. Concurrent byte writes bump each owner's
-revision and restart that owner's recount. A guest migration invalidates both
-counter rows and requires a target recount; it is still denied in enforce mode.
+revision and restart that owner's recount. The public guest-remap endpoint accepts no verifiable source capability, so it
+refuses unsigned guest IDs in both shadow and enforce modes without changing
+records, counters or readiness. A verified remap requires a separate implementation
+that transfers its counted bytes transactionally.
 Legacy media with no owner is reported as unattributed, never assigned to a
 person mentioned in the file. Keep account IDs and results out of public PRs.
 
@@ -78,7 +80,10 @@ A provider failure retains accounting and retries at most eight attempts; after
 that the hold remains for operator review. Its `dryRun:true` action lists candidate
 keys without deleting anything.
 
-The recount verifies Convex storage metadata, but B2 totals come from pinned
+A confirmed missing Convex blob contributes zero and is reported as
+`missingObjects`; it neither lowers readiness nor blocks backfill. Unknown sizes
+and stored bytes without an owner still block completion. The recount verifies
+Convex storage metadata, but B2 totals come from pinned
 manifests and tracked failed-copy holds. It cannot prove B2 object existence or
 find unregistered B2 versions: a separate provider inventory is needed for that.
 The Convex sweep closes the unclaimed Convex-blob gap. Pending declared sizes are
