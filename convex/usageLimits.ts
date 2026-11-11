@@ -485,8 +485,8 @@ export async function addCopies(ctx:MutationCtx,ownerId:string,bytes:number) {
 }
 
 /** Release abandoned web sessions. Provider sessions release only after confirmed cleanup. */
-export const expiredReservationsPage=internalQuery({args:{cursor:v.optional(v.string())},handler:async(ctx,args)=>{
- const page=await ctx.db.query("uploadReservations").withIndex("by_source_expiry",q=>q.eq("source","web").eq("status","reserved").lt("expiresAt",Date.now())).paginate({numItems:100,cursor:args.cursor ?? null});
+export const expiredReservationsPage=internalQuery({args:{cursor:v.optional(v.string()),before:v.number()},handler:async(ctx,args)=>{
+ const page=await ctx.db.query("uploadReservations").withIndex("by_source_expiry",q=>q.eq("source","web").eq("status","reserved").lt("expiresAt",args.before)).paginate({numItems:100,cursor:args.cursor ?? null});
  return {ids:page.page.map(row=>row._id),cursor:page.continueCursor,isDone:page.isDone};
 }});
 export const expireReservation=internalMutation({args:{reservationId:v.id("uploadReservations")},handler:async(ctx,args)=>{
@@ -499,11 +499,12 @@ export const recordExpiryFailure=internalMutation({args:{reservationId:v.id("upl
  const row=await ctx.db.get(args.reservationId);
  if(row?.status==="reserved"&&row.expiryFailureAt===undefined)await ctx.db.patch(row._id,{expiryFailureAt:Date.now()});
 }});
-export const expireReservations = internalAction({args:{cursor:v.optional(v.string())},handler:async(ctx,args):Promise<{released:number;failed:number}>=>{
- const page=await ctx.runQuery(internal.usageLimits.expiredReservationsPage,args);
+export const expireReservations = internalAction({args:{cursor:v.optional(v.string()),before:v.optional(v.number())},handler:async(ctx,args):Promise<{released:number;failed:number}>=>{
+ const before=args.before ?? Date.now();
+ const page=await ctx.runQuery(internal.usageLimits.expiredReservationsPage,{...args,before});
  let released=0,failed=0;
  for(const reservationId of page.ids){try{if(await ctx.runMutation(internal.usageLimits.expireReservation,{reservationId}))released++;}catch{failed++;await ctx.runMutation(internal.usageLimits.recordExpiryFailure,{reservationId});}}
- if(!page.isDone)await ctx.scheduler.runAfter(0,internal.usageLimits.expireReservations,{cursor:page.cursor});
+ if(!page.isDone)await ctx.scheduler.runAfter(0,internal.usageLimits.expireReservations,{cursor:page.cursor,before});
  return {released,failed};
 }});
 

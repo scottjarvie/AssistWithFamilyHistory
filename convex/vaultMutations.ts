@@ -1231,6 +1231,10 @@ export const attachMediaFile = mutation({
     if(competing)throw new Error("This file belongs to another pending upload");
     if(reservation?.storageId && reservation.storageId!==args.storageId) throw new Error("Operation conflict");
     if(reservation?.status==="committed" && reservation.mediaId) return {mediaId:reservation.mediaId,created:false};
+    if(args.mediaId && (await ctx.db.get(args.mediaId))?.storageId===args.storageId){
+      if(reservation?.status==="reserved")await releaseExpiredWeb(ctx,reservation);
+      return {mediaId:args.mediaId,created:false,storage:await summaryFor(ctx,vaultOwnerId)};
+    }
     await commitOperation(ctx,vaultOwnerId,args.operationId,metadata.size);
     const now = Date.now();
     const shared = {

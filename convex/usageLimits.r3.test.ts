@@ -105,3 +105,43 @@ test("expiry rolls back a failing row's delete and still commits an unrelated ro
  expect(await t.action(internal.usageLimits.expireReservations,{})).toEqual({released:0,failed:1});
  expect((await reservation(t,"bad"))?.expiryFailureAt).toBe(123);
 });
+
+
+test.each([false,true])("same-blob reattach is a replay and leaves room for another upload; fresh operation=%s",async freshOperation=>{
+ const t=setup();await settings(t);
+ await t.run(async ctx=>{const site=await ctx.db.query("usageLimitSettings").unique();await ctx.db.patch(site!._id,{planStoredBytes:{free:10,pro:10}});});
+ const id=await blob(t),saved=await person(t).mutation(api.vaultMutations.attachMediaFile,args(id));
+ const mediaBefore=await t.run(ctx=>ctx.db.get(saved.mediaId)),before=await counter(t);
+ if(freshOperation)await start(t,"repeat");
+ const replay=await person(t).mutation(api.vaultMutations.attachMediaFile,{...args(id),mediaId:saved.mediaId,title:"Ignored replay edit",...(freshOperation?{operationId:"repeat"}:{})});
+ expect(replay).toMatchObject({mediaId:saved.mediaId,created:false,storage:{usedBytes:5,remainingBytes:5}});
+ expect(await counter(t)).toMatchObject({storedBytes:5,reservedBytes:0,inFlight:0,revision:before!.revision});
+ expect(await t.run(ctx=>ctx.db.get(saved.mediaId))).toEqual(mediaBefore);
+ expect((await t.run(ctx=>ctx.db.system.get(id)))?.size).toBe(5);
+ if(freshOperation)expect(await reservation(t,"repeat")).toMatchObject({status:"released"});
+ expect(await start(t,"next")).toMatchObject({created:true});
+ await person(t).mutation(api.vaultMutations.attachMediaFile,{...args(await blob(t)),operationId:"next"});
+ expect(await counter(t)).toMatchObject({storedBytes:10,reservedBytes:0,inFlight:0});
+});
+
+test("expiry carries one cutoff through every scheduled page while the clock advances",async()=>{
+ vi.useFakeTimers();
+ try{
+  const before=Date.now(),t=setup();await settings(t);await start(t,"expired-0",1);
+  await t.run(async ctx=>{
+   const first=await ctx.db.query("uploadReservations").unique();await ctx.db.patch(first!._id,{expiresAt:before-1});
+   for(let i=1;i<250;i++)await ctx.db.insert("uploadReservations",{ownerId:OWNER,operationId:`expired-${i}`,bytes:1,day:first!.day,source:"web",status:"reserved",expiresAt:before-1});
+   await ctx.db.insert("uploadReservations",{ownerId:OWNER,operationId:"later",bytes:1,day:first!.day,source:"web",status:"reserved",expiresAt:before+1});
+   const c=await ctx.db.query("usageCounters").unique();await ctx.db.patch(c!._id,{reservedBytes:251,inFlight:251,dayUploadBytes:251});
+  });
+  expect(await t.action(internal.usageLimits.expireReservations,{})).toEqual({released:100,failed:0});
+  const scheduled=await t.run(ctx=>ctx.db.system.query("_scheduled_functions").collect());
+  expect(scheduled).toHaveLength(1);expect(scheduled[0].args).toEqual([{cursor:expect.any(String),before}]);
+  vi.setSystemTime(before+60_000);
+  await t.finishAllScheduledFunctions(()=>vi.runAllTimers());
+  const rows=await t.run(ctx=>ctx.db.query("uploadReservations").collect());
+  expect(rows.filter(row=>row.status==="released")).toHaveLength(250);
+  expect(await reservation(t,"later")).toMatchObject({status:"reserved"});
+  expect(await counter(t)).toMatchObject({storedBytes:0,reservedBytes:1,inFlight:1});
+ }finally{vi.useRealTimers();}
+});
