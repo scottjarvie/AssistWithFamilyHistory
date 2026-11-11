@@ -24,6 +24,7 @@ export function GET() {
     "Grant errors: GRANT_EXPIRED (their chosen end date has passed — ask them to change or remove it at https://assistwithfamilyhistory.com/settings/ai), GRANT_REVOKED (they turned it off — stop), GRANT_REQUIRED (this connection has no active grant — only the person can restore it in Settings), SCOPE_NOT_GRANTED (use only the tools tools/list returned for this connection), OUTSIDE_GRANT_BOUNDARY (that record is outside what they approved).",
     "tools/list is filtered by what the person approved. Trust it; it is the exact surface this connection has.",
     "",
+    "Batch writes: read batchLimits.maxItems and maxBytes in the brief before writing; split a REQUEST_TOO_LARGE call and keep its operation ID for an unchanged retry. Storage: read the counter-only storage summary in the brief and upload begin/finish replies. USAGE_LIMIT_REACHED refuses one upload and reports room left. Keep using this connection; make room before retrying. Files remain private, unreviewed and AI-off until the person reviews them.",
     "## Required workflow",
     "1. Call family_history_get_brief first.",
     "2. Use family_history_search before creating records that may already exist.",

@@ -1,3 +1,4 @@
+import { siteDefaults } from "./siteDefaults";
 /**
  * Provider-free rules for durable family-history evidence bytes.
  *
@@ -13,17 +14,17 @@ export const EVIDENCE_UPLOAD_TTL_SECONDS = 30 * 60;
  * 20 MiB. The old 25 MB promise was never reachable through Vercel's ~4.5 MB
  * function body cap; this number is the one that actually holds.
  */
-export const EVIDENCE_ORIGINAL_MAX_BYTES = 20 * 1024 * 1024;
+export const EVIDENCE_ORIGINAL_MAX_BYTES = siteDefaults.image;
 /**
  * Bigger originals (a scanned book, a long recording) go up in parts through
  * the same relay, each part one request under the relay's 20 MiB body limit.
  * Only exact-kept file types may do this; photos still need display copies,
  * which are made from bytes held in memory.
  */
-export const EVIDENCE_LARGE_ORIGINAL_MAX_BYTES = 512 * 1024 * 1024;
+export const EVIDENCE_LARGE_ORIGINAL_MAX_BYTES = siteDefaults.original;
 export const EVIDENCE_PART_BYTES = 16 * 1024 * 1024;
 export const EVIDENCE_LARGE_UPLOAD_TTL_SECONDS = 2 * 60 * 60;
-export const EVIDENCE_RENDITION_MAX_BYTES = 3 * 1024 * 1024;
+export const EVIDENCE_RENDITION_MAX_BYTES = siteDefaults.copy;
 
 export const EVIDENCE_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 export type EvidenceImageType = (typeof EVIDENCE_IMAGE_TYPES)[number];
@@ -253,11 +254,11 @@ export function hasEmbeddedImageMetadata(bytes: Uint8Array, contentType: string)
   return false;
 }
 
-export function assertEvidenceUploadShape(contentType: string, sizeBytes: number): void {
+export function assertEvidenceUploadShape(contentType: string, sizeBytes: number, cap?: number): void {
   if (!(EVIDENCE_UPLOAD_TYPES as readonly string[]).includes(contentType.toLowerCase())) {
     throw new Error(`This evidence upload accepts ${EVIDENCE_UPLOAD_TYPES.join(", ")}.`);
   }
-  const max = isRenderedEvidenceImage(contentType) ? EVIDENCE_ORIGINAL_MAX_BYTES : EVIDENCE_LARGE_ORIGINAL_MAX_BYTES;
+  const max = cap ?? (isRenderedEvidenceImage(contentType) ? EVIDENCE_ORIGINAL_MAX_BYTES : EVIDENCE_LARGE_ORIGINAL_MAX_BYTES);
   if (!Number.isSafeInteger(sizeBytes) || sizeBytes < 1 || sizeBytes > max) {
     throw new Error(
       isRenderedEvidenceImage(contentType)

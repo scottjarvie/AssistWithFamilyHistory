@@ -1,4 +1,5 @@
 import { defineSchema, defineTable } from "convex/server";
+import { usageLimitTables } from "./usageLimitsSchema";
 import { v } from "convex/values";
 
 /**
@@ -85,6 +86,7 @@ const mediaMetadataProposalValidator = v.object({
 });
 
 export default defineSchema({
+  ...usageLimitTables,
   /**
    * PERSONS
    * Core entity representing an individual (alive or deceased)
@@ -1034,6 +1036,7 @@ export default defineSchema({
     .index("by_type", ["type"])
     .index("by_source", ["sourceId"])
     .index("by_import_key", ["importKey"])
+    .index("by_storage", ["storageId"])
     .index("by_familySearchUrl", ["familySearchUrl"]),
 
   /**
@@ -1042,6 +1045,7 @@ export default defineSchema({
    * and token hash let the same-origin relay re-resolve every authority fact.
    */
   mediaUploadSessions: defineTable({
+    orphanedBytes:v.optional(v.number()),
     vaultOwnerId: v.string(),
     ref: v.string(),
     sourceKind: v.union(v.literal("person"), v.literal("chosen_ai"), v.literal("migration")),
@@ -1086,6 +1090,7 @@ export default defineSchema({
     failureCode: v.optional(v.string()),
     mediaId: v.optional(v.id("media")),
   })
+    .index("by_owner", ["vaultOwnerId"])
     .index("by_owner_ref", ["vaultOwnerId", "ref"])
     .index("by_owner_operation", ["vaultOwnerId", "operationId"])
     .index("by_ref", ["ref"]),

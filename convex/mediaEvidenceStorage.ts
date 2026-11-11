@@ -136,7 +136,7 @@ export const beginMcpEvidenceUpload = internalAction({
     input: uploadInputValidator,
   },
   handler: async (ctx, args) => {
-    assertEvidenceUploadShape(args.input.contentType, args.input.sizeBytes);
+    assertEvidenceUploadShape(args.input.contentType, args.input.sizeBytes, Number.MAX_SAFE_INTEGER);
     const expectedSha256 = assertSha256(args.input.sha256);
     if (!args.input.title.trim() || args.input.title.length > 200) throw new Error("Evidence title is invalid.");
     if (!args.input.fileName.trim() || args.input.fileName.length > 240) throw new Error("Evidence file name is invalid.");
@@ -160,7 +160,7 @@ export const beginMcpEvidenceUpload = internalAction({
         uploadRef: planned.uploadRef,
         mediaId: String(planned.mediaId),
         replayed: true,
-        reviewAuthority: "person_only" as const,
+        storage:await ctx.runQuery(internalApi.usageLimits.storageInternal,{ownerId:args.principal.subject.trim()}),        reviewAuthority: "person_only" as const,
       };
     }
     const url = `${relayOrigin()}/evidence-upload/${encodeURIComponent(planned.uploadRef)}/${relayToken}`;
@@ -190,6 +190,7 @@ export const beginMcpEvidenceUpload = internalAction({
       const parts = evidenceUploadParts(planned.sizeBytes, EVIDENCE_PART_BYTES);
       return {
         status: "pending_upload" as const,
+        storage:await ctx.runQuery(internalApi.usageLimits.storageInternal,{ownerId:args.principal.subject.trim()}),
         uploadRef: planned.uploadRef,
         upload: {
           method: "PUT" as const,
@@ -213,6 +214,7 @@ export const beginMcpEvidenceUpload = internalAction({
     }
     return {
       status: "pending_upload" as const,
+        storage:await ctx.runQuery(internalApi.usageLimits.storageInternal,{ownerId:args.principal.subject.trim()}),
       uploadRef: planned.uploadRef,
       upload: {
         method: "PUT" as const,
@@ -403,7 +405,7 @@ export const finishMcpEvidenceUpload = internalAction({
         mediaId: String(session.mediaId),
         uploadRef: session.ref,
         replayed: true,
-        privacy: "private" as const,
+        storage:await ctx.runQuery(internalApi.usageLimits.storageInternal,{ownerId:args.principal.subject.trim()}),        privacy: "private" as const,
         reviewStatus: "unreviewed" as const,
         rightsStatus: "unknown" as const,
         aiUseAllowed: false,
@@ -452,6 +454,7 @@ export const finishMcpEvidenceUpload = internalAction({
           mediaId: String(committed.mediaId),
           uploadRef: session.ref,
           replayed: committed.replayed,
+        storage:await ctx.runQuery(internalApi.usageLimits.storageInternal,{ownerId:session.vaultOwnerId}),
           privacy: "private" as const,
           reviewStatus: "unreviewed" as const,
           rightsStatus: "unknown" as const,
@@ -460,7 +463,9 @@ export const finishMcpEvidenceUpload = internalAction({
           next: "The person reviews source, rights and people before this connection can read the file later.",
         };
       }
+      const caps=await ctx.runQuery(internalApi.usageLimits.fileCapsInternal,{ownerId:session.vaultOwnerId});
       const verified = await finalizeEvidenceImage({
+        maxRenditionBytes:caps.copy ?? undefined,
         store,
         uploadRef: session.ref,
         objectKey: session.objectKey,
@@ -491,6 +496,7 @@ export const finishMcpEvidenceUpload = internalAction({
         mediaId: String(committed.mediaId),
         uploadRef: session.ref,
         replayed: committed.replayed,
+        storage:await ctx.runQuery(internalApi.usageLimits.storageInternal,{ownerId:session.vaultOwnerId}),
         privacy: "private" as const,
         reviewStatus: "unreviewed" as const,
         rightsStatus: "unknown" as const,
@@ -504,8 +510,10 @@ export const finishMcpEvidenceUpload = internalAction({
         next: "The person reviews source, rights, people, date, and location before this connection can read the evidence later.",
       };
     } catch (error) {
+      const orphanedBytes=(error as {orphanedBytes?:number})?.orphanedBytes;
+      if(orphanedBytes) await ctx.runMutation(internalApi.mediaEvidenceControl.recordOrphanedCopies,{uploadRef:session.ref,bytes:orphanedBytes});
       const message = error instanceof Error ? error.message : String(error);
-      const terminal = /SHA-256|byte length changed|stored content type changed|bytes do not match|unsupported image|decode|retained embedded metadata|declared file type/i.test(message);
+      const terminal = /USAGE_LIMIT_REACHED|usage_limit_reached|SHA-256|byte length changed|stored content type changed|bytes do not match|unsupported image|decode|retained embedded metadata|declared file type/i.test(message);
       if (terminal) {
         await ctx.runMutation(internalApi.mediaEvidenceControl.markUploadFailed, {
           vaultOwnerId: session.vaultOwnerId,
@@ -536,17 +544,19 @@ export const cleanupMcpEvidenceUpload = internalAction({
   handler: async (ctx, args) => {
     const state = await ctx.runQuery(internalApi.mediaEvidenceControl.sessionForCleanup, args);
     if (!state || state.session.expiresAt > Date.now()) return;
+    try {
     const store = storage();
     if (state.session.state === "ready" && state.manifests) {
       await Promise.all(Object.values(state.manifests).filter(Boolean).map((manifest: any) =>
         store.deleteVersionsExcept(manifest.objectKey, manifest.versionId)));
+      await ctx.runMutation(internalApi.mediaEvidenceControl.clearOrphanedCopies,{uploadRef:state.session.ref});
       return;
     }
     if (["authorized", "uploaded", "failed", "expired"].includes(state.session.state)) {
       if (state.session.multipartUploadId) {
         try {
           await store.abortMultipart(state.session.objectKey, state.session.multipartUploadId);
-        } catch { /* already completed or aborted */ }
+        } catch (error) { if((error as {name?:string})?.name!=="NoSuchUpload")throw error; }
       }
       await Promise.all([
         state.session.objectKey,
@@ -554,13 +564,19 @@ export const cleanupMcpEvidenceUpload = internalAction({
         privateEvidenceObjectKey(store.config.environment, state.session.ref, "medium"),
         privateEvidenceObjectKey(store.config.environment, state.session.ref, "large"),
       ].map(async (key) => {
-        try { await store.deleteAllVersions(key); } catch { /* reconciliation retries */ }
+        await store.deleteAllVersions(key);
       }));
       await ctx.runMutation(internalApi.mediaEvidenceControl.markUploadFailed, {
         vaultOwnerId: state.session.vaultOwnerId,
         uploadRef: state.session.ref,
         failureCode: "expired_cleanup_complete",
       });
+    }
+    } catch(error) {
+      // Keep both the reservation and known copies counted until a later,
+      // confirmed provider cleanup succeeds.
+      await ctx.scheduler.runAfter(15*60_000,internalApi.mediaEvidenceStorage.cleanupMcpEvidenceUpload,args);
+      throw error;
     }
   },
 });

@@ -16,6 +16,7 @@ function selectBash(platform = process.platform, exists = existsSync) {
   return candidates.find(exists) ?? "bash";
 }
 const bash = selectBash();
+// Keep the exact-PATH security fixture isolated from machine shell startup hooks.
 const bashPath = (value) => value.replaceAll("\\", "/").replace(/^([A-Za-z]):\//, (_, drive) => `/${drive.toLowerCase()}/`);
 const shellEnvironment = (values) => Object.fromEntries(Object.entries(values).map(([key, value]) => [
   key, value && ["PATH", "TMPDIR", "CLAUDE_PROJECT_DIR", "CLAUDE_ENV_FILE", "NVM_DIR", "FAKE_SELECTED_BIN", "FAKE_CALLS"].includes(key) ? bashPath(value) : value,
@@ -85,7 +86,7 @@ nvm() {
 }
 `);
   const run = (overrides = {}) => {
-    const result = spawnSync(bash, [bashPath(hook)], {
+    const result = spawnSync(bash, ["--noprofile", "--norc", bashPath(hook)], {
       cwd: root,
       timeout: 10_000,
       encoding: "utf8",
@@ -157,7 +158,7 @@ test("same-major patch mismatch selects the exact pin and safely persists PATH",
   const f = fixture(t, "22.22.0");
   assert.match(f.run(), /installed dependencies/);
   assert.deepEqual(f.calls(), ["nvm install 22.23.4", "nvm use 22.23.4", "corepack pnpm --version", "corepack pnpm install --frozen-lockfile --prod=false"]);
-  const result = spawnSync(bash, ["-c", 'source "$1"; printf "%s\\n" "$PATH"; command -v pnpm; node -p process.versions.node; pnpm --version', "test", bashPath(f.envFile)], {
+  const result = spawnSync(bash, ["--noprofile", "--norc", "-c", 'source "$1"; printf "%s\\n" "$PATH"; command -v pnpm; node -p process.versions.node; pnpm --version', "test", bashPath(f.envFile)], {
     cwd: f.root, encoding: "utf8", env: shellEnvironment({ PATH: f.bin, FAKE_CALLS: f.callsFile }),
   });
   assert.equal(result.status, 0);

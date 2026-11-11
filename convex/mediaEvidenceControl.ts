@@ -1,3 +1,5 @@
+import { reserveOperation, commitOperation, releaseOperation, addCopies, removeStoredBytes, summaryFor, assertFileSize } from "./usageLimits";
+import { isRenderedEvidenceImage } from "../lib/media/evidenceStandard";
 /* eslint-disable @typescript-eslint/no-explicit-any -- Exact manifests are runtime-validated at this internal boundary. */
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -142,6 +144,7 @@ export const planMcpEvidenceUpload = internalMutation({
       };
     }
 
+    await reserveOperation(ctx,owner,args.operationId,args.input.sizeBytes,"mcp",isRenderedEvidenceImage(args.input.contentType)?"image":"original");
     await ctx.db.insert("mediaUploadSessions", {
       vaultOwnerId: owner,
       ref: args.uploadRef,
@@ -373,7 +376,7 @@ export const commitMcpEvidenceUpload = internalMutation({
       machineError("NOT_FOUND", "The evidence upload was not found.", "Use the uploadRef returned by the begin call in this connection.");
     }
     if (session.state === "ready" && session.mediaId) {
-      return { replayed: true as const, mediaId: session.mediaId, original: (await ctx.db.get(session.mediaId))?.b2Original };
+      return { replayed: true as const, mediaId: session.mediaId, original: (await ctx.db.get(session.mediaId))?.b2Original, storage:await summaryFor(ctx,owner) };
     }
     if (session.state !== "uploaded" || session.expiresAt <= Date.now()) {
       machineError("UPLOAD_EXPIRED", "That evidence upload is no longer active.", "Begin again with a new operation ID.");
@@ -393,6 +396,9 @@ export const commitMcpEvidenceUpload = internalMutation({
         : contentType === "image/tiff"
           ? "scan" as const
           : "photo" as const;
+    await assertFileSize(ctx,owner,isRenderedEvidenceImage(args.original.contentType)?"image":"original",args.original.sizeBytes);
+    await commitOperation(ctx,owner,session.operationId,args.original.sizeBytes);
+    await addCopies(ctx,owner,[args.tiny,args.medium,args.large].reduce((n,r)=>n+(r?.sizeBytes ?? 0),0));
     const mediaId = await ctx.db.insert("media", {
       vaultOwnerId: owner,
       type: mediaType,
@@ -419,7 +425,7 @@ export const commitMcpEvidenceUpload = internalMutation({
       updatedAt: now,
     });
     await ctx.db.patch(session._id, { state: "ready", mediaId, finalizedAt: now });
-    return { replayed: false as const, mediaId, original: args.original };
+    return { replayed: false as const, mediaId, original: args.original, storage:await summaryFor(ctx,owner) };
   },
 });
 
@@ -431,7 +437,11 @@ export const markUploadFailed = internalMutation({
       .withIndex("by_owner_ref", (q) => q.eq("vaultOwnerId", args.vaultOwnerId).eq("ref", args.uploadRef))
       .first();
     if (!session || session.state === "ready") return;
-    await ctx.db.patch(session._id, { state: "failed", failedAt: Date.now(), failureCode: args.failureCode });
+    if(args.failureCode==="expired_cleanup_complete") {
+      await releaseOperation(ctx,session.vaultOwnerId,session.operationId);
+      await removeStoredBytes(ctx,session.vaultOwnerId,session.orphanedBytes ?? 0);
+    }
+    await ctx.db.patch(session._id, { state: "failed", failedAt: Date.now(), failureCode: args.failureCode, orphanedBytes:args.failureCode==="expired_cleanup_complete"?0:session.orphanedBytes });
   },
 });
 
@@ -482,3 +492,17 @@ export const mediaUploadRef = internalQuery({
     return { uploadRef: media.uploadSessionRef };
   },
 });
+
+/** Durable accounting for exact copies whose provider deletion failed. */
+export const recordOrphanedCopies=internalMutation({args:{uploadRef:v.string(),bytes:v.number()},handler:async(ctx,args)=>{
+ const session=await ctx.db.query("mediaUploadSessions").withIndex("by_ref",q=>q.eq("ref",args.uploadRef)).unique();
+ if(!session||args.bytes<=0)return;
+ await addCopies(ctx,session.vaultOwnerId,args.bytes);
+ await ctx.db.patch(session._id,{orphanedBytes:(session.orphanedBytes ?? 0)+args.bytes});
+}});
+export const clearOrphanedCopies=internalMutation({args:{uploadRef:v.string()},handler:async(ctx,args)=>{
+ const session=await ctx.db.query("mediaUploadSessions").withIndex("by_ref",q=>q.eq("ref",args.uploadRef)).unique();
+ if(!session)return;
+ await removeStoredBytes(ctx,session.vaultOwnerId,session.orphanedBytes ?? 0);
+ await ctx.db.patch(session._id,{orphanedBytes:0});
+}});

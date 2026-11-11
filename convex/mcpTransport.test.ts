@@ -767,3 +767,24 @@ test("AI cannot clear input or hide it through canonical, alias or generic archi
 
 // Explicit website JWT issuer for synthetic person identities; never an auth bypass.
 beforeEach(()=>vi.stubEnv("CLERK_JWT_ISSUER_DOMAIN","https://convex.test"));
+
+test("storage refusal is structured and the same AI token still reads the brief",async()=>{
+ const t=convexTest(schema,modules);
+ await approvedConnection(t);
+ vi.stubEnv("MEDIA_STORAGE_ENVIRONMENT","development");
+ for(const kind of ["PRIVATE","PUBLIC"]){
+  for(const [key,value] of Object.entries({ENDPOINT:"https://storage.example.test",REGION:"synthetic",BUCKET:`synthetic-${kind.toLowerCase()}`,KEY_ID:"synthetic-test-key",APPLICATION_KEY:"synthetic-test-value"}))vi.stubEnv(`B2_${kind}_${key}`,value);
+ }
+ const personId=await t.run(async ctx=>{
+  await ctx.db.insert("usageLimitSettings",{key:"site",planStoredBytes:{free:0},enforcement:"on",updatedAt:0,updatedBy:"synthetic-admin"});
+  return ctx.db.insert("persons",{vaultOwnerId:SUBJECT,name:{given:"Invented",surname:"Ancestor"},sex:"unknown",living:false,researchStatus:"basic",createdAt:0,updatedAt:0});
+ });
+ const token=await accessToken();
+ const refused=await t.fetch("/mcp",modernRequest("tools/call",token,{name:"family_history_begin_evidence_upload",arguments:{operationId:"synthetic-cap-refusal",personId:String(personId),title:"Invented evidence",fileName:"invented.jpg",contentType:"image/jpeg",sizeBytes:1,sha256:"a".repeat(64)}},"family_history_begin_evidence_upload"));
+ const body=await refused.json();
+ expect(body.result.isError).toBe(true);
+ expect(body.result.structuredContent).toMatchObject({code:"USAGE_LIMIT_REACHED",remaining:0});
+ const next=await t.fetch("/mcp",modernRequest("tools/call",token,{name:"family_history_get_brief",arguments:{}},"family_history_get_brief"));
+ const nextBody=await next.json();expect(nextBody.result.isError).not.toBe(true);
+ expect(nextBody.result.structuredContent.storage.capBytes).toBe(0);
+});

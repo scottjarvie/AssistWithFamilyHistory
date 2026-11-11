@@ -10,7 +10,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import {
   MEDIA_UPLOAD_ACCEPT_ATTRIBUTE,
-  MEDIA_UPLOAD_MAX_BYTES,
 } from "@/lib/media/uploadContract";
 
 type MediaItem = {
@@ -53,25 +52,26 @@ type MediaItem = {
  * Returns the server's message on failure so the caller can show the person the
  * real reason rather than a generic one.
  */
+const uploadOperationIds=new WeakMap<File,Map<string,string>>();
+
 async function uploadMediaFile(args: {
   file: File;
   personId?: string;
   mediaId?: string;
   title?: string;
 }): Promise<{ ok: true } | { ok: false; message: string }> {
-  if (args.file.size > MEDIA_UPLOAD_MAX_BYTES) {
-    return {
-      ok: false,
-      message: `That file is larger than ${Math.round(MEDIA_UPLOAD_MAX_BYTES / (1024 * 1024))} MB.`,
-    };
-  }
   const body = new FormData();
   body.append("file", args.file);
   body.append("title", args.title?.trim() || args.file.name);
   if (args.personId) body.append("personIds", args.personId);
   if (args.mediaId) body.append("mediaId", args.mediaId);
 
-  const response = await fetch("/api/media/upload", { method: "POST", body });
+  let operations=uploadOperationIds.get(args.file);
+  if(!operations){operations=new Map();uploadOperationIds.set(args.file,operations);}
+  const target=`${args.personId ?? ""}:${args.mediaId ?? ""}`;
+  const operationId=operations.get(target) ?? crypto.randomUUID();
+  operations.set(target,operationId);
+  const response = await fetch("/api/media/upload", { method: "POST", headers:{"idempotency-key":operationId}, body });
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
     return { ok: false, message: payload?.error || "The file could not be uploaded." };

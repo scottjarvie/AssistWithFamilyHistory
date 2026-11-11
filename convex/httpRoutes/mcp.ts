@@ -1,9 +1,10 @@
+import { mcpLimitText } from "../lib/usageLimits/core";
 import { AI_ACCESS_INSTRUCTIONS } from "../../lib/mcp/accessCopy";
 import { FAMILY_HISTORY_CONTROL_TOOLS } from "../../lib/mcp/catalog";
 /* eslint-disable @typescript-eslint/no-explicit-any -- Generated Convex references and SDK callbacks cross a runtime-validated MCP boundary. */
 import type { HttpRouter } from "convex/server";
 import { currentMediaForExport } from "../../lib/media/currentMediaForExport";
-import { EVIDENCE_LARGE_ORIGINAL_MAX_BYTES, EVIDENCE_UPLOAD_TYPES } from "../../lib/media/evidenceStandard";
+import { EVIDENCE_UPLOAD_TYPES } from "../../lib/media/evidenceStandard";
 import { McpServer, createMcpHandler, type AuthInfo } from "@modelcontextprotocol/server";
 import { createRemoteJWKSet, errors as joseErrors, jwtVerify } from "jose";
 import { z } from "zod";
@@ -244,6 +245,13 @@ function toolResult(data: unknown) {
 
 function toolError(error: unknown) {
   const raw = error instanceof Error ? error.message : String(error);
+  const usageData=(error as {data?:{usage?:import("../lib/usageLimits/core").UsageLimitError}})?.data?.usage;
+  let usage=usageData;
+  if(!usage) { const match=raw.match(/\{\"code\":\"usage_limit_reached\".*\}/); if(match) { try { usage=JSON.parse(match[0]).usage; } catch {} } }
+  let fileRefusal=(error as {data?:{code?:string;message?:string}})?.data;
+  if(!fileRefusal) { const match=raw.match(/\{\"code\":\"FILE_TOO_LARGE\".*\}/); if(match){try{fileRefusal=JSON.parse(match[0]);}catch{}} }
+  if(fileRefusal?.code==="FILE_TOO_LARGE")return {isError:true,content:[{type:"text" as const,text:fileRefusal.message ?? "FILE_TOO_LARGE"}],structuredContent:fileRefusal};
+  if(usage) return {isError:true,content:[{type:"text" as const,text:mcpLimitText(usage)}],structuredContent:usage};
   const marker = "MCP_FAMILY_HISTORY_ERROR:";
   let payload: Record<string, unknown> = {
     code: "INTERNAL_ERROR",
@@ -655,7 +663,7 @@ export function createFamilyHistoryServer(
 
   const identity = { subject: principal.subject, issuer: principal.issuer, clientId: principal.clientId };
   const connection = { state: resolution.state, reason: "reason" in resolution ? resolution.reason : resolution.state, changedAt: "at" in resolution ? resolution.at : null, endsAt: grant?.expiresAt };
-  const instructions = `${AI_ACCESS_INSTRUCTIONS} Actual connection: ${connection.state}; reason: ${connection.reason}${connection.changedAt ? `; changed ${new Date(connection.changedAt).toISOString()}` : ""}; end date ${connection.endsAt ? new Date(connection.endsAt).toISOString() : "none"}. Call family_history_connection for current details. Start research with family_history_get_brief, search, then hydrate stable IDs before editing.`;
+  const instructions = `${AI_ACCESS_INSTRUCTIONS} Actual connection: ${connection.state}; reason: ${connection.reason}${connection.changedAt ? `; changed ${new Date(connection.changedAt).toISOString()}` : ""}; end date ${connection.endsAt ? new Date(connection.endsAt).toISOString() : "none"}. Call family_history_connection for current details. Read storage in the brief and upload replies: these are counters only. A USAGE_LIMIT_REACHED refusal affects one upload; keep this connection and retry the same operation after room is available. Start research with family_history_get_brief, search, then hydrate stable IDs before editing.`;
 
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, {
     instructions,
@@ -956,7 +964,7 @@ export function createFamilyHistoryServer(
       description: z.string().trim().max(2_000).optional(),
       fileName: z.string().trim().min(1).max(240),
       contentType: z.enum(EVIDENCE_UPLOAD_TYPES),
-      sizeBytes: z.number().int().min(1).max(EVIDENCE_LARGE_ORIGINAL_MAX_BYTES),
+      sizeBytes: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
       sha256: z.string().regex(/^[a-fA-F0-9]{64}$/),
       fileModifiedTime: z.string().datetime().optional(),
       scanTime: z.string().datetime().optional(),

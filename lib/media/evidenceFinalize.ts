@@ -47,6 +47,7 @@ const QUALITY = [84, 72, 60, 48] as const;
 async function cleanRendition(
   original: Uint8Array,
   slot: EvidenceRenditionSlot,
+  cap: number,
 ): Promise<{ bytes: Uint8Array; width: number; height: number }> {
   for (const quality of QUALITY) {
     const encoded = await sharp(Buffer.from(original), { failOn: "warning" })
@@ -61,7 +62,7 @@ async function cleanRendition(
       .jpeg({ quality, mozjpeg: true })
       .toBuffer({ resolveWithObject: true });
     const bytes = new Uint8Array(encoded.data);
-    if (bytes.byteLength > EVIDENCE_RENDITION_MAX_BYTES) continue;
+    if (bytes.byteLength > cap) continue;
     if (hasEmbeddedImageMetadata(bytes, "image/jpeg")) {
       throw new Error(`${slot} evidence rendition retained embedded metadata.`);
     }
@@ -78,6 +79,7 @@ async function cleanRendition(
 export async function finalizeEvidenceImage(input: {
   store: EvidenceVerificationStore;
   uploadRef: string;
+  maxRenditionBytes?:number;
   objectKey: string;
   declaredContentType: string;
   declaredSizeBytes: number;
@@ -119,11 +121,12 @@ export async function finalizeEvidenceImage(input: {
     verifiedAt,
   };
 
-  const written: Array<{ objectKey: string; versionId: string }> = [];
+  const written: Array<{ objectKey: string; versionId: string; sizeBytes:number }> = [];
+  let uncertainBytes=0;
   try {
     const prepared = await Promise.all((Object.keys(EDGE) as EvidenceRenditionSlot[]).map(async (slot) => ({
       slot,
-      rendition: await cleanRendition(originalBytes, slot),
+      rendition: await cleanRendition(originalBytes, slot, input.maxRenditionBytes ?? EVIDENCE_RENDITION_MAX_BYTES),
       objectKey: privateEvidenceObjectKey(input.store.config.environment, input.uploadRef, slot),
     })));
     const settled = await Promise.allSettled(prepared.map(async ({ slot, rendition, objectKey }) => {
@@ -132,9 +135,10 @@ export async function finalizeEvidenceImage(input: {
     }));
     for (const result of settled) {
       if (result.status === "fulfilled") {
-        written.push({ objectKey: result.value.objectKey, versionId: result.value.stored.versionId });
+        written.push({ objectKey: result.value.objectKey, versionId: result.value.stored.versionId, sizeBytes:result.value.rendition.bytes.byteLength });
       }
     }
+    uncertainBytes=settled.reduce((bytes,result,index)=>bytes+(result.status==="rejected"?prepared[index].rendition.bytes.byteLength:0),0);
     const failed = settled.find((result) => result.status === "rejected");
     if (failed?.status === "rejected") throw failed.reason;
     const entries = settled.map((result) => {
@@ -167,9 +171,16 @@ export async function finalizeEvidenceImage(input: {
       }),
     };
   } catch (error) {
+    let orphanedBytes=uncertainBytes;
     await Promise.all(written.map(async (part) => {
-      try { await input.store.deleteVersion(part.objectKey, part.versionId); } catch { /* reconciliation can retry */ }
+      try { await input.store.deleteVersion(part.objectKey, part.versionId); }
+      catch { orphanedBytes+=part.sizeBytes; }
     }));
+    if(orphanedBytes) {
+      const failure=new Error(`${error instanceof Error ? error.message : "Evidence finalization failed."} Evidence cleanup requires a retry.`, {cause:error});
+      Object.assign(failure,{orphanedBytes});
+      throw failure;
+    }
     throw error;
   }
 }

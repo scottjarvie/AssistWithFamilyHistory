@@ -1,3 +1,4 @@
+import { summaryFor, limitsFor, assertWriteBatch, fileCapsFor } from "./usageLimits";
 import {queueIdentity,suggestionWithinPeople} from "../lib/queue/identity";
 import { loadStoryScopedSnapshot, buildStoryBundle, buildPublicStoryBundle } from "./vault";
 import { assessStoryPublishReadiness } from "../lib/stories/publishSafety";
@@ -405,6 +406,8 @@ async function operation(
   const operationId = cleanText(args.operationId, "operationId", FAMILY_HISTORY_MCP_LIMITS.operationId, true)!;
   const replay = await replayReceipt(ctx, owner, operationId, args.toolName, args.requestHash);
   if (replay) return replay;
+  const batchItems=["people","relationships","events","sources","claims","stories","places","topics","connections","items"].reduce((n,key)=>n+(Array.isArray(args.input[key])?args.input[key].length:0),0);
+  await assertWriteBatch(ctx,owner,args.toolName,Math.max(1,batchItems),new TextEncoder().encode(JSON.stringify(args.input)).byteLength);
   const beforeIds = await affectedStoryIds(ctx,owner,args.toolName,args.input);
   const beforeExposure = await publicExposures(ctx, owner, beforeIds);
   const reviewStates = new Map<string, Doc<"stories">["status"]>();
@@ -1426,6 +1429,9 @@ export const getBrief = internalQuery({
       updatedAt: person.updatedAt,
     });
     return {
+      storage:await summaryFor(ctx,owner),
+      uploadFileCaps:await fileCapsFor(ctx,owner),
+      batchLimits:await limitsFor(ctx,owner).then(({limits})=>({maxItems:limits.mcpBatchMaxItems,maxBytes:limits.mcpBatchMaxBytes})),
       workspace: "Assist With Family History",
       privacy: "Private owner vault. Living-person notes and unreviewed private context are not returned in broad discovery.",
       recentPeople: people.slice(0, limit).map(personSummary),

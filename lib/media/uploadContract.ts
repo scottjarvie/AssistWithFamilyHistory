@@ -1,3 +1,4 @@
+import { siteDefaults } from "./siteDefaults";
 /**
  * What the vault will hold as a media file, and what it calls it.
  *
@@ -15,7 +16,7 @@
  * a separate question answered by `FAMILY_HISTORY_MCP_LIMITS`, which skips an
  * over-budget item with `TOO_LARGE` and says what to do instead.
  */
-export const MEDIA_UPLOAD_MAX_BYTES = 25 * 1024 * 1024;
+export const MEDIA_UPLOAD_MAX_BYTES = siteDefaults.web;
 
 export const ACCEPTED_MEDIA_UPLOAD_TYPES = [
   "image/jpeg",

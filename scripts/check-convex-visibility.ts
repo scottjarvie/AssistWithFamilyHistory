@@ -26,6 +26,10 @@ import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 
 const PUBLIC_UNSCOPED_ALLOWLIST: Record<string, string> = {
+  "usageLimits.ts:adminOverview": "Control-plane operation behind existing ADMIN_USER_IDS guard.",
+  "usageLimits.ts:adminSetSiteLimits": "Control-plane operation behind existing ADMIN_USER_IDS guard.",
+  "usageLimits.ts:adminSetPersonLimits": "Control-plane operation behind existing ADMIN_USER_IDS guard.",
+
   // Public story-by-slug lookup. Bound by `status === "published"` before
   // any data is returned; uses buildPublicStoryBundle which filters fields.
   "vault.ts:getPublishedStory":

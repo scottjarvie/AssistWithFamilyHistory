@@ -1,3 +1,4 @@
+import { usageRefusalOf } from "@/convex/usageLimits";
 /**
  * Put a real file into the vault.
  *
@@ -21,7 +22,6 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { getAuthedConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
 import { getVaultAccessContext } from "@/lib/vault/server";
 import {
-  MEDIA_UPLOAD_MAX_BYTES,
   classifyMediaUpload,
   isAcceptedMediaUploadType,
 } from "@/lib/media/uploadContract";
@@ -34,6 +34,8 @@ const MetadataSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  let cleanup:(()=>Promise<unknown>)|undefined;
+  const operationId=request.headers.get("idempotency-key") ?? crypto.randomUUID();
   if (!isConvexConfigured()) {
     const issue = getConvexRuntimeIssue();
     return NextResponse.json({ error: issue.title, details: issue.description }, { status: issue.statusCode });
@@ -72,31 +74,30 @@ export async function POST(request: NextRequest) {
     if (file.size <= 0) {
       return NextResponse.json({ error: "That file is empty." }, { status: 400 });
     }
-    if (file.size > MEDIA_UPLOAD_MAX_BYTES) {
-      return NextResponse.json(
-        { error: `That file is larger than ${Math.round(MEDIA_UPLOAD_MAX_BYTES / (1024 * 1024))} MB. Upload a smaller scan or a cropped page.` },
-        { status: 413 },
-      );
-    }
-
     const client = await getAuthedConvexClient();
 
     // Bytes go straight from this server to Convex storage. They never pass
     // through a function argument, so a large scan is not bounded by the
     // argument-size limit and never lands in a log.
-    const { uploadUrl } = await client.mutation(api.vaultMutations.startMediaUpload, { vaultOwnerId });
-    const stored = await fetch(uploadUrl, {
-      method: "POST",
-      headers: { "Content-Type": mimeType },
-      body: await file.arrayBuffer(),
-    });
-    if (!stored.ok) {
-      return NextResponse.json({ error: "The file could not be stored. Try again." }, { status: 502 });
+    cleanup=()=>client.mutation(api.vaultMutations.cancelMediaUpload,{vaultOwnerId,operationId});
+    const started = await client.mutation(api.vaultMutations.startMediaUpload, { vaultOwnerId, sizeBytes:file.size, operationId });
+    if(started.mediaId) return NextResponse.json({success:true,mediaId:started.mediaId,created:false,storage:started.storage});
+    let storageId:string|undefined=started.storageId;
+    if(!storageId) {
+      const stored = await fetch(started.uploadUrl, {
+        method: "POST", headers: { "Content-Type": mimeType }, body: await file.arrayBuffer(),
+      });
+      if (!stored.ok) {
+        await cleanup();
+        return NextResponse.json({ error: "The file could not be stored. Try again." }, { status: 502 });
+      }
+      storageId=((await stored.json()) as {storageId:string}).storageId;
+      await client.mutation(api.vaultMutations.stageMediaUpload,{vaultOwnerId,operationId,storageId:storageId as Id<"_storage">});
     }
-    const { storageId } = (await stored.json()) as { storageId: string };
 
     const result = await client.mutation(api.vaultMutations.attachMediaFile, {
       vaultOwnerId,
+      operationId,
       mediaId: parsed.data.mediaId ? (parsed.data.mediaId as Id<"media">) : undefined,
       storageId: storageId as Id<"_storage">,
       title: parsed.data.title,
@@ -109,6 +110,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, ...result });
   } catch (error) {
+    if(cleanup) { try { await cleanup(); } catch { /* Retain the reservation for confirmed cleanup on expiry. */ } }
+    const fileRefusal=(error as {data?:{code?:string;message?:string}})?.data;
+    if(fileRefusal?.code==="FILE_TOO_LARGE") return NextResponse.json({error:fileRefusal.message,...fileRefusal},{status:413});
+    const refusal=usageRefusalOf(error);
+    if(refusal) return NextResponse.json({error:refusal.message,...refusal},{status:413});
     const issue = getConvexRuntimeIssue(error);
     return NextResponse.json({ error: issue.title, details: issue.description }, { status: issue.statusCode });
   }

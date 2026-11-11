@@ -1,3 +1,4 @@
+import { reserveOperation, commitOperation, releaseOperation, removeStoredBytes, summaryFor, assertFileSize } from "./usageLimits";
 import { v } from "convex/values";
 import { mutation, type MutationCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
@@ -1148,10 +1149,11 @@ export const upsertSourceFact = mutation({
  * protected evidence delivery needs.
  */
 export const startMediaUpload = mutation({
-  args: { vaultOwnerId: v.string() },
+  args: { vaultOwnerId: v.string(), sizeBytes:v.optional(v.number()), operationId:v.optional(v.string()) },
   handler: async (ctx, args) => {
     await authorizeTenantMutation(ctx, "vaultMutations.startMediaUpload", args.vaultOwnerId);
-    return { uploadUrl: await ctx.storage.generateUploadUrl() };
+    const r=args.sizeBytes !== undefined && args.operationId ? await reserveOperation(ctx,args.vaultOwnerId,args.operationId,args.sizeBytes,"web","web") : null;
+    return { uploadUrl: r?.mediaId || r?.storageId ? "" : await ctx.storage.generateUploadUrl(), mediaId:r?.mediaId, storageId:r?.storageId, storage:await summaryFor(ctx,args.vaultOwnerId) };
   },
 });
 
@@ -1169,6 +1171,7 @@ export const startMediaUpload = mutation({
 export const attachMediaFile = mutation({
   args: {
     vaultOwnerId: v.string(),
+    operationId:v.optional(v.string()),
     mediaId: v.optional(v.id("media")),
     storageId: v.id("_storage"),
     title: v.string(),
@@ -1201,13 +1204,20 @@ export const attachMediaFile = mutation({
       );
     }
 
+    const metadata=await ctx.db.system.get(args.storageId);
+    if(!metadata) throw new Error("Stored file not found");
+    await assertFileSize(ctx,vaultOwnerId,"web",metadata.size);
+    const reservation=args.operationId ? await ctx.db.query("uploadReservations").withIndex("by_owner_operation",q=>q.eq("ownerId",vaultOwnerId).eq("operationId",args.operationId!)).unique() : null;
+    if(reservation?.storageId && reservation.storageId!==args.storageId) throw new Error("Operation conflict");
+    if(reservation?.status==="committed" && reservation.mediaId) return {mediaId:reservation.mediaId,created:false};
+    await commitOperation(ctx,vaultOwnerId,args.operationId,metadata.size);
     const now = Date.now();
     const shared = {
       storageId: args.storageId,
       title: args.title,
       type: args.type,
       mimeType: args.mimeType,
-      sizeBytes: args.sizeBytes,
+      sizeBytes: metadata.size,
       description: args.description,
       // A file the person just handed the product is not yet a file they said
       // an AI may read. That stays a separate, deliberate act.
@@ -1228,7 +1238,9 @@ export const attachMediaFile = mutation({
       );
       // Replacing bytes leaves no orphan behind.
       if (existing?.storageId && existing.storageId !== args.storageId) {
+        const oldFile=await ctx.db.system.get(existing.storageId);
         await ctx.storage.delete(existing.storageId);
+        await removeStoredBytes(ctx,vaultOwnerId,oldFile?.size ?? existing.sizeBytes ?? 0);
       }
       // A B2-backed item's pinned original and display copies would otherwise
       // keep winning over the new bytes in every delivery path. The new file
@@ -1262,7 +1274,8 @@ export const attachMediaFile = mutation({
           "A file was attached or replaced, so this item needs review again before an AI may read it.",
         reviewedAt: undefined,
       });
-      return { mediaId: args.mediaId, created: false };
+      if(reservation) await ctx.db.patch(reservation._id,{mediaId:args.mediaId});
+      return { mediaId: args.mediaId, created: false, storage:await summaryFor(ctx,vaultOwnerId) };
     }
 
     const mediaId = await ctx.db.insert("media", {
@@ -1274,7 +1287,8 @@ export const attachMediaFile = mutation({
         "Uploaded to the vault. Set its rights and review it before an AI may read it.",
       createdAt: now,
     });
-    return { mediaId, created: true };
+    if(reservation) await ctx.db.patch(reservation._id,{mediaId});
+    return { mediaId, created: true, storage:await summaryFor(ctx,vaultOwnerId) };
   },
 });
 
@@ -2662,3 +2676,20 @@ export const mergeProvisionalRelative = mutation({
     return { success: true };
   },
 });
+
+export const stageMediaUpload=mutation({args:{vaultOwnerId:v.string(),operationId:v.string(),storageId:v.id("_storage")},handler:async(ctx,args)=>{
+ await authorizeTenantMutation(ctx,"vaultMutations.startMediaUpload",args.vaultOwnerId);
+ const r=await ctx.db.query("uploadReservations").withIndex("by_owner_operation",q=>q.eq("ownerId",args.vaultOwnerId).eq("operationId",args.operationId)).unique();
+ if(!r||r.status!=="reserved")return;
+ if(r.storageId && r.storageId!==args.storageId)throw new Error("Operation conflict");
+ const existing=await ctx.db.query("media").withIndex("by_storage",q=>q.eq("storageId",args.storageId)).first();
+ if(existing)throw new Error("This file is already attached");
+ await ctx.db.patch(r._id,{storageId:args.storageId});
+}});
+export const cancelMediaUpload = mutation({args:{vaultOwnerId:v.string(),operationId:v.string()},handler:async(ctx,args)=>{
+  await authorizeTenantMutation(ctx,"vaultMutations.startMediaUpload",args.vaultOwnerId);
+  const r=await ctx.db.query("uploadReservations").withIndex("by_owner_operation",q=>q.eq("ownerId",args.vaultOwnerId).eq("operationId",args.operationId)).unique();
+  if(!r||r.status!=="reserved") return;
+  if(r.storageId) await ctx.storage.delete(r.storageId);
+  await releaseOperation(ctx,args.vaultOwnerId,args.operationId);
+}});

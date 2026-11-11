@@ -1,4 +1,5 @@
 export const PROTECTED_ROUTE_PATTERNS = [
+  "/api/usage-limits(.*)",
   "/app(.*)",
   "/api/ai-connections(.*)",
   "/api/people(.*)",
@@ -20,6 +21,7 @@ export const PROTECTED_ROUTE_PATTERNS = [
 ] as const;
 
 const PROTECTED_PATH_PREFIXES = [
+  "/api/usage-limits",
   "/app",
   "/api/ai-connections",
   "/api/people",

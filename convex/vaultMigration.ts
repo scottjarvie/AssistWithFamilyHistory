@@ -31,6 +31,7 @@ import { authorizeTenantMutation, handlePolicyViolationMutation } from "./access
 // All tables with a `by_owner` index in schema.ts. If a new owner-scoped table
 // is added, append it here.
 const OWNED_TABLES = [
+  "mediaUploadSessions",
   "persons",
   "relationships",
   "events",

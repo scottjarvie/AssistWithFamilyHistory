@@ -672,6 +672,20 @@
       "risk": "low",
       "scopes": [],
       "notes": "Owner-derived, always matched authenticated Convex subject. Bounded minimal private Audit rows only; no-store; no MCP grant expansion."
+    },
+    {
+      "route": "/api/usage-limits",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "agentSupport": "not-supported",
+      "risk": "high",
+      "capability": "storage_policy_administration",
+      "environment": "website-person",
+      "reviewLevel": "administrator-only",
+      "scopes": [],
+      "notes": "Counter-only control plane behind the existing administrator allowlist. Writes require a reason and append audit entries."
     }
   ]
 }
