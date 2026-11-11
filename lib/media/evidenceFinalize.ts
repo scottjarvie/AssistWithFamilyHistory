@@ -177,7 +177,8 @@ export async function finalizeEvidenceImage(input: {
       catch { orphanedBytes+=part.sizeBytes; }
     }));
     if(orphanedBytes) {
-      const failure=new Error(`${error instanceof Error ? error.message : "Evidence finalization failed."} Evidence cleanup requires a retry.`, {cause:error});
+      const failure=new Error(`${error instanceof Error ? error.message : "Evidence finalization failed."} Evidence cleanup requires a retry.`);
+      Object.defineProperty(failure,"cause",{value:error,writable:true,configurable:true});
       Object.assign(failure,{orphanedBytes});
       throw failure;
     }
