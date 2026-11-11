@@ -9,8 +9,8 @@
  * This file provides a single mutation that re-tags every owner-scoped row
  * from a guest UUID to a Clerk user id. The destination must equal the
  * authenticated Convex identity. The raw guest UUID is not a signed principal,
- * so this public endpoint refuses it in every mode until a signed guest
- * capability exists. No caller can lower readiness or move unproven guest data.
+ * so shadow mode logs and permits this legacy migration while enforce mode
+ * denies it until a signed guest capability exists.
  *
  * Structural checks:
  *   - `fromVaultOwnerId` MUST match `guest_*` (the cookie format from proxy.ts).
@@ -23,10 +23,11 @@
  * Counts are returned per-table so the caller can show "we brought back N
  * entries" and so tests can assert exact behavior.
  */
+import {mediaBytes,addCopies,removeStoredBytes} from "./usageLimits";
 import { v } from "convex/values";
 import { mutation } from "./_generated/server";
 import type { TableNames } from "./_generated/dataModel";
-import { authorizeTenantMutation } from "./access";
+import { authorizeTenantMutation, handlePolicyViolationMutation } from "./access";
 
 // All tables with a `by_owner` index in schema.ts. If a new owner-scoped table
 // is added, append it here.
@@ -119,8 +120,7 @@ export type RetagDb = {
 /**
  * Pure decision/loop for the migration: for each owned table, re-tag the rows
  * owned by `fromVaultOwnerId` to `toVaultOwnerId` and tally counts. No guards
- * here — callers must prove source ownership and transfer counted usage in the
- * same transaction. The public endpoint refuses unsigned sources. Exported so tests can
+ * here — callers must run `assertMigrationOwners` first. Exported so tests can
  * drive it with a fake db and assert exact per-table counts and the total.
  */
 export async function retagGuestRows(
@@ -148,13 +148,49 @@ export async function retagGuestRows(
   return { total, perTable };
 }
 
-/** A raw guest identifier proves no ownership. Until a verified source capability
- * exists, this public endpoint cannot remap records or change usage in any mode. */
 export const migrateGuestVault = mutation({
-  args: {fromVaultOwnerId:v.string(),toVaultOwnerId:v.string()},
-  handler:async(ctx,{fromVaultOwnerId,toVaultOwnerId}):Promise<MigrationResult>=>{
-    const {owner:authenticatedDestination}=await authorizeTenantMutation(ctx,"vaultMigration.migrateGuestVault",toVaultOwnerId);
-    assertMigrationOwners(fromVaultOwnerId,authenticatedDestination);
-    throw new Error("Trust boundary denied: guest_source_unverified (verified source ownership is required)");
+  args: {
+    fromVaultOwnerId: v.string(),
+    toVaultOwnerId: v.string(),
+  },
+  handler: async (ctx, { fromVaultOwnerId, toVaultOwnerId }) => {
+    const { owner: authenticatedDestination } = await authorizeTenantMutation(
+      ctx,
+      "vaultMigration.migrateGuestVault",
+      toVaultOwnerId,
+    );
+    assertMigrationOwners(fromVaultOwnerId, authenticatedDestination);
+
+    // A raw guest UUID is not a verified principal. Shadow mode records any
+    // legitimate reliance on this legacy migration path; enforce mode denies
+    // it until the guest supplies a signed Convex-verifiable capability.
+    await handlePolicyViolationMutation(
+      ctx,
+      "vaultMigration.migrateGuestVault",
+      "guest_source_unverified",
+    );
+
+    // Preserve the legacy remap while moving only bytes belonging to the rows
+    // it will re-tag. Counter readiness and upload rate buckets are untouched.
+    const media=await ctx.db.query("media").withIndex("by_owner",q=>q.eq("vaultOwnerId",fromVaultOwnerId)).collect();
+    const sessions=await ctx.db.query("mediaUploadSessions").withIndex("by_owner",q=>q.eq("vaultOwnerId",fromVaultOwnerId)).collect();
+    let bytes=sessions.reduce((n,row)=>n+(row.orphanedBytes ?? 0),0);
+    for(const row of media){
+      const stored=row.storageId?await ctx.db.system.get(row.storageId):null;
+      bytes+=mediaBytes(row)-(row.storageId?row.sizeBytes ?? 0:0)+(stored?.size ?? 0);
+    }
+    if(bytes>0){
+      await addCopies(ctx,authenticatedDestination,bytes);
+      await removeStoredBytes(ctx,fromVaultOwnerId,bytes);
+    }
+
+    // ctx.db structurally satisfies RetagDb; the casts keep the index/table
+    // names loose the same way the original inline loop did.
+    return retagGuestRows(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ctx.db as any,
+      fromVaultOwnerId,
+      authenticatedDestination,
+    );
   },
 });

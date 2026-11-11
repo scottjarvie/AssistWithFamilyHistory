@@ -39,9 +39,9 @@ const PUBLIC_UNSCOPED_ALLOWLIST: Record<string, string> = {
   "trustBoundary.ts:getShadowLogSummary":
     "Control-plane read; always fail-closed behind TRUST_BOUNDARY_SUPER_ADMIN_IDS.",
   // Guest migration binds its destination owner to the authenticated Clerk
-  // identity. An unsigned guest source is refused in every mode.
+  // identity. The legacy unsigned guest source logs in shadow and is refused in enforce.
   "vaultMigration.ts:migrateGuestVault":
-    "Destination is bound by authorizeTenantMutation; unsigned guest sources are always refused.",
+    "Destination is bound by authorizeTenantMutation; unsigned guest sources are refused in enforce and logged in shadow.",
 };
 
 const failures: string[] = [];

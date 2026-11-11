@@ -410,7 +410,7 @@ describe("migrateGuestVault (real mutation)", () => {
   const GUEST = "guest_aaaaaaaa-1111-2222-3333-444444444444";
   const USER = "user_2migrationTargetUser";
 
-  test("rejects unsigned guest migration and leaves every owner unchanged", async () => {
+  test("re-tags only the guest's rows to the user and leaves others alone", async () => {
     const t = convexTest(schema, modules);
 
     // Seed a guest vault, a foreign guest vault, and an existing user vault.
@@ -438,14 +438,21 @@ describe("migrateGuestVault (real mutation)", () => {
       return { guestPerson, guestMedia, guestStory, foreignGuest, existingUser };
     });
 
-    await expect(t.mutation(api.vaultMigration.migrateGuestVault, {
-      fromVaultOwnerId: GUEST,toVaultOwnerId: USER,
-    })).rejects.toThrow(/guest_source_unverified/);
+    const result = await t.mutation(api.vaultMigration.migrateGuestVault, {
+      fromVaultOwnerId: GUEST,
+      toVaultOwnerId: USER,
+    });
+
+    // 1 person + 1 media + 1 story moved.
+    expect(result.perTable.persons).toBe(1);
+    expect(result.perTable.media).toBe(1);
+    expect(result.perTable.stories).toBe(1);
+    expect(result.total).toBe(3);
 
     await t.run(async (ctx) => {
-      expect((await ctx.db.get(seeded.guestPerson))?.vaultOwnerId).toBe(GUEST);
-      expect((await ctx.db.get(seeded.guestMedia))?.vaultOwnerId).toBe(GUEST);
-      expect((await ctx.db.get(seeded.guestStory))?.vaultOwnerId).toBe(GUEST);
+      expect((await ctx.db.get(seeded.guestPerson))?.vaultOwnerId).toBe(USER);
+      expect((await ctx.db.get(seeded.guestMedia))?.vaultOwnerId).toBe(USER);
+      expect((await ctx.db.get(seeded.guestStory))?.vaultOwnerId).toBe(USER);
       // The foreign guest and pre-existing user rows are untouched.
       expect((await ctx.db.get(seeded.foreignGuest))?.vaultOwnerId).toBe(
         "guest_cccccccc-9999-8888-7777-666666666666"

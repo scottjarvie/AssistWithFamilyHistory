@@ -1,5 +1,5 @@
 import { requireWebsitePerson } from "./access";
-import { reserveOperation, commitOperation, releaseOperation, removeStoredBytes, summaryFor, assertFileSize, limitsFor, releaseExpiredWeb } from "./usageLimits";
+import { reserveOperation, commitOperation, removeStoredBytes, summaryFor, assertFileSize, limitsFor, releaseExpiredWeb } from "./usageLimits";
 import { v } from "convex/values";
 import { mutation, type MutationCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
@@ -1207,6 +1207,10 @@ export const attachMediaFile = mutation({
       "vaultMutations.attachMediaFile",
       args.vaultOwnerId,
     );
+    if(args.mediaId){
+      const target=await ctx.db.get(args.mediaId);
+      if(!target||!matchesVaultOwner(target.vaultOwnerId,vaultOwnerId))throw new Error("Trust boundary denied: reference_owner_mismatch");
+    }
     for (const personId of args.personIds ?? []) {
       await authorizeOwnedReferenceMutation(
         ctx,
@@ -1223,6 +1227,8 @@ export const attachMediaFile = mutation({
     if(!metadata) throw new Error("Stored file not found");
     await assertFileSize(ctx,vaultOwnerId,"web",metadata.size);
     const reservation=args.operationId ? await ctx.db.query("uploadReservations").withIndex("by_owner_operation",q=>q.eq("ownerId",vaultOwnerId).eq("operationId",args.operationId!)).unique() : null;
+    const competing=await ctx.db.query("uploadReservations").withIndex("by_storage",q=>q.eq("storageId",args.storageId)).filter(q=>q.and(q.eq(q.field("status"),"reserved"),q.neq(q.field("_id"),reservation?._id))).first();
+    if(competing)throw new Error("This file belongs to another pending upload");
     if(reservation?.storageId && reservation.storageId!==args.storageId) throw new Error("Operation conflict");
     if(reservation?.status==="committed" && reservation.mediaId) return {mediaId:reservation.mediaId,created:false};
     await commitOperation(ctx,vaultOwnerId,args.operationId,metadata.size);
@@ -2699,6 +2705,8 @@ export const stageMediaUpload=mutation({args:{vaultOwnerId:v.string(),operationI
  if(!r||r.status!=="reserved")return;
  if(r.attemptId && r.attemptId!==args.attemptId)throw new Error("Upload in progress; retry this operation");
  if(r.storageId && r.storageId!==args.storageId)throw new Error("Operation conflict");
+ const competing=await ctx.db.query("uploadReservations").withIndex("by_storage",q=>q.eq("storageId",args.storageId)).filter(q=>q.and(q.eq(q.field("status"),"reserved"),q.neq(q.field("_id"),r._id))).first();
+ if(competing)throw new Error("This file belongs to another pending upload");
  const existing=await ctx.db.query("media").withIndex("by_storage",q=>q.eq("storageId",args.storageId)).first();
  if(existing)throw new Error("This file is already attached");
  await ctx.db.patch(r._id,{storageId:args.storageId});
@@ -2708,7 +2716,5 @@ export const cancelMediaUpload = mutation({args:{vaultOwnerId:v.string(),operati
  await authorizeTenantMutation(ctx,"vaultMutations.startMediaUpload",args.vaultOwnerId);
   const r=await ctx.db.query("uploadReservations").withIndex("by_owner_operation",q=>q.eq("ownerId",args.vaultOwnerId).eq("operationId",args.operationId)).unique();
   if(!r||r.status!=="reserved"||r.attemptId!==args.attemptId) return;
-  if(r.storageId && await ctx.db.query("media").withIndex("by_storage",q=>q.eq("storageId",r.storageId)).first())return;
-  if(r.storageId) await ctx.storage.delete(r.storageId);
-  await releaseOperation(ctx,args.vaultOwnerId,args.operationId);
+  await releaseExpiredWeb(ctx,r);
 }});

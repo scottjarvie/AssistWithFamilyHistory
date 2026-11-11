@@ -2,7 +2,7 @@ import { internal } from "./_generated/api";
 import { authorizeTenantAction, authorizeTenantMutation, requireWebsitePerson, requireTrustBoundarySuperAdmin } from "./access";
 import { ConvexError, v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
-import { action, internalMutation, internalQuery, mutation, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { action, internalAction, internalMutation, internalQuery, mutation, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { FAMILY_HISTORY_MCP_LIMITS } from "../lib/mcp/contract";
 const isConvexAdmin=(subject:string|null|undefined)=>{try{requireTrustBoundarySuperAdmin(subject);return true;}catch{return false;}};
 import { EVIDENCE_RELAY_BODY_BYTES } from "../lib/media/evidenceStandard";
@@ -484,12 +484,27 @@ export async function addCopies(ctx:MutationCtx,ownerId:string,bytes:number) {
   await saveCounters(ctx,ownerId,row,applyStoredAddition(counters,bytes),now,true);
 }
 
-/** Release empty abandoned web sessions. Provider sessions release only after confirmed cleanup. */
-export const expireReservations = internalMutation({args:{},handler:async(ctx)=>{
-  const rows=await ctx.db.query("uploadReservations").withIndex("by_source_expiry",q=>q.eq("source","web").eq("status","reserved").lt("expiresAt",Date.now())).take(100);
-  let released=0,failed=0;
-  for(const row of rows){try{await releaseExpiredWeb(ctx,row);released++;}catch{failed++;}}
-  return {released,failed};
+/** Release abandoned web sessions. Provider sessions release only after confirmed cleanup. */
+export const expiredReservationsPage=internalQuery({args:{cursor:v.optional(v.string())},handler:async(ctx,args)=>{
+ const page=await ctx.db.query("uploadReservations").withIndex("by_source_expiry",q=>q.eq("source","web").eq("status","reserved").lt("expiresAt",Date.now())).paginate({numItems:100,cursor:args.cursor ?? null});
+ return {ids:page.page.map(row=>row._id),cursor:page.continueCursor,isDone:page.isDone};
+}});
+export const expireReservation=internalMutation({args:{reservationId:v.id("uploadReservations")},handler:async(ctx,args)=>{
+ const row=await ctx.db.get(args.reservationId);
+ if(!row||row.source!=="web"||row.status!=="reserved"||row.expiresAt>Date.now())return false;
+ await releaseExpiredWeb(ctx,row);return true;
+}});
+/** Retain one durable failure marker per hold, outside its rolled-back transaction. */
+export const recordExpiryFailure=internalMutation({args:{reservationId:v.id("uploadReservations")},handler:async(ctx,args)=>{
+ const row=await ctx.db.get(args.reservationId);
+ if(row?.status==="reserved"&&row.expiryFailureAt===undefined)await ctx.db.patch(row._id,{expiryFailureAt:Date.now()});
+}});
+export const expireReservations = internalAction({args:{cursor:v.optional(v.string())},handler:async(ctx,args):Promise<{released:number;failed:number}>=>{
+ const page=await ctx.runQuery(internal.usageLimits.expiredReservationsPage,args);
+ let released=0,failed=0;
+ for(const reservationId of page.ids){try{if(await ctx.runMutation(internal.usageLimits.expireReservation,{reservationId}))released++;}catch{failed++;await ctx.runMutation(internal.usageLimits.recordExpiryFailure,{reservationId});}}
+ if(!page.isDone)await ctx.scheduler.runAfter(0,internal.usageLimits.expireReservations,{cursor:page.cursor});
+ return {released,failed};
 }});
 
 export const ownerStorage = action({args:{},handler:async(ctx):Promise<import("./lib/usageLimits/core").AiStorage|null>=>{
@@ -525,11 +540,12 @@ export function mergeByteTable(current:Record<string,number>|undefined,patch:Rec
  const problems=validateFileCaps(result);if(problems.length)throw new ConvexError(problems.join("; "));return result;
 }
 
-/** Never remove a staged object that a live media row still references. */
+/** Never remove an object held by saved media or another pending upload. */
 export async function releaseExpiredWeb(ctx:MutationCtx,row:Doc<"uploadReservations">,dryRun=false) {
+ const competing=row.storageId ? await ctx.db.query("uploadReservations").withIndex("by_storage",q=>q.eq("storageId",row.storageId)).filter(q=>q.and(q.eq(q.field("status"),"reserved"),q.neq(q.field("_id"),row._id))).first() : null;
  const referenced=row.storageId ? await ctx.db.query("media").withIndex("by_storage",q=>q.eq("storageId",row.storageId)).first() : null;
  if(!dryRun){
-  if(row.storageId&&!referenced&&await ctx.db.system.get(row.storageId))await ctx.storage.delete(row.storageId);
+  if(row.storageId&&!referenced&&!competing&&await ctx.db.system.get(row.storageId))await ctx.storage.delete(row.storageId);
   await releaseOperation(ctx,row.ownerId,row.operationId);
  }
  return true;

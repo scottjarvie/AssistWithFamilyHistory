@@ -43,10 +43,11 @@ After discovery, counting and validation, its final step records
 `backfillCompletedAt`. It refuses completion if any source has no owner or an
 unknown size, or any counter remains unready. Fix unresolved records under a
 separate review and start a fresh job. Concurrent byte writes bump each owner's
-revision and restart that owner's recount. The public guest-remap endpoint accepts no verifiable source capability, so it
-refuses unsigned guest IDs in both shadow and enforce modes without changing
-records, counters or readiness. A verified remap requires a separate implementation
-that transfers its counted bytes transactionally.
+revision and restart that owner's recount. Guest migration retains the existing
+shadow-mode behavior and enforce-mode refusal. Its transaction transfers only the
+stored bytes in the rows it moves, using actual Convex blob sizes and tracked B2
+bytes. It leaves existing readiness flags unchanged; an empty migration changes
+no counter.
 Legacy media with no owner is reported as unattributed, never assigned to a
 person mentioned in the file. Keep account IDs and results out of public PRs.
 
@@ -74,7 +75,10 @@ pnpm exec convex run usageLimits:sweepUnclaimedStorage '{"cursor":null,"dryRun":
 Repeat with the returned cursor. The second command deletes real data and needs
 separate approval after the dry run is reviewed. It is not scheduled destructively
 by this release. Ordinary reservation expiry deletes only its own staged object,
-and only if no media references it. B2 cleanup protects active originals, copies
+and only if no media or other pending reservation references it. Expiry runs each
+reservation in a separate transaction, so a failed deletion or counter update
+rolls back that row while unrelated rows continue. A retained reservation records
+its first expiry failure once in `expiryFailureAt` for operator inspection. B2 cleanup protects active originals, copies
 and replacement history; it subtracts only after successful provider deletion.
 A provider failure retains accounting and retries at most eight attempts; after
 that the hold remains for operator review. Its `dryRun:true` action lists candidate
@@ -86,6 +90,8 @@ and stored bytes without an owner still block completion. The recount verifies
 Convex storage metadata, but B2 totals come from pinned
 manifests and tracked failed-copy holds. It cannot prove B2 object existence or
 find unregistered B2 versions: a separate provider inventory is needed for that.
+B2 cleanup deletes explicit object versions (or enumerates all versions of a
+failed upload key); it does not rely on deleting a key to hide older versions.
 The Convex sweep closes the unclaimed Convex-blob gap. Pending declared sizes are
 reservations, not stored-byte recount totals; multipart parts are provider-native
 and no second local original is staged. Export JSON streams directly to the

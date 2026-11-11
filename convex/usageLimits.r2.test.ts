@@ -15,13 +15,15 @@ async function start(t:ReturnType<typeof setup>,operationId:string,sizeBytes=5){
 async function stage(t:ReturnType<typeof setup>,operationId:string,storageId:Awaited<ReturnType<typeof blob>>){await person(t).mutation(api.vaultMutations.stageMediaUpload,{vaultOwnerId:OWNER,operationId,attemptId:operationId,storageId});}
 const attachArgs=(storageId:Awaited<ReturnType<typeof blob>>)=>({vaultOwnerId:OWNER,storageId,title:"Invented scan",type:"document" as const,mimeType:"text/plain",sizeBytes:5});
 
-test.each(["shadow","enforce"])("F1: unsigned guest remap cannot alter readiness, usage or ownership in %s",async mode=>{
+test.each(["shadow","enforce"])("empty guest migration cannot change readiness or usage in %s",async mode=>{
  vi.stubEnv("TRUST_BOUNDARY_MODE",mode);const t=setup();await settings(t,5);
  await person(t).mutation(api.vaultMutations.attachMediaFile,attachArgs(await blob(t)));
  const before=await counter(t);expect(before).toMatchObject({ready:true,storedBytes:5});
  await expect(start(t,"over-cap",1)).rejects.toMatchObject({data:{usage:{code:"USAGE_LIMIT_REACHED",remaining:0}}});
  const rowsBefore=await t.run(ctx=>ctx.db.query("usageCounters").collect());
- await expect(person(t).mutation(api.vaultMigration.migrateGuestVault,{fromVaultOwnerId:"guest_invented",toVaultOwnerId:OWNER})).rejects.toThrow(/guest_source_unverified/);
+ const migration=person(t).mutation(api.vaultMigration.migrateGuestVault,{fromVaultOwnerId:"guest_invented",toVaultOwnerId:OWNER});
+ if(mode==="enforce")await expect(migration).rejects.toThrow(/guest_source_unverified/);
+ else expect(await migration).toMatchObject({total:0});
  expect(await t.run(ctx=>ctx.db.query("usageCounters").collect())).toEqual(rowsBefore);
  expect(await counter(t)).toEqual(before);
  await expect(start(t,"over-cap",1)).rejects.toMatchObject({data:{usage:{code:"USAGE_LIMIT_REACHED",remaining:0}}});
@@ -38,15 +40,16 @@ test.each(["shadow","enforce"])("F2: attach refuses another owner's request and 
 test("F3/F5: expiry releases referenced and missing holds without blocking unrelated rows",async()=>{
  const t=setup();await settings(t);const kept=await blob(t);
  await start(t,"referenced");await stage(t,"referenced",kept);
- await person(t).mutation(api.vaultMutations.attachMediaFile,attachArgs(kept));
+ // Historical overlap: new attaches must name the reservation that owns the blob.
+ await t.run(async ctx=>{await ctx.db.insert("media",{vaultOwnerId:OWNER,storageId:kept,title:"Invented saved scan",type:"document",personIds:[],sizeBytes:5,createdAt:0,updatedAt:0});const c=await ctx.db.query("usageCounters").withIndex("by_owner",q=>q.eq("ownerId",OWNER)).unique();await ctx.db.patch(c!._id,{storedBytes:5,revision:c!.revision+1});});
  const missing=await blob(t,3);await start(t,"missing",3);await stage(t,"missing",missing);
  const abandoned=await blob(t,4);await start(t,"abandoned",4);await stage(t,"abandoned",abandoned);
  await t.run(async ctx=>{await ctx.storage.delete(missing);for(const row of await ctx.db.query("uploadReservations").collect())await ctx.db.patch(row._id,{expiresAt:0});});
- expect(await t.mutation(internal.usageLimits.expireReservations,{})).toEqual({released:3,failed:0});
+ expect(await t.action(internal.usageLimits.expireReservations,{})).toEqual({released:3,failed:0});
  expect(await t.run(ctx=>ctx.db.system.get(kept))).not.toBeNull();
  expect(await t.run(ctx=>ctx.db.system.get(abandoned))).toBeNull();
  expect(await counter(t)).toMatchObject({storedBytes:5,reservedBytes:0,inFlight:0});
- expect(await t.mutation(internal.usageLimits.expireReservations,{})).toEqual({released:0,failed:0});
+ expect(await t.action(internal.usageLimits.expireReservations,{})).toEqual({released:0,failed:0});
 });
 
 test("F4: a blob cannot be attached twice; missing legacy objects count zero without disabling enforcement or backfill",async()=>{
