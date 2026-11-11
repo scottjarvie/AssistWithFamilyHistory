@@ -1,9 +1,10 @@
+import { mcpUploadRefusal } from "../../lib/media/uploadRefusal";
 import { AI_ACCESS_INSTRUCTIONS } from "../../lib/mcp/accessCopy";
 import { FAMILY_HISTORY_CONTROL_TOOLS } from "../../lib/mcp/catalog";
 /* eslint-disable @typescript-eslint/no-explicit-any -- Generated Convex references and SDK callbacks cross a runtime-validated MCP boundary. */
 import type { HttpRouter } from "convex/server";
 import { currentMediaForExport } from "../../lib/media/currentMediaForExport";
-import { EVIDENCE_LARGE_ORIGINAL_MAX_BYTES, EVIDENCE_UPLOAD_TYPES } from "../../lib/media/evidenceStandard";
+import { EVIDENCE_UPLOAD_TYPES } from "../../lib/media/evidenceStandard";
 import { McpServer, createMcpHandler, type AuthInfo } from "@modelcontextprotocol/server";
 import { createRemoteJWKSet, errors as joseErrors, jwtVerify } from "jose";
 import { z } from "zod";
@@ -655,7 +656,7 @@ export function createFamilyHistoryServer(
 
   const identity = { subject: principal.subject, issuer: principal.issuer, clientId: principal.clientId };
   const connection = { state: resolution.state, reason: "reason" in resolution ? resolution.reason : resolution.state, changedAt: "at" in resolution ? resolution.at : null, endsAt: grant?.expiresAt };
-  const instructions = `${AI_ACCESS_INSTRUCTIONS} Actual connection: ${connection.state}; reason: ${connection.reason}${connection.changedAt ? `; changed ${new Date(connection.changedAt).toISOString()}` : ""}; end date ${connection.endsAt ? new Date(connection.endsAt).toISOString() : "none"}. Call family_history_connection for current details. Start research with family_history_get_brief, search, then hydrate stable IDs before editing.`;
+  const instructions = `${AI_ACCESS_INSTRUCTIONS} Actual connection: ${connection.state}; reason: ${connection.reason}${connection.changedAt ? `; changed ${new Date(connection.changedAt).toISOString()}` : ""}; end date ${connection.endsAt ? new Date(connection.endsAt).toISOString() : "none"}. Call family_history_connection for current details. Read storage in the brief and upload replies: these are counters only. A USAGE_LIMIT_REACHED refusal affects one upload; keep this connection and retry the same operation after room is available. Start research with family_history_get_brief, search, then hydrate stable IDs before editing.`;
 
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, {
     instructions,
@@ -732,13 +733,15 @@ export function createFamilyHistoryServer(
   const writeAction = async (toolName: string, fn: any, input: Record<string, unknown>) => {
     try {
       const { operationId: op, ...semanticInput } = input;
-      const result = toolResult(await actionCtx.runAction(fn, {
+      const response = await actionCtx.runAction(fn, {
         principal,
         grantId,
         operationId: op,
         requestHash: await hashMcpInput({ toolName, ...semanticInput }),
         input: semanticInput,
-      }));
+      });
+      if(response?.uploadRefusal)return mcpUploadRefusal(response.uploadRefusal);
+      const result=toolResult(response);
       await touch(toolName);
       return result;
     } catch (error) {
@@ -956,7 +959,7 @@ export function createFamilyHistoryServer(
       description: z.string().trim().max(2_000).optional(),
       fileName: z.string().trim().min(1).max(240),
       contentType: z.enum(EVIDENCE_UPLOAD_TYPES),
-      sizeBytes: z.number().int().min(1).max(EVIDENCE_LARGE_ORIGINAL_MAX_BYTES),
+      sizeBytes: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
       sha256: z.string().regex(/^[a-fA-F0-9]{64}$/),
       fileModifiedTime: z.string().datetime().optional(),
       scanTime: z.string().datetime().optional(),

@@ -21,8 +21,9 @@ vi.mock("../lib/media/evidenceB2", async importOriginal => ({
 }));
 
 const modules = import.meta.glob("./**/*.ts");
+const WEBSITE_ISSUER="https://identity.example.test";
 const OWNER = "synthetic_cleanup_owner";
-beforeEach(() => { providerCalls.length = 0; vi.stubEnv("TRUST_BOUNDARY_MODE", "enforce"); });
+beforeEach(() => { providerCalls.length = 0; vi.stubEnv("CLERK_JWT_ISSUER_DOMAIN",WEBSITE_ISSUER); vi.stubEnv("TRUST_BOUNDARY_MODE", "enforce"); });
 afterEach(() => vi.unstubAllEnvs());
 
 test("existing ready-upload cleanup pins active exact versions but leaves replacement history untouched", async () => {
@@ -38,7 +39,7 @@ test("existing ready-upload cleanup pins active exact versions but leaves replac
   expect(providerCalls.sort()).toEqual(["large", "medium", "original", "tiny"].map(slot => `keep:synthetic/${slot}:${slot}-v1`));
   providerCalls.length = 0;
   const storageId = await t.run(ctx => ctx.storage.store(new Blob([new Uint8Array([7])], { type: "application/pdf" })));
-  await t.withIdentity({ subject: OWNER }).mutation(api.vaultMutations.attachMediaFile, { vaultOwnerId: OWNER, mediaId, storageId, title: "Synthetic replacement", type: "document", mimeType: "application/pdf", sizeBytes: 1 });
+  await t.withIdentity({ subject: OWNER, issuer:WEBSITE_ISSUER }).mutation(api.vaultMutations.attachMediaFile, { vaultOwnerId: OWNER, mediaId, storageId, title: "Synthetic replacement", type: "document", mimeType: "application/pdf", sizeBytes: 1 });
   const state = await t.query(internal.mediaEvidenceControl.sessionForCleanup, { uploadRef: "synthetic_cleanup_ref" });
   expect(state).toMatchObject({ session: { state: "ready" }, manifests: null });
   await t.action(internal.mediaEvidenceStorage.cleanupMcpEvidenceUpload, { uploadRef: "synthetic_cleanup_ref" });

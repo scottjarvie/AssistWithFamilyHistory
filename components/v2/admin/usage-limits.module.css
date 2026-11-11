@@ -1,0 +1,94 @@
+/* Upload limits on the admin Storage tab. Phone first; the table takes over from 900px. */
+
+.head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.kicker { margin: 0; color: var(--site-accent-ink); font: 600 var(--text-micro) var(--body); text-transform: uppercase; letter-spacing: .08em; }
+.title { margin: 4px 0 0; font-family: var(--display); font-size: 1.6rem; font-weight: 700; line-height: 1.2; }
+.pill { flex: none; padding: 4px 10px; border: 1px solid var(--hairline); border-radius: var(--radius-pill); color: var(--muted); font-size: var(--text-micro); }
+.pillAttention { border-color: var(--tone-warning-ink); color: var(--tone-warning-ink); background: var(--tone-warning-wash); }
+.list { list-style: none; margin: 12px 0; padding: 0; display: grid; gap: 8px; }
+.list li { padding: 10px 12px; border: 1px solid var(--hairline); border-radius: var(--radius-panel); background: var(--paper-lift); }
+.list strong { display: block; font-size: var(--text-small); }
+.list p { margin: 4px 0 0; color: var(--muted); font-size: var(--text-micro); }
+
+.lede { margin: .4rem 0 1rem; color: var(--muted); font-size: .9rem; line-height: 1.5; max-width: 62ch; }
+.hint { margin: .4rem 0 0; color: var(--muted); font-size: .8rem; line-height: 1.45; }
+.empty { margin: 1rem 0; padding: 1rem; border: 1px dashed var(--hairline-strong); color: var(--muted); font-size: .9rem; }
+.wide { grid-column: 1 / -1; }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.siteCard { padding: 1rem; border: 1px solid var(--hairline); border-radius: var(--radius-card); background: var(--paper-lift); margin: 1rem 0 1.25rem; }
+.siteLine { margin: .75rem 0 0; font-size: .88rem; line-height: 1.55; }
+
+.modes { display: flex; gap: 0; margin: 0; padding: 0; border: 0; }
+.modes legend { margin-bottom: .45rem; color: var(--muted); font: 500 .8rem var(--body); }
+.modes label {
+  flex: 1; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: .4rem;
+  min-height: 44px; border: 1px solid var(--hairline-strong); margin-left: -1px;
+  color: var(--ink); font: 600 .9rem var(--body); cursor: pointer; background: var(--paper);
+}
+.modes label:first-of-type { margin-left: 0; border-radius: 4px 0 0 4px; }
+.modes label:last-of-type { border-radius: 0 4px 4px 0; }
+.modes input { width: auto; min-height: 0; margin: 0; accent-color: var(--leaf-ground); }
+.modes label:has(input:checked), .modeOn { background: var(--leaf-ground); color: var(--on-leaf); border-color: var(--leaf-ground); }
+.modes label:has(input:focus-visible) { outline: 3px solid var(--leaf-ground); outline-offset: 2px; }
+
+.confirm { margin-top: .75rem; }
+.actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .6rem; }
+.actions button { min-height: 44px; }
+
+.disclosure { margin-top: .75rem; }
+.disclosure summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font: 600 .88rem var(--body); color: var(--site-accent-ink); }
+
+.form { margin-top: .5rem; }
+.fields { display: grid; grid-template-columns: 1fr; gap: .75rem; }
+.form button { margin-top: .9rem; min-height: 44px; }
+/* 16px inputs: no iOS zoom on focus. */
+.form input, .form select, .search input, .search select, .confirm input {
+  width: 100%; box-sizing: border-box; font-size: 16px; min-height: 44px; padding: 8px 10px;
+  border: 1px solid var(--hairline-strong); border-radius: var(--radius-field); background: var(--paper-lift); color: var(--ink); font-family: var(--body);
+}
+.form label, .search, .confirm label { display: flex; flex-direction: column; gap: 6px; }
+.form label span, .search span, .confirm label span { color: var(--muted); font-size: .8rem; }
+
+.search { margin: 0 0 .25rem; }
+.search span { font-size: var(--text-small); }
+
+.cards { list-style: none; margin: 1rem 0; padding: 0; display: grid; gap: .75rem; }
+.cards > li { padding: 1rem; border: 1px solid var(--hairline); border-radius: var(--radius-card); background: var(--paper-lift); }
+.cards > li.near { border-color: var(--tone-warning-ink); }
+.cards > li.at { border-color: var(--tone-danger-ink); border-left-width: 4px; }
+.cardHead { display: flex; justify-content: space-between; align-items: baseline; gap: .75rem; }
+.cardHead strong { font: 700 1rem var(--body); overflow-wrap: anywhere; }
+.badge { font: .7rem ui-monospace, SFMono-Regular, Menlo, monospace; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.near .badge { color: var(--tone-warning-ink); }
+.at .badge { color: var(--tone-danger-ink); font-weight: 700; }
+
+.meters { margin: .75rem 0 0; display: grid; gap: .55rem; }
+.meters > div { display: grid; grid-template-columns: 8.5rem 1fr; gap: .5rem; align-items: center; }
+.meters dt { color: var(--muted); font-size: .8rem; }
+.meters dd { margin: 0; display: grid; gap: .25rem; font-size: .85rem; font-variant-numeric: tabular-nums; }
+
+.track { display: block; height: 6px; border-radius: 3px; background: var(--paper-quiet); overflow: hidden; }
+.fill { display: block; height: 100%; background: var(--leaf-ground); }
+.fill.near { background: var(--tone-warning-ink); }
+.fill.at { background: var(--tone-danger-ink); }
+
+.tableWrap { display: none; }
+
+@media (min-width: 900px) {
+  .fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .cards { display: none; }
+  .tableWrap { display: block; margin: 1rem 0; }
+  .table { width: 100%; border-collapse: collapse; font-size: .85rem; font-variant-numeric: tabular-nums; }
+  .table th, .table td { text-align: left; padding: .6rem .75rem; border-bottom: 1px solid var(--hairline); vertical-align: top; }
+  .table thead th { color: var(--muted); font: 500 .72rem var(--body); text-transform: uppercase; letter-spacing: .04em; }
+  .table tbody th { font: 700 .85rem var(--body); }
+  .table tbody th small { font-family: var(--body); color: var(--muted); }
+  .table td span:first-child { display: block; margin-bottom: .3rem; white-space: nowrap; }
+  .table tr.near td:last-child { color: var(--tone-warning-ink); }
+  .table tr.at td:last-child { color: var(--tone-danger-ink); font-weight: 700; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fill { transition: none; }
+}

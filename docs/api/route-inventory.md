@@ -118,3 +118,5 @@ pnpm check:protected-routes
 pnpm check:trust-boundary
 pnpm check:convex-client-auth
 ```
+
+| `/api/usage-limits` | GET, POST | Counter-only storage policy administration | Existing administrator allowlist and authenticated Convex guard | Internal person-only route | Audited settings; no media contents |

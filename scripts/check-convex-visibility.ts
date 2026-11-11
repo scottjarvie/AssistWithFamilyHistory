@@ -26,6 +26,10 @@ import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 
 const PUBLIC_UNSCOPED_ALLOWLIST: Record<string, string> = {
+  "usageLimits.ts:adminOverview": "Control-plane operation behind existing ADMIN_USER_IDS guard.",
+  "usageLimits.ts:adminSetSiteLimits": "Control-plane operation behind existing ADMIN_USER_IDS guard.",
+  "usageLimits.ts:adminSetPersonLimits": "Control-plane operation behind existing ADMIN_USER_IDS guard.",
+
   // Public story-by-slug lookup. Bound by `status === "published"` before
   // any data is returned; uses buildPublicStoryBundle which filters fields.
   "vault.ts:getPublishedStory":
@@ -35,10 +39,9 @@ const PUBLIC_UNSCOPED_ALLOWLIST: Record<string, string> = {
   "trustBoundary.ts:getShadowLogSummary":
     "Control-plane read; always fail-closed behind TRUST_BOUNDARY_SUPER_ADMIN_IDS.",
   // Guest migration binds its destination owner to the authenticated Clerk
-  // identity. In enforce mode the unverified guest source capability is denied;
-  // in shadow it is logged so the legacy workflow can be measured first.
+  // identity. The legacy unsigned guest source logs in shadow and is refused in enforce.
   "vaultMigration.ts:migrateGuestVault":
-    "Destination is bound by authorizeTenantMutation; unsigned guest source is shadow-logged or denied.",
+    "Destination is bound by authorizeTenantMutation; unsigned guest sources are refused in enforce and logged in shadow.",
 };
 
 const failures: string[] = [];

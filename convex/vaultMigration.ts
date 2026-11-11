@@ -23,6 +23,7 @@
  * Counts are returned per-table so the caller can show "we brought back N
  * entries" and so tests can assert exact behavior.
  */
+import {mediaBytes,addCopies,removeStoredBytes} from "./usageLimits";
 import { v } from "convex/values";
 import { mutation } from "./_generated/server";
 import type { TableNames } from "./_generated/dataModel";
@@ -31,6 +32,7 @@ import { authorizeTenantMutation, handlePolicyViolationMutation } from "./access
 // All tables with a `by_owner` index in schema.ts. If a new owner-scoped table
 // is added, append it here.
 const OWNED_TABLES = [
+  "mediaUploadSessions",
   "persons",
   "relationships",
   "events",
@@ -167,6 +169,20 @@ export const migrateGuestVault = mutation({
       "vaultMigration.migrateGuestVault",
       "guest_source_unverified",
     );
+
+    // Preserve the legacy remap while moving only bytes belonging to the rows
+    // it will re-tag. Counter readiness and upload rate buckets are untouched.
+    const media=await ctx.db.query("media").withIndex("by_owner",q=>q.eq("vaultOwnerId",fromVaultOwnerId)).collect();
+    const sessions=await ctx.db.query("mediaUploadSessions").withIndex("by_owner",q=>q.eq("vaultOwnerId",fromVaultOwnerId)).collect();
+    let bytes=sessions.reduce((n,row)=>n+(row.orphanedBytes ?? 0),0);
+    for(const row of media){
+      const stored=row.storageId?await ctx.db.system.get(row.storageId):null;
+      bytes+=mediaBytes(row)-(row.storageId?row.sizeBytes ?? 0:0)+(stored?.size ?? 0);
+    }
+    if(bytes>0){
+      await addCopies(ctx,authenticatedDestination,bytes);
+      await removeStoredBytes(ctx,fromVaultOwnerId,bytes);
+    }
 
     // ctx.db structurally satisfies RetagDb; the casts keep the index/table
     // names loose the same way the original inline loop did.

@@ -1,3 +1,4 @@
+import { UsageLimitsController } from "@/components/v2/admin/UsageLimitsController";
 /**
  * /app/api/admin — the Admin / Operator API surface (Jarvie Shared Agent API model).
  *
@@ -89,5 +90,5 @@ export default async function AdminApiPage() {
     return <NotAuthorized />;
   }
 
-  return <ApiCenterView keys={keys} ownerKey={ownerKey} admin operatorView/>;
+  return <><ApiCenterView keys={keys} ownerKey={ownerKey} admin operatorView/><UsageLimitsController/></>;
 }

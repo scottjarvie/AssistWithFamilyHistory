@@ -23,6 +23,7 @@ steps=(
   # typecheck against fresh bindings rather than against stale `any`s.
   "check:convex-bindings-fresh"
   "typecheck"
+  "typecheck:convex"
   "lint"
   "test"
   "test:process-route"
