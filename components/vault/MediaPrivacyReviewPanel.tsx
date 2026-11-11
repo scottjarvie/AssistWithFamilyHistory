@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  MEDIA_UPLOAD_ACCEPT_ATTRIBUTE,
+  MEDIA_UPLOAD_ACCEPT_ATTRIBUTE, mediaUploadError,
 } from "@/lib/media/uploadContract";
 
 type MediaItem = {
@@ -74,7 +74,7 @@ async function uploadMediaFile(args: {
   const response = await fetch("/api/media/upload", { method: "POST", headers:{"idempotency-key":operationId}, body });
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    return { ok: false, message: payload?.error || "The file could not be uploaded." };
+    return { ok: false, message: mediaUploadError(payload) || "The file could not be uploaded." };
   }
   return { ok: true };
 }
@@ -129,7 +129,7 @@ export function MediaPrivacyReviewPanel({
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
-        toast.error(payload?.error || "Could not save media review");
+        toast.error(mediaUploadError(payload) || "Could not save media review");
         return;
       }
       toast.success("Media review saved");

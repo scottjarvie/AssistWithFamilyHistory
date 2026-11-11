@@ -1,7 +1,7 @@
 import { ConvexHttpClient } from "convex/browser";
 import { makeFunctionReference } from "convex/server";
 import { createHash } from "node:crypto";
-import { EVIDENCE_ORIGINAL_MAX_BYTES, EVIDENCE_IMAGE_TYPES } from "@/lib/media/evidenceStandard";
+import { EVIDENCE_RELAY_BODY_BYTES, EVIDENCE_IMAGE_TYPES } from "@/lib/media/evidenceStandard";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -41,7 +41,7 @@ export async function PUT(
   if (
     !Number.isSafeInteger(declaredLength)
     || declaredLength < 1
-    || declaredLength > EVIDENCE_ORIGINAL_MAX_BYTES
+    || declaredLength > EVIDENCE_RELAY_BODY_BYTES
   ) return reply(413, "Upload must declare a valid Content-Length within the evidence limit.");
 
   const contentType = request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase() ?? "";

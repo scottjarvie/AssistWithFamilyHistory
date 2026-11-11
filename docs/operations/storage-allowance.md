@@ -1,60 +1,121 @@
-# Storage allowance
+# Storage allowance operations
 
-Enforcement is off when no settings row exists. This change does not change
-review, rights, AI grants, living-person protection or publication authority.
-The operator UI is at `/app/api/admin`; the person's meter is in Settings.
-Administrators use Pro; other accounts use Free. Plan allowances and file caps
-are policy tables; per-account overrides require a reason and append an audit.
+No settings row means enforcement off. Administrators resolve through the
+existing Convex `requireTrustBoundarySuperAdmin` boundary
+(`TRUST_BOUNDARY_SUPER_ADMIN_IDS`), not the web server's separate admin list.
+All allowance settings and meter functions require a website-person session.
+Do not change runtime credentials or access lists as part of this release.
 
-## Shipping (separate approval and audit)
+## Shipping
 
-Do not deploy manually. Follow `how-production-deploys.md`: merging the reviewed
-PR to `main` makes Vercel run `convex deploy` followed by the Next build.
-Do not merge this draft or enable limits until the remaining accounting gaps
-below are resolved and the count is independently verified.
-
-With an explicitly selected, reviewed deployment, read one page without writes:
+After review, merging to main triggers the existing Vercel release command:
 
 ```sh
-pnpm exec convex run usageLimits:dryRunPage '{"ownerId":"<owner>","table":"media","cursor":null}'
+npx --no-install convex deploy --cmd 'npx --no-install next build'
 ```
 
-Repeat with the returned cursor until `isDone`, summing `bytes`. Also page
-`"table":"mediaUploadSessions"` to count copies retained after failed deletion. No provider
-bucket listing is needed. Count active originals, all pinned display copies,
-and retained replacement history; Convex originals use storage metadata sizes.
-Private published-story attachments still count; publication does not expose
-or transfer ownership of them. Remote references with no stored bytes add none.
+Do not run that command manually. No production read, deploy, backfill, cleanup
+or enforcement change was performed while building this draft.
 
-Backfill only derived counters, one bounded transaction at a time:
+## All-account preflight and backfill
+
+Use an explicitly selected, reviewed deployment. This resumable driver discovers
+owners from media, upload sessions, counters, reservations and overrides, and
+checks the Convex system storage inventory for unregistered blobs. It
+reports accounts seen, bytes, file references, unknown sizes and missing owners.
+The dry run writes only its job metadata; it changes no counters, settings or files.
+The existing `usageLimits:dryRunPage` remains a fully read-only query.
 
 ```sh
-pnpm exec convex run usageLimits:recomputeStep '{"ownerId":"<owner>"}'
+pnpm exec convex run usageRecount:allAccountsStep '{}'
+pnpm exec convex run usageRecount:allAccountsStep '{"jobId":"<returned-job-id>"}'
 ```
 
-Repeat until `done: true`. Concurrent stored-byte changes restart the recount.
-Check against the dry-run sum before considering enforcement. Do not put an
-actual account identifier or its results in a public issue or PR.
+Repeat the second command until `done`. Start the separately reviewed backfill:
 
-## Accounting limitations to resolve before enforcement
+```sh
+pnpm exec convex run usageRecount:allAccountsStep '{"dryRun":false}'
+pnpm exec convex run usageRecount:allAccountsStep '{"jobId":"<returned-job-id>"}'
+```
 
-- Legacy browser calls without a declared size remain compatible. They are
-  checked at commit but cannot reserve before uploading until the new route is live.
-- The browser route stages its storage receipt on the reservation. Cancellation
-  and expiry delete those staged bytes before releasing. A lost response before
-  the receipt is staged can still leave an unclaimed Convex blob; the recount
-  reads linked media and cannot enumerate that unclaimed blob.
-- Successful B2 uploads count all three display copies. Known partial rendition
-  copies whose deletion fails are counted on the session until confirmed cleanup.
-  Unacknowledged rendition writes hold their intended bytes conservatively until
-  exact-key cleanup confirms removal. Failed
-  provider cleanup retains the reservation; it never reports success.
-- No production dry run or backfill has been performed for this draft.
+Each call reads a bounded source page or advances one owner's bounded recount.
+After discovery, counting and validation, its final step records
+`backfillCompletedAt`. It refuses completion if any source has no owner or an
+unknown size, or any counter remains unready. Fix unresolved records under a
+separate review and start a fresh job. Concurrent byte writes bump each owner's
+revision and restart that owner's recount. A guest migration invalidates both
+counter rows and requires a target recount; it is still denied in enforce mode.
+Legacy media with no owner is reported as unattributed, never assigned to a
+person mentioned in the file. Keep account IDs and results out of public PRs.
 
-These limitations make the draft unsuitable for enabling enforcement yet.
-The separate pipelines, HEIC behavior, duplicate detection and durable device
-Queue work remain follow-ups; this draft adds no new transports or image sizes.
+Before enabling limits, confirm the existing trust boundary is enforced. Set the
+site's upload/day/in-flight budgets appropriately for its advertised capabilities.
+Default AI batch reliability budgets preserve this site's existing aggregate
+per-kind limits and 256 KiB request ceiling; settings may override them. The brief
+returns the effective budgets. Unknown accounts warn before backfill and start
+at ready zero after it. Uncounted meter and AI output contain no byte numbers.
 
-Local checks use the `.nvmrc` Node version and pnpm. The shell setup security
-fixture disables shell startup files so a machine's runtime manager cannot
-mutate its intentionally isolated PATH; its assertions are unchanged.
+## Finding abandoned bytes
+
+Convex upload URLs cannot bind a resulting blob ID to the reservation in advance.
+A response lost before staging is recovered by paginating the `_storage` system
+table. The sweep ignores objects younger than 25 hours (past upload URL validity,
+reservation lifetime and a safety interval). For each older object it checks
+`media.by_storage` and `uploadReservations.by_storage` in the same transaction.
+Any reference preserves the blob. Dry run is the default:
+
+```sh
+pnpm exec convex run usageLimits:sweepUnclaimedStorage '{"cursor":null}'
+pnpm exec convex run usageLimits:sweepUnclaimedStorage '{"cursor":null,"dryRun":false}'
+```
+
+Repeat with the returned cursor. The second command deletes real data and needs
+separate approval after the dry run is reviewed. It is not scheduled destructively
+by this release. Ordinary reservation expiry deletes only its own staged object,
+and only if no media references it. B2 cleanup protects active originals, copies
+and replacement history; it subtracts only after successful provider deletion.
+A provider failure retains accounting and retries at most eight attempts; after
+that the hold remains for operator review. Its `dryRun:true` action lists candidate
+keys without deleting anything.
+
+The recount verifies Convex storage metadata, but B2 totals come from pinned
+manifests and tracked failed-copy holds. It cannot prove B2 object existence or
+find unregistered B2 versions: a separate provider inventory is needed for that.
+The Convex sweep closes the unclaimed Convex-blob gap. Pending declared sizes are
+reservations, not stored-byte recount totals; multipart parts are provider-native
+and no second local original is staged. Export JSON streams directly to the
+request and is never stored, counted or quota-refused; it ends with the request.
+There are no other generated binary outputs beyond image viewing copies.
+
+## Code ceilings retained
+
+Upload policy defaults live in `siteDefaults` (web, image, original), with settings
+overrides. Rendered images cannot exceed the 20 MiB supported transport ceiling.
+The independent 3 MiB JPEG generator output bound is not an editable upload cap;
+a legacy `maxFileBytes.copy` value cannot disable generation. Existing technical
+ceilings remain: 20 MiB relay bodies/multipart threshold, 16 MiB parts, 30-minute
+and two-hour sessions, two-hour reservations, 100 rows per recount/sweep page,
+500 admin rows, 256 KiB AI requests, 100,000-character source text, per-kind record
+batch limits, and evidence reply budgets in `lib/mcp/contract.ts`. Transport
+numbers in tool prose describe transport, not policy. Downloads/exports are not
+newly gated by this change. Enforced web refusals roll back their mutation, so
+history retains warn/off events rather than a durable log of every refusal.
+
+For older Convex records missing size metadata, repair one page at a time first:
+
+```sh
+pnpm exec convex run usageRecount:repairConvexSizesPage '{"cursor":null}'
+```
+
+Repeat returned cursors to completion. It reads actual object sizes and updates
+record metadata only; it never changes a file. Exact B2 manifests have always
+required original and copy sizes. The all-account driver also reports unclaimed
+Convex inventory entries and refuses to mark backfill complete while any remain.
+Settle active uploads and review the unclaimed sweep before backfilling.
+
+Backend and Next upload-route changes roll back together by reverting this PR;
+keep enforcement off throughout a rollback. Old undeclared starts still work in
+off/warn and close once on. No separate installed uploader or Node script was
+added. Physical limits additionally include a ten-minute finalizer lease and
+25-hour unclaimed-blob safety age. The operator GB-to-byte conversion factor in
+`UsageLimitsView` is a unit conversion, not an allowance policy literal.

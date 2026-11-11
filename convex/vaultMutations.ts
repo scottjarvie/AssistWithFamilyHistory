@@ -1,4 +1,5 @@
-import { reserveOperation, commitOperation, releaseOperation, removeStoredBytes, summaryFor, assertFileSize } from "./usageLimits";
+import { requireWebsitePerson } from "./access";
+import { reserveOperation, commitOperation, releaseOperation, removeStoredBytes, summaryFor, assertFileSize, limitsFor, releaseExpiredWeb } from "./usageLimits";
 import { v } from "convex/values";
 import { mutation, type MutationCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
@@ -1149,11 +1150,21 @@ export const upsertSourceFact = mutation({
  * protected evidence delivery needs.
  */
 export const startMediaUpload = mutation({
-  args: { vaultOwnerId: v.string(), sizeBytes:v.optional(v.number()), operationId:v.optional(v.string()) },
+  args: { vaultOwnerId: v.string(), sizeBytes:v.optional(v.number()), operationId:v.optional(v.string()), attemptId:v.optional(v.string()) },
   handler: async (ctx, args) => {
+    await requireWebsitePerson(ctx);
+    const identity=await ctx.auth.getUserIdentity();
+    if(identity?.subject!==args.vaultOwnerId)throw new Error("Owner mismatch");
     await authorizeTenantMutation(ctx, "vaultMutations.startMediaUpload", args.vaultOwnerId);
+    if((args.sizeBytes===undefined||!args.operationId) && (await limitsFor(ctx,args.vaultOwnerId)).enforcement==="on")throw new Error("Upload declaration required; retry with sizeBytes and operationId");
+    const prior=args.operationId?await ctx.db.query("uploadReservations").withIndex("by_owner_operation",q=>q.eq("ownerId",args.vaultOwnerId).eq("operationId",args.operationId!)).unique():null;
+    if(prior?.status==="reserved" && prior.expiresAt<=Date.now())await releaseExpiredWeb(ctx,prior);
+
     const r=args.sizeBytes !== undefined && args.operationId ? await reserveOperation(ctx,args.vaultOwnerId,args.operationId,args.sizeBytes,"web","web") : null;
-    return { uploadUrl: r?.mediaId || r?.storageId ? "" : await ctx.storage.generateUploadUrl(), mediaId:r?.mediaId, storageId:r?.storageId, storage:await summaryFor(ctx,args.vaultOwnerId) };
+    const created=!!r&&(!prior||prior.status==="released"||prior.expiresAt<=Date.now());
+    if(r && created)await ctx.db.patch(r._id,{attemptId:args.attemptId});
+    const busy=!!r&&!created&&!r.mediaId&&!r.storageId;
+    return { created, busy, uploadUrl: busy ? "" : r?.mediaId || r?.storageId ? "" : await ctx.storage.generateUploadUrl(), mediaId:r?.mediaId, storageId:r?.storageId, storage:await summaryFor(ctx,args.vaultOwnerId) };
   },
 });
 
@@ -2677,19 +2688,23 @@ export const mergeProvisionalRelative = mutation({
   },
 });
 
-export const stageMediaUpload=mutation({args:{vaultOwnerId:v.string(),operationId:v.string(),storageId:v.id("_storage")},handler:async(ctx,args)=>{
+export const stageMediaUpload=mutation({args:{vaultOwnerId:v.string(),operationId:v.string(),attemptId:v.optional(v.string()),storageId:v.id("_storage")},handler:async(ctx,args)=>{
+ const person=await requireWebsitePerson(ctx);if(person.subject!==args.vaultOwnerId)throw new Error("Owner mismatch");
  await authorizeTenantMutation(ctx,"vaultMutations.startMediaUpload",args.vaultOwnerId);
  const r=await ctx.db.query("uploadReservations").withIndex("by_owner_operation",q=>q.eq("ownerId",args.vaultOwnerId).eq("operationId",args.operationId)).unique();
  if(!r||r.status!=="reserved")return;
+ if(r.attemptId && r.attemptId!==args.attemptId)throw new Error("Upload in progress; retry this operation");
  if(r.storageId && r.storageId!==args.storageId)throw new Error("Operation conflict");
  const existing=await ctx.db.query("media").withIndex("by_storage",q=>q.eq("storageId",args.storageId)).first();
  if(existing)throw new Error("This file is already attached");
  await ctx.db.patch(r._id,{storageId:args.storageId});
 }});
-export const cancelMediaUpload = mutation({args:{vaultOwnerId:v.string(),operationId:v.string()},handler:async(ctx,args)=>{
-  await authorizeTenantMutation(ctx,"vaultMutations.startMediaUpload",args.vaultOwnerId);
+export const cancelMediaUpload = mutation({args:{vaultOwnerId:v.string(),operationId:v.string(),attemptId:v.optional(v.string())},handler:async(ctx,args)=>{
+  const person=await requireWebsitePerson(ctx);if(person.subject!==args.vaultOwnerId)throw new Error("Owner mismatch");
+ await authorizeTenantMutation(ctx,"vaultMutations.startMediaUpload",args.vaultOwnerId);
   const r=await ctx.db.query("uploadReservations").withIndex("by_owner_operation",q=>q.eq("ownerId",args.vaultOwnerId).eq("operationId",args.operationId)).unique();
-  if(!r||r.status!=="reserved") return;
+  if(!r||r.status!=="reserved"||r.attemptId!==args.attemptId) return;
+  if(r.storageId && await ctx.db.query("media").withIndex("by_storage",q=>q.eq("storageId",r.storageId)).first())return;
   if(r.storageId) await ctx.storage.delete(r.storageId);
   await releaseOperation(ctx,args.vaultOwnerId,args.operationId);
 }});

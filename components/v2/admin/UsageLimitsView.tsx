@@ -12,6 +12,7 @@ import styles from "./usage-limits.module.css";
 
 export type UsagePerson = {
   id: string;
+  policy?:{planStoredBytes:Record<string,number>;maxFileBytes:Record<string,number>};
   label: string;
   ready: boolean;
   counters: UsageCounters;
@@ -22,7 +23,7 @@ export type UsagePerson = {
 };
 
 export type UsageOverview = {
-  site: { limits: UsageLimits; enforcement: Enforcement; downloadEnforcement: Enforcement; saved: boolean };
+  site: { planStoredBytes?:Record<string,number>; maxFileBytes?:Record<string,number>; limits: UsageLimits; enforcement: Enforcement; downloadEnforcement: Enforcement; saved: boolean };
   people: UsagePerson[];
   truncated: boolean;
   events: Array<{ id: string; at: number; label: string; limit: string; mode: Enforcement; source: string; used: number; cap: number }>;
@@ -40,7 +41,7 @@ type Props = {
 
 /** How each limit is typed in: bytes are edited in GB or KB, counts as counts. */
 const FIELDS: Array<{ name: LimitName; label: string; unit: "GB" | "KB" | "count" }> = [
-  { name: "storedBytesPerUser", label: "Stored per person", unit: "GB" },
+  { name: "storedBytesPerUser", label: "Personal stored allowance", unit: "GB" },
   { name: "uploadsPerHour", label: "Uploads an hour", unit: "count" },
   { name: "uploadsPerDay", label: "Uploads a day", unit: "count" },
   { name: "uploadBytesPerDay", label: "Uploaded a day", unit: "GB" },
@@ -115,6 +116,7 @@ function LimitsForm({
     personal ? (personal[f.name] === undefined ? "" : toInput(personal[f.name]!, f.unit)) : toInput(limits[f.name], f.unit),
   ])) as Record<LimitName, string>;
   const [values, setValues] = useState(initial);
+  const [dirty,setDirty]=useState<Set<LimitName>>(new Set());
   const [mode, setMode] = useState<string>(enforcement ?? "");
   const [reason, setReason] = useState("");
 
@@ -122,12 +124,12 @@ function LimitsForm({
     event.preventDefault();
     const edit: LimitEdit = { limits: {}, reason };
     for (const f of FIELDS) {
-      if(personal === undefined && f.name === "storedBytesPerUser") continue;
+      if(!dirty.has(f.name) || (personal === undefined && f.name === "storedBytesPerUser")) continue;
       const text = values[f.name].trim();
       if (text === initial[f.name]) continue;
       // An empty personal box goes back to the site value; an empty site box changes nothing.
       if (text === "") {
-        if (personal) edit.limits[f.name] = null;
+        // A blank edit leaves the existing override unchanged.
         continue;
       }
       edit.limits[f.name] = fromInput(text, f.unit);
@@ -135,6 +137,7 @@ function LimitsForm({
     if (personal !== undefined && mode !== (enforcement ?? "")) edit.enforcement = mode === "" ? null : (mode as Enforcement);
     await onSave(edit);
     setReason("");
+    setDirty(new Set());
   }
 
   return (
@@ -148,7 +151,7 @@ function LimitsForm({
               inputMode="decimal"
               value={values[f.name]}
               placeholder={personal ? `Site: ${toInput(limits[f.name], f.unit)}` : undefined}
-              onChange={(event) => setValues({ ...values, [f.name]: event.target.value })}
+              onChange={(event) => {setDirty(new Set([...dirty,f.name]));setValues({ ...values, [f.name]: event.target.value });}}
             />
           </label>
         ))}
@@ -265,7 +268,7 @@ export function UsageLimitsView({ data, busy, onSaveSite, onSavePerson }: Props)
           </form>
         ) : null}
         <p className={styles.siteLine}>
-          {formatBytes(l.storedBytesPerUser)} stored per person · {count(l.uploadsPerHour)} uploads an hour · {count(l.uploadsPerDay)} a day ·
+          {Object.entries(data.site.planStoredBytes ?? {}).map(([plan,cap])=>`${plan}: ${formatBytes(cap)}`).join(" · ")} stored per person · {count(l.uploadsPerHour)} uploads an hour · {count(l.uploadsPerDay)} a day ·
           {" "}{formatBytes(l.uploadBytesPerDay)} uploaded a day · {formatBytes(l.downloadBytesPerDay)} download budget · {count(l.maxUploadsInFlight)} at once ·
           {" "}AI batches {count(l.mcpBatchMaxItems)} items / {formatBytes(l.mcpBatchMaxBytes)} per call
         </p>

@@ -1,4 +1,4 @@
-import { mcpLimitText } from "../lib/usageLimits/core";
+import { mcpUploadRefusal } from "../../lib/media/uploadRefusal";
 import { AI_ACCESS_INSTRUCTIONS } from "../../lib/mcp/accessCopy";
 import { FAMILY_HISTORY_CONTROL_TOOLS } from "../../lib/mcp/catalog";
 /* eslint-disable @typescript-eslint/no-explicit-any -- Generated Convex references and SDK callbacks cross a runtime-validated MCP boundary. */
@@ -245,13 +245,6 @@ function toolResult(data: unknown) {
 
 function toolError(error: unknown) {
   const raw = error instanceof Error ? error.message : String(error);
-  const usageData=(error as {data?:{usage?:import("../lib/usageLimits/core").UsageLimitError}})?.data?.usage;
-  let usage=usageData;
-  if(!usage) { const match=raw.match(/\{\"code\":\"usage_limit_reached\".*\}/); if(match) { try { usage=JSON.parse(match[0]).usage; } catch {} } }
-  let fileRefusal=(error as {data?:{code?:string;message?:string}})?.data;
-  if(!fileRefusal) { const match=raw.match(/\{\"code\":\"FILE_TOO_LARGE\".*\}/); if(match){try{fileRefusal=JSON.parse(match[0]);}catch{}} }
-  if(fileRefusal?.code==="FILE_TOO_LARGE")return {isError:true,content:[{type:"text" as const,text:fileRefusal.message ?? "FILE_TOO_LARGE"}],structuredContent:fileRefusal};
-  if(usage) return {isError:true,content:[{type:"text" as const,text:mcpLimitText(usage)}],structuredContent:usage};
   const marker = "MCP_FAMILY_HISTORY_ERROR:";
   let payload: Record<string, unknown> = {
     code: "INTERNAL_ERROR",
@@ -740,13 +733,15 @@ export function createFamilyHistoryServer(
   const writeAction = async (toolName: string, fn: any, input: Record<string, unknown>) => {
     try {
       const { operationId: op, ...semanticInput } = input;
-      const result = toolResult(await actionCtx.runAction(fn, {
+      const response = await actionCtx.runAction(fn, {
         principal,
         grantId,
         operationId: op,
         requestHash: await hashMcpInput({ toolName, ...semanticInput }),
         input: semanticInput,
-      }));
+      });
+      if(response?.uploadRefusal)return mcpUploadRefusal(response.uploadRefusal);
+      const result=toolResult(response);
       await touch(toolName);
       return result;
     } catch (error) {

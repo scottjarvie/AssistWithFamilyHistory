@@ -35,6 +35,7 @@ const MetadataSchema = z.object({
 
 export async function POST(request: NextRequest) {
   let cleanup:(()=>Promise<unknown>)|undefined;
+  const attemptId=crypto.randomUUID();
   const operationId=request.headers.get("idempotency-key") ?? crypto.randomUUID();
   if (!isConvexConfigured()) {
     const issue = getConvexRuntimeIssue();
@@ -79,8 +80,9 @@ export async function POST(request: NextRequest) {
     // Bytes go straight from this server to Convex storage. They never pass
     // through a function argument, so a large scan is not bounded by the
     // argument-size limit and never lands in a log.
-    cleanup=()=>client.mutation(api.vaultMutations.cancelMediaUpload,{vaultOwnerId,operationId});
-    const started = await client.mutation(api.vaultMutations.startMediaUpload, { vaultOwnerId, sizeBytes:file.size, operationId });
+    const started = await client.mutation(api.vaultMutations.startMediaUpload, { vaultOwnerId, sizeBytes:file.size, operationId, attemptId });
+    if(started.created)cleanup=()=>client.mutation(api.vaultMutations.cancelMediaUpload,{vaultOwnerId,operationId,attemptId});
+    if(started.busy)return NextResponse.json({error:"This upload is in progress. Retry with the same operation ID."},{status:409});
     if(started.mediaId) return NextResponse.json({success:true,mediaId:started.mediaId,created:false,storage:started.storage});
     let storageId:string|undefined=started.storageId;
     if(!storageId) {
@@ -88,11 +90,11 @@ export async function POST(request: NextRequest) {
         method: "POST", headers: { "Content-Type": mimeType }, body: await file.arrayBuffer(),
       });
       if (!stored.ok) {
-        await cleanup();
+        if(cleanup)await cleanup();
         return NextResponse.json({ error: "The file could not be stored. Try again." }, { status: 502 });
       }
       storageId=((await stored.json()) as {storageId:string}).storageId;
-      await client.mutation(api.vaultMutations.stageMediaUpload,{vaultOwnerId,operationId,storageId:storageId as Id<"_storage">});
+      await client.mutation(api.vaultMutations.stageMediaUpload,{vaultOwnerId,operationId,attemptId,storageId:storageId as Id<"_storage">});
     }
 
     const result = await client.mutation(api.vaultMutations.attachMediaFile, {
@@ -110,7 +112,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, ...result });
   } catch (error) {
-    if(cleanup) { try { await cleanup(); } catch { /* Retain the reservation for confirmed cleanup on expiry. */ } }
+    if(cleanup) { try { if(cleanup)await cleanup(); } catch { /* Retain the reservation for confirmed cleanup on expiry. */ } }
     const fileRefusal=(error as {data?:{code?:string;message?:string}})?.data;
     if(fileRefusal?.code==="FILE_TOO_LARGE") return NextResponse.json({error:fileRefusal.message,...fileRefusal},{status:413});
     const refusal=usageRefusalOf(error);

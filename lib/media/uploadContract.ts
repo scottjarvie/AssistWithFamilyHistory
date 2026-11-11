@@ -1,3 +1,4 @@
+import { usageLimitError, type Refusal } from "../../convex/lib/usageLimits/core";
 import { siteDefaults } from "./siteDefaults";
 /**
  * What the vault will hold as a media file, and what it calls it.
@@ -60,4 +61,11 @@ export function classifyMediaUpload(mimeType: string): MediaUploadKind {
   if (normalized.startsWith("video/")) return "video";
   if (normalized === "application/pdf" || normalized.startsWith("text/")) return "document";
   return "other";
+}
+
+/** Used by the real browser error reader: rebuild reset clocks in the browser's zone. */
+export function mediaUploadError(payload:unknown):string {
+ const value=payload as Partial<Refusal> & {code?:string;error?:string;message?:string};
+ if(value?.code==="USAGE_LIMIT_REACHED")return usageLimitError(value as Refusal).message;
+ return value?.error ?? value?.message ?? "The file could not be added.";
 }

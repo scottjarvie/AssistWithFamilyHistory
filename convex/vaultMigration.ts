@@ -23,6 +23,7 @@
  * Counts are returned per-table so the caller can show "we brought back N
  * entries" and so tests can assert exact behavior.
  */
+import {emptyCounters} from "./lib/usageLimits/core";
 import { v } from "convex/values";
 import { mutation } from "./_generated/server";
 import type { TableNames } from "./_generated/dataModel";
@@ -147,6 +148,8 @@ export async function retagGuestRows(
   return { total, perTable };
 }
 
+/** Usage counters, overrides and reservations use ownerId rather than vaultOwnerId.
+ * This legacy remap requires a target recount before enforcement. */
 export const migrateGuestVault = mutation({
   args: {
     fromVaultOwnerId: v.string(),
@@ -159,6 +162,13 @@ export const migrateGuestVault = mutation({
       toVaultOwnerId,
     );
     assertMigrationOwners(fromVaultOwnerId, authenticatedDestination);
+    // Media ownership changes require an honest target recount before limits apply.
+    for(const ownerId of [fromVaultOwnerId,authenticatedDestination]){
+      const counter=await ctx.db.query("usageCounters").withIndex("by_owner",q=>q.eq("ownerId",ownerId)).unique();
+      if(counter)await ctx.db.patch(counter._id,{ready:false,revision:counter.revision+1});
+      else await ctx.db.insert("usageCounters",{ownerId,...emptyCounters(Date.now()),ready:false,revision:1,updatedAt:Date.now()});
+    }
+
 
     // A raw guest UUID is not a verified principal. Shadow mode records any
     // legitimate reliance on this legacy migration path; enforce mode denies

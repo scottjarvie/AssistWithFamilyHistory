@@ -1,6 +1,8 @@
+import { uploadRefusalOf } from "../lib/media/uploadRefusal";
 import { reserveOperation, commitOperation, releaseOperation, addCopies, removeStoredBytes, summaryFor, assertFileSize } from "./usageLimits";
 import { isRenderedEvidenceImage } from "../lib/media/evidenceStandard";
 /* eslint-disable @typescript-eslint/no-explicit-any -- Exact manifests are runtime-validated at this internal boundary. */
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, internalQuery } from "./_generated/server";
@@ -94,6 +96,7 @@ export const planMcpEvidenceUpload = internalMutation({
     }),
   },
   handler: async (ctx, args) => {
+    try {
     const owner = args.principal.subject.trim();
     const grant = await assertGrantPermits(ctx, {
       owner,
@@ -144,7 +147,8 @@ export const planMcpEvidenceUpload = internalMutation({
       };
     }
 
-    await reserveOperation(ctx,owner,args.operationId,args.input.sizeBytes,"mcp",isRenderedEvidenceImage(args.input.contentType)?"image":"original");
+    const reservation=await reserveOperation(ctx,owner,args.operationId,args.input.sizeBytes,"mcp",isRenderedEvidenceImage(args.input.contentType)?"image":"original");
+    await ctx.db.patch(reservation._id,{expiresAt:args.expiresAt});
     await ctx.db.insert("mediaUploadSessions", {
       vaultOwnerId: owner,
       ref: args.uploadRef,
@@ -170,6 +174,7 @@ export const planMcpEvidenceUpload = internalMutation({
       createdAt: Date.now(),
       expiresAt: args.expiresAt,
     });
+    await ctx.scheduler.runAt(args.expiresAt+5*60_000,internal.mediaEvidenceStorage.cleanupMcpEvidenceUpload,{uploadRef:args.uploadRef});
     return {
       replayed: false as const,
       state: "authorized" as const,
@@ -181,6 +186,7 @@ export const planMcpEvidenceUpload = internalMutation({
       sha256: args.input.sha256,
       multipartUploadId: undefined as string | undefined,
     };
+    } catch(error) {const refusal=uploadRefusalOf(error);if(refusal)return {refusal};throw error;}
   },
 });
 
@@ -342,8 +348,13 @@ export const claimSessionForFinish = internalMutation({
         );
       }
     }
-    await ctx.db.patch(session._id, { state: "uploaded" });
-    return { ...session, state: "uploaded" as const, replayed: false as const };
+    // Finishing owns a bounded lease. Cleanup cannot release a live finalizer.
+    const expiresAt=Math.max(session.expiresAt,Date.now()+10*60_000);
+    await ctx.db.patch(session._id, { state: "uploaded",expiresAt });
+    const reservation=await ctx.db.query("uploadReservations").withIndex("by_owner_operation",q=>q.eq("ownerId",owner).eq("operationId",session.operationId)).unique();
+    if(reservation)await ctx.db.patch(reservation._id,{expiresAt});
+    await ctx.scheduler.runAt(expiresAt+5*60_000,internal.mediaEvidenceStorage.cleanupMcpEvidenceUpload,{uploadRef:session.ref});
+    return { ...session, state: "uploaded" as const, expiresAt,replayed: false as const };
   },
 });
 
@@ -361,6 +372,7 @@ export const commitMcpEvidenceUpload = internalMutation({
     metadataProposal: metadataProposalValidator,
   },
   handler: async (ctx, args) => {
+    try {
     const owner = args.principal.subject.trim();
     await assertGrantPermits(ctx, {
       owner,
@@ -426,6 +438,7 @@ export const commitMcpEvidenceUpload = internalMutation({
     });
     await ctx.db.patch(session._id, { state: "ready", mediaId, finalizedAt: now });
     return { replayed: false as const, mediaId, original: args.original, storage:await summaryFor(ctx,owner) };
+    } catch(error) {const refusal=uploadRefusalOf(error);if(refusal)return {refusal};throw error;}
   },
 });
 
@@ -441,7 +454,12 @@ export const markUploadFailed = internalMutation({
       await releaseOperation(ctx,session.vaultOwnerId,session.operationId);
       await removeStoredBytes(ctx,session.vaultOwnerId,session.orphanedBytes ?? 0);
     }
-    await ctx.db.patch(session._id, { state: "failed", failedAt: Date.now(), failureCode: args.failureCode, orphanedBytes:args.failureCode==="expired_cleanup_complete"?0:session.orphanedBytes });
+    await ctx.db.patch(session._id, {
+      // A failure remains pending physical cleanup; close and release atomically on confirmation.
+      ...(args.failureCode==="expired_cleanup_complete"?{state:session.failureCode?"failed" as const:"expired" as const}:{}),
+      failedAt:Date.now(),failureCode:args.failureCode==="expired_cleanup_complete"?session.failureCode ?? "upload_expired":args.failureCode,
+      orphanedBytes:args.failureCode==="expired_cleanup_complete"?0:session.orphanedBytes,
+    });
   },
 });
 
@@ -469,17 +487,9 @@ export const sessionForCleanup = internalQuery({
       .first();
     if (!session) return null;
     const media = session.mediaId ? await ctx.db.get(session.mediaId) : null;
-    return {
-      session,
-      manifests: media?.b2Original
-        ? {
-            original: media.b2Original,
-            tiny: media.b2Renditions?.tiny,
-            medium: media.b2Renditions?.medium,
-            large: media.b2Renditions?.large,
-          }
-        : null,
-    };
+    return {session,
+      protectedHistory:(media?.replacedB2Files ?? []).some(file=>file.original.objectKey===session.objectKey),
+      manifests:media?.b2Original?{original:media.b2Original,tiny:media.b2Renditions?.tiny,medium:media.b2Renditions?.medium,large:media.b2Renditions?.large}:null};
   },
 });
 

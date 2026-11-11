@@ -41,6 +41,7 @@ import type * as sources from "../sources.js";
 import type * as trustBoundary from "../trustBoundary.js";
 import type * as usageLimits from "../usageLimits.js";
 import type * as usageLimitsSchema from "../usageLimitsSchema.js";
+import type * as usageRecount from "../usageRecount.js";
 import type * as vault from "../vault.js";
 import type * as vaultCore from "../vaultCore.js";
 import type * as vaultMigration from "../vaultMigration.js";
@@ -88,6 +89,7 @@ declare const fullApi: ApiFromModules<{
   trustBoundary: typeof trustBoundary;
   usageLimits: typeof usageLimits;
   usageLimitsSchema: typeof usageLimitsSchema;
+  usageRecount: typeof usageRecount;
   vault: typeof vault;
   vaultCore: typeof vaultCore;
   vaultMigration: typeof vaultMigration;

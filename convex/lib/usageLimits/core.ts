@@ -1,4 +1,4 @@
-// assist-usage-limits-core v1.4.0 sha256:f2138334f2804a3f303d4e76d24ac51d64e2138b693b0788cc38e17186b7a05f
+// assist-usage-limits-core v1.4.1 sha256:fa964c67d2b4fd521102646fabc31745d2277f3268f95299853de437755cc0a5
 // Synced from assistwithlife shared/usage-limits/core.ts. Do not edit here; change it upstream and re-sync.
 /**
  * Assist family upload and usage limits — framework-free core.
@@ -6,7 +6,7 @@
  * sites receive it through scripts/sync-usage-limits.mjs and must not edit it locally.
  */
 
-export const USAGE_LIMITS_CORE_VERSION = "1.4.0";
+export const USAGE_LIMITS_CORE_VERSION = "1.4.1";
 
 export type Enforcement = "off" | "warn" | "on";
 
@@ -47,6 +47,8 @@ const tableValue = (table: Readonly<Record<string, number>> | undefined, key: st
 export const LIMIT_NAMES = Object.keys(DEFAULT_LIMITS) as LimitName[];
 
 export type LimitSettings = Partial<UsageLimits> & {
+  /** Site settings only; an operator sets this after verifying the all-accounts backfill. */
+  backfillCompletedAt?: number;
   planStoredBytes?: Record<string, number>;
   maxFileBytes?: Record<string, number>;
   enforcement?: Enforcement;
@@ -82,6 +84,21 @@ export function effectiveLimits(site?: LimitSettings | null, override?: LimitSet
   const requestedDownload = override?.downloadEnforcement ?? site?.downloadEnforcement ?? "warn";
   const downloadEnforcement = requestedDownload === "on" ? "warn" : requestedDownload;
   return { limits, enforcement, downloadEnforcement, plan: plan ?? null };
+}
+
+/**
+ * A missing counter is ready with zero files only after the site-wide backfill.
+ * Sites must never set a counter row's ready to false from a caller-supplied value;
+ * only the recount may change it. Backfill completion is read from site settings, never an owner override.
+ */
+export function ownerReady(counter: { ready?: boolean } | null | undefined, site?: LimitSettings | null): boolean {
+  if (counter != null) return counter.ready !== false;
+  return typeof site?.backfillCompletedAt === "number" && Number.isFinite(site.backfillCompletedAt);
+}
+
+/** A not-ready account is warned, never refused. */
+export function ownerEnforcement(effective: EffectiveLimits, ready: boolean): Enforcement {
+  return effective.enforcement === "on" && !ready ? "warn" : effective.enforcement;
 }
 
 export function validateLimits(value: Partial<UsageLimits>): string[] {
@@ -261,6 +278,26 @@ export function storageLine(s: StorageSummary): string {
   return `${formatBytes(s.usedBytes)} of ${formatBytes(s.capBytes)} used; ${formatBytes(s.remainingBytes)} left.`;
 }
 
+export type AiStorage = {
+  ready: boolean;
+  plan: string | null;
+  line: string;
+  usedBytes?: number;
+  capBytes?: number;
+  remainingBytes?: number;
+};
+
+/** This is the only shape a site puts in an AI's reply or shows in a person's meter. */
+export function aiStorage(s: StorageSummary): AiStorage {
+  if (!s.ready) return { ready: false, plan: s.plan, line: storageLine(s) };
+  return {
+    ready: true, plan: s.plan, line: storageLine(s),
+    usedBytes: s.usedBytes, capBytes: s.capBytes, remainingBytes: s.remainingBytes,
+  };
+}
+
+export const AI_STORAGE_NOTE = "The reply carries `storage`: when storage.ready is true, storage.remainingBytes is the room left; when it is false the account is still being counted and no upload is refused for storage. An upload that does not fit is refused with the room left, and the connection is unaffected.";
+
 // ---- Counter transitions (pure; the site adapter persists them) ------------------
 
 /**
@@ -332,9 +369,10 @@ export function pressureBp(c: UsageCounters, limits: UsageLimits): number {
 
 export function formatBytes(bytes: number): string {
   const units: [number, string][] = [[1e9, "GB"], [1e6, "MB"], [1e3, "KB"]];
-  for (const [size, unit] of units) {
+  for (const [index, [size, unit]] of units.entries()) {
     if (bytes >= size) {
       const n = bytes / size;
+      if (index > 0 && Math.round(n) === 1000) return `1 ${units[index - 1][1]}`;
       return `${n >= 10 || Number.isInteger(n) ? Math.round(n) : n.toFixed(1)} ${unit}`;
     }
   }

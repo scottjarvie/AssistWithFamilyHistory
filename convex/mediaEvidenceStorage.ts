@@ -154,6 +154,7 @@ export const beginMcpEvidenceUpload = internalAction({
       expiresAt,
       input: { ...args.input, contentType: args.input.contentType.toLowerCase(), sha256: expectedSha256 },
     });
+    if("refusal" in planned)return {uploadRefusal:planned.refusal};
     if (planned.state === "ready") {
       return {
         status: "pending_person_review" as const,
@@ -164,13 +165,6 @@ export const beginMcpEvidenceUpload = internalAction({
       };
     }
     const url = `${relayOrigin()}/evidence-upload/${encodeURIComponent(planned.uploadRef)}/${relayToken}`;
-    if (!planned.replayed) {
-      await ctx.scheduler.runAt(
-        planned.expiresAt + 5 * 60_000,
-        internalApi.mediaEvidenceStorage.cleanupMcpEvidenceUpload,
-        { uploadRef: planned.uploadRef },
-      );
-    }
     if (multipart) {
       let uploadId = planned.multipartUploadId as string | undefined;
       if (!uploadId) {
@@ -444,6 +438,12 @@ export const finishMcpEvidenceUpload = internalAction({
           original: file.original,
           metadataProposal: file.metadataProposal,
         });
+      if("refusal" in committed) {
+
+        await ctx.runMutation(internalApi.mediaEvidenceControl.markUploadFailed,{vaultOwnerId:session.vaultOwnerId,uploadRef:session.ref,failureCode:committed.refusal!.code});
+        await ctx.scheduler.runAfter(0,internalApi.mediaEvidenceStorage.cleanupMcpEvidenceUpload,{uploadRef:session.ref});
+        return {uploadRefusal:committed.refusal};
+      }
         await ctx.scheduler.runAt(
           session.expiresAt + 5 * 60_000,
           internalApi.mediaEvidenceStorage.cleanupMcpEvidenceUpload,
@@ -463,9 +463,7 @@ export const finishMcpEvidenceUpload = internalAction({
           next: "The person reviews source, rights and people before this connection can read the file later.",
         };
       }
-      const caps=await ctx.runQuery(internalApi.usageLimits.fileCapsInternal,{ownerId:session.vaultOwnerId});
       const verified = await finalizeEvidenceImage({
-        maxRenditionBytes:caps.copy ?? undefined,
         store,
         uploadRef: session.ref,
         objectKey: session.objectKey,
@@ -486,6 +484,12 @@ export const finishMcpEvidenceUpload = internalAction({
         large: verified.renditions.large,
         metadataProposal: verified.metadataProposal,
       });
+      if("refusal" in committed) {
+        await ctx.runMutation(internalApi.mediaEvidenceControl.recordOrphanedCopies,{uploadRef:session.ref,bytes:Object.values(verified.renditions).reduce((n,r)=>n+r.sizeBytes,0)});
+        await ctx.runMutation(internalApi.mediaEvidenceControl.markUploadFailed,{vaultOwnerId:session.vaultOwnerId,uploadRef:session.ref,failureCode:committed.refusal!.code});
+        await ctx.scheduler.runAfter(0,internalApi.mediaEvidenceStorage.cleanupMcpEvidenceUpload,{uploadRef:session.ref});
+        return {uploadRefusal:committed.refusal};
+      }
       await ctx.scheduler.runAt(
         session.expiresAt + 5 * 60_000,
         internalApi.mediaEvidenceStorage.cleanupMcpEvidenceUpload,
@@ -513,12 +517,12 @@ export const finishMcpEvidenceUpload = internalAction({
       const orphanedBytes=(error as {orphanedBytes?:number})?.orphanedBytes;
       if(orphanedBytes) await ctx.runMutation(internalApi.mediaEvidenceControl.recordOrphanedCopies,{uploadRef:session.ref,bytes:orphanedBytes});
       const message = error instanceof Error ? error.message : String(error);
-      const terminal = /USAGE_LIMIT_REACHED|usage_limit_reached|SHA-256|byte length changed|stored content type changed|bytes do not match|unsupported image|decode|retained embedded metadata|declared file type/i.test(message);
+      const terminal = /FILE_TOO_LARGE|USAGE_LIMIT_REACHED|usage_limit_reached|SHA-256|byte length changed|stored content type changed|bytes do not match|unsupported image|decode|retained embedded metadata|declared file type/i.test(message);
       if (terminal) {
         await ctx.runMutation(internalApi.mediaEvidenceControl.markUploadFailed, {
           vaultOwnerId: session.vaultOwnerId,
           uploadRef: session.ref,
-          failureCode: "verification_failed",
+          failureCode: /USAGE_LIMIT_REACHED|usage_limit_reached/.test(message)?"USAGE_LIMIT_REACHED": /FILE_TOO_LARGE/.test(message)?"FILE_TOO_LARGE":"verification_failed",
         });
       } else {
         // Provider/network/rendition writes can be retried with the same
@@ -530,7 +534,7 @@ export const finishMcpEvidenceUpload = internalAction({
         });
       }
       await ctx.scheduler.runAt(
-        session.expiresAt + 5 * 60_000,
+        terminal ? Date.now() : session.expiresAt + 5 * 60_000,
         internalApi.mediaEvidenceStorage.cleanupMcpEvidenceUpload,
         { uploadRef: session.ref },
       );
@@ -540,13 +544,15 @@ export const finishMcpEvidenceUpload = internalAction({
 });
 
 export const cleanupMcpEvidenceUpload = internalAction({
-  args: { uploadRef: v.string() },
+  args: { uploadRef: v.string(), attempt:v.optional(v.number()), dryRun:v.optional(v.boolean()) },
   handler: async (ctx, args) => {
-    const state = await ctx.runQuery(internalApi.mediaEvidenceControl.sessionForCleanup, args);
-    if (!state || state.session.expiresAt > Date.now()) return;
+    const state = await ctx.runQuery(internalApi.mediaEvidenceControl.sessionForCleanup, {uploadRef:args.uploadRef});
+    if (!state || (state.session.state!=="failed" && (!state.session.failureCode||state.session.failureCode==="retryable_finalize_failure") && state.session.expiresAt > Date.now())) return;
+    if(state.protectedHistory)return {candidates:[],referenced:true};
+    if(args.dryRun)return {candidates:state.manifests?[]:[state.session.objectKey,...(["tiny","medium","large"] as const).map(slot=>privateEvidenceObjectKey(storage().config.environment,state.session.ref,slot))],referenced:!!state.manifests};
     try {
     const store = storage();
-    if (state.session.state === "ready" && state.manifests) {
+    if (state.manifests) {
       await Promise.all(Object.values(state.manifests).filter(Boolean).map((manifest: any) =>
         store.deleteVersionsExcept(manifest.objectKey, manifest.versionId)));
       await ctx.runMutation(internalApi.mediaEvidenceControl.clearOrphanedCopies,{uploadRef:state.session.ref});
@@ -575,7 +581,7 @@ export const cleanupMcpEvidenceUpload = internalAction({
     } catch(error) {
       // Keep both the reservation and known copies counted until a later,
       // confirmed provider cleanup succeeds.
-      await ctx.scheduler.runAfter(15*60_000,internalApi.mediaEvidenceStorage.cleanupMcpEvidenceUpload,args);
+      if((args.attempt ?? 0)<7)await ctx.scheduler.runAfter(15*60_000,internalApi.mediaEvidenceStorage.cleanupMcpEvidenceUpload,{uploadRef:args.uploadRef,attempt:(args.attempt ?? 0)+1});
       throw error;
     }
   },

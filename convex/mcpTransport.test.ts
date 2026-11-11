@@ -776,15 +776,26 @@ test("storage refusal is structured and the same AI token still reads the brief"
   for(const [key,value] of Object.entries({ENDPOINT:"https://storage.example.test",REGION:"synthetic",BUCKET:`synthetic-${kind.toLowerCase()}`,KEY_ID:"synthetic-test-key",APPLICATION_KEY:"synthetic-test-value"}))vi.stubEnv(`B2_${kind}_${key}`,value);
  }
  const personId=await t.run(async ctx=>{
-  await ctx.db.insert("usageLimitSettings",{key:"site",planStoredBytes:{free:0},enforcement:"on",updatedAt:0,updatedBy:"synthetic-admin"});
+  await ctx.db.insert("usageLimitSettings",{key:"site",planStoredBytes:{free:0},enforcement:"on",backfillCompletedAt:1,updatedAt:0,updatedBy:"synthetic-admin"});
   return ctx.db.insert("persons",{vaultOwnerId:SUBJECT,name:{given:"Invented",surname:"Ancestor"},sex:"unknown",living:false,researchStatus:"basic",createdAt:0,updatedAt:0});
  });
  const token=await accessToken();
  const refused=await t.fetch("/mcp",modernRequest("tools/call",token,{name:"family_history_begin_evidence_upload",arguments:{operationId:"synthetic-cap-refusal",personId:String(personId),title:"Invented evidence",fileName:"invented.jpg",contentType:"image/jpeg",sizeBytes:1,sha256:"a".repeat(64)}},"family_history_begin_evidence_upload"));
  const body=await refused.json();
  expect(body.result.isError).toBe(true);
- expect(body.result.structuredContent).toMatchObject({code:"USAGE_LIMIT_REACHED",remaining:0});
+ expect(body.result.structuredContent).toMatchObject({code:"USAGE_LIMIT_REACHED",remaining:0,error:{code:"USAGE_LIMIT_REACHED",recovery:expect.any(String)}});
+ expect(body.result.content[0].text).toMatch(/^Upload refused/);
  const next=await t.fetch("/mcp",modernRequest("tools/call",token,{name:"family_history_get_brief",arguments:{}},"family_history_get_brief"));
  const nextBody=await next.json();expect(nextBody.result.isError).not.toBe(true);
  expect(nextBody.result.structuredContent.storage.capBytes).toBe(0);
+ vi.stubEnv("CONVEX_SITE_URL","https://relay.example.test");
+ await t.run(async ctx=>{const settings=await ctx.db.query("usageLimitSettings").first();await ctx.db.patch(settings!._id,{planStoredBytes:{free:10}});});
+ const argumentsAgain={operationId:"synthetic-cap-refusal",personId:String(personId),title:"Invented evidence",fileName:"invented.jpg",contentType:"image/jpeg",sizeBytes:1,sha256:"a".repeat(64)};
+ const retry=await (await t.fetch("/mcp",modernRequest("tools/call",token,{name:"family_history_begin_evidence_upload",arguments:argumentsAgain},"family_history_begin_evidence_upload"))).json();
+ expect(retry.result.isError).not.toBe(true);
+ await t.run(async ctx=>{const settings=await ctx.db.query("usageLimitSettings").first();await ctx.db.patch(settings!._id,{maxFileBytes:{image:0}});});
+ const tooLarge=await (await t.fetch("/mcp",modernRequest("tools/call",token,{name:"family_history_begin_evidence_upload",arguments:{...argumentsAgain,operationId:"synthetic-file-refusal"}},"family_history_begin_evidence_upload"))).json();
+ expect(tooLarge.result).toMatchObject({isError:true,structuredContent:{code:"FILE_TOO_LARGE",error:{code:"FILE_TOO_LARGE",recovery:expect.any(String)}}});
+ expect(tooLarge.result.content[0].text).toMatch(/^This file/);
+
 });

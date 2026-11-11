@@ -1,6 +1,6 @@
 import { anyApi, type HttpRouter } from "convex/server";
 import { httpAction } from "../_generated/server";
-import { EVIDENCE_ORIGINAL_MAX_BYTES, EVIDENCE_UPLOAD_TYPES } from "../../lib/media/evidenceStandard";
+import { EVIDENCE_RELAY_BODY_BYTES, EVIDENCE_UPLOAD_TYPES } from "../../lib/media/evidenceStandard";
 
 // Generated references; internal ones are reachable only from this server.
 const publicApi = anyApi;
@@ -55,7 +55,7 @@ export const evidenceUploadRelay = httpAction(async (ctx, request) => {
   }
 
   const declaredLength = Number(request.headers.get("content-length"));
-  if (!Number.isSafeInteger(declaredLength) || declaredLength < 1 || declaredLength > EVIDENCE_ORIGINAL_MAX_BYTES) {
+  if (!Number.isSafeInteger(declaredLength) || declaredLength < 1 || declaredLength > EVIDENCE_RELAY_BODY_BYTES) {
     return reply(413, "Upload must declare a valid Content-Length of at most 20 MiB.");
   }
   const contentType = request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase() ?? "";
