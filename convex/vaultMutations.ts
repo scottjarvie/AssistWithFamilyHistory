@@ -1,8 +1,9 @@
+import { invalidAudioFileError, checkVoiceNoteDuration, voiceNoteTooLongError, normalizeAudioMime } from "./lib/media/audio";
 import { requireWebsitePerson } from "./access";
-import { reserveOperation, commitOperation, removeStoredBytes, summaryFor, assertFileSize, limitsFor, releaseExpiredWeb } from "./usageLimits";
-import { v } from "convex/values";
-import { mutation, type MutationCtx } from "./_generated/server";
-import type { Doc } from "./_generated/dataModel";
+import { fileCapsFor, audioPolicyFor, reserveOperation, commitOperation, removeStoredBytes, summaryFor, assertFileSize, limitsFor, releaseExpiredWeb } from "./usageLimits";
+import { ConvexError, v } from "convex/values";
+import { internalQuery, internalMutation, mutation, type QueryCtx, type MutationCtx } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
 import { buildStoryPublicSlug } from "../lib/stories/slug";
 import { redactPublicText } from "../lib/privacy/publicTextRedaction";
 import {
@@ -1042,6 +1043,12 @@ export const upsertMedia = mutation({
       existing = filterByVaultOwner(matches, vaultOwnerId)[0] ?? null;
     }
 
+    if(existing && (existing.storageId || existing.b2Original) &&
+      (existing.type==="audio" || args.type==="audio" || (!args.mimeType?.startsWith("video/") && normalizeAudioMime(args.mimeType ?? ""))) &&
+      (args.type!==existing.type || (args.mimeType!==undefined && args.mimeType!==existing.mimeType))) {
+      // Changing an attached file's audio identity must go through stored-byte validation.
+      throw new ConvexError(invalidAudioFileError());
+    }
     const personIds = existing
       ? Array.from(new Set([...existing.personIds, ...args.personIds]))
       : args.personIds;
@@ -1150,7 +1157,7 @@ export const upsertSourceFact = mutation({
  * protected evidence delivery needs.
  */
 export const startMediaUpload = mutation({
-  args: { vaultOwnerId: v.string(), sizeBytes:v.optional(v.number()), operationId:v.optional(v.string()), attemptId:v.optional(v.string()) },
+  args: { vaultOwnerId: v.string(), mimeType:v.optional(v.string()), audioKind:v.optional(v.union(v.literal("audio"),v.literal("voicenote"))), sizeBytes:v.optional(v.number()), operationId:v.optional(v.string()), attemptId:v.optional(v.string()) },
   handler: async (ctx, args) => {
     await requireWebsitePerson(ctx);
     const identity=await ctx.auth.getUserIdentity();
@@ -1160,11 +1167,12 @@ export const startMediaUpload = mutation({
     const prior=args.operationId?await ctx.db.query("uploadReservations").withIndex("by_owner_operation",q=>q.eq("ownerId",args.vaultOwnerId).eq("operationId",args.operationId!)).unique():null;
     if(prior?.status==="reserved" && prior.expiresAt<=Date.now())await releaseExpiredWeb(ctx,prior);
 
+    if(args.sizeBytes !== undefined && args.mimeType && !args.mimeType.startsWith("video/") && normalizeAudioMime(args.mimeType)) await assertFileSize(ctx,args.vaultOwnerId,args.audioKind ?? "audio",args.sizeBytes);
     const r=args.sizeBytes !== undefined && args.operationId ? await reserveOperation(ctx,args.vaultOwnerId,args.operationId,args.sizeBytes,"web","web") : null;
     const created=!!r&&(!prior||prior.status==="released"||prior.expiresAt<=Date.now());
     if(r && created)await ctx.db.patch(r._id,{attemptId:args.attemptId});
     const busy=!!r&&!created&&!r.mediaId&&!r.storageId;
-    return { created, busy, uploadUrl: busy ? "" : r?.mediaId || r?.storageId ? "" : await ctx.storage.generateUploadUrl(), mediaId:r?.mediaId, storageId:r?.storageId, storage:await summaryFor(ctx,args.vaultOwnerId) };
+    return { audioCaps:await fileCapsFor(ctx,args.vaultOwnerId), ...await audioPolicyFor(ctx,args.vaultOwnerId), created, busy, uploadUrl: busy ? "" : r?.mediaId || r?.storageId ? "" : await ctx.storage.generateUploadUrl(), mediaId:r?.mediaId, storageId:r?.storageId, storage:await summaryFor(ctx,args.vaultOwnerId) };
   },
 });
 
@@ -1226,6 +1234,7 @@ export const attachMediaFile = mutation({
     const metadata=await ctx.db.system.get(args.storageId);
     if(!metadata) throw new Error("Stored file not found");
     await assertFileSize(ctx,vaultOwnerId,"web",metadata.size);
+    if(!args.mimeType.startsWith("video/") && normalizeAudioMime(args.mimeType)) await assertFileSize(ctx,vaultOwnerId,"audio",metadata.size);
     const reservation=args.operationId ? await ctx.db.query("uploadReservations").withIndex("by_owner_operation",q=>q.eq("ownerId",vaultOwnerId).eq("operationId",args.operationId!)).unique() : null;
     const competing=await ctx.db.query("uploadReservations").withIndex("by_storage",q=>q.eq("storageId",args.storageId)).filter(q=>q.and(q.eq(q.field("status"),"reserved"),q.neq(q.field("_id"),reservation?._id))).first();
     if(competing)throw new Error("This file belongs to another pending upload");
@@ -1235,10 +1244,25 @@ export const attachMediaFile = mutation({
       if(reservation?.status==="reserved")await releaseExpiredWeb(ctx,reservation);
       return {mediaId:args.mediaId,created:false,storage:await summaryFor(ctx,vaultOwnerId)};
     }
+    const storedAudio = metadata.contentType && !metadata.contentType.startsWith("video/") && normalizeAudioMime(metadata.contentType);
+    if(args.type === "audio" || (!args.mimeType.startsWith("video/") && normalizeAudioMime(args.mimeType)) || storedAudio) {
+      const proof=reservation?.audioValidation;
+      const contentType=normalizeAudioMime(args.mimeType);
+      if(!proof || reservation?.status!=="reserved" || reservation.expiresAt<=Date.now() ||
+        proof.storageId!==args.storageId || proof.sizeBytes!==metadata.size || proof.sha256!==metadata.sha256 ||
+        !contentType || proof.contentType!==contentType || (storedAudio && storedAudio!==proof.contentType))
+        throw new ConvexError(invalidAudioFileError());
+      await assertFileSize(ctx,vaultOwnerId,proof.audioKind,metadata.size);
+      if(proof.audioKind==="voicenote" && proof.durationSeconds!==null) {
+        const {maxVoiceNoteSeconds}=await audioPolicyFor(ctx,vaultOwnerId);
+        if(checkVoiceNoteDuration(proof.durationSeconds,maxVoiceNoteSeconds)) throw new ConvexError(voiceNoteTooLongError(proof.durationSeconds,maxVoiceNoteSeconds));
+      }
+    }
     await commitOperation(ctx,vaultOwnerId,args.operationId,metadata.size);
     const now = Date.now();
     const shared = {
       storageId: args.storageId,
+      transcript: undefined,
       title: args.title,
       type: args.type,
       mimeType: args.mimeType,
@@ -2722,3 +2746,37 @@ export const cancelMediaUpload = mutation({args:{vaultOwnerId:v.string(),operati
   if(!r||r.status!=="reserved"||r.attemptId!==args.attemptId) return;
   await releaseExpiredWeb(ctx,r);
 }});
+
+const audioValidationTargetArgs = {vaultOwnerId:v.string(),operationId:v.string(),storageId:v.id("_storage")};
+async function audioValidationTarget(ctx:QueryCtx|MutationCtx,args:{vaultOwnerId:string;operationId:string;storageId:Id<"_storage">}) {
+  const person=await requireWebsitePerson(ctx);
+  if(person.subject!==args.vaultOwnerId) throw new Error("Owner mismatch");
+  const reservation=await ctx.db.query("uploadReservations").withIndex("by_owner_operation",q=>q.eq("ownerId",args.vaultOwnerId).eq("operationId",args.operationId)).unique();
+  if(!reservation || reservation.status!=="reserved" || reservation.source!=="web" || reservation.expiresAt<=Date.now() || reservation.storageId!==args.storageId) throw new ConvexError(invalidAudioFileError());
+  const metadata=await ctx.db.system.get(args.storageId);
+  if(!metadata || metadata.size!==reservation.bytes) throw new ConvexError(invalidAudioFileError());
+  return {reservation,metadata};
+}
+export const audioUploadForValidation = internalQuery({
+  args:audioValidationTargetArgs,
+  handler:async(ctx,args)=>{
+    const {metadata}=await audioValidationTarget(ctx,args);
+    return {sizeBytes:metadata.size,sha256:metadata.sha256,contentType:metadata.contentType,maxVoiceNoteSeconds:(await audioPolicyFor(ctx,args.vaultOwnerId)).maxVoiceNoteSeconds};
+  },
+});
+/** Only the stored-byte validation action writes this object-bound proof. */
+export const recordAudioValidation = internalMutation({
+  args:{...audioValidationTargetArgs,sizeBytes:v.number(),sha256:v.string(),contentType:v.string(),audioKind:v.union(v.literal("audio"),v.literal("voicenote")),durationSeconds:v.union(v.number(),v.null())},
+  handler:async(ctx,args)=>{
+    await authorizeTenantMutation(ctx,"vaultMutations.attachMediaFile",args.vaultOwnerId);
+    const {reservation,metadata}=await audioValidationTarget(ctx,args);
+    if(metadata.size!==args.sizeBytes || metadata.sha256!==args.sha256) throw new ConvexError(invalidAudioFileError());
+    await assertFileSize(ctx,args.vaultOwnerId,"web",metadata.size);
+    await assertFileSize(ctx,args.vaultOwnerId,args.audioKind,metadata.size);
+    if(args.audioKind==="voicenote" && args.durationSeconds!==null) {
+      const {maxVoiceNoteSeconds}=await audioPolicyFor(ctx,args.vaultOwnerId);
+      if(checkVoiceNoteDuration(args.durationSeconds,maxVoiceNoteSeconds)) throw new ConvexError(voiceNoteTooLongError(args.durationSeconds,maxVoiceNoteSeconds));
+    }
+    await ctx.db.patch(reservation._id,{audioValidation:{storageId:args.storageId,sizeBytes:args.sizeBytes,sha256:args.sha256,contentType:args.contentType,audioKind:args.audioKind,durationSeconds:args.durationSeconds}});
+  },
+});

@@ -1572,6 +1572,7 @@ export const getOwnedMediaFile = internalQuery({
         sizeBytes: row.b2Renditions.medium.sizeBytes,
       };
     }
+    if (row.mediaState === "ready" && row.b2Original && !row.b2Renditions) return {b2:row.b2Original, mimeType:row.b2Original.contentType, title:row.title, sizeBytes:row.b2Original.sizeBytes};
     if (!row.storageId) return null;
     const url = await ctx.storage.getUrl(row.storageId);
     if (!url) return null;

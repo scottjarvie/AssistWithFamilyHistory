@@ -1,5 +1,6 @@
+import { normalizeAudioMime } from "./lib/media/audio";
 import { uploadRefusalOf } from "../lib/media/uploadRefusal";
-import { reserveOperation, commitOperation, releaseOperation, addCopies, removeStoredBytes, summaryFor, assertFileSize } from "./usageLimits";
+import { assertFileSize, reserveOperation, commitOperation, releaseOperation, addCopies, removeStoredBytes, summaryFor } from "./usageLimits";
 import { isRenderedEvidenceImage } from "../lib/media/evidenceStandard";
 /* eslint-disable @typescript-eslint/no-explicit-any -- Exact manifests are runtime-validated at this internal boundary. */
 import { internal } from "./_generated/api";
@@ -88,6 +89,7 @@ export const planMcpEvidenceUpload = internalMutation({
       description: v.optional(v.string()),
       fileName: v.string(),
       contentType: v.string(),
+      audioKind: v.optional(v.union(v.literal("audio"),v.literal("voicenote"))),
       sizeBytes: v.number(),
       sha256: v.string(),
       fileModifiedTime: v.optional(v.string()),
@@ -147,6 +149,7 @@ export const planMcpEvidenceUpload = internalMutation({
       };
     }
 
+    if(normalizeAudioMime(args.input.contentType)) await assertFileSize(ctx,owner,args.input.audioKind ?? "audio",args.input.sizeBytes);
     const reservation=await reserveOperation(ctx,owner,args.operationId,args.input.sizeBytes,"mcp",isRenderedEvidenceImage(args.input.contentType)?"image":"original");
     await ctx.db.patch(reservation._id,{expiresAt:args.expiresAt});
     await ctx.db.insert("mediaUploadSessions", {
@@ -163,6 +166,7 @@ export const planMcpEvidenceUpload = internalMutation({
       fileName: args.input.fileName,
       personIds: [person._id],
       sourceId,
+      audioKind: args.input.audioKind,
       declaredContentType: args.input.contentType,
       declaredSizeBytes: args.input.sizeBytes,
       expectedSha256: args.input.sha256,
@@ -409,6 +413,7 @@ export const commitMcpEvidenceUpload = internalMutation({
           ? "scan" as const
           : "photo" as const;
     await assertFileSize(ctx,owner,isRenderedEvidenceImage(args.original.contentType)?"image":"original",args.original.sizeBytes);
+    if(normalizeAudioMime(args.original.contentType)) await assertFileSize(ctx,owner,session.audioKind ?? "audio",args.original.sizeBytes);
     await commitOperation(ctx,owner,session.operationId,args.original.sizeBytes);
     await addCopies(ctx,owner,[args.tiny,args.medium,args.large].reduce((n,r)=>n+(r?.sizeBytes ?? 0),0));
     const mediaId = await ctx.db.insert("media", {

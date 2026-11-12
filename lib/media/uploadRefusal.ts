@@ -1,6 +1,6 @@
 import { ConvexError } from "convex/values";
 import { mcpLimitText, type UsageLimitError, type FileTooLarge } from "../../convex/lib/usageLimits/core";
-export type UploadRefusal=UsageLimitError|FileTooLarge;
+export type UploadRefusal=UsageLimitError|FileTooLarge|{code:"INVALID_AUDIO_CONTAINER"|"UNSUPPORTED_AUDIO_TYPE"|"AUDIO_HAS_VIDEO"|"AUDIO_TOO_LONG";message:string};
 /** Decode directly at the function that owns the check, never from an exception string. */
 export function uploadRefusalOf(error:unknown):UploadRefusal|null {
  if(!(error instanceof ConvexError))return null;

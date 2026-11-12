@@ -1,3 +1,5 @@
+import { ConvexError } from "convex/values";
+import { normalizeAudioMime, validateAudioContainer, audioContainerError, checkVoiceNoteDuration, voiceNoteTooLongError } from "../../convex/lib/media/audio";
 import sharp from "sharp";
 import type { EvidenceB2Head } from "./evidenceB2";
 import { sha256Hex } from "./evidenceB2";
@@ -20,6 +22,7 @@ export type EvidenceVerificationStore = {
     environment: "development" | "preview" | "production";
   };
   head(objectKey: string, versionId?: string): Promise<EvidenceB2Head>;
+  readRange?(objectKey: string, versionId: string, offset: number, length: number): Promise<Uint8Array>;
   read(objectKey: string, versionId: string): Promise<Uint8Array>;
   /** Streaming hash for originals too large to hold in memory. */
   digest?(objectKey: string, versionId: string): Promise<{ sha256: string; sizeBytes: number; head: Uint8Array }>;
@@ -207,6 +210,8 @@ export async function finalizeEvidenceFile(input: {
   scanTime?: string;
   inferredHistoricalEventDate?: string;
   now?: string;
+  audioKind?: "audio" | "voicenote";
+  maxVoiceNoteSeconds?: number;
 }): Promise<FinalizedEvidenceFile> {
   const verifiedAt = input.now ?? new Date().toISOString();
   const declared = input.declaredContentType.toLowerCase();
@@ -225,7 +230,18 @@ export async function finalizeEvidenceFile(input: {
   if (sha256 !== input.expectedSha256) throw new Error("Evidence SHA-256 did not match the declared original.");
   // A sample shorter than the whole file is judged as a sample (a multi-byte
   // character cut at its end is not held against the file).
-  const sniffed = sniffEvidenceFile(read.head, read.head.byteLength < read.sizeBytes);
+  const audioType = normalizeAudioMime(declared);
+  if (audioType) {
+    const reader = input.store.readRange ? {
+      size: head.sizeBytes,
+      read: (offset: number, length: number) => input.store.readRange!(input.objectKey, head.versionId, offset, length),
+    } : read.head;
+    const result = await validateAudioContainer(reader, audioType);
+    if (!result.valid) throw new ConvexError(audioContainerError(result.reason, "ai"));
+    if(input.audioKind === "voicenote" && result.durationSeconds !== null && input.maxVoiceNoteSeconds !== undefined && checkVoiceNoteDuration(result.durationSeconds,input.maxVoiceNoteSeconds))
+      throw new ConvexError(voiceNoteTooLongError(result.durationSeconds,input.maxVoiceNoteSeconds,"ai"));
+  }
+  const sniffed = audioType ?? sniffEvidenceFile(read.head, read.head.byteLength < read.sizeBytes);
   // HEIC and HEIF share a container; either brand satisfies either label.
   const heifFamily = new Set(["image/heic", "image/heif"]);
   if (!sniffed || (sniffed !== declared && !(heifFamily.has(sniffed) && heifFamily.has(declared)))) {

@@ -1,3 +1,4 @@
+import { AUDIO_TYPES, normalizeAudioMime } from "../../convex/lib/media/audio";
 import { usageLimitError, type Refusal } from "../../convex/lib/usageLimits/core";
 import { siteDefaults } from "./siteDefaults";
 /**
@@ -28,11 +29,8 @@ export const ACCEPTED_MEDIA_UPLOAD_TYPES = [
   "image/heic",
   "application/pdf",
   "text/plain",
-  "audio/mpeg",
-  "audio/mp4",
-  "audio/wav",
+  ...AUDIO_TYPES,
   "audio/x-wav",
-  "audio/webm",
   "video/mp4",
   "video/webm",
   "video/quicktime",
@@ -42,7 +40,7 @@ export const ACCEPTED_MEDIA_UPLOAD_TYPES = [
 export const MEDIA_UPLOAD_ACCEPT_ATTRIBUTE = ACCEPTED_MEDIA_UPLOAD_TYPES.join(",");
 
 export function isAcceptedMediaUploadType(mimeType: string): boolean {
-  return (ACCEPTED_MEDIA_UPLOAD_TYPES as readonly string[]).includes(mimeType.toLowerCase());
+  return !!normalizeAudioMime(mimeType) || (ACCEPTED_MEDIA_UPLOAD_TYPES as readonly string[]).includes(mimeType.toLowerCase());
 }
 
 export type MediaUploadKind = "photo" | "document" | "scan" | "video" | "audio" | "other";

@@ -1,3 +1,5 @@
+import { mintPlaybackCapability, permitsPlayback } from "@/lib/media/playbackCapability";
+import { parseAudioRange } from "@/convex/lib/media/audio";
 /**
  * Serve a stored media file to the person who owns it.
  *
@@ -29,21 +31,28 @@ export async function GET(
     const { vaultOwnerId } = await getVaultAccessContext();
     const { mediaId } = await context.params;
 
+    const capability=_request.nextUrl.searchParams.get("capability");
+    if(capability && !permitsPlayback(capability,vaultOwnerId,mediaId)) return NextResponse.json({error:"That media item is not available."},{status:404});
     const client = await getAuthedConvexClient();
     const file = await client.action(api.vaultReads.getOwnedMediaFile, { vaultOwnerId, mediaId });
     if (!file) {
       return NextResponse.json({ error: "That media item is not available." }, { status: 404 });
     }
 
-    const upstream = await fetch(file.url);
+    const range = file.sizeBytes !== null ? parseAudioRange(_request.headers.get("range"),file.sizeBytes) : null;
+    if(range?.kind === "refused") return new NextResponse(null,{status:416,headers:{"Content-Range":`bytes */${file.sizeBytes}`,"Cache-Control":"private, no-store"}});
+    const upstream = await fetch(file.url, {headers:range?.kind === "partial" ? {Range:`bytes=${range.start}-${range.end}`} : {}});
     if (!upstream.ok || !upstream.body) {
       return NextResponse.json({ error: "That media item could not be read." }, { status: 502 });
     }
 
     return new NextResponse(upstream.body, {
-      status: 200,
+      status: upstream.status === 206 ? 206 : 200,
       headers: {
         "Content-Type": file.mimeType,
+        "Accept-Ranges": "bytes",
+        ...(upstream.headers.get("content-length") ? {"Content-Length":upstream.headers.get("content-length")!}:{}),
+        ...(upstream.status===206 && upstream.headers.get("content-range") ? {"Content-Range":upstream.headers.get("content-range")!}:{}),
         // Private vault bytes: a shared cache must never keep a copy, and the
         // browser must not be able to hand the file to a viewer as a download
         // target under a guessed name.
@@ -56,4 +65,16 @@ export async function GET(
     const issue = getConvexRuntimeIssue(error);
     return NextResponse.json({ error: issue.title, details: issue.description }, { status: issue.statusCode });
   }
+}
+
+/** Mint only after the same owner read check used by playback itself. */
+export async function POST(request:NextRequest,context:{params:Promise<{mediaId:string}>}) {
+  const {vaultOwnerId}=await getVaultAccessContext();
+  const {mediaId}=await context.params;
+  const client=await getAuthedConvexClient();
+  const file=await client.action(api.vaultReads.getOwnedMediaFile,{vaultOwnerId,mediaId});
+  if(!file) return NextResponse.json({error:"That media item is not available."},{status:404});
+  const url=new URL(request.url);
+  url.search=`?capability=${encodeURIComponent(mintPlaybackCapability(vaultOwnerId,mediaId))}`;
+  return NextResponse.json({playbackUrl:url.toString()},{headers:{"Cache-Control":"private, no-store"}});
 }

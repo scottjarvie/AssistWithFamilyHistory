@@ -122,8 +122,10 @@ export const getEvidenceBatch = internalQuery({
       mimeType: string;
       storageId: string;
       sizeBytes: number | null;
+      transcript?: string;
     }> = [];
     const b2Stored: Array<{
+      transcript?: string;
       id: string;
       kind: string;
       title: string;
@@ -190,6 +192,7 @@ export const getEvidenceBatch = internalQuery({
             title: row.title,
             mimeType: row.b2Original.contentType,
             sizeBytes: row.b2Original.sizeBytes,
+            ...(row.type === "audio" && row.transcript ? {transcript:row.transcript}:{}),
           });
           continue;
         }
@@ -209,6 +212,7 @@ export const getEvidenceBatch = internalQuery({
             title: row.title,
             mimeType: row.mimeType ?? "application/octet-stream",
             storageId: row.storageId,
+            ...(row.type === "audio" && row.transcript ? {transcript:row.transcript}:{}),
             sizeBytes: typeof row.sizeBytes === "number" ? row.sizeBytes : null,
           });
           continue;

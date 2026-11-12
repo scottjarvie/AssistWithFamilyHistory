@@ -9,6 +9,7 @@ import { v } from "convex/values";
 export const enforcementValidator = v.union(v.literal("off"), v.literal("warn"), v.literal("on"));
 
 const limitFields = {
+  maxVoiceNoteSeconds: v.optional(v.number()),
   planStoredBytes: v.optional(v.record(v.string(), v.number())),
   maxFileBytes: v.optional(v.record(v.string(), v.number())),
   storedBytesPerUser: v.optional(v.number()),
@@ -26,6 +27,7 @@ export const limitPatchValidator = v.object({...limitFields,planStoredBytes:v.op
 /** Personal limits: a number sets one, null goes back to the site value. */
 const nullableNumber = v.optional(v.union(v.number(), v.null()));
 export const nullableLimitPatch = v.object({
+  maxVoiceNoteSeconds: nullableNumber,
   planStoredBytes:v.optional(v.union(v.record(v.string(),v.union(v.number(),v.null())),v.null())),
   maxFileBytes:v.optional(v.union(v.record(v.string(),v.union(v.number(),v.null())),v.null())),
   storedBytesPerUser: nullableNumber,
@@ -41,7 +43,7 @@ export const nullableLimitPatch = v.object({
 export const usageLimitTables = {
   usageRecountJobs:defineTable({dryRun:v.boolean(),phase:v.number(),cursor:v.union(v.string(),v.null()),accountsSeen:v.number(),bytes:v.number(),files:v.number(),unknownSizeFiles:v.number(),missingObjects:v.optional(v.number()),unattributedFiles:v.number(),notReady:v.number(),done:v.boolean(),startedAt:v.number()}),
   usageRecountOwners:defineTable({jobId:v.id("usageRecountJobs"),ownerId:v.string()}).index("by_job_owner",["jobId","ownerId"]),
-  uploadReservations: defineTable({ownerId:v.string(), operationId:v.string(), storageId:v.optional(v.id("_storage")), bytes:v.number(), day:v.string(), source:v.string(), expiryFailureAt:v.optional(v.number()), status:v.union(v.literal("reserved"),v.literal("committed"),v.literal("released")), expiresAt:v.number(), attemptId:v.optional(v.string()), mediaId:v.optional(v.id("media"))}).index("by_owner_operation",["ownerId","operationId"]).index("by_storage",["storageId"]).index("by_expiry",["status","expiresAt"]).index("by_source_expiry",["source","status","expiresAt"]),
+  uploadReservations: defineTable({ownerId:v.string(), operationId:v.string(), storageId:v.optional(v.id("_storage")), audioValidation:v.optional(v.object({storageId:v.id("_storage"),sizeBytes:v.number(),sha256:v.string(),contentType:v.string(),audioKind:v.union(v.literal("audio"),v.literal("voicenote")),durationSeconds:v.union(v.number(),v.null())})), bytes:v.number(), day:v.string(), source:v.string(), expiryFailureAt:v.optional(v.number()), status:v.union(v.literal("reserved"),v.literal("committed"),v.literal("released")), expiresAt:v.number(), attemptId:v.optional(v.string()), mediaId:v.optional(v.id("media"))}).index("by_owner_operation",["ownerId","operationId"]).index("by_storage",["storageId"]).index("by_expiry",["status","expiresAt"]).index("by_source_expiry",["source","status","expiresAt"]),
   /** One row, key "site". Absent row = family defaults with enforcement off. */
   usageLimitSettings: defineTable({
     key: v.literal("site"),

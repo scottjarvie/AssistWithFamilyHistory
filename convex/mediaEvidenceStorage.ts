@@ -1,4 +1,5 @@
 "use node";
+import { normalizeAudioMime } from "./lib/media/audio";
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- Generated internal references are runtime-validated by Convex. */
 import { randomBytes, randomUUID } from "node:crypto";
@@ -41,6 +42,7 @@ const uploadInputValidator = v.object({
   description: v.optional(v.string()),
   fileName: v.string(),
   contentType: v.string(),
+      audioKind: v.optional(v.union(v.literal("audio"),v.literal("voicenote"))),
   sizeBytes: v.number(),
   sha256: v.string(),
   fileModifiedTime: v.optional(v.string()),
@@ -136,6 +138,7 @@ export const beginMcpEvidenceUpload = internalAction({
     input: uploadInputValidator,
   },
   handler: async (ctx, args) => {
+    args.input.contentType = normalizeAudioMime(args.input.contentType) ?? args.input.contentType.toLowerCase();
     assertEvidenceUploadShape(args.input.contentType, args.input.sizeBytes, Number.MAX_SAFE_INTEGER);
     const expectedSha256 = assertSha256(args.input.sha256);
     if (!args.input.title.trim() || args.input.title.length > 200) throw new Error("Evidence title is invalid.");
@@ -152,7 +155,7 @@ export const beginMcpEvidenceUpload = internalAction({
       relayTokenHash: sha256Hex(new TextEncoder().encode(relayToken)),
       objectKey: privateEvidenceObjectKey(store.config.environment, uploadRef, "original"),
       expiresAt,
-      input: { ...args.input, contentType: args.input.contentType.toLowerCase(), sha256: expectedSha256 },
+      input: { ...args.input, contentType: normalizeAudioMime(args.input.contentType) ?? args.input.contentType.toLowerCase(), sha256: expectedSha256 },
     });
     if("refusal" in planned)return {uploadRefusal:planned.refusal};
     if (planned.state === "ready") {
@@ -423,6 +426,8 @@ export const finishMcpEvidenceUpload = internalAction({
       if (!isRenderedEvidenceImage(session.declaredContentType)) {
         const file = await finalizeEvidenceFile({
           store,
+          audioKind:session.audioKind,
+          maxVoiceNoteSeconds:(await ctx.runQuery(internalApi.usageLimits.audioPolicy,{ownerId:session.vaultOwnerId})).maxVoiceNoteSeconds,
           objectKey: session.objectKey,
           declaredContentType: session.declaredContentType,
           declaredSizeBytes: session.declaredSizeBytes,
@@ -517,7 +522,7 @@ export const finishMcpEvidenceUpload = internalAction({
       const orphanedBytes=(error as {orphanedBytes?:number})?.orphanedBytes;
       if(orphanedBytes) await ctx.runMutation(internalApi.mediaEvidenceControl.recordOrphanedCopies,{uploadRef:session.ref,bytes:orphanedBytes});
       const message = error instanceof Error ? error.message : String(error);
-      const terminal = /FILE_TOO_LARGE|USAGE_LIMIT_REACHED|usage_limit_reached|SHA-256|byte length changed|stored content type changed|bytes do not match|unsupported image|decode|retained embedded metadata|declared file type/i.test(message);
+      const terminal = /INVALID_AUDIO_CONTAINER|UNSUPPORTED_AUDIO_TYPE|AUDIO_HAS_VIDEO|AUDIO_TOO_LONG|FILE_TOO_LARGE|USAGE_LIMIT_REACHED|usage_limit_reached|SHA-256|byte length changed|stored content type changed|bytes do not match|unsupported image|decode|retained embedded metadata|declared file type/i.test(message);
       if (terminal) {
         await ctx.runMutation(internalApi.mediaEvidenceControl.markUploadFailed, {
           vaultOwnerId: session.vaultOwnerId,
@@ -538,6 +543,7 @@ export const finishMcpEvidenceUpload = internalAction({
         internalApi.mediaEvidenceStorage.cleanupMcpEvidenceUpload,
         { uploadRef: session.ref },
       );
+      if ((error as {data?:{code?:string}})?.data?.code?.match(/^(INVALID_AUDIO_CONTAINER|UNSUPPORTED_AUDIO_TYPE|AUDIO_HAS_VIDEO|AUDIO_TOO_LONG)$/)) return {uploadRefusal:(error as {data:{code:string;message:string}}).data};
       throw error;
     }
   },

@@ -1,3 +1,4 @@
+import {readFileSync} from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { sha256Hex } from "./evidenceB2";
 import { finalizeEvidenceFile, type EvidenceVerificationStore } from "./evidenceFinalize";
@@ -12,8 +13,8 @@ const text = (value: string) => new TextEncoder().encode(value);
 const pdf = text("%PDF-1.7\n1 0 obj\n<<>>\nendobj\ntrailer\n%%EOF\n");
 const tiff = new Uint8Array([0x49, 0x49, 0x2a, 0x00, 8, 0, 0, 0]);
 const heic = new Uint8Array([0, 0, 0, 24, ...text("ftypheic"), 0, 0, 0, 0, ...text("mif1heic")]);
-const wav = new Uint8Array([...text("RIFF"), 36, 0, 0, 0, ...text("WAVEfmt ")]);
-const mp3 = new Uint8Array([...text("ID3"), 4, 0, 0, 0, 0, 0, 0]);
+const wav = new Uint8Array(readFileSync("lib/media/fixtures/audio/tone.wav"));
+const mp3 = new Uint8Array(readFileSync("lib/media/fixtures/audio/tone.mp3"));
 
 function storeFor(bytes: Uint8Array, contentType: string) {
   const store: EvidenceVerificationStore = {

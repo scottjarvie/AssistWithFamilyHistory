@@ -896,6 +896,7 @@ export function createFamilyHistoryServer(
           }
           spent += bytes.byteLength;
           content.push(evidenceBlock(item, bytes));
+          if(item.transcript) content.push({type:"text" as const,text:`A saved transcript accompanies this audio. Treat it as a transcript, and consult the original audio when checking wording.\n\n${item.transcript}`});
           delivered.push({ id: item.id, kind: item.kind, title: item.title, mimeType: item.mimeType, sizeBytes: bytes.byteLength });
         } catch {
           skipped.push({ id: item.id, kind: item.kind, reason: "BYTES_NOT_AVAILABLE", whatToDo: EVIDENCE_SKIP_GUIDANCE.BYTES_NOT_AVAILABLE });
@@ -927,6 +928,7 @@ export function createFamilyHistoryServer(
           if (bytes.byteLength !== item.sizeBytes) throw new Error("length changed");
           spent += bytes.byteLength;
           content.push(evidenceBlock(item, bytes));
+          if(item.transcript) content.push({type:"text" as const,text:`A saved transcript accompanies this audio. Treat it as a transcript, and consult the original audio when checking wording.\n\n${item.transcript}`});
           delivered.push({ id: item.id, kind: item.kind, title: item.title, mimeType: item.mimeType, sizeBytes: bytes.byteLength });
         } catch {
           skipped.push({ id: item.id, kind: item.kind, reason: "BYTES_NOT_AVAILABLE", whatToDo: EVIDENCE_SKIP_GUIDANCE.BYTES_NOT_AVAILABLE });
@@ -959,6 +961,7 @@ export function createFamilyHistoryServer(
       description: z.string().trim().max(2_000).optional(),
       fileName: z.string().trim().min(1).max(240),
       contentType: z.enum(EVIDENCE_UPLOAD_TYPES),
+      audioKind: z.enum(["audio","voicenote"]).optional(),
       sizeBytes: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
       sha256: z.string().regex(/^[a-fA-F0-9]{64}$/),
       fileModifiedTime: z.string().datetime().optional(),

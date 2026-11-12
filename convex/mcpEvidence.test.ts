@@ -332,3 +332,11 @@ describe("evidence respects the grant", () => {
     );
   });
 });
+
+test("private audio and saved transcript follow the existing evidence gate",async()=>{
+ const t=convexTest(schema,modules);const person=await seedPerson(t,OWNER);const grantId=await seedGrant(t,{vaultOwnerId:OWNER});
+ const storageId=await storeBytes(t,new Uint8Array([1,2,3]));
+ const id=await seedMedia(t,OWNER,[person],{type:"audio",mimeType:"audio/webm",storageId,sizeBytes:3,transcript:"Invented spoken words."});
+ expect((await batch(t,grantId,[{kind:"media",id:String(id)}])).stored[0]).toMatchObject({mimeType:"audio/webm",transcript:"Invented spoken words."});
+ await t.run(ctx=>ctx.db.patch(id,{aiUseAllowed:false}));expect((await batch(t,grantId,[{kind:"media",id:String(id)}])).stored).toHaveLength(0);
+});

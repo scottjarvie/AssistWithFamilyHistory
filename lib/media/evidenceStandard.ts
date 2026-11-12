@@ -1,3 +1,4 @@
+import { AUDIO_TYPES, sniffAudioType } from "../../convex/lib/media/audio";
 import {formatBytes} from "../../convex/lib/usageLimits/core";
 import { siteDefaults } from "./siteDefaults";
 /**
@@ -42,9 +43,7 @@ export const EVIDENCE_FILE_TYPES = [
   "image/heic",
   "image/heif",
   "image/tiff",
-  "audio/mpeg",
-  "audio/mp4",
-  "audio/wav",
+  ...AUDIO_TYPES,
   "text/plain",
 ] as const;
 export type EvidenceFileType = (typeof EVIDENCE_FILE_TYPES)[number];
@@ -193,9 +192,8 @@ export function sniffEvidenceFile(bytes: Uint8Array, truncated = false): Evidenc
   const brand = isoBrand(bytes);
   if (brand && ["heic", "heix", "heim", "heis"].includes(brand)) return "image/heic";
   if (brand && ["mif1", "msf1", "heif"].includes(brand)) return "image/heif";
-  if (brand && ["M4A ", "M4B ", "mp42", "isom"].includes(brand)) return "audio/mp4";
-  if (ascii(bytes, 0, "RIFF") && ascii(bytes, 8, "WAVE")) return "audio/wav";
-  if (ascii(bytes, 0, "ID3") || (bytes.length > 1 && bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0)) return "audio/mpeg";
+  const audio = sniffAudioType(bytes);
+  if (audio) return audio;
   // Plain text: valid UTF-8 with no control bytes besides tab, newlines and
   // form feed. Only a sample is checked; a multi-byte character cut at the
   // sample's end is trimmed rather than counted against the file.
