@@ -16,6 +16,7 @@ import {localPublicAuthEnabled} from "@/lib/localLiveAuth";
  */
 
 import { AppMobileNav, AppSidebar } from "@/components/layout/AppSidebar";
+import { AppFamilyRow } from "@/components/layout/FamilyRow";
 import { AppTopBar } from "@/components/layout/AppTopBar";
 import { GuestVaultMigrationGate } from "@/components/layout/GuestVaultMigrationGate";
 import { SafeLink } from "@/components/layout/SafeLink";
@@ -60,7 +61,7 @@ export default async function AppLayout({
       <main className="min-h-screen transition-all duration-300 md:ml-64">
         <AppTopBar clerkEnabled={isClerkEnabled()} />
         {children}
-        <footer className="border-t border-stone-200 px-4 py-6 text-sm text-stone-500 md:px-8">
+        <div className="pb-[env(safe-area-inset-bottom)]"><AppFamilyRow signedIn={accessContext.mode === "user"} /><footer className="border-t border-stone-200 px-4 py-6 text-sm text-stone-500 md:px-8">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-0 md:gap-y-2">
             <span>Assist With Family History</span>
             <SafeLink href="/privacy" className="inline-flex min-h-11 items-center hover:text-stone-900 hover:underline md:pointer-fine:min-h-0">
@@ -73,7 +74,7 @@ export default async function AppLayout({
               Updates
             </SafeLink>
           </div>
-        </footer>
+        </footer></div>
       </main>
     </div>
   );

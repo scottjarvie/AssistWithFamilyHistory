@@ -25,7 +25,7 @@ interface AppTopBarProps {
 export function AppTopBar({ clerkEnabled }: AppTopBarProps) {
   return (
     <div className="sticky top-0 z-20 hidden h-14 items-center justify-end border-b border-border bg-card/95 px-6 backdrop-blur md:flex">
-      {clerkEnabled ? <UserButton afterSignOutUrl="/" /> : null}
+      {clerkEnabled ? <UserButton afterSignOutUrl="/" appearance={{ elements: { userButtonTrigger: "!min-h-11 !min-w-11 !p-1.5" } }} /> : null}
     </div>
   );
 }
