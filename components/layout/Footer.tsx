@@ -16,11 +16,12 @@
  */
 
 import { SafeLink } from "@/components/layout/SafeLink";
+import { FamilyRow } from "./FamilyRow";
 import { Compass } from "lucide-react";
 
 export function Footer() {
   return (
-    <footer className="relative overflow-hidden border-t border-[#2c4f5d] bg-[#132b35] py-14 text-[#d9cdb5]">
+    <div><FamilyRow /><footer className="relative overflow-hidden border-t border-[#2c4f5d] bg-[#132b35] py-14 text-[#d9cdb5]">
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center justify-between gap-8 md:flex-row">
           <div className="flex items-center gap-3">
@@ -74,6 +75,6 @@ export function Footer() {
           </p>
         </div>
       </div>
-    </footer>
+    </footer></div>
   );
 }
