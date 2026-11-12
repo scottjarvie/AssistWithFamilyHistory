@@ -38,6 +38,7 @@ import type * as relationships from "../relationships.js";
 import type * as researchLog from "../researchLog.js";
 import type * as researchTasks from "../researchTasks.js";
 import type * as sources from "../sources.js";
+import type * as storageCheck from "../storageCheck.js";
 import type * as trustBoundary from "../trustBoundary.js";
 import type * as usageLimits from "../usageLimits.js";
 import type * as usageLimitsSchema from "../usageLimitsSchema.js";
@@ -86,6 +87,7 @@ declare const fullApi: ApiFromModules<{
   researchLog: typeof researchLog;
   researchTasks: typeof researchTasks;
   sources: typeof sources;
+  storageCheck: typeof storageCheck;
   trustBoundary: typeof trustBoundary;
   usageLimits: typeof usageLimits;
   usageLimitsSchema: typeof usageLimitsSchema;
