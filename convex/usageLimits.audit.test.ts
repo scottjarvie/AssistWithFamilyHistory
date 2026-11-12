@@ -128,7 +128,7 @@ test("14/19/40: an unregistered system-storage blob blocks global backfill compl
 test("58/67: AI reservation matches the session and a live finish lease postpones cleanup",async()=>{const t=setup();await settings(t);const {args}=await aiSession(t);const before=await t.run(async ctx=>({r:await ctx.db.query("uploadReservations").first(),s:await ctx.db.query("mediaUploadSessions").first()}));expect(before.r?.expiresAt).toBe(before.s?.expiresAt);await t.mutation(internal.mediaEvidenceControl.claimSessionForFinish,args);const after=await t.run(async ctx=>({r:await ctx.db.query("uploadReservations").first(),s:await ctx.db.query("mediaUploadSessions").first()}));expect(after.r?.expiresAt).toBe(after.s?.expiresAt);expect(after.s!.expiresAt).toBeGreaterThan(before.s!.expiresAt);expect(await t.action(internal.mediaEvidenceStorage.cleanupMcpEvidenceUpload,{uploadRef:args.uploadRef})).toBeNull();expect((await numbers(t))?.reservedBytes).toBe(5);});
 test("60: bounded size repair fills legacy metadata without changing the object",async()=>{const t=setup();const id=await blob(t,7);const rowId=await t.run(ctx=>ctx.db.insert("media",{vaultOwnerId:owner,storageId:id,type:"document",title:"Invented legacy scan",personIds:[],createdAt:0,updatedAt:0}));await t.mutation(internal.usageLimits.recomputeStep,{ownerId:owner});expect(await t.mutation(internal.usageRecount.repairConvexSizesPage,{cursor:null})).toMatchObject({repaired:1,unknownSizeFiles:0});expect(await t.mutation(internal.usageLimits.recomputeStep,{ownerId:owner})).toMatchObject({done:false,restarts:1});expect((await t.run(ctx=>ctx.db.get(rowId)))?.sizeBytes).toBe(7);expect((await t.run(ctx=>ctx.db.system.get(id)))?.size).toBe(7);});
 test("61/65: admin On really refuses and the admin view uses the same batch defaults as checks",async()=>{const t=setup(),a=person(t,admin);await a.mutation(api.usageLimits.adminSetSiteLimits,{limits:{planStoredBytes:{free:0}},enforcement:"on",reason:"Synthetic policy"});await t.run(async ctx=>{const row=await ctx.db.query("usageLimitSettings").first();await ctx.db.patch(row!._id,{backfillCompletedAt:1});});await expect(start(t)).rejects.toMatchObject({data:{usage:{code:"USAGE_LIMIT_REACHED"}}});const view=await a.action(api.usageLimits.adminOverview,{}) as {site:{limits:{mcpBatchMaxItems:number}}};expect(view.site.limits.mcpBatchMaxItems).toBe((await t.run(ctx=>limitsFor(ctx,owner))).limits.mcpBatchMaxItems);});
-test.each(["photo","audio","video","document","text"])("62: confirmed replacement subtraction covers %s bytes",async kind=>{const t=setup();await settings(t,{planStoredBytes:{free:10}});await start(t,"first");const saved=await attach(t,"first",await blob(t));await start(t,"second");const id=await blob(t);await person(t).mutation(api.vaultMutations.attachMediaFile,{vaultOwnerId:owner,operationId:"second",mediaId:saved.mediaId,storageId:id,title:"Invented replacement",type:kind==="text"?"document":kind as "photo"|"audio"|"video"|"document",mimeType:kind==="text"?"text/plain":`${kind}/synthetic`,sizeBytes:5});expect((await numbers(t))?.storedBytes).toBe(5);expect((await start(t,"third")).created).toBe(true);});
+test.each(["photo","video","document","text"])("62: confirmed replacement subtraction covers %s bytes",async kind=>{const t=setup();await settings(t,{planStoredBytes:{free:10}});await start(t,"first");const saved=await attach(t,"first",await blob(t));await start(t,"second");const id=await blob(t);await person(t).mutation(api.vaultMutations.attachMediaFile,{vaultOwnerId:owner,operationId:"second",mediaId:saved.mediaId,storageId:id,title:"Invented replacement",type:kind==="text"?"document":kind as "photo"|"audio"|"video"|"document",mimeType:kind==="text"?"text/plain":`${kind}/synthetic`,sizeBytes:5});expect((await numbers(t))?.storedBytes).toBe(5);expect((await start(t,"third")).created).toBe(true);});
 
 import {siteDefaults} from "../lib/media/siteDefaults";
 import {FAMILY_HISTORY_TOOLS} from "../lib/mcp/catalog";
@@ -173,4 +173,26 @@ test("a measured audio refusal uses the existing cleanup and releases its single
   await t.action(internal.mediaEvidenceStorage.cleanupMcpEvidenceUpload,{uploadRef:args.uploadRef});
   expect(await numbers(t)).toMatchObject({reservedBytes:0,storedBytes:0,inFlight:0,dayUploads:1});
  }finally{head.mockRestore();digest.mockRestore();range.mockRestore();deletion.mockRestore();}
+});
+
+test.each(Object.entries({webm:"audio/webm",ogg:"audio/ogg",mp4:"audio/mp4",aac:"audio/aac",mp3:"audio/mpeg",wav:"audio/wav",flac:"audio/flac",multipart:"audio/webm"}))("stored Backblaze %s succeeds through the actual finish handler",async(extension,contentType)=>{
+ storageEnvironment();const t=setup();await settings(t,{planStoredBytes:{free:1_000_000}});
+ const {readFileSync}=await import("node:fs");const {sha256Hex}=await import("../lib/media/evidenceB2");
+ const bytes=new Uint8Array(readFileSync(`lib/media/fixtures/audio/tone.${extension==="multipart"?"webm":extension}`));
+ const {args}=await aiSession(t,`synthetic-audio-${extension}`,bytes.length,sha256Hex(bytes));
+ await t.run(async ctx=>{const row=await ctx.db.query("mediaUploadSessions").first();await ctx.db.patch(row!._id,{declaredContentType:contentType});});
+ if(extension==="multipart") {
+  await t.mutation(internal.mediaEvidenceControl.attachMultipartUpload,{uploadRef:args.uploadRef,multipartUploadId:"synthetic-multipart",partSizeBytes:16*1024*1024});
+  await t.mutation(internal.mediaEvidenceControl.recordMcpEvidencePart,{uploadRef:args.uploadRef,relayTokenHash:"synthetic",partNumber:1,etag:"synthetic-etag",sizeBytes:bytes.length,sha256:sha256Hex(bytes)});
+ }
+ const complete=vi.spyOn(EvidenceB2Store.prototype,"completeMultipart").mockResolvedValue({versionId:"synthetic-version"});
+ const head=vi.spyOn(EvidenceB2Store.prototype,"head").mockResolvedValue({versionId:"synthetic-version",sizeBytes:bytes.length,contentType});
+ const digest=vi.spyOn(EvidenceB2Store.prototype,"digest").mockResolvedValue({sha256:sha256Hex(bytes),sizeBytes:bytes.length,head:bytes});
+ const range=vi.spyOn(EvidenceB2Store.prototype,"readRange").mockImplementation(async(_key,_version,offset,length)=>bytes.subarray(offset,offset+length));
+ try {
+  const result=await t.action(internal.mediaEvidenceStorage.finishMcpEvidenceUpload,{principal:args.principal,grantId:args.grantId,operationId:args.operationId,requestHash:"synthetic-finish",input:{uploadRef:args.uploadRef}});
+  expect(result).toMatchObject({status:"pending_person_review"});
+  expect(await t.run(ctx=>ctx.db.query("media").first())).toMatchObject({type:"audio",mediaState:"ready",mimeType:contentType});
+  expect(await numbers(t)).toMatchObject({storedBytes:bytes.length,reservedBytes:0,dayUploads:1});
+ }finally{head.mockRestore();digest.mockRestore();range.mockRestore();complete.mockRestore();}
 });

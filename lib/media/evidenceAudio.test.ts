@@ -30,6 +30,7 @@ describe("audio originals",()=>{
    expect(response.status).toBe(415);expect(data.code).toMatch(/AUDIO/);expect(mediaUploadError(data)).toBe(data.message);
    expect(mocks.mutation).toHaveBeenCalledTimes(2);mocks.mutation.mockReset();
   }
+  mocks.action.mockResolvedValueOnce({validated:true});
   mocks.mutation.mockResolvedValueOnce({created:true,storageId:"synthetic-storage",maxVoiceNoteSeconds:600}).mockResolvedValueOnce({mediaId:"synthetic-media"});
   expect((await upload(request(bytes,type))).status).toBe(200);
  });
@@ -40,13 +41,16 @@ describe("audio originals",()=>{
   mocks.mutation.mockResolvedValueOnce({created:true}).mockResolvedValueOnce({});
   expect(await (await upload(request(bytes,type))).json()).toMatchObject({code});
  });
- it("new upload server accepts legacy backend receipts without changing arguments",async()=>{
+ it("upload server obtains stored-object validation before attaching audio",async()=>{
   const bytes=new Uint8Array(readFileSync("lib/media/fixtures/audio/tone.wav"));
+  mocks.action.mockResolvedValueOnce({validated:true});
   mocks.mutation.mockResolvedValueOnce({created:true,storageId:"synthetic"}).mockResolvedValueOnce({mediaId:"synthetic"});
   expect((await upload(request(bytes,"audio/wav"))).status).toBe(200);
-  expect(mocks.mutation.mock.calls[0][1]).not.toHaveProperty("mimeType");expect(mocks.mutation.mock.calls[0][1]).not.toHaveProperty("audioKind");
+  expect(mocks.action).toHaveBeenCalledWith(expect.anything(),expect.objectContaining({storageId:"synthetic",mimeType:"audio/wav"}));
+  expect(mocks.action.mock.invocationCallOrder[0]).toBeLessThan(mocks.mutation.mock.invocationCallOrder[1]);
  });
  it("preserves the existing video upload path",async()=>{
+  mocks.action.mockResolvedValueOnce({validated:true});
   mocks.mutation.mockResolvedValueOnce({created:true,storageId:"synthetic"}).mockResolvedValueOnce({mediaId:"synthetic"});
   expect((await upload(request(new Uint8Array([1,2,3]),"video/webm"))).status).toBe(200);
   expect(mocks.mutation.mock.calls[1][1]).toMatchObject({mimeType:"video/webm",type:"video"});

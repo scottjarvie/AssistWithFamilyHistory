@@ -6,7 +6,9 @@ import type {
   FunctionReference,
   FunctionReturnType,
 } from "convex/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
+import {requireWebsitePerson} from "./access";
+import {validateAudioContainer, normalizeAudioMime, audioContainerError, invalidAudioFileError, checkVoiceNoteDuration, voiceNoteTooLongError} from "./lib/media/audio";
 import {auditMetrics} from "../lib/audit/contract";
 import { internal } from "./_generated/api";
 import { action, type ActionCtx } from "./_generated/server";
@@ -278,4 +280,26 @@ export const getContextPack = action({
       ...args,
       vaultOwnerId: await authorizedOwner(ctx, "vault.getContextPack", args.vaultOwnerId),
     }),
+});
+
+/** Validate the immutable Convex object before its public attachment mutation. */
+export const validateMediaUpload = action({
+  args:{vaultOwnerId:v.string(),operationId:v.string(),storageId:v.id("_storage"),mimeType:v.string(),audioKind:v.optional(v.union(v.literal("audio"),v.literal("voicenote")))},
+  handler:async(ctx,args):Promise<{validated:true}>=>{
+    const person=await requireWebsitePerson(ctx);
+    if(person.subject!==args.vaultOwnerId) throw new Error("Owner mismatch");
+    await authorizedOwner(ctx,"vaultMutations.attachMediaFile",args.vaultOwnerId);
+    const target={vaultOwnerId:args.vaultOwnerId,operationId:args.operationId,storageId:args.storageId};
+    const metadata=await ctx.runQuery(internal.vaultMutations.audioUploadForValidation,target);
+    const blob=await ctx.storage.get(args.storageId);
+    if(!blob || blob.size!==metadata.sizeBytes) throw new ConvexError(invalidAudioFileError());
+    const result=await validateAudioContainer({size:blob.size,read:async(offset,length)=>new Uint8Array(await blob.slice(offset,offset+length).arrayBuffer())},args.mimeType);
+    if(!result.valid) throw new ConvexError(audioContainerError(result.reason));
+    const storedType=metadata.contentType && !metadata.contentType.startsWith("video/") ? normalizeAudioMime(metadata.contentType):null;
+    if(storedType && storedType!==result.type) throw new ConvexError(invalidAudioFileError());
+    const audioKind=args.audioKind ?? "audio";
+    if(audioKind==="voicenote" && result.durationSeconds!==null && checkVoiceNoteDuration(result.durationSeconds,metadata.maxVoiceNoteSeconds)) throw new ConvexError(voiceNoteTooLongError(result.durationSeconds,metadata.maxVoiceNoteSeconds));
+    await ctx.runMutation(internal.vaultMutations.recordAudioValidation,{...target,sizeBytes:blob.size,sha256:metadata.sha256,contentType:result.type,audioKind,durationSeconds:result.durationSeconds});
+    return {validated:true};
+  },
 });

@@ -120,6 +120,9 @@ export async function POST(request: NextRequest) {
       await client.mutation(api.vaultMutations.stageMediaUpload,{vaultOwnerId,operationId,attemptId,storageId:storageId as Id<"_storage">});
     }
 
+    if (!mimeType.startsWith("video/") && normalizeAudioMime(mimeType)) {
+      await client.action(api.vaultReads.validateMediaUpload,{vaultOwnerId,operationId,storageId:storageId as Id<"_storage">,mimeType,audioKind});
+    }
     const result = await client.mutation(api.vaultMutations.attachMediaFile, {
       vaultOwnerId,
       operationId,
@@ -137,6 +140,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if(cleanup) { try { if(cleanup)await cleanup(); } catch { /* Retain the reservation for confirmed cleanup on expiry. */ } }
     const fileRefusal=(error as {data?:{code?:string;message?:string}})?.data;
+    if(fileRefusal?.code && ["INVALID_AUDIO_CONTAINER","UNSUPPORTED_AUDIO_TYPE","AUDIO_HAS_VIDEO","AUDIO_TOO_LONG"].includes(fileRefusal.code)) return NextResponse.json({error:fileRefusal.message,...fileRefusal},{status:400});
     if(fileRefusal?.code==="FILE_TOO_LARGE") return NextResponse.json({error:fileRefusal.message,...fileRefusal},{status:413});
     const refusal=usageRefusalOf(error);
     if(refusal) return NextResponse.json({error:refusal.message,...refusal},{status:413});
