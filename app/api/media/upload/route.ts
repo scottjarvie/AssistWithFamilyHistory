@@ -1,3 +1,6 @@
+import { checkFileSize } from "@/convex/lib/usageLimits/core";
+import {audioDurationDefaults} from "@/lib/media/siteDefaults";
+import { normalizeAudioMime, validateAudioContainer, audioContainerError, checkVoiceNoteDuration, voiceNoteTooLongError } from "@/convex/lib/media/audio";
 import { usageRefusalOf } from "@/convex/usageLimits";
 /**
  * Put a real file into the vault.
@@ -65,7 +68,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const mimeType = (file.type || "application/octet-stream").toLowerCase();
+    const mimeType = (!file.type.startsWith("video/") && normalizeAudioMime(file.type)) || (file.type || "application/octet-stream").toLowerCase();
     if (!isAcceptedMediaUploadType(mimeType)) {
       return NextResponse.json(
         { error: "That file type cannot be stored here. Upload an image, PDF, plain text, or an audio or video recording." },
@@ -75,6 +78,7 @@ export async function POST(request: NextRequest) {
     if (file.size <= 0) {
       return NextResponse.json({ error: "That file is empty." }, { status: 400 });
     }
+    const audioKind = form.get("audioKind") === "voicenote" ? "voicenote" as const : "audio" as const;
     const client = await getAuthedConvexClient();
 
     // Bytes go straight from this server to Convex storage. They never pass
@@ -84,6 +88,25 @@ export async function POST(request: NextRequest) {
     if(started.created)cleanup=()=>client.mutation(api.vaultMutations.cancelMediaUpload,{vaultOwnerId,operationId,attemptId});
     if(started.busy)return NextResponse.json({error:"This upload is in progress. Retry with the same operation ID."},{status:409});
     if(started.mediaId) return NextResponse.json({success:true,mediaId:started.mediaId,created:false,storage:started.storage});
+    if (!mimeType.startsWith("video/") && normalizeAudioMime(mimeType)) {
+      const sizeRefusal=started.audioCaps ? checkFileSize(audioKind,file.size,started.audioCaps[audioKind]) : null;
+      if(sizeRefusal) {
+        if(cleanup) await cleanup();
+        return NextResponse.json({...sizeRefusal,error:sizeRefusal.message},{status:413});
+      }
+      const durationCap=started.maxVoiceNoteSeconds ?? audioDurationDefaults.voicenote;
+      const result = await validateAudioContainer({size:file.size, read:async(offset,length)=>new Uint8Array(await file.slice(offset,offset+length).arrayBuffer())}, mimeType);
+      if(result.valid && audioKind === "voicenote" && result.durationSeconds !== null && checkVoiceNoteDuration(result.durationSeconds,durationCap)) {
+        if(cleanup) await cleanup();
+        const refusal=voiceNoteTooLongError(result.durationSeconds,durationCap);
+        return NextResponse.json({...refusal,error:refusal.message},{status:400});
+      }
+      if (!result.valid) {
+        if(cleanup) await cleanup();
+        const refusal=audioContainerError(result.reason);
+        return NextResponse.json({...refusal,error:refusal.message},{status:415});
+      }
+    }
     let storageId:string|undefined=started.storageId;
     if(!storageId) {
       const stored = await fetch(started.uploadUrl, {

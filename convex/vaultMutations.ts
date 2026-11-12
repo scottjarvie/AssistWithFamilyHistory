@@ -1,5 +1,6 @@
+import { normalizeAudioMime } from "./lib/media/audio";
 import { requireWebsitePerson } from "./access";
-import { reserveOperation, commitOperation, removeStoredBytes, summaryFor, assertFileSize, limitsFor, releaseExpiredWeb } from "./usageLimits";
+import { fileCapsFor, audioPolicyFor, reserveOperation, commitOperation, removeStoredBytes, summaryFor, assertFileSize, limitsFor, releaseExpiredWeb } from "./usageLimits";
 import { v } from "convex/values";
 import { mutation, type MutationCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
@@ -1150,7 +1151,7 @@ export const upsertSourceFact = mutation({
  * protected evidence delivery needs.
  */
 export const startMediaUpload = mutation({
-  args: { vaultOwnerId: v.string(), sizeBytes:v.optional(v.number()), operationId:v.optional(v.string()), attemptId:v.optional(v.string()) },
+  args: { vaultOwnerId: v.string(), mimeType:v.optional(v.string()), audioKind:v.optional(v.union(v.literal("audio"),v.literal("voicenote"))), sizeBytes:v.optional(v.number()), operationId:v.optional(v.string()), attemptId:v.optional(v.string()) },
   handler: async (ctx, args) => {
     await requireWebsitePerson(ctx);
     const identity=await ctx.auth.getUserIdentity();
@@ -1160,11 +1161,12 @@ export const startMediaUpload = mutation({
     const prior=args.operationId?await ctx.db.query("uploadReservations").withIndex("by_owner_operation",q=>q.eq("ownerId",args.vaultOwnerId).eq("operationId",args.operationId!)).unique():null;
     if(prior?.status==="reserved" && prior.expiresAt<=Date.now())await releaseExpiredWeb(ctx,prior);
 
+    if(args.sizeBytes !== undefined && args.mimeType && !args.mimeType.startsWith("video/") && normalizeAudioMime(args.mimeType)) await assertFileSize(ctx,args.vaultOwnerId,args.audioKind ?? "audio",args.sizeBytes);
     const r=args.sizeBytes !== undefined && args.operationId ? await reserveOperation(ctx,args.vaultOwnerId,args.operationId,args.sizeBytes,"web","web") : null;
     const created=!!r&&(!prior||prior.status==="released"||prior.expiresAt<=Date.now());
     if(r && created)await ctx.db.patch(r._id,{attemptId:args.attemptId});
     const busy=!!r&&!created&&!r.mediaId&&!r.storageId;
-    return { created, busy, uploadUrl: busy ? "" : r?.mediaId || r?.storageId ? "" : await ctx.storage.generateUploadUrl(), mediaId:r?.mediaId, storageId:r?.storageId, storage:await summaryFor(ctx,args.vaultOwnerId) };
+    return { audioCaps:await fileCapsFor(ctx,args.vaultOwnerId), ...await audioPolicyFor(ctx,args.vaultOwnerId), created, busy, uploadUrl: busy ? "" : r?.mediaId || r?.storageId ? "" : await ctx.storage.generateUploadUrl(), mediaId:r?.mediaId, storageId:r?.storageId, storage:await summaryFor(ctx,args.vaultOwnerId) };
   },
 });
 
@@ -1226,6 +1228,7 @@ export const attachMediaFile = mutation({
     const metadata=await ctx.db.system.get(args.storageId);
     if(!metadata) throw new Error("Stored file not found");
     await assertFileSize(ctx,vaultOwnerId,"web",metadata.size);
+    if(!args.mimeType.startsWith("video/") && normalizeAudioMime(args.mimeType)) await assertFileSize(ctx,vaultOwnerId,"audio",metadata.size);
     const reservation=args.operationId ? await ctx.db.query("uploadReservations").withIndex("by_owner_operation",q=>q.eq("ownerId",vaultOwnerId).eq("operationId",args.operationId!)).unique() : null;
     const competing=await ctx.db.query("uploadReservations").withIndex("by_storage",q=>q.eq("storageId",args.storageId)).filter(q=>q.and(q.eq(q.field("status"),"reserved"),q.neq(q.field("_id"),reservation?._id))).first();
     if(competing)throw new Error("This file belongs to another pending upload");
@@ -1239,6 +1242,7 @@ export const attachMediaFile = mutation({
     const now = Date.now();
     const shared = {
       storageId: args.storageId,
+      transcript: undefined,
       title: args.title,
       type: args.type,
       mimeType: args.mimeType,

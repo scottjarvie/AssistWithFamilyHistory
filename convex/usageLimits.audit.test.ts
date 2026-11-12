@@ -146,3 +146,31 @@ test("L11/L12/36/55/69: upload descriptions keep their introductions, append the
  for(const kind of ["image","original"])expect(begin.description).toContain("read uploadFileCaps."+kind+" from family_history_get_brief for the current limit");
  expect(EVIDENCE_RELAY_BODY_BYTES).toBe(20*1024*1024);expect(isMultipartEvidenceUpload(EVIDENCE_RELAY_BODY_BYTES+1)).toBe(true);
 });
+
+test("audio policy is additive and rejects AI callers at the person upload door",async()=>{
+ const t=setup();await settings(t,{maxFileBytes:{web:10,audio:3,voicenote:2},maxVoiceNoteSeconds:4});
+ await expect(person(t).mutation(api.vaultMutations.startMediaUpload,{vaultOwnerId:owner,operationId:"audio-limit",sizeBytes:4,mimeType:"audio/webm"})).rejects.toMatchObject({data:{code:"FILE_TOO_LARGE",max:3}});
+ expect(await t.run(ctx=>ctx.db.query("uploadReservations").collect())).toHaveLength(0);
+ const result=await person(t).mutation(api.vaultMutations.startMediaUpload,{vaultOwnerId:owner,operationId:"audio-accepted",sizeBytes:3,mimeType:"audio/webm"});
+ expect(result).toMatchObject({audioCaps:{audio:3,voicenote:2},maxVoiceNoteSeconds:4});
+ await expect(person(t,owner,{client_id:"synthetic-audio-client",scope:"family_history:write"}).mutation(api.vaultMutations.startMediaUpload,{vaultOwnerId:owner,operationId:"ai-audio",sizeBytes:1,mimeType:"audio/webm"})).rejects.toThrow(/website person session required/);
+});
+
+test("a measured audio refusal uses the existing cleanup and releases its single hold",async()=>{
+ storageEnvironment();const t=setup();await settings(t,{planStoredBytes:{free:1_000_000},maxVoiceNoteSeconds:0.01});
+ const {readFileSync}=await import("node:fs");const {sha256Hex}=await import("../lib/media/evidenceB2");
+ const bytes=new Uint8Array(readFileSync("lib/media/fixtures/audio/tone.wav"));
+ const {args}=await aiSession(t,"synthetic-audio-duration",bytes.length,sha256Hex(bytes));
+ await t.run(async ctx=>{const row=await ctx.db.query("mediaUploadSessions").first();await ctx.db.patch(row!._id,{declaredContentType:"audio/wav",audioKind:"voicenote"});});
+ const head=vi.spyOn(EvidenceB2Store.prototype,"head").mockResolvedValue({versionId:"synthetic-version",sizeBytes:bytes.length,contentType:"audio/wav"});
+ const digest=vi.spyOn(EvidenceB2Store.prototype,"digest").mockResolvedValue({sha256:sha256Hex(bytes),sizeBytes:bytes.length,head:bytes});
+ const range=vi.spyOn(EvidenceB2Store.prototype,"readRange").mockImplementation(async(_key,_version,offset,length)=>bytes.subarray(offset,offset+length));
+ const deletion=vi.spyOn(EvidenceB2Store.prototype,"deleteAllVersions").mockResolvedValue();
+ try {
+  const result=await t.action(internal.mediaEvidenceStorage.finishMcpEvidenceUpload,{principal:args.principal,grantId:args.grantId,operationId:args.operationId,requestHash:"synthetic-finish",input:{uploadRef:args.uploadRef}});
+  expect(result).toMatchObject({uploadRefusal:{code:"AUDIO_TOO_LONG"}});
+  expect(await t.run(ctx=>ctx.db.query("media").collect())).toHaveLength(0);
+  await t.action(internal.mediaEvidenceStorage.cleanupMcpEvidenceUpload,{uploadRef:args.uploadRef});
+  expect(await numbers(t)).toMatchObject({reservedBytes:0,storedBytes:0,inFlight:0,dayUploads:1});
+ }finally{head.mockRestore();digest.mockRestore();range.mockRestore();deletion.mockRestore();}
+});

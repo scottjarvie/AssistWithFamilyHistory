@@ -235,6 +235,15 @@ export class EvidenceB2Store {
     };
   }
 
+  async readRange(objectKey: string, versionId: string, offset: number, length: number): Promise<Uint8Array> {
+    const result = await this.client.send(new GetObjectCommand({
+      Bucket: this.config.bucket, Key: objectKey, VersionId: versionId,
+      Range: `bytes=${offset}-${offset + length - 1}`,
+    }));
+    if (!result.Body) throw new Error("Missing evidence bytes.");
+    return result.Body.transformToByteArray();
+  }
+
   async read(objectKey: string, versionId: string): Promise<Uint8Array> {
     const result = await this.client.send(new GetObjectCommand({
       Bucket: this.config.bucket,

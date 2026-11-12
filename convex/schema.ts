@@ -893,6 +893,7 @@ export default defineSchema({
       v.literal("other")
     ),
     
+    transcript: v.optional(v.string()),
     // Basic info
     title: v.string(),
     description: v.optional(v.string()),
@@ -1065,6 +1066,7 @@ export default defineSchema({
     fileName: v.string(),
     personIds: v.array(v.id("persons")),
     sourceId: v.optional(v.id("sources")),
+    audioKind: v.optional(v.union(v.literal("audio"),v.literal("voicenote"))),
     declaredContentType: v.string(),
     declaredSizeBytes: v.number(),
     expectedSha256: v.string(),

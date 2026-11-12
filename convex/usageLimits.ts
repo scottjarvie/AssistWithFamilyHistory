@@ -1,3 +1,4 @@
+import {audioDurationDefaults} from "../lib/media/siteDefaults";
 import { internal } from "./_generated/api";
 import { authorizeTenantAction, authorizeTenantMutation, requireWebsitePerson, requireTrustBoundarySuperAdmin } from "./access";
 import { ConvexError, v } from "convex/values";
@@ -332,9 +333,10 @@ export const adminOverviewInternal = internalQuery({
   },
 });
 
-type LimitPatch = Partial<Record<LimitName, number | null>>;
+type LimitPatch = Partial<Record<LimitName | "maxVoiceNoteSeconds", number | null>>;
 
-function cleanPatch(patch: LimitPatch): LimitPatch {
+function cleanPatch(patch: LimitPatch & {maxVoiceNoteSeconds?:number|null}): LimitPatch {
+  if(patch.maxVoiceNoteSeconds != null && (!Number.isFinite(patch.maxVoiceNoteSeconds) || patch.maxVoiceNoteSeconds<=0)) throw new ConvexError("Invalid duration setting");
   const values = Object.fromEntries(Object.entries(patch).filter(([key, value]) => LIMIT_NAMES.includes(key as LimitName) && value !== null)) as Partial<UsageLimits>;
   const problems = validateLimits(values);
   if (problems.length) throw new ConvexError(problems.join("; "));
@@ -364,9 +366,9 @@ export const adminSetSiteLimits = mutation({
     const existing = await siteSettings(ctx);
     const before = effectiveLimits(sitePolicy(existing));
     const changes: Array<{ field: string; before?: number | string; after?: number | string }> = [];
-    for (const name of [...LIMIT_NAMES, "planStoredBytes", "maxFileBytes"] as const) {
+    for (const name of [...LIMIT_NAMES, "planStoredBytes", "maxFileBytes", "maxVoiceNoteSeconds"] as const) {
       const after = merged[name];
-      if (after !== undefined && JSON.stringify(after) !== JSON.stringify(name === "planStoredBytes" || name === "maxFileBytes" ? existing?.[name] : before.limits[name])) changes.push({ field: name, before: JSON.stringify(existing?.[name]), after: typeof after === "number" ? after : JSON.stringify(after) });
+      if (after !== undefined && JSON.stringify(after) !== JSON.stringify(name === "planStoredBytes" || name === "maxFileBytes" || name === "maxVoiceNoteSeconds" ? existing?.[name] : before.limits[name])) changes.push({ field: name, before: JSON.stringify(existing?.[name]), after: typeof after === "number" ? after : JSON.stringify(after) });
     }
     if (args.enforcement && args.enforcement !== before.enforcement) changes.push({ field: "enforcement", before: before.enforcement, after: args.enforcement });
     if (args.downloadEnforcement && args.downloadEnforcement !== (existing?.downloadEnforcement ?? "warn")) {
@@ -407,7 +409,7 @@ export const adminSetPersonLimits = mutation({
       next[name]=value;
       changes.push({field:name,before:JSON.stringify(existing?.[name]),after:JSON.stringify(value)});
     }
-    for (const name of LIMIT_NAMES) {
+    for (const name of [...LIMIT_NAMES,"maxVoiceNoteSeconds"] as const) {
       if (!(name in patch)) continue;
       const after = patch[name] ?? undefined;
       if (after !== existing?.[name]) changes.push({ field: name, before: existing?.[name], after });
@@ -565,3 +567,6 @@ export const sweepUnclaimedStorage=internalMutation({args:{cursor:v.union(v.stri
  }
  return {candidates,cursor:page.continueCursor,isDone:page.isDone};
 }});
+
+export async function audioPolicyFor(ctx:Ctx,ownerId:string) {return {maxVoiceNoteSeconds:(await overrideFor(ctx,ownerId))?.maxVoiceNoteSeconds ?? (await siteSettings(ctx))?.maxVoiceNoteSeconds ?? audioDurationDefaults.voicenote};}
+export const audioPolicy = internalQuery({args:{ownerId:v.string()},handler:(ctx,{ownerId})=>audioPolicyFor(ctx,ownerId)});
