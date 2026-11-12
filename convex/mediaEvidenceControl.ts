@@ -1,5 +1,5 @@
 import { normalizeAudioMime } from "./lib/media/audio";
-import { uploadRefusalOf } from "../lib/media/uploadRefusal";
+import { uploadAttemptRefusal, uploadRefusalOf } from "../lib/media/uploadRefusal";
 import { assertFileSize, reserveOperation, commitOperation, releaseOperation, addCopies, removeStoredBytes, summaryFor } from "./usageLimits";
 import { isRenderedEvidenceImage } from "../lib/media/evidenceStandard";
 /* eslint-disable @typescript-eslint/no-explicit-any -- Exact manifests are runtime-validated at this internal boundary. */
@@ -156,7 +156,11 @@ export const planMcpEvidenceUpload = internalMutation({
       if (prior.state !== "authorized" || prior.expiresAt <= Date.now()) {
         machineError("UPLOAD_EXPIRED", "That evidence upload is no longer active.", "Begin again with a new operation ID.");
       }
-      if ((prior.putState === "in_progress" || prior.putState === "delegated") || (prior.activeParts?.length ?? 0) > 0) {
+      if (!prior.multipartUploadId && (prior.putUncertain || prior.putState === "in_progress" || prior.putState === "delegated")) {
+        return { replayed: true as const, state: "recovery" as const, uploadRef: prior.ref,
+          objectKey: prior.objectKey, sizeBytes: prior.declaredSizeBytes, contentType: prior.declaredContentType };
+      }
+      if ((prior.activeParts?.length ?? 0) > 0) {
         machineError("UPLOAD_IN_PROGRESS", "An upload attempt is still running.", "Wait for that attempt before retrying begin.");
       }
       await ctx.db.patch(prior._id, {
@@ -309,6 +313,31 @@ export const relayAuthorization = internalMutation({
       multipartUploadId: session.multipartUploadId,
       partSizeBytes: session.partSizeBytes,
     };
+  },
+});
+
+/** Read recovery advice only through the original connection or valid capability. */
+export const recoveryRefusal = internalQuery({
+  args: { principal: v.optional(principalValidator), grantId: v.optional(v.string()), uploadRef: v.string(), relayTokenHash: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const { session: resolved } = await requireEvidenceConnection(ctx, args);
+    const session = resolved!;
+    if (session.multipartUploadId || session.state !== "authorized" || session.putState === "succeeded" || (!session.putUncertain && session.putState !== "in_progress" && session.putState !== "delegated")) return null;
+    // A fill capability carries session timing, not account-wide usage visibility.
+    return uploadAttemptRefusal(session.expiresAt, args.principal ? (await summaryFor(ctx, session.vaultOwnerId)).remainingBytes : undefined);
+  },
+});
+
+/** Adopt a visible original without reopening its consumed transfer credential. */
+export const adoptEvidencePut = internalMutation({
+  args: { principal: principalValidator, grantId: v.optional(v.string()), uploadRef: v.string(), operationId: v.string(), requestHash: v.string() },
+  handler: async (ctx, args) => {
+    const { session: resolved } = await requireEvidenceConnection(ctx, args);
+    const session = resolved!;
+    if (session.multipartUploadId || session.state !== "authorized" || session.expiresAt <= Date.now()
+      || session.operationId !== args.operationId || session.requestHash !== args.requestHash) return false;
+    await ctx.db.patch(session._id, { putState: "succeeded", putUncertain: false });
+    return true;
   },
 });
 

@@ -69,7 +69,7 @@ test("concurrent single PUTs and replay produce one original version and one cou
   provider.gate = async () => { entered(); await waiting; };
   const first = f.put(r); await started;
   const before = await f.rows();
-  expect((await f.put(r)).status).toBe(404); expect(await f.rows()).toEqual(before);
+  expect((await f.put(r)).status).toBe(409); expect(await f.rows()).toEqual(before);
   release(); expect((await first).status).toBe(204); expect(provider.writes).toBe(1);
   expect((await f.put(r)).status).toBe(404);
   expect(await f.finish(r)).toMatchObject({ status: "pending_person_review" });
@@ -77,13 +77,21 @@ test("concurrent single PUTs and replay produce one original version and one cou
   expect(await f.finish(r)).toMatchObject({ replayed: true });
   expect((await f.rows()).counters[0]).toMatchObject({ reservedBytes: 0, storedBytes: f.bytes.length, dayUploads: 1 });
 });
-for (const mode of ["reject", "after_error", "before_error"]) test(`fresh capability after ${mode} never rewrites an uncertain original`, async () => {
+for (const mode of ["reject", "after_error", "before_error"]) test(`recovery after ${mode} never rewrites an uncertain original`, async () => {
   const f = await fixture(), r = await f.begin(); provider.mode = mode;
-  expect((await f.put(r)).status).toBe(404);
-  const retried = await f.begin(); expect(retried.upload.url).not.toBe(r.upload.url);
-  provider.mode = "ok"; const before = await f.rows(); expect((await f.put(r)).status).toBe(404); expect(await f.rows()).toEqual(before);
-  if (mode === "before_error") { expect((await f.put(retried)).status).toBe(404); expect(provider.writes).toBe(0); }
-  else { expect((await f.put(retried)).status).toBe(204); await f.finish(retried); expect(provider.writes).toBe(1); }
+  expect((await f.put(r)).status).toBe(mode === "reject" ? 404 : 409);
+  provider.mode = "ok";
+  const retried = await f.begin();
+  if (mode === "before_error") {
+    expect(retried).toMatchObject({ uploadRefusal: { code: "UPLOAD_ATTEMPT_CLOSED", resetsAt: new Date(r.upload.expiresAt).toISOString(), recovery: expect.stringContaining("new upload now") } });
+    expect(provider.writes).toBe(0);
+  } else {
+    expect(retried.upload.url).not.toBe(r.upload.url);
+    const before = await f.rows(); expect((await f.put(r)).status).toBe(404); expect(await f.rows()).toEqual(before);
+    if (mode === "after_error") expect(retried.upload.alreadyUploaded).toBe(true);
+    else expect((await f.put(retried)).status).toBe(204);
+    await f.finish(retried); expect(provider.writes).toBe(1);
+  }
 });
 test("wrong digest consumes one attempt, exact begin retries; changed request is refused unchanged", async () => {
   const f = await fixture(), r = await f.begin(); expect((await f.put(r, new Uint8Array(f.bytes.length))).status).toBe(404); expect(provider.writes).toBe(0);
@@ -157,7 +165,7 @@ test("a part in flight blocks finish and same-part overlap; invalid part bounds 
 test("the real HTTP handler claims before opening the body; refused bearer never opens it", async () => {
   const { evidenceUploadRelay } = await import("../../convex/httpRoutes/evidenceUpload");
   const f = await fixture(), r = await f.begin();
-  const ctx = { runAction: (ref: any, args: any) => f.t.action(ref, args), runMutation: (ref: any, args: any) => f.t.mutation(ref, args) };
+  const ctx = { runQuery: (ref: any, args: any) => f.t.query(ref, args), runAction: (ref: any, args: any) => f.t.action(ref, args), runMutation: (ref: any, args: any) => f.t.mutation(ref, args) };
   const req = new Request(r.upload.url, { method: "PUT", headers: { "Content-Type": "text/plain", "Content-Length": String(f.bytes.length) }, body: f.bytes });
   const body = req.body; let atRead: ReturnType<typeof f.rows> | undefined;
   Object.defineProperty(req, "body", { get() { atRead = f.rows(); return body; }, configurable: true });
@@ -195,7 +203,7 @@ for (const enforcement of ["off", "warn", "on"] as const) test(`${enforcement}: 
 });
 test("connection-facing handlers use only the common session authorizer", () => {
   const source = readFileSync("convex/mediaEvidenceControl.ts", "utf8");
-  for (const name of ["planMcpEvidenceUpload", "attachMultipartUpload", "recordMcpEvidencePart", "relayAuthorization", "delegateEvidencePut", "settleEvidencePut", "sessionForFinish", "claimSessionForFinish", "commitMcpEvidenceUpload"]) {
+  for (const name of ["planMcpEvidenceUpload", "attachMultipartUpload", "recordMcpEvidencePart", "relayAuthorization", "delegateEvidencePut", "settleEvidencePut", "adoptEvidencePut", "recoveryRefusal", "sessionForFinish", "claimSessionForFinish", "commitMcpEvidenceUpload"]) {
     const body = source.split(`export const ${name} =`)[1].split("\n});")[0]; expect(body).toContain("requireEvidenceConnection(ctx, args)"); expect(body).not.toMatch(/\.query\("mediaUploadSessions"\)/);
   }
 });
@@ -212,11 +220,53 @@ test("a near-ceiling stream stays bounded and never calls arrayBuffer", async ()
   let offset = 0;
   const req = new Request(r.upload.url, { method: "PUT", headers: { "Content-Type": "text/plain", "Content-Length": String(f.bytes.length) }, body: new ReadableStream({ pull(controller) { if (offset === f.bytes.length) return controller.close(); const end = Math.min(offset + 65536, f.bytes.length); controller.enqueue(f.bytes.subarray(offset, end)); offset = end; } }), duplex: "half" } as RequestInit);
   req.arrayBuffer = async () => { throw new Error("Unbounded body copy"); };
-  expect((await (evidenceUploadRelay as any)._handler({ runAction: (ref: any, args: any) => f.t.action(ref, args), runMutation: (ref: any, args: any) => f.t.mutation(ref, args) }, req)).status).toBe(204);
+  expect((await (evidenceUploadRelay as any)._handler({ runQuery: (ref: any, args: any) => f.t.query(ref, args), runAction: (ref: any, args: any) => f.t.action(ref, args), runMutation: (ref: any, args: any) => f.t.mutation(ref, args) }, req)).status).toBe(204);
   expect(provider.writes).toBe(1); await f.finish(r);
 });
 test("finish action leaves rows untouched when the committing grant is revoked during byte validation", async () => {
   const f = await fixture(), r = await f.begin(); await f.put(r); let atRevoke: Awaited<ReturnType<typeof f.rows>> | undefined;
   provider.onDigest = async () => { await f.t.run(ctx => ctx.db.patch(ctx.db.normalizeId("mcpGrants", f.args.grantId)!, { status: "revoked" })); atRevoke = await f.rows(); };
   await expect(f.finish(r)).rejects.toThrow("GRANT_REVOKED"); expect(await f.rows()).toEqual(atRevoke); expect((await f.rows()).media).toHaveLength(0);
+});
+for (const interrupted of [false, true]) test(`${interrupted ? "interrupted" : "uncertain"} attempt reports expiry and room without changing the hold`, async () => {
+  const f = await fixture();
+  await f.t.run(ctx => ctx.db.insert("usageLimitSettings", { key: "site", enforcement: "on", backfillCompletedAt: 1, planStoredBytes: { free: f.bytes.length }, updatedAt: 1, updatedBy: "synthetic" }));
+  const r = await f.begin();
+  if (interrupted) await f.t.mutation(api.mediaEvidenceControl.relayAuthorization, { uploadRef: r.uploadRef, relayTokenHash: hash(new TextEncoder().encode(new URL(r.upload.url).pathname.split("/").at(-1)!)) });
+  else { provider.mode = "before_error"; const response = await f.put(r); expect(response.status).toBe(409); const body = await response.json(); expect(body.structuredContent).not.toHaveProperty("remaining"); expect(body).toMatchObject({ isError: true, structuredContent: { code: "UPLOAD_ATTEMPT_CLOSED", resetsAt: new Date(r.upload.expiresAt).toISOString(), error: { recovery: expect.stringContaining("same operation ID") } } }); }
+  const before = await f.rows(), refusal = (await f.begin()).uploadRefusal;
+  expect(refusal).toMatchObject({ code: "UPLOAD_ATTEMPT_CLOSED", remaining: 0, resetsAt: new Date(r.upload.expiresAt).toISOString() });
+  expect(refusal.message).toContain("cannot be resumed"); expect(refusal.message).toContain("new upload now"); expect(refusal.message).toContain("keeps its reserved room"); expect(refusal.recovery).toContain("refused for room"); expect(refusal.recovery).toContain("ordinary cleanup");
+  expect(await f.rows()).toEqual(before);
+});
+for (const interrupted of [false, true]) test(`${interrupted ? "interrupted" : "uncertain"}: immediate replacement with room counts late old bytes only until ordinary cleanup`, async () => {
+  const f = await fixture(); await f.t.run(ctx => ctx.db.insert("usageLimitSettings", { key: "site", enforcement: "on", backfillCompletedAt: 1, planStoredBytes: { free: f.bytes.length * 2 }, updatedAt: 1, updatedBy: "synthetic" }));
+  const old = await f.begin();
+  if (interrupted) await f.t.mutation(api.mediaEvidenceControl.relayAuthorization, { uploadRef: old.uploadRef, relayTokenHash: hash(new TextEncoder().encode(new URL(old.upload.url).pathname.split("/").at(-1)!)) });
+  else { provider.mode = "before_error"; await f.put(old); provider.mode = "ok"; }
+  const replacement = await f.begin({ operationId: "synthetic-replacement", requestHash: "replacement" }); expect((await f.put(replacement)).status).toBe(204); await f.finish(replacement, { operationId: "synthetic-replacement" });
+  const oldSession = (await f.rows()).sessions.find(s => s.ref === old.uploadRef)!;
+  provider.objects.set(oldSession.objectKey, { bytes: f.bytes, mime: "text/plain" });
+  expect((await f.rows()).counters[0]).toMatchObject({ storedBytes: f.bytes.length, reservedBytes: f.bytes.length }); expect(provider.objects.size).toBe(2);
+  expect((await f.begin()).upload.alreadyUploaded).toBe(true); // Late original is adoptable without another write.
+  vi.setSystemTime(old.upload.expiresAt + 1); await f.t.action(api.mediaEvidenceStorage.cleanupMcpEvidenceUpload, { uploadRef: old.uploadRef });
+  const rows = await f.rows(); expect(rows.counters[0]).toMatchObject({ storedBytes: f.bytes.length, reservedBytes: 0, inFlight: 0 }); expect(rows.media).toHaveLength(1); expect(provider.objects.size).toBe(1); expect(provider.writes).toBe(1);
+});
+for (const interrupted of [false, true]) test(`${interrupted ? "interrupted" : "uncertain"}: tight-quota recovery matches the main capture and succeeds after ordinary expiry`, async () => {
+  const f = await fixture(); await f.t.run(ctx => ctx.db.insert("usageLimitSettings", { key: "site", enforcement: "on", backfillCompletedAt: 1, planStoredBytes: { free: f.bytes.length }, updatedAt: 1, updatedBy: "synthetic" }));
+  const r = await f.begin();
+  if (interrupted) await f.t.mutation(api.mediaEvidenceControl.relayAuthorization, { uploadRef: r.uploadRef, relayTokenHash: hash(new TextEncoder().encode(new URL(r.upload.url).pathname.split("/").at(-1)!)) });
+  else { provider.mode = "before_error"; await f.put(r); provider.mode = "ok"; }
+  const oldReservedBytes = (await f.rows()).counters[0].reservedBytes, args = { operationId: "synthetic-replacement", requestHash: "replacement" };
+  const refused = await f.begin(args); expect(refused.uploadRefusal.code).toBe("USAGE_LIMIT_REACHED"); expect((await f.rows()).holds).toHaveLength(1);
+  await f.t.action(api.mediaEvidenceStorage.cleanupMcpEvidenceUpload, { uploadRef: r.uploadRef }); expect((await f.rows()).counters[0].reservedBytes).toBe(f.bytes.length);
+  vi.setSystemTime(r.upload.expiresAt + 1); await f.t.action(api.mediaEvidenceStorage.cleanupMcpEvidenceUpload, { uploadRef: r.uploadRef });
+  const replacement = await f.begin(args); expect((await f.put(replacement)).status).toBe(204); await f.finish(replacement, { operationId: args.operationId }); const counter = (await f.rows()).counters[0];
+  expect({ declaredBytes: f.bytes.length, oldReservedBytes, newOperationRefusal: refused.uploadRefusal.code, reservedAfterOrdinaryExpiry: counter.reservedBytes, storedAfterRecovery: counter.storedBytes }).toEqual(JSON.parse(readFileSync("features/aiUpload/recoveryHoldBaseline.json", "utf8")));
+});
+test("interrupted transfer with a visible original adopts it without reopening the credential", async () => {
+  const f = await fixture(), r = await f.begin(), token = new URL(r.upload.url).pathname.split("/").at(-1)!;
+  await f.t.mutation(api.mediaEvidenceControl.relayAuthorization, { uploadRef: r.uploadRef, relayTokenHash: hash(new TextEncoder().encode(token)) });
+  const row = (await f.rows()).sessions[0]; provider.objects.set(row.objectKey, { bytes: f.bytes, mime: "text/plain" });
+  expect((await f.begin()).upload.alreadyUploaded).toBe(true); expect((await f.put(r)).status).toBe(404); await f.finish(r); expect(provider.writes).toBe(0); expect((await f.rows()).counters[0]).toMatchObject({ storedBytes: f.bytes.length, reservedBytes: 0 });
 });

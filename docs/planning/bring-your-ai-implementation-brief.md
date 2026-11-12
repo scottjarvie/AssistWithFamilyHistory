@@ -532,10 +532,19 @@ implements all of them; none has been executed, and no credentials were sought.
 Single-file PUT URLs permit one attempt. Repeat begin with the exact operation
 and content from the original connection after a failed attempt to get a fresh
 URL. An active transfer cannot be replaced. When begin returns
-`upload.alreadyUploaded`, skip PUT and finish. A lost storage response is
-resolved by inspecting the stored object, without another write; if no object
-is visible, keep the original and wait for ordinary expiry before starting a
-new operation. A process interrupted during transfer also waits for expiry.
+`upload.alreadyUploaded`, skip PUT and finish. For an uncertain or interrupted transfer, the byte transfer cannot be resumed.
+First repeat begin with the same operation ID and content: if the original is
+visibly stored, begin adopts it and returns `upload.alreadyUploaded`, so skip
+PUT and finish. This never writes another version to the old key.
+
+Otherwise start a new upload now with a new operation ID. The earlier attempt
+keeps its reserved room until its existing expiry and ordinary cleanup release
+it. The structured begin `UPLOAD_ATTEMPT_CLOSED` refusal gives that time in
+`resetsAt`, the room currently left in `remaining` when counting is ready,
+and the next action in `recovery`. If there is not enough room for both, the
+new operation is refused for room. Retry that new operation after ordinary
+expiry cleanup returns the earlier hold; other usage and limits still apply.
+Keep the original locally until an upload finishes.
 
 Multipart parts retain their resend behavior while the session is open. Parts
 can arrive in any order; overlapping requests for the same part are refused.

@@ -799,3 +799,22 @@ test("storage refusal is structured and the same AI token still reads the brief"
  expect(tooLarge.result.content[0].text).toMatch(/^This file/);
 
 });
+
+test("uncertain upload recovery reaches the AI as structured expiry and room advice", async () => {
+ const t=convexTest(schema,modules);await approvedConnection(t);
+ vi.stubEnv("MEDIA_STORAGE_ENVIRONMENT","development");vi.stubEnv("CONVEX_SITE_URL","https://relay.example.test");
+ for(const kind of ["PRIVATE","PUBLIC"])for(const [key,value] of Object.entries({ENDPOINT:"https://storage.example.test",REGION:"synthetic",BUCKET:`synthetic-${kind.toLowerCase()}`,KEY_ID:"synthetic-test-key",APPLICATION_KEY:"synthetic-test-value"}))vi.stubEnv(`B2_${kind}_${key}`,value);
+ const personId=await t.run(async ctx=>{
+  await ctx.db.insert("usageLimitSettings",{key:"site",planStoredBytes:{free:1},enforcement:"on",backfillCompletedAt:1,updatedAt:0,updatedBy:"synthetic-admin"});
+  return ctx.db.insert("persons",{vaultOwnerId:SUBJECT,name:{given:"Synthetic",surname:"Fixture"},sex:"unknown",living:false,researchStatus:"basic",createdAt:0,updatedAt:0});
+ });
+ const token=await accessToken(),name="family_history_begin_evidence_upload",args={operationId:"synthetic-recovery",personId:String(personId),title:"Synthetic evidence",fileName:"fixture",contentType:"text/plain",sizeBytes:1,sha256:"a".repeat(64)};
+ const call=()=>t.fetch("/mcp",modernRequest("tools/call",token,{name,arguments:args},name));
+ await call();const expiresAt=await t.run(async ctx=>{const session=await ctx.db.query("mediaUploadSessions").first();await ctx.db.patch(session!._id,{putState:"failed",putUncertain:true});return session!.expiresAt;});
+ const {EvidenceB2Store}=await import("../lib/media/evidenceB2");const head=vi.spyOn(EvidenceB2Store.prototype,"head").mockRejectedValue(new Error("Synthetic unavailable"));
+ try {
+  const result=(await (await call()).json()).result;
+  expect(result).toMatchObject({isError:true,structuredContent:{code:"UPLOAD_ATTEMPT_CLOSED",remaining:0,resetsAt:new Date(expiresAt).toISOString(),error:{code:"UPLOAD_ATTEMPT_CLOSED",recovery:expect.stringContaining("new upload now")}}});
+  expect(result.content[0].text).toContain("same operation ID");expect(result.content[0].text).toContain("keeps its reserved room");
+ }finally{head.mockRestore();}
+});

@@ -1,3 +1,4 @@
+import { mcpUploadRefusal } from "../../lib/media/uploadRefusal";
 import {formatBytes} from "../lib/usageLimits/core";
 import { anyApi, type HttpRouter } from "convex/server";
 import { httpAction } from "../_generated/server";
@@ -129,6 +130,8 @@ export const evidenceUploadRelay = httpAction(async (ctx, request) => {
     return new Response(null, { status: 204, headers: { "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer" } });
   } catch {
     if (claimed) await settle(false).catch(() => { /* Revoked connections leave the ordinary session to cleanup. */ });
+    const refusal = await ctx.runQuery(publicApi.mediaEvidenceControl.recoveryRefusal, { uploadRef, relayTokenHash }).catch(() => null);
+    if (refusal) return Response.json(mcpUploadRefusal(refusal), { status: 409, headers: { "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer" } });
     // Invalid, expired, revoked, reused and cross-owner capabilities are
     // intentionally indistinguishable at this public bearer endpoint.
     return reply(404, "Upload authorization not found.");

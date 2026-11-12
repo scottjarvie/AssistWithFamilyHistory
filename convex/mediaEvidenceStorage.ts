@@ -149,7 +149,7 @@ export const beginMcpEvidenceUpload = internalAction({
     const multipart = isMultipartEvidenceUpload(args.input.sizeBytes);
     const expiresAt = Date.now()
       + (multipart ? EVIDENCE_LARGE_UPLOAD_TTL_SECONDS : EVIDENCE_UPLOAD_TTL_SECONDS) * 1000;
-    const planned = await ctx.runMutation(internalApi.mediaEvidenceControl.planMcpEvidenceUpload, {
+    let planned = await ctx.runMutation(internalApi.mediaEvidenceControl.planMcpEvidenceUpload, {
       ...args,
       uploadRef,
       relayTokenHash: sha256Hex(new TextEncoder().encode(relayToken)),
@@ -166,6 +166,29 @@ export const beginMcpEvidenceUpload = internalAction({
         replayed: true,
         storage:await ctx.runQuery(internalApi.usageLimits.storageInternal,{ownerId:args.principal.subject.trim()}),        reviewAuthority: "person_only" as const,
       };
+    }
+    if (planned.state === "recovery") {
+      const recovery = planned;
+      let visible = false;
+      try {
+        const head = await store.head(recovery.objectKey);
+        visible = head.sizeBytes === recovery.sizeBytes && head.contentType.toLowerCase() === recovery.contentType.toLowerCase();
+      } catch { /* An uncertain or missing original must never be written again. */ }
+      if (visible && await ctx.runMutation(internalApi.mediaEvidenceControl.adoptEvidencePut, {
+        principal: args.principal, grantId: args.grantId, uploadRef: recovery.uploadRef,
+        operationId: args.operationId, requestHash: args.requestHash,
+      })) {
+        planned = await ctx.runMutation(internalApi.mediaEvidenceControl.planMcpEvidenceUpload, {
+          ...args, uploadRef, relayTokenHash: sha256Hex(new TextEncoder().encode(relayToken)),
+          objectKey: recovery.objectKey, expiresAt,
+        });
+      } else {
+        const refusal = await ctx.runQuery(internalApi.mediaEvidenceControl.recoveryRefusal, {
+          principal: args.principal, grantId: args.grantId, uploadRef: recovery.uploadRef,
+        });
+        if (!refusal) return ctx.runAction(internalApi.mediaEvidenceStorage.beginMcpEvidenceUpload, args);
+        return { uploadRefusal: refusal };
+      }
     }
     const url = `${relayOrigin()}/evidence-upload/${encodeURIComponent(planned.uploadRef)}/${relayToken}`;
     if (multipart) {
