@@ -63,35 +63,58 @@ export const evidenceUploadRelay = httpAction(async (ctx, request) => {
   if (!(EVIDENCE_UPLOAD_TYPES as readonly string[]).includes(contentType)) {
     return reply(415, `This relay accepts ${EVIDENCE_UPLOAD_TYPES.join(", ")}.`);
   }
-  const bytes = await request.arrayBuffer();
-  if (bytes.byteLength !== declaredLength) return reply(400, "Upload byte length changed in transit.");
 
+  let claimed = false;
+  let uncertain = false;
+  const relayTokenHash = await sha256Hex(new TextEncoder().encode(token).buffer as ArrayBuffer);
+  const settle = (succeeded: boolean) => ctx.runMutation(publicApi.mediaEvidenceControl.settleEvidencePut, {
+    uploadRef, relayTokenHash, ...(partNumber !== undefined ? { partNumber } : {}), succeeded, uncertain,
+  });
   try {
-    const authorization = await ctx.runAction(publicApi.mediaEvidenceStorage.authorizeMcpEvidenceRelay, {
+    const authorization = await ctx.runAction(publicApi.mediaEvidenceStorage.prepareMcpEvidenceRelay, {
       uploadRef,
       relayToken: token,
       ...(partNumber !== undefined ? { partNumber } : {}),
-    }) as { method: "PUT"; url: string; contentType: string; sizeBytes: number; sha256: string | null };
-    const digest = await sha256Hex(bytes);
+    }) as { method: "PUT"; url: string; contentType: string; sizeBytes: number; sha256: string | null; alreadyStored?: boolean };
+    claimed = true;
+    if (authorization.sizeBytes !== declaredLength || authorization.contentType.toLowerCase() !== contentType) throw new Error("Upload authorization not found.");
+    // Allocate once, and stop a streaming sender at its declared boundary.
+    const bytes = new Uint8Array(declaredLength);
+    const reader = request.body?.getReader();
+    if (!reader) throw new Error("Missing upload bytes.");
+    let offset = 0;
+    try {
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (value.byteLength > bytes.length - offset) throw new Error("Upload byte length changed in transit.");
+        bytes.set(value, offset); offset += value.byteLength;
+      }
+    } finally { await reader.cancel(); }
+    if (offset !== bytes.length) throw new Error("Upload byte length changed in transit.");
+    const digest = await sha256Hex(bytes.buffer);
     if (
       authorization.method !== "PUT"
       || authorization.contentType.toLowerCase() !== contentType
       || authorization.sizeBytes !== bytes.byteLength
       // A part has no hash of its own; the whole file's hash is checked at finish.
       || (partNumber === undefined && authorization.sha256 !== digest)
-    ) return reply(404, "Upload authorization not found.");
+    ) throw new Error("Upload authorization not found.");
 
-    const stored = await fetch(authorization.url, {
+    uncertain = true;
+    const stored = authorization.alreadyStored ? new Response(null, { status: 204 }) : await fetch(authorization.url, {
       method: "PUT",
       headers: partNumber === undefined
         ? { "Content-Type": authorization.contentType, "Content-Length": String(authorization.sizeBytes) }
         : { "Content-Length": String(authorization.sizeBytes) },
       body: bytes,
+      redirect: "error",
+      signal: AbortSignal.timeout(120_000),
     });
-    if (!stored.ok) return reply(502, "The private evidence store did not accept the upload.");
+    if (!stored.ok) { uncertain = false; throw new Error("The private evidence store did not accept the upload."); }
     if (partNumber !== undefined) {
       const etag = stored.headers.get("etag");
-      if (!etag) return reply(502, "The private evidence store did not accept the upload.");
+      if (!etag) throw new Error("The private evidence store did not accept the upload.");
       await ctx.runMutation(publicApi.mediaEvidenceControl.recordMcpEvidencePart, {
         uploadRef,
         relayTokenHash: await sha256Hex(new TextEncoder().encode(token).buffer as ArrayBuffer),
@@ -100,9 +123,12 @@ export const evidenceUploadRelay = httpAction(async (ctx, request) => {
         sizeBytes: bytes.byteLength,
         sha256: digest,
       });
+    } else {
+      await settle(true);
     }
     return new Response(null, { status: 204, headers: { "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer" } });
   } catch {
+    if (claimed) await settle(false).catch(() => { /* Revoked connections leave the ordinary session to cleanup. */ });
     // Invalid, expired, revoked, reused and cross-owner capabilities are
     // intentionally indistinguishable at this public bearer endpoint.
     return reply(404, "Upload authorization not found.");

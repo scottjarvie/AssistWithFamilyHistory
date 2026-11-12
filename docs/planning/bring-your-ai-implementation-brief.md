@@ -526,3 +526,25 @@ still-valid token (10).
 a person (5), real evidence bytes (6), the reconnect half of (10), and the live
 zero-residue re-query against the acceptance deployment (11). The harness
 implements all of them; none has been executed, and no credentials were sought.
+
+## Evidence upload retries
+
+Single-file PUT URLs permit one attempt. Repeat begin with the exact operation
+and content from the original connection after a failed attempt to get a fresh
+URL. An active transfer cannot be replaced. When begin returns
+`upload.alreadyUploaded`, skip PUT and finish. A lost storage response is
+resolved by inspecting the stored object, without another write; if no object
+is visible, keep the original and wait for ordinary expiry before starting a
+new operation. A process interrupted during transfer also waits for expiry.
+
+Multipart parts retain their resend behavior while the session is open. Parts
+can arrive in any order; overlapping requests for the same part are refused.
+Wait for part requests to return before finishing. Finish closes the session
+atomically, validates the real stored original and permits no further parts.
+Begin replay, transfer and finish recheck the original connection's current
+permission and person boundary. Invalid upload-bound settings resolve to the
+original defaults; invalid new settings are refused when saved.
+
+The older product-hostname relay forwards through the same checked transfer.
+Its authorization action now returns a forwarding credential instead of a
+private storage URL. Correct clients continue to PUT to the URL from begin.

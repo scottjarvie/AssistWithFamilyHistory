@@ -1,16 +1,9 @@
 import { ConvexHttpClient } from "convex/browser";
 import { makeFunctionReference } from "convex/server";
-import { createHash } from "node:crypto";
 import { EVIDENCE_RELAY_BODY_BYTES, EVIDENCE_IMAGE_TYPES } from "@/lib/media/evidenceStandard";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-const authorizeRelay = makeFunctionReference<
-  "action",
-  { uploadRef: string; relayToken: string },
-  { method: "PUT"; url: string; contentType: string; sizeBytes: number; sha256: string }
->("mediaEvidenceStorage:authorizeMcpEvidenceRelay");
 
 function reply(status: number, message: string): Response {
   return new Response(message, {
@@ -51,42 +44,21 @@ export async function PUT(
 
   const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
   if (!convexUrl) return reply(503, "Evidence upload is not configured.");
-  const bytes = new Uint8Array(await request.arrayBuffer());
-  if (bytes.byteLength !== declaredLength) return reply(400, "Upload byte length changed in transit.");
-
   const { uploadRef, token } = await context.params;
+  const origin = new URL(convexUrl);
+  if (!origin.hostname.endsWith(".convex.cloud")) return reply(503, "Evidence upload is not configured.");
+  origin.hostname = origin.hostname.replace(/\.convex\.cloud$/, ".convex.site");
   try {
-    const authorization = await new ConvexHttpClient(convexUrl).action(authorizeRelay, {
-      uploadRef,
-      relayToken: token,
-    });
-    const digest = createHash("sha256").update(bytes).digest("hex");
-    if (
-      authorization.method !== "PUT"
-      || authorization.contentType.toLowerCase() !== contentType
-      || authorization.sizeBytes !== bytes.byteLength
-      || authorization.sha256 !== digest
-    ) return reply(404, "Upload authorization not found.");
-
-    const stored = await fetch(authorization.url, {
-      method: "PUT",
-      headers: {
-        "Content-Type": authorization.contentType,
-        "Content-Length": String(authorization.sizeBytes),
-      },
-      body: bytes,
-    });
-    if (!stored.ok) return reply(502, "The private evidence store did not accept the upload.");
-    return new Response(null, {
-      status: 204,
-      headers: {
-        "Cache-Control": "private, no-store",
-        "Referrer-Policy": "no-referrer",
-      },
-    });
+    const authorization = await new ConvexHttpClient(convexUrl).action(
+      makeFunctionReference<"action", { uploadRef: string; relayToken: string }, { relayToken: string }>("mediaEvidenceStorage:authorizeMcpEvidenceRelay"),
+      { uploadRef, relayToken: token },
+    );
+    origin.pathname = `/evidence-upload/${encodeURIComponent(uploadRef)}/${encodeURIComponent(authorization.relayToken)}`;
+    return await fetch(origin, {
+      method: "PUT", headers: { "Content-Type": contentType, "Content-Length": String(declaredLength) },
+      body: request.body, duplex: "half", redirect: "error",
+    } as RequestInit);
   } catch {
-    // Invalid, expired, revoked, reused and cross-owner capabilities are
-    // intentionally indistinguishable at this public bearer endpoint.
     return reply(404, "Upload authorization not found.");
   }
 }

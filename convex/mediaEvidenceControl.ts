@@ -6,7 +6,7 @@ import { isRenderedEvidenceImage } from "../lib/media/evidenceStandard";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
-import { internalMutation, internalQuery } from "./_generated/server";
+import { type MutationCtx, type QueryCtx, internalMutation, internalQuery } from "./_generated/server";
 import { evidenceUploadParts } from "../lib/media/evidenceStandard";
 import { assertGrantPermits } from "./mcpGrants";
 import { matchesVaultOwner } from "./vaultCore";
@@ -72,6 +72,36 @@ async function ownedPerson(ctx: any, owner: string, personId: string): Promise<D
   return row;
 }
 
+/** All AI session entry points share connection, grant and boundary checks. */
+export async function requireEvidenceConnection(ctx: QueryCtx | MutationCtx, args: {
+  principal?: { issuer: string; subject: string; clientId: string; scopes: string[] };
+  grantId?: string; uploadRef?: string; operationId?: string; relayTokenHash?: string;
+  input?: { personId: string };
+}) {
+  const session = args.uploadRef && !args.input
+    ? await ctx.db.query("mediaUploadSessions").withIndex("by_ref", q => q.eq("ref", args.uploadRef!)).unique()
+    : args.principal && args.operationId
+      ? await ctx.db.query("mediaUploadSessions").withIndex("by_owner_operation", q => q.eq("vaultOwnerId", args.principal!.subject.trim()).eq("operationId", args.operationId!)).unique()
+      : null;
+  const id = ctx.db.normalizeId("mcpGrants", args.grantId ?? String(session?.grantId ?? ""));
+  const storedGrant = id ? await ctx.db.get(id) : null;
+  const principal = args.principal ?? (storedGrant && session && args.relayTokenHash === session.relayTokenHash
+    ? { subject: session.vaultOwnerId, clientId: session.clientId!, issuer: storedGrant.issuer, scopes: [] } : null);
+  if (!principal || !storedGrant || storedGrant.clientId !== principal.clientId || storedGrant.issuer !== principal.issuer
+    || storedGrant.vaultOwnerId !== principal.subject.trim()
+    || (session && (session.sourceKind !== "chosen_ai" || session.vaultOwnerId !== principal.subject.trim()
+      || session.clientId !== principal.clientId || String(session.grantId) !== String(storedGrant._id)))
+    || (args.uploadRef && !args.input && !session)) {
+    machineError("NOT_FOUND", "The evidence upload was not found.", "Use the original connection and upload reference.");
+  }
+  const grant = await assertGrantPermits(ctx, {
+    owner: principal.subject.trim(), grantId: String(storedGrant._id),
+    toolName: "family_history_begin_evidence_upload",
+    input: args.input ?? { personId: String(session!.personIds[0]) },
+  });
+  return { session, grant: grant! };
+}
+
 export const planMcpEvidenceUpload = internalMutation({
   args: {
     principal: principalValidator,
@@ -100,12 +130,7 @@ export const planMcpEvidenceUpload = internalMutation({
   handler: async (ctx, args) => {
     try {
     const owner = args.principal.subject.trim();
-    const grant = await assertGrantPermits(ctx, {
-      owner,
-      grantId: args.grantId,
-      toolName: "family_history_begin_evidence_upload",
-      input: args.input,
-    });
+    const { grant, session: prior } = await requireEvidenceConnection(ctx, args);
     const person = await ownedPerson(ctx, owner, args.input.personId);
     let sourceId: Id<"sources"> | undefined;
     if (args.input.sourceId) {
@@ -117,10 +142,6 @@ export const planMcpEvidenceUpload = internalMutation({
       sourceId = normalized!;
     }
 
-    const prior = await ctx.db
-      .query("mediaUploadSessions")
-      .withIndex("by_owner_operation", (q) => q.eq("vaultOwnerId", owner).eq("operationId", args.operationId))
-      .first();
     if (prior) {
       if (prior.requestHash !== args.requestHash || prior.sourceKind !== "chosen_ai") {
         machineError(
@@ -135,7 +156,13 @@ export const planMcpEvidenceUpload = internalMutation({
       if (prior.state !== "authorized" || prior.expiresAt <= Date.now()) {
         machineError("UPLOAD_EXPIRED", "That evidence upload is no longer active.", "Begin again with a new operation ID.");
       }
-      await ctx.db.patch(prior._id, { relayTokenHash: args.relayTokenHash });
+      if ((prior.putState === "in_progress" || prior.putState === "delegated") || (prior.activeParts?.length ?? 0) > 0) {
+        machineError("UPLOAD_IN_PROGRESS", "An upload attempt is still running.", "Wait for that attempt before retrying begin.");
+      }
+      await ctx.db.patch(prior._id, {
+        relayTokenHash: args.relayTokenHash,
+        ...(prior.putState === "failed" ? { putState: "awaiting" as const } : {}),
+      });
       return {
         replayed: true as const,
         state: "authorized" as const,
@@ -146,6 +173,7 @@ export const planMcpEvidenceUpload = internalMutation({
         sizeBytes: prior.declaredSizeBytes,
         sha256: prior.expectedSha256,
         multipartUploadId: prior.multipartUploadId,
+        alreadyUploaded: prior.putState === "succeeded",
       };
     }
 
@@ -196,12 +224,9 @@ export const planMcpEvidenceUpload = internalMutation({
 
 /** Record the provider's multipart upload id on a freshly planned session. */
 export const attachMultipartUpload = internalMutation({
-  args: { uploadRef: v.string(), multipartUploadId: v.string(), partSizeBytes: v.number() },
+  args: { principal: principalValidator, grantId: v.optional(v.string()), uploadRef: v.string(), multipartUploadId: v.string(), partSizeBytes: v.number() },
   handler: async (ctx, args) => {
-    const session = await ctx.db
-      .query("mediaUploadSessions")
-      .withIndex("by_ref", (q) => q.eq("ref", args.uploadRef))
-      .first();
+    const { session } = await requireEvidenceConnection(ctx, args);
     if (!session || session.state !== "authorized") return { attached: false as const };
     if (session.multipartUploadId) return { attached: false as const, multipartUploadId: session.multipartUploadId };
     await ctx.db.patch(session._id, {
@@ -228,10 +253,8 @@ export const recordMcpEvidencePart = internalMutation({
     sha256: v.string(),
   },
   handler: async (ctx, args) => {
-    const session = await ctx.db
-      .query("mediaUploadSessions")
-      .withIndex("by_ref", (q) => q.eq("ref", args.uploadRef))
-      .first();
+    const { session: resolved } = await requireEvidenceConnection(ctx, args);
+    const session = resolved!;
     if (
       !session
       || session.sourceKind !== "chosen_ai"
@@ -248,19 +271,18 @@ export const recordMcpEvidencePart = internalMutation({
     const parts = (session.parts ?? []).filter((part) => part.partNumber !== args.partNumber);
     parts.push({ partNumber: args.partNumber, etag: args.etag.slice(0, 200), sizeBytes: args.sizeBytes, sha256: args.sha256 });
     parts.sort((a, b) => a.partNumber - b.partNumber);
-    await ctx.db.patch(session._id, { parts });
+    if (!session.activeParts?.includes(args.partNumber)) throw new Error("Upload authorization not found.");
+    await ctx.db.patch(session._id, { parts, activeParts: session.activeParts.filter(p => p !== args.partNumber) });
     return { stored: parts.length };
   },
 });
 
 /** Resolve the bearer capability without accepting an owner or provider coordinate. */
-export const relayAuthorization = internalQuery({
-  args: { uploadRef: v.string(), relayTokenHash: v.string() },
+export const relayAuthorization = internalMutation({
+  args: { uploadRef: v.string(), relayTokenHash: v.string(), partNumber: v.optional(v.number()) },
   handler: async (ctx, args) => {
-    const session = await ctx.db
-      .query("mediaUploadSessions")
-      .withIndex("by_ref", (q) => q.eq("ref", args.uploadRef))
-      .first();
+    const { session: resolved } = await requireEvidenceConnection(ctx, args);
+    const session = resolved!;
     if (
       !session
       || session.sourceKind !== "chosen_ai"
@@ -268,6 +290,14 @@ export const relayAuthorization = internalQuery({
       || session.relayTokenHash !== args.relayTokenHash
       || session.expiresAt <= Date.now()
     ) return null;
+    if (session.multipartUploadId) {
+      const part = evidenceUploadParts(session.declaredSizeBytes, session.partSizeBytes).find(p => p.partNumber === args.partNumber);
+      if (!part || session.activeParts?.includes(part.partNumber)) throw new Error("Upload authorization not found.");
+      await ctx.db.patch(session._id, { activeParts: [...(session.activeParts ?? []), part.partNumber] });
+    } else {
+      if (args.partNumber !== undefined || !["awaiting", "delegated"].includes(session.putState ?? "awaiting")) throw new Error("Upload authorization not found.");
+      await ctx.db.patch(session._id, { putState: "in_progress" });
+    }
     return {
       vaultOwnerId: session.vaultOwnerId,
       objectKey: session.objectKey,
@@ -275,9 +305,39 @@ export const relayAuthorization = internalQuery({
       sizeBytes: session.declaredSizeBytes,
       sha256: session.expectedSha256,
       expiresAt: session.expiresAt,
+      putUncertain: session.putUncertain,
       multipartUploadId: session.multipartUploadId,
       partSizeBytes: session.partSizeBytes,
     };
+  },
+});
+
+/** The product proxy consumes its credential before forwarding a streaming body. */
+export const delegateEvidencePut = internalMutation({
+  args: { uploadRef: v.string(), relayTokenHash: v.string(), nextTokenHash: v.string() },
+  handler: async (ctx, args) => {
+    const { session: resolved } = await requireEvidenceConnection(ctx, args);
+    const session = resolved!;
+    if (session.state !== "authorized" || session.expiresAt <= Date.now() || session.multipartUploadId
+      || session.relayTokenHash !== args.relayTokenHash || (session.putState ?? "awaiting") !== "awaiting") throw new Error("Upload authorization not found.");
+    await ctx.db.patch(session._id, { relayTokenHash: args.nextTokenHash, putState: "delegated" });
+  },
+});
+
+/** Acknowledge only the claimed transfer, without changing session expiry or cleanup. */
+export const settleEvidencePut = internalMutation({
+  args: { uploadRef: v.string(), relayTokenHash: v.string(), partNumber: v.optional(v.number()), succeeded: v.boolean(), uncertain: v.boolean() },
+  handler: async (ctx, args) => {
+    const { session: resolved } = await requireEvidenceConnection(ctx, args);
+    const session = resolved!;
+    if (session.state !== "authorized" || session.relayTokenHash !== args.relayTokenHash) throw new Error("Upload authorization not found.");
+    if (args.partNumber !== undefined) {
+      if (!session.activeParts?.includes(args.partNumber)) return;
+      await ctx.db.patch(session._id, { activeParts: session.activeParts.filter(p => p !== args.partNumber) });
+    } else {
+      if (session.putState !== "in_progress") return;
+      await ctx.db.patch(session._id, { putState: args.succeeded ? "succeeded" : "failed", putUncertain: args.uncertain });
+    }
   },
 });
 
@@ -288,21 +348,8 @@ export const sessionForFinish = internalQuery({
     uploadRef: v.string(),
   },
   handler: async (ctx, args) => {
-    const owner = args.principal.subject.trim();
-    await assertGrantPermits(ctx, {
-      owner,
-      grantId: args.grantId,
-      toolName: "family_history_finish_evidence_upload",
-      input: { uploadRef: args.uploadRef },
-    });
-    const session = await ctx.db
-      .query("mediaUploadSessions")
-      .withIndex("by_owner_ref", (q) => q.eq("vaultOwnerId", owner).eq("ref", args.uploadRef))
-      .first();
-    if (!session || session.sourceKind !== "chosen_ai" || String(session.grantId) !== args.grantId) {
-      machineError("NOT_FOUND", "The evidence upload was not found.", "Use the uploadRef returned by the begin call in this connection.");
-    }
-    return session;
+    const { session } = await requireEvidenceConnection(ctx, args);
+    return session!;
   },
 });
 
@@ -316,19 +363,8 @@ export const claimSessionForFinish = internalMutation({
   },
   handler: async (ctx, args) => {
     const owner = args.principal.subject.trim();
-    await assertGrantPermits(ctx, {
-      owner,
-      grantId: args.grantId,
-      toolName: "family_history_finish_evidence_upload",
-      input: { uploadRef: args.uploadRef },
-    });
-    const session = await ctx.db
-      .query("mediaUploadSessions")
-      .withIndex("by_owner_ref", (q) => q.eq("vaultOwnerId", owner).eq("ref", args.uploadRef))
-      .first();
-    if (!session || session.sourceKind !== "chosen_ai" || String(session.grantId) !== args.grantId) {
-      machineError("NOT_FOUND", "The evidence upload was not found.", "Use the uploadRef returned by the begin call in this connection.");
-    }
+    const { session: resolved } = await requireEvidenceConnection(ctx, args);
+    const session = resolved!;
     if (session.operationId !== args.operationId) {
       machineError("OPERATION_CONFLICT", "Finish must use the same operation ID as begin.", "Retry with the operation ID returned in the begin response.");
     }
@@ -338,6 +374,9 @@ export const claimSessionForFinish = internalMutation({
     }
     if (session.state !== "authorized" || session.expiresAt <= Date.now()) {
       machineError("UPLOAD_EXPIRED", "That evidence upload is no longer active.", "Begin again with a new operation ID.");
+    }
+    if ((session.activeParts?.length ?? 0) > 0 || (session.putState !== undefined && session.putState !== "succeeded")) {
+      machineError("UPLOAD_INCOMPLETE", "The upload has not completed.", "Finish transferring the file before calling finish.");
     }
     if (session.multipartUploadId) {
       const stored = new Set((session.parts ?? []).map((part) => part.partNumber));
@@ -378,19 +417,8 @@ export const commitMcpEvidenceUpload = internalMutation({
   handler: async (ctx, args) => {
     try {
     const owner = args.principal.subject.trim();
-    await assertGrantPermits(ctx, {
-      owner,
-      grantId: args.grantId,
-      toolName: "family_history_finish_evidence_upload",
-      input: { uploadRef: args.uploadRef },
-    });
-    const session = await ctx.db
-      .query("mediaUploadSessions")
-      .withIndex("by_owner_ref", (q) => q.eq("vaultOwnerId", owner).eq("ref", args.uploadRef))
-      .first();
-    if (!session || session.sourceKind !== "chosen_ai" || String(session.grantId) !== args.grantId) {
-      machineError("NOT_FOUND", "The evidence upload was not found.", "Use the uploadRef returned by the begin call in this connection.");
-    }
+    const { session: resolved } = await requireEvidenceConnection(ctx, args);
+    const session = resolved!;
     if (session.state === "ready" && session.mediaId) {
       return { replayed: true as const, mediaId: session.mediaId, original: (await ctx.db.get(session.mediaId))?.b2Original, storage:await summaryFor(ctx,owner) };
     }

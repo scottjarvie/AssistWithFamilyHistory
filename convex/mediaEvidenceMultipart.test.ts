@@ -63,6 +63,7 @@ async function plannedBook() {
     },
   });
   await t.mutation(attach, {
+    principal, grantId,
     uploadRef: "family_evidence_book",
     multipartUploadId: "b2-upload-1",
     partSizeBytes: EVIDENCE_PART_BYTES,
@@ -81,8 +82,9 @@ const part = (partNumber: number, sizeBytes: number, relayTokenHash = "token-has
 
 describe("multipart evidence uploads", () => {
   test("a second attach keeps the first provider upload", async () => {
-    const { t } = await plannedBook();
+    const { t, grantId } = await plannedBook();
     const again = await t.mutation(attach, {
+    principal, grantId,
       uploadRef: "family_evidence_book",
       multipartUploadId: "b2-upload-2",
       partSizeBytes: EVIDENCE_PART_BYTES,
@@ -107,11 +109,15 @@ describe("multipart evidence uploads", () => {
     });
     expect(evidenceUploadParts(SIZE).map((p) => p.sizeBytes)).toEqual([16 * MIB, 16 * MIB, 8 * MIB]);
 
+    await t.mutation(makeFunctionReference<"mutation">("mediaEvidenceControl:relayAuthorization"), { uploadRef: "family_evidence_book", relayTokenHash: "token-hash-book", partNumber: 1 });
     await t.mutation(recordPart, part(1, 16 * MIB));
+    await t.mutation(makeFunctionReference<"mutation">("mediaEvidenceControl:relayAuthorization"), { uploadRef: "family_evidence_book", relayTokenHash: "token-hash-book", partNumber: 3 });
     await t.mutation(recordPart, part(3, 8 * MIB));
     await expect(finish()).rejects.toThrow(/UPLOAD_INCOMPLETE[\s\S]*Parts 2 have not arrived/);
 
+    await t.mutation(makeFunctionReference<"mutation">("mediaEvidenceControl:relayAuthorization"), { uploadRef: "family_evidence_book", relayTokenHash: "token-hash-book", partNumber: 2 });
     await t.mutation(recordPart, part(2, 16 * MIB));
+    await t.mutation(makeFunctionReference<"mutation">("mediaEvidenceControl:relayAuthorization"), { uploadRef: "family_evidence_book", relayTokenHash: "token-hash-book", partNumber: 2 });
     await t.mutation(recordPart, { ...part(2, 16 * MIB), etag: "\"etag-2-resent\"" });
     const claimed = await finish();
     expect(claimed.state).toBe("uploaded");
