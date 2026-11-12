@@ -1072,6 +1072,9 @@ export default defineSchema({
     expectedSha256: v.string(),
     objectKey: v.string(),
     relayTokenHash: v.string(),
+    putState: v.optional(v.union(v.literal("awaiting"), v.literal("delegated"), v.literal("in_progress"), v.literal("failed"), v.literal("succeeded"))),
+    putUncertain: v.optional(v.boolean()),
+    activeParts: v.optional(v.array(v.number())),
     /** Set when the original goes up in parts (over 20 MiB). */
     multipartUploadId: v.optional(v.string()),
     partSizeBytes: v.optional(v.number()),

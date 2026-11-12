@@ -1,3 +1,4 @@
+import { twoSecondWav } from "../features/aiUpload/audioFixture";
 import {afterEach,beforeEach,expect,test,vi} from "vitest";
 import {convexTest} from "convex-test";
 import schema from "./schema";
@@ -157,9 +158,9 @@ test("audio policy is additive and rejects AI callers at the person upload door"
 });
 
 test("a measured audio refusal uses the existing cleanup and releases its single hold",async()=>{
- storageEnvironment();const t=setup();await settings(t,{planStoredBytes:{free:1_000_000},maxVoiceNoteSeconds:0.01});
- const {readFileSync}=await import("node:fs");const {sha256Hex}=await import("../lib/media/evidenceB2");
- const bytes=new Uint8Array(readFileSync("lib/media/fixtures/audio/tone.wav"));
+ storageEnvironment();const t=setup();await settings(t,{planStoredBytes:{free:1_000_000},maxVoiceNoteSeconds:1});
+ const {sha256Hex}=await import("../lib/media/evidenceB2");
+ const bytes=twoSecondWav();
  const {args}=await aiSession(t,"synthetic-audio-duration",bytes.length,sha256Hex(bytes));
  await t.run(async ctx=>{const row=await ctx.db.query("mediaUploadSessions").first();await ctx.db.patch(row!._id,{declaredContentType:"audio/wav",audioKind:"voicenote"});});
  const head=vi.spyOn(EvidenceB2Store.prototype,"head").mockResolvedValue({versionId:"synthetic-version",sizeBytes:bytes.length,contentType:"audio/wav"});
@@ -182,7 +183,8 @@ test.each(Object.entries({webm:"audio/webm",ogg:"audio/ogg",mp4:"audio/mp4",aac:
  const {args}=await aiSession(t,`synthetic-audio-${extension}`,bytes.length,sha256Hex(bytes));
  await t.run(async ctx=>{const row=await ctx.db.query("mediaUploadSessions").first();await ctx.db.patch(row!._id,{declaredContentType:contentType});});
  if(extension==="multipart") {
-  await t.mutation(internal.mediaEvidenceControl.attachMultipartUpload,{uploadRef:args.uploadRef,multipartUploadId:"synthetic-multipart",partSizeBytes:16*1024*1024});
+  await t.mutation(internal.mediaEvidenceControl.attachMultipartUpload,{principal:args.principal,grantId:args.grantId,uploadRef:args.uploadRef,multipartUploadId:"synthetic-multipart",partSizeBytes:16*1024*1024});
+  await t.mutation(internal.mediaEvidenceControl.relayAuthorization,{uploadRef:args.uploadRef,relayTokenHash:"synthetic",partNumber:1});
   await t.mutation(internal.mediaEvidenceControl.recordMcpEvidencePart,{uploadRef:args.uploadRef,relayTokenHash:"synthetic",partNumber:1,etag:"synthetic-etag",sizeBytes:bytes.length,sha256:sha256Hex(bytes)});
  }
  const complete=vi.spyOn(EvidenceB2Store.prototype,"completeMultipart").mockResolvedValue({versionId:"synthetic-version"});

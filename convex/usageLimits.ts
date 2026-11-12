@@ -7,7 +7,7 @@ import { action, internalAction, internalMutation, internalQuery, mutation, type
 import { FAMILY_HISTORY_MCP_LIMITS } from "../lib/mcp/contract";
 const isConvexAdmin=(subject:string|null|undefined)=>{try{requireTrustBoundarySuperAdmin(subject);return true;}catch{return false;}};
 import { EVIDENCE_RELAY_BODY_BYTES } from "../lib/media/evidenceStandard";
-import { siteDefaults } from "../lib/media/siteDefaults";
+import { siteDefaults, normalizedBound } from "../lib/media/siteDefaults";
 
 import {
   LIMIT_NAMES, DEFAULT_PLAN_STORED_BYTES, ownerReady, ownerEnforcement, aiStorage, checkCommit, applyStoredAddition, storageSummary, effectiveFileCap, checkFileSize, validateFileCaps,
@@ -49,6 +49,16 @@ export type Reservation = { usageReservedBytes?: number; usageReservedDay?: stri
 // Sum of the independently advertised per-kind write limits; these are reliability ceilings.
 const SITE_BATCH_ITEMS=FAMILY_HISTORY_MCP_LIMITS.batchPeople+FAMILY_HISTORY_MCP_LIMITS.batchRelationships+FAMILY_HISTORY_MCP_LIMITS.batchEvents+FAMILY_HISTORY_MCP_LIMITS.batchEvidence+FAMILY_HISTORY_MCP_LIMITS.batchStories+FAMILY_HISTORY_MCP_LIMITS.batchPlaces+FAMILY_HISTORY_MCP_LIMITS.batchTopics+FAMILY_HISTORY_MCP_LIMITS.batchConnections;
 function sitePolicy(site:Doc<"usageLimitSettings">|null){return {...site,mcpBatchMaxItems:site?.mcpBatchMaxItems ?? SITE_BATCH_ITEMS,mcpBatchMaxBytes:site?.mcpBatchMaxBytes ?? FAMILY_HISTORY_MCP_LIMITS.requestBytes};}
+function normalizedUploadSettings<T extends { maxFileBytes?: Record<string, number>; maxVoiceNoteSeconds?: number; mcpBatchMaxItems?: number; mcpBatchMaxBytes?: number }>(row: T | null): T | null {
+  if (!row) return row;
+  const maxFileBytes = row.maxFileBytes && Object.fromEntries(Object.entries(row.maxFileBytes).map(([kind, value]) => [kind,
+    kind in siteDefaults ? normalizedBound(value, siteDefaults[kind as keyof typeof siteDefaults]) : value]));
+  return { ...row, ...(maxFileBytes ? { maxFileBytes } : {}),
+    ...(row.maxVoiceNoteSeconds !== undefined ? { maxVoiceNoteSeconds: normalizedBound(row.maxVoiceNoteSeconds, audioDurationDefaults.voicenote) } : {}),
+    ...(row.mcpBatchMaxItems !== undefined ? { mcpBatchMaxItems: normalizedBound(row.mcpBatchMaxItems, SITE_BATCH_ITEMS) } : {}),
+    ...(row.mcpBatchMaxBytes !== undefined ? { mcpBatchMaxBytes: normalizedBound(row.mcpBatchMaxBytes, FAMILY_HISTORY_MCP_LIMITS.requestBytes) } : {}),
+  };
+}
 const RECOMPUTE_PAGE = 100;
 const ADMIN_ROW_LIMIT = 500;
 const EVENT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
@@ -56,11 +66,11 @@ const EVENT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 type Ctx = QueryCtx | MutationCtx;
 
 async function siteSettings(ctx: Ctx) {
-  return await ctx.db.query("usageLimitSettings").withIndex("by_key", (q) => q.eq("key", "site")).unique();
+  return normalizedUploadSettings(await ctx.db.query("usageLimitSettings").withIndex("by_key", (q) => q.eq("key", "site")).unique());
 }
 
 async function overrideFor(ctx: Ctx, ownerId: string) {
-  return await ctx.db.query("usageLimitOverrides").withIndex("by_owner", (q) => q.eq("ownerId", ownerId)).unique();
+  return normalizedUploadSettings(await ctx.db.query("usageLimitOverrides").withIndex("by_owner", (q) => q.eq("ownerId", ownerId)).unique());
 }
 
 export async function limitsFor(ctx: Ctx, ownerId: string): Promise<EffectiveLimits> {
@@ -298,12 +308,12 @@ export const adminOverviewInternal = internalQuery({
     const site = effectiveLimits(sitePolicy(settings));
     const rows = await ctx.db.query("usageCounters").take(ADMIN_ROW_LIMIT + 1);
     const overrides = await ctx.db.query("usageLimitOverrides").take(ADMIN_ROW_LIMIT);
-    const overrideBy = new Map(overrides.map((row) => [row.ownerId, row]));
+    const overrideBy = new Map(overrides.map((row) => [row.ownerId, normalizedUploadSettings(row)]));
     const labels = new Map(rows.map((row) => [row.ownerId, labelOf(row.ownerId)]));
     const byCounter = new Map(rows.map((row) => [String(row._id), labelOf(row.ownerId)]));
     const people = rows.slice(0, ADMIN_ROW_LIMIT).map((row) => {
       const override = overrideBy.get(row.ownerId) ?? null;
-      const effective = effectiveLimits(settings, override, planFor(row.ownerId));
+      const effective = effectiveLimits(sitePolicy(settings), override, planFor(row.ownerId));
       const counters = rollBuckets(countersOf(row), now);
       return {
         id: row._id,
@@ -335,8 +345,14 @@ export const adminOverviewInternal = internalQuery({
 
 type LimitPatch = Partial<Record<LimitName | "maxVoiceNoteSeconds", number | null>>;
 
-function cleanPatch(patch: LimitPatch & {maxVoiceNoteSeconds?:number|null}): LimitPatch {
-  if(patch.maxVoiceNoteSeconds != null && (!Number.isFinite(patch.maxVoiceNoteSeconds) || patch.maxVoiceNoteSeconds<=0)) throw new ConvexError("Invalid duration setting");
+function cleanPatch(patch: LimitPatch & {maxFileBytes?: Record<string, number | null>}): LimitPatch {
+  for (const [name, fallback] of Object.entries({ maxVoiceNoteSeconds: audioDurationDefaults.voicenote, mcpBatchMaxItems: SITE_BATCH_ITEMS, mcpBatchMaxBytes: FAMILY_HISTORY_MCP_LIMITS.requestBytes })) {
+    const value = patch[name as keyof LimitPatch];
+    if (value != null && normalizedBound(value, fallback) !== value) throw new ConvexError("Invalid upload bound");
+  }
+  for (const [kind, value] of Object.entries(patch.maxFileBytes ?? {})) {
+    if (value != null && kind in siteDefaults && normalizedBound(value, siteDefaults[kind as keyof typeof siteDefaults]) !== value) throw new ConvexError("File cap exceeds the supported transport ceiling or is invalid");
+  }
   const values = Object.fromEntries(Object.entries(patch).filter(([key, value]) => LIMIT_NAMES.includes(key as LimitName) && value !== null)) as Partial<UsageLimits>;
   const problems = validateLimits(values);
   if (problems.length) throw new ConvexError(problems.join("; "));

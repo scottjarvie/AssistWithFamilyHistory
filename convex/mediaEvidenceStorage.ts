@@ -149,7 +149,7 @@ export const beginMcpEvidenceUpload = internalAction({
     const multipart = isMultipartEvidenceUpload(args.input.sizeBytes);
     const expiresAt = Date.now()
       + (multipart ? EVIDENCE_LARGE_UPLOAD_TTL_SECONDS : EVIDENCE_UPLOAD_TTL_SECONDS) * 1000;
-    const planned = await ctx.runMutation(internalApi.mediaEvidenceControl.planMcpEvidenceUpload, {
+    let planned = await ctx.runMutation(internalApi.mediaEvidenceControl.planMcpEvidenceUpload, {
       ...args,
       uploadRef,
       relayTokenHash: sha256Hex(new TextEncoder().encode(relayToken)),
@@ -167,6 +167,29 @@ export const beginMcpEvidenceUpload = internalAction({
         storage:await ctx.runQuery(internalApi.usageLimits.storageInternal,{ownerId:args.principal.subject.trim()}),        reviewAuthority: "person_only" as const,
       };
     }
+    if (planned.state === "recovery") {
+      const recovery = planned;
+      let visible = false;
+      try {
+        const head = await store.head(recovery.objectKey);
+        visible = head.sizeBytes === recovery.sizeBytes && head.contentType.toLowerCase() === recovery.contentType.toLowerCase();
+      } catch { /* An uncertain or missing original must never be written again. */ }
+      if (visible && await ctx.runMutation(internalApi.mediaEvidenceControl.adoptEvidencePut, {
+        principal: args.principal, grantId: args.grantId, uploadRef: recovery.uploadRef,
+        operationId: args.operationId, requestHash: args.requestHash,
+      })) {
+        planned = await ctx.runMutation(internalApi.mediaEvidenceControl.planMcpEvidenceUpload, {
+          ...args, uploadRef, relayTokenHash: sha256Hex(new TextEncoder().encode(relayToken)),
+          objectKey: recovery.objectKey, expiresAt,
+        });
+      } else {
+        const refusal = await ctx.runQuery(internalApi.mediaEvidenceControl.recoveryRefusal, {
+          principal: args.principal, grantId: args.grantId, uploadRef: recovery.uploadRef,
+        });
+        if (!refusal) return ctx.runAction(internalApi.mediaEvidenceStorage.beginMcpEvidenceUpload, args);
+        return { uploadRefusal: refusal };
+      }
+    }
     const url = `${relayOrigin()}/evidence-upload/${encodeURIComponent(planned.uploadRef)}/${relayToken}`;
     if (multipart) {
       let uploadId = planned.multipartUploadId as string | undefined;
@@ -174,6 +197,7 @@ export const beginMcpEvidenceUpload = internalAction({
         const created = await store.createMultipart({ objectKey: planned.objectKey, contentType: planned.contentType });
         const attached = await ctx.runMutation(internalApi.mediaEvidenceControl.attachMultipartUpload, {
           uploadRef: planned.uploadRef,
+          principal: args.principal, grantId: args.grantId,
           multipartUploadId: created,
           partSizeBytes: EVIDENCE_PART_BYTES,
         });
@@ -216,6 +240,7 @@ export const beginMcpEvidenceUpload = internalAction({
       upload: {
         method: "PUT" as const,
         url,
+        alreadyUploaded: planned.alreadyUploaded ?? false,
         contentType: planned.contentType,
         sizeBytes: planned.sizeBytes,
         sha256: planned.sha256,
@@ -232,15 +257,30 @@ export const beginMcpEvidenceUpload = internalAction({
   },
 });
 
-/** Called only by the first-party relay after it proves the opaque bearer token. */
+/** Returns a one-use forwarding credential, never provider coordinates. */
 export const authorizeMcpEvidenceRelay = action({
+  args: { uploadRef: v.string(), relayToken: v.string() },
+  handler: async (ctx, args) => {
+    const relayToken = randomBytes(32).toString("base64url");
+    await ctx.runMutation(internalApi.mediaEvidenceControl.delegateEvidencePut, {
+      uploadRef: args.uploadRef, relayTokenHash: sha256Hex(new TextEncoder().encode(args.relayToken)),
+      nextTokenHash: sha256Hex(new TextEncoder().encode(relayToken)),
+    });
+    return { relayToken };
+  },
+});
+
+/** Called only by the first-party relay after it proves the opaque bearer token. */
+export const prepareMcpEvidenceRelay = internalAction({
   args: { uploadRef: v.string(), relayToken: v.string(), partNumber: v.optional(v.number()) },
   handler: async (ctx, args) => {
-    const relay = await ctx.runQuery(internalApi.mediaEvidenceControl.relayAuthorization, {
+    const relay = await ctx.runMutation(internalApi.mediaEvidenceControl.relayAuthorization, {
       uploadRef: args.uploadRef,
       relayTokenHash: sha256Hex(new TextEncoder().encode(args.relayToken)),
+      ...(args.partNumber !== undefined ? { partNumber: args.partNumber } : {}),
     });
     if (!relay) throw new Error("Upload authorization not found.");
+    try {
     const store = storage();
     // A multipart session accepts only numbered parts; a single upload only
     // the whole file. Either mismatch is the same uniform refusal.
@@ -266,6 +306,11 @@ export const authorizeMcpEvidenceRelay = action({
         partNumber: part.partNumber,
       };
     }
+    if (relay.putUncertain) {
+      const head = await store.head(relay.objectKey);
+      if (head.sizeBytes !== relay.sizeBytes || head.contentType !== relay.contentType) throw new Error("Upload authorization not found.");
+      return { method: "PUT" as const, url: "", alreadyStored: true, contentType: relay.contentType, sizeBytes: relay.sizeBytes, sha256: relay.sha256 };
+    }
     return {
       method: "PUT" as const,
       url: await store.signPut({
@@ -278,6 +323,13 @@ export const authorizeMcpEvidenceRelay = action({
       sizeBytes: relay.sizeBytes,
       sha256: relay.sha256,
     };
+    } catch (error) {
+      await ctx.runMutation(internalApi.mediaEvidenceControl.settleEvidencePut, {
+        uploadRef: args.uploadRef, relayTokenHash: sha256Hex(new TextEncoder().encode(args.relayToken)),
+        ...(args.partNumber !== undefined ? { partNumber: args.partNumber } : {}), succeeded: false, uncertain: relay.putUncertain ?? false,
+      }).catch(() => { /* Leave revoked sessions to ordinary cleanup. */ });
+      throw error;
+    }
   },
 });
 
@@ -519,6 +571,7 @@ export const finishMcpEvidenceUpload = internalAction({
         next: "The person reviews source, rights, people, date, and location before this connection can read the evidence later.",
       };
     } catch (error) {
+      if (error instanceof Error && error.message.includes("MCP_FAMILY_HISTORY_ERROR:")) throw error;
       const orphanedBytes=(error as {orphanedBytes?:number})?.orphanedBytes;
       if(orphanedBytes) await ctx.runMutation(internalApi.mediaEvidenceControl.recordOrphanedCopies,{uploadRef:session.ref,bytes:orphanedBytes});
       const message = error instanceof Error ? error.message : String(error);

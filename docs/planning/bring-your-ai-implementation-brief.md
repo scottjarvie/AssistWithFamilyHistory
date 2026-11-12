@@ -526,3 +526,34 @@ still-valid token (10).
 a person (5), real evidence bytes (6), the reconnect half of (10), and the live
 zero-residue re-query against the acceptance deployment (11). The harness
 implements all of them; none has been executed, and no credentials were sought.
+
+## Evidence upload retries
+
+Single-file PUT URLs permit one attempt. Repeat begin with the exact operation
+and content from the original connection after a failed attempt to get a fresh
+URL. An active transfer cannot be replaced. When begin returns
+`upload.alreadyUploaded`, skip PUT and finish. For an uncertain or interrupted transfer, the byte transfer cannot be resumed.
+First repeat begin with the same operation ID and content: if the original is
+visibly stored, begin adopts it and returns `upload.alreadyUploaded`, so skip
+PUT and finish. This never writes another version to the old key.
+
+Otherwise start a new upload now with a new operation ID. The earlier attempt
+keeps its reserved room until its existing expiry and ordinary cleanup release
+it. The structured begin `UPLOAD_ATTEMPT_CLOSED` refusal gives that time in
+`resetsAt`, the room currently left in `remaining` when counting is ready,
+and the next action in `recovery`. If there is not enough room for both, the
+new operation is refused for room. Retry that new operation after ordinary
+expiry cleanup returns the earlier hold; other usage and limits still apply.
+Keep the original locally until an upload finishes.
+
+Multipart parts retain their resend behavior while the session is open. Parts
+can arrive in any order; overlapping requests for the same part are refused.
+Wait for part requests to return before finishing. Finish closes the session
+atomically, validates the real stored original and permits no further parts.
+Begin replay, transfer and finish recheck the original connection's current
+permission and person boundary. Invalid upload-bound settings resolve to the
+original defaults; invalid new settings are refused when saved.
+
+The older product-hostname relay forwards through the same checked transfer.
+Its authorization action now returns a forwarding credential instead of a
+private storage URL. Correct clients continue to PUT to the URL from begin.

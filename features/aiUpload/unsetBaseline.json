@@ -1,0 +1,377 @@
+{
+  "policies": [
+    {
+      "audio": {
+        "maxVoiceNoteSeconds": 600
+      },
+      "enforcement": "off",
+      "files": {
+        "audio": 536870912,
+        "image": 20971520,
+        "original": 536870912,
+        "voicenote": 10000000,
+        "web": 26214400
+      },
+      "limits": {
+        "downloadEnforcement": "warn",
+        "enforcement": "off",
+        "limits": {
+          "downloadBytesPerDay": 20000000000,
+          "maxUploadsInFlight": 20,
+          "mcpBatchMaxBytes": 262144,
+          "mcpBatchMaxItems": 360,
+          "storedBytesPerUser": 1000000000,
+          "uploadBytesPerDay": 2000000000,
+          "uploadsPerDay": 1000,
+          "uploadsPerHour": 200
+        },
+        "plan": "free"
+      }
+    },
+    {
+      "audio": {
+        "maxVoiceNoteSeconds": 600
+      },
+      "enforcement": "warn",
+      "files": {
+        "audio": 536870912,
+        "image": 20971520,
+        "original": 536870912,
+        "voicenote": 10000000,
+        "web": 26214400
+      },
+      "limits": {
+        "downloadEnforcement": "warn",
+        "enforcement": "warn",
+        "limits": {
+          "downloadBytesPerDay": 20000000000,
+          "maxUploadsInFlight": 20,
+          "mcpBatchMaxBytes": 262144,
+          "mcpBatchMaxItems": 360,
+          "storedBytesPerUser": 1000000000,
+          "uploadBytesPerDay": 2000000000,
+          "uploadsPerDay": 1000,
+          "uploadsPerHour": 200
+        },
+        "plan": "free"
+      }
+    },
+    {
+      "audio": {
+        "maxVoiceNoteSeconds": 600
+      },
+      "enforcement": "on",
+      "files": {
+        "audio": 536870912,
+        "image": 20971520,
+        "original": 536870912,
+        "voicenote": 10000000,
+        "web": 26214400
+      },
+      "limits": {
+        "downloadEnforcement": "warn",
+        "enforcement": "on",
+        "limits": {
+          "downloadBytesPerDay": 20000000000,
+          "maxUploadsInFlight": 20,
+          "mcpBatchMaxBytes": 262144,
+          "mcpBatchMaxItems": 360,
+          "storedBytesPerUser": 1000000000,
+          "uploadBytesPerDay": 2000000000,
+          "uploadsPerDay": 1000,
+          "uploadsPerHour": 200
+        },
+        "plan": "free"
+      }
+    }
+  ],
+  "admissions": [
+    {
+      "enforcement": "off",
+      "kind": "image",
+      "delta": -1,
+      "outcome": "accepted"
+    },
+    {
+      "enforcement": "off",
+      "kind": "image",
+      "delta": 0,
+      "outcome": "accepted"
+    },
+    {
+      "enforcement": "off",
+      "kind": "image",
+      "delta": 1,
+      "outcome": "FILE_TOO_LARGE"
+    },
+    {
+      "enforcement": "off",
+      "kind": "original",
+      "delta": -1,
+      "outcome": "accepted"
+    },
+    {
+      "enforcement": "off",
+      "kind": "original",
+      "delta": 0,
+      "outcome": "accepted"
+    },
+    {
+      "enforcement": "off",
+      "kind": "original",
+      "delta": 1,
+      "outcome": "FILE_TOO_LARGE"
+    },
+    {
+      "enforcement": "off",
+      "kind": "audio",
+      "delta": -1,
+      "outcome": "accepted"
+    },
+    {
+      "enforcement": "off",
+      "kind": "audio",
+      "delta": 0,
+      "outcome": "accepted"
+    },
+    {
+      "enforcement": "off",
+      "kind": "audio",
+      "delta": 1,
+      "outcome": "FILE_TOO_LARGE"
+    },
+    {
+      "enforcement": "off",
+      "kind": "voicenote",
+      "delta": -1,
+      "outcome": "accepted"
+    },
+    {
+      "enforcement": "off",
+      "kind": "voicenote",
+      "delta": 0,
+      "outcome": "accepted"
+    },
+    {
+      "enforcement": "off",
+      "kind": "voicenote",
+      "delta": 1,
+      "outcome": "FILE_TOO_LARGE"
+    },
+    {
+      "enforcement": "off",
+      "kind": "web",
+      "delta": -1,
+      "outcome": "accepted"
+    },
+    {
+      "enforcement": "off",
+      "kind": "web",
+      "delta": 0,
+      "outcome": "accepted"
+    },
+    {
+      "enforcement": "off",
+      "kind": "web",
+      "delta": 1,
+      "outcome": "FILE_TOO_LARGE"
+    },
+    {
+      "enforcement": "warn",
+      "kind": "image",
+      "delta": -1,
+      "outcome": "accepted"
+    },
+    {
+      "enforcement": "warn",
+      "kind": "image",
+      "delta": 0,
+      "outcome": "accepted"
+    },
+    {
+      "enforcement": "warn",
+      "kind": "image",
+      "delta": 1,
+      "outcome": "FILE_TOO_LARGE"
+    },
+    {
+      "enforcement": "warn",
+      "kind": "original",
+      "delta": -1,
+      "outcome": "accepted"
+    },
+    {
+      "enforcement": "warn",
+      "kind": "original",
+      "delta": 0,
+      "outcome": "accepted"
+    },
+    {
+      "enforcement": "warn",
+      "kind": "original",
+      "delta": 1,
+      "outcome": "FILE_TOO_LARGE"
+    },
+    {
+      "enforcement": "warn",
+      "kind": "audio",
+      "delta": -1,
+      "outcome": "accepted"
+    },
+    {
+      "enforcement": "warn",
+      "kind": "audio",
+      "delta": 0,
+      "outcome": "accepted"
+    },
+    {
+      "enforcement": "warn",
+      "kind": "audio",
+      "delta": 1,
+      "outcome": "FILE_TOO_LARGE"
+    },
+    {
+      "enforcement": "warn",
+      "kind": "voicenote",
+      "delta": -1,
+      "outcome": "accepted"
+    },
+    {
+      "enforcement": "warn",
+      "kind": "voicenote",
+      "delta": 0,
+      "outcome": "accepted"
+    },
+    {
+      "enforcement": "warn",
+      "kind": "voicenote",
+      "delta": 1,
+      "outcome": "FILE_TOO_LARGE"
+    },
+    {
+      "enforcement": "warn",
+      "kind": "web",
+      "delta": -1,
+      "outcome": "accepted"
+    },
+    {
+      "enforcement": "warn",
+      "kind": "web",
+      "delta": 0,
+      "outcome": "accepted"
+    },
+    {
+      "enforcement": "warn",
+      "kind": "web",
+      "delta": 1,
+      "outcome": "FILE_TOO_LARGE"
+    },
+    {
+      "enforcement": "on",
+      "kind": "image",
+      "delta": -1,
+      "outcome": "accepted"
+    },
+    {
+      "enforcement": "on",
+      "kind": "image",
+      "delta": 0,
+      "outcome": "accepted"
+    },
+    {
+      "enforcement": "on",
+      "kind": "image",
+      "delta": 1,
+      "outcome": "FILE_TOO_LARGE"
+    },
+    {
+      "enforcement": "on",
+      "kind": "original",
+      "delta": -1,
+      "outcome": "accepted"
+    },
+    {
+      "enforcement": "on",
+      "kind": "original",
+      "delta": 0,
+      "outcome": "accepted"
+    },
+    {
+      "enforcement": "on",
+      "kind": "original",
+      "delta": 1,
+      "outcome": "FILE_TOO_LARGE"
+    },
+    {
+      "enforcement": "on",
+      "kind": "audio",
+      "delta": -1,
+      "outcome": "accepted"
+    },
+    {
+      "enforcement": "on",
+      "kind": "audio",
+      "delta": 0,
+      "outcome": "accepted"
+    },
+    {
+      "enforcement": "on",
+      "kind": "audio",
+      "delta": 1,
+      "outcome": "FILE_TOO_LARGE"
+    },
+    {
+      "enforcement": "on",
+      "kind": "voicenote",
+      "delta": -1,
+      "outcome": "accepted"
+    },
+    {
+      "enforcement": "on",
+      "kind": "voicenote",
+      "delta": 0,
+      "outcome": "accepted"
+    },
+    {
+      "enforcement": "on",
+      "kind": "voicenote",
+      "delta": 1,
+      "outcome": "FILE_TOO_LARGE"
+    },
+    {
+      "enforcement": "on",
+      "kind": "web",
+      "delta": -1,
+      "outcome": "accepted"
+    },
+    {
+      "enforcement": "on",
+      "kind": "web",
+      "delta": 0,
+      "outcome": "accepted"
+    },
+    {
+      "enforcement": "on",
+      "kind": "web",
+      "delta": 1,
+      "outcome": "FILE_TOO_LARGE"
+    }
+  ],
+  "lifecycle": {
+    "cleanupMcpEvidenceUpload": "c3cf68204450c6d091cf11351ca352ed0c289fd58f1d5bb1aba280964832ca67",
+    "markUploadFailed": "c4bb1243d1683d74dfa600a0859db5f905e0fdad5f3f2910f184a000953073af",
+    "releaseUploadForRetry": "39ae6ba9d0b35af520d3aef008c61a74684706088632498237f88d0433251c8c",
+    "sessionForCleanup": "6d1145a5a9990c8b7842257e887bccb91fc53d6f3a946a82839c41df0f310f2c",
+    "mediaUploadRef": "8b918e126ceb8cd21ffa4c2948e93f6625a2a08a8d331ffd280290e4511a6c20",
+    "recordOrphanedCopies": "e244be39fe9b0fba13babd847c2752a961d0bd48f9d56a26b9112fb4ae77c019",
+    "clearOrphanedCopies": "e23c169a7d28d2c361e69478289696a5a1581d733bf9cbce8612ca19ab18fa61",
+    "removeStoredBytes": "a7d9e4fd6aab3e24acec1ac3877736b7b5738828f681b0214074b979d9601d3e",
+    "releaseOperation": "3539d946792acad38cc1450563185fdd1b558849b9dd234a47dfb5178a4726f2",
+    "expireReservations": "d65c52f4e63998d24f0fe4af46301a39fea034cc7137b56be2bcf4a154bbe810",
+    "convex/media.ts": "c5f854b2a3eac148946f5c82d3d2bd9232f6559367a1c86ccb20d2374a4a7a64",
+    "convex/vaultMutations.ts": "49b6c9c86d57cce5d2d96eb5460f6b33bece1217ebb5712768f3d5f404667124",
+    "convex/vaultReads.ts": "f59c753ffaffd0290d517276beb4e47ceea01543708a4b75fbe0157a96dd6985",
+    "lib/media/evidenceB2.ts": "92bda5929976fb5e5681b740449731ad962228fc5c746fd9f4443158375fe52e",
+    "convex/crons.ts": "a112db760bcfb66113fbbdf5425b39e3f4562c7ed10c137820958039a7e66455"
+  }
+}

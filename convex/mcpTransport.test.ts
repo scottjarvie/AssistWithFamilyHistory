@@ -793,9 +793,28 @@ test("storage refusal is structured and the same AI token still reads the brief"
  const argumentsAgain={operationId:"synthetic-cap-refusal",personId:String(personId),title:"Invented evidence",fileName:"invented.jpg",contentType:"image/jpeg",sizeBytes:1,sha256:"a".repeat(64)};
  const retry=await (await t.fetch("/mcp",modernRequest("tools/call",token,{name:"family_history_begin_evidence_upload",arguments:argumentsAgain},"family_history_begin_evidence_upload"))).json();
  expect(retry.result.isError).not.toBe(true);
- await t.run(async ctx=>{const settings=await ctx.db.query("usageLimitSettings").first();await ctx.db.patch(settings!._id,{maxFileBytes:{image:0}});});
- const tooLarge=await (await t.fetch("/mcp",modernRequest("tools/call",token,{name:"family_history_begin_evidence_upload",arguments:{...argumentsAgain,operationId:"synthetic-file-refusal"}},"family_history_begin_evidence_upload"))).json();
+ await t.run(async ctx=>{const settings=await ctx.db.query("usageLimitSettings").first();await ctx.db.patch(settings!._id,{maxFileBytes:{image:1}});});
+ const tooLarge=await (await t.fetch("/mcp",modernRequest("tools/call",token,{name:"family_history_begin_evidence_upload",arguments:{...argumentsAgain,operationId:"synthetic-file-refusal",sizeBytes:2}},"family_history_begin_evidence_upload"))).json();
  expect(tooLarge.result).toMatchObject({isError:true,structuredContent:{code:"FILE_TOO_LARGE",error:{code:"FILE_TOO_LARGE",recovery:expect.any(String)}}});
  expect(tooLarge.result.content[0].text).toMatch(/^This file/);
 
+});
+
+test("uncertain upload recovery reaches the AI as structured expiry and room advice", async () => {
+ const t=convexTest(schema,modules);await approvedConnection(t);
+ vi.stubEnv("MEDIA_STORAGE_ENVIRONMENT","development");vi.stubEnv("CONVEX_SITE_URL","https://relay.example.test");
+ for(const kind of ["PRIVATE","PUBLIC"])for(const [key,value] of Object.entries({ENDPOINT:"https://storage.example.test",REGION:"synthetic",BUCKET:`synthetic-${kind.toLowerCase()}`,KEY_ID:"synthetic-test-key",APPLICATION_KEY:"synthetic-test-value"}))vi.stubEnv(`B2_${kind}_${key}`,value);
+ const personId=await t.run(async ctx=>{
+  await ctx.db.insert("usageLimitSettings",{key:"site",planStoredBytes:{free:1},enforcement:"on",backfillCompletedAt:1,updatedAt:0,updatedBy:"synthetic-admin"});
+  return ctx.db.insert("persons",{vaultOwnerId:SUBJECT,name:{given:"Synthetic",surname:"Fixture"},sex:"unknown",living:false,researchStatus:"basic",createdAt:0,updatedAt:0});
+ });
+ const token=await accessToken(),name="family_history_begin_evidence_upload",args={operationId:"synthetic-recovery",personId:String(personId),title:"Synthetic evidence",fileName:"fixture",contentType:"text/plain",sizeBytes:1,sha256:"a".repeat(64)};
+ const call=()=>t.fetch("/mcp",modernRequest("tools/call",token,{name,arguments:args},name));
+ await call();const expiresAt=await t.run(async ctx=>{const session=await ctx.db.query("mediaUploadSessions").first();await ctx.db.patch(session!._id,{putState:"failed",putUncertain:true});return session!.expiresAt;});
+ const {EvidenceB2Store}=await import("../lib/media/evidenceB2");const head=vi.spyOn(EvidenceB2Store.prototype,"head").mockRejectedValue(new Error("Synthetic unavailable"));
+ try {
+  const result=(await (await call()).json()).result;
+  expect(result).toMatchObject({isError:true,structuredContent:{code:"UPLOAD_ATTEMPT_CLOSED",remaining:0,resetsAt:new Date(expiresAt).toISOString(),error:{code:"UPLOAD_ATTEMPT_CLOSED",recovery:expect.stringContaining("new upload now")}}});
+  expect(result.content[0].text).toContain("same operation ID");expect(result.content[0].text).toContain("keeps its reserved room");
+ }finally{head.mockRestore();}
 });
