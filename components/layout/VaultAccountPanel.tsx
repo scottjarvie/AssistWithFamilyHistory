@@ -70,7 +70,7 @@ export function VaultAccountPanel({
 }: VaultAccountPanelProps) {
   if (!clerkEnabled) {
     return collapsed ? (
-      <div className="flex justify-center text-muted-foreground">
+      <div className="flex justify-center text-stone-400">
         <HardDriveDownload className="h-5 w-5" />
       </div>
     ) : (

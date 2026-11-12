@@ -70,7 +70,7 @@ function FamilyRail() {
     <ul ref={rail} className={`family-rail${overflow ? " family-overflow" : ""}`}>
       <li className="family-kicker">Assist With</li>
       {familySpaces.map((space) => <li key={space.slug}><Entry space={space} /></li>)}
-      <li><SafeAnchor className="family-entry" href={lifeDirectoryHref}>Life · all spaces</SafeAnchor></li>
+      <li><SafeAnchor className="family-entry" href={lifeDirectoryHref}><span aria-hidden="true" className="family-dot" style={{ background: "var(--muted-foreground)" }} />Life · all spaces</SafeAnchor></li>
     </ul>
     <Dialog.Root open={open} onOpenChange={setOpen} modal={phone}>
       {overflow && <Dialog.Trigger asChild><button ref={trigger} className="family-all" type="button" aria-expanded={open}>All {familySpaces.length} <span aria-hidden="true">⌃</span></button></Dialog.Trigger>}
@@ -81,7 +81,7 @@ function FamilyRail() {
           onCloseAutoFocus={(event) => { event.preventDefault(); trigger.current?.focus({ preventScroll: true }); }}
           onPointerDownOutside={(event) => { if (phone) event.preventDefault(); }} aria-describedby={undefined} aria-modal={phone || undefined}>
           <div className="family-roster-heading"><Dialog.Title>Assist With · {familySpaces.length} sites</Dialog.Title><Dialog.Close aria-label="Close family sites">×</Dialog.Close></div>
-          <ul className="family-roster-grid">{familySpaces.map((space) => <li key={space.slug}><Entry space={space} roster close={() => setOpen(false)} /></li>)}<li className="family-life"><SafeAnchor className="family-entry" href={lifeDirectoryHref} onClick={() => setOpen(false)}>Life · all spaces</SafeAnchor></li></ul>
+          <ul className="family-roster-grid">{familySpaces.map((space) => <li key={space.slug}><Entry space={space} roster close={() => setOpen(false)} /></li>)}<li className="family-life"><SafeAnchor className="family-entry" href={lifeDirectoryHref} onClick={() => setOpen(false)}><span aria-hidden="true" className="family-dot" style={{ background: "var(--muted-foreground)" }} />Life · all spaces</SafeAnchor></li></ul>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
@@ -97,8 +97,8 @@ export function FamilyRow() {
 /** Only the ordinary app footer surfaces; task/capture/record shells opt out. */
 export function AppFamilyRow({ signedIn }: { signedIn: boolean }) {
   const path = usePathname();
-  const hash = useSyncExternalStore(subscribeHash, () => window.location.hash, () => "");
-  if (!showAppFamilyRow(path, hash, signedIn)) return null;
+  const hash = useSyncExternalStore<string | null>(subscribeHash, () => window.location.hash, () => null);
+  if (hash === null || !showAppFamilyRow(path, hash, signedIn)) return null;
   return <FamilyRow />;
 }
 
