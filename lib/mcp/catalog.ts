@@ -213,7 +213,7 @@ export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
     writes: false,
     title: "Search Family History",
     description:
-      "Search bounded owner-scoped summaries across people, sources, places, topics, stories, research tasks/findings, and events. Hydrate a returned stable ID before editing.",
+      "Search capped owner-scoped summaries across people, sources, places, topics, stories, research tasks/findings, and events. Read coverage: incomplete windows and unvisited kinds are not exhaustive, even with no results. No continuation is available. Hydrate a returned stable ID before editing.",
     humanSummary: "Searches your research for matching people, sources, and notes.",
     implementedBy: "convex/mcpFamilyHistory.search",
     sunsetNote: ALIAS_SUNSET,

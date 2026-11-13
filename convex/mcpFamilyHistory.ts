@@ -1461,42 +1461,75 @@ export const search = internalQuery({
     const scan = FAMILY_HISTORY_MCP_LIMITS.searchScanPerType;
     const kinds = new Set(args.kinds?.length ? args.kinds : ["person", "source", "place", "topic", "story", "research_task", "research_finding", "event"]);
     const results: Array<Record<string, unknown>> = [];
+    // Coverage describes this legacy candidate window, not a total vault count.
+    // Keep its existing sentinel row searchable for input/result compatibility.
+    const visitedKinds: string[] = [];
+    const candidateWindowLimitedKinds: string[] = [];
+    let additionalMatchesInWindow = false;
+    const recordWindow = (kind: string, count: number) => {
+      visitedKinds.push(kind);
+      if (count > scan) candidateWindowLimitedKinds.push(kind);
+    };
     const add = (kind: string, rows: Array<Record<string, unknown>>) => {
+      if (rows.length > limit - results.length) additionalMatchesInWindow = true;
       for (const row of rows) if (results.length < limit) results.push({ kind, ...row });
     };
     if (kinds.has("person")) {
       const rows = await ctx.db.query("persons").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(scan + 1);
+      recordWindow("person", rows.length);
       add("person", rows.filter((row) => `${row.name.given} ${row.name.surname} ${(row.alternateNames ?? []).map((name) => `${name.given} ${name.surname}`).join(" ")} ${(row.tags ?? []).join(" ")}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, name: `${row.name.given} ${row.name.surname}`.trim(), living: row.living, researchStatus: row.researchStatus, updatedAt: row.updatedAt })));
     }
     if (kinds.has("source") && results.length < limit) {
       const rows = await ctx.db.query("sources").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(scan + 1);
+      recordWindow("source", rows.length);
       add("source", rows.filter((row) => `${row.title} ${row.repository ?? ""} ${row.author ?? ""} ${row.type}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, title: row.title, type: row.type, repository: row.repository, updatedAt: row.updatedAt })));
     }
     if (kinds.has("story") && results.length < limit) {
       const rows = await ctx.db.query("stories").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(scan + 1);
+      recordWindow("story", rows.length);
       add("story", rows.filter((row) => `${row.title} ${(row.tags ?? []).join(" ")} ${row.type}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, title: row.title, type: row.type, status: row.status, personId: row.personId, updatedAt: row.updatedAt })));
     }
     if (kinds.has("research_task") && results.length < limit) {
       const rows = await ctx.db.query("researchTasks").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(scan + 1);
+      recordWindow("research_task", rows.length);
       add("research_task", rows.filter((row) => `${row.title} ${row.description ?? ""} ${row.notes ?? ""}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, title: row.title, status: row.status, priority: row.priority, personId: row.personId, updatedAt: row.updatedAt })));
     }
     if (kinds.has("research_finding") && results.length < limit) {
       const rows = await ctx.db.query("researchLog").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(scan + 1);
+      recordWindow("research_finding", rows.length);
       add("research_finding", rows.filter((row) => `${row.summary} ${row.details ?? ""}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, summary: row.summary, entityType: row.entityType, entityId: row.entityId, status: row.status, updatedAt: row.updatedAt })));
     }
     if (kinds.has("event") && results.length < limit) {
       const rows = await ctx.db.query("events").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(scan + 1);
+      recordWindow("event", rows.length);
       add("event", rows.filter((row) => `${row.type} ${row.customType ?? ""} ${row.description ?? ""} ${row.place?.original ?? ""} ${row.date?.original ?? ""}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, type: row.type, customType: row.customType, date: row.date, place: row.place, description: row.description, updatedAt: row.updatedAt })));
     }
     if (kinds.has("place") && results.length < limit) {
       const rows = await ctx.db.query("places").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(scan + 1);
+      recordWindow("place", rows.length);
       add("place", rows.filter((row) => `${row.name} ${row.fullName} ${row.type} ${(row.alternateNames ?? []).map((name) => name.name).join(" ")}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, name: row.name, fullName: row.fullName, type: row.type, parentId: row.parentId, updatedAt: row.updatedAt })));
     }
     if (kinds.has("topic") && results.length < limit) {
       const rows = await ctx.db.query("topics").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(scan + 1);
+      recordWindow("topic", rows.length);
       add("topic", rows.filter((row) => `${row.name} ${row.kind} ${(row.alternateNames ?? []).join(" ")} ${row.description ?? ""}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, name: row.name, kind: row.kind, updatedAt: row.updatedAt })));
     }
-    return { query: args.query, results, limit, truncated: results.length === limit, nextRecommendedTool: "get_family_history_context" };
+    const requestedKinds = ["person", "source", "story", "research_task", "research_finding", "event", "place", "topic"].filter(kind => kinds.has(kind));
+    const unvisitedKinds = requestedKinds.filter(kind => !visitedKinds.includes(kind));
+    const candidateWindowLimited = candidateWindowLimitedKinds.length > 0;
+    const resultLimited = additionalMatchesInWindow || unvisitedKinds.length > 0;
+    const truncated = candidateWindowLimited || resultLimited;
+    return {
+      query: args.query, results, limit, truncated,
+      coverage: {
+        status: candidateWindowLimited ? "budgetLimited" : resultLimited ? "resultLimited" : "complete",
+        requestedKinds, visitedKinds, unvisitedKinds, candidateWindowLimitedKinds,
+        resultLimited,
+        // No offset into this same capped pool can provide complete continuation.
+        continuation: "unavailable",
+      },
+      nextRecommendedTool: "get_family_history_context",
+    };
   },
 });
 
