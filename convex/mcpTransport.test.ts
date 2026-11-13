@@ -818,3 +818,31 @@ test("uncertain upload recovery reaches the AI as structured expiry and room adv
   expect(result.content[0].text).toContain("same operation ID");expect(result.content[0].text).toContain("keeps its reserved room");
  }finally{head.mockRestore();}
 });
+
+test("canonical and alias search serialize restricted coverage identically across hidden saturation", async () => {
+  const t = convexTest(schema, modules);
+  const allowed = await t.run(ctx => ctx.db.insert("persons", { vaultOwnerId: SUBJECT, name: { given: "Allowed", surname: "Synthetic" }, sex: "unknown", living: false, researchStatus: "basic", createdAt: 0, updatedAt: 0 }));
+  await seedGrant(t, { vaultOwnerId: SUBJECT, clientId: CLIENT_ID, issuer: ISSUER, boundary: { kind: "selected_people", personIds: [allowed] } });
+  const token = await accessToken();
+  const call = async (name: string, args: Record<string, unknown>) => {
+    const response = await t.fetch("/mcp", modernRequest("tools/call", token, { name, arguments: args }, name));
+    const result = (await response.json()).result;
+    if (result.structuredContent) return result.structuredContent;
+    try { return JSON.parse(result.content[0].text); }
+    catch { return result; } // SDK validation refusals are plain text.
+  };
+  const args = { query: "unfindable", kinds: ["person", "person"], limit: 1 };
+  const before = await call("family_history_search", args);
+  await t.run(async ctx => {
+    for (let i = 0; i < 251; i++) await ctx.db.insert("persons", { vaultOwnerId: SUBJECT, name: { given: "Hidden", surname: "Synthetic" }, sex: "unknown", living: false, researchStatus: "basic", createdAt: 0, updatedAt: 0 });
+  });
+  expect(await call("search_family_history", args)).toEqual(before);
+  expect(before).toMatchObject({ results: [], truncated: true, coverage: { status: "unavailable", continuation: "unavailable" } });
+  for (const bad of [{ query: "" }, { query: "x".repeat(201) }, { query: "valid", kinds: ["invalid"] }]) {
+    const canonical = await call("family_history_search", bad);
+    const alias = await call("search_family_history", bad);
+    // Tool-specific validation text may include the invoked name; both refuse.
+    expect(JSON.stringify(canonical)).toMatch(/error|invalid|required|small|big/i);
+    expect(JSON.stringify(alias)).toMatch(/error|invalid|required|small|big/i);
+  }
+});
