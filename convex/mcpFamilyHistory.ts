@@ -11,9 +11,9 @@ import type { Doc, Id, TableNames } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { mutation, internalMutation, internalQuery } from "./_generated/server";
 import { anyApi } from "convex/server";
-import { FAMILY_HISTORY_MCP_LIMITS } from "../lib/mcp/contract";
+import { hashMcpInput, FAMILY_HISTORY_MCP_LIMITS } from "../lib/mcp/contract";
 import { matchesVaultOwner } from "./vaultCore";
-import { assertGrantPermits } from "./mcpGrants";
+import { assertGrantPermits, resolveSearchAuthority } from "./mcpGrants";
 
 const principalValidator = v.object({
   issuer: v.string(),
@@ -1447,6 +1447,11 @@ export const getBrief = internalQuery({
   },
 });
 
+/** Shared legacy person-summary matching; never match person notes/context. */
+function personMatchesDiscovery(row: Doc<"persons">, needle: string) {
+  return `${row.name.given} ${row.name.surname} ${(row.alternateNames ?? []).map(name => `${name.given} ${name.surname}`).join(" ")} ${(row.tags ?? []).join(" ")}`.toLowerCase().includes(needle);
+}
+
 export const search = internalQuery({
   args: {
     principal: principalValidator,
@@ -1456,6 +1461,7 @@ export const search = internalQuery({
   },
   handler: async (ctx, args) => {
     const owner = ownerFromPrincipal(args.principal);
+    const authority = await resolveSearchAuthority(ctx, args.principal);
     const needle = args.query.trim().toLowerCase();
     const limit = Math.max(1, Math.min(Math.floor(args.limit ?? 25), FAMILY_HISTORY_MCP_LIMITS.searchLimit));
     const scan = FAMILY_HISTORY_MCP_LIMITS.searchScanPerType;
@@ -1477,7 +1483,7 @@ export const search = internalQuery({
     if (kinds.has("person")) {
       const rows = await ctx.db.query("persons").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(scan + 1);
       recordWindow("person", rows.length);
-      add("person", rows.filter((row) => `${row.name.given} ${row.name.surname} ${(row.alternateNames ?? []).map((name) => `${name.given} ${name.surname}`).join(" ")} ${(row.tags ?? []).join(" ")}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, name: `${row.name.given} ${row.name.surname}`.trim(), living: row.living, researchStatus: row.researchStatus, updatedAt: row.updatedAt })));
+      add("person", rows.filter((row) => personMatchesDiscovery(row, needle)).map((row) => ({ id: row._id, name: `${row.name.given} ${row.name.surname}`.trim(), living: row.living, researchStatus: row.researchStatus, updatedAt: row.updatedAt })));
     }
     if (kinds.has("source") && results.length < limit) {
       const rows = await ctx.db.query("sources").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(scan + 1);
@@ -1520,8 +1526,14 @@ export const search = internalQuery({
     const resultLimited = additionalMatchesInWindow || unvisitedKinds.length > 0;
     const truncated = candidateWindowLimited || resultLimited;
     return {
-      query: args.query, results, limit, truncated,
-      coverage: {
+      query: args.query, results, limit,
+      // FH-A-01 containment: the inherited owner-window results are NOT yet
+      // FH-R006-compliant. Never add progress about that window to restricted
+      // grants. Keep this constant even if hidden terms change legacy hits.
+      truncated: authority.boundary.kind === "whole_workspace" ? truncated : true,
+      coverage: authority.boundary.kind !== "whole_workspace" ? {
+        status: "unavailable", continuation: "unavailable",
+      } : {
         status: candidateWindowLimited ? "budgetLimited" : resultLimited ? "resultLimited" : "complete",
         requestedKinds, visitedKinds, unvisitedKinds, candidateWindowLimitedKinds,
         resultLimited,
@@ -1530,6 +1542,64 @@ export const search = internalQuery({
       },
       nextRecommendedTool: "get_family_history_context",
     };
+  },
+});
+
+/** HELD SOURCE PROTOTYPE. Not wired into HTTP/MCP/UI; no read switch.
+ * Page-local exhaustion only: an editable native/selected position is a seek,
+ * never an attestation that earlier authorized rows were traversed. */
+export const searchPeoplePagePrototype = internalQuery({
+  args: {
+    principal: principalValidator, query: v.string(), pageSize: v.optional(v.number()),
+    cursor: v.optional(v.object({ version: v.literal(1), binding: v.string(), position: v.union(v.string(), v.number()) })),
+  },
+  handler: async (ctx, args) => {
+    const authority = await resolveSearchAuthority(ctx, args.principal);
+    const query = args.query.trim().toLowerCase();
+    const pageSize = args.pageSize ?? 25;
+    if (!query || query.length > 200 || !Number.isInteger(pageSize) || pageSize < 1 || pageSize > FAMILY_HISTORY_MCP_LIMITS.searchLimit) {
+      machineError("VALIDATION_ERROR", "Use 1–200 query characters and an integer page size from 1–50.", "Correct the query and restart.");
+    }
+    const binding = await hashMcpInput({ authority: authority.binding, query, pageSize,
+      family: "person", mode: "legacy_literal_substring", order: "owner_creation_desc", plan: 1 });
+    const cursor = args.cursor;
+    if (cursor && (cursor.binding.length !== 64 || cursor.binding !== binding ||
+      (typeof cursor.position === "string" && cursor.position.length > 4096))) {
+      machineError("STALE_VERSION", "Search cursor no longer matches this authority or query.", "Restart without a cursor.");
+    }
+    let rows: Doc<"persons">[];
+    let next: string | number | null;
+    if (authority.boundary.kind === "selected_people") {
+      const ids = [...new Set(authority.boundary.personIds ?? [])].sort();
+      if (ids.length > 200) machineError("RESULT_TOO_LARGE", "This prototype supports up to 200 selected people.", "Use the existing finder; await reviewed traversal support.");
+      const position = cursor?.position ?? 0;
+      if (typeof position !== "number" || !Number.isInteger(position) || position < 0 || position > ids.length) {
+        machineError("VALIDATION_ERROR", "Invalid selected-person position.", "Restart without a cursor.");
+      }
+      // One direct approved ID per selected page: no owner scan/hidden text,
+      // no parent fanout; one source document is bounded by Convex row limits.
+      const id = position < ids.length ? ctx.db.normalizeId("persons", ids[position]) : null;
+      const row = id ? await ctx.db.get(id) : null;
+      rows = row?.vaultOwnerId === args.principal.subject ? [row] : [];
+      next = position + 1 < ids.length ? position + 1 : null;
+    } else {
+      if (authority.boundary.kind !== "whole_workspace") machineError("OUTSIDE_GRANT_BOUNDARY", "People are outside this connection boundary.", "Use permitted Queue tools.");
+      if (cursor && typeof cursor.position !== "string") machineError("VALIDATION_ERROR", "Invalid owner-source cursor.", "Restart without a cursor.");
+      const page = await ctx.db.query("persons").withIndex("by_owner", q => q.eq("vaultOwnerId", args.principal.subject)).order("desc")
+        .paginate({ numItems: pageSize, maximumRowsRead: 200, maximumBytesRead: 1_000_000, cursor: cursor?.position as string | undefined ?? null });
+      rows = page.page;
+      next = page.isDone ? null : page.continueCursor;
+    }
+    const results = rows.filter(row => row.archivedAt === undefined &&
+      personMatchesDiscovery(row, query))
+      .map(row => ({ kind: "person", id: row._id, name: `${row.name.given} ${row.name.surname}`.trim(), living: row.living, researchStatus: row.researchStatus, updatedAt: row.updatedAt }));
+    const result = { results, cursor: next === null ? null : { version: 1 as const, binding, position: next },
+      coverage: { status: next === null ? "pageExhausted" : "continuable", globalCompleteness: "not_attested" } };
+    // Reject rather than silently truncate a matching DTO or advance over it.
+    if (new TextEncoder().encode(JSON.stringify(result)).byteLength > FAMILY_HISTORY_MCP_LIMITS.resultJson) {
+      machineError("RESULT_TOO_LARGE", "Search response exceeds the prototype byte budget.", "Restart with a smaller page size; retain the existing finder if one row is too large.");
+    }
+    return result;
   },
 });
 

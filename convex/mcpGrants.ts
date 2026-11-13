@@ -426,6 +426,30 @@ export async function assertGrantPermits(
   return projected;
 }
 
+/** Read-only transaction adapter: lookup keys come from verified transport identity.
+ * No grant ID, boundary boolean or revision supplied by a client grants access. */
+export async function resolveSearchAuthority(
+  ctx: QueryCtx,
+  identity: { subject: string; issuer: string; clientId: string },
+) {
+  const row = await callingGrant(ctx, identity);
+  const permitted = await assertGrantPermits(ctx, {
+    owner: identity.subject, grantId: row?._id,
+    toolName: "family_history_search", input: {},
+  });
+  if (!permitted) throw new Error("Search authority unavailable");
+  const carried = await carriedForOwner(ctx, identity.subject);
+  return {
+    boundary: permitted.boundary,
+    binding: await hashMcpInput({
+      identity, grantId: permitted._id, revision: permitted.revision ?? 0,
+      carriedRevision: carried?.revision ?? 0,
+      scopes: effectiveScopes(permitted).slice().sort(),
+      boundary: permitted.boundary, endsAt: effectiveExpiry(permitted) ?? null,
+    }),
+  };
+}
+
 /* ------------------------------------------------ owner-scoped product reads */
 
 /**
