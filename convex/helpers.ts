@@ -4,7 +4,7 @@ import { v } from "convex/values";
 // grep). Internalize the whole file via alias so existing `mutation({...})`
 // syntax still compiles but the underlying functions are not publicly
 // callable.
-import { internalMutation as mutation } from "./_generated/server";
+import { internalMutation as mutation } from "./searchServer";
 import { Id } from "./_generated/dataModel";
 
 /**

@@ -5,7 +5,7 @@ import type { FunctionReference } from "convex/server";
 
 import type { Doc, Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
-import { action, internalQuery, mutation, type ActionCtx, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { action, internalQuery, mutation, type ActionCtx, type MutationCtx, type QueryCtx } from "./searchServer";
 import { authorizeTenantAction, authorizeTenantMutation, type TenantAccessDecision } from "./access";
 
 type AcceptanceInspection = {

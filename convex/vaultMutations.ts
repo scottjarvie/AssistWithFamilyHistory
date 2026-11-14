@@ -1,8 +1,9 @@
+import { DEFAULT_LOCAL_VAULT_OWNER } from "../lib/vault/constants";
 import { invalidAudioFileError, checkVoiceNoteDuration, voiceNoteTooLongError, normalizeAudioMime } from "./lib/media/audio";
 import { requireWebsitePerson } from "./access";
 import { fileCapsFor, audioPolicyFor, reserveOperation, commitOperation, removeStoredBytes, summaryFor, assertFileSize, limitsFor, releaseExpiredWeb } from "./usageLimits";
 import { ConvexError, v } from "convex/values";
-import { internalQuery, internalMutation, mutation, type QueryCtx, type MutationCtx } from "./_generated/server";
+import { internalQuery, internalMutation, mutation, type QueryCtx, type MutationCtx } from "./searchServer";
 import type { Doc, Id } from "./_generated/dataModel";
 import { buildStoryPublicSlug } from "../lib/stories/slug";
 import { redactPublicText } from "../lib/privacy/publicTextRedaction";
@@ -354,7 +355,16 @@ export const upsertPerson = mutation({
       existing = filterByVaultOwner(fsMatches, vaultOwnerId)[0] ?? null;
     }
 
-    if (!existing) {
+    const namesReady = await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", "persons")).unique();
+    if (!existing && namesReady?.complete) {
+      const owners = vaultOwnerId === DEFAULT_LOCAL_VAULT_OWNER ? [vaultOwnerId, undefined] : [vaultOwnerId];
+      for (const owner of owners) {
+        if (existing) break;
+        const candidates = ctx.db.query("persons").withIndex("by_owner_name", q => q.eq("vaultOwnerId", owner).eq("name.surname", args.name.surname).eq("nameGivenKey", args.name.given.trim().toLowerCase()));
+        existing = args.birth?.date?.year ? await candidates.filter(q => q.or(q.eq(q.field("birth.date.year"), undefined), q.eq(q.field("birth.date.year"), 0), q.eq(q.field("birth.date.year"), args.birth!.date!.year))).first() : await candidates.first();
+      }
+    }
+    if (!existing && !namesReady?.complete) {
       const candidates = await ctx.db
         .query("persons")
         .withIndex("by_surname", (q) => q.eq("name.surname", args.name.surname))
@@ -562,27 +572,11 @@ export const upsertSource = mutation({
     const now = Date.now();
     let existing: Doc<"sources"> | null = null;
 
-    if (args.fsId) {
-      const matches = await ctx.db
-        .query("sources")
-        .withIndex("by_fsId", (q) => q.eq("fsId", args.fsId))
-        .collect();
-      existing = filterByVaultOwner(matches, vaultOwnerId)[0] ?? null;
-    }
-
-    if (!existing && args.importKey) {
-      const matches = await ctx.db
-        .query("sources")
-        .withIndex("by_import_key", (q) => q.eq("importKey", args.importKey))
-        .collect();
-      existing = filterByVaultOwner(matches, vaultOwnerId)[0] ?? null;
-    }
-
-    if (!existing && args.url) {
-      const matches = filterByVaultOwner(await ctx.db.query("sources").collect(), vaultOwnerId);
-      existing =
-        matches.find((source) => source.url === args.url && source.title === args.title) || null;
-    }
+    const owners = vaultOwnerId === DEFAULT_LOCAL_VAULT_OWNER ? [vaultOwnerId, undefined] : [vaultOwnerId];
+    const oldest = (rows: Array<Doc<"sources"> | null>) => rows.filter((row): row is Doc<"sources"> => row !== null).sort((a,b) => a._creationTime - b._creationTime)[0] ?? null;
+    if (args.fsId) existing = oldest(await Promise.all(owners.map(owner => ctx.db.query("sources").withIndex("by_owner_fsId", q => q.eq("vaultOwnerId", owner).eq("fsId", args.fsId)).first())));
+    if (!existing && args.importKey) existing = oldest(await Promise.all(owners.map(owner => ctx.db.query("sources").withIndex("by_owner_import_key", q => q.eq("vaultOwnerId", owner).eq("importKey", args.importKey)).first())));
+    if (!existing && args.url) existing = oldest(await Promise.all(owners.map(owner => ctx.db.query("sources").withIndex("by_owner_url_title", q => q.eq("vaultOwnerId", owner).eq("url", args.url).eq("title", args.title)).first())));
 
     const payload = {
       ...args,

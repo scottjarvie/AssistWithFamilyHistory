@@ -65,7 +65,7 @@ for (const file of files) {
   const basename = path.basename(file);
 
   // Detect aliased internal imports — `internalQuery as query` etc.
-  const importLine = source.match(/import\s*\{\s*([^}]*)\s*\}\s*from\s*["']\.\/(_generated\/)?server["']/);
+  const importLine = source.match(/import\s*\{\s*([^}]*)\s*\}\s*from\s*["']\.\/(?:(?:_generated\/)?server|searchServer)["']/);
   const aliasedToInternal = importLine
     ? /\binternalQuery\s+as\s+query\b/.test(importLine[1]) ||
       /\binternalMutation\s+as\s+mutation\b/.test(importLine[1])
