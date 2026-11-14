@@ -34,6 +34,10 @@ ignored at read time.
 
 ## Delivering changes
 
+- Source mutations for People Explorer dependencies must use `convex/searchServer.ts`
+  builders: they maintain exact explorer projections. See
+  [projection maintenance and backfill](docs/operations/people-explorer-scale.md).
+
 - `pnpm verify` is the full check (typecheck, lint, tests, every `check:*`
   contract, build). Run it before pushing code.
 - Merging to `main` deploys production: Vercel runs `convex deploy` and then

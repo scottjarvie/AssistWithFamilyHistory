@@ -94,6 +94,9 @@ export default defineSchema({
    */
   searchBuildState: defineTable({ table: v.string(), cursor: v.union(v.string(), v.null()), complete: v.boolean() }).index("by_table", ["table"]),
 
+  peopleExplorerRows: defineTable({personId: v.id("persons"), vaultOwnerId: v.string(), researchStatus: v.string(), orderKey: v.string(), text: v.string(), payload: v.any()})
+    .index("by_person", ["personId"]).index("by_owner_order", ["vaultOwnerId", "orderKey"]).index("by_owner_status_order", ["vaultOwnerId", "researchStatus", "orderKey"]),
+
   mediaPeople: defineTable({personId: v.id("persons"), mediaId: v.id("media")}).index("by_person", ["personId"]).index("by_media", ["mediaId"]),
 
   persons: defineTable({
@@ -1230,6 +1233,7 @@ export default defineSchema({
     .index("by_owner", ["vaultOwnerId"])
     .index("by_person", ["personId"])
     .index("by_person_fsId", ["personFsId"])
+    .index("by_owner_person_fsId", ["vaultOwnerId", "personFsId"])
     .index("by_imported_at", ["importedAt"])
     .index("by_capture_id", ["captureId"]),
 
@@ -1637,6 +1641,7 @@ export default defineSchema({
   })
     .index("by_owner", ["vaultOwnerId"])
     .index("by_personId", ["personId"])
+    .index("by_owner_personId", ["vaultOwnerId", "personId"])
     .index("by_personId_type", ["personId", "type"]),
 
   /**

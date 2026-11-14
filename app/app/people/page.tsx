@@ -62,5 +62,5 @@ export default async function PeoplePage({searchParams}: {searchParams: Promise<
     );
   }
 
-  return <PaginatedPeopleExplorer key={`${vaultOwnerId}:${params.q || ""}:${status || ""}`} initial={people} firstStartEligible={firstStartEligible} query={params.q} status={status} preferenceKey={`awf.collection.people.${vaultOwnerId}`}/>;
+  return <PaginatedPeopleExplorer key={`${vaultOwnerId}:${params.q || ""}:${status || ""}`} vaultOwnerId={vaultOwnerId} initial={people} firstStartEligible={firstStartEligible} query={params.q} status={status} preferenceKey={`awf.collection.people.${vaultOwnerId}`}/>;
 }
