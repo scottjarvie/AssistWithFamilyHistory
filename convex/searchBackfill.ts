@@ -23,7 +23,7 @@ export const step = internalMutation({
 export const run = internalAction({
   args: {},
   handler: async (ctx): Promise<{ complete: boolean }> => {
-    const deadline = Date.now() + 8 * 60 * 1000;
+    const deadline = Date.now() + 2 * 60 * 1000;
     for (const table of SEARCH_TABLES) {
       // Bound an action; rerun to resume if an exceptionally large vault needs more.
       for (let i = 0; i < 10000; i++) {

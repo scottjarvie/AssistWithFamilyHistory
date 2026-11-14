@@ -20,7 +20,7 @@ Deploy through the normal coordinated Vercel production build. After backend
 deployment, run the internal `searchBackfill:run` on **accomplished-dodo-308**.
 It pages at most 200 records at a time with a 1 MB read budget, writes only derived fields
 and progress, and returns `{ complete: true }` when all eight tables are done.
-It can be rerun after interruption or an action timeout; it yields after eight
+It can be rerun after interruption or an action timeout; it yields after two
 minutes when possible. Confirm all eight flags with `searchBackfill:status`. No real records are deleted, and original
 fields and timestamps are preserved. Each table keeps the prior search path
 until its completion flag is committed. Confirm completion before declaring
