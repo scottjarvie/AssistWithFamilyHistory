@@ -1,76 +1,113 @@
 # People Explorer at large tree sizes
 
-The website People list uses maintained `peopleExplorerRows`: only display DTOs,
-exact per-person counts, exact search text and an ordering key. Research-state
-and owner filters use index prefixes. No global tree totals are displayed:
-“All loaded people” counts the visible rows, not an estimated tree size.
+The website People list uses `peopleExplorerRows`: validated display DTOs, exact
+per-person counts, substring search text and an ordering key. Owner/research-state
+filters use index prefixes. “All loaded people” counts the visible rows, not an
+estimated tree total. After backfill, browsing reads 50 compact rows and one flag;
+sparse substring search scans at most 2,000 candidates / 2 MB per call, returning
+at most 50 matches. Empty pages mean progress, not completion. Arbitrary substring
+search remains linear overall; MCP word search cannot reproduce its semantics.
 
-After backfill, browsing reads at most 50 compact rows and one readiness flag;
-no event/citation/media lookups. Searching preserves case-insensitive arbitrary
-substring matching over name, IDs, original birth/death dates and first two
-resolved place names. The MCP word index cannot reproduce this contract. It
-starts with 50 compact candidates, then scans up to 2,000 per call through sparse
-matches. Each call returns at most 50 matches and advances only through processed
-candidates. Empty pages are progress, not end-of-results. This remains linear
-for absent/rare substrings, but a 100k tree takes at most 52 bounded calls, with
-no repeated event/citation joins. It is not constant-cost indexed text search.
+Ordering is updated-descending / creation-ascending. Load more appends; sorting,
+grouping and selection apply to loaded rows. Filters restart traversal. Concurrent
+edits can move rows ahead of a cursor; reload for a current traversal. Server
+loads refuse an active-tree change. Versioned cursors restart across migration.
 
-Ordering preserves updated-descending, creation-ascending ties. Load more appends
-50 rows; grouping, sorting and selection apply to loaded rows. Changing filters
-restarts traversal. Editing records during traversal may move them before the
-cursor; reload for a current complete ordering. The server refuses further loads
-if the active tree changed. Versioned cursors restart safely across migration.
+## Projection maintenance without blocking source edits
 
-## Exact projection maintenance
+Source mutations use `searchServer`, which captures writes through `searchWrites`.
+Discovery runs only when projection-relevant fields change:
 
-`searchServer` wraps central mutations, records old/new source rows through
-`searchWrites`, discovers affected people and refreshes each once, atomically at
-transaction end. Dependencies cover persons, events/personEvents, places,
-sources/citations/citationLinks, media, documents, stories and importRuns.
-Media array membership uses `mediaPeople`; source rows are always owner checked.
-Document and FamilySearch-import reads now have owner-prefixed indexes.
+- Places: name, fullName, archivedAt, vaultOwnerId.
+- Sources: archivedAt, vaultOwnerId.
+- Citations: sourceId, archivedAt, vaultOwnerId.
+- Events: place.placeId, archivedAt, vaultOwnerId.
+- Media: personIds, archivedAt, vaultOwnerId.
+- Documents/stories: personId, archivedAt, vaultOwnerId.
+- Imports: personId, personFsId, importedAt, archivedAt, vaultOwnerId.
+- Persons, personEvents and citationLinks: always.
 
-The projection contains no raw notes, artifacts, URLs or unused workspace data.
-Counts are computed exactly from the relevant source rows during a refresh;
-none are approximated or dropped. Source mutations and projections commit or
-roll back together. Exceptionally large per-person fan-out or a shared-source /
-place change affecting thousands of people may exceed write-time transaction
-limits and roll back. Paginated asynchronous invalidation/rebuild for such
-mass edits remains follow-up; readers never accept a partially refreshed commit.
-The former source mutation could succeed where this synchronous refresh fails,
-so this is a material write-time limitation, not a claimed fix for all bulk edits.
+Timestamp-only FamilySearch upserts do not discover or refresh dependants. Inline
+work has one shared operation/byte budget, serializes reads to enforce that byte
+budget, and attempts at most 25 people. Small reads use short bounded probes;
+large ranges, evidence-heavy people or exhausted budgets defer the remaining work.
+The source edit commits with scheduled work instead of rolling back because of
+the projection. Dependency jobs page 25 rows / 100 KB at each indexed graph hop;
+individual person refreshes run in isolated mutations via scheduled actions.
 
-Only website `/app/people` uses this DTO path. The compatibility array API
-`vaultReads.getPeopleExplorer`, Places, Operations, Research, Overview and writing
-candidates remain follow-ups: their broader metric/context contracts need their
-own exact counters/projections and migrations.
+Rows can be briefly stale after deferred edits. They contain exact last-computed
+counts, not approximations. A failed isolated refresh records only the person ID,
+time and a fixed diagnostic in `peopleExplorerFailures`; it never rolls back the
+source edit. Inspect/repair failures using the commands below. A single person's
+extreme evidence fan-out can still exceed a refresh transaction's limits; such a
+row remains stale and needs an incremental refresh implementation or investigation,
+not alteration/deletion of source data. Owner changes/archive/delete immediately
+remove a person's old display row before scheduling, so stale rows cannot stay in
+a former owner's tree. Media membership links remain maintained atomically.
 
-## Release and backfill
+The guest migration route `/api/vault/migrate-guest` is wired to the application.
+It is permitted in shadow mode and refused in enforce mode pending a signed guest
+capability; we do not assume production's mode. Its dedicated central builder
+captures only person retags, removes old-owner projections, and schedules a paged
+owner repair. It does not refresh every guest person inline. The pre-existing
+owner-table retag/storage-accounting mutation itself remains unpaged; this change
+removes the added projection fan-out rather than redesigning that legacy flow.
+
+A type-aware test checks Convex files with raw `_generated/server` mutation
+builders: inserts and both patch/delete signatures are checked using table/ID
+brands, including aliases and unknown dynamic IDs. Projection-source writes must
+use `searchServer`. Derived-search and media-size repairs also use that adapter.
+
+## Release, backfill and repair
 
 Merge deploys Convex through Vercel, then builds the frontend. Never manually
-deploy production Convex. Wait for the coordinated Vercel deploy to succeed.
-Run the shipped internal migration on the **explicit actual deployment**:
+deploy production. After the coordinated Vercel deployment succeeds:
 
 ```bash
 pnpm exec convex run --deployment accomplished-dodo-308 peopleExplorer:backfill '{}'
 pnpm exec convex run --deployment accomplished-dodo-308 peopleExplorer:backfillStatus '{}'
 ```
 
-Rerun `backfill` on `{complete:false}` or interruption until status returns
-`{complete:true, mediaComplete:true, peopleComplete:true}`. The action yields
-after two minutes. It first reconciles at most 100 media records / 500 KB per
-transaction, then refreshes five legacy people / 100 KB of person records per
-transaction. Related-row reads add to that budget. All stages are idempotent and
-restartable. If a single person's or media record's fan-out exceeds transaction
-limits, stop and report it; do not change source records or completion flags.
+Actions yield after two minutes. Membership batches process <=100 media / 500 KB.
+Person backfill reads one legacy ID at a time, refreshes it in an isolated
+mutation, then advances a restartable cursor in a separate transaction. Neither
+source fields nor source timestamps change. Concurrent normal writes maintain
+links and schedule/refresh projections once membership is ready.
 
-Central writes maintain media links from deployment onward, and person rows
-once membership is complete. Thus concurrent edits cannot be missed by the
-person backfill. Neither source timestamps nor source data are modified.
-Until both flags are complete, reads use the previous scoped fallback, including
-an owner-wide media read until membership is complete. Scale readiness is
-**pending backfill**; very large vaults can still fail on that fallback.
+On an error, the default stops without advancing that person's cursor. To finish
+traversing other people while recording failed IDs:
 
-Local synthetic measurements are indicative only. The anonymous backend's
-index latency can grow with range size, unlike cloud behavior; neither query
-latency nor historical migration throughput is a production promise.
+```bash
+pnpm exec convex run --deployment accomplished-dodo-308 peopleExplorer:backfill '{"skipErrors":true}'
+pnpm exec convex run --deployment accomplished-dodo-308 peopleExplorer:failures '{"cursor":null}'
+```
+
+The failures query is paginated; pass its continueCursor to inspect later pages.
+`traversalComplete:true` means all IDs were visited. Skipped errors keep
+`peopleComplete`/`complete` false until repaired, so incomplete projections cannot
+replace the legacy read. Repair up to 100 IDs per invocation:
+
+```bash
+pnpm exec convex run --deployment accomplished-dodo-308 peopleExplorer:refreshPeople '{"personIds":["<failed person ID>"]}'
+pnpm exec convex run --deployment accomplished-dodo-308 peopleExplorer:backfillStatus '{}'
+```
+
+Repair schedules isolated refreshes; wait for them to finish before interpreting
+status. Successful repair removes its failure. After traversal, the last repaired
+failure releases the completion gate. Confirm `complete:true`, `mediaComplete:true`,
+`peopleComplete:true`, `traversalComplete:true`, `hasFailures:false`. Background
+failures after initial readiness can leave `complete:true` with `hasFailures:true`;
+the completion flag describes migration, not continuous freshness. Inspect and
+repair those failures too. Never manually set flags or change source data to force
+progress. No new review, merge or production action is implied by these commands.
+
+Until the projection flag is complete, the website calls the **original**
+`vault.getPeopleExplorer` implementation with limit/offset slicing, preserving its
+full snapshot/filter/count behavior and creation-ascending ties. It retains the
+old large-tree limitations until migration completes. It no longer uses the
+intermediate per-person fallback, which added excessive index ranges.
+
+Other snapshot pages (Places, Operations, Research, Overview, writing candidates)
+and the compatibility People array API remain follow-ups. Their broader exact
+metrics/context need separate projections and backfills. Anonymous local timings
+are indicative only; neither latency nor migration throughput is a cloud promise.

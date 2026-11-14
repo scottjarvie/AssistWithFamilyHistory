@@ -85,6 +85,7 @@ performed by hand. It never did.
 After the Vercel deployment that adds the cursor People list, follow
 [People Explorer scale and backfill](people-explorer-scale.md#release-and-backfill).
 Run its shipped `peopleExplorer:backfill` on accomplished-dodo-308 and confirm
-`peopleExplorer:backfillStatus` is complete. Until then the read retains the old
-media fallback to preserve exact counts. This is a post-deploy data migration,
+`peopleExplorer:backfillStatus` is complete. Until then the read retains the original
+People Explorer snapshot behavior. The runbook also documents skipped-row
+diagnostics and the internal refreshPeople repair mutation. This is a post-deploy data migration,
 not a manual production code deployment.

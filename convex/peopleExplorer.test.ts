@@ -1,6 +1,10 @@
 import { describe, expect, test, vi } from "vitest";
 import { convexTest } from "convex-test";
 import schema from "./schema";
+import { internalMutation, type MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+import { v } from "convex/values";
+import { seedGrant } from "../lib/mcp/testSupport";
 import { internal, api } from "./_generated/api";
 import { applyExplorerChanges, type ExplorerChange } from "./peopleExplorer";
 import { withSearchWrites } from "./searchWrites";
@@ -118,4 +122,121 @@ describe("People cursor explorer", () => {
     await expect(t.withIdentity({subject: "user_foreign"}).action(api.vaultReads.getPeopleExplorerPage, {vaultOwnerId: owner, cursor: null})).rejects.toThrow();
     vi.unstubAllEnvs();
   });
+});
+
+async function sharedFixture(t: ReturnType<typeof setup>, count = 500) {
+  return t.run(async ctx => {
+    const place = await ctx.db.insert("places", {vaultOwnerId: owner, familySearchId: "SYNTHETIC-CITY", name: "Salt Lake City", fullName: "Salt Lake City", type: "city", createdAt: 0, updatedAt: 0});
+    const source = await ctx.db.insert("sources", {vaultOwnerId: owner, fsId: "SYNTHETIC-SOURCE", title: "Invented register", type: "other", createdAt: 0, updatedAt: 0});
+    const citation = await ctx.db.insert("citations", {vaultOwnerId: owner, sourceId: source, isEvidence: true, confidence: "high", createdAt: 0, updatedAt: 0});
+    const people = [];
+    for (let i=0;i<count;i++) {
+      const id = await ctx.db.insert("persons", {...fields(i), birth: {place: {original: "Salt Lake City", placeId: place}}}); people.push(id);
+      await ctx.db.insert("citationLinks", {vaultOwnerId: owner, citationId: citation, targetType: "person", targetId: String(id), createdAt: 0});
+    }
+    for (const table of ["mediaPeople", "peopleExplorerRows"]) await ctx.db.insert("searchBuildState", {table, complete: true, cursor: null});
+    return {place, source, people};
+  });
+}
+
+test("500 people sharing a place/source: capture no-ops refresh nobody", async () => {
+  const t=setup(), ids=await sharedFixture(t);
+  await t.withIdentity({subject: owner}).mutation(api.places.upsert, {vaultOwnerId: owner, familySearchId: "SYNTHETIC-CITY", name: "Salt Lake City", fullName: "Salt Lake City", type: "city"});
+  await t.withIdentity({subject: owner}).mutation(api.vaultMutations.upsertSource, {vaultOwnerId: owner, fsId: "SYNTHETIC-SOURCE", title: "Invented register", type: "other"});
+  expect((await t.run(ctx=>ctx.db.get(ids.place)))?.updatedAt).toBeGreaterThan(0);
+  expect(await t.run(ctx=>ctx.db.query("peopleExplorerRows").collect())).toEqual([]);
+  expect(await t.run(ctx=>ctx.db.system.query("_scheduled_functions").collect())).toEqual([]);
+});
+
+test("shared place rename and source archive commit before paged refresh; all 500 converge", async () => {
+  vi.useFakeTimers();
+  try {
+    const t=setup(), ids=await sharedFixture(t);
+    const grantId=await seedGrant(t,{vaultOwnerId:owner});
+    const principal={subject:owner,issuer:"https://identity.example.test",clientId:"synthetic-mcp-client",scopes:[]};
+    const saved=await t.mutation(internal.mcpFamilyHistory.saveRecords,{principal,grantId,operationId:"rename-shared",requestHash:"synthetic-rename",input:{summary:"Synthetic shared-place edit",places:[{mode:"update",placeId:ids.place,expectedUpdatedAt:0,name:"New city",fullName:"New city"}]}});
+    expect(saved.counts).toMatchObject({updated:1,failed:0});
+    await t.mutation(internal.mcpFamilyHistory.archiveRecord,{principal,grantId,operationId:"archive-shared",requestHash:"synthetic-archive",input:{kind:"source",id:ids.source,expectedUpdatedAt:0,action:"archive"}});
+    expect((await t.run(ctx=>ctx.db.get(ids.place)))?.fullName).toBe("New city");
+    expect((await t.run(ctx=>ctx.db.get(ids.source)))?.archivedAt).toBeGreaterThan(0);
+    expect((await t.run(ctx=>ctx.db.query("peopleExplorerRows").collect())).length).toBeLessThanOrEqual(25);
+    await t.finishAllScheduledFunctions(()=>vi.runAllTimers());
+    const rows=await t.run(ctx=>ctx.db.query("peopleExplorerRows").collect());
+    expect(rows).toHaveLength(500);expect(rows.every(r=>r.text.includes("new city") && r.payload.stats.sources===0)).toBe(true);
+    expect(await t.run(ctx=>ctx.db.query("peopleExplorerFailures").collect())).toEqual([]);
+  } finally {vi.useRealTimers();}
+}, 120_000);
+
+test("evidence-heavy person edits defer and repair outside the source transaction", async () => {
+  vi.useFakeTimers();
+  try {
+    const t=setup();
+    const personId=await t.run(async ctx=>{
+      const personId=await ctx.db.insert("persons", {...fields(0), fsId:"DENSE-SYNTHETIC"});
+      for(let i=0;i<150;i++) {
+        const source=await ctx.db.insert("sources",{vaultOwnerId:owner,title:"Invented",type:"other",createdAt:0,updatedAt:0});
+        const citationId=await ctx.db.insert("citations",{vaultOwnerId:owner,sourceId:source,isEvidence:true,confidence:"high",createdAt:0,updatedAt:0});
+        await ctx.db.insert("citationLinks",{vaultOwnerId:owner,citationId,targetType:"person",targetId:String(personId),createdAt:0});
+      }
+      await ctx.db.insert("searchBuildState",{table:"mediaPeople",complete:true,cursor:null});return personId;
+    });
+    await t.withIdentity({subject:owner}).mutation(api.vaultMutations.upsertPerson,{vaultOwnerId:owner,fsId:"DENSE-SYNTHETIC",name:{given:"Updated",surname:"Finch"},sex:"unknown",living:false});
+    expect((await t.run(ctx=>ctx.db.get(personId)))?.name.given).toBe("Updated");
+    expect(await t.run(ctx=>ctx.db.query("peopleExplorerRows").collect())).toEqual([]);
+    await t.finishAllScheduledFunctions(()=>vi.runAllTimers());
+    expect((await t.run(ctx=>ctx.db.query("peopleExplorerRows").unique()))?.payload.stats.sources).toBe(150);
+    await t.mutation(internal.peopleExplorer.refreshPeople,{personIds:[personId]});
+    await t.finishAllScheduledFunctions(()=>vi.runAllTimers());
+    expect(await t.run(ctx=>ctx.db.query("peopleExplorerFailures").collect())).toEqual([]);
+  }finally{vi.useRealTimers();}
+});
+
+test("pre-backfill list uses the legacy slice and creation-ascending tie order", async () => {
+  const t=setup();await t.run(async ctx=>{for(let i=0;i<70;i++)await ctx.db.insert("persons",{...fields(i),updatedAt:42});});
+  const old=(await t.query(internal.vault.getPeopleExplorer,{vaultOwnerId:owner})).map(projectPeopleCollectionRow);
+  const first=await t.query(internal.peopleExplorer.page,{vaultOwnerId:owner,cursor:null});
+  const next=await t.query(internal.peopleExplorer.page,{vaultOwnerId:owner,cursor:first.continueCursor});
+  expect(first.page).toEqual(old.slice(0,50));expect(next.page).toEqual(old.slice(50));expect(next.isDone).toBe(true);
+});
+
+test("guest migration is reachable in shadow mode and defers 80 people's projection work", async () => {
+  vi.useFakeTimers();vi.stubEnv("TRUST_BOUNDARY_MODE","shadow");
+  try {
+    const t=setup(), guest="guest_syntheticMigration";
+    await t.run(async ctx=>{for(let i=0;i<80;i++)await ctx.db.insert("persons",{...fields(i),vaultOwnerId:guest});});
+    await build(t);
+    const result=await t.withIdentity({subject:owner}).mutation(api.vaultMigration.migrateGuestVault,{fromVaultOwnerId:guest,toVaultOwnerId:owner});
+    expect(result.perTable.persons).toBe(80);
+    expect((await t.run(ctx=>ctx.db.query("peopleExplorerRows").collect()))).toEqual([]);
+    const jobs=await t.run(ctx=>ctx.db.system.query("_scheduled_functions").collect());expect(jobs).toHaveLength(1);
+    expect(jobs[0].args).toEqual([{kind:"owner",id:owner}]);
+    await t.finishAllScheduledFunctions(()=>vi.runAllTimers());
+    expect((await t.run(ctx=>ctx.db.query("peopleExplorerRows").collect())).every(r=>r.vaultOwnerId===owner)).toBe(true);
+    expect((await t.run(ctx=>ctx.db.query("peopleExplorerRows").collect()))).toHaveLength(80);
+  }finally{vi.useRealTimers();vi.unstubAllEnvs();}
+},60_000);
+
+test("backfill can skip/log an isolated failure, and repair releases the complete flag", async () => {
+  vi.useFakeTimers();
+  try {
+    let fail=true;
+    const t=convexTest(schema,{...modules,"./peopleExplorer.ts":async()=>{
+      const real=await import("./peopleExplorer");
+      return {...real,rebuildOne:internalMutation({args:{personId:v.id("persons")},handler:async(ctx,args)=>{
+        if(fail && args.personId===blocked) throw new Error("Synthetic projection failure");
+        await (real.rebuildOne as unknown as {_handler:(ctx:MutationCtx,args:{personId:Id<"persons">})=>Promise<void>})._handler(ctx,args);
+      }})};
+    }});
+    const blocked=await t.run(async ctx=>{const first=await ctx.db.insert("persons",fields(0));await ctx.db.insert("persons",fields(1));return first;});
+    await expect(t.action(internal.peopleExplorer.backfill,{})).rejects.toThrow(/skipErrors/);
+    expect((await t.query(internal.peopleExplorer.backfillStatus,{})).traversalComplete).toBe(false);
+    expect(await t.action(internal.peopleExplorer.backfill,{skipErrors:true})).toEqual({complete:false,traversalComplete:true});
+    expect((await t.query(internal.peopleExplorer.failures,{cursor:null})).page.map(r=>r.personId)).toEqual([blocked]);
+    expect(await t.run(ctx=>ctx.db.query("peopleExplorerRows").collect())).toHaveLength(1);
+    fail=false;
+    await t.mutation(internal.peopleExplorer.refreshPeople,{personIds:[blocked]});
+    await t.finishAllScheduledFunctions(()=>vi.runAllTimers());
+    expect((await t.query(internal.peopleExplorer.backfillStatus,{}))).toMatchObject({complete:true,hasFailures:false});
+    expect(await t.run(ctx=>ctx.db.query("peopleExplorerRows").collect())).toHaveLength(2);
+  }finally{vi.useRealTimers();}
 });

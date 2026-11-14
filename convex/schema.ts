@@ -1,3 +1,4 @@
+import { peopleExplorerPayload } from "../lib/vault/peopleExplorerValidator";
 import { defineSchema, defineTable } from "convex/server";
 import { usageLimitTables } from "./usageLimitsSchema";
 import { v } from "convex/values";
@@ -94,8 +95,10 @@ export default defineSchema({
    */
   searchBuildState: defineTable({ table: v.string(), cursor: v.union(v.string(), v.null()), complete: v.boolean() }).index("by_table", ["table"]),
 
-  peopleExplorerRows: defineTable({personId: v.id("persons"), vaultOwnerId: v.string(), researchStatus: v.string(), orderKey: v.string(), text: v.string(), payload: v.any()})
+  peopleExplorerRows: defineTable({personId: v.id("persons"), vaultOwnerId: v.string(), researchStatus: v.string(), orderKey: v.string(), text: v.string(), payload: peopleExplorerPayload})
     .index("by_person", ["personId"]).index("by_owner_order", ["vaultOwnerId", "orderKey"]).index("by_owner_status_order", ["vaultOwnerId", "researchStatus", "orderKey"]),
+
+  peopleExplorerFailures: defineTable({personId: v.id("persons"), reason: v.string(), failedAt: v.number()}).index("by_person", ["personId"]),
 
   mediaPeople: defineTable({personId: v.id("persons"), mediaId: v.id("media")}).index("by_person", ["personId"]).index("by_media", ["mediaId"]),
 

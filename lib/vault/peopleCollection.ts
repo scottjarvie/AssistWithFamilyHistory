@@ -1,5 +1,5 @@
 import type { FunctionReturnType } from "convex/server";
-import type { api } from "@/convex/_generated/api";
+import type { api } from "../../convex/_generated/api";
 
 type RawPersonRow = FunctionReturnType<typeof api.vaultReads.getPeopleExplorer>[number];
 

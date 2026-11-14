@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation } from "./_generated/server";
+import { internalMutation } from "./searchServer";
 import { mediaBytes, recomputeOwner } from "./usageLimits";
 
 /** Resumable, bounded all-account driver. Dry run writes job metadata only, never counters or files. */

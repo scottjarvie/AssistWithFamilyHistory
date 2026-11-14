@@ -25,7 +25,7 @@
  */
 import {mediaBytes,addCopies,removeStoredBytes} from "./usageLimits";
 import { v } from "convex/values";
-import { mutation } from "./searchServer";
+import { deferredExplorerMutation as mutation } from "./searchServer";
 import type { TableNames } from "./_generated/dataModel";
 import { authorizeTenantMutation, handlePolicyViolationMutation } from "./access";
 

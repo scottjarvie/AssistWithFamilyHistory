@@ -15,8 +15,9 @@ export function PaginatedPeopleExplorer({initial, firstStartEligible, query, sta
     if (!searching || error || fetching.current) return;
     fetching.current = true;
     loadPeoplePage({expectedOwner: vaultOwnerId, search: query, researchStatus: status, cursor: result.continueCursor}).then(next => {
+      fetching.current = false;
       if (alive.current) setResult(previous => ({...next, page: [...new Map([...previous.page, ...next.page].map(row => [row._id, row])).values()]}));
-    }).catch(() => {if (alive.current) setError(true);}).finally(() => {fetching.current = false;});
+    }).catch(() => {fetching.current = false; if (alive.current) setError(true);});
   }, [searching, error, query, status, vaultOwnerId, result.continueCursor]);
   return <>
     <PeopleExplorerView people={result.page.slice(0, target)} firstStartEligible={firstStartEligible} query={query} status={status} preferenceKey={preferenceKey} loadMoreHref={null} onLoadMore={(!result.isDone || result.page.length > target) && !searching ? () => setTarget(target + 50) : undefined} searching={searching}/>

@@ -1,3 +1,6 @@
+import { projectPeopleCollectionRow } from "../lib/vault/peopleCollection";
+import type { PeopleExplorerPayload } from "../lib/vault/peopleExplorerValidator";
+import { readLegacyPeopleExplorer } from "./vault";
 import { v, type Infer } from "convex/values";
 import { internalQuery, internalMutation, internalAction, type QueryCtx, type MutationCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
@@ -61,25 +64,13 @@ async function rowForPerson(ctx: Pick<QueryCtx, "db">, person: Doc<"persons">, e
 
 /** A bounded scan preserves the existing arbitrary substring search, including joined place names.
  * A sparse/empty page is not end-of-results: callers must retain its cursor. */
-export type PeoplePageResult = {page: Awaited<ReturnType<typeof rowForPerson>>[]; continueCursor: string; isDone: boolean};
-async function scopedPeoplePage(ctx: QueryCtx, args: PeoplePageArgs): Promise<PeoplePageResult> {
-    const owner = normalizeVaultOwnerId(args.vaultOwnerId);
-    const mediaReady = (await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", "mediaPeople")).unique())?.complete ?? false;
-    const legacyMedia = mediaReady ? null : await ctx.db.query("media").withIndex("by_owner", q => q.eq("vaultOwnerId", owner)).collect();
-    const base = ctx.db.query("persons");
-    const candidates = args.researchStatus
-      ? base.withIndex("by_owner_status_updated", q => q.eq("vaultOwnerId", owner).eq("archivedAt", undefined).eq("researchStatus", args.researchStatus!))
-      : base.withIndex("by_owner_updated", q => q.eq("vaultOwnerId", owner).eq("archivedAt", undefined));
-    const result = await candidates.order("desc").paginate({cursor: args.cursor, numItems: 50, maximumBytesRead: 500_000});
-    const needle = args.search?.trim().toLowerCase();
-    const rows = await Promise.all(result.page.map(async person => {
-      const {events, keyPlaces} = await placesForPerson(ctx, person);
-      if (needle && ![formatPersonName(person), person.fsId || "", String(person._id), person.birth?.date?.original || "", person.death?.date?.original || "", ...keyPlaces].join(" ").toLowerCase().includes(needle)) return null;
-      return rowForPerson(ctx, person, events, legacyMedia);
-    }));
-    return {page: rows.filter(row => row !== null), continueCursor: result.continueCursor, isDone: result.isDone};
+export type PeoplePageResult = {page: PeopleExplorerPayload[]; continueCursor: string; isDone: boolean};
+async function legacyPeoplePage(ctx: QueryCtx, args: PeoplePageArgs): Promise<PeoplePageResult> {
+  const parsed = args.cursor?.startsWith("s:") ? Number(args.cursor.slice(2)) : 0;
+  const offset = Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 0;
+  const rows = await readLegacyPeopleExplorer(ctx, {...args, limit: offset + 51});
+  return {page: rows.slice(offset, offset + 50).map(projectPeopleCollectionRow), continueCursor: `s:${offset + 50}`, isDone: rows.length <= offset + 50};
 }
-export const scopedPage = internalQuery({args: pageArgs, handler: scopedPeoplePage});
 
 /** Projection refresh happens once per affected person at the end of a central mutation. */
 export async function refreshPerson(ctx: {db: MutationCtx["db"]}, personId: Doc<"persons">["_id"]) {
@@ -102,8 +93,7 @@ export const page = internalQuery({args: pageArgs, handler: async (ctx, args): P
   const ready = (await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", "peopleExplorerRows")).unique())?.complete;
   // Existing scoped read until BOTH membership and person projections are ready.
   if (!ready) {
-    const result = await scopedPeoplePage(ctx, {...args, cursor: args.cursor?.startsWith("s:") ? args.cursor.slice(2) : null});
-    return {...result, continueCursor: `s:${result.continueCursor}`};
+    return legacyPeoplePage(ctx, args);
   }
   const owner = normalizeVaultOwnerId(args.vaultOwnerId);
   const needle = args.search?.trim().toLowerCase();
@@ -119,7 +109,7 @@ export const page = internalQuery({args: pageArgs, handler: async (ctx, args): P
   let processed = 0;
   for (const candidate of page) {
     cursor = candidate.orderKey; processed++;
-    if (!needle || candidate.text.includes(needle)) rows.push(candidate.payload as PeoplePageResult["page"][number]);
+    if (!needle || candidate.text.includes(needle)) rows.push(candidate.payload);
     if (rows.length === 50) break;
   }
   return {page: rows, continueCursor: `p:${rows.length < 50 ? "l" : "s"}:${cursor}`, isDone: processed === page.length && candidates.isDone};
@@ -137,23 +127,123 @@ export const backfillStep = internalMutation({
     return rows.isDone;
   },
 });
-export const backfill = internalAction({
-  args: {},
-  handler: async (ctx): Promise<{complete: boolean}> => {
-    const deadline = Date.now() + 120_000;
-    let membershipReady = false;
-    while (Date.now() < deadline) {
-      if (!membershipReady) membershipReady = await ctx.runMutation(internal.peopleExplorer.backfillStep, {});
-      else if (await ctx.runMutation(internal.peopleExplorer.projectionStep, {})) return {complete: true};
-    }
-    return {complete: false};
-  },
-});
-export const backfillStatus = internalQuery({args: {}, handler: async ctx => {
-  const mediaComplete = (await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", "mediaPeople")).unique())?.complete ?? false;
-  const peopleComplete = (await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", "peopleExplorerRows")).unique())?.complete ?? false;
-  return {complete: mediaComplete && peopleComplete, mediaComplete, peopleComplete};
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export type ExplorerChange = {table: string; before: any; after: any};
+export const EXPLORER_TABLES = ["persons", "personEvents", "events", "places", "citationLinks", "citations", "sources", "media", "documents", "stories", "importRuns"];
+const RELEVANT: Record<string, string[]> = {
+  places: ["name", "fullName", "archivedAt", "vaultOwnerId"], sources: ["archivedAt", "vaultOwnerId"],
+  citations: ["sourceId", "archivedAt", "vaultOwnerId"], events: ["place.placeId", "archivedAt", "vaultOwnerId"],
+  media: ["personIds", "archivedAt", "vaultOwnerId"], documents: ["personId", "archivedAt", "vaultOwnerId"],
+  stories: ["personId", "archivedAt", "vaultOwnerId"],
+  importRuns: ["personId", "personFsId", "importedAt", "archivedAt", "vaultOwnerId"],
+};
+export function affectsExplorer(change: ExplorerChange): boolean {
+  if (!change.before || !change.after) return true;
+  const fields = RELEVANT[change.table];
+  if (!fields) return true;
+  const field = (row: any, key: string) => key.split(".").reduce((value, part) => value?.[part], row);
+  return fields.some(key => JSON.stringify(field(change.before, key)) !== JSON.stringify(field(change.after, key)));
+}
+class DeferredProjection extends Error {}
+/** Never spend the source mutation's entire read budget on an optional projection. */
+function budgetDb(db: MutationCtx["db"], limit = 75): MutationCtx["db"] {
+  let operations = 0, rows = 0, bytes = 0;
+  let pending: Promise<unknown> = Promise.resolve();
+  const run = <T>(read: () => Promise<T>): Promise<T> => {
+    const result = pending.then(async () => {
+      if (++operations > limit || bytes > 2_000_000) throw new DeferredProjection();
+      const value = await read();
+      bytes += new TextEncoder().encode(JSON.stringify(value) ?? "").length;
+      return value;
+    });
+    pending = result.then(() => undefined, () => undefined);
+    return result;
+  };
+  const query = (value: any): any => new Proxy(value, {get(target, key) {
+    if (key === "collect") return async () => {
+      const result = await run(() => target.take(2)) as any[]; rows += result.length;
+      if (result.length > 1 || rows > 250) throw new DeferredProjection();
+      return result;
+    };
+    const method = Reflect.get(target, key);
+    if (typeof method !== "function") return method;
+    if (key === "unique" || key === "first") return (...args: any[]) => {return run(() => method.apply(target, args));};
+    return (...args: any[]) => query(method.apply(target, args));
+  }});
+  return new Proxy(db, {get(target, key) {
+    if (key === "query") return (...args: any[]) => query((target.query as any)(...args));
+    if (key === "get") return (...args: any[]) => {return run(() => (target.get as any)(...args));};
+    const value = Reflect.get(target, key); return typeof value === "function" ? value.bind(target) : value;
+  }});
+}
+
+const jobArgs = {kind: v.string(), id: v.string(), owner: v.optional(v.string()), stage: v.optional(v.number()), cursor: v.optional(v.union(v.string(), v.null()))};
+type DependencyJob = {kind: string; id: string; owner?: string; stage?: number; cursor?: string | null};
+async function scheduleJob(ctx: MutationCtx, job: DependencyJob) {
+  await ctx.scheduler.runAfter(0, internal.peopleExplorer.dependencyPage, job);
+}
+async function schedulePerson(ctx: MutationCtx, personId: Doc<"persons">["_id"]) {
+  if (!ctx.db.normalizeId("persons", personId)) return;
+  await ctx.scheduler.runAfter(0, internal.peopleExplorer.refreshScheduled, {personId});
+}
+
+/** Paged dependency discovery. Every hop uses one bounded range; child jobs are transactional. */
+export const dependencyPage = internalMutation({args: jobArgs, handler: async (ctx, job) => {
+  const stage = job.stage ?? 0;
+  let range: any;
+  if (job.kind === "owner") range = ctx.db.query("persons").withIndex("by_owner", q => q.eq("vaultOwnerId", job.id));
+  else if (job.kind === "personKey") range = ctx.db.query("persons").withIndex("by_owner_fsId", q => q.eq("vaultOwnerId", job.owner).eq("fsId", job.id));
+  else if (job.kind === "event") range = ctx.db.query("personEvents").withIndex("by_event", q => q.eq("eventId", ctx.db.normalizeId("events", job.id)!));
+  else if (job.kind === "citation") range = ctx.db.query("citationLinks").withIndex("by_citation", q => q.eq("citationId", ctx.db.normalizeId("citations", job.id)!));
+  else if (job.kind === "source") range = ctx.db.query("citations").withIndex("by_source", q => q.eq("sourceId", ctx.db.normalizeId("sources", job.id)!));
+  else if (job.kind === "place") {
+    const id = ctx.db.normalizeId("places", job.id)!;
+    if (stage === 0) range = ctx.db.query("persons").withIndex("by_birth_place", q => q.eq("vaultOwnerId", job.owner).eq("birth.place.placeId", id));
+    else if (stage === 1) range = ctx.db.query("persons").withIndex("by_death_place", q => q.eq("vaultOwnerId", job.owner).eq("death.place.placeId", id));
+    else range = ctx.db.query("events").withIndex("by_place", q => q.eq("place.placeId", id));
+  } else throw new Error("Unknown explorer dependency job");
+  const result = await range.paginate({cursor: job.cursor ?? null, numItems: 25, maximumBytesRead: 100_000});
+  for (const row of result.page) {
+    if (job.kind === "source") await scheduleJob(ctx, {kind: "citation", id: String(row._id)});
+    else if (job.kind === "citation") {
+      if (row.targetType === "event") await scheduleJob(ctx, {kind: "event", id: row.targetId});
+      else if (row.targetType === "person") await schedulePerson(ctx, row.targetId);
+    } else if (job.kind === "place" && stage === 2) await scheduleJob(ctx, {kind: "event", id: String(row._id)});
+    else await schedulePerson(ctx, job.kind === "event" ? row.personId : row._id);
+  }
+  if (!result.isDone) await scheduleJob(ctx, {...job, cursor: result.continueCursor});
+  else if (job.kind === "place" && stage < 2) await scheduleJob(ctx, {...job, stage: stage + 1, cursor: null});
 }});
+
+export const rebuildOne = internalMutation({args: {personId: v.id("persons")}, handler: async (ctx, {personId}) => {
+  await refreshPerson(ctx, personId);
+  const failed = await ctx.db.query("peopleExplorerFailures").withIndex("by_person", q => q.eq("personId", personId)).unique();
+  if (failed) await ctx.db.delete(failed._id);
+  // A repaired skipped row can release the migration gate, but never before traversal finishes.
+  const traversal = await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", "peopleExplorerTraversal")).unique();
+  if (traversal?.complete && !await ctx.db.query("peopleExplorerFailures").first()) {
+    const state = await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", "peopleExplorerRows")).unique();
+    if (state && !state.complete) await ctx.db.patch(state._id, {complete: true});
+  }
+}});
+export const recordFailure = internalMutation({args: {personId: v.id("persons")}, handler: async (ctx, {personId}) => {
+  const old = await ctx.db.query("peopleExplorerFailures").withIndex("by_person", q => q.eq("personId", personId)).unique();
+  const value = {personId, reason: "Projection refresh failed; retry with refreshPeople after investigating the execution log", failedAt: Date.now()};
+  if (old) await ctx.db.replace(old._id, value); else await ctx.db.insert("peopleExplorerFailures", value);
+  console.warn("People Explorer projection refresh failed", {personId});
+}});
+/** An action isolates limit failures from source edits and from the migration cursor transaction. */
+export const refreshScheduled = internalAction({args: {personId: v.id("persons")}, handler: async (ctx, {personId}): Promise<boolean> => {
+  try {await ctx.runMutation(internal.peopleExplorer.rebuildOne, {personId}); return true;}
+  catch {await ctx.runMutation(internal.peopleExplorer.recordFailure, {personId}); return false;}
+}});
+export const refreshPeople = internalMutation({args: {personIds: v.array(v.id("persons"))}, handler: async (ctx, {personIds}) => {
+  if (personIds.length > 100) throw new Error("Repair at most 100 people per call");
+  for (const personId of new Set(personIds)) await schedulePerson(ctx, personId);
+  return {scheduled: new Set(personIds).size};
+}});
+export const failures = internalQuery({args: {cursor: v.union(v.string(), v.null())}, handler: (ctx, {cursor}) => ctx.db.query("peopleExplorerFailures").paginate({cursor, numItems: 100})});
 
 export const projectionStep = internalMutation({args: {}, handler: async ctx => {
   const mediaReady = (await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", "mediaPeople")).unique())?.complete;
@@ -162,18 +252,67 @@ export const projectionStep = internalMutation({args: {}, handler: async ctx => 
   if (state?.complete) return true;
   const result = await ctx.db.query("persons").paginate({cursor: state?.cursor ?? null, numItems: 5, maximumBytesRead: 100_000});
   for (const person of result.page) await refreshPerson(ctx, person._id);
-  const value = {table: "peopleExplorerRows", cursor: result.continueCursor, complete: result.isDone};
+  const value = {table: "peopleExplorerRows", cursor: result.continueCursor, complete: result.isDone && !await ctx.db.query("peopleExplorerFailures").first()};
   if (state) await ctx.db.patch(state._id, value); else await ctx.db.insert("searchBuildState", value);
-  return result.isDone;
+  return value.complete;
+}});
+export const nextBackfillPerson = internalQuery({args: {}, handler: async ctx => {
+  const state = await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", "peopleExplorerRows")).unique();
+  const traversal = await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", "peopleExplorerTraversal")).unique();
+  if (state?.complete || traversal?.complete) return null;
+  const result = await ctx.db.query("persons").paginate({cursor: state?.cursor ?? null, numItems: 1, maximumBytesRead: 100_000});
+  return {personId: result.page[0]?._id, expectedCursor: state?.cursor ?? null, cursor: result.continueCursor, done: result.isDone};
+}});
+export const advanceBackfill = internalMutation({args: {expectedCursor: v.union(v.string(), v.null()), cursor: v.string(), done: v.boolean()}, handler: async (ctx, args) => {
+  const state = await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", "peopleExplorerRows")).unique();
+  if ((state?.cursor ?? null) !== args.expectedCursor || state?.complete) return;
+  const complete = args.done && !await ctx.db.query("peopleExplorerFailures").first();
+  const value = {table: "peopleExplorerRows", cursor: args.cursor, complete};
+  if (state) await ctx.db.patch(state._id, value); else await ctx.db.insert("searchBuildState", value);
+  if (args.done) {
+    const traversal = await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", "peopleExplorerTraversal")).unique();
+    const value = {table: "peopleExplorerTraversal", cursor: args.cursor, complete: true};
+    if (traversal) await ctx.db.patch(traversal._id, value); else await ctx.db.insert("searchBuildState", value);
+  }
+}});
+export const backfill = internalAction({args: {skipErrors: v.optional(v.boolean())}, handler: async (ctx, args): Promise<{complete: boolean; traversalComplete: boolean}> => {
+  const deadline = Date.now() + 120_000;
+  while (Date.now() < deadline && !await ctx.runMutation(internal.peopleExplorer.backfillStep, {})) { /* membership */ }
+  while (Date.now() < deadline) {
+    const next = await ctx.runQuery(internal.peopleExplorer.nextBackfillPerson, {});
+    if (!next) break;
+    if (next.personId) {
+      const ok = await ctx.runAction(internal.peopleExplorer.refreshScheduled, {personId: next.personId});
+      if (!ok && !args.skipErrors) throw new Error("Projection failed; inspect failures, repair it, or rerun backfill with skipErrors:true");
+    }
+    await ctx.runMutation(internal.peopleExplorer.advanceBackfill, {expectedCursor: next.expectedCursor, cursor: next.cursor, done: next.done});
+  }
+  const status = await ctx.runQuery(internal.peopleExplorer.backfillStatus, {});
+  return {complete: status.complete, traversalComplete: status.traversalComplete};
+}});
+export const backfillStatus = internalQuery({args: {}, handler: async ctx => {
+  const state = async (table: string) => (await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", table)).unique())?.complete ?? false;
+  const mediaComplete = await state("mediaPeople"), peopleComplete = await state("peopleExplorerRows");
+  return {complete: mediaComplete && peopleComplete, mediaComplete, peopleComplete, traversalComplete: peopleComplete || await state("peopleExplorerTraversal"), hasFailures: !!await ctx.db.query("peopleExplorerFailures").first()};
 }});
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-export type ExplorerChange = {table: string; before: any; after: any};
-export const EXPLORER_TABLES = ["persons", "personEvents", "events", "places", "citationLinks", "citations", "sources", "media", "documents", "stories", "importRuns"];
-export async function applyExplorerChanges(ctx: MutationCtx, changes: ExplorerChange[]) {
+export async function applyExplorerChanges(ctx: MutationCtx, changes: ExplorerChange[], defer = false) {
+  changes = changes.filter(affectsExplorer);
   if (!changes.length) return;
   const ready = (await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", "mediaPeople")).unique())?.complete;
   if (!ready) return; // The subsequent complete backfill includes these writes.
+  // Ownership changes must not leave a private display row in its former tree.
+  for (const change of changes) if (change.table === "persons" && change.before && (!change.after || change.after.archivedAt !== undefined || change.before.vaultOwnerId !== change.after.vaultOwnerId)) {
+    const row = await ctx.db.query("peopleExplorerRows").withIndex("by_person", q => q.eq("personId", change.before._id)).unique();
+    if (row) await ctx.db.delete(row._id);
+  }
+  if (defer) {
+    const owners = new Set<string>(changes.filter(c => c.table === "persons" && c.after).map(c => normalizeVaultOwnerId(c.after.vaultOwnerId)));
+    for (const owner of owners) await scheduleJob(ctx, {kind: "owner", id: owner});
+    return;
+  }
+  const sourceCtx = ctx;
+  ctx = {...ctx, db: budgetDb(ctx.db, 1000)};
   const ids = new Set<Doc<"persons">["_id"]>();
   const person = (id: any) => {if (id) {const key = ctx.db.normalizeId("persons", id); if (key) ids.add(key);}};
   const event = async (id: any) => {
@@ -191,7 +330,23 @@ export async function applyExplorerChanges(ctx: MutationCtx, changes: ExplorerCh
     const owner = normalizeVaultOwnerId(row.vaultOwnerId);
     for (const p of await ctx.db.query("persons").withIndex("by_owner_fsId", q => q.eq("vaultOwnerId", owner).eq("fsId", key)).collect()) person(p._id);
   };
-  for (const change of changes) for (const row of [change.before, change.after]) {
+  const deferred = new Map<string, DependencyJob>();
+  const queue = (job: DependencyJob) => deferred.set(JSON.stringify(job), job);
+  const queueChange = (change: ExplorerChange) => {
+    for (const row of [change.before, change.after]) if (row) {
+      const owner = normalizeVaultOwnerId(row.vaultOwnerId);
+      if (change.table === "persons") person(row._id);
+      else if (change.table === "personEvents" || change.table === "stories") person(row.personId);
+      else if (change.table === "media") for (const id of row.personIds) person(id);
+      else if (change.table === "documents") {person(row.personId); queue({kind: "personKey", id: row.personId, owner});}
+      else if (change.table === "importRuns") {person(row.personId); queue({kind: "personKey", id: row.personFsId, owner});}
+      else if (change.table === "citationLinks") {
+        if (row.targetType === "person") person(row.targetId);
+        else if (row.targetType === "event") queue({kind: "event", id: row.targetId});
+      } else queue({kind: ({places: "place", sources: "source", citations: "citation", events: "event"} as Record<string,string>)[change.table], id: String(row._id), ...(change.table === "places" ? {owner} : {})});
+    }
+  };
+  for (const change of changes) {try {for (const row of [change.before, change.after]) {
     if (!row) continue;
     switch (change.table) {
       case "persons": person(row._id); break;
@@ -212,5 +367,13 @@ export async function applyExplorerChanges(ctx: MutationCtx, changes: ExplorerCh
         break;
     }
   }
-  for (const id of ids) await refreshPerson(ctx, id);
+  } catch {queueChange(change);}}
+  for (const job of deferred.values()) await scheduleJob(sourceCtx, job);
+  let refreshed = 0;
+  for (const id of ids) {
+    if (refreshed >= 25) {await schedulePerson(sourceCtx, id); continue;}
+    refreshed++;
+    try {await refreshPerson(ctx, id);}
+    catch {await schedulePerson(sourceCtx, id);}
+  }
 }
