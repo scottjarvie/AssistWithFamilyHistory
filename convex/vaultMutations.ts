@@ -348,11 +348,9 @@ export const upsertPerson = mutation({
     let existing: Doc<"persons"> | null = null;
 
     if (args.fsId) {
-      const fsMatches = await ctx.db
-        .query("persons")
-        .withIndex("by_fsId", (q) => q.eq("fsId", args.fsId))
-        .collect();
-      existing = filterByVaultOwner(fsMatches, vaultOwnerId)[0] ?? null;
+      const owners = vaultOwnerId === DEFAULT_LOCAL_VAULT_OWNER ? [vaultOwnerId, undefined] : [vaultOwnerId];
+      const matches = await Promise.all(owners.map(owner => ctx.db.query("persons").withIndex("by_owner_fsId", q => q.eq("vaultOwnerId", owner).eq("fsId", args.fsId)).first()));
+      existing = matches.filter((row): row is Doc<"persons"> => row !== null).sort((a,b) => a._creationTime - b._creationTime)[0] ?? null;
     }
 
     const namesReady = await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", "persons")).unique();

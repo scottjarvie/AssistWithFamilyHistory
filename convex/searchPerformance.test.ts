@@ -2,7 +2,7 @@
 import { expect, test } from "vitest";
 import { convexTest } from "convex-test";
 import schema from "./schema";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { withSearchWrites } from "./searchWrites";
 const modules = import.meta.glob("./**/*.ts");
 const principal = { issuer: "https://synthetic.example", subject: "user_search_synthetic", clientId: "synthetic", scopes: ["family_history:read"] };
@@ -25,6 +25,12 @@ test("migration gates old-row search; indexed names, aliases and tags survive ed
  expect((await search("Rareancestor")).results).toHaveLength(0);
  expect((await search("Changedancestor")).results.map(r=>r.id)).toEqual([id]);
  expect((await search("researchtag")).results).toHaveLength(0);
+ const authenticated = t.withIdentity({ subject: principal.subject, issuer: principal.issuer });
+ const duplicate = await authenticated.mutation(api.vaultMutations.upsertPerson, { vaultOwnerId: principal.subject, name: { given: " CHANGEDANCESTOR ", surname: "Synthetic" }, sex: "unknown", living: false });
+ expect(duplicate).toMatchObject({ personId: id, created: false });
+ const sourceInput = { vaultOwnerId: principal.subject, title: "Synthetic source", type: "census" as const, url: "https://synthetic.example/source" };
+ const source = await authenticated.mutation(api.vaultMutations.upsertSource, sourceInput);
+ expect(await authenticated.mutation(api.vaultMutations.upsertSource, sourceInput)).toMatchObject({ sourceId: source.sourceId, created: false });
  expect((await search("Common")).results).toHaveLength(25);
  const restricted = await t.query(internal.mcpFamilyHistory.search, { principal, query: "Changedancestor", personIds: [id] });
  expect(restricted.results.map(r=>r.id)).toEqual([id]);
