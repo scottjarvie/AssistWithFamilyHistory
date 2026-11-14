@@ -1460,6 +1460,7 @@ export const search = internalQuery({
   handler: async (ctx, args) => {
     const owner = ownerFromPrincipal(args.principal);
     const needle = args.query.trim().toLowerCase();
+    if ((needle.match(/[\p{L}\p{N}]+/gu)?.length ?? 0) > 16) machineError("VALIDATION_ERROR", "Search accepts at most 16 terms.", "Use a shorter name or phrase.");
     const limit = Math.max(1, Math.min(Math.floor(args.limit ?? 25), FAMILY_HISTORY_MCP_LIMITS.searchLimit));
     const kinds = new Set(args.kinds?.length ? args.kinds : ["person", "source", "place", "topic", "story", "research_task", "research_finding", "event"]);
     const results: Array<Record<string, unknown>> = [];

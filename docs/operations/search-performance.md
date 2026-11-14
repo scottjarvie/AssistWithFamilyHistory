@@ -18,9 +18,10 @@ migration writes derive the same fields. Do not change the generated builders.
 
 Deploy through the normal coordinated Vercel production build. After backend
 deployment, run the internal `searchBackfill:run` on **accomplished-dodo-308**.
-It pages 50 records at a time with a 1 MB read budget, writes only derived fields
+It pages at most 200 records at a time with a 1 MB read budget, writes only derived fields
 and progress, and returns `{ complete: true }` when all eight tables are done.
-It can be rerun after interruption. No real records are deleted, and original
+It can be rerun after interruption or an action timeout; it yields after eight
+minutes when possible. Confirm all eight flags with `searchBackfill:status`. No real records are deleted, and original
 fields and timestamps are preserved. Each table keeps the prior search path
 until its completion flag is committed. Confirm completion before declaring
 indexed search live. Do not point this at gallant-mallard-74: the production
@@ -28,8 +29,8 @@ operations guide documents that local binding as unrelated.
 
 Source duplicate checks use owner/FamilySearch ID, owner/import key and
 owner/URL/title indexes. After person backfill, name duplicate checks narrow by
-owner, exact surname and normalized given name before applying the existing
-birth-year compatibility rule. Ownerless records remain supported in the local
+owner, exact surname and normalized given name and compatible birth year (unknown, zero or the requested year) in
+separate exact ranges, so a large same-name family does not need scanning. Ownerless records remain supported in the local
 legacy vault. The historical surname fallback remains until migration is done.
 
 ## Remaining scale work
@@ -41,3 +42,5 @@ and context calculations with maintained collection projections and pagination
 in a separate change. The older internal `persons.search` also still scans all
 people, but is not a publicly callable or website search path. The import UI is
 FamilySearch record capture; no GEDCOM-tree import implementation was found.
+
+Queries accept at most 16 terms; longer phrases receive a validation error.

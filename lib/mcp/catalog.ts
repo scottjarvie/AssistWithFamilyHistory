@@ -213,7 +213,7 @@ export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
     writes: false,
     title: "Search Family History",
     description:
-      "Search owner-scoped summaries across people (including alternate names, tags and FamilySearch IDs), sources, places, topics, stories, research tasks/findings, and events. After search migration completes, uses word matching with final-word prefix matching across all records; during migration uses substring matching in the newest 251 per type. Selected-people connections search only their approved people using substring matching. Blank queries return recent records. Returns at most 50 summaries. Hydrate a returned stable ID before editing.",
+      "Search owner-scoped summaries across people (including alternate names, tags and FamilySearch IDs), sources, places, topics, stories, research tasks/findings, and events. After search migration completes, uses word matching with final-word prefix matching across all records; during migration uses substring matching in the newest 251 per type. Selected-people connections search only their approved people using substring matching. Blank queries return recent records. Accepts at most 16 terms. Returns at most 50 summaries. Hydrate a returned stable ID before editing.",
     humanSummary: "Searches your research for matching people, sources, and notes.",
     implementedBy: "convex/mcpFamilyHistory.search",
     sunsetNote: ALIAS_SUNSET,

@@ -356,11 +356,14 @@ export const upsertPerson = mutation({
     const namesReady = await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", "persons")).unique();
     if (!existing && namesReady?.complete) {
       const owners = vaultOwnerId === DEFAULT_LOCAL_VAULT_OWNER ? [vaultOwnerId, undefined] : [vaultOwnerId];
-      for (const owner of owners) {
-        if (existing) break;
-        const candidates = ctx.db.query("persons").withIndex("by_owner_name", q => q.eq("vaultOwnerId", owner).eq("name.surname", args.name.surname).eq("nameGivenKey", args.name.given.trim().toLowerCase()));
-        existing = args.birth?.date?.year ? await candidates.filter(q => q.or(q.eq(q.field("birth.date.year"), undefined), q.eq(q.field("birth.date.year"), 0), q.eq(q.field("birth.date.year"), args.birth!.date!.year))).first() : await candidates.first();
-      }
+      const matches = await Promise.all(owners.map(async owner => {
+        const given = args.name.given.trim().toLowerCase();
+        if (!args.birth?.date?.year) return await ctx.db.query("persons").withIndex("by_owner_name", q => q.eq("vaultOwnerId", owner).eq("name.surname", args.name.surname).eq("nameGivenKey", given)).first();
+        const years = [undefined, 0, args.birth.date.year];
+        const candidates = await Promise.all(years.map(year => ctx.db.query("persons").withIndex("by_owner_name", q => q.eq("vaultOwnerId", owner).eq("name.surname", args.name.surname).eq("nameGivenKey", given).eq("birth.date.year", year)).first()));
+        return candidates.filter((row): row is Doc<"persons"> => row !== null).sort((a,b) => a._creationTime - b._creationTime)[0] ?? null;
+      }));
+      existing = matches.filter((row): row is Doc<"persons"> => row !== null).sort((a,b) => a._creationTime - b._creationTime)[0] ?? null;
     }
     if (!existing && !namesReady?.complete) {
       const candidates = await ctx.db

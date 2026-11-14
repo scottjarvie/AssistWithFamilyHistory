@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, internalAction } from "./_generated/server";
+import { internalMutation, internalAction, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { SEARCH_TABLES, searchFields } from "./searchWrites";
 
@@ -8,8 +8,11 @@ export const step = internalMutation({
   handler: async (ctx, { table }) => {
     const state = await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", table)).unique();
     if (state?.complete) return true;
-    const page = await ctx.db.query(table).paginate({ cursor: state?.cursor ?? null, numItems: 50, maximumBytesRead: 1_000_000 });
-    for (const row of page.page) await ctx.db.patch(row._id, searchFields(table, row));
+    const page = await ctx.db.query(table).paginate({ cursor: state?.cursor ?? null, numItems: 200, maximumBytesRead: 1_000_000 });
+    for (const row of page.page) {
+      const fields = searchFields(table, row);
+      if (row.searchText !== fields.searchText || (table === "persons" && (!("nameGivenKey" in row) || row.nameGivenKey !== fields.nameGivenKey))) await ctx.db.patch(row._id, fields);
+    }
     const value = { table, cursor: page.continueCursor, complete: page.isDone };
     if (state) await ctx.db.patch(state._id, value);
     else await ctx.db.insert("searchBuildState", value);
@@ -20,14 +23,24 @@ export const step = internalMutation({
 export const run = internalAction({
   args: {},
   handler: async (ctx): Promise<{ complete: boolean }> => {
+    const deadline = Date.now() + 8 * 60 * 1000;
     for (const table of SEARCH_TABLES) {
       // Bound an action; rerun to resume if an exceptionally large vault needs more.
       for (let i = 0; i < 10000; i++) {
+        if (Date.now() >= deadline) return { complete: false };
         const done: boolean = await ctx.runMutation(internal.searchBackfill.step, { table });
         if (done) break;
         if (i === 9999) return { complete: false };
       }
     }
     return { complete: true };
+  },
+});
+
+export const status = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const tables = await Promise.all(SEARCH_TABLES.map(async table => ({ table, complete: (await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", table)).unique())?.complete ?? false })));
+    return { complete: tables.every(t => t.complete), tables };
   },
 });

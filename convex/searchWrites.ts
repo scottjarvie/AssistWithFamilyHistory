@@ -22,11 +22,15 @@ export function withSearchWrites<T extends { db: MutationCtx["db"] }>(ctx: T): T
   const db = ctx.db;
   return { ...ctx, db: new Proxy(db, { get(target, key) {
     if (key === "insert") return async (table: any, value: any) => target.insert(table, SEARCH_TABLES.includes(table) ? { ...value, ...searchFields(table, value) } : value);
-    if (key === "patch" || key === "replace") return async (id: any, value: any) => {
-      const table = SEARCH_TABLES.find(t => target.normalizeId(t, id));
-      if (!table) return (target[key] as any)(id, value);
+    if (key === "patch" || key === "replace") return async (...args: any[]) => {
+      const explicitTable = args.length === 3;
+      const id = args[explicitTable ? 1 : 0], value = args[explicitTable ? 2 : 1];
+      const table = explicitTable ? SEARCH_TABLES.find(t => t === args[0]) : SEARCH_TABLES.find(t => target.normalizeId(t, id));
+      if (!table) return (target[key] as any).apply(target, args);
       const old = key === "patch" ? await target.get(id) : {};
-      return (target[key] as any)(id, { ...value, ...searchFields(table, { ...old, ...value }) });
+      if (old === null) return (target[key] as any).apply(target, args);
+      const updated = { ...value, ...searchFields(table, { ...old, ...value }) };
+      return (target[key] as any).apply(target, explicitTable ? [table, id, updated] : [id, updated]);
     };
     const value = Reflect.get(target, key);
     return typeof value === "function" ? value.bind(target) : value;
