@@ -94,6 +94,8 @@ export default defineSchema({
    */
   searchBuildState: defineTable({ table: v.string(), cursor: v.union(v.string(), v.null()), complete: v.boolean() }).index("by_table", ["table"]),
 
+  mediaPeople: defineTable({personId: v.id("persons"), mediaId: v.id("media")}).index("by_person", ["personId"]).index("by_media", ["mediaId"]),
+
   persons: defineTable({
     nameGivenKey: v.optional(v.string()),
     searchText: v.optional(v.string()),
@@ -209,6 +211,8 @@ export default defineSchema({
   })
     .searchIndex("search_text", { searchField: "searchText", filterFields: ["vaultOwnerId", "archivedAt"] })
     .index("by_owner", ["vaultOwnerId"])
+    .index("by_owner_updated", ["vaultOwnerId", "archivedAt", "updatedAt"])
+    .index("by_owner_status_updated", ["vaultOwnerId", "archivedAt", "researchStatus", "updatedAt"])
     .index("by_owner_name", ["vaultOwnerId", "name.surname", "nameGivenKey", "birth.date.year"])
     .index("by_owner_fsId", ["vaultOwnerId", "fsId"])
     .index("by_owner_creation_operation", ["vaultOwnerId", "creationProvenance.operationId"])

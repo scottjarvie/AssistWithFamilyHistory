@@ -10,6 +10,7 @@ import { ConvexError, v } from "convex/values";
 import {requireWebsitePerson} from "./access";
 import {validateAudioContainer, normalizeAudioMime, audioContainerError, invalidAudioFileError, checkVoiceNoteDuration, voiceNoteTooLongError} from "./lib/media/audio";
 import {auditMetrics} from "../lib/audit/contract";
+import { pageArgs, type PeoplePageResult } from "./peopleExplorer";
 import { internal } from "./_generated/api";
 import { action, type ActionCtx } from "./_generated/server";
 import { decideTenantAccess, authorizeTenantAction, type TrustBoundaryShadowEntry } from "./access";
@@ -57,6 +58,12 @@ async function authorizedOwner(ctx: ActionCtx, functionName: string, suppliedOwn
   );
   return decision.owner;
 }
+
+export const getPeopleExplorerPage = action({
+  args: pageArgs,
+  handler: async (ctx, args): Promise<PeoplePageResult> =>
+    ctx.runQuery(internal.peopleExplorer.page, {...args, vaultOwnerId: await authorizedOwner(ctx, "vault.getPeopleExplorer", args.vaultOwnerId)}),
+});
 
 export const getPeopleExplorer = action({
   args: {

@@ -6,7 +6,7 @@ import { isRenderedEvidenceImage } from "../lib/media/evidenceStandard";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
-import { type MutationCtx, type QueryCtx, internalMutation, internalQuery } from "./_generated/server";
+import { type MutationCtx, type QueryCtx, internalMutation, internalQuery } from "./searchServer";
 import { evidenceUploadParts } from "../lib/media/evidenceStandard";
 import { assertGrantPermits } from "./mcpGrants";
 import { matchesVaultOwner } from "./vaultCore";
