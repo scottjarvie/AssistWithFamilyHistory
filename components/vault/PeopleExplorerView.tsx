@@ -22,8 +22,8 @@ const columns: CollectionColumn<PeopleExplorerRow>[] = [
 const researchStates = [["not_started", "Not started"], ["basic", "Basic"], ["in_progress", "In progress"], ["thorough", "Thorough"], ["complete", "Complete"]];
 
 /** Search across the vault; compare and arrange its bounded loaded result without dropping fields. */
-export function PeopleExplorerView({ people, firstStartEligible, query, status:requestedStatus, loadMoreHref, preferenceKey = "awf.collection.people.local" }: {
-  people: PeopleExplorerRow[]; firstStartEligible: boolean; query?: string; status?: string; loadMoreHref: string | null; preferenceKey?: string;
+export function PeopleExplorerView({ people, firstStartEligible, query, status:requestedStatus, loadMoreHref, onLoadMore, searching = false, preferenceKey = "awf.collection.people.local" }: {
+  people: PeopleExplorerRow[]; firstStartEligible: boolean; query?: string; status?: string; loadMoreHref: string | null; onLoadMore?: () => void; searching?: boolean; preferenceKey?: string;
 }) {
   const status = researchStates.some(([value]) => value === requestedStatus) ? requestedStatus : "";
   const action = firstStartEligible ? <Button asChild className="min-h-11"><Link href="/app/people/new">Start with two people</Link></Button> : <Button asChild className="min-h-11"><Link href="/app/imports">Import FamilySearch Capture</Link></Button>;
@@ -34,7 +34,7 @@ export function PeopleExplorerView({ people, firstStartEligible, query, status:r
       <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Each ancestor is a research workspace with sources, places, memories, documents, and AI context packs.</p>
     </div>{action}</header>
     <CollectionWorkspace
-      rows={people} columns={columns} preferenceKey={preferenceKey} query={query} status={status} noun="people" identityLabel="Person" defaultGroup="" columnVersion={2} primaryColumn="sources" loadMoreHref={loadMoreHref}
+      rows={people} columns={columns} preferenceKey={preferenceKey} query={query} status={status} noun="people" identityLabel="Person" defaultGroup="" columnVersion={2} primaryColumn="sources" loadMoreHref={loadMoreHref} onLoadMore={onLoadMore}
       groups={[
         { key: "living", label: "Living / deceased", value: (p) => p.living ? "Living" : "Deceased" },
         { key: "state", label: "Research state", value: (p) => p.researchStatus.replace(/_/g, " ") },
@@ -44,7 +44,7 @@ export function PeopleExplorerView({ people, firstStartEligible, query, status:r
       renderDetail={(p) => p.creationProvenance?.evidenceStatus === "unsourced" ? <p className="mt-1 text-sm text-annotation">Starting statement · needs a source</p> : null}
       searchControls={<CollectionFilters path="/app/people" noun="people" query={query || ""} queryLabel="Search people" placeholder="Name, FamilySearch ID, or years" values={{status:status || ""}} facets={[{key:"status",label:"Research state",options:researchStates.map(([value,label])=>({value,label}))}]}/>}
       emptyState={<div className="rounded-lg border border-dashed border-border bg-card px-4 py-10 text-center text-muted-foreground">
-        {firstStartEligible ? <><p>No people are here yet. Begin privately with two people and one known relationship.</p><Button asChild className="mt-4 min-h-11"><Link href="/app/people/new">Start your first connection</Link></Button></> : <p>No people match this filter. Widen the search or clear the research-state filter.</p>}
+        {firstStartEligible ? <><p>No people are here yet. Begin privately with two people and one known relationship.</p><Button asChild className="mt-4 min-h-11"><Link href="/app/people/new">Start your first connection</Link></Button></> : <p>{searching ? "Searching people…" : "No people match this filter. Widen the search or clear the research-state filter."}</p>}
       </div>}
     />
   </div>;

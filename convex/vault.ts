@@ -1502,7 +1502,10 @@ export const getPeopleExplorer = internalQuery({
     ),
     limit: v.optional(v.number()),
   },
-  handler: async (ctx, args) => {
+  handler: readLegacyPeopleExplorer,
+});
+
+export async function readLegacyPeopleExplorer(ctx: QueryCtx, args: {vaultOwnerId: string; search?: string; researchStatus?: Doc<"persons">["researchStatus"]; limit?: number}) {
     const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
     const search = args.search?.trim().toLowerCase();
 
@@ -1524,8 +1527,7 @@ export const getPeopleExplorer = internalQuery({
 
     const sorted = rows.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
     return args.limit ? sorted.slice(0, args.limit) : sorted;
-  },
-});
+  }
 
 export const getPersonWorkspace = internalQuery({
   args: {

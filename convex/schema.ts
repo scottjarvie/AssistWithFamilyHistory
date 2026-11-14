@@ -1,3 +1,4 @@
+import { peopleExplorerPayload } from "../lib/vault/peopleExplorerValidator";
 import { defineSchema, defineTable } from "convex/server";
 import { usageLimitTables } from "./usageLimitsSchema";
 import { v } from "convex/values";
@@ -93,6 +94,13 @@ export default defineSchema({
    * GEDCOM X: Person extends Subject extends Conclusion
    */
   searchBuildState: defineTable({ table: v.string(), cursor: v.union(v.string(), v.null()), complete: v.boolean() }).index("by_table", ["table"]),
+
+  peopleExplorerRows: defineTable({personId: v.id("persons"), vaultOwnerId: v.string(), researchStatus: v.string(), orderKey: v.string(), text: v.string(), payload: peopleExplorerPayload})
+    .index("by_person", ["personId"]).index("by_owner_order", ["vaultOwnerId", "orderKey"]).index("by_owner_status_order", ["vaultOwnerId", "researchStatus", "orderKey"]),
+
+  peopleExplorerFailures: defineTable({personId: v.id("persons"), reason: v.string(), failedAt: v.number()}).index("by_person", ["personId"]),
+
+  mediaPeople: defineTable({personId: v.id("persons"), mediaId: v.id("media")}).index("by_person", ["personId"]).index("by_media", ["mediaId"]),
 
   persons: defineTable({
     nameGivenKey: v.optional(v.string()),
@@ -209,6 +217,8 @@ export default defineSchema({
   })
     .searchIndex("search_text", { searchField: "searchText", filterFields: ["vaultOwnerId", "archivedAt"] })
     .index("by_owner", ["vaultOwnerId"])
+    .index("by_owner_updated", ["vaultOwnerId", "archivedAt", "updatedAt"])
+    .index("by_owner_status_updated", ["vaultOwnerId", "archivedAt", "researchStatus", "updatedAt"])
     .index("by_owner_name", ["vaultOwnerId", "name.surname", "nameGivenKey", "birth.date.year"])
     .index("by_owner_fsId", ["vaultOwnerId", "fsId"])
     .index("by_owner_creation_operation", ["vaultOwnerId", "creationProvenance.operationId"])
@@ -1226,6 +1236,7 @@ export default defineSchema({
     .index("by_owner", ["vaultOwnerId"])
     .index("by_person", ["personId"])
     .index("by_person_fsId", ["personFsId"])
+    .index("by_owner_person_fsId", ["vaultOwnerId", "personFsId"])
     .index("by_imported_at", ["importedAt"])
     .index("by_capture_id", ["captureId"]),
 
@@ -1633,6 +1644,7 @@ export default defineSchema({
   })
     .index("by_owner", ["vaultOwnerId"])
     .index("by_personId", ["personId"])
+    .index("by_owner_personId", ["vaultOwnerId", "personId"])
     .index("by_personId_type", ["personId", "type"]),
 
   /**

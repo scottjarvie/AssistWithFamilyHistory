@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, internalAction, internalQuery } from "./_generated/server";
+import { internalMutation, internalAction, internalQuery } from "./searchServer";
 import { internal } from "./_generated/api";
 import { SEARCH_TABLES, searchFields } from "./searchWrites";
 

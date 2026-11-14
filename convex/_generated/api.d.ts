@@ -30,6 +30,7 @@ import type * as mcpGrants from "../mcpGrants.js";
 import type * as media from "../media.js";
 import type * as mediaEvidenceControl from "../mediaEvidenceControl.js";
 import type * as mediaEvidenceStorage from "../mediaEvidenceStorage.js";
+import type * as peopleExplorer from "../peopleExplorer.js";
 import type * as personEvents from "../personEvents.js";
 import type * as persons from "../persons.js";
 import type * as places from "../places.js";
@@ -84,6 +85,7 @@ declare const fullApi: ApiFromModules<{
   media: typeof media;
   mediaEvidenceControl: typeof mediaEvidenceControl;
   mediaEvidenceStorage: typeof mediaEvidenceStorage;
+  peopleExplorer: typeof peopleExplorer;
   personEvents: typeof personEvents;
   persons: typeof persons;
   places: typeof places;

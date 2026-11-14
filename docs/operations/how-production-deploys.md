@@ -79,3 +79,13 @@ The elaborate pinned-worktree deploy runbook that used to live at
 `docs/archive/2026-08-awf-wo-011-deploy/deploy-pin-awf-wo-011.md`. It was written
 during the failed-build period, when it looked as though a deploy had to be
 performed by hand. It never did.
+
+## People Explorer membership migration
+
+After the Vercel deployment that adds the cursor People list, follow
+[People Explorer scale and backfill](people-explorer-scale.md#release-and-backfill).
+Run its shipped `peopleExplorer:backfill` on accomplished-dodo-308 and confirm
+`peopleExplorer:backfillStatus` is complete. Until then the read retains the original
+People Explorer snapshot behavior. The runbook also documents skipped-row
+diagnostics and the internal refreshPeople repair mutation. This is a post-deploy data migration,
+not a manual production code deployment.

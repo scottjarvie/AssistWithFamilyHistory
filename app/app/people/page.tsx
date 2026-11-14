@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { projectPeopleCollectionRow } from "@/lib/vault/peopleCollection";
-import { PeopleExplorerView } from "@/components/vault/PeopleExplorerView";
+
+import { PaginatedPeopleExplorer } from "@/components/vault/PaginatedPeopleExplorer";
 import { VaultStateCard } from "@/components/vault/VaultStateCard";
 import { createPageMetadata } from "@/lib/seo";
 import {
@@ -20,21 +20,9 @@ export const metadata: Metadata = createPageMetadata({
 
 export const dynamic = "force-dynamic";
 
-const PEOPLE_PAGE_SIZE = 50;
-
-export default async function PeoplePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ q?: string; status?: string; page?: string }>;
-}) {
+export default async function PeoplePage({searchParams}: {searchParams: Promise<{q?: string; status?: string}>}) {
   const params = await searchParams;
-  const parsedPage = Number.parseInt(params.page ?? "1", 10);
-  const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
-  // Cap how many rows we render. We request one extra row beyond the visible
-  // window so we can tell whether a "Load more" link should appear without a
-  // second query. Small vaults are unaffected (page 1 shows up to 50 people).
-  const visibleCount = PEOPLE_PAGE_SIZE * page;
-
+  const status = params.status === "not_started" || params.status === "basic" || params.status === "in_progress" || params.status === "thorough" || params.status === "complete" ? params.status : undefined;
   if (!isConvexConfigured()) {
     const issue = getConvexUnavailableState(
       "People Explorer",
@@ -54,18 +42,11 @@ export default async function PeoplePage({
 
   try {
     const [peopleResult, eligibility] = await Promise.all([
-      client.action(api.vaultReads.getPeopleExplorer, {
+      client.action(api.vaultReads.getPeopleExplorerPage, {
         vaultOwnerId,
         search: params.q || undefined,
-        researchStatus:
-          params.status === "not_started" ||
-          params.status === "basic" ||
-          params.status === "in_progress" ||
-          params.status === "thorough" ||
-          params.status === "complete"
-            ? params.status
-            : undefined,
-        limit: visibleCount + 1,
+        researchStatus: status,
+        cursor: null,
       }),
       client.action(api.vaultReads.getFirstStartEligibility, { vaultOwnerId }),
     ]);
@@ -81,21 +62,5 @@ export default async function PeoplePage({
     );
   }
 
-  const hasMore = people.length > visibleCount;
-  const visiblePeople = hasMore ? people.slice(0, visibleCount) : people;
-  const loadMoreParams = new URLSearchParams();
-  if (params.q) loadMoreParams.set("q", params.q);
-  if (params.status) loadMoreParams.set("status", params.status);
-  loadMoreParams.set("page", String(page + 1));
-
-  return (
-    <PeopleExplorerView
-      preferenceKey={`awf.collection.people.${vaultOwnerId}`}
-      people={visiblePeople.map(projectPeopleCollectionRow)}
-      firstStartEligible={firstStartEligible}
-      query={params.q}
-      status={params.status}
-      loadMoreHref={hasMore ? `/app/people?${loadMoreParams.toString()}` : null}
-    />
-  );
+  return <PaginatedPeopleExplorer key={`${vaultOwnerId}:${params.q || ""}:${status || ""}`} vaultOwnerId={vaultOwnerId} initial={people} firstStartEligible={firstStartEligible} query={params.q} status={status} preferenceKey={`awf.collection.people.${vaultOwnerId}`}/>;
 }
