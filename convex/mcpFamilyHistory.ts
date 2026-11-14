@@ -1,3 +1,5 @@
+import { searchText } from "./searchWrites";
+import { searchRows } from "./searchRows";
 import { summaryFor, limitsFor, assertWriteBatch, fileCapsFor } from "./usageLimits";
 import {queueIdentity,suggestionWithinPeople} from "../lib/queue/identity";
 import { loadStoryScopedSnapshot, buildStoryBundle, buildPublicStoryBundle } from "./vault";
@@ -8,8 +10,8 @@ import { authorizeTenantMutation } from "./access";
 /* eslint-disable @typescript-eslint/no-explicit-any -- Internal inputs are validated by the public MCP Zod schemas before dispatch. */
 import { v } from "convex/values";
 import type { Doc, Id, TableNames } from "./_generated/dataModel";
-import type { MutationCtx, QueryCtx } from "./_generated/server";
-import { mutation, internalMutation, internalQuery } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./searchServer";
+import { mutation, internalMutation, internalQuery } from "./searchServer";
 import { anyApi } from "convex/server";
 import { FAMILY_HISTORY_MCP_LIMITS } from "../lib/mcp/contract";
 import { matchesVaultOwner } from "./vaultCore";
@@ -1451,50 +1453,57 @@ export const search = internalQuery({
   args: {
     principal: principalValidator,
     query: v.string(),
+    personIds: v.optional(v.array(v.string())),
     kinds: v.optional(v.array(v.string())),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const owner = ownerFromPrincipal(args.principal);
     const needle = args.query.trim().toLowerCase();
+    if ((needle.match(/[\p{L}\p{N}]+/gu)?.length ?? 0) > 16) machineError("VALIDATION_ERROR", "Search accepts at most 16 terms.", "Use a shorter name or phrase.");
     const limit = Math.max(1, Math.min(Math.floor(args.limit ?? 25), FAMILY_HISTORY_MCP_LIMITS.searchLimit));
-    const scan = FAMILY_HISTORY_MCP_LIMITS.searchScanPerType;
     const kinds = new Set(args.kinds?.length ? args.kinds : ["person", "source", "place", "topic", "story", "research_task", "research_finding", "event"]);
     const results: Array<Record<string, unknown>> = [];
     const add = (kind: string, rows: Array<Record<string, unknown>>) => {
       for (const row of rows) if (results.length < limit) results.push({ kind, ...row });
     };
     if (kinds.has("person")) {
-      const rows = await ctx.db.query("persons").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(scan + 1);
-      add("person", rows.filter((row) => `${row.name.given} ${row.name.surname} ${(row.alternateNames ?? []).map((name) => `${name.given} ${name.surname}`).join(" ")} ${(row.tags ?? []).join(" ")}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, name: `${row.name.given} ${row.name.surname}`.trim(), living: row.living, researchStatus: row.researchStatus, updatedAt: row.updatedAt })));
+      // A selected-people grant reads only explicit allowed IDs; hidden rows
+      // never enter a candidate window, counts or ranking.
+      const rows = args.personIds ? (await Promise.all(args.personIds.slice(0, 500).map(async id => {
+        const normalized = ctx.db.normalizeId("persons", id);
+        const row = normalized ? await ctx.db.get(normalized) : null;
+        return row && matchesVaultOwner(row.vaultOwnerId, owner) && row.archivedAt === undefined ? row : null;
+      }))).filter((row): row is Doc<"persons"> => row !== null).filter(row => searchText("persons", row).toLowerCase().includes(needle)).slice(0, limit) : await searchRows(ctx, "persons", owner, needle, limit - results.length);
+      add("person", rows.map((row) => ({ id: row._id, name: `${row.name.given} ${row.name.surname}`.trim(), living: row.living, researchStatus: row.researchStatus, updatedAt: row.updatedAt })));
     }
-    if (kinds.has("source") && results.length < limit) {
-      const rows = await ctx.db.query("sources").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(scan + 1);
-      add("source", rows.filter((row) => `${row.title} ${row.repository ?? ""} ${row.author ?? ""} ${row.type}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, title: row.title, type: row.type, repository: row.repository, updatedAt: row.updatedAt })));
+    if (!args.personIds && kinds.has("source") && results.length < limit) {
+      const rows = await searchRows(ctx, "sources", owner, needle, limit - results.length);
+      add("source", rows.map((row) => ({ id: row._id, title: row.title, type: row.type, repository: row.repository, updatedAt: row.updatedAt })));
     }
-    if (kinds.has("story") && results.length < limit) {
-      const rows = await ctx.db.query("stories").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(scan + 1);
-      add("story", rows.filter((row) => `${row.title} ${(row.tags ?? []).join(" ")} ${row.type}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, title: row.title, type: row.type, status: row.status, personId: row.personId, updatedAt: row.updatedAt })));
+    if (!args.personIds && kinds.has("story") && results.length < limit) {
+      const rows = await searchRows(ctx, "stories", owner, needle, limit - results.length);
+      add("story", rows.map((row) => ({ id: row._id, title: row.title, type: row.type, status: row.status, personId: row.personId, updatedAt: row.updatedAt })));
     }
-    if (kinds.has("research_task") && results.length < limit) {
-      const rows = await ctx.db.query("researchTasks").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(scan + 1);
-      add("research_task", rows.filter((row) => `${row.title} ${row.description ?? ""} ${row.notes ?? ""}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, title: row.title, status: row.status, priority: row.priority, personId: row.personId, updatedAt: row.updatedAt })));
+    if (!args.personIds && kinds.has("research_task") && results.length < limit) {
+      const rows = await searchRows(ctx, "researchTasks", owner, needle, limit - results.length);
+      add("research_task", rows.map((row) => ({ id: row._id, title: row.title, status: row.status, priority: row.priority, personId: row.personId, updatedAt: row.updatedAt })));
     }
-    if (kinds.has("research_finding") && results.length < limit) {
-      const rows = await ctx.db.query("researchLog").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(scan + 1);
-      add("research_finding", rows.filter((row) => `${row.summary} ${row.details ?? ""}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, summary: row.summary, entityType: row.entityType, entityId: row.entityId, status: row.status, updatedAt: row.updatedAt })));
+    if (!args.personIds && kinds.has("research_finding") && results.length < limit) {
+      const rows = await searchRows(ctx, "researchLog", owner, needle, limit - results.length);
+      add("research_finding", rows.map((row) => ({ id: row._id, summary: row.summary, entityType: row.entityType, entityId: row.entityId, status: row.status, updatedAt: row.updatedAt })));
     }
-    if (kinds.has("event") && results.length < limit) {
-      const rows = await ctx.db.query("events").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(scan + 1);
-      add("event", rows.filter((row) => `${row.type} ${row.customType ?? ""} ${row.description ?? ""} ${row.place?.original ?? ""} ${row.date?.original ?? ""}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, type: row.type, customType: row.customType, date: row.date, place: row.place, description: row.description, updatedAt: row.updatedAt })));
+    if (!args.personIds && kinds.has("event") && results.length < limit) {
+      const rows = await searchRows(ctx, "events", owner, needle, limit - results.length);
+      add("event", rows.map((row) => ({ id: row._id, type: row.type, customType: row.customType, date: row.date, place: row.place, description: row.description, updatedAt: row.updatedAt })));
     }
-    if (kinds.has("place") && results.length < limit) {
-      const rows = await ctx.db.query("places").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(scan + 1);
-      add("place", rows.filter((row) => `${row.name} ${row.fullName} ${row.type} ${(row.alternateNames ?? []).map((name) => name.name).join(" ")}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, name: row.name, fullName: row.fullName, type: row.type, parentId: row.parentId, updatedAt: row.updatedAt })));
+    if (!args.personIds && kinds.has("place") && results.length < limit) {
+      const rows = await searchRows(ctx, "places", owner, needle, limit - results.length);
+      add("place", rows.map((row) => ({ id: row._id, name: row.name, fullName: row.fullName, type: row.type, parentId: row.parentId, updatedAt: row.updatedAt })));
     }
-    if (kinds.has("topic") && results.length < limit) {
-      const rows = await ctx.db.query("topics").withIndex("by_owner", (q) => q.eq("vaultOwnerId", owner)).order("desc").filter(q => q.eq(q.field("archivedAt"), undefined)).take(scan + 1);
-      add("topic", rows.filter((row) => `${row.name} ${row.kind} ${(row.alternateNames ?? []).join(" ")} ${row.description ?? ""}`.toLowerCase().includes(needle)).map((row) => ({ id: row._id, name: row.name, kind: row.kind, updatedAt: row.updatedAt })));
+    if (!args.personIds && kinds.has("topic") && results.length < limit) {
+      const rows = await searchRows(ctx, "topics", owner, needle, limit - results.length);
+      add("topic", rows.map((row) => ({ id: row._id, name: row.name, kind: row.kind, updatedAt: row.updatedAt })));
     }
     return { query: args.query, results, limit, truncated: results.length === limit, nextRecommendedTool: "get_family_history_context" };
   },

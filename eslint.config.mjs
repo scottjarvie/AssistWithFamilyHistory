@@ -17,6 +17,7 @@ const eslintConfig = defineConfig([
     // Local-mode build output and ignored record-only Sandbox snapshots.
     ".next-local-*/**",
     "sandbox-backend*/**",
+    ".scratch/**",
     ".record-only-codegen-test-*/**",
     // Docs (archived evidence, prototypes) skip CI, so they must not lint.
     "docs/**",

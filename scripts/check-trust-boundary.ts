@@ -84,7 +84,7 @@ function importedBuilders(sourceFile: ts.SourceFile): Map<string, string> {
 
   for (const statement of sourceFile.statements) {
     if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
-    if (statement.moduleSpecifier.text !== GENERATED_SERVER_MODULE) continue;
+    if (![GENERATED_SERVER_MODULE, "./searchServer"].includes(statement.moduleSpecifier.text)) continue;
 
     const bindings = statement.importClause?.namedBindings;
     if (!bindings || !ts.isNamedImports(bindings)) continue;

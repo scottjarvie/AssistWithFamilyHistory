@@ -787,7 +787,7 @@ export function createFamilyHistoryServer(
       limit: z.number().int().min(1).max(FAMILY_HISTORY_MCP_LIMITS.searchLimit).default(25),
     }).strict(),
     annotations: readOnly,
-  }, (input: any) => read("family_history_search", () => actionCtx.runQuery(mcp.search, { principal, ...input })));
+  }, (input: any) => read("family_history_search", () => actionCtx.runQuery(mcp.search, { principal, ...input, personIds: grant?.boundary.kind === "selected_people" ? grant.boundary.personIds ?? [] : undefined })));
 
   registerTool("family_history_get_context", {
     inputSchema: z.object({

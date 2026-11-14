@@ -9,7 +9,7 @@
  * Transition legality lives in the pure, unit-tested lib/operations/taskLifecycle.ts.
  */
 import { v } from "convex/values";
-import { action, internalQuery, mutation } from "./_generated/server";
+import { action, internalQuery, mutation } from "./searchServer";
 import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
 import { authorizeTenantAction, authorizeTenantMutation } from "./access";
