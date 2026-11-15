@@ -27,6 +27,8 @@ test('public-only adapters failclosed outside exact local mode and endpoint',()=
  const live={NODE_ENV:'development',LOCAL_DEVELOPMENT_MODE:'live',CONVEX_DEPLOYMENT:'prod:gallant-mallard-74',NEXT_PUBLIC_CONVEX_URL:'https://gallant-mallard-74.convex.cloud'};assert.equal(localLiveEnabled(live),true);
  for(const wrong of [{NODE_ENV:'production'},{VERCEL:'1'},{CI:'1'},{CLERK_SECRET_KEY:'placeholder'},{NEXT_PUBLIC_CONVEX_URL:'https://wrong.convex.cloud'}])assert.equal(localLiveEnabled({...live,...wrong}),false);
  assert.equal(localSandboxEnabled({...live,LOCAL_DEVELOPMENT_MODE:'sandbox'}),false);
+ const sandbox={NODE_ENV:'development',LOCAL_DEVELOPMENT_MODE:'sandbox',CONVEX_DEPLOYMENT:'dev:clear-capybara-929',NEXT_PUBLIC_CONVEX_URL:'https://clear-capybara-929.convex.cloud'};assert.equal(localSandboxEnabled(sandbox),true);
+ for(const wrong of [{NODE_ENV:'production'},{VERCEL:'1'},{CI:'1'},{CLERK_SECRET_KEY:'placeholder'},{CONVEX_DEPLOYMENT:'anonymous:anonymous-family-history-completion-20261007'},{NEXT_PUBLIC_CONVEX_URL:'http://127.0.0.1:4323'}])assert.equal(localSandboxEnabled({...sandbox,...wrong}),false);
 });
 
 

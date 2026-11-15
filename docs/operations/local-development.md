@@ -4,7 +4,7 @@ Family History can run from a normal checkout of `main` in two local modes.
 
 | Mode | Command | Address | Backend and identity |
 | --- | --- | --- | --- |
-| Sandbox | `pnpm dev:sandbox` | `http://family-history.localhost:3443` | A separate local record-only backend on `127.0.0.1:4323` and a development Clerk instance. Synthetic records only. |
+| Sandbox | `pnpm dev:sandbox` | `http://family-history.localhost:3443` | The cloud development deployment `dev:clear-capybara-929` (`jarvie:tell-their-stories:dev/sandbox`, no provider keys) and the development Clerk instance `improved-ram-86`. Synthetic records only. |
 | Live | `pnpm dev:live` | `https://local.assistwithfamilyhistory.com` (port 3444) | The production backend and the production Clerk instance. **Currently withheld**: the launcher refuses Live until its backend binding and production owner enforcement are independently verified. The binding in `scripts/local-development.json` must be re-checked against the production deployment recorded in [Bring Your AI provider actions](bring-your-ai-provider-actions.md) before Live is enabled. |
 
 `pnpm dev:status` reports whether each mode's local environment file is present and valid.
@@ -18,7 +18,15 @@ Family History can run from a normal checkout of `main` in two local modes.
 
 ## Sandbox backend
 
-The Sandbox backend is a source-only, record-only snapshot prepared by `scripts/prepare-record-only-sandbox.mjs` into the ignored `sandbox-backend/` folder. It always enforces the existing owner checks, has no crons, and refuses every Convex action except a hash-locked list of vetted record reads (`scripts/record-only-actions.json`, `scripts/record-only-action-hashes.json`). Its native database, configuration and storage are persistent state, not a cache; the family launcher owns starting it.
+Since 2026-11-15 the Sandbox is the cloud development deployment `dev:clear-capybara-929`, so it works from any machine. It was created empty: its only environment variable is the public `CLERK_JWT_ISSUER_DOMAIN` (`https://improved-ram-86.clerk.accounts.dev`), so provider, storage and AI calls have no keys. Push backend source to it with `pnpm dev:backend` (it reads only `.env.local-sandbox`). Never point it at production data.
+
+### Sign-in and screenshots
+
+`node ../assist-local-dev/screenshots/sandbox-profile.mjs .` writes the ignored `.env.local-sandbox` from public values; then `pnpm dev:sandbox` and `shoot.mjs --base http://family-history.localhost:3443 --site family-history --routes /app`. It signs in as the Clerk development `+clerk_test` user (code 424242), never Scott's account. See the [screenshots README](https://github.com/scottjarvie/assist-local-dev/blob/main/screenshots/README.md).
+
+### Native record-only backend (Mac mini history)
+
+The earlier native backend binding is kept as `nativeSandbox` in `scripts/local-development.json`. It was a source-only, record-only snapshot prepared by `scripts/prepare-record-only-sandbox.mjs` into the ignored `sandbox-backend/` folder. It always enforces the existing owner checks, has no crons, and refuses every Convex action except a hash-locked list of vetted record reads (`scripts/record-only-actions.json`, `scripts/record-only-action-hashes.json`). Its native database, configuration and storage are persistent state, not a cache; the family launcher owns starting it.
 
 ## Checks
 

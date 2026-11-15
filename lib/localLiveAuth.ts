@@ -19,8 +19,8 @@ const sandboxPublicKeys = createRemoteJWKSet(new URL(`${LOCAL_SANDBOX_ISSUER}/.w
 export function localSandboxEnabled(env: Record<string, string | undefined> = process.env): boolean {
   return env.NODE_ENV === "development" && env.LOCAL_DEVELOPMENT_MODE === "sandbox"
     && !env.VERCEL && !env.CI && !env.CLERK_SECRET_KEY
-    && env.CONVEX_DEPLOYMENT === "anonymous:anonymous-family-history-completion-20261007"
-    && env.NEXT_PUBLIC_CONVEX_URL === "http://127.0.0.1:4323";
+    && env.CONVEX_DEPLOYMENT === "dev:clear-capybara-929"
+    && env.NEXT_PUBLIC_CONVEX_URL === "https://clear-capybara-929.convex.cloud";
 }
 export function localPublicAuthEnabled(env: Record<string, string | undefined> = process.env): boolean {
   return localLiveEnabled(env) || localSandboxEnabled(env);
