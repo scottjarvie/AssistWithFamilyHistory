@@ -50,9 +50,17 @@ ignored at read time.
 - The AI merges and deploys routine work; Scott does not need to press merge.
   Stop and ask before money, deleting real data, DNS, secrets, or changing who
   can access production data.
-- Preview locally with `pnpm dev:sandbox` (record-only backend, synthetic
-  records) or `pnpm preview:local`. `pnpm dev:live` stays withheld until its
+- Preview locally with `pnpm dev:sandbox` (cloud dev backend
+  `clear-capybara-929`, synthetic records) or `pnpm preview:local`. `pnpm dev:live` stays withheld until its
   production binding is verified.
+
+## Sign-in and screenshots
+
+Sandbox is `http://family-history.localhost:3443`. Once per checkout run
+`node ../assist-local-dev/screenshots/sandbox-profile.mjs .`, then
+`pnpm dev:sandbox` and `shoot.mjs`. It signs in as the Clerk dev `+clerk_test`
+user, never Scott's account. See the
+[screenshots README](https://github.com/scottjarvie/assist-local-dev/blob/main/screenshots/README.md).
 
 <!-- BEGIN:nextjs-agent-rules -->
 

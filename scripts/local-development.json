@@ -11,11 +11,21 @@
   },
   "sandbox": {
     "port": 3443,
+    "hostname": "family-history.localhost",
+    "deployment": "dev:clear-capybara-929",
+    "clerkHost": "improved-ram-86.clerk.accounts.dev",
+    "providerIsolationVerified": true,
+    "providerEvidence": "2026-11-15 cloud dev deployment jarvie:tell-their-stories:dev/sandbox created empty; its only env var name is CLERK_JWT_ISSUER_DOMAIN (public development Clerk issuer). No provider, payment, email, storage or AI keys; no data copied.",
+    "blocker": "Public-JWKS local sign-in; local server APIs, media, MCP and provider actions stay unavailable."
+  },
+  "nativeSandbox": {
+    "port": 3443,
     "deployment": "anonymous:anonymous-family-history-completion-20261007",
     "backendURL": "http://127.0.0.1:4323",
     "siteURL": "http://127.0.0.1:4324",
     "hostname": "family-history.localhost",
     "clerkHost": "improved-ram-86.clerk.accounts.dev",
-    "recordOnly": true
+    "recordOnly": true,
+    "note": "Mac mini native record-only backend (history). Prepared by scripts/prepare-record-only-sandbox.mjs; no longer the Sandbox binding."
   }
 }
