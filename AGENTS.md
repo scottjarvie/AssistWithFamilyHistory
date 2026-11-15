@@ -64,6 +64,8 @@ user, never Scott's account. See the
 
 <!-- BEGIN:nextjs-agent-rules -->
 
+**Scott's real account** (testing only, read-mostly; use the test user for anything that writes): `shoot.mjs --live --checkout .` on the local Live address reuses his saved session; see the [standard](https://github.com/scottjarvie/assist-local-dev/blob/main/docs/sign-in-and-screenshots.md#scotts-real-account-approved-15-nov-2026).
+
 ## This is NOT the Next.js you know
 
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
