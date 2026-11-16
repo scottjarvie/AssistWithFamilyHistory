@@ -1,4 +1,4 @@
-import { WritingCandidatesView } from "@/components/vault/WritingCandidatesView";
+import { PagedWriting } from "./PagedWriting";
 import { projectWritingCandidate } from "@/lib/vault/collectionRows";
 import type { Metadata } from "next";
 import { VaultStateCard } from "@/components/vault/VaultStateCard";
@@ -33,7 +33,7 @@ export default async function StoryWriterPage() {
   let people;
 
   try {
-    people = await client.action(api.vaultReads.getStoryReadinessCandidates, {
+    people = await client.action(api.vaultReads.getStoryReadinessPage, {
       vaultOwnerId,
       limit: 24,
     });
@@ -46,5 +46,5 @@ export default async function StoryWriterPage() {
     );
   }
 
-  return <WritingCandidatesView people={people.map(projectWritingCandidate)} preferenceKey={`awf.collection.writing.${vaultOwnerId}`} />;
+  return <PagedWriting key={vaultOwnerId} owner={vaultOwnerId} initial={{...people,page:people.page.map(projectWritingCandidate)}} preferenceKey={`awf.collection.writing.${vaultOwnerId}`} />;
 }

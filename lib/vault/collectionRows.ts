@@ -4,7 +4,7 @@ import { publicStoryPath } from "@/lib/stories/slug";
 
 import type {PlaceRow as Place} from "@/convex/placePages";
 type Story = FunctionReturnType<typeof api.vaultReads.getStoriesIndex>["page"][number];
-type Candidate = FunctionReturnType<typeof api.vaultReads.getStoryReadinessCandidates>[number];
+type Candidate = FunctionReturnType<typeof api.vaultReads.getStoryReadinessPage>["page"][number];
 import type { TaskWithPerson, LogWithPerson } from "@/convex/researchPages";
 
 // Never spread a backend document into a client collection row.

@@ -1,6 +1,6 @@
 import { operationQueryArguments } from "@/lib/operations/query";
 import type { Metadata } from "next";
-import { OperationsView } from "@/components/operations/OperationsView";
+import { PagedOperations } from "./PagedOperations";
 import { projectOperationRow, normalizeOperationFilters } from "@/lib/vault/operationsRows";
 import { VaultStateCard } from "@/components/vault/VaultStateCard";
 import { createPageMetadata } from "@/lib/seo";
@@ -23,17 +23,11 @@ export const dynamic = "force-dynamic";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-const OPERATIONS_PAGE_SIZE = 50;
+
 
 export default async function OperationsPage({ searchParams }: { searchParams: SearchParams }) {
   const rawParams = await searchParams;
   const params = {...rawParams,...normalizeOperationFilters(rawParams),page:Array.isArray(rawParams.page)?rawParams.page[0]:rawParams.page};
-  const parsedPage = Number.parseInt(params.page ?? "1", 10);
-  const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
-  // Cap rendered rows. The Convex query slices to `limit` and computes the
-  // summary over the visible rows, so the "Visible rows" stat stays consistent
-  // with what is shown. Keep the existing cap-based next-page heuristic.
-  const visibleCount = OPERATIONS_PAGE_SIZE * page;
 
   if (!isConvexConfigured()) {
     const issue = getConvexUnavailableState(
@@ -56,7 +50,7 @@ export default async function OperationsPage({ searchParams }: { searchParams: S
     queue = await client.action(api.vaultReads.getOperationsQueue, {
       vaultOwnerId,
       ...operationQueryArguments(normalizeOperationFilters(params)),
-      limit: visibleCount,
+
     });
   } catch (error) {
     const issue = getConvexRuntimeIssue(error);
@@ -67,15 +61,11 @@ export default async function OperationsPage({ searchParams }: { searchParams: S
     );
   }
 
-  const hasMore = queue.rows.length >= visibleCount;
-  const loadMoreParams = new URLSearchParams(Object.entries(params).filter((entry): entry is [string, string] => typeof entry[1] === "string" && Boolean(entry[1]) && entry[0] !== "page"));
-  loadMoreParams.set("page", String(page + 1));
   const handoffParams = new URLSearchParams({ format: "handoff" });
   for (const [key, value] of Object.entries(params)) {
     if (typeof value === "string" && value) handoffParams.set(key, value);
   }
-  return <OperationsView rows={queue.rows.map(projectOperationRow)} summary={queue.summary}
+  return <PagedOperations key={JSON.stringify([vaultOwnerId,normalizeOperationFilters(params)])} owner={vaultOwnerId} initial={{...queue,rows:queue.rows.map(projectOperationRow)}}
     filters={normalizeOperationFilters(params)} preferenceKey={`awf.collection.operations.${vaultOwnerId}`}
-    loadMoreHref={hasMore ? `/app/operations?${loadMoreParams}` : null}
     handoffHref={`/api/operations/queue?${handoffParams}`} mode={accessContext.mode} />;
 }

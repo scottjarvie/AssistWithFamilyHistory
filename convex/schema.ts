@@ -1,3 +1,4 @@
+import { scoreRowFields } from "./personScoreModel";
 import { peopleExplorerPayload } from "../lib/vault/peopleExplorerValidator";
 import { defineSchema, defineTable } from "convex/server";
 import { usageLimitTables } from "./usageLimitsSchema";
@@ -105,6 +106,39 @@ export default defineSchema({
   vaultCountMembers: defineTable({recordId: v.string(), table: v.string(), owner: v.string(), keys: v.array(v.string()), shard: v.optional(v.number()), places:v.optional(v.array(v.object({owner:v.string(),placeId:v.id("places"),kind:v.union(v.literal("events"),v.literal("citations"),v.literal("context"),v.literal("research")),year:v.optional(v.number())})))})
     .index("by_record", ["recordId"]),
 
+  personScoreRows: defineTable(scoreRowFields)
+    .index("by_record", ["recordId"])
+    .index("by_readiness", ["vaultOwnerId", "rowType", "readinessOrder"])
+    .index("by_workflow_readiness", ["vaultOwnerId", "rowType", "storyWorkflow", "readinessOrder"])
+    .index("by_stale", ["vaultOwnerId", "oldestReview"])
+    .index("by_missing_identity_review", ["vaultOwnerId", "missing.identity_review", "missingCriticalOrder"])
+    .index("by_missing_biography", ["vaultOwnerId", "missing.biography", "missingCriticalOrder"])
+    .index("by_missing_timeline", ["vaultOwnerId", "missing.timeline", "missingCriticalOrder"])
+    .index("by_missing_relationships", ["vaultOwnerId", "missing.relationships", "missingCriticalOrder"])
+    .index("by_missing_birth_record", ["vaultOwnerId", "missing.birth_record", "missingCriticalOrder"])
+    .index("by_missing_marriage_record", ["vaultOwnerId", "missing.marriage_record", "missingCriticalOrder"])
+    .index("by_missing_death_record", ["vaultOwnerId", "missing.death_record", "missingCriticalOrder"])
+    .index("by_missing_census", ["vaultOwnerId", "missing.census", "missingCriticalOrder"])
+    .index("by_missing_immigration", ["vaultOwnerId", "missing.immigration", "missingCriticalOrder"])
+    .index("by_missing_military", ["vaultOwnerId", "missing.military", "missingCriticalOrder"])
+    .index("by_missing_probate_land_newspaper", ["vaultOwnerId", "missing.probate_land_newspaper", "missingCriticalOrder"])
+    .index("by_missing_church_records", ["vaultOwnerId", "missing.church_records", "missingCriticalOrder"])
+    .index("by_missing_memories", ["vaultOwnerId", "missing.memories", "missingCriticalOrder"])
+    .index("by_missing_place_context", ["vaultOwnerId", "missing.place_context", "missingCriticalOrder"])
+    .index("by_type_priority",["vaultOwnerId","rowType","missingCriticalOrder"])
+    .index("by_workflow_priority",["vaultOwnerId","storyWorkflow","missingCriticalOrder"])
+    .index("by_story_priority",["vaultOwnerId","hasStory","missingCriticalOrder"])
+
+    .index("by_missingCritical", ["vaultOwnerId", "missingCriticalOrder"])
+    .index("by_completion", ["vaultOwnerId", "completionOrder"])
+    .index("by_lastTouched", ["vaultOwnerId", "lastTouchedOrder"])
+    .index("by_sourceCount", ["vaultOwnerId", "sourceCountOrder"])
+    .index("by_storyReadiness", ["vaultOwnerId", "storyReadinessOrder"])
+    .index("by_newestImport", ["vaultOwnerId", "newestImportOrder"])
+    ,
+  personScoreReviews: defineTable({recordId:v.string(),vaultOwnerId:v.string(),reviewedAt:v.number()})
+    .index("by_record",["recordId"]).index("by_owner_review",["vaultOwnerId","reviewedAt"]),
+
   peopleExplorerRows: defineTable({personId: v.id("persons"), vaultOwnerId: v.string(), researchStatus: v.string(), orderKey: v.string(), text: v.string(), payload: peopleExplorerPayload})
     .index("by_person", ["personId"]).index("by_owner_order", ["vaultOwnerId", "orderKey"]).index("by_owner_status_order", ["vaultOwnerId", "researchStatus", "orderKey"]),
 
@@ -112,7 +146,7 @@ export default defineSchema({
 
   peopleExplorerDependencyFailures: defineTable({
     key: v.string(),
-    job: v.object({kind: v.union(v.literal("owner"), v.literal("personKey"), v.literal("event"), v.literal("citation"), v.literal("source"), v.literal("place")), id: v.string(), owner: v.optional(v.string()), stage: v.optional(v.number()), cursor: v.optional(v.union(v.string(), v.null()))}),
+    job: v.object({kind: v.union(v.literal("owner"), v.literal("personKey"), v.literal("event"), v.literal("citation"), v.literal("source"), v.literal("place"),v.literal("provisional"),v.literal("provisionalRow")), id: v.string(), owner: v.optional(v.string()), stage: v.optional(v.number()), cursor: v.optional(v.union(v.string(), v.null()))}),
     state: v.union(v.literal("pending"), v.literal("failed")), reason: v.string(), recordedAt: v.number(),
   }).index("by_key", ["key"]),
 

@@ -10,7 +10,7 @@
     "getOperationsSummary",
     "getVaultAudit",
     "getContextCoverage",
-    "getStoryReadinessCandidates",
+    "getStoryReadinessPage",
     "getPlacesPage",
     "getPlaceSection",
     "getPlaceMentions",

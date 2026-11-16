@@ -1,3 +1,4 @@
+import {refreshPersonScore, refreshProvisionalScore, removeScore} from "./personScores";
 import { projectPeopleCollectionRow } from "../lib/vault/peopleCollection";
 import type { PeopleExplorerPayload } from "../lib/vault/peopleExplorerValidator";
 import { readLegacyPeopleExplorer } from "./vault";
@@ -74,6 +75,7 @@ async function legacyPeoplePage(ctx: QueryCtx, args: PeoplePageArgs): Promise<Pe
 
 /** Projection refresh happens once per affected person at the end of a central mutation. */
 export async function refreshPerson(ctx: {db: MutationCtx["db"]}, personId: Doc<"persons">["_id"]) {
+  await refreshPersonScore(ctx,personId);
   const old = await ctx.db.query("peopleExplorerRows").withIndex("by_person", q => q.eq("personId", personId)).unique();
   const person = await ctx.db.get(personId);
   if (!person || person.archivedAt !== undefined) {
@@ -130,12 +132,12 @@ export const backfillStep = internalMutation({
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export type ExplorerChange = {table: string; before: any; after: any};
-export const EXPLORER_TABLES = ["persons", "personEvents", "events", "places", "citationLinks", "citations", "sources", "media", "documents", "stories", "importRuns"];
+export const EXPLORER_TABLES = ["persons", "personEvents", "events", "places", "citationLinks", "citations", "sources", "media", "documents", "stories", "importRuns", "relationships", "researchChecks", "researchTasks", "historicalContext", "provisionalRelatives"];
 const RELEVANT: Record<string, string[]> = {
-  places: ["name", "fullName", "archivedAt", "vaultOwnerId"], sources: ["archivedAt", "vaultOwnerId"],
+  places: ["name", "fullName", "archivedAt", "vaultOwnerId"], sources: ["title", "type", "notes", "archivedAt", "vaultOwnerId"],
   citations: ["sourceId", "archivedAt", "vaultOwnerId"], events: ["place.placeId", "archivedAt", "vaultOwnerId"],
-  media: ["personIds", "archivedAt", "vaultOwnerId"], documents: ["personId", "archivedAt", "vaultOwnerId"],
-  stories: ["personId", "archivedAt", "vaultOwnerId"],
+  media: ["personIds", "archivedAt", "vaultOwnerId"], documents: ["personId", "type", "archivedAt", "vaultOwnerId"],
+  stories: ["personId", "type", "status", "archivedAt", "vaultOwnerId"],
   importRuns: ["personId", "personFsId", "importedAt", "archivedAt", "vaultOwnerId"],
 };
 export function affectsExplorer(change: ExplorerChange): boolean {
@@ -178,8 +180,8 @@ function budgetDb(db: MutationCtx["db"], limit = 75): MutationCtx["db"] {
   }});
 }
 
-const jobArgs = {kind: v.union(v.literal("owner"), v.literal("personKey"), v.literal("event"), v.literal("citation"), v.literal("source"), v.literal("place")), id: v.string(), owner: v.optional(v.string()), stage: v.optional(v.number()), cursor: v.optional(v.union(v.string(), v.null()))};
-type DependencyJob = {kind: "owner" | "personKey" | "event" | "citation" | "source" | "place"; id: string; owner?: string; stage?: number; cursor?: string | null};
+export const jobArgs = {kind: v.union(v.literal("owner"), v.literal("personKey"), v.literal("event"), v.literal("citation"), v.literal("source"), v.literal("place"), v.literal("provisional"), v.literal("provisionalRow")), id: v.string(), owner: v.optional(v.string()), stage: v.optional(v.number()), cursor: v.optional(v.union(v.string(), v.null()))};
+type DependencyJob = {kind: "owner" | "personKey" | "event" | "citation" | "source" | "place" | "provisional" | "provisionalRow"; id: string; owner?: string; stage?: number; cursor?: string | null};
 async function scheduleJob(ctx: MutationCtx, job: DependencyJob) {
   const key = dependencyKey(job);
   const old = await ctx.db.query("peopleExplorerDependencyFailures").withIndex("by_key", q => q.eq("key", key)).unique();
@@ -231,7 +233,12 @@ export const dependencyPage = internalMutation({args: jobArgs, handler: async (c
   if (failed) await ctx.db.delete(failed._id);
   const stage = job.stage ?? 0;
   let range: any;
-  if (job.kind === "owner") range = ctx.db.query("persons").withIndex("by_owner", q => q.eq("vaultOwnerId", job.id));
+  if(job.kind === "provisionalRow") {
+    await refreshProvisionalScore(ctx, ctx.db.normalizeId("provisionalRelatives",job.id)!);
+    await releaseProjectionGate(ctx); return;
+  }
+  if(job.kind === "provisional") range=ctx.db.query("provisionalRelatives").withIndex("by_anchor",q=>q.eq("anchorPersonId",ctx.db.normalizeId("persons",job.id)!));
+  else if (job.kind === "owner") range = ctx.db.query("persons").withIndex("by_owner", q => q.eq("vaultOwnerId", job.id));
   else if (job.kind === "personKey") range = ctx.db.query("persons").withIndex("by_owner_fsId", q => q.eq("vaultOwnerId", job.owner).eq("fsId", job.id));
   else if (job.kind === "event") range = ctx.db.query("personEvents").withIndex("by_event", q => q.eq("eventId", ctx.db.normalizeId("events", job.id)!));
   else if (job.kind === "citation") range = ctx.db.query("citationLinks").withIndex("by_citation", q => q.eq("citationId", ctx.db.normalizeId("citations", job.id)!));
@@ -244,12 +251,13 @@ export const dependencyPage = internalMutation({args: jobArgs, handler: async (c
   } else throw new Error("Unknown explorer dependency job");
   const result = await range.paginate({cursor: job.cursor ?? null, numItems: 25, maximumBytesRead: 100_000});
   for (const row of result.page) {
-    if (job.kind === "source") await scheduleJob(ctx, {kind: "citation", id: String(row._id)});
+    if(job.kind === "provisional") await scheduleJob(ctx,{kind:"provisionalRow",id:String(row._id)});
+    else if (job.kind === "source") await scheduleJob(ctx, {kind: "citation", id: String(row._id)});
     else if (job.kind === "citation") {
       if (row.targetType === "event") await scheduleJob(ctx, {kind: "event", id: row.targetId});
       else if (row.targetType === "person") await schedulePerson(ctx, row.targetId);
     } else if (job.kind === "place" && stage === 2) await scheduleJob(ctx, {kind: "event", id: String(row._id)});
-    else await schedulePerson(ctx, job.kind === "event" ? row.personId : row._id);
+    else {await schedulePerson(ctx, job.kind === "event" ? row.personId : row._id);if(job.kind==="owner")await scheduleJob(ctx,{kind:"provisional",id:String(row._id)});}
   }
   if (!result.isDone) await scheduleJob(ctx, {...job, cursor: result.continueCursor});
   else if (job.kind === "place" && stage < 2) await scheduleJob(ctx, {...job, stage: stage + 1, cursor: null});
@@ -340,12 +348,22 @@ export async function applyExplorerChanges(ctx: MutationCtx, changes: ExplorerCh
   for (const change of changes) if (change.table === "persons" && change.before && (!change.after || change.after.archivedAt !== undefined || change.before.vaultOwnerId !== change.after.vaultOwnerId)) {
     const row = await ctx.db.query("peopleExplorerRows").withIndex("by_person", q => q.eq("personId", change.before._id)).unique();
     if (row) await ctx.db.delete(row._id);
+    await removeScore(ctx,String(change.before._id));
   }
   if (defer) {
     const owners = new Set<string>(changes.filter(c => c.table === "persons" && c.after).map(c => normalizeVaultOwnerId(c.after.vaultOwnerId)));
     for (const owner of owners) await scheduleJob(ctx, {kind: "owner", id: owner});
     return;
   }
+  const extraJobs=new Map<string,DependencyJob>();
+  const queueExtra=(job:DependencyJob)=>{extraJobs.set(dependencyKey(job),job);};
+  for(const change of changes) for(const row of [change.before,change.after]) if(row) {
+    if(change.table==="persons"||(change.table==="stories"&&row.personId)) queueExtra({kind:"provisional",id:String(change.table==="persons"?row._id:row.personId)});
+    if(change.table==="provisionalRelatives"&&change.before&&(!change.after||change.before.vaultOwnerId!==change.after.vaultOwnerId||change.after.mergeState!=="provisional"))await removeScore(ctx,String(change.before._id));
+    if(change.table==="provisionalRelatives") queueExtra({kind:"provisionalRow",id:String(row._id)});
+    if(change.table==="historicalContext") queueExtra(row.placeId?{kind:"place",id:String(row.placeId),owner:normalizeVaultOwnerId(row.vaultOwnerId)}:{kind:"owner",id:normalizeVaultOwnerId(row.vaultOwnerId)});
+  }
+  for(const job of extraJobs.values())await scheduleJob(ctx,job);
   const sourceCtx = ctx;
   ctx = {...ctx, db: budgetDb(ctx.db, 1000)};
   const ids = new Set<Doc<"persons">["_id"]>();
@@ -371,7 +389,10 @@ export async function applyExplorerChanges(ctx: MutationCtx, changes: ExplorerCh
     for (const row of [change.before, change.after]) if (row) {
       const owner = normalizeVaultOwnerId(row.vaultOwnerId);
       if (change.table === "persons") person(row._id);
-      else if (change.table === "personEvents" || change.table === "stories") person(row.personId);
+      else if (["personEvents","stories","researchChecks","researchTasks"].includes(change.table)) person(row.personId);
+      else if(change.table==="relationships"){person(row.person1);person(row.person2);}
+      else if(change.table==="provisionalRelatives")person(row.anchorPersonId);
+      else if(change.table==="historicalContext")continue;
       else if (change.table === "media") for (const id of row.personIds) person(id);
       else if (change.table === "documents") {person(row.personId); queue({kind: "personKey", id: row.personId, owner});}
       else if (change.table === "importRuns") {person(row.personId); queue({kind: "personKey", id: row.personFsId, owner});}
@@ -385,7 +406,10 @@ export async function applyExplorerChanges(ctx: MutationCtx, changes: ExplorerCh
     if (!row) continue;
     switch (change.table) {
       case "persons": person(row._id); break;
-      case "personEvents": case "stories": person(row.personId); break;
+      case "personEvents": case "stories": case "researchChecks": case "researchTasks": person(row.personId); break;
+      case "relationships": person(row.person1);person(row.person2);break;
+      case "provisionalRelatives": person(row.anchorPersonId);break;
+      case "historicalContext": break;
       case "media": for (const id of row.personIds) person(id); break;
       case "documents": await personKey(row, row.personId); break;
       case "importRuns": person(row.personId); await personKey(row, row.personFsId); break;

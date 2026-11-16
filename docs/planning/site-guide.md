@@ -245,3 +245,5 @@ Explorer as the website, with Load more and server-side substring search. Public
 stories keep their existing publication/privacy/redaction gates while reading a
 story-scoped graph. Operational migration details and remaining page work are in
 [the scale runbook](../operations/vault-counts-scale.md#batch-b-scoped-reads-and-compatibility-changes-release-pending).
+
+Implementation note (pending release): Operations summaries cover the whole vault before filters; Operations and Story Writer use paged maintained scores after the v6 migration. Handoff export is paged with continuation. See [score scaling](../operations/person-scores-scale.md); Audit remains on its legacy path.

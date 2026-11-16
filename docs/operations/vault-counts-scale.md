@@ -281,3 +281,5 @@ During v5 traversal, scoped readers depend on its progress flag. Each step can
 invalidate reactive queries or conflict with mutations that read that flag;
 retry ordinary OCC failures. This is temporary during the upgrade, and v4-ready
 batch A readers do not read the changing v5 flag.
+
+The next v6 upgrade adds exact per-person Operations/readiness scores and 32-shard weighted totals. See [person score migration](person-scores-scale.md). Audit remains deferred.

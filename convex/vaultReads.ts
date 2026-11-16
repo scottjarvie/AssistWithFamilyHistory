@@ -1,4 +1,6 @@
 "use node";
+import {operationsArgs, readinessArgs} from "./personScores";
+import type {OperationsPage,ReadinessPage} from "./personScoreModel";
 
 import {placePageArgs,sectionValidator,type PlaceWorkspace,type SectionPage,type PlaceSection,type PlaceListPage,type PlaceMention} from "./placePages";
 
@@ -37,13 +39,7 @@ const shadowRecorder: FunctionReference<"mutation", "internal"> = (
   }
 ).trustBoundary.recordShadowDenial;
 
-const storyWorkflowValidator = v.union(
-  v.literal("needs_genealogy_evidence"),
-  v.literal("needs_context_research"),
-  v.literal("ready_to_draft"),
-  v.literal("ready_to_review"),
-  v.literal("published"),
-);
+
 
 type OwnedMediaFileResponse = {
   url: string;
@@ -140,41 +136,41 @@ export const getProvisionalRelatives = action({
     }),
 });
 
+/** Totals describe the entire vault; arbitrary substring/facet combinations are paged. */
 export const getOperationsQueue = action({
-  args: {
-    vaultOwnerId: v.string(),
-    search: v.optional(v.string()),
-    rowType: v.optional(v.union(v.literal("person"), v.literal("provisional"))),
-    missingCheck: v.optional(v.string()),
-    storyStatus: v.optional(v.union(v.literal("has_story"), v.literal("no_story"))),
-    storyWorkflow: v.optional(storyWorkflowValidator),
-    staleOnly: v.optional(v.boolean()),
-    sortBy: v.optional(
-      v.union(
-        v.literal("missingCritical"),
-        v.literal("completion"),
-        v.literal("lastTouched"),
-        v.literal("sourceCount"),
-        v.literal("storyReadiness"),
-        v.literal("newestImport"),
-      ),
-    ),
-    sortDirection: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args): Promise<FunctionReturnType<typeof vaultInternal.getOperationsQueue>> =>
-    ctx.runQuery(vaultInternal.getOperationsQueue, {
-      ...args,
-      vaultOwnerId: await authorizedOwner(ctx, "vault.getOperationsQueue", args.vaultOwnerId),
-    }),
+ args:operationsArgs,
+ handler:async(ctx,args):Promise<OperationsPage>=>{
+  const vaultOwnerId=await authorizedOwner(ctx,"vault.getOperationsQueue",args.vaultOwnerId);
+  if(!await ctx.runQuery(internal.personScores.status,{})) {
+   const offset=args.cursor?.startsWith("legacy:")?Number(args.cursor.slice(7)):0;
+   if(!Number.isSafeInteger(offset)||offset<0)throw new Error("Invalid cursor");
+   const {cursor:ignored,...legacyArgs}=args;void ignored;
+   const old=await ctx.runQuery(vaultInternal.getOperationsQueue,{...legacyArgs,storyWorkflow:legacyArgs.storyWorkflow as "published"|undefined,vaultOwnerId,limit:offset+51});
+   const rows=old.rows.slice(offset,offset+50),people=rows.filter(r=>r.rowType==="person");
+   const summary={visibleRows:rows.length,provisionalRows:rows.length-people.length,missingRequired:rows.reduce((n,r)=>n+r.missingCritical.length,0),missingRecommended:people.reduce((n,r)=>n+r.researchChecks.filter(c=>c.applicability==="recommended"&&(c.status==="missing"||c.status==="needs_review")).length,0),staleChecks:rows.reduce((n,r)=>n+r.staleChecksCount,0),averageCompletion:people.length?Math.round(people.reduce((n,r)=>n+r.completionPercent,0)/people.length):0};
+   return {summary,summaryScope:"loaded",rows,continueCursor:`legacy:${offset+50}`,isDone:old.rows.length<=offset+50};
+  }
+  const now=Date.now();
+  const [page,total]=await Promise.all([
+   ctx.runQuery(internal.personScores.operationsPage,{...args,cursor:args.cursor?.startsWith("legacy:")?null:args.cursor,vaultOwnerId,now}),
+   ctx.runQuery(internal.personScores.totals,{vaultOwnerId}),
+  ]);
+  const counts=total.counts;
+  let staleChecks=0,cursor:string|null=null;
+  do {const p:{count:number;continueCursor:string;isDone:boolean}=await ctx.runQuery(internal.personScores.stalePage,{vaultOwnerId,now,cursor});staleChecks+=p.count;if(p.isDone)break;cursor=p.continueCursor;}while(true);
+  return {...page,summaryScope:"vault",summary:{visibleRows:counts.rows??0,provisionalRows:counts.provisional??0,missingRequired:counts.required??0,missingRecommended:counts.recommended??0,staleChecks,averageCompletion:counts.people?Math.round((counts.completion??0)/counts.people):0}};
+ }
 });
-
 export const getOperationsSummary = action({
-  args: { vaultOwnerId: v.string() },
-  handler: async (ctx, args): Promise<FunctionReturnType<typeof vaultInternal.getOperationsSummary>> =>
-    ctx.runQuery(vaultInternal.getOperationsSummary, {
-      vaultOwnerId: await authorizedOwner(ctx, "vault.getOperationsSummary", args.vaultOwnerId),
-    }),
+ args:{vaultOwnerId:v.string()},
+ handler:async(ctx,args):Promise<{people:number;provisional:number;avgCompletion:number;missingRequired:number;staleChecks:number}>=>{
+  const vaultOwnerId=await authorizedOwner(ctx,"vault.getOperationsSummary",args.vaultOwnerId);
+  if(!await ctx.runQuery(internal.personScores.status,{}))return ctx.runQuery(vaultInternal.getOperationsSummary,{vaultOwnerId});
+  const counts=(await ctx.runQuery(internal.personScores.totals,{vaultOwnerId})).counts;
+  let staleChecks=0,cursor:string|null=null;const now=Date.now();
+  do {const p:{count:number;continueCursor:string;isDone:boolean}=await ctx.runQuery(internal.personScores.stalePage,{vaultOwnerId,now,cursor});staleChecks+=p.count;if(p.isDone)break;cursor=p.continueCursor;}while(true);
+  return {people:counts.people??0,provisional:counts.provisional??0,avgCompletion:counts.people?Math.round((counts.completion??0)/counts.people):0,missingRequired:(counts.required??0)-2*(counts.provisional??0),staleChecks};
+ }
 });
 
 export const getVaultAudit = action({
@@ -209,17 +205,18 @@ export const getContextCoverage = action({
     }),
 });
 
-export const getStoryReadinessCandidates = action({
-  args: {
-    vaultOwnerId: v.string(),
-    storyWorkflow: v.optional(storyWorkflowValidator),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args): Promise<FunctionReturnType<typeof vaultInternal.getStoryReadinessCandidates>> =>
-    ctx.runQuery(vaultInternal.getStoryReadinessCandidates, {
-      ...args,
-      vaultOwnerId: await authorizedOwner(ctx, "vault.getStoryReadinessCandidates", args.vaultOwnerId),
-    }),
+export const getStoryReadinessPage = action({
+ args:readinessArgs,
+ handler:async(ctx,args):Promise<ReadinessPage>=>{
+  const vaultOwnerId=await authorizedOwner(ctx,"vault.getStoryReadinessCandidates",args.vaultOwnerId);
+  if(!await ctx.runQuery(internal.personScores.status,{})) {
+   const offset=args.cursor?.startsWith("legacy:")?Number(args.cursor.slice(7)):0;
+   if(!Number.isSafeInteger(offset)||offset<0)throw new Error("Invalid cursor");
+   const page=await ctx.runQuery(vaultInternal.getStoryReadinessCandidates,{vaultOwnerId,storyWorkflow:args.storyWorkflow as "published"|undefined,limit:offset+25});
+   return {page:page.slice(offset,offset+24),continueCursor:`legacy:${offset+24}`,isDone:page.length<=offset+24};
+  }
+  return ctx.runQuery(internal.personScores.readinessPage,{...args,cursor:args.cursor?.startsWith("legacy:")?null:args.cursor,vaultOwnerId});
+ }
 });
 
 export const getPlacesPage = action({

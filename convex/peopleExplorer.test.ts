@@ -6,7 +6,7 @@ import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { seedGrant } from "../lib/mcp/testSupport";
 import { internal, api } from "./_generated/api";
-import { applyExplorerChanges, type ExplorerChange } from "./peopleExplorer";
+import { jobArgs, applyExplorerChanges, type ExplorerChange } from "./peopleExplorer";
 import { withSearchWrites } from "./searchWrites";
 import { projectPeopleCollectionRow } from "../lib/vault/peopleCollection";
 const modules = import.meta.glob("./**/*.ts");
@@ -247,9 +247,9 @@ test("dependency failures persist a replayable page and clear only after success
     let fail = true;
     const t = convexTest(schema, {...modules, "./peopleExplorer.ts": async () => {
       const real = await import("./peopleExplorer");
-      return {...real, dependencyPage: internalMutation({args: {kind: v.string(), id: v.string(), owner: v.optional(v.string()), stage: v.optional(v.number()), cursor: v.optional(v.union(v.string(), v.null()))}, handler: async (ctx, args) => {
+      return {...real, dependencyPage: internalMutation({args: jobArgs, handler: async (ctx, args) => {
         if (fail) throw new Error("Synthetic discovery failure");
-        await (real.dependencyPage as unknown as {_handler: (ctx: MutationCtx, job: Omit<typeof args, "kind"> & {kind: "owner"}) => Promise<void>})._handler(ctx, {...args, kind: "owner"});
+        await (real.dependencyPage as unknown as {_handler: (ctx: MutationCtx, job: typeof args) => Promise<void>})._handler(ctx, args);
       }})};
     }});
     const personId = await t.run(ctx => ctx.db.insert("persons", fields(0)));
@@ -308,7 +308,7 @@ test("a failed non-first dependency page rolls back scheduled children and remai
     let fail = true;
     const t = convexTest(schema, {...modules, "./peopleExplorer.ts": async () => {
       const real = await import("./peopleExplorer");
-      return {...real, dependencyPage: internalMutation({args: {kind: v.literal("owner"), id: v.string(), cursor: v.optional(v.union(v.string(), v.null()))}, handler: async (ctx, args) => {
+      return {...real, dependencyPage: internalMutation({args: jobArgs, handler: async (ctx, args) => {
         let scheduled = 0;
         const scheduler = {...ctx.scheduler, runAfter: (async (...params: Parameters<typeof ctx.scheduler.runAfter>) => {
           if (fail && ++scheduled === 2) throw new Error("Synthetic mid-page scheduling failure");
