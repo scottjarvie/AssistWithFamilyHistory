@@ -1,3 +1,4 @@
+import {refreshPersonScore,refreshProvisionalScore} from "./personScores";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {directPlaces,syncDirectPlaces,syncPlaceMediaConnection,refreshMediaAvailability} from "./placeCounts";
 import { v } from "convex/values";
@@ -13,7 +14,7 @@ export const COUNT_TABLES = [
   "researchChecks", "provisionalRelatives", "sourceContents", "recordPersonas", "topics", "connections",
 ] as const;
 export type CountTable = typeof COUNT_TABLES[number];
-export const BUILD = "vaultCounts:v5";
+export const BUILD = "vaultCounts:v6";
 export const COUNTER_SHARDS = 32;
 export function counterShard(id: string) {
   let hash = 2166136261;
@@ -90,7 +91,7 @@ export async function syncCount(ctx: Pick<MutationCtx, "db">, table: CountTable,
 }
 
 export async function scopedReadsReady(ctx: Pick<QueryCtx, "db">) {
-  return !!(await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", BUILD)).unique())?.complete;
+  return !!(await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", "vaultCounts:v5")).unique())?.complete || !!(await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", BUILD)).unique())?.complete;
 }
 /** v5 adds memberships, not new count semantics: keep already migrated v4
  * Dashboard/Research/Places readers on their bounded paths during the upgrade. */
@@ -98,7 +99,7 @@ export async function countsReady(ctx: Pick<QueryCtx, "db">) {
   const v4 = await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", "vaultCounts:v4")).unique();
   return !!v4?.complete || await scopedReadsReady(ctx);
 }
-export async function ownerTableCounter(ctx: Pick<QueryCtx, "db">, owner: string, table: CountTable) {
+export async function ownerTableCounter(ctx: Pick<QueryCtx, "db">, owner: string, table: CountTable | "personScores") {
   const shards = await ctx.db.query("vaultCounterShards").withIndex("by_owner_table_shard", q => q.eq("vaultOwnerId", owner).eq("table", table)).collect();
   const legacy = await ctx.db.query("vaultCounts").withIndex("by_owner_table", q => q.eq("vaultOwnerId", owner).eq("table", table)).unique();
   const counts: Record<string, number> = {};
@@ -128,11 +129,33 @@ export const backfillStep = internalMutation({args: {}, handler: async ctx => {
   const state = await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", BUILD)).unique();
   if (state?.complete) return true;
   const position: {tableIndex: number; cursor: string | null} = state?.cursor ? JSON.parse(state.cursor) : {tableIndex: 0, cursor: null};
+  if(position.tableIndex >= COUNT_TABLES.length) {
+    const phase=position.tableIndex-COUNT_TABLES.length;
+    const result=await ctx.db.query(phase===0?"persons":"provisionalRelatives").paginate({cursor:position.cursor,numItems:1,maximumBytesRead:100_000});
+    for(const row of result.page) {
+      if(phase===0) await refreshPersonScore(ctx,row._id as import("./_generated/dataModel").Id<"persons">,true);
+      else await refreshProvisionalScore(ctx,row._id as import("./_generated/dataModel").Id<"provisionalRelatives">);
+    }
+    if(result.isDone){position.tableIndex++;position.cursor=null;}else position.cursor=result.continueCursor;
+    const complete=position.tableIndex===COUNT_TABLES.length+2;
+    const value={table:BUILD,cursor:complete?null:JSON.stringify(position),complete};
+    if(state)await ctx.db.replace(state._id,value);else await ctx.db.insert("searchBuildState",value);
+    return complete;
+  }
   const table = COUNT_TABLES[position.tableIndex];
   const result = await ctx.db.query(table).paginate({cursor: position.cursor, numItems: 100, maximumRowsRead: 100, maximumBytesRead: 500_000});
   for (const row of result.page) await syncSourceCount(ctx, table, String(row._id), row);
   if (result.isDone) { position.tableIndex++; position.cursor = null; } else position.cursor = result.continueCursor;
-  const complete = position.tableIndex === COUNT_TABLES.length;
+  if(position.tableIndex===COUNT_TABLES.length) {
+    // All membership sources were visited. Release the prerequisite gates before
+    // visiting scores so concurrent writes behind that cursor maintain them too.
+    for(const table of ["vaultCounts:v5","mediaPeople"]) {
+      const gate=await ctx.db.query("searchBuildState").withIndex("by_table",q=>q.eq("table",table)).unique();
+      if(!gate)await ctx.db.insert("searchBuildState",{table,cursor:null,complete:true});
+      else if(!gate.complete)await ctx.db.patch(gate._id,{complete:true,cursor:null});
+    }
+  }
+  const complete = false;
   const value = {table: BUILD, cursor: complete ? null : JSON.stringify(position), complete};
   if (state) await ctx.db.replace(state._id, value); else await ctx.db.insert("searchBuildState", value);
   return complete;
@@ -140,7 +163,7 @@ export const backfillStep = internalMutation({args: {}, handler: async ctx => {
 export const backfillStatus = internalQuery({args: {}, handler: async ctx => {
   const state = await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", BUILD)).unique();
   const position = state?.cursor ? JSON.parse(state.cursor) as {tableIndex: number} : null;
-  return {complete: state?.complete ?? false, table: state?.complete ? null : COUNT_TABLES[position?.tableIndex ?? 0]};
+  return {build:BUILD,complete: state?.complete ?? false, table: state?.complete ? null : ([...COUNT_TABLES,"personScores","provisionalScores"])[position?.tableIndex ?? 0]};
 }});
 export const backfill = internalAction({args: {}, handler: async (ctx): Promise<{complete: boolean}> => {
   const until = Date.now() + 90_000;

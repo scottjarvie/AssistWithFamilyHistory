@@ -1,10 +1,12 @@
 type QueuePayload = {
+  summaryScope?:"vault"|"loaded";
   summary: Record<string, unknown>;
   rows: Array<Record<string, unknown>>;
 };
 
 export type OperationsHandoffPacket = {
   packetVersion: "2026-05-21";
+  summaryScope?:"vault"|"loaded";
   generatedAt: string;
   summary: Record<string, unknown>;
   rows: Array<{
@@ -45,6 +47,7 @@ export function buildOperationsHandoffPacket(
     packetVersion: "2026-05-21",
     generatedAt: options.generatedAt ?? new Date().toISOString(),
     summary: payload.summary,
+    summaryScope:payload.summaryScope,
     rows: payload.rows.map((row) => ({
       rowType: row.rowType,
       id: row.id,

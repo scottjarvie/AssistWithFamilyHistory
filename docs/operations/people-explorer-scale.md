@@ -163,3 +163,5 @@ No backfill is required. The retry command schedules production repair writes;
 run it only when investigating the returned job. No repair command was run during
 implementation. The remaining
 snapshot-page migrations are not implemented by this worker reliability change.
+
+Operations/readiness extend this same refresh pipeline; see [score maintenance](person-scores-scale.md) for added dependencies, totals, v6 migration and the remaining Audit scope.

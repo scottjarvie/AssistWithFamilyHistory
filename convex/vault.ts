@@ -960,7 +960,7 @@ export function buildPublicStoryBundle(
   };
 }
 
-function buildPeopleRows(snapshot: VaultSnapshot) {
+export function buildPeopleRows(snapshot: VaultSnapshot) {
   // GEN-93: build the per-person bucket index ONCE for the whole snapshot, then
   // reuse it across every person row. Previously each row re-filtered every
   // snapshot array, making this O(people * total-rows).
@@ -1142,7 +1142,8 @@ export async function loadPersonScopedSnapshot(
   ctx: QueryCtx,
   vaultOwnerId: string,
   personIdentifier: string,
-  publicOnly = false
+  publicOnly = false,
+  forceMemberships = false
 ): Promise<VaultSnapshot | null> {
   const owned = <T extends { vaultOwnerId?: string; archivedAt?: number }>(rows: T[]) =>
     filterByVaultOwner(rows, vaultOwnerId).filter(row => row.archivedAt === undefined);
@@ -1316,7 +1317,7 @@ export async function loadPersonScopedSnapshot(
 
   // Ordinary indexes cannot index array elements. The v5 backfill visits
   // media/contextItems and central source writers maintain reverse memberships.
-  const ready = await scopedReadsReady(ctx);
+  const ready = forceMemberships || await scopedReadsReady(ctx);
   const [allMedia, allContextItems, historicalByPlace] = await Promise.all([
     ready
       ? ctx.db.query("mediaPeople").withIndex("by_person", q => q.eq("personId", personId)).collect()

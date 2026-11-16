@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
     const client = await getAuthedConvexClient();
     const payload = await client.action(api.vaultReads.getOperationsQueue, {
       vaultOwnerId,
+      cursor:searchParams.get("cursor"),
       ...operationQueryArguments(operationFiltersFromURL(searchParams)),
     });
 
@@ -34,6 +35,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         handoff: buildOperationsHandoffPacket(payload),
+        summaryScope:payload.summaryScope,
+        isDone:payload.isDone,
+        continueCursor:payload.continueCursor,
+        next:payload.isDone?null:(()=>{const next=new URL(request.url);next.searchParams.set("cursor",payload.continueCursor);return next.pathname+next.search;})(),
       });
     }
 
