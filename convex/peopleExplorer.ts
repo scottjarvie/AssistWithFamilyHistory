@@ -184,7 +184,7 @@ export const jobArgs = {kind: v.union(v.literal("owner"), v.literal("personKey")
 type DependencyJob = {kind: "owner" | "personKey" | "event" | "citation" | "source" | "place" | "provisional" | "provisionalRow" | "batch"; provisionals?:boolean; id: string; owner?: string; stage?: number; cursor?: string | null};
 async function scheduleJob(ctx: MutationCtx, job: DependencyJob) {
   const key = dependencyKey(job);
-  const old = await ctx.db.query("peopleExplorerDependencyFailures").withIndex("by_key", q => q.eq("key", key)).unique();
+  const old = await dependencyFailure(ctx, job);
   const value = {key, job, state: "pending" as const, recordedAt: Date.now(), reason: "Dependency page scheduled; retry if its action stops without completing"};
   if (old) await ctx.db.replace(old._id, value); else await ctx.db.insert("peopleExplorerDependencyFailures", value);
   await ctx.scheduler.runAfter(0, internal.peopleExplorer.dependencyScheduled, job);
@@ -196,7 +196,16 @@ async function schedulePerson(ctx: MutationCtx, personId: Doc<"persons">["_id"])
 
 /** Paged dependency discovery. Every hop uses one bounded range; child jobs are transactional. */
 function dependencyKey(job: DependencyJob) {
-  return JSON.stringify([job.kind, job.id, job.owner ?? null, job.stage ?? 0, job.cursor ?? null]);
+  return JSON.stringify([job.kind, job.id, job.owner ?? null, job.stage ?? 0, job.cursor ?? null, job.provisionals ?? false]);
+}
+/** Pending jobs from the prior deployment still carry the old key. Only
+ * consume their row when its stored job has the same provisional semantics. */
+async function dependencyFailure(ctx: Pick<QueryCtx, "db">, job: DependencyJob) {
+  const current = await ctx.db.query("peopleExplorerDependencyFailures").withIndex("by_key", q => q.eq("key", dependencyKey(job))).unique();
+  if (current) return current;
+  const legacyKey = JSON.stringify([job.kind, job.id, job.owner ?? null, job.stage ?? 0, job.cursor ?? null]);
+  const legacy = await ctx.db.query("peopleExplorerDependencyFailures").withIndex("by_key", q => q.eq("key", legacyKey)).unique();
+  return legacy && !!legacy.job.provisionals === !!job.provisionals ? legacy : null;
 }
 async function hasProjectionFailures(ctx: Pick<QueryCtx, "db">) {
   return !!await ctx.db.query("peopleExplorerFailures").first() || !!await ctx.db.query("peopleExplorerDependencyFailures").first();
@@ -210,7 +219,7 @@ async function releaseProjectionGate(ctx: MutationCtx) {
 }
 export const recordDependencyFailure = internalMutation({args: jobArgs, handler: async (ctx, job) => {
   const key = dependencyKey(job);
-  const old = await ctx.db.query("peopleExplorerDependencyFailures").withIndex("by_key", q => q.eq("key", key)).unique();
+  const old = await dependencyFailure(ctx, job);
   const value = {key, job, state: "failed" as const, recordedAt: Date.now(), reason: "Dependency discovery failed; inspect execution log and retry this job"};
   if (old) await ctx.db.replace(old._id, value); else await ctx.db.insert("peopleExplorerDependencyFailures", value);
 }});
@@ -229,7 +238,7 @@ export const refreshBatch = internalMutation({args: {personIds: v.array(v.id("pe
 }});
 
 export const dependencyPage = internalMutation({args: jobArgs, handler: async (ctx, job) => {
-  const failed = await ctx.db.query("peopleExplorerDependencyFailures").withIndex("by_key", q => q.eq("key", dependencyKey(job))).unique();
+  const failed = await dependencyFailure(ctx, job);
   if (failed) await ctx.db.delete(failed._id);
   const stage = job.stage ?? 0;
   let range: any;
@@ -263,7 +272,12 @@ export const dependencyPage = internalMutation({args: jobArgs, handler: async (c
       if (row.targetType === "event") await scheduleJob(ctx, {kind: "event", id: row.targetId});
       else if (row.targetType === "person") await schedulePerson(ctx, row.targetId);
     } else if (job.kind === "place" && stage === 2) await scheduleJob(ctx, {kind: "event", id: String(row._id)});
-    else {await schedulePerson(ctx, job.kind === "event" ? row.personId : row._id);if(job.kind==="owner"&&job.provisionals)await scheduleJob(ctx,{kind:"provisional",id:String(row._id)});}
+    else {
+      if (job.kind === "owner") {
+        const score = await ctx.db.query("personScoreRows").withIndex("by_record", q => q.eq("recordId", String(row._id))).unique();
+        if (score && score.vaultOwnerId !== row.vaultOwnerId) await removeScore(ctx, String(row._id));
+      }
+      await schedulePerson(ctx, job.kind === "event" ? row.personId : row._id);if(job.kind==="owner"&&job.provisionals)await scheduleJob(ctx,{kind:"provisional",id:String(row._id)});}
   }
   if (!result.isDone) await scheduleJob(ctx, {...job, cursor: result.continueCursor});
   else if (job.kind === "place" && stage < 2) await scheduleJob(ctx, {...job, stage: stage + 1, cursor: null});
@@ -276,16 +290,17 @@ export const rebuildOne = internalMutation({args: {personId: v.id("persons")}, h
   if (failed) await ctx.db.delete(failed._id);
   await releaseProjectionGate(ctx);
 }});
-export const recordFailure = internalMutation({args: {personId: v.id("persons")}, handler: async (ctx, {personId}) => {
+export const recordFailure = internalMutation({args: {personId: v.id("persons"), retry: v.optional(v.boolean())}, handler: async (ctx, {personId, retry}) => {
   const old = await ctx.db.query("peopleExplorerFailures").withIndex("by_person", q => q.eq("personId", personId)).unique();
-  const value = {personId, reason: "Projection refresh failed; retry with refreshPeople after investigating the execution log", failedAt: Date.now()};
+  const value = {personId, reason: retry ? "Projection refresh and automatic retry failed; inspect the execution log and retry with refreshPeople" : "Projection refresh failed; one automatic retry scheduled", failedAt: Date.now(), retryAttempt: retry ? 1 : 0, retryPending: !retry};
   if (old) await ctx.db.replace(old._id, value); else await ctx.db.insert("peopleExplorerFailures", value);
-  console.warn("People Explorer projection refresh failed", {personId});
+  if (!retry) await ctx.scheduler.runAfter(250, internal.peopleExplorer.refreshScheduled, {personId, retry: true});
+  console.warn("People Explorer projection refresh failed", {personId, retry: !!retry});
 }});
 /** An action isolates limit failures from source edits and from the migration cursor transaction. */
-export const refreshScheduled = internalAction({args: {personId: v.id("persons")}, handler: async (ctx, {personId}): Promise<boolean> => {
+export const refreshScheduled = internalAction({args: {personId: v.id("persons"), retry: v.optional(v.boolean())}, handler: async (ctx, {personId, retry}): Promise<boolean> => {
   try {await ctx.runMutation(internal.peopleExplorer.rebuildOne, {personId}); return true;}
-  catch {await ctx.runMutation(internal.peopleExplorer.recordFailure, {personId}); return false;}
+  catch {await ctx.runMutation(internal.peopleExplorer.recordFailure, {personId, ...(retry ? {retry} : {})}); return false;}
 }});
 export const refreshPeople = internalMutation({args: {personIds: v.array(v.id("persons"))}, handler: async (ctx, {personIds}) => {
   if (personIds.length > 100) throw new Error("Repair at most 100 people per call");
@@ -354,7 +369,11 @@ export async function applyExplorerChanges(ctx: MutationCtx, changes: ExplorerCh
   for (const change of changes) if (change.table === "persons" && change.before && (!change.after || change.after.archivedAt !== undefined || change.before.vaultOwnerId !== change.after.vaultOwnerId)) {
     const row = await ctx.db.query("peopleExplorerRows").withIndex("by_person", q => q.eq("personId", change.before._id)).unique();
     if (row) await ctx.db.delete(row._id);
-    await removeScore(ctx,String(change.before._id));
+    // Guest adoption already queues a paged owner job. Removing every score
+    // here adds three ranges/person and can exhaust the source retag mutation.
+    // Other owner changes/archive/deletes retain synchronous removal.
+    if (!(defer && change.before.vaultOwnerId?.startsWith("guest_") && change.after?.vaultOwnerId?.startsWith("user_")))
+      await removeScore(ctx,String(change.before._id));
   }
   if (defer) {
     const owners = new Set<string>(changes.filter(c => c.table === "persons" && c.after).map(c => normalizeVaultOwnerId(c.after.vaultOwnerId)));

@@ -24,7 +24,7 @@ export type OperationSummary = {
 };
 export type OperationsPage = {
     rows: OperationRow[];
-    summary: OperationSummary; summaryScope: "vault" | "loaded";
+    summary: OperationSummary; exact: boolean; summaryScope: "vault" | "loaded";
     continueCursor: string;
     isDone: boolean;
 };

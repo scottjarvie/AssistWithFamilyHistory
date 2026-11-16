@@ -1,4 +1,5 @@
 type QueuePayload = {
+  exact?: boolean;
   summaryScope?:"vault"|"loaded";
   summary: Record<string, unknown>;
   rows: Array<Record<string, unknown>>;
@@ -6,6 +7,7 @@ type QueuePayload = {
 
 export type OperationsHandoffPacket = {
   packetVersion: "2026-05-21";
+  exact?: boolean;
   summaryScope?:"vault"|"loaded";
   generatedAt: string;
   summary: Record<string, unknown>;
@@ -47,6 +49,7 @@ export function buildOperationsHandoffPacket(
     packetVersion: "2026-05-21",
     generatedAt: options.generatedAt ?? new Date().toISOString(),
     summary: payload.summary,
+    exact: payload.exact,
     summaryScope:payload.summaryScope,
     rows: payload.rows.map((row) => ({
       rowType: row.rowType,

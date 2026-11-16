@@ -205,14 +205,22 @@ test("guest migration is reachable in shadow mode and defers 80 people's project
     const t=setup(), guest="guest_syntheticMigration";
     await t.run(async ctx=>{for(let i=0;i<80;i++)await ctx.db.insert("persons",{...fields(i),vaultOwnerId:guest});});
     await build(t);
+    while (!await t.mutation(internal.vaultCounts.backfillStep, {})) { /* v6 */ }
     const result=await t.withIdentity({subject:owner}).mutation(api.vaultMigration.migrateGuestVault,{fromVaultOwnerId:guest,toVaultOwnerId:owner});
     expect(result.perTable.persons).toBe(80);
+    // Removed in bounded owner pages, never in the 80-person source mutation.
+    expect((await t.query(internal.personScores.totals, {vaultOwnerId: guest})).counts.people).toBe(80);
+    expect((await t.query(internal.personScores.operationsPage, {vaultOwnerId: guest, cursor: null, now: Date.now()})).rows).toEqual([]);
+    expect((await t.query(internal.personScores.readinessPage, {vaultOwnerId: guest, cursor: null})).page).toEqual([]);
     expect((await t.run(ctx=>ctx.db.query("peopleExplorerRows").collect()))).toEqual([]);
     const jobs=await t.run(ctx=>ctx.db.system.query("_scheduled_functions").collect());expect(jobs).toHaveLength(1);
     expect(jobs[0].args).toEqual([{kind:"owner",id:owner,provisionals:true}]);
     await t.finishAllScheduledFunctions(()=>vi.runAllTimers());
     expect((await t.run(ctx=>ctx.db.query("peopleExplorerRows").collect())).every(r=>r.vaultOwnerId===owner)).toBe(true);
     expect((await t.run(ctx=>ctx.db.query("peopleExplorerRows").collect()))).toHaveLength(80);
+    expect((await t.query(internal.personScores.totals, {vaultOwnerId: guest})).counts.people).toBe(0);
+    expect((await t.query(internal.personScores.totals, {vaultOwnerId: owner})).counts.people).toBe(80);
+    expect((await t.run(ctx=>ctx.db.query("personScoreRows").collect()))).toHaveLength(80);
   }finally{vi.useRealTimers();vi.unstubAllEnvs();}
 },60_000);
 
@@ -333,4 +341,53 @@ test("a failed non-first dependency page rolls back scheduled children and remai
     expect(await t.run(ctx => ctx.db.query("peopleExplorerRows").collect())).toHaveLength(5);
     expect((await t.query(internal.peopleExplorer.dependencyFailures, {cursor: null})).page).toHaveLength(0);
   } finally {vi.useRealTimers();}
+});
+
+test("owner jobs with and without provisional discovery retain independent failure rows", async () => {
+ const t = setup();
+ const job = {kind: "owner" as const, id: owner};
+ await t.mutation(internal.peopleExplorer.recordDependencyFailure, {...job, provisionals: true});
+ await t.mutation(internal.peopleExplorer.recordDependencyFailure, job);
+ expect((await t.query(internal.peopleExplorer.dependencyFailures, {cursor: null})).page).toHaveLength(2);
+ await t.mutation(internal.peopleExplorer.dependencyPage, job);
+ const remaining = (await t.query(internal.peopleExplorer.dependencyFailures, {cursor: null})).page;
+ expect(remaining).toHaveLength(1); expect(remaining[0].job.provisionals).toBe(true);
+ await t.mutation(internal.peopleExplorer.dependencyPage, {...job, provisionals: true});
+ expect((await t.query(internal.peopleExplorer.dependencyFailures, {cursor: null})).page).toEqual([]);
+});
+
+test.each([true, false])("scheduled refresh records and runs only one automatic retry; recovers=%s", async recovers => {
+ vi.useFakeTimers();
+ try {
+   let attempts = 0;
+   const t = convexTest(schema, {...modules, "./peopleExplorer.ts": async () => {
+     const real = await import("./peopleExplorer");
+     return {...real, rebuildOne: internalMutation({args: {personId: v.id("persons")}, handler: async (ctx, args) => {
+       attempts++;
+       if (attempts === 1 || !recovers) throw new Error("Synthetic conflict");
+       await (real.rebuildOne as unknown as {_handler: (ctx: MutationCtx, args: {personId: Id<"persons">}) => Promise<void>})._handler(ctx, args);
+     }})};
+   }});
+   const personId = await t.run(ctx => ctx.db.insert("persons", fields(0)));
+   expect(await t.action(internal.peopleExplorer.refreshScheduled, {personId})).toBe(false);
+   expect((await t.query(internal.peopleExplorer.failures, {cursor: null})).page).toMatchObject([{personId, retryAttempt: 0, retryPending: true}]);
+   const pending = await t.run(ctx => ctx.db.system.query("_scheduled_functions").collect());
+   expect(pending).toHaveLength(1); expect(pending[0].scheduledTime).toBeGreaterThan(Date.now());
+   await t.finishAllScheduledFunctions(() => vi.runAllTimers());
+   expect(attempts).toBe(2);
+   const failures = (await t.query(internal.peopleExplorer.failures, {cursor: null})).page;
+   if (recovers) {
+     expect(failures).toEqual([]);
+     expect(await t.run(ctx => ctx.db.query("peopleExplorerRows").collect())).toHaveLength(1);
+   } else expect(failures).toMatchObject([{personId, retryAttempt: 1, retryPending: false}]);
+ } finally {vi.useRealTimers();}
+});
+
+test("legacy dependency failure keys preserve provisional jobs and clear when replayed", async () => {
+ const t = setup(), job = {kind: "owner" as const, id: owner, provisionals: true};
+ await t.run(ctx => ctx.db.insert("peopleExplorerDependencyFailures", {key: JSON.stringify(["owner", owner, null, 0, null]), job, state: "failed", reason: "Synthetic old deployment", recordedAt: 1}));
+ await t.mutation(internal.peopleExplorer.dependencyPage, {kind: "owner", id: owner});
+ expect((await t.query(internal.peopleExplorer.dependencyFailures, {cursor: null})).page).toHaveLength(1);
+ await t.mutation(internal.peopleExplorer.dependencyPage, job);
+ expect((await t.query(internal.peopleExplorer.dependencyFailures, {cursor: null})).page).toEqual([]);
 });

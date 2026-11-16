@@ -2,7 +2,7 @@ import { expect, test, vi, afterEach } from "vitest";
 import { convexTest } from "convex-test";
 import schema from "./schema";
 import { api, internal } from "./_generated/api";
-import { getVaultSnapshot, buildPeopleRows } from "./vault";
+import { getVaultSnapshot, buildPeopleRows, loadPersonScopedSnapshot } from "./vault";
 import { withSearchWrites } from "./searchWrites";
 import { applyExplorerChanges, type ExplorerChange } from "./peopleExplorer";
 import { personScore } from "./personScores";
@@ -134,7 +134,7 @@ test("migration resumes with concurrent writes behind its cursor; authenticated 
  while(!await t.mutation(internal.vaultCounts.backfillStep,{})){/* resume */}
  await recount(t);
  const authed=t.withIdentity({subject:owner});
- expect(await authed.action(api.vaultReads.getOperationsSummary,{vaultOwnerId:owner})).toEqual(await t.query(internal.vault.getOperationsSummary,{vaultOwnerId:owner}));
+ expect(await authed.action(api.vaultReads.getOperationsSummary,{vaultOwnerId:owner})).toEqual({...await t.query(internal.vault.getOperationsSummary,{vaultOwnerId:owner}),exact:true});
  const p=await authed.action(api.vaultReads.getOperationsQueue,{vaultOwnerId:owner});expect(p.summary.visibleRows).toBe(4);expect(p.rows).toHaveLength(4);
  await expect(t.withIdentity({subject:other}).action(api.vaultReads.getStoryReadinessPage,{vaultOwnerId:owner})).rejects.toThrow(/owner_mismatch/);
  await expect(t.withIdentity({subject:other}).action(api.vaultReads.getOperationsQueue,{vaultOwnerId:owner})).rejects.toThrow(/owner_mismatch/);
@@ -165,12 +165,72 @@ test("event type changes refresh census, immigration and military evidence",asyn
  vi.useFakeTimers();const t=setup();const ids=await t.run(async ctx=>{const p=await ctx.db.insert("persons",fields(1));const e=await ctx.db.insert("events",{vaultOwnerId:owner,type:"residence",createdAt:1,updatedAt:1});await ctx.db.insert("personEvents",{vaultOwnerId:owner,personId:p,eventId:e,role:"primary",createdAt:1});return {p,e};});await migrate(t);
  for(const type of ["census","immigration","military","residence"] as const){await write(t,db=>db.patch(ids.e,{type}));const snap=await recount(t);expect((await t.run(ctx=>ctx.db.query("personScoreRows").withIndex("by_record",q=>q.eq("recordId",ids.p)).unique()))?.operation).toEqual(personScore(snap,ids.p)?.operation);}
 });
-test("stale aggregates retry on concurrent score refresh and refuse a persistently moving vault",async()=>{
- const {readScoreTotals}=await import("./vaultReads");const {getFunctionName}=await import("convex/server");let reads=0;
- const runQuery=vi.fn(async(ref:unknown)=>{if(getFunctionName(ref as never).endsWith(":totals")){reads++;return {revision:reads===1?1:2,counts:{people:2}};}return {count:reads===1?99:2,isDone:true,continueCursor:""};});
- expect(await readScoreTotals({runQuery} as never,owner,Date.now())).toEqual({counts:{people:2},staleChecks:2});
- const unstable=vi.fn(async(ref:unknown)=>getFunctionName(ref as never).endsWith(":totals")?{revision:++reads,counts:{people:2}}:{count:1,isDone:true,continueCursor:""});
- await expect(readScoreTotals({runQuery:unstable} as never,owner,Date.now())).rejects.toThrow(/vault changed/);
+test("single-page stale count needs one snapshot, multi-page counts retry with backoff then degrade", async () => {
+ const {readScoreTotals} = await import("./vaultReads");
+ const {getFunctionName} = await import("convex/server");
+ const single = vi.fn(async () => ({revision: 1, counts: {people: 2}, page: {count: 250, isDone: true, continueCursor: ""}}));
+ expect(await readScoreTotals({runQuery: single} as never, owner, 123)).toEqual({counts: {people: 2}, staleChecks: 250, exact: true});
+ expect(single).toHaveBeenCalledTimes(1);
+ for (const stabilizes of [true, false]) {
+   let attempts = 0;
+   const backoff = vi.fn(async () => {});
+   const runQuery = vi.fn(async (ref: unknown) => {
+     const name = getFunctionName(ref as never);
+     if (name.endsWith(":totalsAndStale")) return {revision: ++attempts, counts: {people: attempts}, page: {count: 250, isDone: false, continueCursor: "second"}};
+     if (name.endsWith(":totals")) return {revision: stabilizes && attempts === 2 ? attempts : attempts + 1};
+     return {count: 3, isDone: true, continueCursor: ""};
+   });
+   expect(await readScoreTotals({runQuery} as never, owner, 123, backoff)).toEqual({counts: {people: stabilizes ? 2 : 3}, staleChecks: 253, exact: stabilizes});
+   expect(backoff.mock.calls).toEqual(stabilizes ? [[50]] : [[50], [100]]);
+   expect(attempts).toBe(stabilizes ? 2 : 3);
+ }
+});
+test("real totals and first stale page share one snapshot, candidateLimit preserves continuation", async () => {
+ const t = setup(), now = Date.now();
+ await t.run(async ctx => {
+   for (let i = 0; i < 65; i++) await ctx.db.insert("persons", fields(i));
+   for (let i = 0; i < 250; i++) await ctx.db.insert("personScoreReviews", {vaultOwnerId: owner, recordId: "synthetic", reviewedAt: now - STALE_AGE - 1});
+ });
+ await migrate(t);
+ const total = await t.query(internal.personScores.totalsAndStale, {vaultOwnerId: owner, now});
+ expect(total.page).toMatchObject({count: 250, isDone: true});
+ expect(total.counts.people).toBe(65);
+ let cursor: string | null = null;
+ const ids: string[] = [];
+ do {
+   const p = await t.query(internal.personScores.operationsPage, {vaultOwnerId: owner, now, cursor, candidateLimit: 7});
+   expect(p.scanned).toBeLessThanOrEqual(7);
+   ids.push(...p.rows.map(r => r.id)); cursor = p.isDone ? null : p.continueCursor;
+ } while (cursor);
+ expect(ids).toHaveLength(65); expect(new Set(ids).size).toBe(65);
+});
+test("import warnings edit refreshes identity_review and name-only edit queues no provisional job", async () => {
+ vi.useFakeTimers();
+ const t = setup();
+ const {personId, importId} = await t.run(async ctx => {
+   const personId = await ctx.db.insert("persons", fields(1));
+   const sourceId = await ctx.db.insert("sources", {vaultOwnerId: owner, title: "Invented source", type: "other", createdAt: 1, updatedAt: 1});
+   const citationId = await ctx.db.insert("citations", {vaultOwnerId: owner, sourceId, isEvidence: true, confidence: "high", createdAt: 1, updatedAt: 1});
+   await ctx.db.insert("citationLinks", {vaultOwnerId: owner, citationId, targetType: "person", targetId: personId, createdAt: 1});
+   const importId = await ctx.db.insert("importRuns", {vaultOwnerId: owner, personId, personFsId: "SYNTHETIC-1", personName: "Invented", captureId: "synthetic", captureVersion: "1", pageTypes: ["person"], sourceUrls: [], capturedAt: 1, importedAt: 1, compatibilityMode: false, mergeStatus: "created", counts: {sources: 0, citations: 0, memories: 0, relationships: 0, places: 0, events: 0, warnings: 0}, warnings: [], artifactPaths: {}});
+   return {personId, importId};
+ });
+ await migrate(t);
+ const check = async () => (await t.run(ctx => ctx.db.query("personScoreRows").withIndex("by_record", q => q.eq("recordId", personId)).unique()))!.operation.researchChecks.find(c => c.checkKey === "identity_review")!.status;
+ expect(await check()).toBe("complete");
+ await write(t, db => db.patch(importId, {warnings: ["Invented identity conflict"]}));
+ expect(await check()).toBe("needs_review"); await recount(t);
+ await t.run(async ctx => {
+   const changes: ExplorerChange[] = [];
+   await withSearchWrites(ctx, changes).db.patch(personId, {name: {given: "Renamed", surname: "Synthetic"}});
+   await applyExplorerChanges(ctx, changes);
+ });
+ expect((await t.query(internal.peopleExplorer.dependencyFailures, {cursor: null})).page).toEqual([]);
+ const jobs = await t.run(ctx => ctx.db.system.query("_scheduled_functions").collect());
+ expect(jobs.filter(j => j.state.kind === "pending").every(j => j.name.endsWith("refreshScheduled"))).toBe(true);
+ await settle(t); await recount(t);
+ const renamed = await t.run(ctx => ctx.db.query("personScoreRows").withIndex("by_record", q => q.eq("recordId", personId)).unique());
+ expect(renamed?.operation.displayName).toBe("Renamed Synthetic");
 });
 test("no-op score refresh ignores stored object key order",async()=>{
  const t=setup();const id=await t.run(ctx=>ctx.db.insert("persons",fields(1)));await migrate(t);
@@ -180,4 +240,35 @@ test("no-op score refresh ignores stored object key order",async()=>{
 test("sparse Operations search fills a user page across candidate pages without extra clicks",async()=>{
  const t=setup();await t.run(async ctx=>{for(let i=0;i<65;i++)await ctx.db.insert("persons",fields(i));});await migrate(t);
  const result=await t.withIdentity({subject:owner}).action(api.vaultReads.getOperationsQueue,{vaultOwnerId:owner,search:"Invented 64 "});expect(result.rows.map(r=>r.displayName)).toEqual(["Invented 64 Synthetic"]);expect(result.isDone).toBe(true);
+});
+
+test("v4 and v5 readers remain ready throughout an incomplete v6 upgrade", async () => {
+ const {countsReady, scopedReadsReady} = await import("./vaultCounts");
+ const {scoresReady} = await import("./personScores");
+ const t = setup();
+ await t.run(async ctx => {
+   await ctx.db.insert("searchBuildState", {table: "vaultCounts:v4", cursor: null, complete: true});
+   await ctx.db.insert("searchBuildState", {table: "vaultCounts:v5", cursor: null, complete: true});
+   await ctx.db.insert("searchBuildState", {table: "vaultCounts:v6", cursor: null, complete: false});
+   expect(await countsReady(ctx)).toBe(true); expect(await scopedReadsReady(ctx)).toBe(true); expect(await scoresReady(ctx)).toBe(false);
+ });
+ const summary = await t.query(internal.vault.getDashboardSummary, {vaultOwnerId: owner});
+ expect(summary.counts.people).toBe(0);
+ const tasks = await t.query(internal.researchPages.tasks, {vaultOwnerId: owner, cursor: null});
+ expect(tasks.isDone).toBe(true);
+ const places = await t.query(internal.placePages.list, {vaultOwnerId: owner, cursor: null});
+ expect(places.isDone).toBe(true);
+ await t.run(async ctx => {
+   const id = await ctx.db.insert("persons", fields(0));
+   const db = new Proxy(ctx.db, {get(target, key) {
+     if (key === "query") return (table: string) => {
+       if (["media", "contextItems"].includes(table)) throw new Error("Unexpected owner-wide loader fallback");
+       return target.query(table as "persons");
+     };
+     const value = Reflect.get(target, key);
+     return typeof value === "function" ? value.bind(target) : value;
+   }});
+   const snapshot = await loadPersonScopedSnapshot({...ctx, db} as never, owner, String(id));
+   expect(snapshot?.people.map(p => p._id)).toEqual([id]);
+ });
 });

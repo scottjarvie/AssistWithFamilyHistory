@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 
 const packet = buildOperationsHandoffPacket(
   {
+    exact: false,
     summary: {
       visibleRows: 3,
     },
@@ -88,3 +89,5 @@ function assert(condition: unknown, message: string) {
     throw new Error(message);
   }
 }
+
+if (packet.exact !== false) throw new Error("Handoff must preserve approximate summary status");
