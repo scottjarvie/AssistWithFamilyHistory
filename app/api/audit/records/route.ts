@@ -9,6 +9,7 @@ export async function GET(request: NextRequest) {
   const metric = request.nextUrl.searchParams.get("metric") || "";
   const rawOffset = request.nextUrl.searchParams.get("offset") ?? "0";
   const offset = Number(rawOffset);
+  const cursor=request.nextUrl.searchParams.get("cursor");
   if (!isAuditMetric(metric) || !/^\d+$/.test(rawOffset) || !Number.isSafeInteger(offset)) {
     return NextResponse.json({success:false,error:"Choose a valid Audit metric and page offset."}, {status:400,headers});
   }
@@ -16,7 +17,7 @@ export async function GET(request: NextRequest) {
   try {
     const {vaultOwnerId} = await getVaultAccessContext();
     const client = await getAuthedConvexClient({requireAuthentication:true});
-    const result = await client.action(api.vaultReads.getVaultAudit, {vaultOwnerId,metric,offset});
+    const result = await client.action(api.vaultReads.getVaultAudit, {vaultOwnerId,metric,offset,...(cursor?{cursor}:{})});
     // Never return the legacy audit object: it includes raw recentContext.
     return NextResponse.json({success:true,page:result.records}, {headers});
   } catch (error) {

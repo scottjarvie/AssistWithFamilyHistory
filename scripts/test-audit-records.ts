@@ -4,6 +4,7 @@ import {buildAuditRecordPage,type AuditRecordSnapshot,type AuditPersonInput} fro
 import {auditMetrics,type AuditMetric} from "../lib/audit/contract";
 import {getVaultAudit as auditRead} from "../convex/vaultReads";
 import {getVaultAudit as auditQuery} from "../convex/vault";
+import {getFunctionName} from "convex/server";
 import type {ActionCtx, QueryCtx} from "../convex/_generated/server";
 import {projectAuditSummary} from "../lib/audit/presentation";
 const owner="owner-a";
@@ -57,13 +58,13 @@ test("New drilldowns require the matched identity in both legacy modes; ordinary
  try {for(const mode of ["shadow","enforce"]){process.env.TRUST_BOUNDARY_MODE=mode;
   for(const subject of [null,"owner-b",owner]) {
    let reads=0,denialLogs=0;
-   const ctx={auth:{getUserIdentity:async()=>subject?{subject}:null},runQuery:async(_fn:unknown,args:unknown)=>{reads++;return args;},runMutation:async()=>{denialLogs++;}} as unknown as ActionCtx;
-   if(subject===owner){assert.deepEqual(await handler(ctx,{vaultOwnerId:owner,metric:"people",offset:50}),{vaultOwnerId:owner,metric:"people",offset:50});assert.equal(reads,1);}
+   const ctx={auth:{getUserIdentity:async()=>subject?{subject}:null},runQuery:async(_fn:unknown,args:unknown)=>{reads++;return getFunctionName(_fn as never)==="auditPages:status"?false:args;},runMutation:async()=>{denialLogs++;}} as unknown as ActionCtx;
+   if(subject===owner){assert.deepEqual(await handler(ctx,{vaultOwnerId:owner,metric:"people",offset:50}),{vaultOwnerId:owner,metric:"people",offset:50});assert.equal(reads,2);}
    else {await assert.rejects(()=>handler(ctx,{vaultOwnerId:owner,metric:"people"}),/Trust boundary denied/);assert.equal(reads,0);}
    assert.equal(denialLogs,0,"strict new reads do not depend on shadow logging");
    reads=0;
    if(mode==="enforce"&&subject!==owner)await assert.rejects(()=>handler(ctx,{vaultOwnerId:owner}),/Trust boundary denied/);
-   else {await handler(ctx,{vaultOwnerId:owner});assert.equal(reads,1);assert.equal(denialLogs,subject===owner?0:1);}
+   else {await handler(ctx,{vaultOwnerId:owner});assert.equal(reads,2);assert.equal(denialLogs,subject===owner?0:1);}
   }
  }
  const ctx={auth:{getUserIdentity:async()=>({subject:owner})},runQuery:async()=>{throw Error("must not query");}} as unknown as ActionCtx;

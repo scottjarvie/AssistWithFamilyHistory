@@ -107,6 +107,9 @@ export default defineSchema({
     .index("by_record", ["recordId"]),
 
   personScoreRows: defineTable(scoreRowFields)
+    .index("by_audit_sources", ["vaultOwnerId", "rowType", "auditWithoutSources"])
+    .index("by_audit_context", ["vaultOwnerId", "rowType", "auditWithoutContext"])
+    .index("by_audit_stories", ["vaultOwnerId", "rowType", "auditWithoutStories"])
     .index("by_record", ["recordId"])
     .index("by_readiness", ["vaultOwnerId", "rowType", "readinessOrder"])
     .index("by_workflow_readiness", ["vaultOwnerId", "rowType", "storyWorkflow", "readinessOrder"])
@@ -499,6 +502,7 @@ export default defineSchema({
    * GEDCOM X: PlaceDescription with temporal support
    */
   places: defineTable({
+    auditWithoutContext: v.optional(v.boolean()),
     searchText: v.optional(v.string()),
     archivedAt: v.optional(v.number()), archivedBy: v.optional(v.string()),
     vaultOwnerId: v.optional(v.string()),
@@ -571,6 +575,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .searchIndex("search_text", { searchField: "searchText", filterFields: ["vaultOwnerId", "archivedAt"] })
+    .index("by_audit_context", ["vaultOwnerId", "archivedAt", "auditWithoutContext"])
     .index("by_owner_active", ["vaultOwnerId", "archivedAt"])
     .index("by_owner", ["vaultOwnerId"])
     .index("by_name", ["name"])
@@ -672,6 +677,7 @@ export default defineSchema({
     .index("by_owner_url_title", ["vaultOwnerId", "url", "title"])
     .index("by_owner_fsId", ["vaultOwnerId", "fsId"])
     .index("by_owner_import_key", ["vaultOwnerId", "importKey"])
+    .index("by_audit_active", ["vaultOwnerId", "archivedAt"])
     .index("by_owner", ["vaultOwnerId"])
     .index("by_type", ["type"])
     .index("by_fsId", ["fsId"])
@@ -1370,6 +1376,7 @@ export default defineSchema({
     searchText: v.optional(v.string()),
     archivedAt: v.optional(v.number()), archivedBy: v.optional(v.string()),
     vaultOwnerId: v.optional(v.string()),
+    auditOpen: v.optional(v.boolean()),
     personId: v.optional(v.id("persons")),
     type: v.union(
       v.literal("source_extraction"),
@@ -1414,6 +1421,7 @@ export default defineSchema({
     .searchIndex("search_text", { searchField: "searchText", filterFields: ["vaultOwnerId", "archivedAt"] })
     .index("by_owner_active_cursor",["vaultOwnerId","archivedAt","researchCursorKey"])
     .index("by_owner_active_status_cursor",["vaultOwnerId","archivedAt","status","researchCursorKey"])
+    .index("by_audit_open", ["vaultOwnerId", "archivedAt", "auditOpen"])
     .index("by_owner", ["vaultOwnerId"])
     .index("by_owner_active_order", ["vaultOwnerId", "archivedAt", "researchOrderTime"])
     .index("by_owner_active_status_order", ["vaultOwnerId", "archivedAt", "status", "researchOrderTime"])
@@ -1803,6 +1811,8 @@ export default defineSchema({
   })
     .searchIndex("search_text", { searchField: "searchText", filterFields: ["vaultOwnerId", "archivedAt"] })
     .index("by_owner_updated", ["vaultOwnerId", "archivedAt", "updatedAt"])
+    .index("by_audit_status", ["vaultOwnerId", "archivedAt", "status"])
+    .index("by_audit_active", ["vaultOwnerId", "archivedAt"])
     .index("by_owner", ["vaultOwnerId"])
     .index("by_person", ["personId"])
     .index("by_relationship", ["relationshipId"])
@@ -2015,6 +2025,7 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   })
+    .index("by_audit_recent", ["vaultOwnerId", "archivedAt", "browseOrderTime"])
     .index("by_owner_place_order", ["vaultOwnerId", "archivedAt", "placeId", "browseOrderTime"])
     .index("by_owner", ["vaultOwnerId"])
     .index("by_place", ["placeId"]),

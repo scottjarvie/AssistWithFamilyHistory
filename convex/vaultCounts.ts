@@ -14,7 +14,7 @@ export const COUNT_TABLES = [
   "researchChecks", "provisionalRelatives", "sourceContents", "recordPersonas", "topics", "connections",
 ] as const;
 export type CountTable = typeof COUNT_TABLES[number];
-export const BUILD = "vaultCounts:v6";
+export const BUILD = "vaultCounts:v7";
 export const COUNTER_SHARDS = 32;
 export function counterShard(id: string) {
   let hash = 2166136261;
@@ -40,6 +40,9 @@ export function contribution(table: CountTable, row: any): {owner: string; keys:
   // exclusion of rows without a stored owner. Zero is an archive timestamp too.
   if (!row || row.archivedAt !== undefined || !row.vaultOwnerId) return null;
   const keys = ["active"];
+  if (table === "places" && row.auditWithoutContext === true) keys.push("withoutContext");
+  if (table === "stories") keys.push(`status:${row.status}`);
+  if (table === "researchTasks" && row.status !== "done") keys.push("open");
   if (table === "researchTasks" || table === "researchLog") keys.push(`status:${row.status}`);
   if (table === "provisionalRelatives") keys.push(`mergeState:${row.mergeState}`);
   if (table === "researchLog") {
@@ -91,7 +94,7 @@ export async function syncCount(ctx: Pick<MutationCtx, "db">, table: CountTable,
 }
 
 export async function scopedReadsReady(ctx: Pick<QueryCtx, "db">) {
-  return !!(await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", "vaultCounts:v5")).unique())?.complete || !!(await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", BUILD)).unique())?.complete;
+  return !!(await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", "vaultCounts:v5")).unique())?.complete || !!(await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", "vaultCounts:v6")).unique())?.complete || !!(await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", BUILD)).unique())?.complete;
 }
 /** v5 adds memberships, not new count semantics: keep already migrated v4
  * Dashboard/Research/Places readers on their bounded paths during the upgrade. */
@@ -138,6 +141,11 @@ export const backfillStep = internalMutation({args: {}, handler: async ctx => {
     }
     if(result.isDone){position.tableIndex++;position.cursor=null;}else position.cursor=result.continueCursor;
     const complete=position.tableIndex===COUNT_TABLES.length+2;
+    if(complete) {
+      const v6=await ctx.db.query("searchBuildState").withIndex("by_table",q=>q.eq("table","vaultCounts:v6")).unique();
+      if(!v6)await ctx.db.insert("searchBuildState",{table:"vaultCounts:v6",cursor:null,complete:true});
+      else if(!v6.complete)await ctx.db.patch(v6._id,{complete:true,cursor:null});
+    }
     const value={table:BUILD,cursor:complete?null:JSON.stringify(position),complete};
     if(state)await ctx.db.replace(state._id,value);else await ctx.db.insert("searchBuildState",value);
     return complete;

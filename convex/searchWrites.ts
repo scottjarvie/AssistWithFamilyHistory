@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { refreshPlaceAudit } from "./auditMaintenance";
 import { syncMediaPeople, EXPLORER_TABLES, type ExplorerChange } from "./peopleExplorer";
 import { COUNT_TABLES, syncCount, researchOrderTime, researchCursorKey, type CountTable } from "./vaultCounts";
 import type { Doc } from "./_generated/dataModel";
@@ -38,7 +39,11 @@ export async function syncSourceCount(ctx: {db: MutationCtx["db"]}, table: Count
   if(row&&table==="media"&&row.description===undefined)await ctx.db.patch(id as any,{description:""});
   if (table === "contextItems") await syncContextItemPeople(ctx, id, row);
   if (table === "media") await syncMediaPeople(ctx, id as any);
+  const oldContext = table === "historicalContext" ? await ctx.db.query("vaultCountMembers").withIndex("by_record",q=>q.eq("recordId",id)).unique() : null;
+  if(row && table === "researchTasks" && row.auditOpen !== (row.status !== "done")) await ctx.db.patch(id as any,{auditOpen:row.status !== "done"});
   await syncCount(ctx, table, id, row, touch);
+  if(table === "places") await refreshPlaceAudit(ctx,id);
+  if(table === "historicalContext") for(const placeId of new Set([...(oldContext?.places??[]).filter(p=>p.kind==="context").map(p=>String(p.placeId)), ...(row?.placeId?[String(row.placeId)]:[])])) await refreshPlaceAudit(ctx,placeId);
 }
 
 /** Reverse memberships, maintained even before the migration reaches a row. */

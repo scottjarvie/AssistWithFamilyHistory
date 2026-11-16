@@ -13,6 +13,8 @@ import type {
 import { ConvexError, v } from "convex/values";
 import {requireWebsitePerson} from "./access";
 import {validateAudioContainer, normalizeAudioMime, audioContainerError, invalidAudioFileError, checkVoiceNoteDuration, voiceNoteTooLongError} from "./lib/media/audio";
+import {readRecords} from "./auditPages";
+import {projectAuditSummary} from "../lib/audit/presentation";
 import {auditMetrics} from "../lib/audit/contract";
 import { researchPageArgs } from "./researchPages";
 import type { TaskPage, LogPage } from "./researchPages";
@@ -203,6 +205,7 @@ export const getVaultAudit = action({
     vaultOwnerId: v.string(),
     metric: v.optional(v.union(...auditMetrics.map(metric => v.literal(metric)))),
     offset: v.optional(v.number()),
+    cursor: v.optional(v.union(v.string(),v.null())),
   },
   handler: async (ctx, args): Promise<FunctionReturnType<typeof vaultInternal.getVaultAudit>> => {
     // New record drilldowns always require the matched authenticated owner,
@@ -214,9 +217,16 @@ export const getVaultAudit = action({
       if (!decision.allowed) throw new Error(`Trust boundary denied: ${decision.reason}`);
       if (!Number.isSafeInteger(args.offset ?? 0) || (args.offset ?? 0) < 0) throw new Error("Invalid Audit offset");
     }
+    const vaultOwnerId=await authorizedOwner(ctx, "vault.getVaultAudit", args.vaultOwnerId);
+    if(await ctx.runQuery(internal.auditPages.status,{})) {
+      // A pre-v7 offset restarts at page one; the client deduplicates IDs.
+      const summary=await ctx.runQuery(internal.auditPages.summary,{vaultOwnerId});
+      const records=args.metric?await readRecords(ctx,vaultOwnerId,args.metric,args.cursor??null,projectAuditSummary(summary).metrics[args.metric],summary.counts.people):null;
+      return {...summary,records};
+    }
     return ctx.runQuery(vaultInternal.getVaultAudit, {
-      ...args,
-      vaultOwnerId: await authorizedOwner(ctx, "vault.getVaultAudit", args.vaultOwnerId),
+      metric:args.metric, offset:args.offset,
+      vaultOwnerId,
     });
   },
 });

@@ -10,6 +10,8 @@
 
 import type * as access from "../access.js";
 import type * as apiKeys from "../apiKeys.js";
+import type * as auditMaintenance from "../auditMaintenance.js";
+import type * as auditPages from "../auditPages.js";
 import type * as citations from "../citations.js";
 import type * as contextPackBuilder from "../contextPackBuilder.js";
 import type * as crons from "../crons.js";
@@ -72,6 +74,8 @@ import type {
 declare const fullApi: ApiFromModules<{
   access: typeof access;
   apiKeys: typeof apiKeys;
+  auditMaintenance: typeof auditMaintenance;
+  auditPages: typeof auditPages;
   citations: typeof citations;
   contextPackBuilder: typeof contextPackBuilder;
   crons: typeof crons;
