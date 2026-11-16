@@ -163,7 +163,7 @@ export const backfillStep = internalMutation({args: {}, handler: async ctx => {
 export const backfillStatus = internalQuery({args: {}, handler: async ctx => {
   const state = await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", BUILD)).unique();
   const position = state?.cursor ? JSON.parse(state.cursor) as {tableIndex: number} : null;
-  return {complete: state?.complete ?? false, table: state?.complete ? null : ([...COUNT_TABLES,"personScores","provisionalScores"])[position?.tableIndex ?? 0]};
+  return {build:BUILD,complete: state?.complete ?? false, table: state?.complete ? null : ([...COUNT_TABLES,"personScores","provisionalScores"])[position?.tableIndex ?? 0]};
 }});
 export const backfill = internalAction({args: {}, handler: async (ctx): Promise<{complete: boolean}> => {
   const until = Date.now() + 90_000;

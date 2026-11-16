@@ -146,7 +146,7 @@ export default defineSchema({
 
   peopleExplorerDependencyFailures: defineTable({
     key: v.string(),
-    job: v.object({kind: v.union(v.literal("owner"), v.literal("personKey"), v.literal("event"), v.literal("citation"), v.literal("source"), v.literal("place"),v.literal("provisional"),v.literal("provisionalRow")), id: v.string(), owner: v.optional(v.string()), stage: v.optional(v.number()), cursor: v.optional(v.union(v.string(), v.null()))}),
+    job: v.object({kind: v.union(v.literal("owner"), v.literal("personKey"), v.literal("event"), v.literal("citation"), v.literal("source"), v.literal("place"),v.literal("provisional"),v.literal("provisionalRow"),v.literal("batch")), provisionals:v.optional(v.boolean()), id: v.string(), owner: v.optional(v.string()), stage: v.optional(v.number()), cursor: v.optional(v.union(v.string(), v.null()))}),
     state: v.union(v.literal("pending"), v.literal("failed")), reason: v.string(), recordedAt: v.number(),
   }).index("by_key", ["key"]),
 

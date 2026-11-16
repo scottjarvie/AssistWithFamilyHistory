@@ -146,3 +146,38 @@ test("inline budget deferral cannot commit counter deltas without their score ro
  expect((await t.query(internal.personScores.totals,{vaultOwnerId:owner})).counts).toEqual(before.counts);
  await settle(t);await recount(t);
 });
+test("zero-valued sort keys match old primary orders in both directions and readiness order exactly",async()=>{
+ const {orderedNumber}=await import("./personScoreModel");expect(orderedNumber(-0)).toBe(orderedNumber(0));expect([0,1,2,100,-2].sort((a,b)=>orderedNumber(-a).localeCompare(orderedNumber(-b)))).toEqual([100,2,1,0,-2]);
+ const {RESEARCH_CHECK_DEFINITIONS}=await import("./vaultCore");const t=setup();await t.run(async ctx=>{
+  const ids=[];for(let i=0;i<3;i++)ids.push(await ctx.db.insert("persons",{...fields(i),...(i===1?{birth:{date:{original:"1800",year:1800}}}:{})}));
+  for(const d of RESEARCH_CHECK_DEFINITIONS)await ctx.db.insert("researchChecks",{vaultOwnerId:owner,personId:ids[2],checkKey:d.key,status:"complete",applicability:"required",completionSource:"user",confidence:1,createdAt:1,updatedAt:1});
+ });await migrate(t);
+ const fieldsBySort={missingCritical:"missingCritical",completion:"completionPercent",lastTouched:"lastTouched",sourceCount:"sourceCount",storyReadiness:"storyReadinessScore",newestImport:"latestImportAt"} as const;
+ for(const sortBy of Object.keys(fieldsBySort) as (keyof typeof fieldsBySort)[])for(const sortDirection of ["asc","desc"] as const){
+  const old=await t.query(internal.vault.getOperationsQueue,{vaultOwnerId:owner,sortBy,sortDirection});
+  const next=await t.query(internal.personScores.operationsPage,{vaultOwnerId:owner,sortBy,sortDirection,now:Date.now(),cursor:null});
+  const value=(r:typeof next.rows[number])=>sortBy==="missingCritical"?r.missingCritical.length:r[fieldsBySort[sortBy]]??0;
+  expect(next.rows.map(value),`${sortBy}/${sortDirection}`).toEqual(old.rows.map(value));
+ }
+ expect((await t.query(internal.personScores.readinessPage,{vaultOwnerId:owner,cursor:null})).page).toEqual(await t.query(internal.vault.getStoryReadinessCandidates,{vaultOwnerId:owner}));
+});
+test("event type changes refresh census, immigration and military evidence",async()=>{
+ vi.useFakeTimers();const t=setup();const ids=await t.run(async ctx=>{const p=await ctx.db.insert("persons",fields(1));const e=await ctx.db.insert("events",{vaultOwnerId:owner,type:"residence",createdAt:1,updatedAt:1});await ctx.db.insert("personEvents",{vaultOwnerId:owner,personId:p,eventId:e,role:"primary",createdAt:1});return {p,e};});await migrate(t);
+ for(const type of ["census","immigration","military","residence"] as const){await write(t,db=>db.patch(ids.e,{type}));const snap=await recount(t);expect((await t.run(ctx=>ctx.db.query("personScoreRows").withIndex("by_record",q=>q.eq("recordId",ids.p)).unique()))?.operation).toEqual(personScore(snap,ids.p)?.operation);}
+});
+test("stale aggregates retry on concurrent score refresh and refuse a persistently moving vault",async()=>{
+ const {readScoreTotals}=await import("./vaultReads");const {getFunctionName}=await import("convex/server");let reads=0;
+ const runQuery=vi.fn(async(ref:unknown)=>{if(getFunctionName(ref as never).endsWith(":totals")){reads++;return {revision:reads===1?1:2,counts:{people:2}};}return {count:reads===1?99:2,isDone:true,continueCursor:""};});
+ expect(await readScoreTotals({runQuery} as never,owner,Date.now())).toEqual({counts:{people:2},staleChecks:2});
+ const unstable=vi.fn(async(ref:unknown)=>getFunctionName(ref as never).endsWith(":totals")?{revision:++reads,counts:{people:2}}:{count:1,isDone:true,continueCursor:""});
+ await expect(readScoreTotals({runQuery:unstable} as never,owner,Date.now())).rejects.toThrow(/vault changed/);
+});
+test("no-op score refresh ignores stored object key order",async()=>{
+ const t=setup();const id=await t.run(ctx=>ctx.db.insert("persons",fields(1)));await migrate(t);
+ await t.run(async ctx=>{const old=(await ctx.db.query("personScoreRows").withIndex("by_record",q=>q.eq("recordId",id)).unique())!;const reorder=(value:unknown):unknown=>Array.isArray(value)?value.map(reorder):value&&typeof value==="object"?Object.fromEntries(Object.entries(value).reverse().map(([k,v])=>[k,reorder(v)])):value;const {_id,_creationTime,...value}=old;void _creationTime;await ctx.db.replace(_id,reorder(value) as typeof value);});
+ const before=await t.query(internal.personScores.totals,{vaultOwnerId:owner});await t.mutation(internal.peopleExplorer.rebuildOne,{personId:id});expect(await t.query(internal.personScores.totals,{vaultOwnerId:owner})).toEqual(before);
+});
+test("sparse Operations search fills a user page across candidate pages without extra clicks",async()=>{
+ const t=setup();await t.run(async ctx=>{for(let i=0;i<65;i++)await ctx.db.insert("persons",fields(i));});await migrate(t);
+ const result=await t.withIdentity({subject:owner}).action(api.vaultReads.getOperationsQueue,{vaultOwnerId:owner,search:"Invented 64 "});expect(result.rows.map(r=>r.displayName)).toEqual(["Invented 64 Synthetic"]);expect(result.isDone).toBe(true);
+});

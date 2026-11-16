@@ -135,10 +135,10 @@ export type ExplorerChange = {table: string; before: any; after: any};
 export const EXPLORER_TABLES = ["persons", "personEvents", "events", "places", "citationLinks", "citations", "sources", "media", "documents", "stories", "importRuns", "relationships", "researchChecks", "researchTasks", "historicalContext", "provisionalRelatives"];
 const RELEVANT: Record<string, string[]> = {
   places: ["name", "fullName", "archivedAt", "vaultOwnerId"], sources: ["title", "type", "notes", "archivedAt", "vaultOwnerId"],
-  citations: ["sourceId", "archivedAt", "vaultOwnerId"], events: ["place.placeId", "archivedAt", "vaultOwnerId"],
+  citations: ["sourceId", "archivedAt", "vaultOwnerId"], events: ["type", "place.placeId", "archivedAt", "vaultOwnerId"],
   media: ["personIds", "archivedAt", "vaultOwnerId"], documents: ["personId", "type", "archivedAt", "vaultOwnerId"],
   stories: ["personId", "type", "status", "archivedAt", "vaultOwnerId"],
-  importRuns: ["personId", "personFsId", "importedAt", "archivedAt", "vaultOwnerId"],
+  importRuns: ["personId", "personFsId", "warnings", "importedAt", "archivedAt", "vaultOwnerId"],
 };
 export function affectsExplorer(change: ExplorerChange): boolean {
   if (!change.before || !change.after) return true;
@@ -180,8 +180,8 @@ function budgetDb(db: MutationCtx["db"], limit = 75): MutationCtx["db"] {
   }});
 }
 
-export const jobArgs = {kind: v.union(v.literal("owner"), v.literal("personKey"), v.literal("event"), v.literal("citation"), v.literal("source"), v.literal("place"), v.literal("provisional"), v.literal("provisionalRow")), id: v.string(), owner: v.optional(v.string()), stage: v.optional(v.number()), cursor: v.optional(v.union(v.string(), v.null()))};
-type DependencyJob = {kind: "owner" | "personKey" | "event" | "citation" | "source" | "place" | "provisional" | "provisionalRow"; id: string; owner?: string; stage?: number; cursor?: string | null};
+export const jobArgs = {kind: v.union(v.literal("owner"), v.literal("personKey"), v.literal("event"), v.literal("citation"), v.literal("source"), v.literal("place"), v.literal("provisional"), v.literal("provisionalRow"),v.literal("batch")), provisionals:v.optional(v.boolean()), id: v.string(), owner: v.optional(v.string()), stage: v.optional(v.number()), cursor: v.optional(v.union(v.string(), v.null()))};
+type DependencyJob = {kind: "owner" | "personKey" | "event" | "citation" | "source" | "place" | "provisional" | "provisionalRow" | "batch"; provisionals?:boolean; id: string; owner?: string; stage?: number; cursor?: string | null};
 async function scheduleJob(ctx: MutationCtx, job: DependencyJob) {
   const key = dependencyKey(job);
   const old = await ctx.db.query("peopleExplorerDependencyFailures").withIndex("by_key", q => q.eq("key", key)).unique();
@@ -233,6 +233,12 @@ export const dependencyPage = internalMutation({args: jobArgs, handler: async (c
   if (failed) await ctx.db.delete(failed._id);
   const stage = job.stage ?? 0;
   let range: any;
+  if(job.kind === "batch") {
+    const jobs=JSON.parse(job.id) as DependencyJob[];
+    if(jobs.length>25)throw new Error("Too many dependency jobs");
+    for(const child of jobs)await scheduleJob(ctx,child);
+    await releaseProjectionGate(ctx);return;
+  }
   if(job.kind === "provisionalRow") {
     await refreshProvisionalScore(ctx, ctx.db.normalizeId("provisionalRelatives",job.id)!);
     await releaseProjectionGate(ctx); return;
@@ -257,7 +263,7 @@ export const dependencyPage = internalMutation({args: jobArgs, handler: async (c
       if (row.targetType === "event") await scheduleJob(ctx, {kind: "event", id: row.targetId});
       else if (row.targetType === "person") await schedulePerson(ctx, row.targetId);
     } else if (job.kind === "place" && stage === 2) await scheduleJob(ctx, {kind: "event", id: String(row._id)});
-    else {await schedulePerson(ctx, job.kind === "event" ? row.personId : row._id);if(job.kind==="owner")await scheduleJob(ctx,{kind:"provisional",id:String(row._id)});}
+    else {await schedulePerson(ctx, job.kind === "event" ? row.personId : row._id);if(job.kind==="owner"&&job.provisionals)await scheduleJob(ctx,{kind:"provisional",id:String(row._id)});}
   }
   if (!result.isDone) await scheduleJob(ctx, {...job, cursor: result.continueCursor});
   else if (job.kind === "place" && stage < 2) await scheduleJob(ctx, {...job, stage: stage + 1, cursor: null});
@@ -352,18 +358,19 @@ export async function applyExplorerChanges(ctx: MutationCtx, changes: ExplorerCh
   }
   if (defer) {
     const owners = new Set<string>(changes.filter(c => c.table === "persons" && c.after).map(c => normalizeVaultOwnerId(c.after.vaultOwnerId)));
-    for (const owner of owners) await scheduleJob(ctx, {kind: "owner", id: owner});
+    for (const owner of owners) await scheduleJob(ctx, {kind: "owner", id: owner, provisionals:true});
     return;
   }
   const extraJobs=new Map<string,DependencyJob>();
   const queueExtra=(job:DependencyJob)=>{extraJobs.set(dependencyKey(job),job);};
   for(const change of changes) for(const row of [change.before,change.after]) if(row) {
-    if(change.table==="persons"||(change.table==="stories"&&row.personId)) queueExtra({kind:"provisional",id:String(change.table==="persons"?row._id:row.personId)});
+    if((change.table==="persons"&&change.before&&(!change.after||["fsId","archivedAt","vaultOwnerId"].some(k=>change.before[k]!==change.after[k])))||(change.table==="stories"&&row.personId&&(!change.before||!change.after||["personId","archivedAt","vaultOwnerId"].some(k=>change.before[k]!==change.after[k])))) queueExtra({kind:"provisional",id:String(change.table==="persons"?row._id:row.personId)});
     if(change.table==="provisionalRelatives"&&change.before&&(!change.after||change.before.vaultOwnerId!==change.after.vaultOwnerId||change.after.mergeState!=="provisional"))await removeScore(ctx,String(change.before._id));
     if(change.table==="provisionalRelatives") queueExtra({kind:"provisionalRow",id:String(row._id)});
     if(change.table==="historicalContext") queueExtra(row.placeId?{kind:"place",id:String(row.placeId),owner:normalizeVaultOwnerId(row.vaultOwnerId)}:{kind:"owner",id:normalizeVaultOwnerId(row.vaultOwnerId)});
   }
-  for(const job of extraJobs.values())await scheduleJob(ctx,job);
+  const jobs=[...extraJobs.values()];
+  for(let i=0;i<jobs.length;i+=25)await scheduleJob(ctx,{kind:"batch",id:JSON.stringify(jobs.slice(i,i+25))});
   const sourceCtx = ctx;
   ctx = {...ctx, db: budgetDb(ctx.db, 1000)};
   const ids = new Set<Doc<"persons">["_id"]>();

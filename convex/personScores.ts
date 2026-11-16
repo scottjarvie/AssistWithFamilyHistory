@@ -28,9 +28,18 @@ function scoreValue(recordId: string, vaultOwnerId: string, created: number, ope
 }
 type Value = ReturnType<typeof scoreValue>;
 /** Row and weighted exact totals commit together, on the existing 32-shard pattern. */
+function canonical(value:unknown):string {
+ return JSON.stringify(value,(_key,item:unknown)=>{
+  if(item&&typeof item==="object"&&!Array.isArray(item)) {
+   const row=item as Record<string,unknown>;
+   return Object.fromEntries(Object.keys(row).sort().filter(k=>row[k]!==undefined).map(k=>[k,row[k]]));
+  }
+  return item;
+ });
+}
 async function put(ctx: Pick<MutationCtx, "db">, id: string, next: Value | null) {
     const old = await ctx.db.query("personScoreRows").withIndex("by_record", q => q.eq("recordId", id)).unique();
-    if (old && JSON.stringify({ ...old, _id: undefined, _creationTime: undefined }) === JSON.stringify(next)) return;
+    if (old && canonical({ ...old, _id: undefined, _creationTime: undefined }) === canonical(next)) return;
     // Complete every budgeted read before the first write: inline refresh can
     // catch a budget deferral and commit its source edit in the same transaction.
     const reviews = await ctx.db.query("personScoreReviews").withIndex("by_record", q => q.eq("recordId", id)).collect();
@@ -80,8 +89,9 @@ export const stalePage = internalQuery({ args: { vaultOwnerId: v.string(), now: 
         return { count: p.page.length, continueCursor: p.continueCursor, isDone: p.isDone };
     } });
 const sortValidator = v.optional(v.union(v.literal("missingCritical"), v.literal("completion"), v.literal("lastTouched"), v.literal("sourceCount"), v.literal("storyReadiness"), v.literal("newestImport")));
-export const operationsArgs = { vaultOwnerId: v.string(), cursor: v.optional(v.union(v.string(), v.null())), search: v.optional(v.string()), rowType: v.optional(v.union(v.literal("person"), v.literal("provisional"))), missingCheck: v.optional(v.string()), storyStatus: v.optional(v.union(v.literal("has_story"), v.literal("no_story"))), storyWorkflow: v.optional(v.string()), staleOnly: v.optional(v.boolean()), sortBy: sortValidator, sortDirection: v.optional(v.union(v.literal("asc"), v.literal("desc"))), limit: v.optional(v.number()) };
-export const operationsPage = internalQuery({ args: { ...operationsArgs, now: v.number() }, handler: async (ctx, a): Promise<Omit<OperationsPage, "summary" | "summaryScope">> => {
+const workflowValidator=v.union(v.literal("needs_genealogy_evidence"),v.literal("needs_context_research"),v.literal("ready_to_draft"),v.literal("ready_to_review"),v.literal("published"));
+export const operationsArgs = { vaultOwnerId: v.string(), cursor: v.optional(v.union(v.string(), v.null())), search: v.optional(v.string()), rowType: v.optional(v.union(v.literal("person"), v.literal("provisional"))), missingCheck: v.optional(v.string()), storyStatus: v.optional(v.union(v.literal("has_story"), v.literal("no_story"))), storyWorkflow: v.optional(workflowValidator), staleOnly: v.optional(v.boolean()), sortBy: sortValidator, sortDirection: v.optional(v.union(v.literal("asc"), v.literal("desc"))), limit: v.optional(v.number()) };
+export const operationsPage = internalQuery({ args: { ...operationsArgs, now: v.number(), candidateLimit:v.optional(v.number()) }, handler: async (ctx, a): Promise<Omit<OperationsPage, "summary" | "summaryScope"> & {scanned:number}> => {
         const base = ctx.db.query("personScoreRows");
         const priority = !a.sortBy || a.sortBy === "missingCritical";
         const range = priority && a.missingCheck && RESEARCH_CHECK_DEFINITIONS.some(c => c.key === a.missingCheck)
@@ -93,9 +103,9 @@ export const operationsPage = internalQuery({ args: { ...operationsArgs, now: v.
         const p = await range.order(a.sortDirection === "asc" ? "desc" : "asc").paginate({ cursor: a.cursor ?? null, numItems: 50, maximumBytesRead: 250000 });
         const needle = a.search?.trim().toLowerCase();
         const rows = p.page.filter(s => { const r = s.operation; return (!a.rowType || s.rowType === a.rowType) && (!a.storyStatus || (r.storyCount > 0) === (a.storyStatus === "has_story")) && (!a.storyWorkflow || s.storyWorkflow === a.storyWorkflow) && (!a.staleOnly || staleCount(s.reviews, a.now) > 0) && (!a.missingCheck || r.missingCritical.includes(a.missingCheck)) && (!needle || [r.displayName, r.relationshipHint || "", ...r.keyPlaces, r.lifespan].join(" ").toLowerCase().includes(needle)); }).map(s => ({ ...s.operation, staleChecksCount: staleCount(s.reviews, a.now) }));
-        return { rows, continueCursor: p.continueCursor, isDone: p.isDone };
+        return { rows, scanned:p.page.length, continueCursor: p.continueCursor, isDone: p.isDone };
     } });
-export const readinessArgs = { vaultOwnerId: v.string(), storyWorkflow: v.optional(v.string()), cursor: v.optional(v.union(v.string(), v.null())), limit: v.optional(v.number()) };
+export const readinessArgs = { vaultOwnerId: v.string(), storyWorkflow: v.optional(workflowValidator), cursor: v.optional(v.union(v.string(), v.null())), limit: v.optional(v.number()) };
 export const readinessPage = internalQuery({ args: readinessArgs, handler: async (ctx, a): Promise<ReadinessPage> => {
         const base = ctx.db.query("personScoreRows");
         const query = a.storyWorkflow ? base.withIndex("by_workflow_readiness", q => q.eq("vaultOwnerId", a.vaultOwnerId).eq("rowType", "person").eq("storyWorkflow", a.storyWorkflow!)) : base.withIndex("by_readiness", q => q.eq("vaultOwnerId", a.vaultOwnerId).eq("rowType", "person"));

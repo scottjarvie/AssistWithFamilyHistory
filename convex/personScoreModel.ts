@@ -36,4 +36,6 @@ export type ReadinessPage = {
 export const STALE_AGE = 45 * 24 * 60 * 60 * 1000;
 export const staleCount = (reviews: number[], now: number) => reviews.filter(t => t > 0 && t < now - STALE_AGE).length;
 // Full IEEE precision; stable creation order is also the old readiness tie order.
-export function orderedNumber(n: number) { const d = new DataView(new ArrayBuffer(8)); d.setFloat64(0, n); const bits = d.getBigUint64(0); return (n < 0 ? BigInt.asUintN(64, ~bits) : bits ^ 0x8000000000000000n).toString(16).padStart(16, "0"); }
+export function orderedNumber(n: number) {
+    if(n===0)n=0; // Canonicalize -0 before encoding the sign bit.
+    const d = new DataView(new ArrayBuffer(8)); d.setFloat64(0, n); const bits = d.getBigUint64(0); return (n < 0 ? BigInt.asUintN(64, ~bits) : bits ^ 0x8000000000000000n).toString(16).padStart(16, "0"); }

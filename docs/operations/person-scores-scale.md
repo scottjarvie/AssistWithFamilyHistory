@@ -15,7 +15,7 @@ Dependencies now include source title/type/notes; document type; story type/stat
 relationships; research checks and tasks; provisional anchors and historical
 context. Historical context with a place uses existing place/person/event hops;
 place-less context visits the owner's people. Both old/new owners, person keys,
-anchors and places are discovered. Provisional rows use paged anchor discovery
+anchors and places are discovered. Provisional anchor discovery runs only for anchor identity/availability or story membership changes. Extra dependency jobs are batched in groups of 25 through the same recorded-failure system; historical-context owner jobs do not refresh provisional rows. Provisional rows use paged anchor discovery
 in the same job system and record failed dependency jobs for retry. Person
 ownership/archive/delete immediately removes the old score and its totals.
 
@@ -29,11 +29,11 @@ following concurrent edits; cursors can move, and the client deduplicates IDs.
 Stale status is never persisted. Each applicable resolved check with a positive
 review timestamp has a small `personScoreReviews` entry. Reads use the
 owner/timestamp range `0 < reviewedAt < now - 45 days`, in pages of 250. They sum
-all pages with one fixed cutoff for an exact count. This is proportional to stale
+all pages with one fixed cutoff for an exact count, checking summed shard revisions before/after. Concurrent refreshes restart the count; three unstable attempts fail explicitly instead of returning a mixed total. This is proportional to stale
 checks across multiple bounded transactions, rather than a constant-time count.
 No wall-clock scheduler is needed; stale status changes without any source edit.
 
-Operations reads 50 score candidates / 250 KB per query; Load more retains progress
+Operations reads 50 score candidates / 250 KB per query, and scans up to 2,000 candidates across bounded child queries to fill a 50-match user page; Load more retains progress
 through empty filtered pages. Default-priority facets (required-check flag, type,
 workflow, story presence) use indexed prefixes. Other sorts use their ordered
 indexes and apply residual combined facets/substring search within bounded pages.
@@ -45,9 +45,9 @@ Readiness uses an owner/person/score index (or workflow prefix), 24 candidates p
 page. Its exact old score-descending, person-creation-ascending ordering is
 preserved, including ties. Operations preserves primary numeric sort values;
 its former locale-name tie-break changes to creation-ascending/ID for descending
-sorts, reversed for ascending sorts, so no unbounded tied bucket is hydrated.
+sorts, reversed for ascending sorts, so no unbounded tied bucket is hydrated. Tied people/provisional rows can interleave by creation time.
 Handoff `/api/operations/queue?format=handoff` returns one page and `next`,
-`continueCursor`, `isDone`. Follow `next` until exhausted; an empty filtered page
+`continueCursor`, `isDone`, and `summaryScope` (also inside the packet). Follow `next` until exhausted; an empty filtered page
 is progress, never end. Handoff packets remain private operational material.
 
 ## Release and migration

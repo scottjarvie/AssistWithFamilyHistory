@@ -209,7 +209,7 @@ test("guest migration is reachable in shadow mode and defers 80 people's project
     expect(result.perTable.persons).toBe(80);
     expect((await t.run(ctx=>ctx.db.query("peopleExplorerRows").collect()))).toEqual([]);
     const jobs=await t.run(ctx=>ctx.db.system.query("_scheduled_functions").collect());expect(jobs).toHaveLength(1);
-    expect(jobs[0].args).toEqual([{kind:"owner",id:owner}]);
+    expect(jobs[0].args).toEqual([{kind:"owner",id:owner,provisionals:true}]);
     await t.finishAllScheduledFunctions(()=>vi.runAllTimers());
     expect((await t.run(ctx=>ctx.db.query("peopleExplorerRows").collect())).every(r=>r.vaultOwnerId===owner)).toBe(true);
     expect((await t.run(ctx=>ctx.db.query("peopleExplorerRows").collect()))).toHaveLength(80);
