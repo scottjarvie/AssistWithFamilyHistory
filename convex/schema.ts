@@ -116,6 +116,7 @@ export default defineSchema({
     state: v.union(v.literal("pending"), v.literal("failed")), reason: v.string(), recordedAt: v.number(),
   }).index("by_key", ["key"]),
 
+  contextItemPeople: defineTable({personId: v.id("persons"), contextItemId: v.id("contextItems")}).index("by_person", ["personId"]).index("by_item", ["contextItemId"]),
   mediaPeople: defineTable({personId: v.id("persons"), mediaId: v.id("media")}).index("by_person", ["personId"]).index("by_media", ["mediaId"]),
 
   persons: defineTable({
@@ -1767,6 +1768,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .searchIndex("search_text", { searchField: "searchText", filterFields: ["vaultOwnerId", "archivedAt"] })
+    .index("by_owner_updated", ["vaultOwnerId", "archivedAt", "updatedAt"])
     .index("by_owner", ["vaultOwnerId"])
     .index("by_person", ["personId"])
     .index("by_relationship", ["relationshipId"])
@@ -1839,7 +1841,9 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   })
+    .index("by_owner_updated", ["vaultOwnerId", "updatedAt"])
     .index("by_owner", ["vaultOwnerId"])
+    .index("by_owner_anchor_updated", ["vaultOwnerId", "anchorPersonId", "updatedAt"])
     .index("by_anchor", ["anchorPersonId"])
     .index("by_dedupe_key", ["dedupeKey"])
     .index("by_merge_state", ["mergeState"]),

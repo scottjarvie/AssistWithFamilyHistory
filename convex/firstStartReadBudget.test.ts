@@ -15,7 +15,7 @@ function fixture(rows: Record<string, Row[]> = {}, allowSnapshot = false) {
           if (table === "searchBuildState") return {
             withIndex(index: string, select: (q: {eq: (field: string, value: string) => void}) => void) {
               expect(index).toBe("by_table");
-              select({eq(field, value) {expect(field).toBe("table"); expect(value).toBe("vaultCounts:v4");}});
+              select({eq(field, value) {expect(field).toBe("table"); expect(["vaultCounts:v4", "vaultCounts:v5"]).toContain(value);}});
               return {async unique() {return null;}}; // Exercise the legacy migration fallback.
             },
           };

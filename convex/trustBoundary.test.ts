@@ -34,10 +34,10 @@ describe("TRUST_BOUNDARY_MODE", () => {
     const t = convexTest(schema, modules);
     await seedPerson(t);
 
-    const rows = await t.action(api.vaultReads.getPeopleExplorer, {
-      vaultOwnerId: OWNER_A,
+    const rows = await t.action(api.vaultReads.getPeopleExplorerPage, {
+      vaultOwnerId: OWNER_A, cursor: null,
     });
-    expect(rows).toHaveLength(1);
+    expect(rows.page).toHaveLength(1);
 
     const logs = await t.run((ctx) => ctx.db.query("trustBoundaryShadowLog").collect());
     expect(logs).toHaveLength(1);
@@ -55,7 +55,7 @@ describe("TRUST_BOUNDARY_MODE", () => {
     await seedPerson(t);
 
     await expect(
-      t.action(api.vaultReads.getPeopleExplorer, { vaultOwnerId: OWNER_A }),
+      t.action(api.vaultReads.getPeopleExplorerPage, { vaultOwnerId: OWNER_A, cursor: null }),
     ).rejects.toThrow(/missing_identity/);
 
     const logs = await t.run((ctx) => ctx.db.query("trustBoundaryShadowLog").collect());
@@ -68,8 +68,8 @@ describe("TRUST_BOUNDARY_MODE", () => {
     await seedPerson(t);
 
     await expect(
-      t.withIdentity({ subject: OWNER_B }).action(api.vaultReads.getPeopleExplorer, {
-        vaultOwnerId: OWNER_A,
+      t.withIdentity({ subject: OWNER_B }).action(api.vaultReads.getPeopleExplorerPage, {
+        vaultOwnerId: OWNER_A, cursor: null,
       }),
     ).rejects.toThrow(/owner_mismatch/);
   });

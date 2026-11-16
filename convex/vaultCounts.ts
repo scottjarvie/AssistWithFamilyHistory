@@ -13,7 +13,7 @@ export const COUNT_TABLES = [
   "researchChecks", "provisionalRelatives", "sourceContents", "recordPersonas", "topics", "connections",
 ] as const;
 export type CountTable = typeof COUNT_TABLES[number];
-const BUILD = "vaultCounts:v4";
+export const BUILD = "vaultCounts:v5";
 export const COUNTER_SHARDS = 32;
 export function counterShard(id: string) {
   let hash = 2166136261;
@@ -89,8 +89,14 @@ export async function syncCount(ctx: Pick<MutationCtx, "db">, table: CountTable,
   } else if (old) await ctx.db.delete(old._id);
 }
 
-export async function countsReady(ctx: Pick<QueryCtx, "db">) {
+export async function scopedReadsReady(ctx: Pick<QueryCtx, "db">) {
   return !!(await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", BUILD)).unique())?.complete;
+}
+/** v5 adds memberships, not new count semantics: keep already migrated v4
+ * Dashboard/Research/Places readers on their bounded paths during the upgrade. */
+export async function countsReady(ctx: Pick<QueryCtx, "db">) {
+  const v4 = await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", "vaultCounts:v4")).unique();
+  return !!v4?.complete || await scopedReadsReady(ctx);
 }
 export async function ownerTableCounter(ctx: Pick<QueryCtx, "db">, owner: string, table: CountTable) {
   const shards = await ctx.db.query("vaultCounterShards").withIndex("by_owner_table_shard", q => q.eq("vaultOwnerId", owner).eq("table", table)).collect();

@@ -235,3 +235,13 @@ This section is guidance for end users and the AI they connect — what `/ai`, `
 ### AWL-0015 revised decisions (2026-11-09)
 
 Every new AI connection starts at the person’s narrowest unreleased restriction floor; existing client IDs keep their own grant. Names and app identities never match connections. Only revision-checked person actions release restrictions. Settings offers Restore and Forget and lists every current connection. Your AI may publish and unpublish stories after one batch sensitive-info check: secrets refuse; one acknowledgeContactDetails count object covers contact details and can accompany the first call. Business contacts are expected; remove only the person’s own private details. Media review, rights and living-person protections stay.
+
+
+### Collection scaling contracts — batch B implementation pending release
+
+Stories can load additional pages; its search, facets, grouping and sorting
+cover loaded stories. The private merge-target lookup uses the same paged People
+Explorer as the website, with Load more and server-side substring search. Public
+stories keep their existing publication/privacy/redaction gates while reading a
+story-scoped graph. Operational migration details and remaining page work are in
+[the scale runbook](../operations/vault-counts-scale.md#batch-b-scoped-reads-and-compatibility-changes-release-pending).

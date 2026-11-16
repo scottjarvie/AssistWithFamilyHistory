@@ -1,6 +1,6 @@
 {
   "vaultReads.ts": [
-    "getPeopleExplorer",
+    "getPeopleExplorerPage",
     "getPersonWorkspace",
     "getStoriesIndex",
     "getStoryReview",

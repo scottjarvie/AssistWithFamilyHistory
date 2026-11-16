@@ -69,28 +69,6 @@ export const getPeopleExplorerPage = action({
     ctx.runQuery(internal.peopleExplorer.page, {...args, vaultOwnerId: await authorizedOwner(ctx, "vault.getPeopleExplorer", args.vaultOwnerId)}),
 });
 
-export const getPeopleExplorer = action({
-  args: {
-    vaultOwnerId: v.string(),
-    search: v.optional(v.string()),
-    researchStatus: v.optional(
-      v.union(
-        v.literal("not_started"),
-        v.literal("basic"),
-        v.literal("in_progress"),
-        v.literal("thorough"),
-        v.literal("complete"),
-      ),
-    ),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args): Promise<FunctionReturnType<typeof vaultInternal.getPeopleExplorer>> =>
-    ctx.runQuery(vaultInternal.getPeopleExplorer, {
-      ...args,
-      vaultOwnerId: await authorizedOwner(ctx, "vault.getPeopleExplorer", args.vaultOwnerId),
-    }),
-});
-
 export const getPersonWorkspace = action({
   args: { vaultOwnerId: v.string(), personIdentifier: v.string() },
   handler: async (ctx, args): Promise<FunctionReturnType<typeof vaultInternal.getPersonWorkspace>> =>
@@ -124,12 +102,15 @@ export const getOwnedMediaFile = action({
   },
 });
 
+export type StoriesPage = {page: ReturnType<typeof vaultFunctions.buildStoryIndexRow>[]; isDone: boolean; continueCursor: string};
 export const getStoriesIndex = action({
-  args: { vaultOwnerId: v.string() },
-  handler: async (ctx, args): Promise<FunctionReturnType<typeof vaultInternal.getStoriesIndex>> =>
-    ctx.runQuery(vaultInternal.getStoriesIndex, {
-      vaultOwnerId: await authorizedOwner(ctx, "vault.getStoriesIndex", args.vaultOwnerId),
-    }),
+  args: {vaultOwnerId: v.string(), cursor: v.optional(v.union(v.string(), v.null()))},
+  handler: async (ctx, args): Promise<StoriesPage> => {
+    const vaultOwnerId = await authorizedOwner(ctx, "vault.getStoriesIndex", args.vaultOwnerId);
+    const page = await ctx.runQuery(vaultInternal.getStoriesIndex, {...args, vaultOwnerId});
+    const rows = await Promise.all(page.page.map(story => ctx.runQuery(vaultInternal.getStoryIndexRow, {vaultOwnerId, storyId: story._id})));
+    return {...page, page: rows.filter((row): row is NonNullable<typeof row> => row !== null)};
+  },
 });
 
 export const getStoryReview = action({
@@ -151,7 +132,7 @@ export const getPersonResearchChecks = action({
 });
 
 export const getProvisionalRelatives = action({
-  args: { vaultOwnerId: v.string(), personIdentifier: v.optional(v.string()) },
+  args: { vaultOwnerId: v.string(), personIdentifier: v.optional(v.string()), cursor: v.optional(v.union(v.string(), v.null())) },
   handler: async (ctx, args): Promise<FunctionReturnType<typeof vaultInternal.getProvisionalRelatives>> =>
     ctx.runQuery(vaultInternal.getProvisionalRelatives, {
       ...args,

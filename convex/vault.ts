@@ -1,4 +1,4 @@
-import { countsReady } from "./vaultCounts";
+import { countsReady, scopedReadsReady } from "./vaultCounts";
 import { readDashboard, dashboardFromSnapshot, type DashboardSummary } from "./dashboard";
 import {buildAuditRecordPage} from "../lib/audit/records";
 import {auditMetrics} from "../lib/audit/contract";
@@ -1124,7 +1124,7 @@ async function findPersonByIdentifier(
   }
   const byFsId = await ctx.db
     .query("persons")
-    .withIndex("by_fsId", (q) => q.eq("fsId", personIdentifier))
+    .withIndex("by_owner_fsId", (q) => q.eq("vaultOwnerId", vaultOwnerId).eq("fsId", personIdentifier))
     .collect();
   return (
     byFsId.find((person) => person.archivedAt === undefined && matchesVaultOwner(person.vaultOwnerId, vaultOwnerId)) ?? null
@@ -1135,13 +1135,14 @@ async function findPersonByIdentifier(
 // whole vault (getVaultSnapshot collects all ~20 owner tables). Returns a
 // VaultSnapshot whose arrays are restricted to this person's related rows but
 // ordered identically to the full snapshot, so assemblePersonWorkspaceFromSnapshot
-// produces the same output. media, contextItems, and historicalContext have no
-// usable person-scoped index, so they are read owner-wide and narrowed in JS;
-// every other (and larger) relational table is index-narrowed to this person.
+// produces the same output. Media/context memberships are gated by v5;
+// historical context reads only referenced places and place-less entries.
+// Per-person fan-out remains proportional to that person’s referenced graph.
 export async function loadPersonScopedSnapshot(
   ctx: QueryCtx,
   vaultOwnerId: string,
-  personIdentifier: string
+  personIdentifier: string,
+  publicOnly = false
 ): Promise<VaultSnapshot | null> {
   const owned = <T extends { vaultOwnerId?: string; archivedAt?: number }>(rows: T[]) =>
     filterByVaultOwner(rows, vaultOwnerId).filter(row => row.archivedAt === undefined);
@@ -1164,11 +1165,11 @@ export async function loadPersonScopedSnapshot(
       .withIndex("by_person2", (q) => q.eq("person2", personId))
       .collect(),
   ]);
-  const relationshipSet = new Set<Doc<"relationships">>();
+  const relationshipSet = new Map<string, Doc<"relationships">>();
   for (const rel of [...relAsPerson1, ...relAsPerson2]) {
-    if (matchesVaultOwner(rel.vaultOwnerId, vaultOwnerId)) relationshipSet.add(rel);
+    if (matchesVaultOwner(rel.vaultOwnerId, vaultOwnerId)) relationshipSet.set(String(rel._id), rel);
   }
-  const relationships = owned(Array.from(relationshipSet));
+  const relationships = owned(Array.from(relationshipSet.values()));
 
   // personEvents for this person, then the referenced events by id.
   const personEvents = owned(
@@ -1267,83 +1268,75 @@ export async function loadPersonScopedSnapshot(
     researchChecks,
     provisionalRelatives,
   ] = await Promise.all([
-    ctx.db
+    publicOnly ? [] : ctx.db
       .query("sourceFacts")
       .withIndex("by_person", (q) => q.eq("personId", personId))
       .collect(),
-    ctx.db
+    publicOnly ? [] : ctx.db
       .query("stories")
       .withIndex("by_person", (q) => q.eq("personId", personId))
       .collect(),
-    ctx.db
+    publicOnly ? [] : ctx.db
       .query("documents")
-      .withIndex("by_personId", (q) => q.eq("personId", personKey))
+      .withIndex("by_owner_personId", (q) => q.eq("vaultOwnerId", vaultOwnerId).eq("personId", personKey))
       .collect(),
-    ctx.db
+    publicOnly ? [] : ctx.db
       .query("importRuns")
       .withIndex("by_person", (q) => q.eq("personId", personId))
       .collect(),
-    person.fsId
+    !publicOnly && person.fsId
       ? ctx.db
           .query("importRuns")
-          .withIndex("by_person_fsId", (q) => q.eq("personFsId", person.fsId as string))
+          .withIndex("by_owner_person_fsId", (q) => q.eq("vaultOwnerId", vaultOwnerId).eq("personFsId", person.fsId as string))
           .collect()
       : Promise.resolve([] as Doc<"importRuns">[]),
-    ctx.db
+    publicOnly ? [] : ctx.db
       .query("researchTasks")
       .withIndex("by_person", (q) => q.eq("personId", personId))
       .collect(),
-    ctx.db
+    publicOnly ? [] : ctx.db
       .query("researchLog")
-      .withIndex("by_entity", (q) => q.eq("entityType", "person").eq("entityId", personId))
+      .withIndex("by_owner_entity_order", (q) => q.eq("vaultOwnerId", vaultOwnerId).eq("archivedAt", undefined).eq("entityType", "person").eq("entityId", personId))
       .collect(),
-    ctx.db
+    publicOnly ? [] : ctx.db
       .query("researchChecks")
       .withIndex("by_person", (q) => q.eq("personId", personId))
       .collect(),
-    ctx.db
+    publicOnly ? [] : ctx.db
       .query("provisionalRelatives")
       .withIndex("by_anchor", (q) => q.eq("anchorPersonId", personId))
       .collect(),
   ]);
 
-  const importRunSet = new Set<Doc<"importRuns">>();
+  const importRunSet = new Map<string, Doc<"importRuns">>();
   for (const run of [...importRunsByPerson, ...importRunsByFsId]) {
-    if (matchesVaultOwner(run.vaultOwnerId, vaultOwnerId)) importRunSet.add(run);
+    if (matchesVaultOwner(run.vaultOwnerId, vaultOwnerId)) importRunSet.set(String(run._id), run);
   }
-  const importRuns = owned(Array.from(importRunSet));
+  const importRuns = owned(Array.from(importRunSet.values()));
 
-  // media, contextItems, historicalContext: read owner-wide, then narrow in JS
-  // to keep the assembled output identical to the full snapshot.
-  // IMPORTANT: media.personIds / contextItems.personIds are arrays, and Convex
-  // standard `.index()` does NOT support array-element ("contains") matching —
-  // array-typed indexes exist only for vector indexes. A `by_person` index on
-  // `personIds` queried with `q.eq("personIds", oneId)` compares against the
-  // whole serialized array and returns ZERO rows in production. So these two
-  // tables CANNOT be index-narrowed by person without a join/link table; do not
-  // re-attempt it. (The fake-ctx parity tests cannot catch that mismatch — it is
-  // exactly the class of bug the GEN-95C convex-test follow-up would surface.)
-  const [allMedia, allContextItems, historicalContextRows] = await Promise.all([
-    ctx.db
-      .query("media")
-      .withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId))
-      .collect(),
-    ctx.db
-      .query("contextItems")
-      .withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId))
-      .collect(),
-    ctx.db
-      .query("historicalContext")
-      .withIndex("by_owner", (q) => q.eq("vaultOwnerId", vaultOwnerId))
-      .collect(),
+  // Ordinary indexes cannot index array elements. The v5 backfill visits
+  // media/contextItems and central source writers maintain reverse memberships.
+  const ready = await scopedReadsReady(ctx);
+  const [allMedia, allContextItems, historicalByPlace] = await Promise.all([
+    ready
+      ? ctx.db.query("mediaPeople").withIndex("by_person", q => q.eq("personId", personId)).collect()
+          .then(links => Promise.all(links.map(link => ctx.db.get(link.mediaId))))
+      : ctx.db.query("media").withIndex("by_owner", q => q.eq("vaultOwnerId", vaultOwnerId)).collect(),
+    publicOnly ? [] as (Doc<"contextItems"> | null)[] : ready
+      ? ctx.db.query("contextItemPeople").withIndex("by_person", q => q.eq("personId", personId)).collect()
+          .then(links => Promise.all(links.map(link => ctx.db.get(link.contextItemId))))
+      : ctx.db.query("contextItems").withIndex("by_owner", q => q.eq("vaultOwnerId", vaultOwnerId)).collect(),
+    // Place-less entries apply to every person, with the existing year/privacy
+    // gates still applied by buildContextCoverage. No metadata backfill needed.
+    Promise.all([undefined, ...places.map(p => p._id)].map(placeId =>
+      ctx.db.query("historicalContext").withIndex("by_owner_place_order", q =>
+        q.eq("vaultOwnerId", vaultOwnerId).eq("archivedAt", undefined).eq("placeId", placeId)).collect())),
   ]);
-  const media = owned(allMedia).filter((item) =>
-    item.personIds.some((id) => String(id) === personIdStr)
-  );
-  const contextItems = owned(allContextItems).filter((item) =>
-    item.personIds.some((id) => String(id) === personIdStr)
-  );
-  const historicalContext = owned(historicalContextRows);
+  const media = owned(allMedia.filter((row): row is Doc<"media"> => row !== null))
+    .filter(item => item.personIds.includes(personId));
+  const contextItems = owned(allContextItems.filter((row): row is Doc<"contextItems"> => row !== null))
+    .filter(item => item.personIds.includes(personId));
+  const historicalContext = owned(historicalByPlace.flat());
 
   // Related people: the relationship counterparts (relatedPeople + relationship
   // mapping look these up via snapshot.people.find). Include the target person.
@@ -1361,7 +1354,7 @@ export async function loadPersonScopedSnapshot(
       })
     )
   ).filter(
-    (doc): doc is Doc<"persons"> => doc !== null && matchesVaultOwner(doc.vaultOwnerId, vaultOwnerId)
+    (doc): doc is Doc<"persons"> => doc !== null && doc.archivedAt === undefined && matchesVaultOwner(doc.vaultOwnerId, vaultOwnerId)
   );
   const people = byCreationTime([person, ...relatedPeopleDocs]);
 
@@ -1417,7 +1410,8 @@ async function assemblePersonWorkspaceScoped(
 export async function loadStoryScopedSnapshot(
   ctx: QueryCtx,
   vaultOwnerId: string,
-  storyId: Id<"stories">
+  storyId: Id<"stories">,
+  purpose: "review" | "index" | "public" = "review"
 ): Promise<VaultSnapshot | null> {
   const story = await ctx.db.get(storyId);
   if (!story || story.archivedAt !== undefined || !matchesVaultOwner(story.vaultOwnerId, vaultOwnerId)) return null;
@@ -1427,10 +1421,10 @@ export async function loadStoryScopedSnapshot(
   // before the bundle re-sorts with sortByTimestampDesc.
   const reviewEvents = byCreationTime(
     filterByVaultOwner(
-      await ctx.db
+      purpose === "review" ? await ctx.db
         .query("storyReviewEvents")
         .withIndex("by_story", (q) => q.eq("storyId", storyId))
-        .collect(),
+        .collect() : [],
       vaultOwnerId
     )
   );
@@ -1442,7 +1436,8 @@ export async function loadStoryScopedSnapshot(
     const personScoped = await loadPersonScopedSnapshot(
       ctx,
       vaultOwnerId,
-      String(story.personId)
+      String(story.personId),
+      purpose === "public"
     );
     // If the person can't be resolved (orphaned personId), fall back to the
     // minimal snapshot so the story is still reviewable.
@@ -1589,55 +1584,66 @@ export const getOwnedMediaFile = internalQuery({
   },
 });
 
-export const getStoriesIndex = internalQuery({
-  args: {
-    vaultOwnerId: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
-    const index = buildSnapshotIndex(snapshot);
-    return sortByTimestampDesc(snapshot.stories).map((story) => {
-      const person = story.personId
-        ? snapshot.people.find((entry) => entry._id === story.personId) ?? null
-        : null;
-      const publicSlug = story.publicSlug ?? buildStoryPublicSlug({
-        storyId: String(story._id),
-        title: story.title,
-        personName: person ? formatPersonName(person) : undefined,
-      });
-      const operations = person ? buildPersonOperations(snapshot, index, person) : null;
-      const contextCoverage = person && operations ? buildContextCoverage(snapshot, person, operations) : null;
-      const sourceCount = operations?.relatedSources.length ?? 0;
+/** The rich row is hydrated in its own query, so a page never combines
+ * several people's evidence graphs in one Convex transaction. */
+export function buildStoryIndexRow(snapshot: VaultSnapshot, story: Doc<"stories">, index = buildSnapshotIndex(snapshot)) {
+  const person = story.personId
+    ? snapshot.people.find((entry) => entry._id === story.personId) ?? null
+    : null;
+  const publicSlug = story.publicSlug ?? buildStoryPublicSlug({
+    storyId: String(story._id),
+    title: story.title,
+    personName: person ? formatPersonName(person) : undefined,
+  });
+  const operations = person ? buildPersonOperations(snapshot, index, person) : null;
+  const contextCoverage = person && operations ? buildContextCoverage(snapshot, person, operations) : null;
+  const sourceCount = operations?.relatedSources.length ?? 0;
 
-      return {
-        ...story,
-        publicSlug,
-        publicIndexing: story.publicIndexing ?? "noindex",
-        person: person
-          ? {
-              ...person,
-              displayName: formatPersonName(person),
-              routeId: person.fsId || String(person._id),
-              lifespan: getPersonLifespan(person),
-            }
-          : null,
-        readiness: operations?.summary ?? null,
-        storyWorkflow: operations && contextCoverage
-          ? getStoryWorkflowStatus({ operations, contextCoverage })
-          : "needs_genealogy_evidence",
-        publishWarnings: buildPublishWarnings({
-          checks: operations?.checks ?? [],
-          contextCoverage,
-          sourceCount,
-          media: operations?.relatedMedia ?? [],
-          storyStatus: story.status,
-        }),
-        evidenceCount: sourceCount,
-        placeCount: operations?.relatedPlaces.length ?? 0,
-        memoryCount: operations?.relatedMedia.length ?? 0,
-        contextReportCount: contextCoverage?.count ?? 0,
-      };
-    });
+  return {
+    ...story,
+    publicSlug,
+    publicIndexing: story.publicIndexing ?? "noindex",
+    person: person
+      ? {
+          _id: person._id,
+          displayName: formatPersonName(person),
+          routeId: person.fsId || String(person._id),
+          lifespan: getPersonLifespan(person),
+        }
+      : null,
+    readiness: operations?.summary ?? null,
+    storyWorkflow: operations && contextCoverage
+      ? getStoryWorkflowStatus({ operations, contextCoverage })
+      : "needs_genealogy_evidence",
+    publishWarnings: buildPublishWarnings({
+      checks: operations?.checks ?? [],
+      contextCoverage,
+      sourceCount,
+      media: operations?.relatedMedia ?? [],
+      storyStatus: story.status,
+    }),
+    evidenceCount: sourceCount,
+    placeCount: operations?.relatedPlaces.length ?? 0,
+    memoryCount: operations?.relatedMedia.length ?? 0,
+    contextReportCount: contextCoverage?.count ?? 0,
+  };
+}
+
+export const getStoriesIndex = internalQuery({
+  args: {vaultOwnerId: v.string(), cursor: v.optional(v.union(v.string(), v.null()))},
+  handler: async (ctx, args) => {
+    const owner = normalizeVaultOwnerId(args.vaultOwnerId);
+    const result = await ctx.db.query("stories").withIndex("by_owner_updated", q => q.eq("vaultOwnerId", owner).eq("archivedAt", undefined)).order("desc")
+      .paginate({cursor: args.cursor ?? null, numItems: 10, maximumRowsRead: 10, maximumBytesRead: 250_000});
+    return {...result, page: result.page.filter(row => row.archivedAt === undefined)};
+  },
+});
+export const getStoryIndexRow = internalQuery({
+  args: {vaultOwnerId: v.string(), storyId: v.id("stories")},
+  handler: async (ctx, args) => {
+    const snapshot = await loadStoryScopedSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId), args.storyId, "index");
+    const story = snapshot?.stories.find(row => row._id === args.storyId);
+    return snapshot && story ? buildStoryIndexRow(snapshot, story) : null;
   },
 });
 
@@ -1664,15 +1670,28 @@ export const getStoryReview = internalQuery({
   },
 });
 
+/** Preserve getVaultSnapshot's exact stored-owner exclusion on this anonymous
+ * surface. Scoped private loaders also support legacy local-owner records. */
+async function loadPublicStorySnapshot(ctx: QueryCtx, story: Doc<"stories">): Promise<VaultSnapshot | null> {
+  const owner = normalizeVaultOwnerId(story.vaultOwnerId);
+  const person = story.personId ? await ctx.db.get(story.personId) : null;
+  if (!person || person.vaultOwnerId !== owner || person.archivedAt !== undefined || person.living) return null;
+  const snapshot = await loadStoryScopedSnapshot(ctx, owner, story._id, "public");
+  if (!snapshot) return null;
+  return Object.fromEntries((Object.keys(snapshot) as (keyof VaultSnapshot)[])
+    .map(key => [key, snapshot[key].filter(row => row.vaultOwnerId === owner)])) as VaultSnapshot;
+}
+
 export const getPublishedStory = query({
   args: {
     storyId: v.id("stories"),
   },
   handler: async (ctx, args) => {
     const story = await ctx.db.get(args.storyId);
-    if (!story || story.status !== "published") return null;
+    if (!story || story.status !== "published" || story.archivedAt !== undefined || !story.vaultOwnerId) return null;
 
-    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(story.vaultOwnerId));
+    const snapshot = await loadPublicStorySnapshot(ctx, story);
+    if (!snapshot) return null;
     const ownedStory = snapshot.stories.find((entry) => entry._id === story._id);
     const person = ownedStory
       ? snapshot.people.find((entry) => entry._id === ownedStory.personId)
@@ -1700,9 +1719,10 @@ export const getPublishedStoryByIdentifier = query({
     const normalizedStoryId = ctx.db.normalizeId("stories", identifier);
     const idMatch = normalizedStoryId ? await ctx.db.get(normalizedStoryId) : null;
     const candidate = slugMatch ?? idMatch;
-    if (!candidate || candidate.status !== "published" || candidate.archivedAt !== undefined) return null;
+    if (!candidate || candidate.status !== "published" || candidate.archivedAt !== undefined || !candidate.vaultOwnerId) return null;
 
-    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(candidate.vaultOwnerId));
+    const snapshot = await loadPublicStorySnapshot(ctx, candidate);
+    if (!snapshot) return null;
     const ownedStory = snapshot.stories.find((entry) => entry._id === candidate._id);
     const person = ownedStory
       ? snapshot.people.find((entry) => entry._id === ownedStory.personId)
@@ -1739,21 +1759,15 @@ export const getPersonResearchChecks = internalQuery({
 });
 
 export const getProvisionalRelatives = internalQuery({
-  args: {
-    vaultOwnerId: v.string(),
-    personIdentifier: v.optional(v.string()),
-  },
+  args: {vaultOwnerId: v.string(), personIdentifier: v.optional(v.string()), cursor: v.optional(v.union(v.string(), v.null()))},
   handler: async (ctx, args) => {
-    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
-    if (!args.personIdentifier) {
-      return sortByTimestampDesc(snapshot.provisionalRelatives);
-    }
-
-    const person = getPersonByIdentifier(snapshot, args.personIdentifier);
-    if (!person) return [];
-    return sortByTimestampDesc(
-      snapshot.provisionalRelatives.filter((relative) => relative.anchorPersonId === person._id)
-    );
+    const owner = normalizeVaultOwnerId(args.vaultOwnerId);
+    const person = args.personIdentifier ? await findPersonByIdentifier(ctx, owner, args.personIdentifier) : null;
+    if (args.personIdentifier && !person) return {page: [], isDone: true, continueCursor: ""};
+    const query = person
+      ? ctx.db.query("provisionalRelatives").withIndex("by_owner_anchor_updated", q => q.eq("vaultOwnerId", owner).eq("anchorPersonId", person._id))
+      : ctx.db.query("provisionalRelatives").withIndex("by_owner_updated", q => q.eq("vaultOwnerId", owner));
+    return query.order("desc").paginate({cursor: args.cursor ?? null, numItems: 50, maximumRowsRead: 50, maximumBytesRead: 250_000});
   },
 });
 

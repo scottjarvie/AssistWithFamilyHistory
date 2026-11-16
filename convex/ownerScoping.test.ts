@@ -175,17 +175,18 @@ async function seedOwner(
 describe("owner isolation (real withIndex(by_owner) paths)", () => {
   test("getPeopleExplorer returns only the queried owner's people", async () => {
     const t = convexTest(schema, modules);
-    await seedOwner(t, OWNER_A, "A");
-    await seedOwner(t, OWNER_B, "B");
+    const a = await seedOwner(t, OWNER_A, "A");
+    const b = await seedOwner(t, OWNER_B, "B");
 
-    const rowsA = await t.action(api.vaultReads.getPeopleExplorer, { vaultOwnerId: OWNER_A });
-    const namesA = rowsA.map((r) => r.displayName);
+    const rowsA = await t.action(api.vaultReads.getPeopleExplorerPage, { vaultOwnerId: OWNER_A, cursor: null });
+    const namesA = rowsA.page.map((r) => r.displayName);
 
     // A sees exactly its two people, NONE of B's.
-    expect(rowsA).toHaveLength(2);
+    expect(rowsA.page).toHaveLength(2);
     expect(namesA.some((n) => n.includes("A"))).toBe(true);
     expect(namesA.every((n) => !n.includes("RelativeB") && !n.includes("PrimaryB"))).toBe(true);
-    expect(rowsA.every((r) => r.vaultOwnerId === OWNER_A)).toBe(true);
+    expect(new Set(rowsA.page.map(row => row._id))).toEqual(new Set([String(a.primary), String(a.relative)]));
+    expect(rowsA.page.some(row => row._id === String(b.primary) || row._id === String(b.relative))).toBe(false);
   });
 
   test("getPersonWorkspace leaks NO row from another owner", async () => {
