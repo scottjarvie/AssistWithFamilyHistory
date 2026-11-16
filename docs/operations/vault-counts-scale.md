@@ -1,10 +1,11 @@
 # Exact vault counts and paged workspace reads
 
-This describes the batch A implementation on PR #151. It is not a production
-release claim. Vercel deploys Convex and Next on merge; the lead must confirm
-that deployment and complete the migration below before claiming the new reads
-are live. Until the completion gate is set, readers use their original snapshot
-fallback, which can still fail on large vaults.
+This covers batch A's exact counts and paged workspaces plus the partial batch B
+scoped reads below. Batch B remains pending release. Vercel deploys Convex and
+Next on merge; confirm deployment and the relevant migration before claiming a
+new read is live. Already-complete v4 counters keep batch A readers on their
+bounded paths during the v5 membership upgrade. New person memberships use v5;
+until then, media/loose-context retain their original fallback.
 
 ## Counters and contention
 
@@ -172,8 +173,13 @@ investigate and rerun rather than editing flags or source data. For one step:
 CONVEX_DEPLOYMENT=prod:accomplished-dodo-308 npx convex run vaultCounts:backfillStep '{}'
 ```
 
-The completion flag is `vaultCounts:v4`: all source tables, shard memberships,
+The current traversal flag is `vaultCounts:v5`: all source tables, shard memberships,
 place contributions, browse/section keys and media index fields must be visited.
+v5 also builds media/person and loose-context/person reverse memberships.
+The original v4 flag remains valid for exact counters and batch A readers;
+only the scoped media/context reads require v5. Upgrading does not send those
+already-migrated pages back to their old snapshots.
+
 New normal writes reconcile immediately, including inserts after a cursor has
 passed. The membership ledger prevents double counting during concurrent edits.
 Changing table order, contribution rules, metadata requirements or shard layout
@@ -198,9 +204,66 @@ There is no blind reset/repair operation. A discrepancy needs investigation and
 a bounded versioned repair that does not race normal writes. Raw ordering fields,
 like existing search metadata, may appear in raw exports; client DTOs omit them.
 
-Operations, Audit, readiness, Stories, public stories, provisional-relative pages
-and the compatibility People array remain batch B. Their snapshot fallbacks and
-rich graph dependencies are not migrated or claimed safe by this batch. The
+Operations, Audit and readiness remain deferred. The partial batch B additions
+and their graph-fan-out limits are described below. The
 original campaign's 13-caller map remains the baseline: Dashboard, Research and
 the two Places website consumers now select the bounded paths after this gate;
 the original implementations are retained only where migration/parity requires.
+
+## Batch B scoped reads and compatibility changes (release pending)
+
+Stories uses a 10-candidate owner/updated-time page (250 KB split threshold),
+then hydrates each rich row in a separate story/person-scoped query. The browser
+has Load more. Search, facets, counts, grouping and sorting explicitly cover
+loaded stories. Equal updated timestamps now use creation-descending index ties,
+rather than the former full-snapshot creation-ascending ties. No persisted score
+or inferred full-vault ranking is introduced. Archived candidates can produce an
+empty page with a continuation; it is not end-of-results.
+
+Both public story lookups use the same scoped graph and existing public DTO,
+with publication, archive, living-person, stored ownership, media rights/privacy,
+historical-context publication and text redaction gates preserved. They skip
+review history, other stories, loose context, documents, imports, tasks, logs,
+research checks, source facts and provisional-relative history: those private
+inputs never affected the public DTO. No public caching or publication policy changed.
+
+After v5, person/scoped story loaders read media and contextItems through reverse
+person memberships, re-check the actual source's owner/person membership, and
+restore original creation order. Document/import-FS/log/FS-ID lookups also use
+existing owner-prefixed indexes. Relationship/import unions deduplicate by record
+ID, including self-relationships and a run found through both import indexes.
+Historical context uses the existing exact
+owner/active/place ranges for the person's referenced places plus place-less
+entries. Place-less context still applies to every person under the existing year
+and privacy gates. Before v5, only media/loose context retain their old owner-wide
+fallback. These are graph-scoped reads: a single extraordinarily large person
+or place-less-context graph can still exceed Convex transaction limits. This is
+not a bounded rich readiness projection or a universal per-person fan-out proof.
+
+The central searchServer adapter maintains contextItemPeople and mediaPeople in
+the source transaction, including delete, replace, ownership and membership edits.
+The restartable v5 traversal refreshes links for legacy rows. Duplicate personIds
+make only one link. Membership links carry IDs only; source owner/archive/privacy
+checks remain authoritative. v5 adds no counter kinds or shared score rows and
+retains all 32 existing counter shards.
+
+`vaultReads.getProvisionalRelatives` now returns `{page, continueCursor, isDone}`:
+50 candidates / 250 KB split, owner or owner+anchor indexed. All previous merge
+states remain visible. Missing anchors produce an exhausted empty page. There
+are no current website/MCP callers of this wrapper. Tied timestamps use the same
+creation-descending convention as Stories.
+
+Repository-wide caller tracing found one use of `/api/convex/people`: the
+Operations merge-target dialog. No external API dependency is declared in the
+route/capability inventory. Removed the public rich-array action
+`vaultReads.getPeopleExplorer`; the internal legacy builder stays solely for
+People Explorer migration/parity. The route now calls the existing paged compact
+People Explorer and accepts `q` and opaque `cursor`. Its response retains
+`people` and per-page `count`, adding `continueCursor` and `isDone`; `people` rows
+are the website's compact People DTO. The dialog supports server search and Load
+more, cancels obsolete searches, and does not call an early empty page complete.
+The underlying People Explorer migration gate remains separate from v5.
+
+Operations, Operations summary, Audit and Story Writer readiness remain on their
+old snapshots in this partial batch. Do not mark batch B complete or ship this
+partial PR as completion of the campaign.

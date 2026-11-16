@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { syncMediaPeople, EXPLORER_TABLES, type ExplorerChange } from "./peopleExplorer";
 import { COUNT_TABLES, syncCount, researchOrderTime, researchCursorKey, type CountTable } from "./vaultCounts";
+import type { Doc } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 export const SEARCH_TABLES = ["persons", "sources", "stories", "researchTasks", "researchLog", "events", "places", "topics"] as const;
 export type SearchTable = typeof SEARCH_TABLES[number];
@@ -35,7 +36,21 @@ export async function syncSourceCount(ctx: {db: MutationCtx["db"]}, table: Count
     if(row.pageOrderKey!==pageOrderKey)await ctx.db.patch(id as any,{pageOrderKey});
   }
   if(row&&table==="media"&&row.description===undefined)await ctx.db.patch(id as any,{description:""});
+  if (table === "contextItems") await syncContextItemPeople(ctx, id, row);
+  if (table === "media") await syncMediaPeople(ctx, id as any);
   await syncCount(ctx, table, id, row, touch);
+}
+
+/** Reverse memberships, maintained even before the migration reaches a row. */
+export async function syncContextItemPeople(ctx: {db: MutationCtx["db"]}, id: string, row: any) {
+  const itemId = ctx.db.normalizeId("contextItems", id)!;
+  const previous = await ctx.db.query("contextItemPeople").withIndex("by_item", q => q.eq("contextItemId", itemId)).collect();
+  const wanted = new Set<Doc<"persons">["_id"]>(row?.personIds ?? []);
+  for (const link of previous) {
+    if (wanted.delete(link.personId)) continue;
+    await ctx.db.delete(link._id);
+  }
+  for (const personId of wanted) await ctx.db.insert("contextItemPeople", {personId, contextItemId: itemId});
 }
 
 const writeScopes = new WeakMap<object, {flush: () => Promise<void>}>();
@@ -61,21 +76,18 @@ export function withSearchWrites<T extends { db: MutationCtx["db"] }>(ctx: T, ch
   const wrapped = new Proxy(db, { get(target, key) {
     if (key === "insert") return (table: any, value: any) => serialized(async () => {
       const id = await target.insert(table, SEARCH_TABLES.includes(table) ? { ...value, ...searchFields(table, value) } : value);
-      if (table === "media") await syncMediaPeople({db: target}, id as any);
       if (changes && EXPLORER_TABLES.includes(table) && (!personsOnly || table === "persons")) changes.push({table, before: null, after: await target.get(id)});
       if (COUNT_TABLES.includes(table)) await maintain(table, id, await target.get(id));
       return id;
     });
     if (key === "delete") return (...args: any[]) => serialized(async () => {
       const id = args.length === 2 ? args[1] : args[0];
-      const isMedia = !!target.normalizeId("media", id);
       const table = EXPLORER_TABLES.find(t => (!personsOnly || t === "persons") && target.normalizeId(t as any, id));
       const before = table && changes ? await target.get(id) : null;
       const countTable = COUNT_TABLES.find(t => target.normalizeId(t, id));
       const result = await (target.delete as any).apply(target, args);
       if (countTable) await maintain(countTable, id, null);
       if (table && changes) changes.push({table, before, after: null});
-      if (isMedia) await syncMediaPeople({db: target}, id);
       return result;
     });
     if (key === "patch" || key === "replace") return (...args: any[]) => serialized(async () => {
@@ -88,7 +100,6 @@ export function withSearchWrites<T extends { db: MutationCtx["db"] }>(ctx: T, ch
       if (!table) {
         const result = await (target[key] as any).apply(target, args);
         if (countTable) await maintain(countTable, id, await target.get(id));
-        if (target.normalizeId("media", id)) await syncMediaPeople({db: target}, id);
         if (explorerTable && changes) changes.push({table: explorerTable, before, after: await target.get(id)});
         return result;
       }

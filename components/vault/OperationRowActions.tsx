@@ -70,42 +70,36 @@ export function OperationRowActions({
   const [promoteDialogOpen, setPromoteDialogOpen] = useState(false);
   const [reviewNote, setReviewNote] = useState("");
 
+  const [candidateCursor, setCandidateCursor] = useState<string | null>(null);
+  const [candidatesDone, setCandidatesDone] = useState(false);
+  const [candidateLoad, setCandidateLoad] = useState<{cursor: string | null; revision: number}>({cursor: null, revision: 0});
   useEffect(() => {
-    if (readonlyPreview || !mergeDialogOpen || mergeCandidates.length > 0) return;
-
+    if (readonlyPreview || !mergeDialogOpen) return;
     let cancelled = false;
-
-    async function loadCandidates() {
-      setLoadingCandidates(true);
-      try {
-        const response = await fetch("/api/convex/people");
-        const payload = await response.json().catch(() => null);
-
-        if (!response.ok || !payload?.success) {
-          throw new Error(payload?.error || "Could not load canonical people");
-        }
-
-        if (!cancelled) {
-          setMergeCandidates(Array.isArray(payload.people) ? payload.people : []);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          toast.error(error instanceof Error ? error.message : "Could not load canonical people");
-          setMergeDialogOpen(false);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingCandidates(false);
-        }
-      }
-    }
-
-    void loadCandidates();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [readonlyPreview, mergeDialogOpen, mergeCandidates.length]);
+    const controller = new AbortController();
+    const cursor = candidateLoad.cursor;
+    setLoadingCandidates(true);
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          const params = new URLSearchParams({q: candidateQuery});
+          if (cursor) params.set("cursor", cursor);
+          const response = await fetch(`/api/convex/people?${params}`, {signal: controller.signal});
+          const payload = await response.json();
+          if (!response.ok || !payload?.success) throw new Error(payload?.error || "Could not load canonical people");
+          if (!cancelled) {
+            const people: MergeCandidate[] = Array.isArray(payload.people) ? payload.people : [];
+            setMergeCandidates(previous => cursor ? [...new Map([...previous, ...people].map(row => [row._id, row])).values()] : people);
+            setCandidateCursor(payload.continueCursor ?? null);
+            setCandidatesDone(payload.isDone === true);
+          }
+        } catch (error) {
+          if (!cancelled) toast.error(error instanceof Error ? error.message : "Could not load canonical people");
+        } finally {if (!cancelled) setLoadingCandidates(false);}
+      })();
+    }, 200);
+    return () => {cancelled = true; clearTimeout(timer); controller.abort();};
+  }, [readonlyPreview, mergeDialogOpen, candidateQuery, candidateLoad]);
 
   const filteredCandidates = useMemo(() => {
     const query = candidateQuery.trim().toLowerCase();
@@ -393,7 +387,7 @@ export function OperationRowActions({
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={candidateQuery}
-                  onChange={(event) => setCandidateQuery(event.target.value)}
+                  onChange={(event) => {setCandidateQuery(event.target.value); setCandidateLoad({cursor: null, revision: candidateLoad.revision + 1}); setMergeCandidates([]); setCandidateCursor(null); setCandidatesDone(false);}}
                   placeholder="Search canonical people by name or ID"
                   className="pl-9"
                 />
@@ -409,6 +403,8 @@ export function OperationRowActions({
                 Minimum 20 characters. This note is written to the research log with the merge.
               </p>
 
+              <p className="text-xs text-muted-foreground">{mergeCandidates.length} matching people loaded. Search continues through the vault with Load more.</p>
+              {!candidatesDone && !readonlyPreview && <Button variant="outline" disabled={loadingCandidates} onClick={() => setCandidateLoad({cursor: candidateCursor, revision: candidateLoad.revision + 1})}>Load more people</Button>}
               <div className="max-h-[320px] space-y-2 overflow-y-auto">
                 {loadingCandidates ? (
                   <div className="flex items-center justify-center rounded-2xl border border-dashed border-border px-4 py-10 text-sm text-muted-foreground">
@@ -417,7 +413,7 @@ export function OperationRowActions({
                   </div>
                 ) : filteredCandidates.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
-                    {readonlyPreview ? "Synthetic preview: canonical people lookup is disconnected." : "No canonical people match this search."}
+                    {readonlyPreview ? "Synthetic preview: canonical people lookup is disconnected." : candidatesDone ? "No canonical people match this search." : "No matches in this page. Load more to continue searching."}
                   </div>
                 ) : (
                   filteredCandidates.map((candidate) => (

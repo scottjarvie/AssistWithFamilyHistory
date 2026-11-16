@@ -1,4 +1,4 @@
-import { StoriesCollectionView } from "@/components/vault/StoriesCollectionView";
+import { PagedStories } from "./PagedStories";
 import { projectStoryRow } from "@/lib/vault/collectionRows";
 import type { Metadata } from "next";
 import { api } from "@/convex/_generated/api";
@@ -48,5 +48,5 @@ export default async function StoriesIndexPage({
   }
 
   const params = await searchParams;
-  return <StoriesCollectionView stories={stories.map(projectStoryRow)} query={params.q} status={params.status} workflow={params.workflow} preferenceKey={`awf.collection.stories.${vaultOwnerId}`} />;
+  return <PagedStories key={vaultOwnerId} owner={vaultOwnerId} initial={{...stories, page: stories.page.map(projectStoryRow)}} query={params.q} status={params.status} workflow={params.workflow} preferenceKey={`awf.collection.stories.${vaultOwnerId}`} />;
 }

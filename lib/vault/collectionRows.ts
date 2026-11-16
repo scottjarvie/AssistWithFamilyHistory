@@ -3,7 +3,7 @@ import type { api } from "@/convex/_generated/api";
 import { publicStoryPath } from "@/lib/stories/slug";
 
 import type {PlaceRow as Place} from "@/convex/placePages";
-type Story = FunctionReturnType<typeof api.vaultReads.getStoriesIndex>[number];
+type Story = FunctionReturnType<typeof api.vaultReads.getStoriesIndex>["page"][number];
 type Candidate = FunctionReturnType<typeof api.vaultReads.getStoryReadinessCandidates>[number];
 import type { TaskWithPerson, LogWithPerson } from "@/convex/researchPages";
 

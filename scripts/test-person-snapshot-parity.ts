@@ -71,6 +71,8 @@ class FakeQuery {
     return this.matched();
   }
 
+  async unique(): Promise<AnyRow | null> { return this.matched()[0] ?? null; }
+
   async first(): Promise<AnyRow | null> {
     return this.matched()[0] ?? null;
   }
