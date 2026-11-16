@@ -2,7 +2,7 @@ import type { PaginationResult } from "convex/server";
 import { v } from "convex/values";
 import { internalQuery, type QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
-import { countsReady, ownerCounts } from "./vaultCounts";
+import { countsReady, ownerTableCounter } from "./vaultCounts";
 import { normalizeVaultOwnerId } from "./vaultCore";
 
 const status = v.union(v.literal("todo"), v.literal("in_progress"), v.literal("blocked"), v.literal("done"));
@@ -33,8 +33,8 @@ export const tasks = internalQuery({args: {...args, status: v.optional(status)},
   const result = await range.paginate({cursor: args.cursor, numItems: 50, maximumRowsRead: 50, maximumBytesRead: 250_000});
   const people = await peopleForRows(ctx, owner, result.page.flatMap(row => row.personId ? [String(row.personId)] : []));
   const page: TaskWithPerson[] = result.page.map(row => ({...row, person: row.personId ? people.get(String(row.personId)) ?? null : null}));
-  const counts = await ownerCounts(ctx, owner);
-  return {...result, page, totals: counts.researchTasks ?? {active: 0}};
+  const counter = await ownerTableCounter(ctx, owner, "researchTasks");
+  return {...result, page, totals: counter?.counts ?? {active: 0}};
 }});
 export const log = internalQuery({args, handler: async (ctx, args): Promise<LogPage> => {
   if (!await countsReady(ctx)) throw new Error("Research pages require vaultCounts backfill completion");
@@ -43,6 +43,12 @@ export const log = internalQuery({args, handler: async (ctx, args): Promise<LogP
     .paginate({cursor: args.cursor, numItems: 50, maximumRowsRead: 50, maximumBytesRead: 250_000});
   const people = await peopleForRows(ctx, owner, result.page.flatMap(row => row.entityType === "person" && row.entityId !== undefined ? [String(row.entityId)] : []));
   const page: LogWithPerson[] = result.page.map(row => ({...row, person: row.entityType === "person" && row.entityId !== undefined ? people.get(String(row.entityId)) ?? null : null}));
-  const counts = await ownerCounts(ctx, owner);
-  return {...result, page, totals: counts.researchLog ?? {active: 0}};
+  const counter = await ownerTableCounter(ctx, owner, "researchLog");
+  return {...result, page, totals: counter?.counts ?? {active: 0}};
+}});
+
+export const version = internalQuery({args: {vaultOwnerId: v.string()}, handler: async (ctx, args) => {
+  const owner = normalizeVaultOwnerId(args.vaultOwnerId);
+  const [persons, tasks, log] = await Promise.all((["persons", "researchTasks", "researchLog"] as const).map(table => ownerTableCounter(ctx, owner, table)));
+  return {ready: await countsReady(ctx), revisions: [persons?.revision ?? 0, tasks?.revision ?? 0, log?.revision ?? 0], tasks: tasks?.counts.active ?? 0, log: log?.counts.active ?? 0};
 }});

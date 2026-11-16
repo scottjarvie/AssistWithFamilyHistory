@@ -42,3 +42,43 @@ test("Research pages reproduce legacy rows/order with exact global facets and ow
   const archived = await t.query(internal.researchPages.tasks, {vaultOwnerId: owner, cursor: null});
   expect(archived.page.every(t => t.person === null)).toBe(true);
 });
+
+test("filtered continuation and large task descriptions remain complete", async () => {
+  const t = convexTest(schema, modules);
+  await t.run(async ctx => {
+    const db = withSearchWrites(ctx).db;
+    for (let i = 0; i < 110; i++) await db.insert("researchTasks", {vaultOwnerId: owner, title: `Synthetic large ${i}`, description: "Synthetic ".repeat(2000), type: "other", status: "blocked", priority: "medium", aiSuggested: false, createdAt: i, updatedAt: i});
+  });
+  while (!await t.mutation(internal.vaultCounts.backfillStep, {})) { /* resume */ }
+  let cursor: string | null = null;
+  const titles: string[] = [];
+  do {
+    const r = await t.query(internal.researchPages.tasks, {vaultOwnerId: owner, cursor, status: "blocked"});
+    expect(r.page.length).toBeLessThanOrEqual(50);
+    titles.push(...r.page.map(x => x.title));
+    if (r.isDone) break;
+    cursor = r.continueCursor;
+  } while (true);
+  expect(titles).toEqual(Array.from({length: 110}, (_, i) => `Synthetic large ${109-i}`));
+});
+
+test("Research retries changed revisions, then fails explicitly under continuous edits", async () => {
+  let calls = 0, tick = 0;
+  let mode: "once" | "always" = "once";
+  const {internalQuery} = await import("./_generated/server");
+  const {v} = await import("convex/values");
+  const t = convexTest(schema, {...modules, "./researchPages.ts": async () => {
+    const real = await import("./researchPages");
+    return {...real, version: internalQuery({args: {vaultOwnerId: v.string()}, handler: async () => {
+      calls++;
+      if (mode === "always" || calls === 2) tick++;
+      return {ready: true, revisions: [tick, 0, 0], tasks: 0, log: 0};
+    }})};
+  }});
+  while (!await t.mutation(internal.vaultCounts.backfillStep, {})) { /* resume */ }
+  expect(await t.withIdentity({subject: owner}).action(api.vaultReads.getResearchOverview, {vaultOwnerId: owner})).toEqual({tasks: [], logEntries: []});
+  expect(calls).toBe(4);
+  mode = "always"; calls = 0;
+  await expect(t.withIdentity({subject: owner}).action(api.vaultReads.getResearchOverview, {vaultOwnerId: owner})).rejects.toThrow("Research changed while loading");
+  expect(calls).toBe(6);
+});

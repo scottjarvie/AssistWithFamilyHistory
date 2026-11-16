@@ -277,25 +277,29 @@ export const getDashboardSummary = action({
  * The current ledger/facet client consumes all rows; do not silently cap it.
  * The indexed page functions are also suitable for a future cursor consumer. */
 async function readResearchOverview(ctx: ActionCtx, vaultOwnerId: string): Promise<FunctionReturnType<typeof vaultInternal.getResearchOverview>> {
-  const ready = await ctx.runQuery(internal.vaultCounts.read, {vaultOwnerId});
-  if (!ready.complete) return ctx.runQuery(vaultInternal.getResearchOverview, {vaultOwnerId});
-  const tasks: FunctionReturnType<typeof vaultInternal.getResearchOverview>["tasks"] = [];
-  const logEntries: FunctionReturnType<typeof vaultInternal.getResearchOverview>["logEntries"] = [];
-  let cursor: string | null = null;
-  do {
-    const result: TaskPage = await ctx.runQuery(internal.researchPages.tasks, {vaultOwnerId, cursor});
-    tasks.push(...result.page);
-    if (result.isDone) break;
-    cursor = result.continueCursor;
-  } while (true);
-  cursor = null;
-  do {
-    const result: LogPage = await ctx.runQuery(internal.researchPages.log, {vaultOwnerId, cursor});
-    logEntries.push(...result.page);
-    if (result.isDone) break;
-    cursor = result.continueCursor;
-  } while (true);
-  return {tasks, logEntries};
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const start = await ctx.runQuery(internal.researchPages.version, {vaultOwnerId});
+    if (!start.ready) return ctx.runQuery(vaultInternal.getResearchOverview, {vaultOwnerId});
+    const tasks: FunctionReturnType<typeof vaultInternal.getResearchOverview>["tasks"] = [];
+    const logEntries: FunctionReturnType<typeof vaultInternal.getResearchOverview>["logEntries"] = [];
+    let cursor: string | null = null;
+    do {
+      const result: TaskPage = await ctx.runQuery(internal.researchPages.tasks, {vaultOwnerId, cursor});
+      tasks.push(...result.page);
+      if (result.isDone) break;
+      cursor = result.continueCursor;
+    } while (true);
+    cursor = null;
+    do {
+      const result: LogPage = await ctx.runQuery(internal.researchPages.log, {vaultOwnerId, cursor});
+      logEntries.push(...result.page);
+      if (result.isDone) break;
+      cursor = result.continueCursor;
+    } while (true);
+    const end = await ctx.runQuery(internal.researchPages.version, {vaultOwnerId});
+    if (end.ready && JSON.stringify(start.revisions) === JSON.stringify(end.revisions) && tasks.length === end.tasks && logEntries.length === end.log) return {tasks, logEntries};
+  }
+  throw new Error("Research changed while loading. Please reload to read a complete ledger.");
 }
 
 export const getResearchOverview = action({

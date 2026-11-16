@@ -1,15 +1,10 @@
 # Agent Operating Rules
 
-This repo builds Assist With Family History: a private family-history vault
-(FamilySearch-first capture), a research Queue, and story writing. Genealogy
-data is private by default, especially living people, memories, notes and raw
-imported artifacts.
+A private FamilySearch-first research vault, Queue and story workspace.
 
 ## Read first
 
-- [Site Guide](docs/planning/site-guide.md): the one product document (trust
-  and privacy rules, building blocks, the Queue, AI tools, language, defaults
-  for users and their AI). Open questions: `docs/planning/site-guide-content.json`.
+- [Site Guide](docs/planning/site-guide.md): product, privacy and AI-tool truth. Open questions: `docs/planning/site-guide-content.json`.
 - [Tracker Guide](docs/tracker/GUIDE.md) and the open parked Cards
   (`docs/tracker/cards/`, status `backlog`): grouped bugs, minor issues, design
   work, pages not yet on the new design, and features worth building later.

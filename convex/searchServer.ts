@@ -3,9 +3,23 @@
 export * from "./_generated/server";
 import { mutation as baseMutation, internalMutation as baseInternalMutation } from "./_generated/server";
 import { applyExplorerChanges, type ExplorerChange } from "./peopleExplorer";
-import { withSearchWrites } from "./searchWrites";
+import { withSearchWrites, flushSearchWrites } from "./searchWrites";
 function tracked(builder: any, defer = false): any {
-  return (definition: any) => builder({ ...definition, handler: async (ctx: any, args: any) => {const changes: ExplorerChange[] = []; const result = await definition.handler(withSearchWrites(ctx, changes, defer), args); await applyExplorerChanges(ctx, changes, defer); return result;} });
+  return (definition: any) => builder({
+    ...definition,
+    handler: async (ctx: any, args: any) => {
+      const changes: ExplorerChange[] = [];
+      const trackedCtx = withSearchWrites(ctx, changes, defer);
+      let result;
+      try {
+        result = await definition.handler(trackedCtx, args);
+      } finally {
+        await flushSearchWrites(trackedCtx);
+      }
+      await applyExplorerChanges(ctx, changes, defer);
+      return result;
+    },
+  });
 }
 export const mutation: typeof baseMutation = tracked(baseMutation);
 export const internalMutation: typeof baseInternalMutation = tracked(baseInternalMutation);

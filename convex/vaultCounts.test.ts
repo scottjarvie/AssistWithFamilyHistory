@@ -40,7 +40,7 @@ async function parity(t: ReturnType<typeof convexTest>) {
   }
 }
 
-test("randomized write/archive/restore/delete/owner moves remain equal to a full recount during and after backfill", async () => {
+test("randomized write/archive/restore/delete/owner moves match a full recount after writes interleaved with backfill and after completion", async () => {
   const t = convexTest(schema, modules);
   const ids: Id<"researchTasks">[] = [];
   await t.run(async ctx => {
@@ -103,4 +103,42 @@ test("source and counters roll back together", async () => {
   })).rejects.toThrow("synthetic failure");
   expect(await t.run(ctx => ctx.db.query("researchTasks").collect())).toEqual([]);
   await parity(t);
+});
+
+test("parallel adapter writes serialize counter creation and owner deltas", async () => {
+  const t = convexTest(schema, modules);
+  await build(t);
+  const ids = await t.run(async ctx => {
+    const db = withSearchWrites(ctx).db;
+    return Promise.all(Array.from({length: 40}, (_, i) => db.insert("researchTasks", task(i))));
+  });
+  await parity(t);
+  await t.run(async ctx => {
+    const db = withSearchWrites(ctx).db;
+    await Promise.all(ids.map((id, i) => db.patch(id, {vaultOwnerId: other, ...(i % 2 ? {archivedAt: 0} : {status: "done" as const})})));
+  });
+  await parity(t);
+  expect((await t.query(internal.vaultCounts.read, {vaultOwnerId: other})).counts.researchTasks?.active).toBe(20);
+});
+
+test("deferred guest adapter still tracks non-person owner moves and content revisions", async () => {
+  const t = convexTest(schema, modules);
+  await build(t);
+  await t.run(async ctx => {
+    const db = withSearchWrites(ctx, [], true).db;
+    const source = await db.insert("sources", {vaultOwnerId: owner, title: "Synthetic", type: "other", createdAt: 0, updatedAt: 0});
+    const work = await db.insert("researchTasks", task(0));
+    await Promise.all([db.patch(source, {vaultOwnerId: other}), db.patch(work, {vaultOwnerId: other, updatedAt: 123.123456})]);
+  });
+  await parity(t);
+  const page = await t.query(internal.researchPages.tasks, {vaultOwnerId: other, cursor: null});
+  expect(page.page[0].researchOrderTime).toBe(-123.123456);
+  const before = await t.query(internal.researchPages.version, {vaultOwnerId: other});
+  await t.run(ctx => withSearchWrites(ctx).db.patch(page.page[0]._id, {title: "Renamed synthetic task"}));
+  const after = await t.query(internal.researchPages.version, {vaultOwnerId: other});
+  expect(after.tasks).toBe(before.tasks);
+  expect(after.revisions[1]).toBe(before.revisions[1] + 1);
+  const audit = await t.query(internal.vaultCounts.recountPage, {vaultOwnerId: other, table: "researchTasks", cursor: null});
+  expect(audit.isDone).toBe(true);
+  for (const [key, n] of Object.entries(audit.counter)) expect(audit.subtotal[key] ?? 0).toBe(n);
 });

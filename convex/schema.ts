@@ -95,7 +95,7 @@ export default defineSchema({
    */
   searchBuildState: defineTable({ table: v.string(), cursor: v.union(v.string(), v.null()), complete: v.boolean() }).index("by_table", ["table"]),
 
-  vaultCounts: defineTable({vaultOwnerId: v.string(), table: v.string(), counts: v.record(v.string(), v.number())})
+  vaultCounts: defineTable({vaultOwnerId: v.string(), table: v.string(), counts: v.record(v.string(), v.number()), revision: v.optional(v.number())})
     .index("by_owner_table", ["vaultOwnerId", "table"]),
   vaultCountMembers: defineTable({recordId: v.string(), table: v.string(), owner: v.string(), keys: v.array(v.string())})
     .index("by_record", ["recordId"]),

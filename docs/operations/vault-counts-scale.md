@@ -38,7 +38,12 @@ The global `vaultCounts:v1` flag becomes complete only after all source tables
 have been traversed. Consumers **must check it** before trusting totals. Research
 keeps the original snapshot path until completion. No count is estimated from a
 page, a newest-N sample, or a table-size cap. The write cost includes a membership
-lookup and up to two owner counters per source change. Large existing bulk
+lookup and up to two owner counters per source change. Writes through one adapter are serialized even when
+callers use `Promise.all`; the mutation drains that queue before finishing.
+Counter-maintenance errors cannot be swallowed by a caller and commit a source
+without its matching contribution. Active source writes also advance a per-owner,
+per-type revision, including edits whose count contribution stays unchanged.
+Large existing bulk
 mutations need separate write-cost assessment before claiming unlimited scale.
 
 ## Research transport
@@ -59,9 +64,16 @@ pages and retains its complete DTO. This preserves arbitrary substring search
 ledger's author/kind/date/month counts. **The browser is not yet a cursor
 consumer.** End-to-end cost, action reply size and client rendering still grow
 with task/log history, and independently committed query pages do not provide
-one frozen snapshot during concurrent edits. This is transport groundwork,
+one frozen snapshot. The compatibility action now checks person/task/log revisions
+before and after traversal and verifies exact task/log lengths against counters.
+A relevant concurrent edit restarts traversal, up to three attempts; continuous
+editing returns a clear reload error instead of a silently incomplete ledger. This is transport groundwork,
 not completion of the requested Research UI migration or an unlimited action
-size/latency guarantee. The old internal `vault:getResearchOverview` remains the
+size/latency guarantee. The local heavy fixture traversed all 5,000 tasks and
+10,000 log entries, then its final compatibility action return was rejected:
+Convex arrays allow at most 8,192 elements. Thus the full Research page still
+fails at the requested heavy size until its browser consumer uses the pages.
+The old internal `vault:getResearchOverview` remains the
 legacy snapshot implementation, used before the completion gate and for parity.
 
 To finish Research, provide a paged browser consumer with exact query-specific
@@ -100,3 +112,28 @@ CONVEX_DEPLOYMENT=prod:accomplished-dodo-308 npx convex run vaultCounts:backfill
 The separate People Explorer backfill remains separate. Completing it does not
 complete these counters, and completing counters does not migrate Dashboard or
 Places. This draft needs the remaining implementation before a release decision.
+
+## Read-only drift diagnosis and versioning
+
+The internal `vaultCounts:recountPage` reads one owner/type range at a time
+(100 rows / 500 KB source budget). Sum its `subtotal` keys across cursors and
+compare with `counter`, treating absent keys as zero. Require the same `revision`
+throughout; if it changes, restart the traversal. This diagnoses drift without
+editing real records or clearing the ledger:
+
+```bash
+CONVEX_DEPLOYMENT=prod:accomplished-dodo-308 npx convex run vaultCounts:recountPage '{"vaultOwnerId":"<owner>","table":"sources","cursor":null}'
+```
+
+There is no automatic repair/reset operation. If drift is found, stop and
+investigate its source; ship a bounded, versioned repair with a fallback gate.
+Blindly replacing counters while active writes continue could hide ledger drift.
+The randomized independent recount tests and the writer contract are prevention,
+not proof that future maintenance can never introduce drift.
+
+Adding/reordering `COUNT_TABLES` or changing contributions requires a new `BUILD`
+version and a considered migration. Old positional cursors and a completed flag
+must never be reused for a different table list. Preserve member/counter data;
+a fresh traversal reconciles existing members idempotently. Derived ordering
+metadata, like existing `searchText`, remains on raw Research documents and may
+appear in raw tool/export records; client collection projections omit it.

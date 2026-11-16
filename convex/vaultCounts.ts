@@ -36,20 +36,25 @@ export function contribution(table: CountTable, row: any): {owner: string; keys:
 /** Idempotent membership ledger makes backfill and concurrent normal writes commute.
  * Never subtract an unvisited legacy row. Once visited, its owner/archive/status
  * changes remove precisely the old contribution in the same source transaction. */
-export async function syncCount(ctx: Pick<MutationCtx, "db">, table: CountTable, id: string, row: any) {
+export async function syncCount(ctx: Pick<MutationCtx, "db">, table: CountTable, id: string, row: any, touch = false) {
   const old = await ctx.db.query("vaultCountMembers").withIndex("by_record", q => q.eq("recordId", id)).unique();
   const next = contribution(table, row);
-  if ((!old && !next) || (old && next && old.owner === next.owner && JSON.stringify(old.keys) === JSON.stringify(next.keys))) return;
+  const same = (!old && !next) || !!(old && next && old.owner === next.owner && JSON.stringify(old.keys) === JSON.stringify(next.keys));
+  const trackRevision = touch;
+  if (same && !trackRevision) return;
   const owners = new Set([old?.owner, next?.owner].filter((owner): owner is string => owner !== undefined));
   for (const owner of owners) {
     const counter = await ctx.db.query("vaultCounts").withIndex("by_owner_table", q => q.eq("vaultOwnerId", owner).eq("table", table)).unique();
     const counts: Record<string, number> = {...counter?.counts};
-    if (old?.owner === owner) for (const key of old.keys) counts[key] = (counts[key] ?? 0) - 1;
-    if (next?.owner === owner) for (const key of next.keys) counts[key] = (counts[key] ?? 0) + 1;
+    if (!same && old?.owner === owner) for (const key of old.keys) counts[key] = (counts[key] ?? 0) - 1;
+    if (!same && next?.owner === owner) for (const key of next.keys) counts[key] = (counts[key] ?? 0) + 1;
     if (Object.values(counts).some(n => !Number.isSafeInteger(n) || n < 0)) throw new Error("Invalid vault counter; source transaction rolled back");
-    if (counter) await ctx.db.patch(counter._id, {counts});
-    else await ctx.db.insert("vaultCounts", {vaultOwnerId: owner, table, counts});
+    const revision = (counter?.revision ?? 0) + (trackRevision ? 1 : 0);
+    if (!Number.isSafeInteger(revision)) throw new Error("Invalid vault revision");
+    if (counter) await ctx.db.patch(counter._id, {counts, revision});
+    else await ctx.db.insert("vaultCounts", {vaultOwnerId: owner, table, counts, revision});
   }
+  if (same) return;
   if (next) {
     const value = {recordId: id, table, owner: next.owner, keys: next.keys};
     if (old) await ctx.db.replace(old._id, value); else await ctx.db.insert("vaultCountMembers", value);
@@ -58,6 +63,9 @@ export async function syncCount(ctx: Pick<MutationCtx, "db">, table: CountTable,
 
 export async function countsReady(ctx: Pick<QueryCtx, "db">) {
   return !!(await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", BUILD)).unique())?.complete;
+}
+export async function ownerTableCounter(ctx: Pick<QueryCtx, "db">, owner: string, table: CountTable) {
+  return ctx.db.query("vaultCounts").withIndex("by_owner_table", q => q.eq("vaultOwnerId", owner).eq("table", table)).unique();
 }
 export async function ownerCounts(ctx: Pick<QueryCtx, "db">, owner: string) {
   const rows = await ctx.db.query("vaultCounts").withIndex("by_owner_table", q => q.eq("vaultOwnerId", owner)).collect();
@@ -90,3 +98,15 @@ export const backfill = internalAction({args: {}, handler: async (ctx): Promise<
   return {complete: false};
 }});
 export const read = internalQuery({args: {vaultOwnerId: v.string()}, handler: async (ctx, args) => ({complete: await countsReady(ctx), counts: await ownerCounts(ctx, args.vaultOwnerId)})});
+
+/** Read-only, bounded drift diagnosis. Sum subtotal across pages only while
+ * counter.revision is unchanged, otherwise restart. No automatic data repair. */
+export const recountPage = internalQuery({args: {vaultOwnerId: v.string(), table: v.union(...COUNT_TABLES.map(table => v.literal(table))), cursor: v.union(v.string(), v.null())}, handler: async (ctx, args) => {
+  if (!await countsReady(ctx)) throw new Error("Finish the counter backfill before auditing");
+  const page = await ctx.db.query(args.table).withIndex("by_owner", q => q.eq("vaultOwnerId", args.vaultOwnerId))
+    .paginate({cursor: args.cursor, numItems: 100, maximumRowsRead: 100, maximumBytesRead: 500_000});
+  const subtotal: Record<string, number> = {};
+  for (const row of page.page) for (const key of contribution(args.table, row)?.keys ?? []) subtotal[key] = (subtotal[key] ?? 0) + 1;
+  const counter = await ownerTableCounter(ctx, args.vaultOwnerId, args.table);
+  return {subtotal, counter: counter?.counts ?? {}, revision: counter?.revision ?? 0, continueCursor: page.continueCursor, isDone: page.isDone};
+}});
