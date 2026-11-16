@@ -22,6 +22,12 @@ async function parity(t: ReturnType<typeof convexTest>) {
       const byKey = byTable[table] ??= {};
       byKey.active = (byKey.active ?? 0) + 1;
       const add = (key: string) => {byKey[key] = (byKey[key] ?? 0) + 1;};
+      if(table === "researchTasks" && "status" in row && row.status !== "done")add("open");
+      if(table === "stories" && "status" in row)add(`status:${row.status}`);
+      if(table === "places") {
+        const context=await ctx.db.query("historicalContext").collect();
+        if(!context.some(c=>c.vaultOwnerId===row.vaultOwnerId&&c.archivedAt===undefined&&c.placeId===row._id))add("withoutContext");
+      }
       if (table === "researchTasks" || table === "researchLog") add(`status:${"status" in row ? row.status : ""}`);
       if (table === "provisionalRelatives") add(`mergeState:${"mergeState" in row ? row.mergeState : ""}`);
       if (table === "researchLog" && "activityType" in row) {

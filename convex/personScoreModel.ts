@@ -7,6 +7,7 @@ export const operationRow = v.object({
 export const readinessRow = v.object({ _id: v.id("persons"), displayName: v.string(), routeId: v.string(), lifespan: v.string(), storyWorkflow: v.string(), completionPercent: v.number(), sourceCount: v.number(), contextReportCount: v.number(), storyCount: v.number(), nextActions: v.array(v.string()) });
 export const missingFlags = v.object({ identity_review: v.boolean(), biography: v.boolean(), timeline: v.boolean(), relationships: v.boolean(), birth_record: v.boolean(), marriage_record: v.boolean(), death_record: v.boolean(), census: v.boolean(), immigration: v.boolean(), military: v.boolean(), probate_land_newspaper: v.boolean(), church_records: v.boolean(), memories: v.boolean(), place_context: v.boolean() });
 export const scoreRowFields = {
+    auditWithoutSources: v.optional(v.boolean()), auditWithoutContext: v.optional(v.boolean()), auditWithoutStories: v.optional(v.boolean()),
     recordId: v.string(), vaultOwnerId: v.string(), rowType: v.union(v.literal("person"), v.literal("provisional")), storyWorkflow: v.string(),
     missing: missingFlags, hasStory: v.boolean(),
     operation: operationRow, readiness: v.optional(readinessRow), counts: v.record(v.string(), v.number()), reviews: v.array(v.number()), oldestReview: v.optional(v.number()),

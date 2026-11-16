@@ -27,7 +27,7 @@ test("Research pages reproduce legacy rows/order with exact global facets and ow
   do {
     const page = await t.query(internal.researchPages.tasks, {vaultOwnerId: owner, cursor});
     expect(page.page.length).toBeLessThanOrEqual(50);
-    expect(page.totals).toEqual({active: 121, "status:done": 61, "status:todo": 60});
+    expect(page.totals).toEqual({active: 121, open:60, "status:done": 61, "status:todo": 60});
     tasks.push(...page.page.map(stripKey));
     if (page.isDone) break;
     cursor = page.continueCursor;

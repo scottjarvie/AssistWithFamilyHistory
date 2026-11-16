@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import {directPlaces} from "./placeCounts";
+import { refreshPlaceAudit } from "./auditMaintenance";
 import { syncMediaPeople, EXPLORER_TABLES, type ExplorerChange } from "./peopleExplorer";
 import { COUNT_TABLES, syncCount, researchOrderTime, researchCursorKey, type CountTable } from "./vaultCounts";
 import type { Doc } from "./_generated/dataModel";
@@ -38,7 +40,19 @@ export async function syncSourceCount(ctx: {db: MutationCtx["db"]}, table: Count
   if(row&&table==="media"&&row.description===undefined)await ctx.db.patch(id as any,{description:""});
   if (table === "contextItems") await syncContextItemPeople(ctx, id, row);
   if (table === "media") await syncMediaPeople(ctx, id as any);
+  const oldContext = table === "historicalContext" ? await ctx.db.query("vaultCountMembers").withIndex("by_record",q=>q.eq("recordId",id)).unique() : null;
+  if(row && table === "researchTasks" && row.auditOpen !== (row.status !== "done")) await ctx.db.patch(id as any,{auditOpen:row.status !== "done"});
   await syncCount(ctx, table, id, row, touch);
+  if(table === "places") await refreshPlaceAudit(ctx,id);
+  if(table === "historicalContext") {
+    const oldPlaces=(oldContext?.places??[]).filter(p=>p.kind==="context"),nextPlaces=directPlaces(ctx,table,row);
+    const key=(p:{owner:string;placeId:unknown})=>`${p.owner}:${p.placeId}`;
+    const before=new Set(oldPlaces.map(key)),after=new Set(nextPlaces.map(key));
+    // An addition proves coverage without reading every shard. Removals must
+    // recount; content-only edits do not affect place coverage at all.
+    for(const p of oldPlaces)if(!after.has(key(p)))await refreshPlaceAudit(ctx,String(p.placeId));
+    for(const p of nextPlaces)if(!before.has(key(p)))await refreshPlaceAudit(ctx,String(p.placeId),p.owner);
+  }
 }
 
 /** Reverse memberships, maintained even before the migration reaches a row. */

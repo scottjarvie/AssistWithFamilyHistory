@@ -3,7 +3,7 @@ import { v, type Infer } from "convex/values";
 import { internalQuery, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { buildPeopleRows, loadPersonScopedSnapshot, type VaultSnapshot } from "./vault";
-import { counterShard, ownerTableCounter, BUILD, scopedReadsReady } from "./vaultCounts";
+import { counterShard, ownerTableCounter, scopedReadsReady } from "./vaultCounts";
 import { missingFlags, orderedNumber, STALE_AGE, staleCount, type OperationRow, type OperationsPage, type ReadinessPage } from "./personScoreModel";
 export function personScore(snapshot: VaultSnapshot, personId: Id<"persons">) {
     const row = buildPeopleRows({ ...snapshot, people: snapshot.people.filter(p => p._id === personId) })[0];
@@ -24,7 +24,7 @@ function scoreValue(recordId: string, vaultOwnerId: string, created: number, ope
         counts.withoutContext = Number(operation.contextReportCount === 0);
         counts.withoutStories = Number(operation.storyCount === 0);
     }
-    return { missing: Object.fromEntries(RESEARCH_CHECK_DEFINITIONS.map(c => [c.key, operation.missingCritical.includes(c.key)])) as Infer<typeof missingFlags>, hasStory: operation.storyCount > 0, recordId, vaultOwnerId, rowType: operation.rowType, storyWorkflow: operation.storyWorkflow, operation, readiness, counts, reviews, oldestReview: reviews.length ? Math.min(...reviews) : undefined, readinessOrder: key(score), missingCriticalOrder: key(operation.missingCritical.length), completionOrder: key(operation.completionPercent), lastTouchedOrder: key(operation.lastTouched), sourceCountOrder: key(operation.sourceCount), storyReadinessOrder: key(operation.storyReadinessScore), newestImportOrder: key(operation.latestImportAt ?? 0) };
+    return { auditWithoutSources: operation.rowType === "person" && operation.sourceCount === 0, auditWithoutContext: operation.rowType === "person" && operation.contextReportCount === 0, auditWithoutStories: operation.rowType === "person" && operation.storyCount === 0, missing: Object.fromEntries(RESEARCH_CHECK_DEFINITIONS.map(c => [c.key, operation.missingCritical.includes(c.key)])) as Infer<typeof missingFlags>, hasStory: operation.storyCount > 0, recordId, vaultOwnerId, rowType: operation.rowType, storyWorkflow: operation.storyWorkflow, operation, readiness, counts, reviews, oldestReview: reviews.length ? Math.min(...reviews) : undefined, readinessOrder: key(score), missingCriticalOrder: key(operation.missingCritical.length), completionOrder: key(operation.completionPercent), lastTouchedOrder: key(operation.lastTouched), sourceCountOrder: key(operation.sourceCount), storyReadinessOrder: key(operation.storyReadinessScore), newestImportOrder: key(operation.latestImportAt ?? 0) };
 }
 type Value = ReturnType<typeof scoreValue>;
 /** Row and weighted exact totals commit together, on the existing 32-shard pattern. */
@@ -61,6 +61,15 @@ async function put(ctx: Pick<MutationCtx, "db">, id: string, next: Value | null)
     if (next) { if (old) await ctx.db.replace(old._id, next); else await ctx.db.insert("personScoreRows", next); }
     else if (old) await ctx.db.delete(old._id);
 }
+/** v6 already scored these exact inputs; v7 only needs its indexed flags.
+ * Reuse put so source-row and old/new contributions still commit together. */
+export async function refreshAuditFlags(ctx:Pick<MutationCtx,"db">,id:string) {
+ const old=await ctx.db.query("personScoreRows").withIndex("by_record",q=>q.eq("recordId",id)).unique();
+ if(!old)return;
+ const {_id,_creationTime,...value}=old;void _id;void _creationTime;
+ const person=old.rowType==="person";
+ await put(ctx,id,{...value,readiness:old.readiness,oldestReview:old.oldestReview,auditWithoutSources:person&&old.operation.sourceCount===0,auditWithoutContext:person&&old.operation.contextReportCount===0,auditWithoutStories:person&&old.operation.storyCount===0});
+}
 export async function removeScore(ctx: Pick<MutationCtx, "db">, id: string) { await put(ctx, id, null); }
 export async function refreshPersonScore(ctx: Pick<MutationCtx, "db">, id: Id<"persons">, force = false) {
     if (!force && !await scopedReadsReady(ctx))
@@ -81,7 +90,7 @@ export async function refreshProvisionalScore(ctx: Pick<MutationCtx, "db">, id: 
     const op: OperationRow = { rowType: "provisional", id: String(id), personIdentifier: null, displayName: r.displayName, relationshipHint: r.relationshipHint, lifespan: r.possibleBirthYear || r.possibleDeathYear ? `${r.possibleBirthYear || "?"} to ${r.possibleDeathYear || "?"}` : "Undated", keyPlaces: r.possiblePlaces || [], completionPercent: 0, sourceCount: r.evidenceCount, memoryCount: 0, documentCount: 0, storyCount: stories.length, openTaskCount: 0, contextReportCount: 0, storyWorkflow: "needs_genealogy_evidence", latestImportAt: null, lastTouched: r.updatedAt, missingCritical: ["identity_review", "relationships"], nextActions: [`Review ${r.displayName} and decide whether to promote or merge.`], staleChecksCount: 0, researchChecks: [], storyReadinessScore: 0, anchorPersonIdentifier: active?.fsId || String(r.anchorPersonId), badge: r.relationshipHint || "provisional" };
     await put(ctx, String(id), scoreValue(String(id), r.vaultOwnerId, r._creationTime, op, []));
 }
-export async function scoresReady(ctx: Pick<QueryCtx, "db">) { return !!(await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", BUILD)).unique())?.complete; }
+export async function scoresReady(ctx: Pick<QueryCtx, "db">) { return !!(await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", "vaultCounts:v6")).unique())?.complete; }
 export const status = internalQuery({ args: {}, handler: ctx => scoresReady(ctx) });
 export const totals = internalQuery({ args: { vaultOwnerId: v.string() }, handler: (ctx, a) => ownerTableCounter(ctx, a.vaultOwnerId, "personScores") });
 async function staleReviewsPage(ctx: Pick<QueryCtx, "db">, a: {vaultOwnerId: string; now: number; cursor: string | null}, numItems = 250) {

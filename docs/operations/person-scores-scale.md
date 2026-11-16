@@ -110,3 +110,10 @@ loop itself still has mutation limits; this is not an unlimited-vault migration.
 No BUILD bump: the held v6 backfill covers this batch after Vercel deploys. Audit
 still uses its full snapshot and needs its own exact maintained gaps and paged
 record drilldowns. This fix batch must not be described as the Audit migration.
+
+## Audit migration follow-up
+
+The pending [v7 Audit migration](audit-scale.md) completes this remaining caller.
+It preserves the completed v6 gate for Operations and writing during v7. Historical
+release notes above describe the earlier split; v7 deployment/backfill is a separate
+lead handoff.
