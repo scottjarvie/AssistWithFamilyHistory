@@ -3,9 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import { loadPeoplePage } from "@/app/app/people/actions";
 import { PeopleExplorerView } from "./PeopleExplorerView";
 type Page = Awaited<ReturnType<typeof loadPeoplePage>>;
-export function PaginatedPeopleExplorer({initial, firstStartEligible, query, status, preferenceKey, vaultOwnerId}: {initial: Page; firstStartEligible: boolean; query?: string; status?: Parameters<typeof loadPeoplePage>[0]["researchStatus"]; preferenceKey: string; vaultOwnerId: string}) {
+export function PaginatedPeopleExplorer({initial, initialTarget = 50, firstStartEligible, query, status, preferenceKey, vaultOwnerId}: {initial: Page; initialTarget?: number; firstStartEligible: boolean; query?: string; status?: Parameters<typeof loadPeoplePage>[0]["researchStatus"]; preferenceKey: string; vaultOwnerId: string}) {
   const [result, setResult] = useState(initial);
-  const [target, setTarget] = useState(50);
+  const [target, setTarget] = useState(initialTarget);
   const [error, setError] = useState(false);
   const fetching = useRef(false);
   const alive = useRef(true);

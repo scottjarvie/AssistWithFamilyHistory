@@ -100,6 +100,12 @@ export default defineSchema({
 
   peopleExplorerFailures: defineTable({personId: v.id("persons"), reason: v.string(), failedAt: v.number()}).index("by_person", ["personId"]),
 
+  peopleExplorerDependencyFailures: defineTable({
+    key: v.string(),
+    job: v.object({kind: v.union(v.literal("owner"), v.literal("personKey"), v.literal("event"), v.literal("citation"), v.literal("source"), v.literal("place")), id: v.string(), owner: v.optional(v.string()), stage: v.optional(v.number()), cursor: v.optional(v.union(v.string(), v.null()))}),
+    state: v.union(v.literal("pending"), v.literal("failed")), reason: v.string(), recordedAt: v.number(),
+  }).index("by_key", ["key"]),
+
   mediaPeople: defineTable({personId: v.id("persons"), mediaId: v.id("media")}).index("by_person", ["personId"]).index("by_media", ["mediaId"]),
 
   persons: defineTable({

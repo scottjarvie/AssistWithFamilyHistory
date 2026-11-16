@@ -178,10 +178,14 @@ function budgetDb(db: MutationCtx["db"], limit = 75): MutationCtx["db"] {
   }});
 }
 
-const jobArgs = {kind: v.string(), id: v.string(), owner: v.optional(v.string()), stage: v.optional(v.number()), cursor: v.optional(v.union(v.string(), v.null()))};
-type DependencyJob = {kind: string; id: string; owner?: string; stage?: number; cursor?: string | null};
+const jobArgs = {kind: v.union(v.literal("owner"), v.literal("personKey"), v.literal("event"), v.literal("citation"), v.literal("source"), v.literal("place")), id: v.string(), owner: v.optional(v.string()), stage: v.optional(v.number()), cursor: v.optional(v.union(v.string(), v.null()))};
+type DependencyJob = {kind: "owner" | "personKey" | "event" | "citation" | "source" | "place"; id: string; owner?: string; stage?: number; cursor?: string | null};
 async function scheduleJob(ctx: MutationCtx, job: DependencyJob) {
-  await ctx.scheduler.runAfter(0, internal.peopleExplorer.dependencyPage, job);
+  const key = dependencyKey(job);
+  const old = await ctx.db.query("peopleExplorerDependencyFailures").withIndex("by_key", q => q.eq("key", key)).unique();
+  const value = {key, job, state: "pending" as const, recordedAt: Date.now(), reason: "Dependency page scheduled; retry if its action stops without completing"};
+  if (old) await ctx.db.replace(old._id, value); else await ctx.db.insert("peopleExplorerDependencyFailures", value);
+  await ctx.scheduler.runAfter(0, internal.peopleExplorer.dependencyScheduled, job);
 }
 async function schedulePerson(ctx: MutationCtx, personId: Doc<"persons">["_id"]) {
   if (!ctx.db.normalizeId("persons", personId)) return;
@@ -189,7 +193,42 @@ async function schedulePerson(ctx: MutationCtx, personId: Doc<"persons">["_id"])
 }
 
 /** Paged dependency discovery. Every hop uses one bounded range; child jobs are transactional. */
+function dependencyKey(job: DependencyJob) {
+  return JSON.stringify([job.kind, job.id, job.owner ?? null, job.stage ?? 0, job.cursor ?? null]);
+}
+async function hasProjectionFailures(ctx: Pick<QueryCtx, "db">) {
+  return !!await ctx.db.query("peopleExplorerFailures").first() || !!await ctx.db.query("peopleExplorerDependencyFailures").first();
+}
+async function releaseProjectionGate(ctx: MutationCtx) {
+  // A repaired skipped row can release the migration gate, but never before traversal finishes.
+  const state = await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", "peopleExplorerRows")).unique();
+  if (!state || state.complete) return;
+  const traversal = await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", "peopleExplorerTraversal")).unique();
+  if (traversal?.complete && !await hasProjectionFailures(ctx)) await ctx.db.patch(state._id, {complete: true});
+}
+export const recordDependencyFailure = internalMutation({args: jobArgs, handler: async (ctx, job) => {
+  const key = dependencyKey(job);
+  const old = await ctx.db.query("peopleExplorerDependencyFailures").withIndex("by_key", q => q.eq("key", key)).unique();
+  const value = {key, job, state: "failed" as const, recordedAt: Date.now(), reason: "Dependency discovery failed; inspect execution log and retry this job"};
+  if (old) await ctx.db.replace(old._id, value); else await ctx.db.insert("peopleExplorerDependencyFailures", value);
+}});
+export const dependencyScheduled = internalAction({args: jobArgs, handler: async (ctx, job): Promise<boolean> => {
+  try {await ctx.runMutation(internal.peopleExplorer.dependencyPage, job); return true;}
+  catch {await ctx.runMutation(internal.peopleExplorer.recordDependencyFailure, job); return false;}
+}});
+export const dependencyFailures = internalQuery({args: {cursor: v.union(v.string(), v.null())}, handler: (ctx, {cursor}) => ctx.db.query("peopleExplorerDependencyFailures").paginate({cursor, numItems: 25})});
+export const retryDependency = internalMutation({args: jobArgs, handler: async (ctx, job) => {await scheduleJob(ctx, job);}});
+
+/** Batch scheduling avoids Convex's 1,000 scheduled-function limit in the source transaction.
+ * Isolated person actions still record failures; failed people do not stop later repairs. */
+export const refreshBatch = internalMutation({args: {personIds: v.array(v.id("persons"))}, handler: async (ctx, {personIds}) => {
+  if (personIds.length > 100) throw new Error("Refresh at most 100 people per batch");
+  for (const personId of personIds) await schedulePerson(ctx, personId);
+}});
+
 export const dependencyPage = internalMutation({args: jobArgs, handler: async (ctx, job) => {
+  const failed = await ctx.db.query("peopleExplorerDependencyFailures").withIndex("by_key", q => q.eq("key", dependencyKey(job))).unique();
+  if (failed) await ctx.db.delete(failed._id);
   const stage = job.stage ?? 0;
   let range: any;
   if (job.kind === "owner") range = ctx.db.query("persons").withIndex("by_owner", q => q.eq("vaultOwnerId", job.id));
@@ -214,18 +253,14 @@ export const dependencyPage = internalMutation({args: jobArgs, handler: async (c
   }
   if (!result.isDone) await scheduleJob(ctx, {...job, cursor: result.continueCursor});
   else if (job.kind === "place" && stage < 2) await scheduleJob(ctx, {...job, stage: stage + 1, cursor: null});
+  await releaseProjectionGate(ctx);
 }});
 
 export const rebuildOne = internalMutation({args: {personId: v.id("persons")}, handler: async (ctx, {personId}) => {
   await refreshPerson(ctx, personId);
   const failed = await ctx.db.query("peopleExplorerFailures").withIndex("by_person", q => q.eq("personId", personId)).unique();
   if (failed) await ctx.db.delete(failed._id);
-  // A repaired skipped row can release the migration gate, but never before traversal finishes.
-  const traversal = await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", "peopleExplorerTraversal")).unique();
-  if (traversal?.complete && !await ctx.db.query("peopleExplorerFailures").first()) {
-    const state = await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", "peopleExplorerRows")).unique();
-    if (state && !state.complete) await ctx.db.patch(state._id, {complete: true});
-  }
+  await releaseProjectionGate(ctx);
 }});
 export const recordFailure = internalMutation({args: {personId: v.id("persons")}, handler: async (ctx, {personId}) => {
   const old = await ctx.db.query("peopleExplorerFailures").withIndex("by_person", q => q.eq("personId", personId)).unique();
@@ -252,7 +287,7 @@ export const projectionStep = internalMutation({args: {}, handler: async ctx => 
   if (state?.complete) return true;
   const result = await ctx.db.query("persons").paginate({cursor: state?.cursor ?? null, numItems: 5, maximumBytesRead: 100_000});
   for (const person of result.page) await refreshPerson(ctx, person._id);
-  const value = {table: "peopleExplorerRows", cursor: result.continueCursor, complete: result.isDone && !await ctx.db.query("peopleExplorerFailures").first()};
+  const value = {table: "peopleExplorerRows", cursor: result.continueCursor, complete: result.isDone && !await hasProjectionFailures(ctx)};
   if (state) await ctx.db.patch(state._id, value); else await ctx.db.insert("searchBuildState", value);
   return value.complete;
 }});
@@ -266,7 +301,7 @@ export const nextBackfillPerson = internalQuery({args: {}, handler: async ctx =>
 export const advanceBackfill = internalMutation({args: {expectedCursor: v.union(v.string(), v.null()), cursor: v.string(), done: v.boolean()}, handler: async (ctx, args) => {
   const state = await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", "peopleExplorerRows")).unique();
   if ((state?.cursor ?? null) !== args.expectedCursor || state?.complete) return;
-  const complete = args.done && !await ctx.db.query("peopleExplorerFailures").first();
+  const complete = args.done && !await hasProjectionFailures(ctx);
   const value = {table: "peopleExplorerRows", cursor: args.cursor, complete};
   if (state) await ctx.db.patch(state._id, value); else await ctx.db.insert("searchBuildState", value);
   if (args.done) {
@@ -293,7 +328,7 @@ export const backfill = internalAction({args: {skipErrors: v.optional(v.boolean(
 export const backfillStatus = internalQuery({args: {}, handler: async ctx => {
   const state = async (table: string) => (await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", table)).unique())?.complete ?? false;
   const mediaComplete = await state("mediaPeople"), peopleComplete = await state("peopleExplorerRows");
-  return {complete: mediaComplete && peopleComplete, mediaComplete, peopleComplete, traversalComplete: peopleComplete || await state("peopleExplorerTraversal"), hasFailures: !!await ctx.db.query("peopleExplorerFailures").first()};
+  return {complete: mediaComplete && peopleComplete, mediaComplete, peopleComplete, traversalComplete: peopleComplete || await state("peopleExplorerTraversal"), hasFailures: !!await hasProjectionFailures(ctx)};
 }});
 
 export async function applyExplorerChanges(ctx: MutationCtx, changes: ExplorerChange[], defer = false) {
@@ -343,7 +378,7 @@ export async function applyExplorerChanges(ctx: MutationCtx, changes: ExplorerCh
       else if (change.table === "citationLinks") {
         if (row.targetType === "person") person(row.targetId);
         else if (row.targetType === "event") queue({kind: "event", id: row.targetId});
-      } else queue({kind: ({places: "place", sources: "source", citations: "citation", events: "event"} as Record<string,string>)[change.table], id: String(row._id), ...(change.table === "places" ? {owner} : {})});
+      } else queue({kind: ({places: "place", sources: "source", citations: "citation", events: "event"} as Record<string,DependencyJob["kind"]>)[change.table], id: String(row._id), ...(change.table === "places" ? {owner} : {})});
     }
   };
   for (const change of changes) {try {for (const row of [change.before, change.after]) {
@@ -369,11 +404,15 @@ export async function applyExplorerChanges(ctx: MutationCtx, changes: ExplorerCh
   }
   } catch {queueChange(change);}}
   for (const job of deferred.values()) await scheduleJob(sourceCtx, job);
+  const pending: Doc<"persons">["_id"][] = [];
   let refreshed = 0;
   for (const id of ids) {
-    if (refreshed >= 25) {await schedulePerson(sourceCtx, id); continue;}
+    if (refreshed >= 25) {pending.push(id); continue;}
     refreshed++;
     try {await refreshPerson(ctx, id);}
-    catch {await schedulePerson(sourceCtx, id);}
+    catch {pending.push(id);}
+  }
+  for (let i = 0; i < pending.length; i += 100) {
+    await sourceCtx.scheduler.runAfter(0, internal.peopleExplorer.refreshBatch, {personIds: pending.slice(i, i + 100)});
   }
 }
