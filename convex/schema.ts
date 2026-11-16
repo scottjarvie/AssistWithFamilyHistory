@@ -95,6 +95,11 @@ export default defineSchema({
    */
   searchBuildState: defineTable({ table: v.string(), cursor: v.union(v.string(), v.null()), complete: v.boolean() }).index("by_table", ["table"]),
 
+  vaultCounts: defineTable({vaultOwnerId: v.string(), table: v.string(), counts: v.record(v.string(), v.number())})
+    .index("by_owner_table", ["vaultOwnerId", "table"]),
+  vaultCountMembers: defineTable({recordId: v.string(), table: v.string(), owner: v.string(), keys: v.array(v.string())})
+    .index("by_record", ["recordId"]),
+
   peopleExplorerRows: defineTable({personId: v.id("persons"), vaultOwnerId: v.string(), researchStatus: v.string(), orderKey: v.string(), text: v.string(), payload: peopleExplorerPayload})
     .index("by_person", ["personId"]).index("by_owner_order", ["vaultOwnerId", "orderKey"]).index("by_owner_status_order", ["vaultOwnerId", "researchStatus", "orderKey"]),
 
@@ -1297,6 +1302,7 @@ export default defineSchema({
    * AI-suggested or user-created research tasks
    */
   researchTasks: defineTable({
+    researchOrderTime: v.optional(v.number()),
     searchText: v.optional(v.string()),
     archivedAt: v.optional(v.number()), archivedBy: v.optional(v.string()),
     vaultOwnerId: v.optional(v.string()),
@@ -1343,6 +1349,8 @@ export default defineSchema({
   })
     .searchIndex("search_text", { searchField: "searchText", filterFields: ["vaultOwnerId", "archivedAt"] })
     .index("by_owner", ["vaultOwnerId"])
+    .index("by_owner_active_order", ["vaultOwnerId", "archivedAt", "researchOrderTime"])
+    .index("by_owner_active_status_order", ["vaultOwnerId", "archivedAt", "status", "researchOrderTime"])
     .index("by_person", ["personId"])
     .index("by_status", ["status"]),
 
@@ -1351,6 +1359,7 @@ export default defineSchema({
    * Tracks research activities across entity types
    */
   researchLog: defineTable({
+    researchOrderTime: v.optional(v.number()),
     searchText: v.optional(v.string()),
     archivedAt: v.optional(v.number()), archivedBy: v.optional(v.string()),
     vaultOwnerId: v.optional(v.string()),
@@ -1439,6 +1448,7 @@ export default defineSchema({
   })
     .searchIndex("search_text", { searchField: "searchText", filterFields: ["vaultOwnerId", "archivedAt"] })
     .index("by_owner", ["vaultOwnerId"])
+    .index("by_owner_active_order", ["vaultOwnerId", "archivedAt", "researchOrderTime"])
     .index("by_entity", ["entityType", "entityId"])
     .index("by_activity", ["activityType"])
     .index("by_status", ["status"])

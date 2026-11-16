@@ -34,9 +34,10 @@ ignored at read time.
 
 ## Delivering changes
 
-- Source mutations for People Explorer dependencies must use `convex/searchServer.ts`
-  builders: they maintain exact explorer projections. See
-  [projection maintenance and backfill](docs/operations/people-explorer-scale.md).
+- Source mutations must use `convex/searchServer.ts` builders: they maintain
+  exact explorer projections and active owner counters atomically. See
+  [projection maintenance](docs/operations/people-explorer-scale.md) and
+  [vault counters and Research](docs/operations/vault-counts-scale.md).
 
 - `pnpm verify` is the full check (typecheck, lint, tests, every `check:*`
   contract, build). Run it before pushing code.

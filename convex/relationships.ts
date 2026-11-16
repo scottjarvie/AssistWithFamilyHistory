@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation as mutation, internalQuery as query } from "./_generated/server";
+import { internalMutation as mutation, internalQuery as query } from "./searchServer";
 import { Doc, Id } from "./_generated/dataModel";
 
 export type FamilyTreeNode = {

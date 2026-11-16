@@ -10,6 +10,7 @@ import { ConvexError, v } from "convex/values";
 import {requireWebsitePerson} from "./access";
 import {validateAudioContainer, normalizeAudioMime, audioContainerError, invalidAudioFileError, checkVoiceNoteDuration, voiceNoteTooLongError} from "./lib/media/audio";
 import {auditMetrics} from "../lib/audit/contract";
+import type { TaskPage, LogPage } from "./researchPages";
 import { pageArgs, type PeoplePageResult } from "./peopleExplorer";
 import { internal } from "./_generated/api";
 import { action, type ActionCtx } from "./_generated/server";
@@ -272,12 +273,35 @@ export const getDashboardSummary = action({
     }),
 });
 
+/** Preserve the full Research DTO while avoiding one whole-vault transaction.
+ * The current ledger/facet client consumes all rows; do not silently cap it.
+ * The indexed page functions are also suitable for a future cursor consumer. */
+async function readResearchOverview(ctx: ActionCtx, vaultOwnerId: string): Promise<FunctionReturnType<typeof vaultInternal.getResearchOverview>> {
+  const ready = await ctx.runQuery(internal.vaultCounts.read, {vaultOwnerId});
+  if (!ready.complete) return ctx.runQuery(vaultInternal.getResearchOverview, {vaultOwnerId});
+  const tasks: FunctionReturnType<typeof vaultInternal.getResearchOverview>["tasks"] = [];
+  const logEntries: FunctionReturnType<typeof vaultInternal.getResearchOverview>["logEntries"] = [];
+  let cursor: string | null = null;
+  do {
+    const result: TaskPage = await ctx.runQuery(internal.researchPages.tasks, {vaultOwnerId, cursor});
+    tasks.push(...result.page);
+    if (result.isDone) break;
+    cursor = result.continueCursor;
+  } while (true);
+  cursor = null;
+  do {
+    const result: LogPage = await ctx.runQuery(internal.researchPages.log, {vaultOwnerId, cursor});
+    logEntries.push(...result.page);
+    if (result.isDone) break;
+    cursor = result.continueCursor;
+  } while (true);
+  return {tasks, logEntries};
+}
+
 export const getResearchOverview = action({
   args: { vaultOwnerId: v.string() },
   handler: async (ctx, args): Promise<FunctionReturnType<typeof vaultInternal.getResearchOverview>> =>
-    ctx.runQuery(vaultInternal.getResearchOverview, {
-      vaultOwnerId: await authorizedOwner(ctx, "vault.getResearchOverview", args.vaultOwnerId),
-    }),
+    readResearchOverview(ctx, await authorizedOwner(ctx, "vault.getResearchOverview", args.vaultOwnerId)),
 });
 
 export const getContextPack = action({
