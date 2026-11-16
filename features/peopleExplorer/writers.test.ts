@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { expect, test } from "vitest";
 import ts from "typescript";
-import { EXPLORER_TABLES } from "../../convex/peopleExplorer";
+import { COUNT_TABLES } from "../../convex/vaultCounts";
 
 /** Check actual ID/table types, including dynamic generic writers and either patch signature. */
 test("source-table writes cannot bypass the central mutation builders", () => {
@@ -27,7 +27,7 @@ test("source-table writes cannot bypass the central mutation builders", () => {
         const arg = node.arguments[node.arguments.length === 3 ? 1 : 0];
         if (arg) {
           const names = tables(checker.getTypeAtLocation(arg));
-          if (names.includes("<unknown>") || names.some(n => EXPLORER_TABLES.includes(n))) problems.push(`${name}:${file.getLineAndCharacterOfPosition(node.pos).line + 1} ${names.join("|")}`);
+          if (names.includes("<unknown>") || names.some(n => COUNT_TABLES.includes(n as typeof COUNT_TABLES[number]))) problems.push(`${name}:${file.getLineAndCharacterOfPosition(node.pos).line + 1} ${names.join("|")}`);
         }
       }
       ts.forEachChild(node, walk);

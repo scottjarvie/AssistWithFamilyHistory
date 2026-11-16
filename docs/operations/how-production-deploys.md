@@ -89,3 +89,9 @@ Run its shipped `peopleExplorer:backfill` on accomplished-dodo-308 and confirm
 People Explorer snapshot behavior. The runbook also documents skipped-row
 diagnostics and the internal refreshPeople repair mutation. This is a post-deploy data migration,
 not a manual production code deployment.
+
+## Exact vault counters
+
+The batch A [counter/backfill and paged workspace runbook](vault-counts-scale.md)
+covers Dashboard, Research and Places. Its completion gate is separate from the
+People Explorer migration. Confirm both required migrations independently.

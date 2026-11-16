@@ -1,15 +1,10 @@
 # Agent Operating Rules
 
-This repo builds Assist With Family History: a private family-history vault
-(FamilySearch-first capture), a research Queue, and story writing. Genealogy
-data is private by default, especially living people, memories, notes and raw
-imported artifacts.
+A private FamilySearch-first research vault, Queue and story workspace.
 
 ## Read first
 
-- [Site Guide](docs/planning/site-guide.md): the one product document (trust
-  and privacy rules, building blocks, the Queue, AI tools, language, defaults
-  for users and their AI). Open questions: `docs/planning/site-guide-content.json`.
+- [Site Guide](docs/planning/site-guide.md): product, privacy and AI-tool truth. Open questions: `docs/planning/site-guide-content.json`.
 - [Tracker Guide](docs/tracker/GUIDE.md) and the open parked Cards
   (`docs/tracker/cards/`, status `backlog`): grouped bugs, minor issues, design
   work, pages not yet on the new design, and features worth building later.
@@ -34,9 +29,10 @@ ignored at read time.
 
 ## Delivering changes
 
-- Source mutations for People Explorer dependencies must use `convex/searchServer.ts`
-  builders: they maintain exact explorer projections. See
-  [projection maintenance and backfill](docs/operations/people-explorer-scale.md).
+- Source mutations must use `convex/searchServer.ts` builders: they maintain
+  exact explorer projections and active owner counters atomically. See
+  [projection maintenance](docs/operations/people-explorer-scale.md) and
+  [vault counters and Research](docs/operations/vault-counts-scale.md).
 
 - `pnpm verify` is the full check (typecheck, lint, tests, every `check:*`
   contract, build). Run it before pushing code.
@@ -62,9 +58,9 @@ Sandbox is `http://family-history.localhost:3443`. Once per checkout run
 user, never Scott's account. See the
 [screenshots README](https://github.com/scottjarvie/assist-local-dev/blob/main/screenshots/README.md).
 
-<!-- BEGIN:nextjs-agent-rules -->
-
 **Scott's real account** (testing only, read-mostly; use the test user for anything that writes): `shoot.mjs --live --checkout .` on the local Live address reuses his saved session; see the [standard](https://github.com/scottjarvie/assist-local-dev/blob/main/docs/sign-in-and-screenshots.md#scotts-real-account-approved-15-nov-2026).
+
+<!-- BEGIN:nextjs-agent-rules -->
 
 ## This is NOT the Next.js you know
 

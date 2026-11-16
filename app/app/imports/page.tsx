@@ -21,21 +21,7 @@ import {
   type CaptureImportTone,
 } from "@/features/capture/importModel";
 
-type RecentImport = {
-  _id: string;
-  personName: string;
-  personFsId: string;
-  personRouteId?: string;
-  mergeStatus: string;
-  pageTypes: string[];
-  importedAt: number;
-  warnings: string[];
-  counts: {
-    sources: number;
-    memories: number;
-    warnings: number;
-  };
-};
+type RecentImport = import("@/convex/dashboard").DashboardSummary["recentImports"][number];
 
 type BackendStatus = {
   tone: "ready" | "degraded";

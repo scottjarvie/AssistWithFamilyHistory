@@ -1,15 +1,14 @@
-import { PlaceCollectionView } from "@/components/vault/PlaceCollectionView";
-import { projectPlaceRow } from "@/lib/vault/collectionRows";
+import { PaginatedPlaces } from "@/components/vault/PaginatedPlaces";
+import { loadPlaces } from "./actions";
+
 import type { Metadata } from "next";
 import { VaultStateCard } from "@/components/vault/VaultStateCard";
 import { createPageMetadata } from "@/lib/seo";
 import {
-  getAuthedConvexClient,
   getConvexRuntimeIssue,
   getConvexUnavailableState,
   isConvexConfigured,
 } from "@/lib/convex/server";
-import { api } from "@/convex/_generated/api";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
 export const metadata: Metadata = createPageMetadata({
@@ -39,15 +38,11 @@ export default async function PlacesPage({
     );
   }
 
-  const client = await getAuthedConvexClient();
   const { vaultOwnerId } = await getVaultAccessContext();
   let places;
 
   try {
-    places = await client.action(api.vaultReads.getPlacesExplorer, {
-      vaultOwnerId,
-      search: params.q || undefined,
-    });
+    places = await loadPlaces({expectedOwner:vaultOwnerId,cursor:null,search:params.q||undefined});
   } catch (error) {
     const issue = getConvexRuntimeIssue(error);
 
@@ -58,5 +53,5 @@ export default async function PlacesPage({
     );
   }
 
-  return <PlaceCollectionView places={places.map(projectPlaceRow)} query={params.q} preferenceKey={`awf.collection.places.${vaultOwnerId}`} />;
+  return <PaginatedPlaces key={`${vaultOwnerId}:${params.q}`} initial={places} query={params.q} vaultOwnerId={vaultOwnerId} preferenceKey={`awf.collection.places.${vaultOwnerId}`} />;
 }

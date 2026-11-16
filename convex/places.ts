@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { action, internalQuery, mutation } from "./searchServer";
 import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
-import { authorizeTenantAction, authorizeTenantMutation } from "./access";
+import { authorizeTenantAction, authorizeTenantMutation, requireWebsitePerson } from "./access";
 import { filterByVaultOwner } from "./vaultCore";
 
 const placeTypeValidator = v.union(
@@ -142,4 +142,39 @@ export const list = action({
       vaultOwnerId: decision.owner,
     });
   },
+});
+
+export const linkMedia = mutation({
+ args:{vaultOwnerId:v.string(),placeId:v.id("places"),mediaId:v.id("media")},
+ handler:async(ctx,args)=>{
+  const person=await requireWebsitePerson(ctx);
+  const {owner}=await authorizeTenantMutation(ctx,"places.linkMedia",args.vaultOwnerId);
+  if(person.subject!==owner)throw new Error("Owner mismatch");
+  const [place,media]=await Promise.all([ctx.db.get(args.placeId),ctx.db.get(args.mediaId)]);
+  if(!place||place.vaultOwnerId!==owner||place.archivedAt!==undefined||!media||media.vaultOwnerId!==owner||media.archivedAt!==undefined)throw new Error("Place or media not found");
+  const existing=await ctx.db.query("placeMediaMembers").withIndex("by_place_media",q=>q.eq("vaultOwnerId",owner).eq("placeId",args.placeId).eq("mediaId",args.mediaId)).unique();
+  if(existing?.active)return {linked:true};
+  await ctx.db.insert("connections",{vaultOwnerId:owner,from:{kind:"media",id:String(args.mediaId)},to:{kind:"place",id:String(args.placeId)},relation:"taken_at",state:"accepted",acceptedBy:person.subject,acceptedAt:Date.now(),createdAt:Date.now(),updatedAt:Date.now()});
+  return {linked:true};
+ }
+});
+
+/** Reject one accepted connection at a time so even duplicate legacy links and
+ * large media bodies stay bounded. The website continues up to 50 transactions. */
+export const unlinkMedia = mutation({
+ args:{vaultOwnerId:v.string(),placeId:v.id("places"),mediaId:v.id("media")},
+ handler:async(ctx,args)=>{
+  const person=await requireWebsitePerson(ctx);
+  const {owner}=await authorizeTenantMutation(ctx,"places.unlinkMedia",args.vaultOwnerId);
+  if(person.subject!==owner)throw new Error("Owner mismatch");
+  const [place,media]=await Promise.all([ctx.db.get(args.placeId),ctx.db.get(args.mediaId)]);
+  if(!place||place.vaultOwnerId!==owner||place.archivedAt!==undefined||!media||media.vaultOwnerId!==owner)throw new Error("Place or media not found");
+  const edges=await ctx.db.query("placeMediaConnectionEdges").withIndex("by_pair",q=>q.eq("vaultOwnerId",owner).eq("placeId",args.placeId).eq("mediaId",args.mediaId)).take(2);
+  if(!edges.length)return {linked:false};
+  const id=ctx.db.normalizeId("connections",edges[0].connectionId);
+  const connection=id?await ctx.db.get(id):null;
+  if(!connection||connection.vaultOwnerId!==owner||connection.state!=="accepted")throw new Error("Place connection changed. Reload and try again.");
+  await ctx.db.patch(connection._id,{state:"rejected",rejectedBy:person.subject,rejectedAt:Date.now(),updatedAt:Date.now()});
+  return {linked:edges.length>1};
+ }
 });

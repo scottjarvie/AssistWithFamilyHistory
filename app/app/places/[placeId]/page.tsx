@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { notFound } from "next/navigation";
 import { VaultStateCard } from "@/components/vault/VaultStateCard";
 import {
@@ -53,5 +54,6 @@ export default async function PlaceWorkspacePage({ params }: PageProps) {
   if (!workspace) {
     notFound();
   }
-  return <PlaceWorkspaceView workspace={workspace}/>;
+  const workspaceKey = createHash("sha256").update(JSON.stringify(workspace)).digest("hex");
+  return <PlaceWorkspaceView key={`${vaultOwnerId}:${placeId}:${workspaceKey}`} workspace={workspace} vaultOwnerId={vaultOwnerId}/>;
 }

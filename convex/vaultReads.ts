@@ -1,5 +1,7 @@
 "use node";
 
+import {placePageArgs,sectionValidator,type PlaceWorkspace,type SectionPage,type PlaceSection,type PlaceListPage,type PlaceMention} from "./placePages";
+
 import type {
   ApiFromModules,
   FilterApi,
@@ -10,6 +12,8 @@ import { ConvexError, v } from "convex/values";
 import {requireWebsitePerson} from "./access";
 import {validateAudioContainer, normalizeAudioMime, audioContainerError, invalidAudioFileError, checkVoiceNoteDuration, voiceNoteTooLongError} from "./lib/media/audio";
 import {auditMetrics} from "../lib/audit/contract";
+import { researchPageArgs } from "./researchPages";
+import type { TaskPage, LogPage } from "./researchPages";
 import { pageArgs, type PeoplePageResult } from "./peopleExplorer";
 import { internal } from "./_generated/api";
 import { action, type ActionCtx } from "./_generated/server";
@@ -237,22 +241,28 @@ export const getStoryReadinessCandidates = action({
     }),
 });
 
-export const getPlacesExplorer = action({
-  args: { vaultOwnerId: v.string(), search: v.optional(v.string()), limit: v.optional(v.number()) },
-  handler: async (ctx, args): Promise<FunctionReturnType<typeof vaultInternal.getPlacesExplorer>> =>
-    ctx.runQuery(vaultInternal.getPlacesExplorer, {
-      ...args,
-      vaultOwnerId: await authorizedOwner(ctx, "vault.getPlacesExplorer", args.vaultOwnerId),
-    }),
+export const getPlacesPage = action({
+  args:{...placePageArgs,search:v.optional(v.string())},
+  handler:async(ctx,args):Promise<PlaceListPage>=>ctx.runQuery(internal.placePages.list,{...args,vaultOwnerId:await authorizedOwner(ctx,"vault.getPlacesExplorer",args.vaultOwnerId)}),
 });
-
+export const getPlaceSection = action({
+  args:{...placePageArgs,placeId:v.id("places"),section:sectionValidator},
+  handler:async(ctx,args):Promise<SectionPage>=>ctx.runQuery(internal.placePages.section,{...args,vaultOwnerId:await authorizedOwner(ctx,"vault.getPlaceWorkspace",args.vaultOwnerId)}),
+});
+export const getPlaceMentions = action({
+  args:{vaultOwnerId:v.string(),placeId:v.id("places")},
+  handler:async(ctx,args):Promise<PlaceMention[]>=>ctx.runQuery(internal.placePages.mentions,{...args,vaultOwnerId:await authorizedOwner(ctx,"vault.getPlaceWorkspace",args.vaultOwnerId)}),
+});
 export const getPlaceWorkspace = action({
-  args: { vaultOwnerId: v.string(), placeId: v.id("places") },
-  handler: async (ctx, args): Promise<FunctionReturnType<typeof vaultInternal.getPlaceWorkspace>> =>
-    ctx.runQuery(vaultInternal.getPlaceWorkspace, {
-      ...args,
-      vaultOwnerId: await authorizedOwner(ctx, "vault.getPlaceWorkspace", args.vaultOwnerId),
-    }),
+  args:{vaultOwnerId:v.string(),placeId:v.id("places")},
+  handler:async(ctx,args):Promise<PlaceWorkspace|null>=>{
+    const vaultOwnerId=await authorizedOwner(ctx,"vault.getPlaceWorkspace",args.vaultOwnerId);
+    const initial=await ctx.runQuery(internal.placePages.initial,{vaultOwnerId,placeId:args.placeId});
+    if(!initial)return null;if(initial.mode==="legacy")return initial.workspace;
+    const sections:PlaceSection[]=["events","people","sources","context","research","media"];
+    const results=await Promise.all(sections.map(section=>ctx.runQuery(internal.placePages.section,{vaultOwnerId,placeId:args.placeId,section,cursor:null})));
+    return {header:initial.header,pages:Object.fromEntries(sections.map((s,i)=>[s,results[i]]))as PlaceWorkspace["pages"]};
+  },
 });
 
 /** The People pages' small question: may the private first start be offered? */
@@ -272,12 +282,13 @@ export const getDashboardSummary = action({
     }),
 });
 
-export const getResearchOverview = action({
-  args: { vaultOwnerId: v.string() },
-  handler: async (ctx, args): Promise<FunctionReturnType<typeof vaultInternal.getResearchOverview>> =>
-    ctx.runQuery(vaultInternal.getResearchOverview, {
-      vaultOwnerId: await authorizedOwner(ctx, "vault.getResearchOverview", args.vaultOwnerId),
-    }),
+export const getResearchTasksPage = action({
+  args: {...researchPageArgs, search: v.optional(v.string()), status: v.optional(v.union(v.literal("todo"), v.literal("in_progress"), v.literal("blocked"), v.literal("done")))},
+  handler: async (ctx, args): Promise<TaskPage> => ctx.runQuery(internal.researchPages.tasks, {...args, vaultOwnerId: await authorizedOwner(ctx, "vault.getResearchOverview", args.vaultOwnerId)}),
+});
+export const getResearchLogPage = action({
+  args: researchPageArgs,
+  handler: async (ctx, args): Promise<LogPage> => ctx.runQuery(internal.researchPages.log, {...args, vaultOwnerId: await authorizedOwner(ctx, "vault.getResearchOverview", args.vaultOwnerId)}),
 });
 
 export const getContextPack = action({

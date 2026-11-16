@@ -28,11 +28,14 @@ test('each vetted statement calls raw builder only through its explicit approved
  for(const [file,names] of Object.entries(whitelist)){
   const source=readFileSync('sandbox-backend/convex/'+file,'utf8');
   assert.match(source,/import \{action as recordOnlyAction\} from "\.\/_generated\/server"/);
-  assert.match(source,/_local\/recordOnlyServer/);
+  if (source.includes('from "./searchServer"')) {
+   // Central source writers re-export the guarded action builder transitively.
+   assert.match(readFileSync('sandbox-backend/convex/searchServer.ts','utf8'),/export \* from "\.\/_local\/recordOnlyServer"/);
+  } else assert.match(source,/_local\/recordOnlyServer/);
   const uses=[...source.matchAll(/export const (\w+) = recordOnlyAction\(/g)].map(match=>match[1]);
   assert.deepEqual(uses,names);count+=uses.length;
  }
- assert.equal(count,26);
+ assert.equal(count,29);
  assert.match(readFileSync('sandbox-backend/convex/vaultReads.ts','utf8'),/export const getOwnedMediaFile = action\(/);
  assert.match(readFileSync('sandbox-backend/convex/access.ts','utf8'),/return "enforce"/);
 });

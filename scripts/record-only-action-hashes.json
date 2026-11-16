@@ -10,13 +10,11 @@
   "vaultReads.ts:getVaultAudit": "b8509c75cdaea6dac7a0571e79a90363e4ee02b31f92fef82f85bcb0b2d58d15",
   "vaultReads.ts:getContextCoverage": "a552186b55eb610f9c256d0be07deea74ab0c04d4824f29c2bd3dacd2b891cd5",
   "vaultReads.ts:getStoryReadinessCandidates": "7bf987ea37b93eb7eade8d5aed087651a68a5b86692982dcd2b437b2c3dcaca8",
-  "vaultReads.ts:getPlacesExplorer": "b10bb61dd1110e884f0f60c9c98d7c875ab5dcde85a0cc2db519d1b84ad1ca1a",
-  "vaultReads.ts:getPlaceWorkspace": "ed4721fb7327123d5c368a5485e79fd50dc1cda312a99d11641925652d08b3d0",
+  "vaultReads.ts:getPlaceWorkspace": "532a7c6226f363dde3ff2c184d70707d82889a619bfe293e7ef23a47ce294b59",
   "vaultReads.ts:getDashboardSummary": "6a0629ca294f7c584b87603c2009cb878ed75b2259d98c7b21702f9d97361685",
-  "vaultReads.ts:getResearchOverview": "4e13994aa935b3a703bfc2cb6cd099f12a5210f481d6cfa322a3b7cf28fc3d0a",
   "vaultReads.ts:getContextPack": "3006868e7004222178cd2c73368b477c663b345324e27a2b4e3e67fb52414001",
-  "queue.ts:listQueueItems": "818845671c0bb4616d94715125b0c3c154110f5ba666d380451ec13d6fcc6fa0",
-  "queue.ts:getQueueItem": "926df1fb2d7dc887ae78361454cb085ac8159efcf048e7d5f10ee3f381f45ad2",
+  "queue.ts:listQueueItems": "e8a31afb2771a0482c1c4e7d4ac493c23250cb5c92d292523a7fd099d6a08ce0",
+  "queue.ts:getQueueItem": "3e78bfa521800cb7c2b56ff247f2af01bbb6a8e3a6bf515f89b1364cd479c1b6",
   "documents.ts:getDocumentsByPerson": "d0c9c7d1e4cf97ea9c4760ab5a157fbd834f8f748079c7cd0861d480e43375c2",
   "documents.ts:getDocument": "e29b58d1635d69b0598993474ade8e2da2b27e36e77af43723254c382e931fc5",
   "documents.ts:list": "44d61f3bb8d3f813bde9cebf5646a1faf291623cdaa4296a607f7246653cc405",
@@ -24,5 +22,10 @@
   "importRuns.ts:getByCaptureId": "e925c132d414b21bdc6f7eae0a089fb0faf9319986496719b4919ebc94a4377f",
   "places.ts:getByFsId": "a68fc09ce602632630536006be38451dcc16f5958d3e0edb71047640aa9f6399",
   "places.ts:list": "6262a70e978b602a5256eb8c304aac1a5216cf6ae4964a6e0348ff108ed38f9c",
-  "researchLog.ts:listForEntity": "36ffbe58bd058470d9db0ed2f10f02a535a7fde2d747c020aad5d3fb27f563a8"
+  "researchLog.ts:listForEntity": "36ffbe58bd058470d9db0ed2f10f02a535a7fde2d747c020aad5d3fb27f563a8",
+  "vaultReads.ts:getPlacesPage": "da8da2d49e84a843c07473c841588606fbaaa3b7a88133c63d0364ef41b922c8",
+  "vaultReads.ts:getPlaceSection": "3018af962c9574350c911e9f3618e1f67e3829547b41603b3c72e87eeb716250",
+  "vaultReads.ts:getPlaceMentions": "7b983a30a2109ccf73e8883cd637c4fd883a09fbc689fe6b10ed34efa01451b2",
+  "vaultReads.ts:getResearchTasksPage": "d5e6073673c8649e53207ed39d3d147edfb52df06c37061ea250f678f22532ef",
+  "vaultReads.ts:getResearchLogPage": "bd19c248c239fa3645dde408f13b09a9d2c65a2e2682e54fa2916add8879b8d3"
 }
