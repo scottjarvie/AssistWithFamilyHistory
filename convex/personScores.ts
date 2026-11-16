@@ -84,14 +84,20 @@ export async function refreshProvisionalScore(ctx: Pick<MutationCtx, "db">, id: 
 export async function scoresReady(ctx: Pick<QueryCtx, "db">) { return !!(await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", BUILD)).unique())?.complete; }
 export const status = internalQuery({ args: {}, handler: ctx => scoresReady(ctx) });
 export const totals = internalQuery({ args: { vaultOwnerId: v.string() }, handler: (ctx, a) => ownerTableCounter(ctx, a.vaultOwnerId, "personScores") });
-export const stalePage = internalQuery({ args: { vaultOwnerId: v.string(), now: v.number(), cursor: v.union(v.string(), v.null()) }, handler: async (ctx, a) => {
-        const p = await ctx.db.query("personScoreReviews").withIndex("by_owner_review", q => q.eq("vaultOwnerId", a.vaultOwnerId).gt("reviewedAt", 0).lt("reviewedAt", a.now - STALE_AGE)).paginate({ cursor: a.cursor, numItems: 250, maximumBytesRead: 250000 });
-        return { count: p.page.length, continueCursor: p.continueCursor, isDone: p.isDone };
-    } });
+async function staleReviewsPage(ctx: Pick<QueryCtx, "db">, a: {vaultOwnerId: string; now: number; cursor: string | null}) {
+    const p = await ctx.db.query("personScoreReviews").withIndex("by_owner_review", q => q.eq("vaultOwnerId", a.vaultOwnerId).gt("reviewedAt", 0).lt("reviewedAt", a.now - STALE_AGE)).paginate({ cursor: a.cursor, numItems: 250, maximumBytesRead: 250000 });
+    return { count: p.page.length, continueCursor: p.continueCursor, isDone: p.isDone };
+}
+export const stalePage = internalQuery({ args: { vaultOwnerId: v.string(), now: v.number(), cursor: v.union(v.string(), v.null()) }, handler: staleReviewsPage });
+/** One snapshot covers the common case: totals plus at most 250 stale reviews. */
+export const totalsAndStale = internalQuery({args: {vaultOwnerId: v.string(), now: v.number()}, handler: async (ctx, a) => {
+    const [total, page] = await Promise.all([ownerTableCounter(ctx, a.vaultOwnerId, "personScores"), staleReviewsPage(ctx, {...a, cursor: null})]);
+    return {...total, page};
+}});
 const sortValidator = v.optional(v.union(v.literal("missingCritical"), v.literal("completion"), v.literal("lastTouched"), v.literal("sourceCount"), v.literal("storyReadiness"), v.literal("newestImport")));
 const workflowValidator=v.union(v.literal("needs_genealogy_evidence"),v.literal("needs_context_research"),v.literal("ready_to_draft"),v.literal("ready_to_review"),v.literal("published"));
 export const operationsArgs = { vaultOwnerId: v.string(), cursor: v.optional(v.union(v.string(), v.null())), search: v.optional(v.string()), rowType: v.optional(v.union(v.literal("person"), v.literal("provisional"))), missingCheck: v.optional(v.string()), storyStatus: v.optional(v.union(v.literal("has_story"), v.literal("no_story"))), storyWorkflow: v.optional(workflowValidator), staleOnly: v.optional(v.boolean()), sortBy: sortValidator, sortDirection: v.optional(v.union(v.literal("asc"), v.literal("desc"))), limit: v.optional(v.number()) };
-export const operationsPage = internalQuery({ args: { ...operationsArgs, now: v.number(), candidateLimit:v.optional(v.number()) }, handler: async (ctx, a): Promise<Omit<OperationsPage, "summary" | "summaryScope"> & {scanned:number}> => {
+export const operationsPage = internalQuery({ args: { ...operationsArgs, now: v.number(), candidateLimit:v.optional(v.number()) }, handler: async (ctx, a): Promise<Omit<OperationsPage, "summary" | "summaryScope" | "exact"> & {scanned:number}> => {
         const base = ctx.db.query("personScoreRows");
         const priority = !a.sortBy || a.sortBy === "missingCritical";
         const range = priority && a.missingCheck && RESEARCH_CHECK_DEFINITIONS.some(c => c.key === a.missingCheck)
@@ -100,9 +106,17 @@ export const operationsPage = internalQuery({ args: { ...operationsArgs, now: v.
                 : priority && a.storyWorkflow ? base.withIndex("by_workflow_priority", q => q.eq("vaultOwnerId", a.vaultOwnerId).eq("storyWorkflow", a.storyWorkflow!))
                     : priority && a.storyStatus ? base.withIndex("by_story_priority", q => q.eq("vaultOwnerId", a.vaultOwnerId).eq("hasStory", a.storyStatus === "has_story"))
                         : base.withIndex(`by_${a.sortBy ?? "missingCritical"}`, q => q.eq("vaultOwnerId", a.vaultOwnerId));
-        const p = await range.order(a.sortDirection === "asc" ? "desc" : "asc").paginate({ cursor: a.cursor ?? null, numItems: 50, maximumBytesRead: 250000 });
+        const p = await range.order(a.sortDirection === "asc" ? "desc" : "asc").paginate({ cursor: a.cursor ?? null, numItems: Math.max(1, Math.min(50, Math.floor(a.candidateLimit ?? 50))), maximumBytesRead: 250000 });
         const needle = a.search?.trim().toLowerCase();
-        const rows = p.page.filter(s => { const r = s.operation; return (!a.rowType || s.rowType === a.rowType) && (!a.storyStatus || (r.storyCount > 0) === (a.storyStatus === "has_story")) && (!a.storyWorkflow || s.storyWorkflow === a.storyWorkflow) && (!a.staleOnly || staleCount(s.reviews, a.now) > 0) && (!a.missingCheck || r.missingCritical.includes(a.missingCheck)) && (!needle || [r.displayName, r.relationshipHint || "", ...r.keyPlaces, r.lifespan].join(" ").toLowerCase().includes(needle)); }).map(s => ({ ...s.operation, staleChecksCount: staleCount(s.reviews, a.now) }));
+        const active = await Promise.all(p.page.map(async s => {
+            // Guest adoption defers score removal; recheck this narrow transitional
+            // case before returning a former guest's display data.
+            if (!s.vaultOwnerId.startsWith("guest_")) return true;
+            const id = ctx.db.normalizeId(s.rowType === "person" ? "persons" : "provisionalRelatives", s.recordId);
+            const source = id ? await ctx.db.get(id) : null;
+            return source?.vaultOwnerId === s.vaultOwnerId;
+        }));
+        const rows = p.page.filter((s, i) => active[i]).filter(s => { const r = s.operation; return (!a.rowType || s.rowType === a.rowType) && (!a.storyStatus || (r.storyCount > 0) === (a.storyStatus === "has_story")) && (!a.storyWorkflow || s.storyWorkflow === a.storyWorkflow) && (!a.staleOnly || staleCount(s.reviews, a.now) > 0) && (!a.missingCheck || r.missingCritical.includes(a.missingCheck)) && (!needle || [r.displayName, r.relationshipHint || "", ...r.keyPlaces, r.lifespan].join(" ").toLowerCase().includes(needle)); }).map(s => ({ ...s.operation, staleChecksCount: staleCount(s.reviews, a.now) }));
         return { rows, scanned:p.page.length, continueCursor: p.continueCursor, isDone: p.isDone };
     } });
 export const readinessArgs = { vaultOwnerId: v.string(), storyWorkflow: v.optional(workflowValidator), cursor: v.optional(v.union(v.string(), v.null())), limit: v.optional(v.number()) };
@@ -110,5 +124,10 @@ export const readinessPage = internalQuery({ args: readinessArgs, handler: async
         const base = ctx.db.query("personScoreRows");
         const query = a.storyWorkflow ? base.withIndex("by_workflow_readiness", q => q.eq("vaultOwnerId", a.vaultOwnerId).eq("rowType", "person").eq("storyWorkflow", a.storyWorkflow!)) : base.withIndex("by_readiness", q => q.eq("vaultOwnerId", a.vaultOwnerId).eq("rowType", "person"));
         const p = await query.paginate({ cursor: a.cursor ?? null, numItems: 24, maximumBytesRead: 250000 });
-        return { page: p.page.flatMap(r => r.readiness ? [r.readiness] : []), continueCursor: p.continueCursor, isDone: p.isDone };
+        const visible = await Promise.all(p.page.map(async r => {
+            if (!r.vaultOwnerId.startsWith("guest_")) return true;
+            const id = ctx.db.normalizeId("persons", r.recordId);
+            return id && (await ctx.db.get(id))?.vaultOwnerId === r.vaultOwnerId;
+        }));
+        return { page: p.page.flatMap((r, i) => visible[i] && r.readiness ? [r.readiness] : []), continueCursor: p.continueCursor, isDone: p.isDone };
     } });

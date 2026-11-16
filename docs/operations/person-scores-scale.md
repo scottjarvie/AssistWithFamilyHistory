@@ -29,7 +29,13 @@ following concurrent edits; cursors can move, and the client deduplicates IDs.
 Stale status is never persisted. Each applicable resolved check with a positive
 review timestamp has a small `personScoreReviews` entry. Reads use the
 owner/timestamp range `0 < reviewedAt < now - 45 days`, in pages of 250. They sum
-all pages with one fixed cutoff for an exact count, checking summed shard revisions before/after. Concurrent refreshes restart the count; three unstable attempts fail explicitly instead of returning a mixed total. This is proportional to stale
+all pages with one fixed cutoff. Totals and the first stale page share one query,
+so up to 250 stale reviews need no revision recheck or retry. Larger traversals
+check summed shard revisions before/after. Concurrent refreshes restart the count,
+with 50 ms then 100 ms backoff. After three unstable attempts, reads return the
+last attempt with `exact:false`; Operations shows an Approximate summary notice,
+and the JSON API and private handoff packet preserve the flag. Refresh activity
+never makes these reads throw a revision-refusal error. This is proportional to stale
 checks across multiple bounded transactions, rather than a constant-time count.
 No wall-clock scheduler is needed; stale status changes without any source edit.
 
@@ -81,3 +87,25 @@ historical-context jobs. An extreme single-person graph can still exceed refresh
 limits and leave a recorded failure/stale row. No source edit is rolled back by
 that asynchronous worker. This does not certify unbounded single-person evidence
 or an unlimited place-less-context range. Audit migration remains required.
+
+## Scheduled refresh resilience and guest adoption
+
+A failed `refreshScheduled` records its failure and transactionally schedules one
+retry after 250 ms. The failure row records `retryAttempt` (0 or 1) and
+`retryPending`. Success removes the failure; failure on attempt 1 remains available
+for `refreshPeople` repair. No unbounded retry loop. Existing failure rows need no
+migration. Dependency keys include the provisional-discovery flag; old keys are
+recognized only when the stored job has matching provisional semantics.
+
+Guest adoption retains the existing single source-retag mutation and immediately
+removes old Explorer display rows. It defers score removals to the existing
+25-person owner dependency pages, before scheduling rebuilds. During this short
+window guest Operations/readiness candidate reads recheck stored source ownership;
+they cannot return adopted people to the former guest vault. Other person archive,
+delete and ownership changes retain synchronous score removal. Totals describe
+last-computed projections until scheduled work settles. The legacy source-retag
+loop itself still has mutation limits; this is not an unlimited-vault migration.
+
+No BUILD bump: the held v6 backfill covers this batch after Vercel deploys. Audit
+still uses its full snapshot and needs its own exact maintained gaps and paged
+record drilldowns. This fix batch must not be described as the Audit migration.

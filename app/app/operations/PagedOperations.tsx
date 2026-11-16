@@ -19,5 +19,5 @@ export function PagedOperations({ owner, initial, ...props }: Omit<OperationsVie
     finally {
         setPending(false);
     } }
-    return <><OperationsView {...props} rows={state.rows} summary={state.summary} summaryScope={state.summaryScope} loadMoreHref={null}/><div className="px-6 pb-8">{error && <p role="alert">{error}</p>}{!state.isDone && <Button disabled={pending} onClick={() => void more()}>{pending ? "Loading…" : "Load more operations"}</Button>}{!state.isDone && <p className="mt-2 text-sm text-muted-foreground">More records remain to search, even when this page has no matches.</p>}</div></>;
+    return <><OperationsView {...props} rows={state.rows} summary={state.summary} summaryScope={state.summaryScope} exact={state.exact} loadMoreHref={null}/><div className="px-6 pb-8">{error && <p role="alert">{error}</p>}{!state.isDone && <Button disabled={pending} onClick={() => void more()}>{pending ? "Loading…" : "Load more operations"}</Button>}{!state.isDone && <p className="mt-2 text-sm text-muted-foreground">More records remain to search, even when this page has no matches.</p>}</div></>;
 }

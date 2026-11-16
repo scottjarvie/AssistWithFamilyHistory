@@ -142,7 +142,7 @@ export default defineSchema({
   peopleExplorerRows: defineTable({personId: v.id("persons"), vaultOwnerId: v.string(), researchStatus: v.string(), orderKey: v.string(), text: v.string(), payload: peopleExplorerPayload})
     .index("by_person", ["personId"]).index("by_owner_order", ["vaultOwnerId", "orderKey"]).index("by_owner_status_order", ["vaultOwnerId", "researchStatus", "orderKey"]),
 
-  peopleExplorerFailures: defineTable({personId: v.id("persons"), reason: v.string(), failedAt: v.number()}).index("by_person", ["personId"]),
+  peopleExplorerFailures: defineTable({personId: v.id("persons"), reason: v.string(), failedAt: v.number(), retryAttempt: v.optional(v.number()), retryPending: v.optional(v.boolean())}).index("by_person", ["personId"]),
 
   peopleExplorerDependencyFailures: defineTable({
     key: v.string(),
