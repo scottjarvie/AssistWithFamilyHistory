@@ -143,7 +143,7 @@ test("deferred guest adapter still tracks non-person owner moves and content rev
   for (const [key, n] of Object.entries(audit.counter)) expect(audit.subtotal[key] ?? 0).toBe(n);
 });
 
-test("v1 unsharded memberships migrate atomically with edits before the v3 completion gate",async()=>{
+test("v1 unsharded memberships migrate atomically with edits before the v4 completion gate",async()=>{
  const t=convexTest(schema,modules);
  const ids=await t.run(async ctx=>{
   await ctx.db.insert("searchBuildState",{table:"vaultCounts:v1",cursor:null,complete:true});

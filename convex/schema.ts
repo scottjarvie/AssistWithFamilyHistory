@@ -101,7 +101,7 @@ export default defineSchema({
     .index("by_owner_table_shard", ["vaultOwnerId", "table", "shard"]),
   placeCounterShards: defineTable({vaultOwnerId:v.string(),placeId:v.id("places"),shard:v.number(),counts:v.record(v.string(),v.number())}).index("by_place_shard",["vaultOwnerId","placeId","shard"]),
   placeMediaMembers: defineTable({vaultOwnerId:v.string(),placeId:v.id("places"),mediaId:v.id("media"),refs:v.number(),active:v.boolean(),orderKey:v.string()}).index("by_place_media",["vaultOwnerId","placeId","mediaId"]).index("by_place_active",["vaultOwnerId","placeId","active"]).index("by_place_order",["vaultOwnerId","placeId","active","orderKey"]).index("by_media",["mediaId"]),
-  placeMediaConnectionEdges: defineTable({connectionId:v.string(),vaultOwnerId:v.string(),placeId:v.id("places"),mediaId:v.id("media")}).index("by_connection",["connectionId"]),
+  placeMediaConnectionEdges: defineTable({connectionId:v.string(),vaultOwnerId:v.string(),placeId:v.id("places"),mediaId:v.id("media")}).index("by_connection",["connectionId"]).index("by_pair",["vaultOwnerId","placeId","mediaId"]),
   vaultCountMembers: defineTable({recordId: v.string(), table: v.string(), owner: v.string(), keys: v.array(v.string()), shard: v.optional(v.number()), places:v.optional(v.array(v.object({owner:v.string(),placeId:v.id("places"),kind:v.union(v.literal("events"),v.literal("citations"),v.literal("context"),v.literal("research")),year:v.optional(v.number())})))})
     .index("by_record", ["recordId"]),
 
@@ -928,6 +928,8 @@ export default defineSchema({
     state: v.union(v.literal("proposed"), v.literal("accepted"), v.literal("rejected")),
     acceptedBy:v.optional(v.string()),
     acceptedAt:v.optional(v.number()),
+    rejectedBy:v.optional(v.string()),
+    rejectedAt:v.optional(v.number()),
     importKey: v.optional(v.string()),
     creationProvenance: v.optional(creationProvenanceValidator),
     createdAt: v.number(),

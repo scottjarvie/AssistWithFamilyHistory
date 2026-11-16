@@ -44,6 +44,16 @@ test("place pages keep exact totals, accepted unique media, complete bounded sec
  expect(await all("sources")).toHaveLength(1);expect(await all("context")).toHaveLength(2);expect(await all("research")).toHaveLength(4);expect(await all("media")).toHaveLength(2);
  expect(await t.query(internal.placePages.initial,{vaultOwnerId:"user_other",placeId:ids.a})).toBeNull();
  await expect(t.query(internal.placePages.section,{vaultOwnerId:"user_other",placeId:ids.a,section:"events",cursor:null})).rejects.toThrow("Place not found");
+ const signed=t.withIdentity({subject:owner,issuer:"https://synthetic-local.invalid"});
+ await expect(t.withIdentity({subject:"user_other",issuer:"https://synthetic-local.invalid"}).mutation(api.places.unlinkMedia,{vaultOwnerId:owner,placeId:ids.a,mediaId:ids.media})).rejects.toThrow();
+ expect(await signed.mutation(api.places.unlinkMedia,{vaultOwnerId:owner,placeId:ids.a,mediaId:ids.media})).toEqual({linked:true});
+ expect(await signed.mutation(api.places.unlinkMedia,{vaultOwnerId:owner,placeId:ids.a,mediaId:ids.media})).toEqual({linked:false});
+ expect(await t.run(ctx=>ctx.db.get(ids.media))).not.toBeNull();
+ for(const id of [ids.c1,ids.c2])expect(await t.run(ctx=>ctx.db.get(id))).toMatchObject({state:"rejected",rejectedBy:owner,rejectedAt:expect.any(Number)});
+ const unlinked=await t.query(internal.placePages.initial,{vaultOwnerId:owner,placeId:ids.a});if(unlinked?.mode!=="indexed")throw Error("not indexed");expect(unlinked.header.totals.media).toBe(1);
+ expect(await signed.mutation(api.places.unlinkMedia,{vaultOwnerId:owner,placeId:ids.a,mediaId:ids.media})).toEqual({linked:false});
+ await signed.mutation(api.places.linkMedia,{vaultOwnerId:owner,placeId:ids.a,mediaId:ids.media});
+ await t.run(async ctx=>{const db=withSearchWrites(ctx).db;const edges=await ctx.db.query("placeMediaConnectionEdges").withIndex("by_pair",q=>q.eq("vaultOwnerId",owner).eq("placeId",ids.a).eq("mediaId",ids.media)).collect();for(const edge of edges)await db.delete(ctx.db.normalizeId("connections",edge.connectionId)!);await db.patch(ids.c1,{state:"accepted"});await db.patch(ids.c2,{state:"accepted"});});
  const mention=await t.query(internal.placePages.mentions,{vaultOwnerId:owner,placeId:ids.a});expect(mention.some(m=>m.id===ids.media&&m.linked)).toBe(true);
  await t.run(async ctx=>{const db=withSearchWrites(ctx).db;await db.patch(ids.media,{archivedAt:0});await db.patch(ids.lastEvent,{place:{original:"Whitby",placeId:ids.b},date:{original:"1770",year:1770}});});
  const changed=await t.query(internal.placePages.initial,{vaultOwnerId:owner,placeId:ids.a});if(changed?.mode!=="indexed")throw Error("not indexed");expect(changed.header.totals.media).toBe(1);expect(changed.header.totals.events).toBe(119);expect(changed.header.lastYear).toBe(1918);
@@ -53,4 +63,25 @@ test("place pages keep exact totals, accepted unique media, complete bounded sec
  const removed=await t.query(internal.placePages.initial,{vaultOwnerId:owner,placeId:ids.a});if(removed?.mode!=="indexed")throw Error("not indexed");expect(removed.header.totals.media).toBe(1);
  await t.withIdentity({subject:owner,issuer:"https://synthetic-local.invalid"}).mutation(api.places.linkMedia,{vaultOwnerId:owner,placeId:ids.a,mediaId:ids.media});
  const relinked=await t.query(internal.placePages.initial,{vaultOwnerId:owner,placeId:ids.a});if(relinked?.mode!=="indexed")throw Error("not indexed");expect(relinked.header.totals.media).toBe(2);
+});
+
+test("legacy media linked before its counter backfill is removed from place totals on archive and delete",async()=>{
+ vi.stubEnv("CLERK_JWT_ISSUER_DOMAIN","https://synthetic-local.invalid");
+ const t=convexTest(schema,modules);
+ const ids=await t.run(async ctx=>{
+  const p=await ctx.db.insert("places",place("Invented Parish"));
+  const media=[];
+  for(let i=0;i<2;i++)media.push(await ctx.db.insert("media",{vaultOwnerId:owner,title:`Legacy ${i}`,type:"photo",personIds:[],createdAt:0,updatedAt:0}));
+  return {p,media};
+ });
+ const signed=t.withIdentity({subject:owner,issuer:"https://synthetic-local.invalid"});
+ for(const mediaId of ids.media)await signed.mutation(api.places.linkMedia,{vaultOwnerId:owner,placeId:ids.p,mediaId});
+ expect(await t.run(ctx=>ctx.db.query("vaultCountMembers").withIndex("by_record",q=>q.eq("recordId",String(ids.media[0]))).unique())).toBeNull();
+ await t.run(async ctx=>{const db=withSearchWrites(ctx).db;await db.patch(ids.media[0],{archivedAt:0});await db.delete(ids.media[1]);});
+ while(!await t.mutation(internal.vaultCounts.backfillStep,{})) { /* finish after the racing edits */ }
+ const initial=await t.query(internal.placePages.initial,{vaultOwnerId:owner,placeId:ids.p});
+ if(initial?.mode!=="indexed")throw Error("not indexed");expect(initial.header.totals.media).toBe(0);
+ expect((await t.query(internal.placePages.section,{vaultOwnerId:owner,placeId:ids.p,section:"media",cursor:null})).page).toEqual([]);
+ await t.run(ctx=>withSearchWrites(ctx).db.patch(ids.media[0],{archivedAt:undefined}));
+ const restored=await t.query(internal.placePages.initial,{vaultOwnerId:owner,placeId:ids.p});if(restored?.mode!=="indexed")throw Error("not indexed");expect(restored.header.totals.media).toBe(1);
 });

@@ -23,3 +23,11 @@ export async function linkPlaceMedia(input:{expectedOwner:string;placeId:string;
  const {vaultOwnerId,client}=await context(input.expectedOwner);
  return client.mutation(api.places.linkMedia,{vaultOwnerId,placeId:input.placeId as Id<"places">,mediaId:input.mediaId as Id<"media">});
 }
+export async function unlinkPlaceMedia(input:{expectedOwner:string;placeId:string;mediaId:string}) {
+ const {vaultOwnerId,client}=await context(input.expectedOwner);
+ for(let i=0;i<50;i++){
+  const result=await client.mutation(api.places.unlinkMedia,{vaultOwnerId,placeId:input.placeId as Id<"places">,mediaId:input.mediaId as Id<"media">});
+  if(!result.linked)return result;
+ }
+ return {linked:true};
+}

@@ -4,7 +4,7 @@ import type { VaultSnapshot } from "./vault";
 import { ownerCounts } from "./vaultCounts";
 import { formatPersonName, sortByTimestampDesc } from "./vaultCore";
 const personRow = (p: Doc<"persons">) => ({_id:p._id, routeId:p.fsId||String(p._id), displayName:formatPersonName(p), birth:p.birth?{date:{year:p.birth.date?.year}}:undefined, death:p.death?{date:{year:p.death.date?.year}}:undefined, researchStatus:p.researchStatus, researchPriority:p.researchPriority});
-const importRow = (run: Doc<"importRuns">, person: Doc<"persons"> | null) => ({_id:run._id, personName:run.personName, pageTypes:run.pageTypes, importedAt:run.importedAt, mergeStatus:run.mergeStatus, personRouteId:person?.fsId||(run.personId?String(run.personId):run.personFsId)});
+const importRow = (run: Doc<"importRuns">, person: Doc<"persons"> | null) => ({_id:run._id, personName:run.personName, personFsId:run.personFsId, counts:run.counts, warnings:run.warnings, pageTypes:run.pageTypes, importedAt:run.importedAt, mergeStatus:run.mergeStatus, personRouteId:person?.fsId||(run.personId?String(run.personId):run.personFsId)});
 const taskRow = (task: Doc<"researchTasks">, person: Doc<"persons"> | null) => ({_id:task._id,title:task.title,status:task.status,updatedAt:task.updatedAt,person:person?{routeId:person.fsId||String(person._id),name:formatPersonName(person)}:null});
 async function bounded<T>(range: AsyncIterable<T>, limit:number, bytes:number):Promise<T[]> {
   const rows:T[]=[];let used=0;

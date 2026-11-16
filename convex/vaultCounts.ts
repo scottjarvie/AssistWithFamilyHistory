@@ -69,7 +69,9 @@ export async function syncCount(ctx: Pick<MutationCtx, "db">, table: CountTable,
   const places=directPlaces(ctx,table,row);
   await syncDirectPlaces(ctx,id,old?.places??[],places);
   if(table==="connections")await syncPlaceMediaConnection(ctx,id,row);
-  if(table==="media"&&(old?.owner!==next?.owner||!!old!==!!next))await refreshMediaAvailability(ctx,id);
+  // A legacy media row may have active connection memberships before its own
+  // counter ledger is visited. Refresh even when old/next contributions are null.
+  if(table==="media"&&(!old||old.owner!==next?.owner||!next))await refreshMediaAvailability(ctx,id);
   const shard = counterShard(id);
   const same = (!old && !next) || !!(old && next && old.shard === shard && old.owner === next.owner && JSON.stringify(old.keys) === JSON.stringify(next.keys));
   if (same) {

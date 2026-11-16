@@ -79,7 +79,9 @@ indexes. Open task previews use three owner/active/status/time ranges; taking
 five from each sorted state and then the newest five preserves the union's top
 five. Streamed document/byte budgets bound source reads without collecting owner
 history or using multiple paginators in one query. Only displayed task/import
-people are hydrated.
+people are hydrated. Recent import DTOs retain counts, warning strings and the
+FamilySearch person ID because the Imports page consumes the same
+`/api/convex/stats` response; its type is derived from that DTO.
 
 **Intentional priority change, authorized by Scott's lead:** the five highlight
 people are now selected by their existing assigned `researchPriority` index,
@@ -105,6 +107,8 @@ multiple accepted Connections refer to the same pair. Proposed/rejected links
 never become accepted count members. Owner/archive/delete changes, removed
 connections, duplicate links and restoration update counts in the same source
 transaction. Reverse media memberships avoid scanning the owner's media history.
+Unvisited legacy media writes also refresh those memberships, so an archive/delete
+before the media backfill cannot leave an earlier accepted connection counted.
 A media availability edit visits its linked places, not all owner records; an
 extreme single-media fan-out remains subject to ordinary mutation limits.
 
@@ -117,7 +121,12 @@ final-word prefix semantics, up to six hits per field / twelve distinct candidat
 These are labelled suggestions, never a complete mention count or confirmed
 links. A signed-in website person can explicitly accept a candidate using
 “Link to this place”; the mutation enforces the matched owner and creates an
-accepted `taken_at` Connection. It never publishes or changes media privacy.
+accepted `taken_at` Connection. “Unlink from this place” rejects accepted
+Connections while keeping the media. Each mutation rejects one connection via
+an indexed pair lookup; the website continues for up to 50 transactions, and
+exceptionally duplicated links can be continued with another click. Acceptance
+and rejection record the acting person and time. It never publishes or changes
+media privacy.
 Optional descriptions are initialized to an empty string for safe indexing.
 No duplicated long media text or content-bearing search mirror is created.
 
