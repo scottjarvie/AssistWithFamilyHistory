@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { syncMediaPeople, EXPLORER_TABLES, type ExplorerChange } from "./peopleExplorer";
-import { COUNT_TABLES, syncCount, researchOrderTime, type CountTable } from "./vaultCounts";
+import { COUNT_TABLES, syncCount, researchOrderTime, researchCursorKey, type CountTable } from "./vaultCounts";
 import type { MutationCtx } from "./_generated/server";
 export const SEARCH_TABLES = ["persons", "sources", "stories", "researchTasks", "researchLog", "events", "places", "topics"] as const;
 export type SearchTable = typeof SEARCH_TABLES[number];
@@ -23,8 +23,18 @@ export function searchFields(table: SearchTable, row: any) {
 export async function syncSourceCount(ctx: {db: MutationCtx["db"]}, table: CountTable, id: string, row: any, touch = false) {
   if (row && (table === "researchTasks" || table === "researchLog")) {
     const key = researchOrderTime(row);
-    if (row.researchOrderTime !== key) await ctx.db.patch(id as any, {researchOrderTime: key});
+    const cursorKey=researchCursorKey(row);
+    if (row.researchOrderTime !== key || row.researchCursorKey !== cursorKey) await ctx.db.patch(id as any, {researchOrderTime: key,researchCursorKey:cursorKey});
   }
+  if (row && (table === "persons" || table === "importRuns" || table === "historicalContext")) {
+    const browseOrderTime = -(table === "importRuns" ? row.importedAt : row.updatedAt);
+    if (row.browseOrderTime !== browseOrderTime) await ctx.db.patch(id as any, {browseOrderTime});
+  }
+  if(row&&(table==="citationLinks"||table==="personEvents")) {
+    const pageOrderKey=`${row._creationTime.toFixed(6).padStart(24,"0")}:${id}`;
+    if(row.pageOrderKey!==pageOrderKey)await ctx.db.patch(id as any,{pageOrderKey});
+  }
+  if(row&&table==="media"&&row.description===undefined)await ctx.db.patch(id as any,{description:""});
   await syncCount(ctx, table, id, row, touch);
 }
 

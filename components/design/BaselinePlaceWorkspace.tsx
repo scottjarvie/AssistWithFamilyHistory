@@ -4,7 +4,8 @@ import { ArrowLeft, BookOpen, ImageIcon, MapPinned, Users } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ContextReportForm } from "@/components/vault/ContextReportForm";
-import type {PlaceWorkspace} from "@/components/vault/PlaceWorkspaceView";
+import type {readLegacyPlaceWorkspace} from "@/convex/vault";
+type PlaceWorkspace=NonNullable<Awaited<ReturnType<typeof readLegacyPlaceWorkspace>>>;
 export function BaselinePlaceWorkspace({workspace}:{workspace:PlaceWorkspace}) {
   const eventYears = workspace.events
     .map((event) => event.date?.year)

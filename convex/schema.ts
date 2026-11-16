@@ -97,7 +97,12 @@ export default defineSchema({
 
   vaultCounts: defineTable({vaultOwnerId: v.string(), table: v.string(), counts: v.record(v.string(), v.number()), revision: v.optional(v.number())})
     .index("by_owner_table", ["vaultOwnerId", "table"]),
-  vaultCountMembers: defineTable({recordId: v.string(), table: v.string(), owner: v.string(), keys: v.array(v.string())})
+  vaultCounterShards: defineTable({vaultOwnerId: v.string(), table: v.string(), shard: v.number(), counts: v.record(v.string(), v.number()), revision: v.number()})
+    .index("by_owner_table_shard", ["vaultOwnerId", "table", "shard"]),
+  placeCounterShards: defineTable({vaultOwnerId:v.string(),placeId:v.id("places"),shard:v.number(),counts:v.record(v.string(),v.number())}).index("by_place_shard",["vaultOwnerId","placeId","shard"]),
+  placeMediaMembers: defineTable({vaultOwnerId:v.string(),placeId:v.id("places"),mediaId:v.id("media"),refs:v.number(),active:v.boolean(),orderKey:v.string()}).index("by_place_media",["vaultOwnerId","placeId","mediaId"]).index("by_place_active",["vaultOwnerId","placeId","active"]).index("by_place_order",["vaultOwnerId","placeId","active","orderKey"]).index("by_media",["mediaId"]),
+  placeMediaConnectionEdges: defineTable({connectionId:v.string(),vaultOwnerId:v.string(),placeId:v.id("places"),mediaId:v.id("media")}).index("by_connection",["connectionId"]),
+  vaultCountMembers: defineTable({recordId: v.string(), table: v.string(), owner: v.string(), keys: v.array(v.string()), shard: v.optional(v.number()), places:v.optional(v.array(v.object({owner:v.string(),placeId:v.id("places"),kind:v.union(v.literal("events"),v.literal("citations"),v.literal("context"),v.literal("research")),year:v.optional(v.number())})))})
     .index("by_record", ["recordId"]),
 
   peopleExplorerRows: defineTable({personId: v.id("persons"), vaultOwnerId: v.string(), researchStatus: v.string(), orderKey: v.string(), text: v.string(), payload: peopleExplorerPayload})
@@ -117,6 +122,7 @@ export default defineSchema({
     nameGivenKey: v.optional(v.string()),
     searchText: v.optional(v.string()),
     archivedAt: v.optional(v.number()), archivedBy: v.optional(v.string()),
+    browseOrderTime: v.optional(v.number()),
     vaultOwnerId: v.optional(v.string()),
     // FamilySearch Integration
     fsId: v.optional(v.string()),              // FamilySearch Person ID (e.g., "KWCJ-RN4")
@@ -227,7 +233,11 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .searchIndex("search_text", { searchField: "searchText", filterFields: ["vaultOwnerId", "archivedAt"] })
+    .index("by_owner_birth_place", ["vaultOwnerId", "archivedAt", "birth.place.placeId"])
+    .index("by_owner_death_place", ["vaultOwnerId", "archivedAt", "death.place.placeId"])
     .index("by_owner", ["vaultOwnerId"])
+    .index("by_owner_active_browse", ["vaultOwnerId", "archivedAt", "browseOrderTime"])
+    .index("by_owner_active_priority", ["vaultOwnerId", "archivedAt", "researchPriority"])
     .index("by_owner_updated", ["vaultOwnerId", "archivedAt", "updatedAt"])
     .index("by_owner_status_updated", ["vaultOwnerId", "archivedAt", "researchStatus", "updatedAt"])
     .index("by_owner_name", ["vaultOwnerId", "name.surname", "nameGivenKey", "birth.date.year"])
@@ -414,6 +424,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .searchIndex("search_text", { searchField: "searchText", filterFields: ["vaultOwnerId", "archivedAt"] })
+    .index("by_owner_place", ["vaultOwnerId", "archivedAt", "place.placeId"])
     .index("by_owner", ["vaultOwnerId"])
     .index("by_type", ["type"])
     .index("by_place", ["place.placeId"])
@@ -425,6 +436,7 @@ export default defineSchema({
    * GEDCOM X: EventRole
    */
   personEvents: defineTable({
+    pageOrderKey:v.optional(v.string()),
     vaultOwnerId: v.optional(v.string()),
     personId: v.id("persons"),
     eventId: v.id("events"),
@@ -439,6 +451,8 @@ export default defineSchema({
     // Metadata
     createdAt: v.number(),
   })
+    .index("by_owner_event_person", ["vaultOwnerId", "eventId", "personId"])
+    .index("by_owner_event_order",["vaultOwnerId","eventId","pageOrderKey"])
     .index("by_owner", ["vaultOwnerId"])
     .index("by_person", ["personId"])
     .index("by_event", ["eventId"])
@@ -522,6 +536,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .searchIndex("search_text", { searchField: "searchText", filterFields: ["vaultOwnerId", "archivedAt"] })
+    .index("by_owner_active", ["vaultOwnerId", "archivedAt"])
     .index("by_owner", ["vaultOwnerId"])
     .index("by_name", ["name"])
     .index("by_parent", ["parentId"])
@@ -682,6 +697,7 @@ export default defineSchema({
    * (persons, relationships, events, places)
    */
   citationLinks: defineTable({
+    pageOrderKey:v.optional(v.string()),
     vaultOwnerId: v.optional(v.string()),
     citationId: v.id("citations"),
     targetType: v.union(
@@ -696,6 +712,8 @@ export default defineSchema({
     // Metadata
     createdAt: v.number(),
   })
+    .index("by_owner_target", ["vaultOwnerId", "targetType", "targetId"])
+    .index("by_owner_target_order",["vaultOwnerId","targetType","targetId","pageOrderKey"])
     .index("by_owner", ["vaultOwnerId"])
     .index("by_citation", ["citationId"])
     .index("by_target", ["targetType", "targetId"])
@@ -908,6 +926,8 @@ export default defineSchema({
     ),
     reason: v.optional(v.string()),
     state: v.union(v.literal("proposed"), v.literal("accepted"), v.literal("rejected")),
+    acceptedBy:v.optional(v.string()),
+    acceptedAt:v.optional(v.number()),
     importKey: v.optional(v.string()),
     creationProvenance: v.optional(creationProvenanceValidator),
     createdAt: v.number(),
@@ -922,6 +942,7 @@ export default defineSchema({
    * Photos, documents, scans, videos, audio
    */
   media: defineTable({
+    archivedAt:v.optional(v.number()),
     vaultOwnerId: v.optional(v.string()),
     type: v.union(
       v.literal("photo"),
@@ -1072,6 +1093,8 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   })
+    .searchIndex("search_title",{searchField:"title",filterFields:["vaultOwnerId","archivedAt"]})
+    .searchIndex("search_description",{searchField:"description",filterFields:["vaultOwnerId","archivedAt"]})
     .index("by_owner", ["vaultOwnerId"])
     .index("by_type", ["type"])
     .index("by_source", ["sourceId"])
@@ -1201,6 +1224,8 @@ export default defineSchema({
    * Canonical record of capture imports and merge outcomes
    */
   importRuns: defineTable({
+    browseOrderTime: v.optional(v.number()),
+    archivedAt: v.optional(v.number()),
     vaultOwnerId: v.optional(v.string()),
     personId: v.optional(v.id("persons")),
     personFsId: v.string(),
@@ -1245,6 +1270,7 @@ export default defineSchema({
     ),
   })
     .index("by_owner", ["vaultOwnerId"])
+    .index("by_owner_active_browse", ["vaultOwnerId", "archivedAt", "browseOrderTime"])
     .index("by_person", ["personId"])
     .index("by_person_fsId", ["personFsId"])
     .index("by_owner_person_fsId", ["vaultOwnerId", "personFsId"])
@@ -1302,6 +1328,7 @@ export default defineSchema({
    * AI-suggested or user-created research tasks
    */
   researchTasks: defineTable({
+    researchCursorKey:v.optional(v.string()),
     researchOrderTime: v.optional(v.number()),
     searchText: v.optional(v.string()),
     archivedAt: v.optional(v.number()), archivedBy: v.optional(v.string()),
@@ -1348,6 +1375,8 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .searchIndex("search_text", { searchField: "searchText", filterFields: ["vaultOwnerId", "archivedAt"] })
+    .index("by_owner_active_cursor",["vaultOwnerId","archivedAt","researchCursorKey"])
+    .index("by_owner_active_status_cursor",["vaultOwnerId","archivedAt","status","researchCursorKey"])
     .index("by_owner", ["vaultOwnerId"])
     .index("by_owner_active_order", ["vaultOwnerId", "archivedAt", "researchOrderTime"])
     .index("by_owner_active_status_order", ["vaultOwnerId", "archivedAt", "status", "researchOrderTime"])
@@ -1359,6 +1388,7 @@ export default defineSchema({
    * Tracks research activities across entity types
    */
   researchLog: defineTable({
+    researchCursorKey:v.optional(v.string()),
     researchOrderTime: v.optional(v.number()),
     searchText: v.optional(v.string()),
     archivedAt: v.optional(v.number()), archivedBy: v.optional(v.string()),
@@ -1447,6 +1477,8 @@ export default defineSchema({
     completedAt: v.optional(v.number()),
   })
     .searchIndex("search_text", { searchField: "searchText", filterFields: ["vaultOwnerId", "archivedAt"] })
+    .index("by_owner_entity_order", ["vaultOwnerId", "archivedAt", "entityType", "entityId", "researchOrderTime"])
+    .index("by_owner_active_cursor",["vaultOwnerId","archivedAt","researchCursorKey"])
     .index("by_owner", ["vaultOwnerId"])
     .index("by_owner_active_order", ["vaultOwnerId", "archivedAt", "researchOrderTime"])
     .index("by_entity", ["entityType", "entityId"])
@@ -1855,6 +1887,8 @@ export default defineSchema({
    * (e.g., "Daily life in 1920s New York", "The Great Migration")
    */
   historicalContext: defineTable({
+    archivedAt:v.optional(v.number()),
+    browseOrderTime:v.optional(v.number()),
     vaultOwnerId: v.optional(v.string()),
     placeId: v.optional(v.id("places")),
     timePeriod: v.object({
@@ -1941,6 +1975,7 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   })
+    .index("by_owner_place_order", ["vaultOwnerId", "archivedAt", "placeId", "browseOrderTime"])
     .index("by_owner", ["vaultOwnerId"])
     .index("by_place", ["placeId"]),
 

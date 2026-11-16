@@ -1,3 +1,5 @@
+import { countsReady } from "./vaultCounts";
+import { readDashboard, dashboardFromSnapshot, type DashboardSummary } from "./dashboard";
 import {buildAuditRecordPage} from "../lib/audit/records";
 import {auditMetrics} from "../lib/audit/contract";
 import { v } from "convex/values";
@@ -16,7 +18,7 @@ import {
   sortByTimestampDesc,
 } from "./vaultCore";
 
-type VaultSnapshot = {
+export type VaultSnapshot = {
   people: Doc<"persons">[];
   relationships: Doc<"relationships">[];
   events: Doc<"events">[];
@@ -2102,7 +2104,9 @@ export const getPlaceWorkspace = internalQuery({
     vaultOwnerId: v.string(),
     placeId: v.id("places"),
   },
-  handler: async (ctx, args) => {
+  handler: readLegacyPlaceWorkspace,
+});
+export async function readLegacyPlaceWorkspace(ctx:QueryCtx,args:{vaultOwnerId:string;placeId:Id<"places">}) {
     const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
     const place = snapshot.places.find((entry) => entry._id === args.placeId);
     if (!place) return null;
@@ -2158,8 +2162,7 @@ export const getPlaceWorkspace = internalQuery({
         )
       ),
     };
-  },
-});
+}
 
 /**
  * Whether this owner's workspace is genuinely empty, so the two-person private
@@ -2231,41 +2234,11 @@ export const getDashboardSummary = internalQuery({
   args: {
     vaultOwnerId: v.string(),
   },
-  handler: async (ctx, args) => {
-    const snapshot = await getVaultSnapshot(ctx, normalizeVaultOwnerId(args.vaultOwnerId));
-    const peopleRows = buildPeopleRows(snapshot);
-    const personById = new Map(snapshot.people.map((person) => [String(person._id), person]));
-    const firstStartEligible = await isFirstStartEligible(ctx, normalizeVaultOwnerId(args.vaultOwnerId), snapshot);
-
-    return {
-      firstStartEligible,
-      counts: {
-        people: snapshot.people.length,
-        places: snapshot.places.length,
-        stories: snapshot.stories.length,
-        documents: snapshot.documents.length,
-        imports: snapshot.importRuns.length,
-        openTasks: snapshot.researchTasks.filter((task) => task.status !== "done").length,
-        provisionalRelatives: snapshot.provisionalRelatives.filter(
-          (relative) => relative.mergeState === "provisional"
-        ).length,
-      },
-      recentPeople: peopleRows
-        .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
-        .slice(0, 6),
-      recentImports: sortByTimestampDesc(snapshot.importRuns)
-        .slice(0, 6)
-        .map((run) => {
-          const linkedPerson = run.personId ? personById.get(String(run.personId)) ?? null : null;
-          return {
-            ...run,
-            personRouteId: linkedPerson?.fsId || (run.personId ? String(run.personId) : run.personFsId),
-          };
-        }),
-      operationsHighlights: peopleRows
-        .sort((a, b) => b.operations.requiredMissingCount - a.operations.requiredMissingCount)
-        .slice(0, 5),
-    };
+  handler: async (ctx, args):Promise<DashboardSummary> => {
+    const owner = normalizeVaultOwnerId(args.vaultOwnerId);
+    if (await countsReady(ctx)) return readDashboard(ctx, owner);
+    const snapshot = await getVaultSnapshot(ctx, owner);
+    return dashboardFromSnapshot(snapshot, await isFirstStartEligible(ctx, owner, snapshot));
   },
 });
 

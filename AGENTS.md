@@ -58,9 +58,9 @@ Sandbox is `http://family-history.localhost:3443`. Once per checkout run
 user, never Scott's account. See the
 [screenshots README](https://github.com/scottjarvie/assist-local-dev/blob/main/screenshots/README.md).
 
-<!-- BEGIN:nextjs-agent-rules -->
-
 **Scott's real account** (testing only, read-mostly; use the test user for anything that writes): `shoot.mjs --live --checkout .` on the local Live address reuses his saved session; see the [standard](https://github.com/scottjarvie/assist-local-dev/blob/main/docs/sign-in-and-screenshots.md#scotts-real-account-approved-15-nov-2026).
+
+<!-- BEGIN:nextjs-agent-rules -->
 
 ## This is NOT the Next.js you know
 

@@ -12,6 +12,13 @@ function fixture(rows: Record<string, Row[]> = {}, allowSnapshot = false) {
     ctx: {
       db: {
         query(table: string) {
+          if (table === "searchBuildState") return {
+            withIndex(index: string, select: (q: {eq: (field: string, value: string) => void}) => void) {
+              expect(index).toBe("by_table");
+              select({eq(field, value) {expect(field).toBe("table"); expect(value).toBe("vaultCounts:v4");}});
+              return {async unique() {return null;}}; // Exercise the legacy migration fallback.
+            },
+          };
           return {
             withIndex(index: string, select: (q: { eq: (field: string, owner: string) => void }) => void) {
               expect(index).toBe("by_owner");

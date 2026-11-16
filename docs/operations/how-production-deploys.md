@@ -92,6 +92,6 @@ not a manual production code deployment.
 
 ## Exact vault counters
 
-The draft remaining-page foundation has its own [counter backfill and Research
-transport runbook](vault-counts-scale.md). Its completion flag does not migrate
-Dashboard or Places, and it is separate from the People Explorer migration.
+The batch A [counter/backfill and paged workspace runbook](vault-counts-scale.md)
+covers Dashboard, Research and Places. Its completion gate is separate from the
+People Explorer migration. Confirm both required migrations independently.

@@ -1,139 +1,197 @@
-# Exact vault counters and bounded Research reads
+# Exact vault counts and paged workspace reads
 
-This is an incomplete first batch of the remaining-page scale work. No release
-or production backfill is claimed here. Dashboard, Places, Operations, Audit,
-Stories, story readiness, provisional-relative pages and the compatibility People
-array still have their original loaders. In particular, the home page still
-loads the whole vault and can fail at realistic evidence-heavy growth.
+This describes the batch A implementation on PR #151. It is not a production
+release claim. Vercel deploys Convex and Next on merge; the lead must confirm
+that deployment and complete the migration below before claiming the new reads
+are live. Until the completion gate is set, readers use their original snapshot
+fallback, which can still fail on large vaults.
 
-## Counter contract
+## Counters and contention
 
-`convex/vaultCounts.ts` lists 24 source record types: all 20 snapshot tables,
-plus source contents, record personas, topics and connections. It deliberately
-excludes credentials, operational receipts, derived tables and Queue (which has
-its own counter system). A count means an exact `by_owner` match with
-`archivedAt === undefined`. An archive timestamp of zero is archived. Rows
-without a stored owner retain the original snapshot's exclusion; this migration
-does not retag legacy data or broaden access.
+`convex/vaultCounts.ts` lists the 20 original snapshot types plus source
+contents, record personas, topics and connections. Queue retains its own counter
+system. Credentials, receipts and derived records are excluded. An active count
+means an exact stored owner match and `archivedAt === undefined`; timestamp zero
+is archived. Rows without stored owners retain their old snapshot exclusion.
 
-Every source writer must use `convex/searchServer.ts`, including guest retagging
-and Relationships. Its database adapter updates `vaultCounts` and
-`vaultCountMembers` in the same transaction as the source write. The member
-stores its last counted owner and contribution keys, never source contents.
-Owner moves, archives, restores, replacements and deletions remove the old
-contribution and add the new one. Status facets exist for tasks and research
-logs; logs also have activity and author facets; provisional relatives have
-merge-state facets. Future page migrations can reuse these exact counters.
+Source writers use `convex/searchServer.ts`. The adapter maintains search/order
+metadata, a last-counted membership ledger and counter deltas in the source
+transaction. It handles insert, patch (both signatures), replace, delete,
+archive, restore and old/new ownership. Guest retagging counts every source type
+even while deferring People Explorer work. Per-mutation writes are serialized;
+the builder drains the queue and cannot swallow a counter-maintenance failure
+and commit the source separately.
 
-Backfill calls the same reconciler on bounded pages (100 source documents /
-500 KB per transaction, plus ledger/counter operations). A normal edit to an
-unvisited legacy row counts its new state once. A later backfill sees that
-membership and does nothing. A deletion cannot be resurrected by a stale page:
-source traversal, reconciliation and cursor advancement are one mutation.
-Convex conflict retries serialize concurrent edits. Completed steps are durable;
-interrupted actions resume the next committed page. New inserts after a cursor
-passes are already counted by the normal writer. No manual reset is supported.
+Counts **and revisions** use 32 deterministic shards per owner/type, selected
+by the record ID. Writers touch only the applicable old/new shard; they never
+read a shared revision document or all shards. Reads sum the shards exactly.
+Revisions are monotonic change tokens, not numbers of source records. Content-only
+edits advance a shard revision too, supporting stable read-only recounts.
 
-The global `vaultCounts:v1` flag becomes complete only after all source tables
-have been traversed. Consumers **must check it** before trusting totals. Research
-keeps the original snapshot path until completion. No count is estimated from a
-page, a newest-N sample, or a table-size cap. The write cost includes a membership
-lookup and up to two owner counters per source change. Writes through one adapter are serialized even when
-callers use `Promise.all`; the mutation drains that queue before finishing.
-Counter-maintenance errors cannot be swallowed by a caller and commit a source
-without its matching contribution. Active source writes also advance a per-owner,
-per-type revision, including edits whose count contribution stays unchanged.
-Large existing bulk
-mutations need separate write-cost assessment before claiming unlimited scale.
+Local three-round tests of 20 concurrent source upserts found OCC failures with
+the unsharded design. The sharded design passed all 60 creations and a repeat
+60-update test. Conflict/retry counts and documents/bytes are in the campaign
+report. Local elapsed times are not cloud latency evidence. Shards reduce
+incidental owner contention; simultaneous writes to the same actual record or
+the same logical media/place membership can still conflict.
 
-## Research transport
+Old `vaultCounts` rows and their index remain for idempotent migration. A legacy
+member without a shard is subtracted from its old row and added to its shard
+atomically. Do not delete/reset old counters or member data. After migration,
+ordinary source writes do not update the legacy owner/type counter. The old
+index is retained; no production index is deleted.
 
-`researchPages:tasks` uses owner/active/time or owner/active/status/time indexes;
-`researchPages:log` uses owner/active/time. Each transaction returns at most 50
-records and requests at most 250 KB of source rows, then hydrates distinct owned,
-active people referenced by those records. Unrelated sources/citations/media are
-never read. A byte-split or empty page is not end-of-results; follow its cursor
-until `isDone`. Global facet totals come from the counters, independently of the
-current task status. A negative numeric `updatedAt` index key preserves timestamp
-precision, newest-first ordering and creation-ascending ties, without taking a
-window before sorting. Backfill populates that key without changing timestamps.
+## Research
 
-The existing website action `vaultReads:getResearchOverview` traverses these
-pages and retains its complete DTO. This preserves arbitrary substring search
-(including person names), all task facet numbers and the complete activity
-ledger's author/kind/date/month counts. **The browser is not yet a cursor
-consumer.** End-to-end cost, action reply size and client rendering still grow
-with task/log history, and independently committed query pages do not provide
-one frozen snapshot. The compatibility action now checks person/task/log revisions
-before and after traversal and verifies exact task/log lengths against counters.
-A relevant concurrent edit restarts traversal, up to three attempts; continuous
-editing returns a clear reload error instead of a silently incomplete ledger. This is transport groundwork,
-not completion of the requested Research UI migration or an unlimited action
-size/latency guarantee. The local heavy fixture traversed all 5,000 tasks and
-10,000 log entries, then its final compatibility action return was rejected:
-Convex arrays allow at most 8,192 elements. Thus the full Research page still
-fails at the requested heavy size until its browser consumer uses the pages.
-The old internal `vault:getResearchOverview` remains the
-legacy snapshot implementation, used before the completion gate and for parity.
+The website uses `vaultReads:getResearchTasksPage` and `getResearchLogPage`, with
+the first 50 candidates/rows and cursor-based Load more. The unbounded complete
+Research DTO action was removed: no non-website caller needed it. Its old
+internal snapshot query remains solely as a migration/parity fallback.
 
-To finish Research, provide a paged browser consumer with exact query-specific
-facet and activity summaries; do not silently change its all-history numbers
-to page-local numbers. To finish Dashboard, maintain rich person priority rows
-with all check dependencies before taking five highlights. To finish Places,
-preserve the existing **case-sensitive arbitrary substring** media rule and
-case-insensitive open-task description rule through maintained memberships,
-or document an intentional, evidenced product change. This batch does neither
-and leaves the Places behavior untouched.
+Tasks use owner/active/time or owner/active/status/time indexes. Search scans at
+most 50 ordered candidates and requests a 250 KB source split threshold per
+transaction; it preserves arbitrary case-insensitive substrings in task title,
+description (or type fallback) and linked person name. An empty search page is
+progress, not exhaustion. The browser continues until it has another 50 matches
+or reaches the end. Only referenced owned active people are hydrated, and only
+small name/route fields are returned. Sortable IEEE timestamp/creation keys retain full numeric precision and
+creation-ascending ties, and a separate hydration byte budget resumes at the last
+processed candidate rather than skipping the rest of a page. Log pages use owner/active/time.
 
-## Release and backfill (lead only, after Vercel deploy)
+Unfiltered totals and status facets are exact counters. Search facets explicitly
+say **matching rows loaded so far, within the selected status**. The log's total,
+author and activity-lane totals are exact for the vault; its chart, month counts,
+date range and local filters explicitly cover loaded entries. Source records and
+client DTOs are separate: raw source/large person documents never cross into
+collection components. The 10,000-entry heavy log uses pages, so it does not hit
+the former complete action's 8,192-element array-return limit.
 
-Manual production code deployments are prohibited. The only production command
-run during implementation is the dry-run. After the lead confirms the coordinated
-Vercel deployment, from the Family History checkout run:
+Cursors describe a live traversal, not a frozen multi-query snapshot. Concurrent
+edits can move rows ahead of a cursor; reload for a fresh traversal. Active-tree
+changes are rejected by server actions. Switching query/status remounts the
+cursor consumer. Legacy/native cursor prefixes restart safely across migration.
+
+## Dashboard
+
+All prior vault-wide totals come from exact counters, including open task states
+and provisional merge state. Recent people/imports use owner/active/ordered
+indexes. Open task previews use three owner/active/status/time ranges; taking
+five from each sorted state and then the newest five preserves the union's top
+five. Streamed document/byte budgets bound source reads without collecting owner
+history or using multiple paginators in one query. Only displayed task/import
+people are hydrated.
+
+**Intentional priority change, authorized by Scott's lead:** the five highlight
+people are now selected by their existing assigned `researchPriority` index,
+not an all-history inferred evidence-gap score. The screen says this list covers
+assigned priorities only, not every evidence gap. Recent people no longer claim
+full-history critical-gap counts. No invented or zero-filled operation scores
+are returned. The full Operations page is batch B and unchanged. `/api/convex/stats`
+uses the same bounded dashboard data.
+
+## Places and explicit media
+
+The place list uses owner/active pages, preserving arbitrary name/fullName
+substring search through bounded candidate pages and continuation. Each displayed
+place has exact event, citation-link and media counts from maintained per-place
+shards. Workspace headers also have exact context/research counts and the min/max
+years of all linked active events. Event year buckets track old/new date, owner,
+archive and place deltas, so archive/restore/removal can change either endpoint.
+
+Events, citation links, historical context and place research logs contribute
+transactionally through their source membership. Accepted explicit media/place
+**Connections** contribute once per distinct owned active media record, even if
+multiple accepted Connections refer to the same pair. Proposed/rejected links
+never become accepted count members. Owner/archive/delete changes, removed
+connections, duplicate links and restoration update counts in the same source
+transaction. Reverse media memberships avoid scanning the owner's media history.
+A media availability edit visits its linked places, not all owner records; an
+extreme single-media fan-out remains subject to ordinary mutation limits.
+
+**Intentional matching change, authorized by the lead:** media is no longer
+associated by a case-sensitive arbitrary substring of the place name anywhere
+in its title/description. The media total/list now means accepted explicit
+Connections. A separate **Possible mentions** lookup uses two source-table text
+indexes, on title and description, with owner/active filters: word matching with
+final-word prefix semantics, up to six hits per field / twelve distinct candidates.
+These are labelled suggestions, never a complete mention count or confirmed
+links. A signed-in website person can explicitly accept a candidate using
+“Link to this place”; the mutation enforces the matched owner and creates an
+accepted `taken_at` Connection. It never publishes or changes media privacy.
+Optional descriptions are initialized to an empty string for safe indexing.
+No duplicated long media text or content-bearing search mirror is created.
+
+**Loaded badges, expressly approved by the lead:** People and Sources show
+“N loaded”, with Load more, not whole-place totals. Sources are cards for loaded
+citation links, preserving duplicate source cards where several links support
+the place and omitting missing/archived/foreign citations or sources. Other
+workspace badges remain exact whole-place totals. People enumerate direct birth
+and death matches then event participants, deduplicated in the browser. They do
+not claim a global score/sort. All scoped source reads are owner-indexed and
+bounded; evidence hydration uses a separate byte budget and resumes at the last
+processed key so a byte split never skips remaining candidates.
+
+The initial legacy workspace fallback loads one snapshot, not one per section.
+Before migration its media remains explicitly labelled legacy text mentions;
+after the gate it switches to explicit links and the separate possible-mentions
+lookup. No old substring association is silently converted into an accepted
+Connection.
+
+## Release/backfill — lead after Vercel confirms deployment
+
+Only a production **dry-run** is allowed from an implementation session:
+
+```bash
+CONVEX_DEPLOYMENT=prod:accomplished-dodo-308 npx convex deploy --dry-run --codegen disable
+```
+
+After the coordinated Vercel release, from the Family History checkout run:
 
 ```bash
 CONVEX_DEPLOYMENT=prod:accomplished-dodo-308 npx convex run vaultCounts:backfill '{}'
 CONVEX_DEPLOYMENT=prod:accomplished-dodo-308 npx convex run vaultCounts:backfillStatus '{}'
 ```
 
-Repeat `backfill` after `{complete:false}` or an interruption until status says
-`complete:true`. Each action yields after about 90 seconds of successful steps;
-a failed step propagates its error and leaves the preceding cursor intact.
-Investigate failures and rerun; do not set flags, clear the ledger, reset the
-cursor or edit source data to force completion. The backfill itself writes
-production derived data, so these are explicit post-deploy migration commands,
-not read-only diagnostics. Do not run them on another deployment. For focused
-operations, one transaction is:
+Repeat backfill after `{complete:false}` or interruption until status says
+`complete:true`. Each step reads <=100 source records with a 500 KB source split
+threshold, plus bounded member/counter work. Cursor advancement, source metadata
+and count reconciliation commit together. Each action yields after roughly 90
+seconds of completed steps. Failed steps leave the preceding cursor intact;
+investigate and rerun rather than editing flags or source data. For one step:
 
 ```bash
 CONVEX_DEPLOYMENT=prod:accomplished-dodo-308 npx convex run vaultCounts:backfillStep '{}'
 ```
 
-The separate People Explorer backfill remains separate. Completing it does not
-complete these counters, and completing counters does not migrate Dashboard or
-Places. This draft needs the remaining implementation before a release decision.
+The completion flag is `vaultCounts:v4`: all source tables, shard memberships,
+place contributions, browse/section keys and media index fields must be visited.
+New normal writes reconcile immediately, including inserts after a cursor has
+passed. The membership ledger prevents double counting during concurrent edits.
+Changing table order, contribution rules, metadata requirements or shard layout
+requires a new build version and a considered migration. Never reuse positional
+cursors/completion flags for different work. The People Explorer migration stays
+separate; completing either flag does not complete the other.
 
-## Read-only drift diagnosis and versioning
+No production backfill was executed during implementation. Never target
+`gallant-mallard-74`, and never deploy production code manually.
 
-The internal `vaultCounts:recountPage` reads one owner/type range at a time
-(100 rows / 500 KB source budget). Sum its `subtotal` keys across cursors and
-compare with `counter`, treating absent keys as zero. Require the same `revision`
-throughout; if it changes, restart the traversal. This diagnoses drift without
-editing real records or clearing the ledger:
+## Drift diagnosis and deferred pages
+
+`vaultCounts:recountPage` is a read-only, owner/type paged recount. Sum its source
+subtotals across cursors and compare with the returned counter, treating missing
+keys as zero; require the same summed shard revision throughout or restart.
 
 ```bash
 CONVEX_DEPLOYMENT=prod:accomplished-dodo-308 npx convex run vaultCounts:recountPage '{"vaultOwnerId":"<owner>","table":"sources","cursor":null}'
 ```
 
-There is no automatic repair/reset operation. If drift is found, stop and
-investigate its source; ship a bounded, versioned repair with a fallback gate.
-Blindly replacing counters while active writes continue could hide ledger drift.
-The randomized independent recount tests and the writer contract are prevention,
-not proof that future maintenance can never introduce drift.
+There is no blind reset/repair operation. A discrepancy needs investigation and
+a bounded versioned repair that does not race normal writes. Raw ordering fields,
+like existing search metadata, may appear in raw exports; client DTOs omit them.
 
-Adding/reordering `COUNT_TABLES` or changing contributions requires a new `BUILD`
-version and a considered migration. Old positional cursors and a completed flag
-must never be reused for a different table list. Preserve member/counter data;
-a fresh traversal reconciles existing members idempotently. Derived ordering
-metadata, like existing `searchText`, remains on raw Research documents and may
-appear in raw tool/export records; client collection projections omit it.
+Operations, Audit, readiness, Stories, public stories, provisional-relative pages
+and the compatibility People array remain batch B. Their snapshot fallbacks and
+rich graph dependencies are not migrated or claimed safe by this batch. The
+original campaign's 13-caller map remains the baseline: Dashboard, Research and
+the two Places website consumers now select the bounded paths after this gate;
+the original implementations are retained only where migration/parity requires.

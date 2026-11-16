@@ -157,6 +157,7 @@ Family history is media-heavy: scanned records, old photographs, certificates, l
 - **New uploads are private, unreviewed and not readable by the AI** until the person reviews them.
 - **Originals are never altered.** Display sizes, portrait crops, enhanced copies, transcripts and translations are derived files linked to the original. Capture time and location in a file are proposals the person reviews, handled under the standard's privacy rules.
 - **The AI reads the actual image, scan or audio** the person has allowed, not only its title, and never receives a raw storage link.
+- **Place media means accepted links.** A Place’s media count and list use accepted explicit Connections. Possible mentions in titles or descriptions are suggestions kept separately; a mention never becomes an accepted link by itself. Paged Place People and Sources badges say “loaded”, while the other Place totals cover the whole place.
 - **Audio and video need a transcript** as a derived file; oral history matters more here than on most sites.
 
 ---

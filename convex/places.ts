@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { action, internalQuery, mutation } from "./searchServer";
 import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
-import { authorizeTenantAction, authorizeTenantMutation } from "./access";
+import { authorizeTenantAction, authorizeTenantMutation, requireWebsitePerson } from "./access";
 import { filterByVaultOwner } from "./vaultCore";
 
 const placeTypeValidator = v.union(
@@ -142,4 +142,19 @@ export const list = action({
       vaultOwnerId: decision.owner,
     });
   },
+});
+
+export const linkMedia = mutation({
+ args:{vaultOwnerId:v.string(),placeId:v.id("places"),mediaId:v.id("media")},
+ handler:async(ctx,args)=>{
+  const person=await requireWebsitePerson(ctx);
+  const {owner}=await authorizeTenantMutation(ctx,"places.linkMedia",args.vaultOwnerId);
+  if(person.subject!==owner)throw new Error("Owner mismatch");
+  const [place,media]=await Promise.all([ctx.db.get(args.placeId),ctx.db.get(args.mediaId)]);
+  if(!place||place.vaultOwnerId!==owner||place.archivedAt!==undefined||!media||media.vaultOwnerId!==owner||media.archivedAt!==undefined)throw new Error("Place or media not found");
+  const existing=await ctx.db.query("placeMediaMembers").withIndex("by_place_media",q=>q.eq("vaultOwnerId",owner).eq("placeId",args.placeId).eq("mediaId",args.mediaId)).unique();
+  if(existing?.active)return {linked:true};
+  await ctx.db.insert("connections",{vaultOwnerId:owner,from:{kind:"media",id:String(args.mediaId)},to:{kind:"place",id:String(args.placeId)},relation:"taken_at",state:"accepted",acceptedBy:person.subject,acceptedAt:Date.now(),createdAt:Date.now(),updatedAt:Date.now()});
+  return {linked:true};
+ }
 });

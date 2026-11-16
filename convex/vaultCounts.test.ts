@@ -142,3 +142,20 @@ test("deferred guest adapter still tracks non-person owner moves and content rev
   expect(audit.isDone).toBe(true);
   for (const [key, n] of Object.entries(audit.counter)) expect(audit.subtotal[key] ?? 0).toBe(n);
 });
+
+test("v1 unsharded memberships migrate atomically with edits before the v3 completion gate",async()=>{
+ const t=convexTest(schema,modules);
+ const ids=await t.run(async ctx=>{
+  await ctx.db.insert("searchBuildState",{table:"vaultCounts:v1",cursor:null,complete:true});
+  await ctx.db.insert("vaultCounts",{vaultOwnerId:owner,table:"researchTasks",counts:{active:2,"status:todo":2},revision:7});
+  const ids=[];
+  for(let i=0;i<2;i++){const id=await ctx.db.insert("researchTasks",task(i));ids.push(id);await ctx.db.insert("vaultCountMembers",{recordId:String(id),table:"researchTasks",owner,keys:["active","status:todo"]});}
+  return ids;
+ });
+ expect((await t.query(internal.vaultCounts.read,{vaultOwnerId:owner})).complete).toBe(false);
+ await t.run(async ctx=>{const db=withSearchWrites(ctx).db;await db.patch(ids[0],{archivedAt:0});await db.patch(ids[1],{vaultOwnerId:other});});
+ await build(t);await parity(t);
+ expect((await t.query(internal.vaultCounts.read,{vaultOwnerId:owner})).counts.researchTasks?.active).toBe(0);
+ expect((await t.query(internal.vaultCounts.read,{vaultOwnerId:other})).counts.researchTasks?.active).toBe(1);
+ expect(await t.run(ctx=>ctx.db.query("vaultCountMembers").withIndex("by_record",q=>q.eq("recordId",String(ids[1]))).unique())).toMatchObject({owner:other,shard:expect.any(Number)});
+});

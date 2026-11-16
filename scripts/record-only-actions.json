@@ -11,10 +11,13 @@
     "getVaultAudit",
     "getContextCoverage",
     "getStoryReadinessCandidates",
-    "getPlacesExplorer",
+    "getPlacesPage",
+    "getPlaceSection",
+    "getPlaceMentions",
     "getPlaceWorkspace",
     "getDashboardSummary",
-    "getResearchOverview",
+    "getResearchTasksPage",
+    "getResearchLogPage",
     "getContextPack"
   ],
   "queue.ts": [

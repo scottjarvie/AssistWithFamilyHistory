@@ -1,15 +1,14 @@
-import { ResearchOverviewView } from "@/components/vault/ResearchOverviewView";
-import { projectResearchTask, projectResearchLog } from "@/lib/vault/collectionRows";
+import { PaginatedResearch } from "@/components/vault/PaginatedResearch";
+import { loadResearchTasks, loadResearchLog } from "./actions";
+
 import type { Metadata } from "next";
 import { VaultStateCard } from "@/components/vault/VaultStateCard";
 import { createPageMetadata } from "@/lib/seo";
 import {
-  getAuthedConvexClient,
   getConvexRuntimeIssue,
   getConvexUnavailableState,
   isConvexConfigured,
 } from "@/lib/convex/server";
-import { api } from "@/convex/_generated/api";
 import { getVaultAccessContext } from "@/lib/vault/server";
 
 export const metadata: Metadata = createPageMetadata({
@@ -33,12 +32,14 @@ export default async function ResearchPage({searchParams}:{searchParams:Promise<
     );
   }
 
-  const client = await getAuthedConvexClient();
+  const params = await searchParams;
+  const status = (["todo", "in_progress", "blocked", "done"] as const).find(s => s === params.status);
   const { vaultOwnerId } = await getVaultAccessContext();
   let overview;
 
   try {
-    overview = await client.action(api.vaultReads.getResearchOverview, { vaultOwnerId });
+    const [tasks, log] = await Promise.all([loadResearchTasks({expectedOwner: vaultOwnerId, cursor: null, search: params.q, status}), loadResearchLog({expectedOwner: vaultOwnerId, cursor: null})]);
+    overview = {tasks, log};
   } catch (error) {
     const issue = getConvexRuntimeIssue(error);
 
@@ -49,6 +50,5 @@ export default async function ResearchPage({searchParams}:{searchParams:Promise<
     );
   }
 
-  const params = await searchParams;
-  return <ResearchOverviewView tasks={overview.tasks.map(projectResearchTask)} log={overview.logEntries.map(projectResearchLog)} query={params.q} status={params.status} preferenceKey={`awf.collection.research.${vaultOwnerId}`} />;
+  return <PaginatedResearch key={`${vaultOwnerId}:${params.q}:${status}`} initial={overview} query={params.q} status={status} vaultOwnerId={vaultOwnerId} preferenceKey={`awf.collection.research.${vaultOwnerId}`} />;
 }
