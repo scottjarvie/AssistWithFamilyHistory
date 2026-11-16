@@ -1633,7 +1633,7 @@ export const getStoriesIndex = internalQuery({
   args: {vaultOwnerId: v.string(), cursor: v.optional(v.union(v.string(), v.null()))},
   handler: async (ctx, args) => {
     const owner = normalizeVaultOwnerId(args.vaultOwnerId);
-    const result = await ctx.db.query("stories").withIndex("by_owner_updated", q => q.eq("vaultOwnerId", owner)).order("desc")
+    const result = await ctx.db.query("stories").withIndex("by_owner_updated", q => q.eq("vaultOwnerId", owner).eq("archivedAt", undefined)).order("desc")
       .paginate({cursor: args.cursor ?? null, numItems: 10, maximumRowsRead: 10, maximumBytesRead: 250_000});
     return {...result, page: result.page.filter(row => row.archivedAt === undefined)};
   },

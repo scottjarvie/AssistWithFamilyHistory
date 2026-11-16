@@ -1768,7 +1768,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .searchIndex("search_text", { searchField: "searchText", filterFields: ["vaultOwnerId", "archivedAt"] })
-    .index("by_owner_updated", ["vaultOwnerId", "updatedAt"])
+    .index("by_owner_updated", ["vaultOwnerId", "archivedAt", "updatedAt"])
     .index("by_owner", ["vaultOwnerId"])
     .index("by_person", ["personId"])
     .index("by_relationship", ["relationshipId"])

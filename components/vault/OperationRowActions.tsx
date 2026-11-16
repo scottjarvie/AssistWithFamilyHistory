@@ -101,6 +101,15 @@ export function OperationRowActions({
     return () => {cancelled = true; clearTimeout(timer); controller.abort();};
   }, [readonlyPreview, mergeDialogOpen, candidateQuery, candidateLoad]);
 
+  function openMergeDialog() {
+    setCandidateQuery("");
+    setMergeCandidates([]);
+    setCandidateCursor(null);
+    setCandidatesDone(false);
+    setCandidateLoad(previous => ({cursor: null, revision: previous.revision + 1}));
+    setMergeDialogOpen(true);
+  }
+
   const filteredCandidates = useMemo(() => {
     const query = candidateQuery.trim().toLowerCase();
 
@@ -113,8 +122,7 @@ export function OperationRowActions({
           .join(" ")
           .toLowerCase()
           .includes(query);
-      })
-      .slice(0, 10);
+      });
   }, [anchorPersonIdentifier, candidateQuery, mergeCandidates]);
 
   const handoffText = useMemo(
@@ -302,7 +310,7 @@ export function OperationRowActions({
           <Button size="sm" variant="outline" onClick={() => setPromoteDialogOpen(true)} disabled={busy}>
             Promote
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setMergeDialogOpen(true)} disabled={busy}>
+          <Button size="sm" variant="outline" onClick={openMergeDialog} disabled={busy}>
             Merge
           </Button>
         </div>
@@ -358,7 +366,8 @@ export function OperationRowActions({
         <Dialog
           open={mergeDialogOpen}
           onOpenChange={(open) => {
-            setMergeDialogOpen(open);
+            if (open) openMergeDialog();
+            else setMergeDialogOpen(false);
             if (!open) {
               setCandidateQuery("");
               setReviewNote("");

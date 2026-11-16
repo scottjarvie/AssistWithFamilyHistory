@@ -125,7 +125,9 @@ links. A signed-in website person can explicitly accept a candidate using
 accepted `taken_at` Connection. “Unlink from this place” rejects accepted
 Connections while keeping the media. Each mutation rejects one connection via
 an indexed pair lookup; the website continues for up to 50 transactions, and
-exceptionally duplicated links can be continued with another click. Acceptance
+exceptionally duplicated links can be continued with another click. Partial
+unlinks keep their continuation notice mounted; refresh happens only after the
+last accepted link is removed. Acceptance
 and rejection record the acting person and time. It never publishes or changes
 media privacy.
 Optional descriptions are initialized to an empty string for safe indexing.
@@ -205,8 +207,8 @@ a bounded versioned repair that does not race normal writes. Raw ordering fields
 like existing search metadata, may appear in raw exports; client DTOs omit them.
 
 Operations, Audit and readiness remain deferred. The partial batch B additions
-and their graph-fan-out limits are described below. The
-original campaign's 13-caller map remains the baseline: Dashboard, Research and
+and their graph-fan-out limits are described below.
+The original campaign's 13-caller map remains the baseline: Dashboard, Research and
 the two Places website consumers now select the bounded paths after this gate;
 the original implementations are retained only where migration/parity requires.
 
@@ -217,8 +219,8 @@ then hydrates each rich row in a separate story/person-scoped query. The browser
 has Load more. Search, facets, counts, grouping and sorting explicitly cover
 loaded stories. Equal updated timestamps now use creation-descending index ties,
 rather than the former full-snapshot creation-ascending ties. No persisted score
-or inferred full-vault ranking is introduced. Archived candidates can produce an
-empty page with a continuation; it is not end-of-results.
+or inferred full-vault ranking is introduced. The list index excludes archived stories before pagination. A story deleted or
+archived between selection and hydration can still vanish from its page.
 
 Both public story lookups use the same scoped graph and existing public DTO,
 with publication, archive, living-person, stored ownership, media rights/privacy,
@@ -267,3 +269,15 @@ The underlying People Explorer migration gate remains separate from v5.
 Operations, Operations summary, Audit and Story Writer readiness remain on their
 old snapshots in this partial batch. Do not mark batch B complete or ship this
 partial PR as completion of the campaign.
+
+
+Existing owner-prefixed lookups intentionally require a stored owner match,
+consistent with the original whole-vault snapshot. Legacy ownerless rows in the
+local default vault may therefore no longer appear through FS-ID/document/import/
+log private lookups; real authenticated owner IDs are unaffected. Do not assign
+ownership or rewrite these records automatically.
+
+During v5 traversal, scoped readers depend on its progress flag. Each step can
+invalidate reactive queries or conflict with mutations that read that flag;
+retry ordinary OCC failures. This is temporary during the upgrade, and v4-ready
+batch A readers do not read the changing v5 flag.

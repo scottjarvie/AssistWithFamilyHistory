@@ -87,7 +87,7 @@ test("scoped public DTO and workspace equal original complete snapshot before an
   expect(await t.query(api.vault.getPublishedStoryByIdentifier, {storyIdentifier: String(ids.story)})).toBeNull();
 });
 
-test("story pages continue beyond archived/empty candidates, equal the rich rows, and isolate owners", async () => {
+test("story pages exclude archived candidates before pagination, equal the rich rows, and isolate owners", async () => {
   vi.stubEnv("TRUST_BOUNDARY_MODE", "enforce");
   const t = convexTest(schema, modules), ids = await fixture(t);
   await migrate(t);
@@ -102,6 +102,7 @@ test("story pages continue beyond archived/empty candidates, equal the rich rows
     const {_id, _creationTime, ...fields} = original; void _id; void _creationTime;
     await db.insert("stories", {...fields, vaultOwnerId: other});
   });
+  expect((await t.query(internal.vault.getStoriesIndex, {vaultOwnerId: owner})).page).toHaveLength(10);
   let cursor: string | null = null; const found: string[] = [];
   do {
     const page = await t.withIdentity({subject: owner}).action(api.vaultReads.getStoriesIndex, {vaultOwnerId: owner, cursor});
