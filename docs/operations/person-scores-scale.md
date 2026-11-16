@@ -30,6 +30,7 @@ Stale status is never persisted. Each applicable resolved check with a positive
 review timestamp has a small `personScoreReviews` entry. Reads use the
 owner/timestamp range `0 < reviewedAt < now - 45 days`, in pages of 250. They sum
 all pages with one fixed cutoff. Totals and the first stale page share one query,
+using a 251-row lookahead (a full native page can have `isDone:false`),
 so up to 250 stale reviews need no revision recheck or retry. Larger traversals
 check summed shard revisions before/after. Concurrent refreshes restart the count,
 with 50 ms then 100 ms backoff. After three unstable attempts, reads return the

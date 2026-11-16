@@ -2,7 +2,7 @@ import { expect, test, vi, afterEach } from "vitest";
 import { convexTest } from "convex-test";
 import schema from "./schema";
 import { api, internal } from "./_generated/api";
-import { getVaultSnapshot, buildPeopleRows } from "./vault";
+import { getVaultSnapshot, buildPeopleRows, loadPersonScopedSnapshot } from "./vault";
 import { withSearchWrites } from "./searchWrites";
 import { applyExplorerChanges, type ExplorerChange } from "./peopleExplorer";
 import { personScore } from "./personScores";
@@ -229,6 +229,8 @@ test("import warnings edit refreshes identity_review and name-only edit queues n
  const jobs = await t.run(ctx => ctx.db.system.query("_scheduled_functions").collect());
  expect(jobs.filter(j => j.state.kind === "pending").every(j => j.name.endsWith("refreshScheduled"))).toBe(true);
  await settle(t); await recount(t);
+ const renamed = await t.run(ctx => ctx.db.query("personScoreRows").withIndex("by_record", q => q.eq("recordId", personId)).unique());
+ expect(renamed?.operation.displayName).toBe("Renamed Synthetic");
 });
 test("no-op score refresh ignores stored object key order",async()=>{
  const t=setup();const id=await t.run(ctx=>ctx.db.insert("persons",fields(1)));await migrate(t);
@@ -256,4 +258,17 @@ test("v4 and v5 readers remain ready throughout an incomplete v6 upgrade", async
  expect(tasks.isDone).toBe(true);
  const places = await t.query(internal.placePages.list, {vaultOwnerId: owner, cursor: null});
  expect(places.isDone).toBe(true);
+ await t.run(async ctx => {
+   const id = await ctx.db.insert("persons", fields(0));
+   const db = new Proxy(ctx.db, {get(target, key) {
+     if (key === "query") return (table: string) => {
+       if (["media", "contextItems"].includes(table)) throw new Error("Unexpected owner-wide loader fallback");
+       return target.query(table as "persons");
+     };
+     const value = Reflect.get(target, key);
+     return typeof value === "function" ? value.bind(target) : value;
+   }});
+   const snapshot = await loadPersonScopedSnapshot({...ctx, db} as never, owner, String(id));
+   expect(snapshot?.people.map(p => p._id)).toEqual([id]);
+ });
 });

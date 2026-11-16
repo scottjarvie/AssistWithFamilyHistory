@@ -84,14 +84,15 @@ export async function refreshProvisionalScore(ctx: Pick<MutationCtx, "db">, id: 
 export async function scoresReady(ctx: Pick<QueryCtx, "db">) { return !!(await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", BUILD)).unique())?.complete; }
 export const status = internalQuery({ args: {}, handler: ctx => scoresReady(ctx) });
 export const totals = internalQuery({ args: { vaultOwnerId: v.string() }, handler: (ctx, a) => ownerTableCounter(ctx, a.vaultOwnerId, "personScores") });
-async function staleReviewsPage(ctx: Pick<QueryCtx, "db">, a: {vaultOwnerId: string; now: number; cursor: string | null}) {
-    const p = await ctx.db.query("personScoreReviews").withIndex("by_owner_review", q => q.eq("vaultOwnerId", a.vaultOwnerId).gt("reviewedAt", 0).lt("reviewedAt", a.now - STALE_AGE)).paginate({ cursor: a.cursor, numItems: 250, maximumBytesRead: 250000 });
+async function staleReviewsPage(ctx: Pick<QueryCtx, "db">, a: {vaultOwnerId: string; now: number; cursor: string | null}, numItems = 250) {
+    const p = await ctx.db.query("personScoreReviews").withIndex("by_owner_review", q => q.eq("vaultOwnerId", a.vaultOwnerId).gt("reviewedAt", 0).lt("reviewedAt", a.now - STALE_AGE)).paginate({ cursor: a.cursor, numItems, maximumBytesRead: 250000 });
     return { count: p.page.length, continueCursor: p.continueCursor, isDone: p.isDone };
 }
 export const stalePage = internalQuery({ args: { vaultOwnerId: v.string(), now: v.number(), cursor: v.union(v.string(), v.null()) }, handler: staleReviewsPage });
-/** One snapshot covers the common case: totals plus at most 250 stale reviews. */
+/** A 251-row probe makes <=250 reviews provably exhausted in native Convex,
+ * whose pagination can return isDone:false on an exactly full page. */
 export const totalsAndStale = internalQuery({args: {vaultOwnerId: v.string(), now: v.number()}, handler: async (ctx, a) => {
-    const [total, page] = await Promise.all([ownerTableCounter(ctx, a.vaultOwnerId, "personScores"), staleReviewsPage(ctx, {...a, cursor: null})]);
+    const [total, page] = await Promise.all([ownerTableCounter(ctx, a.vaultOwnerId, "personScores"), staleReviewsPage(ctx, {...a, cursor: null}, 251)]);
     return {...total, page};
 }});
 const sortValidator = v.optional(v.union(v.literal("missingCritical"), v.literal("completion"), v.literal("lastTouched"), v.literal("sourceCount"), v.literal("storyReadiness"), v.literal("newestImport")));
