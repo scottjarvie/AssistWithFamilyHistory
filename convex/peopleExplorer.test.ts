@@ -240,3 +240,97 @@ test("backfill can skip/log an isolated failure, and repair releases the complet
     expect(await t.run(ctx=>ctx.db.query("peopleExplorerRows").collect())).toHaveLength(2);
   }finally{vi.useRealTimers();}
 });
+
+test("dependency failures persist a replayable page and clear only after successful retry", async () => {
+  vi.useFakeTimers();
+  try {
+    let fail = true;
+    const t = convexTest(schema, {...modules, "./peopleExplorer.ts": async () => {
+      const real = await import("./peopleExplorer");
+      return {...real, dependencyPage: internalMutation({args: {kind: v.string(), id: v.string(), owner: v.optional(v.string()), stage: v.optional(v.number()), cursor: v.optional(v.union(v.string(), v.null()))}, handler: async (ctx, args) => {
+        if (fail) throw new Error("Synthetic discovery failure");
+        await (real.dependencyPage as unknown as {_handler: (ctx: MutationCtx, job: Omit<typeof args, "kind"> & {kind: "owner"}) => Promise<void>})._handler(ctx, {...args, kind: "owner"});
+      }})};
+    }});
+    const personId = await t.run(ctx => ctx.db.insert("persons", fields(0)));
+    await build(t);
+    const job = {kind: "owner" as const, id: owner};
+    expect(await t.action(internal.peopleExplorer.dependencyScheduled, job)).toBe(false);
+    expect(await t.action(internal.peopleExplorer.dependencyScheduled, job)).toBe(false);
+    const failures = await t.query(internal.peopleExplorer.dependencyFailures, {cursor: null});
+    expect(failures.page).toHaveLength(1);
+    expect(failures.page[0].job).toEqual(job);
+    expect(await t.query(internal.peopleExplorer.backfillStatus, {})).toMatchObject({hasFailures: true});
+    await t.run(async ctx => {
+      const state = await ctx.db.query("searchBuildState").withIndex("by_table", q => q.eq("table", "peopleExplorerRows")).unique();
+      await ctx.db.patch(state!._id, {complete: false});
+      await ctx.db.insert("searchBuildState", {table: "peopleExplorerTraversal", cursor: null, complete: true});
+    });
+    expect(await t.query(internal.peopleExplorer.backfillStatus, {})).toMatchObject({complete: false});
+    fail = false;
+    await t.mutation(internal.peopleExplorer.retryDependency, failures.page[0].job);
+    expect((await t.query(internal.peopleExplorer.dependencyFailures, {cursor: null})).page[0].state).toBe("pending");
+    await t.finishAllScheduledFunctions(() => vi.runAllTimers());
+    expect(await t.query(internal.peopleExplorer.backfillStatus, {})).toMatchObject({complete: true, hasFailures: false});
+    expect((await t.run(ctx => ctx.db.query("peopleExplorerRows").collect()))[0].personId).toBe(personId);
+  } finally {vi.useRealTimers();}
+});
+
+test("a media edit affecting 1,100 people schedules batches and refreshes every person", async () => {
+  vi.useFakeTimers();
+  try {
+    const t = setup();
+    const {ids, mediaId} = await t.run(async ctx => {
+      const ids: Id<"persons">[] = [];
+      for (let i = 0; i < 1100; i++) ids.push(await ctx.db.insert("persons", fields(i)));
+      await ctx.db.insert("searchBuildState", {table: "mediaPeople", cursor: null, complete: true});
+      const mediaId = await ctx.db.insert("media", {vaultOwnerId: owner, type: "photo", title: "Synthetic shared photo", personIds: [], createdAt: 0, updatedAt: 0});
+      return {ids, mediaId};
+    });
+    await t.run(async ctx => {
+      const changes: ExplorerChange[] = [];
+      await withSearchWrites(ctx, changes).db.patch(mediaId, {personIds: ids});
+      await applyExplorerChanges(ctx, changes);
+    });
+    const jobs = await t.run(ctx => ctx.db.system.query("_scheduled_functions").collect());
+    expect(jobs.length).toBeLessThan(20);
+    await t.finishAllScheduledFunctions(() => vi.runAllTimers());
+    const rows = await t.run(ctx => ctx.db.query("peopleExplorerRows").collect());
+    expect(rows).toHaveLength(1100);
+    expect(rows.every(row => row.payload.stats.memories === 1)).toBe(true);
+    expect(await t.query(internal.peopleExplorer.backfillStatus, {})).toMatchObject({hasFailures: false});
+  } finally {vi.useRealTimers();}
+}, 120_000);
+
+test("a failed non-first dependency page rolls back scheduled children and remains replayable", async () => {
+  vi.useFakeTimers();
+  try {
+    let fail = true;
+    const t = convexTest(schema, {...modules, "./peopleExplorer.ts": async () => {
+      const real = await import("./peopleExplorer");
+      return {...real, dependencyPage: internalMutation({args: {kind: v.literal("owner"), id: v.string(), cursor: v.optional(v.union(v.string(), v.null()))}, handler: async (ctx, args) => {
+        let scheduled = 0;
+        const scheduler = {...ctx.scheduler, runAfter: (async (...params: Parameters<typeof ctx.scheduler.runAfter>) => {
+          if (fail && ++scheduled === 2) throw new Error("Synthetic mid-page scheduling failure");
+          return ctx.scheduler.runAfter(...params);
+        }) as typeof ctx.scheduler.runAfter};
+        await (real.dependencyPage as unknown as {_handler: (ctx: MutationCtx, job: typeof args) => Promise<void>})._handler({...ctx, scheduler}, args);
+      }})};
+    }});
+    const cursor = await t.run(async ctx => {
+      for (let i = 0; i < 30; i++) await ctx.db.insert("persons", fields(i));
+      await ctx.db.insert("searchBuildState", {table: "mediaPeople", cursor: null, complete: true});
+      return (await ctx.db.query("persons").withIndex("by_owner", q => q.eq("vaultOwnerId", owner)).paginate({cursor: null, numItems: 25})).continueCursor;
+    });
+    const job = {kind: "owner" as const, id: owner, cursor};
+    expect(await t.action(internal.peopleExplorer.dependencyScheduled, job)).toBe(false);
+    expect(await t.run(ctx => ctx.db.system.query("_scheduled_functions").collect())).toHaveLength(0);
+    const failures = await t.query(internal.peopleExplorer.dependencyFailures, {cursor: null});
+    expect(failures.page[0]).toMatchObject({job, state: "failed"});
+    fail = false;
+    await t.mutation(internal.peopleExplorer.retryDependency, failures.page[0].job);
+    await t.finishAllScheduledFunctions(() => vi.runAllTimers());
+    expect(await t.run(ctx => ctx.db.query("peopleExplorerRows").collect())).toHaveLength(5);
+    expect((await t.query(internal.peopleExplorer.dependencyFailures, {cursor: null})).page).toHaveLength(0);
+  } finally {vi.useRealTimers();}
+});

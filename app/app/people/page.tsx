@@ -20,8 +20,11 @@ export const metadata: Metadata = createPageMetadata({
 
 export const dynamic = "force-dynamic";
 
-export default async function PeoplePage({searchParams}: {searchParams: Promise<{q?: string; status?: string}>}) {
+export default async function PeoplePage({searchParams}: {searchParams: Promise<{q?: string; status?: string; page?: string}>}) {
   const params = await searchParams;
+  // Legacy page=N links meant “show the first N batches”, not an offset page.
+  const requestedPage = Number.parseInt(params.page ?? "1", 10);
+  const initialTarget = Number.isSafeInteger(requestedPage) && requestedPage > 0 && requestedPage <= Math.floor(Number.MAX_SAFE_INTEGER / 50) ? requestedPage * 50 : 50;
   const status = params.status === "not_started" || params.status === "basic" || params.status === "in_progress" || params.status === "thorough" || params.status === "complete" ? params.status : undefined;
   if (!isConvexConfigured()) {
     const issue = getConvexUnavailableState(
@@ -62,5 +65,5 @@ export default async function PeoplePage({searchParams}: {searchParams: Promise<
     );
   }
 
-  return <PaginatedPeopleExplorer key={`${vaultOwnerId}:${params.q || ""}:${status || ""}`} vaultOwnerId={vaultOwnerId} initial={people} firstStartEligible={firstStartEligible} query={params.q} status={status} preferenceKey={`awf.collection.people.${vaultOwnerId}`}/>;
+  return <PaginatedPeopleExplorer key={`${vaultOwnerId}:${params.q || ""}:${status || ""}:${initialTarget}`} vaultOwnerId={vaultOwnerId} initial={people} initialTarget={initialTarget} firstStartEligible={firstStartEligible} query={params.q} status={status} preferenceKey={`awf.collection.people.${vaultOwnerId}`}/>;
 }

@@ -111,3 +111,55 @@ Other snapshot pages (Places, Operations, Research, Overview, writing candidates
 and the compatibility People array API remain follow-ups. Their broader exact
 metrics/context need separate projections and backfills. Anonymous local timings
 are indicative only; neither latency nor migration throughput is a cloud promise.
+
+## Worker diagnostics and legacy People links
+
+Dependency discovery is scheduled through an action boundary. Scheduling commits
+an internal pending diagnostic with the job in the same transaction. If the action
+is interrupted, that pending job remains visible and replayable. The diagnostics
+query includes pending and failed jobs; inspect scheduled-function state before
+retrying a pending job that may still be running. A failed discovery
+page is recorded separately from person failures, with its exact kind, ID,
+owner, stage and cursor. No full source documents or exception text are saved. IDs can include a FamilySearch
+person key, and opaque cursors can encode indexed values; treat these internal
+operational records as private.
+The original page mutation rolls back both child scheduling and diagnostic
+removal on failure. Retrying a successful page removes its diagnostic atomically
+with child scheduling. Person work remains isolated and reports its own failures.
+
+For a deployment containing these functions, inspect
+and retry dependency failures using the exact job object returned by the query:
+
+```bash
+CONVEX_DEPLOYMENT=prod:accomplished-dodo-308 npx convex run peopleExplorer:dependencyFailures '{"cursor":null}'
+CONVEX_DEPLOYMENT=prod:accomplished-dodo-308 npx convex run peopleExplorer:retryDependency '{"kind":"owner","id":"<owner from diagnostic>"}'
+CONVEX_DEPLOYMENT=prod:accomplished-dodo-308 npx convex run peopleExplorer:backfillStatus '{}'
+```
+
+Include `owner`, `stage` and `cursor` if present in the returned job; the example
+only shows an owner repair. Pass continueCursor to inspect subsequent diagnostic
+pages. Wait for scheduled work to finish; both diagnostic tables must be empty.
+A failed dependency page now contributes to `hasFailures` and holds initial
+migration completion. Existing completed migrations remain complete and surface
+later failures through `hasFailures`. Successful retry/repair can release a held
+completion flag once traversal and all recorded failures are resolved. The completion flag records migration, not continuous freshness: a
+successful dependency retry can release it while isolated child refreshes remain
+queued. A later child failure keeps `complete:true` and sets `hasFailures:true`,
+including when the retry released an initial migration hold. Inspect pending jobs
+and child person failures before claiming current projections.
+
+Direct refresh fan-out is dispatched in batches of at most 100 IDs, each atomically
+scheduling at most 100 isolated person actions in a separate mutation. This avoids one scheduled function per person in
+the source transaction, which previously hit Convex's 1,000-job cap. Indexed
+dependency discovery still pages 25 rows per hop.
+
+Legacy People `?page=N` links meant “show the first N batches of 50.” They now
+progress through the current cursor read until that cumulative target is reached
+(or results end), preserving search and research-state filters. They cannot be
+mapped to a stored opaque cursor: old URLs never stored one, and concurrent edits
+can move rows. All intermediate reads retain the existing page budgets.
+
+No backfill is required. The retry command schedules production repair writes;
+run it only when investigating the returned job. No repair command was run during
+implementation. The remaining
+snapshot-page migrations are not implemented by this worker reliability change.
