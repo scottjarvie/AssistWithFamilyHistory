@@ -32,7 +32,8 @@ export const records=internalQuery({args:{vaultOwnerId:v.string(),metric:v.union
  else if(metric==="historicalContext")range=ctx.db.query("historicalContext").withIndex("by_audit_recent",q=>q.eq("vaultOwnerId",owner).eq("archivedAt",undefined));
  else if(metric==="publishedStories")range=ctx.db.query("stories").withIndex("by_audit_status",q=>q.eq("vaultOwnerId",owner).eq("archivedAt",undefined).eq("status","published"));
  else if(metric==="citations")range=ctx.db.query("citations").withIndex("by_owner",q=>q.eq("vaultOwnerId",owner));
- else range=ctx.db.query(metric as "sources"|"stories").withIndex("by_audit_active",q=>q.eq("vaultOwnerId",owner).eq("archivedAt",undefined));
+ else if(metric==="stories")range=ctx.db.query("stories").withIndex("by_owner_updated",q=>q.eq("vaultOwnerId",owner).eq("archivedAt",undefined)).order("desc");
+ else range=ctx.db.query("sources").withIndex("by_audit_active",q=>q.eq("vaultOwnerId",owner).eq("archivedAt",undefined));
  const p=await range.paginate({cursor:a.cursor,numItems:50,maximumBytesRead:250000});
  const rows:AuditRecord[]=[];
  for(const r of p.page) {
@@ -70,7 +71,7 @@ export const references=internalQuery({args:{vaultOwnerId:v.string(),kind:v.unio
  const base:any=ctx.db.query(a.kind==="source"?"citations":a.kind==="citation"?"citationLinks":a.kind==="event"?"personEvents":"sourceFacts");
  const range=base.withIndex(a.kind==="source"||a.kind==="sourceFacts"?"by_source":a.kind==="event"?"by_event":"by_citation",(q:any)=>q.eq(a.kind==="source"||a.kind==="sourceFacts"?"sourceId":a.kind==="event"?"eventId":"citationId",a.id));
  const p=await range.paginate({cursor:a.cursor,numItems:50,maximumBytesRead:250000});
- return {refs:p.page.filter((r:any)=>owned(r,a.vaultOwnerId)).map((r:any)=>a.kind==="source"?{kind:"linkedCitation",id:String(r._id)}:a.kind==="citation"?{kind:r.targetType as string,id:r.targetId as string}:{kind:"person",id:String(r.personId)}),continueCursor:p.continueCursor as string,isDone:p.isDone as boolean};
+ return {refs:p.page.filter((r:any)=>owned(r,a.vaultOwnerId)&&(a.kind!=="citation"||["person","place","event","relationship"].includes(r.targetType))).map((r:any)=>a.kind==="source"?{kind:"linkedCitation",id:String(r._id)}:a.kind==="citation"?{kind:r.targetType as string,id:r.targetId as string}:{kind:"person",id:String(r.personId)}),continueCursor:p.continueCursor as string,isDone:p.isDone as boolean};
 }});
 type Destination={href:string;label:string};
 export const target=internalQuery({args:{vaultOwnerId:v.string(),kind:v.string(),id:v.string()},handler:async(ctx,a):Promise<{destination:Destination|null;event?:boolean}>=>{
@@ -99,12 +100,19 @@ export async function resolveDestination(ctx:Pick<ActionCtx,"runQuery">,owner:st
  return t.event?scan("event",id):t.destination;
 }
 export async function readRecords(ctx:Pick<ActionCtx,"runQuery">,owner:string,metric:AuditMetric,cursor:string|null,total:number,people:number):Promise<AuditRecordPage> {
- const p=await ctx.runQuery(internal.auditPages.records,{vaultOwnerId:owner,metric,cursor});
+ let rawCursor:string|null=null;
+ if(cursor) {
+  let value:{owner?:string;metric?:string;cursor?:unknown};
+  try{value=JSON.parse(cursor);}catch{throw new Error("Invalid Audit cursor; restart at page one");}
+  if(!value||value.owner!==owner||value.metric!==metric||typeof value.cursor!=="string")throw new Error("Audit cursor belongs to another metric or vault; restart at page one");
+  rawCursor=value.cursor;
+ }
+ const p=await ctx.runQuery(internal.auditPages.records,{vaultOwnerId:owner,metric,cursor:rawCursor});
  const rows=await Promise.all(p.rows.map(async raw=>{
   const r=["citations","historicalContext","openResearchTasks"].includes(metric)?{...raw,...await ctx.runQuery(internal.auditPages.recordLink,{vaultOwnerId:owner,metric,id:raw.id})}:raw;
   if(metric!=="sources"&&metric!=="citations")return r;
   const dest=await resolveDestination(ctx,owner,metric==="sources"?"source":"citation",r.id);
   return {...r,href:dest?.href??null,destination:dest?.label??null};
  }));
- return {metric,total,rows,nextOffset:null,continueCursor:p.continueCursor,isDone:p.isDone,...(metric.startsWith("peopleWithout")||metric.startsWith("workflow:")?{denominator:{metric:"people" as const,total:people}}:{})};
+ return {metric,total,rows,nextOffset:null,continueCursor:JSON.stringify({owner,metric,cursor:p.continueCursor}),isDone:p.isDone,...(metric.startsWith("peopleWithout")||metric.startsWith("workflow:")?{denominator:{metric:"people" as const,total:people}}:{})};
 }

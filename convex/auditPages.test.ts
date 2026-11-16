@@ -88,3 +88,32 @@ test("destinations retain link precedence, source-fact fallback, name prefixes a
   await ctx.db.insert("citationLinks",{vaultOwnerId:owner,citationId:cites[0]._id,targetType:"person",targetId:f.people[0],createdAt:100});
  });await migrate(t);await parity(t,owner,true);
 });
+test("completed v6 upgrades only Audit source tables and existing score flags",async()=>{
+ vi.useFakeTimers();const t=setup();const f=await fixture(t,3);await migrate(t);
+ await t.run(async ctx=>{
+  const gate=(await ctx.db.query("searchBuildState").withIndex("by_table",q=>q.eq("table","vaultCounts:v7")).unique())!;await ctx.db.delete(gate._id);
+  for(const row of await ctx.db.query("personScoreRows").collect())await ctx.db.patch(row._id,{auditWithoutSources:undefined,auditWithoutContext:undefined,auditWithoutStories:undefined});
+ });
+ const {backfillStep}=await import("./vaultCounts");
+ for(let i=0;i<10;i++) {
+  const done=await t.run(async ctx=>{
+   const db=new Proxy(ctx.db,{get(target,key){if(key==="query")return (table:string)=>{if(["persons","sources","citations","citationLinks"].includes(table))throw Error("v7 upgrade reread v6 graph");return target.query(table as "persons");};const value=Reflect.get(target,key);return typeof value==="function"?value.bind(target):value;}});
+   return (backfillStep as unknown as {_handler:(ctx:unknown,args:object)=>Promise<boolean>})._handler({...ctx,db},{});
+  });if(i===0)await write(t,db=>db.patch(f.contexts[0],{placeId:f.places[2]}));if(done)break;
+ }
+ expect(await t.query(internal.auditPages.status,{})).toBe(true);await parity(t,owner,true);
+});
+test("cursor continuation is bound to the matching metric and owner",async()=>{
+ vi.useFakeTimers();const t=setup();await fixture(t);await migrate(t);const client=t.withIdentity({subject:owner});
+ const first=(await client.action(api.vaultReads.getVaultAudit,{vaultOwnerId:owner,metric:"sources"})).records!;expect(first.isDone).toBe(false);
+ await expect(client.action(api.vaultReads.getVaultAudit,{vaultOwnerId:owner,metric:"citations",cursor:first.continueCursor})).rejects.toThrow(/cursor belongs/);
+ await expect(t.withIdentity({subject:other}).action(api.vaultReads.getVaultAudit,{vaultOwnerId:other,metric:"sources",cursor:first.continueCursor})).rejects.toThrow(/cursor belongs/);
+});
+test("place and task inserts and deletes maintain Audit gaps after v7",async()=>{
+ vi.useFakeTimers();const t=setup();await migrate(t);
+ for(let i=0;i<12;i++) {
+  const ids=await t.run(async ctx=>{const db=withSearchWrites(ctx).db;return {p:await db.insert("places",{...base,name:`Invented ${i}`,fullName:`Invented ${i}`,type:"city"}),task:await db.insert("researchTasks",{...base,type:"other",title:`Invented task ${i}`,status:i%2?"todo":"done",priority:"low",aiSuggested:false})};});
+  await parity(t);await write(t,async db=>{await db.patch(ids.p,{vaultOwnerId:other});await db.patch(ids.task,{vaultOwnerId:other,status:"blocked"});});await parity(t,other);
+  await write(t,async db=>{await db.delete(ids.p);await db.delete(ids.task);});await parity(t);await parity(t,other);
+ }
+});

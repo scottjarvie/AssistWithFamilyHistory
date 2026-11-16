@@ -1812,7 +1812,6 @@ export default defineSchema({
     .searchIndex("search_text", { searchField: "searchText", filterFields: ["vaultOwnerId", "archivedAt"] })
     .index("by_owner_updated", ["vaultOwnerId", "archivedAt", "updatedAt"])
     .index("by_audit_status", ["vaultOwnerId", "archivedAt", "status"])
-    .index("by_audit_active", ["vaultOwnerId", "archivedAt"])
     .index("by_owner", ["vaultOwnerId"])
     .index("by_person", ["personId"])
     .index("by_relationship", ["relationshipId"])

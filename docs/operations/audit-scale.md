@@ -43,8 +43,7 @@ and sources have no separate Audit gap. No approximate totals or first-N windows
 
 Record membership, totals, minimal DTOs and destination precedence match the old
 Audit. Natural traversal changes from whole-vault locale title sorting to indexed
-vault order: readiness for person/workflow lists, creation for gap/source/citation/
-story/task/place lists, and most-recent first for context. Presentation sorting
+vault order: readiness for person/workflow lists, creation for gap/source/citation/task/place lists, latest update for stories, and most-recent first for context. Presentation sorting
 and searching apply to loaded rows, as labelled. Following `continueCursor` until
 `isDone:true` visits the whole set. Legacy offset replies retain `nextOffset`;
 post-migration requests with a legacy offset restart at page one and the client
@@ -84,9 +83,11 @@ Repeat until `build:"vaultCounts:v7", complete:true`. Optional single step:
 CONVEX_DEPLOYMENT=prod:accomplished-dodo-308 npx convex run vaultCounts:backfillStep '{}'
 ```
 
-The idempotent ledger traversal revisits source contributions/flags, then refreshes
-one person/provisional per transaction, with cursor and maintenance committed
-together. No resets, skipped errors or manually completed production gates.
+With completed v6, the idempotent upgrade visits only places, research tasks
+and stories, then fills indexed flags from existing score rows in pages of 25.
+It uses the same old/new counter transaction, without recollecting person graphs.
+Fresh/incomplete-v6 migrations retain the full source/person/provisional traversal.
+Cursor and maintenance commit together in both modes. No resets, skipped errors or manually completed production gates.
 Existing completed v6/v5/v4 readers remain migrated throughout v7. Only Audit
 uses its legacy snapshot until v7 completes. Legacy fallback keeps its old large
 vault limits. Existing failure inspection and repair commands are documented in

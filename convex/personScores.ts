@@ -61,6 +61,15 @@ async function put(ctx: Pick<MutationCtx, "db">, id: string, next: Value | null)
     if (next) { if (old) await ctx.db.replace(old._id, next); else await ctx.db.insert("personScoreRows", next); }
     else if (old) await ctx.db.delete(old._id);
 }
+/** v6 already scored these exact inputs; v7 only needs its indexed flags.
+ * Reuse put so source-row and old/new contributions still commit together. */
+export async function refreshAuditFlags(ctx:Pick<MutationCtx,"db">,id:string) {
+ const old=await ctx.db.query("personScoreRows").withIndex("by_record",q=>q.eq("recordId",id)).unique();
+ if(!old)return;
+ const {_id,_creationTime,...value}=old;void _id;void _creationTime;
+ const person=old.rowType==="person";
+ await put(ctx,id,{...value,readiness:old.readiness,oldestReview:old.oldestReview,auditWithoutSources:person&&old.operation.sourceCount===0,auditWithoutContext:person&&old.operation.contextReportCount===0,auditWithoutStories:person&&old.operation.storyCount===0});
+}
 export async function removeScore(ctx: Pick<MutationCtx, "db">, id: string) { await put(ctx, id, null); }
 export async function refreshPersonScore(ctx: Pick<MutationCtx, "db">, id: Id<"persons">, force = false) {
     if (!force && !await scopedReadsReady(ctx))
