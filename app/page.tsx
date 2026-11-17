@@ -18,14 +18,12 @@ export const metadata = createPageMetadata({
 export default function HomePage() {
   return (
     <HomeTheme>
-      <div className="fh-home">
-        <MarketingNav />
-        <div className="fh-theme-row fh-width">
-          <ThemeSwitch />
-        </div>
-        <HomeLanding />
-        <Footer />
+      <MarketingNav />
+      <div className="fh-theme-row fh-width">
+        <ThemeSwitch />
       </div>
+      <HomeLanding />
+      <Footer />
     </HomeTheme>
   );
 }

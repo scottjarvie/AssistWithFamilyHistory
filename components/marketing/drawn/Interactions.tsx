@@ -8,30 +8,11 @@ import {
   useState,
   type KeyboardEvent,
 } from "react";
-import { ThemeProvider, useTheme } from "next-themes";
+export { HomeTheme, ThemeSwitch } from "./HomeTheme";
 import { PARTS, KEEPS } from "./content";
 import { PartPicture } from "./PartPicture";
 import { questions } from "../FamilyHistoryFaq";
 const IdeasDialog = dynamic(() => import("./IdeasDialog"), { ssr: false });
-export function HomeTheme({ children }: { children: React.ReactNode }) {
-  return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      {children}
-    </ThemeProvider>
-  );
-}
-export function ThemeSwitch() {
-  const { resolvedTheme, setTheme } = useTheme();
-  return (
-    <button
-      className="fh-theme"
-      onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-      aria-label="Switch colour theme"
-    >
-      Light / Dark
-    </button>
-  );
-}
 export function IdeasButton({
   id,
   total = 6,

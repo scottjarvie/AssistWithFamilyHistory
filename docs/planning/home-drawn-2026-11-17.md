@@ -65,3 +65,27 @@ limits, responsive interaction and dialog focus; no previous test is removed.
   out; no Convex process or deploy command was run. The page has no live reads.
 - Campaign captures live outside Git in
   `/home/jarvie/code/_campaigns/family-home-drawn-2026-11-16/shots/family-history/`.
+
+## Review follow-up · home-only theme
+
+The home theme now applies its light/dark class to `.fh-home` and, separately,
+to the portalled ideas dialog. It never changes `<html>` or `<body>`. The saved
+home preference uses `family-history-home-theme` (with the previous preference
+read for continuity). System preference is followed until the visitor chooses.
+Other public routes retain their direct-load appearance after client navigation.
+The About and legacy FAQ introduction now use the approved motto too.
+
+The first-review lessons also require the selected part in the ideas title:
+`Follow the question · 1 of 6 ideas`, for example. The all-ideas title matches
+its button. All six current parts have one idea, so no zero-idea control exists.
+The chip note is checked at 1000, 1050 and 1440px; FAQ hidden items share the same
+details selector; `/ai.txt` is an inline sentence link; stand-alone home controls
+and header, footer and retained-status links have at least 44px targets. Record definitions continue
+to come from the guide and the existing ideas list.
+
+Targeted follow-up validation: the two home contracts pass; thirteen browser
+checks cover existing controls, warning-free light/dark loads and colours,
+portalled dialog themes, direct-load versus client-navigation styles for all six
+public destinations, chip pointer alignment at three widths and phone link
+sizes. The touched component lint check has no errors. The full verification
+suite was not repeated for these review fixes, per the lead's instruction.

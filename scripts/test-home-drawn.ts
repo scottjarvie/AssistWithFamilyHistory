@@ -24,6 +24,8 @@ test("family motto stays aligned with the guide and public metadata", () => {
   assert.equal(MOTTO, "Assisting your AI to assist you with Family History.");
   for (const path of [
     "lib/site.ts",
+    "app/about/page.tsx",
+    "components/marketing/FamilyHistoryFaq.tsx",
     "app/opengraph-image.tsx",
     "docs/planning/site-guide.md",
   ])

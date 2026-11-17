@@ -50,7 +50,7 @@ export function FamilyHistoryFaq() {
               A careful workspace should be easy to understand.
             </h2>
             <p className="mt-5 text-base leading-8 text-[#4e5a64]">
-              Assist your AI, so it can assist you with family history—without confusing help with authority.
+              Assisting your AI to assist you with Family History.
             </p>
             <SafeLink href="/ai" className="mt-7 inline-flex min-h-11 items-center rounded-full border border-[#234d5e] px-5 text-sm font-semibold text-[#234d5e] hover:bg-[#edf4f0]">
               See how the AI connection works

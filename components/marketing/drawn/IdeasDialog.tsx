@@ -8,6 +8,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { SafeLink } from "@/components/layout/SafeLink";
+import { useHomeTheme } from "./HomeTheme";
+import { PARTS } from "./content";
 import { IDEAS } from "@/lib/site/ideas";
 export default function IdeasDialog({
   id,
@@ -20,6 +22,8 @@ export default function IdeasDialog({
   onOpenChange: (v: boolean) => void;
   returnFocus: RefObject<HTMLButtonElement | null>;
 }) {
+  const theme = useHomeTheme();
+  const part = PARTS.find((part) => part.id === id);
   const ideas = [
     ...IDEAS.filter((x) => x.id === id),
     ...IDEAS.filter((x) => x.id !== id),
@@ -27,14 +31,18 @@ export default function IdeasDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="fh-dialog"
+        className={`fh-dialog ${theme}`}
         onCloseAutoFocus={(event) => {
           event.preventDefault();
           returnFocus.current?.focus();
         }}
       >
         <DialogHeader>
-          <DialogTitle>Ideas · {IDEAS.length}</DialogTitle>
+          <DialogTitle>
+            {part
+              ? `${part.name} · 1 of ${IDEAS.length} ideas`
+              : `All ${IDEAS.length} ideas`}
+          </DialogTitle>
           <DialogDescription>
             What your AI already does well, and what your data adds.
           </DialogDescription>
