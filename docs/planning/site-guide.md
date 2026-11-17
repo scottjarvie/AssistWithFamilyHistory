@@ -6,7 +6,7 @@ The one product document for Assist With Family History. It is written for the p
 
 ## What Family History is
 
-**Assist With Family History assists your AI, so your AI can assist you with family history.** It is a durable, user-controlled research-to-story workspace: the person and their AI keep the people, how they are related, the sources behind every important detail, the questions still open, and the stories that come from it all — connected, attributed and still there when they return months later, possibly with a different AI.
+**Assisting your AI to assist you with Family History.** It is a durable, user-controlled research-to-story workspace: the person and their AI keep the people, how they are related, the sources behind every important detail, the questions still open, and the stories that come from it all — connected, attributed and still there when they return months later, possibly with a different AI.
 
 The subject of the work can be a person, a family line, a relationship, a place, a building, a community, a religion, an event or an era — not only a pedigree position. A family tree is one view of the research, not its limit.
 
@@ -247,3 +247,9 @@ story-scoped graph. Operational migration details and remaining page work are in
 [the scale runbook](../operations/vault-counts-scale.md#batch-b-scoped-reads-and-compatibility-changes-release-pending).
 
 Implementation note (pending release): Operations summaries cover the whole vault before filters; Operations and Story Writer use paged maintained scores after the v6 migration. Handoff export is paged with continuation. See [score scaling](../operations/person-scores-scale.md); Audit remains on its legacy path.
+
+## Decisions
+
+| Date | Decision |
+| --- | --- |
+| 2026-11-17 | Scott: the home leads with the family motto (family home campaign). The signed-out home uses the drawn family recipe, with six parts from the live ideas list and seven record-kind chips. |

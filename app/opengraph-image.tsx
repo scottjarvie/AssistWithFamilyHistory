@@ -33,7 +33,7 @@ export default function OpenGraphImage() {
             <span>Family History</span>
           </div>
           <div style={{ fontSize: 34, maxWidth: "85%", color: "#44403c" }}>
-            Research deeply, document evidence, and turn genealogy records into narratives.
+            Assisting your AI to assist you with Family History.
           </div>
         </div>
         <div style={{ fontSize: 28, color: "#57534e" }}>assistwithfamilyhistory.com</div>

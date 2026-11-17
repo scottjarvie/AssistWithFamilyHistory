@@ -1,7 +1,7 @@
 import { ChevronDown } from "lucide-react";
 import { SafeLink } from "@/components/layout/SafeLink";
 
-const questions = [
+export const questions = [
   {question:"How do Queue requests and AI suggestions differ?",answer:"Requests you ask your AI to add are ordinary Queue items, marked added by your AI. Your AI’s own ideas are AI suggestions in your private Queue, hidden by default with a count; you can edit first, accept or dismiss them. Nothing runs before you accept. Needs your input is a flag on an item, never a state. Family-history conclusions stay on their records as AI proposal until you decide, never in the Queue."},
   { question: "What can my AI do here, and how do I limit it?",
     answer: "When you connect your first AI, it gets full access to your Family History workspace from the start: it can read, save, organise, archive and restore, including tools we add later, with no end date. You can limit it any time: in Settings → AI, or just ask your AI to limit itself (for example, \"only read, don’t change anything\" or \"stop until Friday\"). Your AI can narrow its own access but never widen it. Only you can give access back. A new connection starts with the limits of your most limited AI until you Restore it. It never permanently deletes anything or spends money for you. If you ask, it can publish or share something for you — it checks for private details first, and you can unpublish it any time." },
@@ -50,7 +50,7 @@ export function FamilyHistoryFaq() {
               A careful workspace should be easy to understand.
             </h2>
             <p className="mt-5 text-base leading-8 text-[#4e5a64]">
-              Assist your AI, so it can assist you with family history—without confusing help with authority.
+              Assisting your AI to assist you with Family History.
             </p>
             <SafeLink href="/ai" className="mt-7 inline-flex min-h-11 items-center rounded-full border border-[#234d5e] px-5 text-sm font-semibold text-[#234d5e] hover:bg-[#edf4f0]">
               See how the AI connection works

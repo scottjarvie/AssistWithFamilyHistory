@@ -20,7 +20,7 @@ export function Hero() {
             className="mt-8 max-w-5xl text-5xl leading-[0.98] text-[#1d212a] sm:text-6xl lg:text-7xl"
             data-display="true"
           >
-            Bring your chosen AI. Keep the research trail.
+            Assisting your AI to assist you with Family History.
           </h1>
 
           <p className="mt-7 max-w-3xl text-lg leading-8 text-[#3b4650] sm:text-xl">

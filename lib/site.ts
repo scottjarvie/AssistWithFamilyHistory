@@ -2,7 +2,7 @@ const defaultSiteUrl = "http://127.0.0.1:3443";
 
 export const SITE_NAME = "Assist With Family History";
 export const SITE_DESCRIPTION =
-  "A durable, user-controlled family-history workspace where your AI can work with connected evidence and context and you can correct and shape source-aware stories.";
+  "Assisting your AI to assist you with Family History. Keep evidence, questions and stories connected across conversations.";
 
 /**
  * Normalize a configured site URL into a safe origin: no internal or trailing

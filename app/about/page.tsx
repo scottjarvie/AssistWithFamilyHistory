@@ -173,7 +173,7 @@ export default function AboutPage() {
           {/* Open Source Note */}
           <section className="text-center">
             <p className="text-stone-500">
-              Assist your AI, so it can assist you with family history.
+              Assisting your AI to assist you with Family History.
             </p>
           </section>
         </div>

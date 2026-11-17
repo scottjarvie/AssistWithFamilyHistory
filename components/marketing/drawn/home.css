@@ -1,0 +1,754 @@
+/* Family History's own folio colours; campaign layout is scoped to the public home. */
+.fh-home,
+.fh-dialog {
+  --draw-ink: var(--foreground);
+  --draw-muted: #788077;
+  --draw-ai: #4666b2;
+  --draw-ai-fill: #dce5fb;
+  --draw-accent: #2c6a4f;
+  --draw-wash: var(--evidence-surface);
+  --draw-card: var(--card);
+  --draw-label: var(--background);
+  --draw-paper: var(--muted);
+  --draw-thing: #9abeb0;
+  --draw-band-ink: #fff6e5;
+  --draw-band-accent: #e2cda9;
+  --draw-band-ground: #193d30;
+  --fh-green: #2c6a4f;
+  --fh-on-green: #fffaf2;
+  background: var(--background);
+  color: var(--foreground);
+}
+.fh-home.dark,
+.fh-dialog.dark {
+  --draw-muted: #a0aea7;
+  --draw-ai: #a7bdf5;
+  --draw-ai-fill: #283d66;
+  --draw-accent: #89b79c;
+  --draw-thing: #537d70;
+  --fh-green: #8cbea0;
+  --fh-on-green: #13281e;
+}
+.fh-width {
+  width: min(100% - 32px, 1248px);
+  margin-inline: auto;
+}
+.fh-main {
+  padding-bottom: 64px;
+}
+.fh-theme-row {
+  padding-top: 80px;
+  text-align: right;
+  height: 124px;
+}
+.fh-theme,
+.fh-home button {
+  cursor: pointer;
+}
+.fh-theme {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  font-size: 13px;
+}
+.fh-home :focus-visible,
+.fh-dialog :focus-visible {
+  outline: 2px solid var(--foreground);
+  outline-offset: 4px;
+}
+.fh-home h1,
+.fh-home h2,
+.fh-home h3 {
+  font-family: var(--font-cormorant-garamond), Georgia, serif;
+}
+.fh-home h2 {
+  font-size: 30px;
+  line-height: 1.15;
+  font-weight: 600;
+}
+.fh-home h3 {
+  font-size: 28px;
+  line-height: 1.15;
+}
+.fh-home p {
+  line-height: 1.55;
+}
+.fh-hero h1 {
+  font-size: clamp(38px, 4.4vw, 64px);
+  line-height: 1.04;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+  max-width: 900px;
+}
+.fh-hero p {
+  margin-top: 20px;
+  max-width: 660px;
+  font-size: 18px;
+  color: var(--muted-foreground);
+}
+.fh-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+}
+.fh-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 8px 22px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: 1px solid transparent;
+  border-radius: 100px;
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.fh-button.fh-secondary {
+  background: transparent;
+  color: var(--foreground);
+  border-color: var(--muted-foreground);
+}
+.fh-hero-art {
+  width: 210px !important;
+  margin: 10px 0 0 auto;
+}
+.fh-parts {
+  margin-top: 48px;
+}
+.fh-hint {
+  margin-top: 8px;
+  color: var(--muted-foreground);
+  font-size: 14px;
+}
+.fh-freedom-faq {
+  display: grid;
+  gap: 40px;
+  margin-top: 48px;
+  padding-top: 32px;
+  border-top: 1px solid var(--border);
+}
+.fh-pair {
+  font-size: 28px;
+  font-family: var(--font-cormorant-garamond), Georgia, serif;
+  color: var(--evidence);
+  margin: 10px 0;
+}
+.fh-lede {
+  color: var(--muted-foreground);
+  font-size: 16px;
+}
+.fh-desktop {
+  display: none;
+}
+.fh-accordion {
+  margin-top: 20px;
+  display: grid;
+  gap: 8px;
+}
+.fh-fold {
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: 8px;
+}
+.fh-fold > h3 button {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-align: left;
+  padding: 14px 16px;
+  min-height: 52px;
+  font:
+    600 15px var(--font-instrument-sans),
+    sans-serif;
+}
+.fh-panel {
+  padding: 16px;
+  display: grid;
+  grid-template-columns: 1fr 110px;
+  gap: 14px;
+  align-items: center;
+}
+.fh-panel .part-picture {
+  grid-column: 2;
+  grid-row: 1 / 3;
+}
+.fh-panel > div {
+  grid-row: 2;
+  grid-column: 1 / -1;
+}
+.fh-accordion .fh-panel h3 {
+  display: none;
+}
+.fh-panel dl {
+  grid-row: 1;
+  grid-column: 1;
+}
+.fh-panel dt,
+.fh-label {
+  font:
+    600 11px var(--font-ibm-plex-mono),
+    monospace;
+  color: var(--evidence);
+  margin: 0 0 4px;
+}
+.fh-panel dt {
+  margin-top: 10px;
+}
+.fh-panel dd {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.4;
+}
+.fh-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 10px;
+}
+.fh-tags span {
+  background: var(--evidence-surface);
+  color: var(--evidence);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.fh-more {
+  min-height: 44px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--evidence);
+  padding: 0 4px;
+}
+.fh-more:hover {
+  text-decoration: underline;
+}
+.fh-keeps {
+  position: relative;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.fh-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.fh-chips > b {
+  font-size: 12px;
+  margin-right: 8px;
+}
+.fh-chips > b span {
+  font-weight: 400;
+}
+.fh-chips button {
+  border: 1px solid var(--border);
+  padding: 8px 14px;
+  min-height: 44px;
+  border-radius: 100px;
+  font-size: 13px;
+}
+.fh-chips button[aria-pressed="true"] {
+  background: var(--fh-green);
+  color: var(--fh-on-green);
+  border-color: var(--fh-green);
+}
+.fh-note {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 14px;
+  padding: 12px 16px;
+  background: var(--evidence-surface);
+  border-radius: 14px 18px 12px 16px;
+  font-size: 14px;
+}
+.fh-note:before {
+  content: "";
+  position: absolute;
+  left: var(--pointer, 24px);
+  top: -5px;
+  width: 10px;
+  height: 10px;
+  transform: rotate(45deg);
+  background: inherit;
+}
+.fh-account {
+  margin: 24px 0;
+}
+.fh-ais {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  text-align: center;
+}
+.fh-ais > div {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+}
+.fh-ais .drawn {
+  width: 62px;
+}
+.fh-ais p {
+  font-size: 12px;
+  min-height: 40px;
+}
+.fh-ais .drawn:last-child {
+  width: 18px;
+  height: 36px;
+}
+.fh-card-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding: 0 8px;
+  margin: 0 0 -8px;
+  list-style: none;
+}
+.fh-card-tabs li {
+  flex: 1 0 22%;
+  padding: 8px 2px 16px;
+  background: var(--card);
+  border: 1px solid var(--muted-foreground);
+  border-radius: 8px 7px 0 0;
+  text-align: center;
+  font-size: 11px;
+  transform: rotate(-1deg);
+}
+.fh-card-tabs li:nth-child(even) {
+  background: var(--muted);
+  transform: rotate(1deg);
+}
+.fh-card-tabs svg {
+  width: 15px;
+  height: 15px;
+  margin: 0 auto 4px;
+  color: var(--evidence);
+}
+.fh-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--fh-green);
+  color: var(--fh-on-green);
+  border-radius: 6px 8px 16px 14px;
+  padding: 22px 18px;
+  box-shadow: 5px 6px 0 var(--evidence-surface);
+}
+.fh-box:before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1.6px solid var(--foreground);
+  border-radius: inherit;
+  filter: url(#fh-rough-b);
+  pointer-events: none;
+}
+.fh-box > svg {
+  width: 44px;
+  height: 44px;
+  flex: none;
+}
+.fh-box strong {
+  font:
+    600 25px/1.1 var(--font-cormorant-garamond),
+    Georgia,
+    serif;
+  display: block;
+}
+.fh-box span {
+  display: block;
+  font-size: 11px;
+  margin-top: 8px;
+}
+.fh-facts {
+  padding-left: 18px;
+  font-size: 14px;
+  margin: 24px 0;
+}
+.fh-facts li {
+  margin: 8px 0;
+  color: var(--muted-foreground);
+}
+.fh-facts b {
+  color: var(--foreground);
+}
+.fh-freedom > details,
+.fh-faq details,
+.fh-dialog details {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin: 8px 0;
+  background: var(--card);
+}
+.fh-home summary,
+.fh-dialog summary {
+  cursor: pointer;
+  min-height: 48px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.fh-freedom > details > p,
+.fh-faq details p,
+.fh-dialog details p {
+  padding: 0 16px 16px;
+  color: var(--muted-foreground);
+  font-size: 14px;
+}
+.fh-home .fh-status section {
+  background: var(--card);
+  padding: 24px 0;
+}
+.fh-home .fh-status section > div > div {
+  display: block;
+}
+.fh-home .fh-status section h2 {
+  font-size: 26px;
+}
+.fh-extra {
+  display: none;
+}
+.fh-show-more {
+  min-height: 44px;
+  text-decoration: underline;
+  font-size: 14px;
+  color: var(--evidence);
+}
+.fh-connect {
+  margin-top: 48px;
+  display: grid;
+  gap: 22px;
+  padding: 28px 24px 38px;
+  background: #193d30;
+  color: #f7f3e8;
+  border-radius: 8px 10px 20px 16px;
+  position: relative;
+  scroll-margin-top: 90px;
+}
+.fh-connect:after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--background) 0 9px,
+    transparent 9px 18px
+  );
+}
+.fh-connect p {
+  margin-top: 10px;
+  color: #d7e4d9;
+}
+.fh-connect > .drawn {
+  width: 160px;
+}
+.fh-connect .fh-button {
+  background: #e2cda9;
+  color: #193d30;
+}
+.fh-connect .fh-ai-note {
+  font-size: 12px;
+}
+.fh-ai-note a {
+  text-decoration: underline;
+}
+.fh-dialog {
+  max-height: 90dvh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  width: calc(100% - 32px) !important;
+  max-width: 720px !important;
+}
+.fh-idea-scroll {
+  overflow: auto;
+  min-height: 0;
+}
+.fh-dialog b {
+  display: block;
+  color: var(--evidence);
+  margin-bottom: 4px;
+}
+.fh-dialog a {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  color: var(--evidence);
+  text-decoration: underline;
+}
+.fh-home [hidden] {
+  display: none !important;
+}
+/* Keep shared chrome readable in both themes without changing other routes. */
+.fh-home > nav {
+  background: var(--background);
+  color: var(--foreground);
+  border-color: var(--border);
+}
+.fh-home > nav a,
+.fh-home > nav button,
+.fh-home > nav p {
+  color: var(--foreground);
+}
+.fh-home > nav a[href="/app"] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+.fh-home > nav div:has(> a[href="/features"]) {
+  background: var(--background);
+}
+@media (min-width: 600px) {
+  .fh-card-tabs li {
+    flex: 1 1 0;
+  }
+  .fh-hero-art {
+    width: 250px !important;
+  }
+  .idea-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .fh-panel {
+    grid-template-columns: 1fr 160px;
+  }
+}
+@media (min-width: 1000px) {
+  .fh-theme-row {
+    height: 118px;
+  }
+  .fh-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 56px;
+    align-items: center;
+    padding-top: 12px;
+  }
+  .fh-hero-art {
+    width: 300px !important;
+    margin: 0;
+  }
+  .fh-parts {
+    margin-top: 68px;
+  }
+  .fh-accordion {
+    display: none;
+  }
+  .fh-desktop {
+    display: block;
+    margin-top: 28px;
+  }
+  .fh-stepper {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .fh-stepper:before {
+    content: "";
+    position: absolute;
+    left: 8%;
+    right: 8%;
+    top: 8px;
+    height: 10px;
+    border-top: 2px solid var(--muted-foreground);
+    border-radius: 50%;
+    filter: url(#fh-rough-b);
+  }
+  .fh-stepper button {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    align-content: start;
+    gap: 10px;
+    min-height: 80px;
+    font-size: 13px;
+    padding: 0 12px 16px;
+    z-index: 1;
+  }
+  .fh-stepper button > span {
+    width: 17px;
+    height: 17px;
+    border: 1.6px solid var(--foreground);
+    background: var(--background);
+    border-radius: 52% 48% 55% 45%;
+  }
+  .fh-stepper button[aria-pressed="true"] > span {
+    background: var(--fh-green);
+    box-shadow: 3px 3px 0 var(--evidence-surface);
+  }
+  .fh-stepper button[aria-pressed="true"] {
+    font-weight: 600;
+  }
+  .fh-stepper button[aria-pressed="true"]:after {
+    content: "";
+    position: absolute;
+    bottom: -7px;
+    width: 14px;
+    height: 14px;
+    transform: rotate(45deg);
+    background: var(--card);
+    border-top: 1px solid var(--muted-foreground);
+    border-left: 1px solid var(--muted-foreground);
+  }
+  .fh-desktop .fh-panel {
+    border: 1px solid var(--muted-foreground);
+    border-radius: 22px 26px 20px 28px;
+    box-shadow: 5px 6px 0 var(--evidence-surface);
+    grid-template-columns: 210px minmax(0, 1fr) minmax(0, 1.25fr);
+    gap: 28px;
+    background: var(--card);
+    padding: 20px 30px;
+  }
+  .fh-desktop .fh-panel > * {
+    grid-row: auto;
+    grid-column: auto;
+  }
+  .fh-desktop .fh-panel dl {
+    border-left: 1px dashed var(--muted-foreground);
+    padding-left: 28px;
+    display: grid;
+    gap: 12px;
+  }
+  .fh-panel dd {
+    font-size: 18px;
+  }
+  .fh-freedom-faq {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 60px;
+    margin-top: 64px;
+    padding-top: 40px;
+  }
+  .fh-extra {
+    display: block;
+  }
+  .fh-show-more {
+    display: none;
+  }
+  .fh-connect {
+    grid-template-columns: minmax(0, 1fr) 170px auto;
+    align-items: center;
+    padding: 36px 32px 46px;
+  }
+  .fh-pair {
+    font-size: 34px;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .fh-note {
+    transition: margin-left 180ms ease;
+  }
+}
+
+.drawn {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.drawn-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+:is(.drawn, .drawn-defs) .g-i {
+  fill: none;
+  stroke: var(--draw-ink);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+:is(.drawn, .drawn-defs) .g-ib {
+  stroke: var(--draw-ai);
+}
+:is(.drawn, .drawn-defs) .g-ia {
+  stroke: var(--draw-accent);
+}
+:is(.drawn, .drawn-defs) .g-im {
+  stroke: var(--draw-muted);
+}
+:is(.drawn, .drawn-defs) .g-thin {
+  stroke-width: 1.7;
+}
+:is(.drawn, .drawn-defs) .g-dash {
+  stroke-dasharray: 4 5;
+}
+:is(.drawn, .drawn-defs) .g-fw {
+  fill: var(--draw-wash);
+}
+:is(.drawn, .drawn-defs) .g-fk {
+  fill: var(--draw-card);
+}
+:is(.drawn, .drawn-defs) .g-fl {
+  fill: var(--draw-label);
+}
+:is(.drawn, .drawn-defs) .g-fa {
+  fill: var(--draw-accent);
+}
+:is(.drawn, .drawn-defs) .g-ft {
+  fill: var(--draw-thing);
+}
+:is(.drawn, .drawn-defs) .g-fb {
+  fill: var(--draw-ai-fill);
+}
+:is(.drawn, .drawn-defs) .g-fm {
+  fill: var(--draw-paper);
+}
+:is(.drawn, .drawn-defs) .g-eye {
+  fill: var(--draw-ai);
+}
+:is(.drawn, .drawn-defs) .g-eyem {
+  fill: var(--draw-muted);
+}
+/* On the dark Connect band. */
+.drawn .g-bi {
+  fill: none;
+  stroke: var(--draw-band-ink);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.drawn .g-bf {
+  fill: var(--draw-ai);
+}
+.drawn .g-be {
+  fill: var(--draw-band-ink);
+}
+.drawn .g-bt {
+  fill: var(--draw-band-accent);
+}
+.drawn .g-bh {
+  fill: var(--draw-band-ground);
+}
+.drawn .g-bs {
+  fill: none;
+  stroke: var(--draw-band-ground);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+/* The retained status disclosure uses the same surfaces when opened after dark. */
+.fh-home .fh-status section,
+.fh-home .fh-status [class*="bg-"] {
+  background: var(--card);
+}
+.fh-home .fh-status :is(p, h2, h3, span, a, svg) {
+  color: var(--foreground);
+}
+
+/* Stand-alone links keep a full target, including the retained status disclosure. */
+.fh-home > nav a,
+.fh-home footer a,
+.fh-home .fh-status a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
