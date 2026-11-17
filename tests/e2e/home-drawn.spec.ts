@@ -53,3 +53,29 @@ test("home parts, chips and ideas preserve keyboard focus", async ({
     ),
   ).toBe(true);
 });
+
+for (const theme of ["light", "dark"] as const) {
+  test(`signed-out home hydrates without theme warnings in ${theme} mode`, async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error" || /hydrat/i.test(message.text())) {
+        errors.push(message.text());
+      }
+    });
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.addInitScript(
+      (value) => localStorage.setItem("theme", value),
+      theme,
+    );
+    await page.goto("/", { waitUntil: "networkidle" });
+    await expect(page.locator("html")).toHaveClass(theme);
+    // An interactive control confirms React has hydrated before checking its console.
+    await page.getByRole("button", { name: "Switch colour theme" }).click();
+    await expect(page.locator("html")).toHaveClass(
+      theme === "light" ? "dark" : "light",
+    );
+    expect(errors).toEqual([]);
+  });
+}
