@@ -49,6 +49,9 @@ const ibmPlexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   ...defaultMetadata,
   metadataBase: new URL(SITE_URL),
+  icons: {
+    apple: [{ url: "/icons/apple-touch-icon-2026-11.png", sizes: "180x180", type: "image/png" }],
+  },
   keywords: ["family history", "genealogy", "AI", "storytelling", "FamilySearch", "ancestors"],
   alternates: {
     canonical: "/",
