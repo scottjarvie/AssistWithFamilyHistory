@@ -44,7 +44,7 @@ export default function IdeasDialog({
               : `All ${IDEAS.length} ideas`}
           </DialogTitle>
           <DialogDescription>
-            What your AI already does well, and what your data adds.
+            Prompts grounded in what you deliberately save.
           </DialogDescription>
         </DialogHeader>
         <div className="fh-idea-scroll">
@@ -64,6 +64,8 @@ export default function IdeasDialog({
               <p>
                 <b>Try it with your AI</b>“{idea.prompt}”
               </p>
+              <p><b>Available context</b>{idea.context}</p>
+              <p><b>Next level</b>{idea.next}</p>
             </details>
           ))}
         </div>

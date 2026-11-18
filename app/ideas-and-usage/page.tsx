@@ -1,3 +1,7 @@
+import { HomeTheme, ThemeSwitch } from "@/components/marketing/drawn/HomeTheme";
+import { EvidenceExamples } from "@/components/marketing/drawn/EvidenceExamples";
+import { DrawingDefs } from "@/components/marketing/drawn/drawings";
+import "@/components/marketing/drawn/home.css";
 import type { Metadata } from "next";
 import { MarketingNav } from "@/components/layout/MarketingNav";
 import { Footer } from "@/components/layout/Footer";
@@ -18,18 +22,22 @@ export const metadata: Metadata = createPageMetadata({
  */
 export default function IdeasAndUsagePage() {
   return (
-    <div className="min-h-screen bg-stone-50">
+    <HomeTheme>
+      <DrawingDefs />
       <MarketingNav />
-      <main className="pt-24 pb-16">
+      <div className="fh-theme-row fh-width"><ThemeSwitch /></div>
+      <main className="fh-ideas-page pb-16">
         <div className="mx-auto max-w-4xl space-y-8 px-4 sm:px-6 lg:px-8">
           <header className="space-y-3">
             <p className="text-sm font-medium uppercase tracking-wide text-stone-500">Ideas and Usage</p>
             <h1 className="text-4xl font-bold text-stone-900">What could your AI do with a memory of your family?</h1>
             <p className="text-lg text-stone-600">{IDEAS_INTRO}</p>
           </header>
+          <EvidenceExamples showAll={false} />
+          <h2 className="text-3xl">More ways to use your workspace</h2>
           <ol className="space-y-4">
             {IDEAS.map((idea) => (
-              <li key={idea.id} className="rounded-lg border border-stone-200 bg-white p-5">
+              <li id={idea.id} key={idea.id} className="rounded-lg border border-stone-200 bg-white p-5">
                 <h2 className="text-xl font-semibold text-stone-900">{idea.situation}</h2>
                 <dl className="mt-3 grid gap-3 text-sm text-stone-700 md:grid-cols-2">
                   <div>
@@ -44,6 +52,9 @@ export default function IdeasAndUsagePage() {
                     <dt className="font-medium text-stone-900">A prompt to try</dt>
                     <dd><q>{idea.prompt}</q></dd>
                   </div>
+                  <div className="md:col-span-2"><dt className="font-medium">Available context</dt><dd>{idea.context}</dd></div>
+                  <div className="md:col-span-2"><dt className="font-medium">Next level</dt><dd>{idea.next}</dd>
+                  </div>
                 </dl>
               </li>
             ))}
@@ -55,6 +66,6 @@ export default function IdeasAndUsagePage() {
         </div>
       </main>
       <Footer />
-    </div>
+    </HomeTheme>
   );
 }
