@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <title>Family History</title>
+  <rect width="512" height="512" fill="#f7f3e8"/>
+  <!-- Two boughs converge in a short trunk with plug-shaped roots. -->
+  <path fill="#c57d39" d="M147 254c13 34 50 64 88 77v29c0 12 9 21 21 21s21-9 21-21v-40c35-17 63-44 81-80l-24-11c-20 33-45 54-73 66-33-4-71-22-94-54z"/>
+  <g fill="#c57d39">
+    <path d="M225 347h62v15a31 31 0 0 1-62 0z"/>
+    <rect x="234" y="378" width="13" height="36" rx="6"/>
+    <rect x="265" y="378" width="13" height="36" rx="6"/>
+  </g>
+  <path fill="#234d5e" d="M92 243c-2-29 14-53 40-65 0-34 26-61 60-62 14-25 41-37 68-31 16 3 29 12 39 24 36-7 70 15 76 50 28 5 45 28 44 54 7 36-17 65-49 70-15 16-44 20-65 10-21 14-47 15-70 2-19 13-43 15-65 5-37 6-74-15-78-57z"/>
+  <!-- Broad shoulders and a gap below each head survive phone-size rendering. -->
+  <g fill="#f7f3e8">
+    <circle cx="195" cy="175" r="27"/>
+    <path d="M143 250c1-24 24-42 52-42s51 18 52 42q0 7-7 7h-90q-7 0-7-7z"/>
+    <circle cx="314" cy="199" r="23"/>
+    <path d="M270 262c2-20 20-35 44-35s42 15 44 35q0 7-7 7h-74q-7 0-7-7z"/>
+  </g>
+</svg>

@@ -351,10 +351,11 @@
   filter: url(#fh-rough-b);
   pointer-events: none;
 }
-.fh-box > svg {
+.fh-box > img {
   width: 44px;
   height: 44px;
   flex: none;
+  border-radius: 10px;
 }
 .fh-box strong {
   font:

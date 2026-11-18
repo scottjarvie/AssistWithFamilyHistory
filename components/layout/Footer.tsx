@@ -17,7 +17,7 @@
 
 import { SafeLink } from "@/components/layout/SafeLink";
 import { FamilyRow } from "./FamilyRow";
-import { Compass } from "lucide-react";
+import { SiteMark } from "./SiteMark";
 
 export function Footer() {
   return (
@@ -25,9 +25,7 @@ export function Footer() {
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center justify-between gap-8 md:flex-row">
           <div className="flex items-center gap-3">
-            <div className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[#f2d7af77] bg-[#f2d7af22]">
-              <Compass className="h-5 w-5 text-[#f2d7af]" />
-            </div>
+            <SiteMark className="h-10 w-10 flex-shrink-0 rounded-lg border border-[#f2d7af77]" />
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#b8a987]">Assist With</p>
               <p className="mt-1 text-xl text-[#fff6e5]" data-display="true">Family History</p>

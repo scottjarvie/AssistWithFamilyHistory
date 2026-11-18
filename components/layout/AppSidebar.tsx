@@ -22,7 +22,6 @@
 import { usePathname } from "next/navigation";
 import { SafeLink } from "@/components/layout/SafeLink";
 import { 
-  BookOpen, 
   Settings, 
   ChevronLeft,
   ChevronRight,
@@ -36,6 +35,7 @@ import {
   isNavItemActive,
 } from "@/components/layout/appNavigation";
 import { VaultAccountPanel } from "@/components/layout/VaultAccountPanel";
+import { SiteMark } from "@/components/layout/SiteMark";
 import {
   Sheet,
   SheetClose,
@@ -62,9 +62,7 @@ export function AppMobileNav({ accountMode, vaultOwnerId, clerkEnabled, activePa
     <header className="sticky top-0 z-30 border-b border-stone-800 bg-stone-900 text-white md:hidden">
       <div className="flex h-16 items-center justify-between px-4">
         <SafeLink href="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-amber-700 rounded-lg flex items-center justify-center flex-shrink-0">
-            <BookOpen className="w-5 h-5 text-white" />
-          </div>
+          <SiteMark className="w-8 h-8 rounded-lg flex-shrink-0" />
           <span className="font-semibold text-sm">Family History</span>
         </SafeLink>
 
@@ -90,9 +88,7 @@ export function AppMobileNav({ accountMode, vaultOwnerId, clerkEnabled, activePa
             </SheetHeader>
             <div className="shrink-0 border-b border-stone-800 p-4">
               <SafeLink href="/" className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-amber-700 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <BookOpen className="w-5 h-5 text-white" />
-                </div>
+                <SiteMark className="w-8 h-8 rounded-lg flex-shrink-0" />
                 <span className="font-semibold text-sm">Family History</span>
               </SafeLink>
             </div>
@@ -156,9 +152,7 @@ export function AppSidebar({ accountMode, vaultOwnerId, clerkEnabled, activePath
           title={collapsed ? "Assist With Family History home" : undefined}
           className="flex items-center gap-3"
         >
-          <div className="w-8 h-8 bg-amber-700 rounded-lg flex items-center justify-center flex-shrink-0">
-            <BookOpen className="w-5 h-5 text-white" />
-          </div>
+          <SiteMark className="w-8 h-8 rounded-lg flex-shrink-0" />
           {!collapsed && (
             <span className="font-semibold text-sm">Family History</span>
           )}
