@@ -11,7 +11,7 @@ import {
 export { HomeTheme, ThemeSwitch } from "./HomeTheme";
 import { PARTS, KEEPS } from "./content";
 import { PartPicture } from "./PartPicture";
-import { questions } from "../FamilyHistoryFaq";
+import { FaqList } from "../FamilyHistoryFaq";
 const IdeasDialog = dynamic(() => import("./IdeasDialog"), { ssr: false });
 export function IdeasButton({
   id,
@@ -203,21 +203,8 @@ export function ItKeeps() {
   );
 }
 export function Faq() {
-  const [more, setMore] = useState(false);
-  return (
-    <section className="fh-faq" aria-labelledby="fh-faq-heading">
-      <h2 id="fh-faq-heading">Questions before you begin</h2>
-      {questions.map((q, i) => (
-        <details key={q.question} className={i > 2 && !more ? "fh-extra" : ""}>
-          <summary>{q.question}</summary>
-          <p>{q.answer}</p>
-        </details>
-      ))}
-      {!more && (
-        <button className="fh-show-more" onClick={() => setMore(true)}>
-          Show more
-        </button>
-      )}
-    </section>
-  );
+  return <section className="fh-faq" aria-labelledby="fh-faq-heading">
+    <h2 id="fh-faq-heading">Questions before you begin</h2>
+    <FaqList />
+  </section>;
 }

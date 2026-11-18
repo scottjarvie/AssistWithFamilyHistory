@@ -1,10 +1,9 @@
-import { ChevronDown } from "lucide-react";
 import { SafeLink } from "@/components/layout/SafeLink";
 
-export const questions = [
+const extraQuestions = [
   {question:"How do Queue requests and AI suggestions differ?",answer:"Requests you ask your AI to add are ordinary Queue items, marked added by your AI. Your AI’s own ideas are AI suggestions in your private Queue, hidden by default with a count; you can edit first, accept or dismiss them. Nothing runs before you accept. Needs your input is a flag on an item, never a state. Family-history conclusions stay on their records as AI proposal until you decide, never in the Queue."},
   { question: "What can my AI do here, and how do I limit it?",
-    answer: "When you connect your first AI, it gets full access to your Family History workspace from the start: it can read, save, organise, archive and restore, including tools we add later, with no end date. You can limit it any time: in Settings → AI, or just ask your AI to limit itself (for example, \"only read, don’t change anything\" or \"stop until Friday\"). Your AI can narrow its own access but never widen it. Only you can give access back. A new connection starts with the limits of your most limited AI until you Restore it. It never permanently deletes anything or spends money for you. If you ask, it can publish or share something for you — it checks for private details first, and you can unpublish it any time." },
+    answer: "Your first AI starts with full tool access and no end date. Limit it in Settings → AI, or ask it to narrow its own access. Only you can restore access. A new connection starts with the limits of your most limited AI until you Restore it. It never permanently deletes anything or spends money for you. If you ask, it can publish or share something for you — it checks for private details first, and you can unpublish it any time." },
   {
     question: "Is this another family-tree site?",
     answer: "A tree can be one view, but the workspace is built for the trail behind it: sources, relationships, events, uncertainty, research questions, context, and stories.",
@@ -23,7 +22,7 @@ export const questions = [
   },
   {
     question: "Can the AI publish or permanently delete for me?",
-    answer: "Not through the current connection. Story saves remain private drafts or review requests; publication and permanent deletion keep their human gates. Archive and restore are reversible and available to your AI.",
+    answer: "With publishing permission, your AI can publish or unpublish stories. Living-person, readiness and second-review gates still apply. It cannot permanently delete records; archive and restore are reversible.",
   },
   {
     question: "Does it import directly from every genealogy provider?",
@@ -38,6 +37,20 @@ export const questions = [
     answer: "Begin with one person and a known relationship, preserve the source or question that brought you there, or connect a compatible AI and ask it for your Family History brief.",
   },
 ] as const;
+
+export const questions = [
+  { question: "Which AI can I use?", answer: "Use a compatible MCP client. Family History is not an AI itself. The Connect AI page has setup steps for supported clients." },
+  { question: "How does my AI connect?", answer: "Follow your client’s steps on Connect AI, sign in and allow the connection. Your AI can then work with the records you deliberately save here; it does not inherit access to genealogy providers." },
+  { question: "What can it do, and can I limit access?", answer: "Your first AI starts with full tool access and no end date: reading, saving, drafting, archiving and guarded story publishing. Limit or revoke access in Settings → AI, or ask the AI to narrow its own access. Only you can restore it. Permanent deletion and spending are never allowed." },
+  { question: "Can I use Family History without AI?", answer: "Yes. Add, inspect, correct and organise records yourself. An AI connection is optional." },
+  { question: "Is my family information private?", answer: "Your vault is private by default. An authorised AI can read core living-person details, with notes withheld. Loose context and media need review and AI-use permission. Publishing a story is explicit and does not publish the surrounding tree or sources." },
+  ...extraQuestions,
+] as const;
+
+export function FaqList() {
+  const row = ({ question, answer }: {question: string; answer: string}) => <details key={question}><summary>{question}</summary><p>{answer}</p></details>;
+  return <>{questions.slice(0, 5).map(row)}<details className="fh-more-faq"><summary>More questions about research and records</summary><div>{questions.slice(5).map(row)}</div></details></>;
+}
 
 export function FamilyHistoryFaq() {
   return (
@@ -57,15 +70,7 @@ export function FamilyHistoryFaq() {
             </SafeLink>
           </div>
           <div className="divide-y divide-[#d7cfbf] border-y border-[#c9b791]">
-            {questions.map(({ question, answer }) => (
-              <details key={question} className="group">
-                <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 py-4 [&::-webkit-details-marker]:hidden">
-                  <h3 className="text-xl leading-tight text-[#24323e]" data-display="true">{question}</h3>
-                  <ChevronDown className="h-5 w-5 shrink-0 text-[#9f5a2d] transition-transform group-open:rotate-180" aria-hidden="true" />
-                </summary>
-                <p className="max-w-2xl pb-5 text-sm leading-6 text-[#5d5548]">{answer}</p>
-              </details>
-            ))}
+            <FaqList />
           </div>
         </div>
       </div>

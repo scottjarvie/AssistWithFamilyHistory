@@ -1,25 +1,15 @@
-import {
-  BookOpen,
-  FileText,
-  Users,
-  MapPin,
-  Search,
-  HelpCircle,
-  Quote,
-} from "lucide-react";
 import { SafeLink } from "@/components/layout/SafeLink";
-import { SiteMark } from "@/components/layout/SiteMark";
+import { RecordMap } from "./RecordMap";
+import { EvidenceExamples } from "./EvidenceExamples";
 import { FeatureShowcase } from "../FeatureShowcase";
 import {
   DrawingDefs,
   HeroDrawing,
-  AiFigure,
-  AiCord,
   ConnectDrawing,
 } from "./drawings";
-import { KEEPS, MOTTO } from "./content";
-import { Parts, ItKeeps, IdeasButton, Faq } from "./Interactions";
-const icons = [Users, FileText, Quote, HelpCircle, Search, MapPin, BookOpen];
+import { MOTTO } from "./content";
+import { Parts, IdeasButton, Faq } from "./Interactions";
+
 export function HomeLanding() {
   return (
     <main className="fh-main" id="main-content">
@@ -47,9 +37,8 @@ export function HomeLanding() {
           <h2 id="fh-parts-heading">
             With the right data, your AI is even more helpful
           </h2>
-          <p className="fh-hint">Pick any part of family history.</p>
-          <Parts />
-          <ItKeeps />
+          <RecordMap />
+          <details className="fh-other-ways"><summary>More ways to use your research desk</summary><Parts /></details>
         </section>
         <div className="fh-freedom-faq">
           <section className="fh-freedom" aria-labelledby="fh-freedom-heading">
@@ -59,46 +48,6 @@ export function HomeLanding() {
               Try another compatible AI. The people, sources, questions and
               stories you save stay in your Assist With Family History account.
             </p>
-            <figure
-              className="fh-account"
-              aria-label="Your AI changes. Your Assist With Family History account stays."
-            >
-              <div className="fh-ais">
-                {(["now", "newer", "other"] as const).map((kind, i) => (
-                  <div key={kind}>
-                    <AiFigure kind={kind} />
-                    <p>
-                      {
-                        [
-                          "The AI you use today",
-                          "A newer model",
-                          "A different AI app",
-                        ][i]
-                      }
-                    </p>
-                    <AiCord kind={kind} />
-                  </div>
-                ))}
-              </div>
-              <ul className="fh-card-tabs">
-                {KEEPS.map((keep, i) => {
-                  const Icon = icons[i];
-                  return (
-                    <li key={keep.name}>
-                      <Icon aria-hidden="true" />
-                      {keep.name}
-                    </li>
-                  );
-                })}
-              </ul>
-              <div className="fh-box">
-                <SiteMark />
-                <p>
-                  <strong>Assist With Family History</strong>
-                  <span>Your account · everything you save</span>
-                </p>
-              </div>
-            </figure>
             <ul className="fh-facts">
               <li>
                 <b>Switch whenever you like.</b> Connect another compatible AI
@@ -145,6 +94,7 @@ export function HomeLanding() {
           </section>
           <Faq />
         </div>
+        <EvidenceExamples />
         <section
           className="fh-connect"
           id="connect"
