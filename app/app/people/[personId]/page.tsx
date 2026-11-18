@@ -4,7 +4,6 @@ import { VaultStateCard } from "@/components/vault/VaultStateCard";
 import { getAuthedConvexClient, getConvexUnavailableState, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
 import { getVaultAccessContext } from "@/lib/vault/server";
 import { api } from "@/convex/_generated/api";
-import type { FunctionReturnType } from "convex/server";
 
 interface PageProps {
   params: Promise<{ personId: string }>;
@@ -49,20 +48,11 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
     notFound();
   }
 
-  // Documents (PS/CST) are loaded server-side here and passed into the
-  // DocumentsViewer as a prop. Previously the viewer re-fetched them over REST
-  // in a client useEffect, duplicating work the server can do during render.
-  const documentsPersonId = workspace.person.fsId || String(workspace.person._id);
-  let documents: FunctionReturnType<typeof api.documents.getDocumentsByPerson> = [];
-  let documentsError: string | null = null;
-  try {
-    documents = await client.action(api.documents.getDocumentsByPerson, {
-      vaultOwnerId,
-      personId: documentsPersonId,
-    });
-  } catch {
-    documentsError = "Could not load Convex documents";
-  }
+  // The owner-scoped person snapshot already contains these PS/CST records.
+  // Keep the Documents tab's order and send only the fields the viewer uses.
+  const documents = [...workspace.documents]
+    .sort((a, b) => a.type.localeCompare(b.type) || a._creationTime - b._creationTime)
+    .map(({ _id, type, title, contentMarkdown, updatedAt }) => ({ _id, type, title, contentMarkdown, updatedAt }));
 
-  return <PersonWorkspaceView workspace={workspace} personId={personId} documents={documents} documentsError={documentsError}/>;
+  return <PersonWorkspaceView workspace={workspace} personId={personId} documents={documents} documentsError={null} />;
 }
