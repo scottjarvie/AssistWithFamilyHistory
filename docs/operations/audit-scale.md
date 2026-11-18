@@ -1,7 +1,6 @@
 # Audit at vault scale
 
-Pending release: the lead must confirm Vercel's coordinated Convex/Next deployment
-and `vaultCounts:v7` completion before describing this path as live.
+`vaultCounts:v7` completed in production on 2026-11-16 after PR #155 deployed.
 
 ## Inventory and maintenance
 
@@ -44,10 +43,11 @@ and sources have no separate Audit gap. No approximate totals or first-N windows
 Record membership, totals, minimal DTOs and destination precedence match the old
 Audit. Natural traversal changes from whole-vault locale title sorting to indexed
 vault order: readiness for person/workflow lists, creation for gap/source/citation/task/place lists, latest update for stories, and most-recent first for context. Presentation sorting
-and searching apply to loaded rows, as labelled. Following `continueCursor` until
-`isDone:true` visits the whole set. Legacy offset replies retain `nextOffset`;
+and searching apply to loaded rows, as labelled. With no intervening edits, following `continueCursor` until
+`isDone:true` visits the whole set. In a newest-first list, an edited row can
+move ahead of the cursor before it has been loaded. Reload from page one to see it. Legacy offset replies retain `nextOffset`;
 post-migration requests with a legacy offset restart at page one and the client
-deduplicates. Concurrent edits can move cursors; reload for a fresh traversal.
+deduplicates.
 
 The record API returns only the six-field private record DTO, never recent raw
 context, evidence text, source URLs or narratives. The summary browser projection
