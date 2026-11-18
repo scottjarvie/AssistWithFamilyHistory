@@ -1,5 +1,4 @@
 import {
-  Compass,
   BookOpen,
   FileText,
   Users,
@@ -9,6 +8,7 @@ import {
   Quote,
 } from "lucide-react";
 import { SafeLink } from "@/components/layout/SafeLink";
+import { SiteMark } from "@/components/layout/SiteMark";
 import { FeatureShowcase } from "../FeatureShowcase";
 import {
   DrawingDefs,
@@ -92,7 +92,7 @@ export function HomeLanding() {
                 })}
               </ul>
               <div className="fh-box">
-                <Compass aria-hidden="true" />
+                <SiteMark />
                 <p>
                   <strong>Assist With Family History</strong>
                   <span>Your account · everything you save</span>

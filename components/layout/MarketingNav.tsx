@@ -2,7 +2,8 @@
 
 import { Button } from "@/components/ui/button";
 import { SafeLink } from "@/components/layout/SafeLink";
-import { Compass, Menu, Sparkles, X } from "lucide-react";
+import { SiteMark } from "@/components/layout/SiteMark";
+import { Menu, Sparkles, X } from "lucide-react";
 import { useId, useRef, useState } from "react";
 
 const navLinks = [
@@ -36,10 +37,7 @@ export function MarketingNav() {
             aria-label="Assist With Family History home"
             className="group flex items-center gap-3"
           >
-            <div className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[#b79f7a77] bg-[#efe4cd] shadow-[0_10px_30px_-20px_#000] transition-transform duration-300 group-hover:scale-105">
-              <div className="absolute inset-1 rounded-full border border-[#c57d3980] animate-pulse-ring" />
-              <Compass className="h-5 w-5 text-[#234d5e]" />
-            </div>
+            <SiteMark className="h-10 w-10 flex-shrink-0 rounded-lg border border-[#b79f7a77] shadow-[0_10px_30px_-20px_#000] transition-transform duration-300 group-hover:scale-105" />
             <div className="hidden sm:block">
               <p className="text-[10px] font-semibold uppercase leading-none tracking-[0.2em] text-[#6f664f]">Assist With</p>
               <p className="mt-1 text-xl font-semibold leading-none text-[#1d212a]" data-display="true">Family History</p>
