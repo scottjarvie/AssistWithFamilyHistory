@@ -93,13 +93,42 @@ test("completed v6 upgrades only Audit source tables and existing score flags",a
  await t.run(async ctx=>{
   const gate=(await ctx.db.query("searchBuildState").withIndex("by_table",q=>q.eq("table","vaultCounts:v7")).unique())!;await ctx.db.delete(gate._id);
   for(const row of await ctx.db.query("personScoreRows").collect())await ctx.db.patch(row._id,{auditWithoutSources:undefined,auditWithoutContext:undefined,auditWithoutStories:undefined});
+  // Restore the source fields, ledger keys and aggregate keys as they were
+  // before v7. The v6 person gap totals already existed, so retain those.
+  for(const id of f.places)await ctx.db.patch(id,{auditWithoutContext:undefined});
+  for(const id of f.tasks)await ctx.db.patch(id,{auditOpen:undefined});
+  const isNewAuditKey=(table:string,key:string)=>
+    (table==="places"&&key==="withoutContext")||
+    (table==="researchTasks"&&key==="open")||
+    (table==="stories"&&key.startsWith("status:"));
+  for(const row of await ctx.db.query("vaultCountMembers").collect()){
+    const keys=row.keys.filter(key=>!isNewAuditKey(row.table,key));
+    if(keys.length!==row.keys.length)await ctx.db.patch(row._id,{keys});
+  }
+  for(const row of await ctx.db.query("vaultCounterShards").collect()){
+    const keys=Object.entries(row.counts);
+    const retained=keys.filter(([key])=>!isNewAuditKey(row.table,key));
+    if(retained.length!==keys.length)await ctx.db.patch(row._id,{counts:Object.fromEntries(retained)});
+  }
  });
  const {backfillStep}=await import("./vaultCounts");
  for(let i=0;i<10;i++) {
+  const phase=await t.query(internal.vaultCounts.backfillStatus,{});
+  const scoreTotals=phase.table==="auditFlags"
+   ? await t.query(internal.personScores.totals,{vaultOwnerId:owner})
+   : undefined;
   const done=await t.run(async ctx=>{
    const db=new Proxy(ctx.db,{get(target,key){if(key==="query")return (table:string)=>{if(["persons","sources","citations","citationLinks"].includes(table))throw Error("v7 upgrade reread v6 graph");return target.query(table as "persons");};const value=Reflect.get(target,key);return typeof value==="function"?value.bind(target):value;}});
    return (backfillStep as unknown as {_handler:(ctx:unknown,args:object)=>Promise<boolean>})._handler({...ctx,db},{});
-  });if(i===0)await write(t,db=>db.patch(f.contexts[0],{placeId:f.places[2]}));if(done)break;
+  });
+  if(scoreTotals)expect(await t.query(internal.personScores.totals,{vaultOwnerId:owner})).toEqual(scoreTotals);
+  if(i===0){
+   expect(await t.query(internal.auditPages.status,{})).toBe(false);
+   await write(t,db=>db.patch(f.contexts[0],{placeId:f.places[2]}));
+   await write(t,db=>db.patch(f.tasks[0],{status:"blocked"}));
+   await write(t,db=>db.patch(f.stories[0],{status:"draft"}));
+  }
+  if(done)break;
  }
  expect(await t.query(internal.auditPages.status,{})).toBe(true);await parity(t,owner,true);
 });
