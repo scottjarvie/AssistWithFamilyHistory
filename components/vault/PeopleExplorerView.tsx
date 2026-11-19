@@ -26,6 +26,7 @@ export function PeopleExplorerView({ people, firstStartEligible, query, status:r
   people: PeopleExplorerRow[]; firstStartEligible: boolean; query?: string; status?: string; loadMoreHref: string | null; onLoadMore?: () => void; searching?: boolean; preferenceKey?: string;
 }) {
   const status = researchStates.some(([value]) => value === requestedStatus) ? requestedStatus : "";
+  const filtered = Boolean(query?.trim() || status);
   const action = firstStartEligible ? <Button asChild className="min-h-11"><Link href="/app/people/new">Start with two people</Link></Button> : <Button asChild className="min-h-11"><Link href="/app/imports">Import FamilySearch Capture</Link></Button>;
   return <div className="min-w-0 p-4 sm:p-8">
     <header className="mb-5 flex flex-wrap items-end justify-between gap-3"><div>
@@ -43,9 +44,22 @@ export function PeopleExplorerView({ people, firstStartEligible, query, status:r
       renderIdentity={(p) => <><span className="block text-base font-semibold leading-snug [overflow-wrap:anywhere]">{p.displayName}</span><span className="text-xs font-normal text-muted-foreground">{p.living ? "Living" : "Deceased"}</span></>}
       renderDetail={(p) => p.creationProvenance?.evidenceStatus === "unsourced" ? <p className="mt-1 text-sm text-annotation">Starting statement · needs a source</p> : null}
       searchControls={<CollectionFilters path="/app/people" noun="people" query={query || ""} queryLabel="Search people" placeholder="Name, FamilySearch ID, or years" values={{status:status || ""}} facets={[{key:"status",label:"Research state",options:researchStates.map(([value,label])=>({value,label}))}]}/>}
-      emptyState={<div className="rounded-lg border border-dashed border-border bg-card px-4 py-10 text-center text-muted-foreground">
-        {firstStartEligible ? <><p>No people are here yet. Begin privately with two people and one known relationship.</p><Button asChild className="mt-4 min-h-11"><Link href="/app/people/new">Start your first connection</Link></Button></> : <p>{searching ? "Searching people…" : "No people match this filter. Widen the search or clear the research-state filter."}</p>}
-      </div>}
+      emptyState={searching ? null : filtered ? (
+        <div className="flex flex-wrap items-center gap-x-4 rounded-lg border border-dashed border-border bg-card px-4 py-2">
+          <p className="text-sm text-muted-foreground">No people match this view.</p>
+          <Button asChild variant="link" className="min-h-11 px-0"><Link href="/app/people">Reset filters</Link></Button>
+        </div>
+      ) : firstStartEligible ? (
+        <section className="rounded-lg border border-dashed border-border bg-card px-4 py-8 text-center">
+          <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false" className="mx-auto mb-3 size-16 text-annotation [--spot-accent:var(--evidence)]">
+            <path d="M7 17 25 12 48 15 54 49 32 46 14 53Z M25 14 28 29 M31 40 32 46" />
+            <path d="M17 41Q27 39 34 31Q29 19 22 22Q20 29 31 33 M34 31Q45 31 45 22Q37 21 34 31Z" stroke="var(--spot-accent, currentColor)" fill="var(--spot-accent, currentColor)" fillOpacity=".18" />
+          </svg>
+          <h2 className="text-lg font-semibold">No people yet</h2>
+        </section>
+      ) : (
+        <p className="rounded-lg border border-dashed border-border bg-card p-4 text-sm text-muted-foreground">No people yet.</p>
+      )}
     />
   </div>;
 }
