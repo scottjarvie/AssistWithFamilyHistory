@@ -194,6 +194,47 @@ test("MCP commit checks the exact principal and grant, including replay and repl
   expect((await read()).rows[0].actor).toBe("Connected AI");
 });
 
+test.each(["single", "complete", "batch"] as const)("MCP %s rechecks resolved Persons after a grant narrows", async (kind) => {
+  const { t } = setup();
+  const clientId = "bounded-replay-client";
+  const principal = { subject: owner, issuer, clientId, scopes: [] };
+  const grantId = await seedGrant(t, { vaultOwnerId: owner, issuer, clientId });
+  const handlers = internal.mcpFamilyHistory;
+  const save = kind === "single" ? handlers.savePerson : kind === "complete" ? handlers.saveCompleteResult : handlers.saveRecords;
+  const request = (key: string, operationId: string) => {
+    const person = { mode: "create", createKey: key, name: capturePerson.name, sex: "unknown", living: false };
+    const summary = "Synthetic Person save";
+    const input = kind === "single" ? person : kind === "complete" ? { person, summary } : { people: [person], summary };
+    return { principal, grantId, operationId, requestHash: key, input };
+  };
+  const inScope = request("selected-person", "selected-original");
+  const outOfScope = request("other-person", "other-original");
+  const kept = await t.mutation(save, inScope);
+  await t.mutation(save, outOfScope);
+  const mappings = await t.run(ctx => ctx.db.query("mcpRecordKeys").collect());
+  const selectedId = mappings.find(row => row.recordKey === "selected-person")!.recordId;
+  const otherId = mappings.find(row => row.recordKey === "other-person")!.recordId;
+  await t.run(ctx => ctx.db.patch(grantId as Id<"mcpGrants">, {
+    boundary: { kind: "selected_people", personIds: [selectedId] },
+  }));
+
+  expect(await t.mutation(save, inScope)).toEqual({ ...kept, deduplicated: true });
+  await expect(t.mutation(save, outOfScope)).rejects.toThrow(/OUTSIDE_GRANT_BOUNDARY/);
+
+  const reused = await t.mutation(save, request("selected-person", "selected-new-operation"));
+  expect(JSON.stringify(reused)).toContain(selectedId);
+  const mapped = t.mutation(save, request("other-person", "other-new-operation"));
+  if (kind === "batch") {
+    const refusal = await mapped;
+    expect(refusal).toMatchObject({
+      results: { people: [{ status: "failed", reason: expect.stringContaining("OUTSIDE_GRANT_BOUNDARY") }] },
+    });
+    expect(JSON.stringify(refusal)).not.toContain(otherId);
+  } else {
+    await expect(mapped).rejects.toThrow(/OUTSIDE_GRANT_BOUNDARY/);
+  }
+});
+
 test("an atomic complete result keeps a Person edit only after the entire result commits", async () => {
   const { t, site } = setup();
   const { personId } = await site.mutation(api.vaultMutations.upsertPerson, capturePerson);

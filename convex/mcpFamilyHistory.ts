@@ -17,6 +17,7 @@ import { FAMILY_HISTORY_MCP_LIMITS } from "../lib/mcp/contract";
 import { matchesVaultOwner } from "./vaultCore";
 import { appendPersonHistory, changedPersonFields, savesPerson } from "./personHistory";
 import { assertGrantPermits } from "./mcpGrants";
+import { personWithinGrantBoundary } from "../lib/mcp/authorize";
 
 const principalValidator = v.object({
   issuer: v.string(),
@@ -88,6 +89,17 @@ async function owned<T extends TableNames>(
     machineError("NOT_FOUND", `${label} was not found.`, "Refresh Family History context and use an ID returned for this vault.");
   }
   return row as Doc<T>;
+}
+
+async function ownedGrantedPerson(ctx: MutationCtx, owner: string, personId: string, grant: Doc<"mcpGrants"> | null) {
+  if (grant?.vaultOwnerId !== owner || !personWithinGrantBoundary(grant.boundary, personId)) {
+    machineError(
+      "OUTSIDE_GRANT_BOUNDARY",
+      "That request is outside the part of the research this connection was approved for.",
+      "Stay inside the records this connection already returned or ask the person to widen the boundary.",
+    );
+  }
+  return await owned(ctx, "persons", personId, owner, "Person");
 }
 
 async function assertOwnedPlaceRefs(ctx: MutationCtx, owner: string, input: any, label: string) {
@@ -174,7 +186,7 @@ async function replayReceipt(
   operationId: string,
   toolName: string,
   requestHash: string,
-  binding?: { grantId: Id<"mcpGrants">; clientId: string },
+  binding?: Doc<"mcpGrants">,
 ) {
   const row = await ctx.db
     .query("mcpOperations")
@@ -196,7 +208,7 @@ async function replayReceipt(
         && entry.outcome === "ok" && entry.scope === toolName && entry.clientId === row.clientId);
       if (activity.length < 17 && matching.length === 1) originalGrant = matching[0].grantId;
     }
-    if (row.clientId !== binding.clientId || originalGrant !== binding.grantId) {
+    if (row.clientId !== binding.clientId || originalGrant !== binding._id) {
       machineError("IDEMPOTENCY_CONFLICT", "This operation belongs to a different or unverified connection.", "Use a new operation ID for new work.");
     }
   }
@@ -205,7 +217,7 @@ async function replayReceipt(
   if (binding) {
     const people = [result.person, result.saved?.person, ...(result.results?.people ?? [])];
     for (const person of people) {
-      if (typeof person?.id === "string") await owned(ctx, "persons", person.id, owner, "Person");
+      if (typeof person?.id === "string") await ownedGrantedPerson(ctx, owner, person.id, binding);
     }
   }
   return { ...(result as Record<string, unknown>), deduplicated: true };
@@ -438,7 +450,7 @@ async function operation(
   const personSaveGrantId = bindsPersonSave ? grant?._id : undefined;
   const operationId = cleanText(args.operationId, "operationId", FAMILY_HISTORY_MCP_LIMITS.operationId, true)!;
   const replay = await replayReceipt(ctx, owner, operationId, args.toolName, args.requestHash,
-    personSaveGrantId ? { grantId: personSaveGrantId, clientId: args.principal.clientId } : undefined);
+    bindsPersonSave ? grant ?? undefined : undefined);
   if (replay) return replay;
   const batchItems=["people","relationships","events","sources","claims","stories","places","topics","connections","items"].reduce((n,key)=>n+(Array.isArray(args.input[key])?args.input[key].length:0),0);
   await assertWriteBatch(ctx,owner,args.toolName,Math.max(1,batchItems),new TextEncoder().encode(JSON.stringify(args.input)).byteLength);
@@ -509,7 +521,7 @@ async function savePersonRecord(ctx: MutationCtx, owner: string, input: any, pro
     const createKey = cleanKey(input.createKey, "createKey");
     const mapping = await mappedRecord(ctx, owner, "person", createKey);
     if (mapping) {
-      const row = await owned(ctx, "persons", mapping.recordId, owner, "Person");
+      const row = await ownedGrantedPerson(ctx, owner, mapping.recordId, await ctx.db.get(grantId));
       return { id: row._id, created: false, updatedAt: row.updatedAt, createKey };
     }
     if (!input.name || typeof input.name.given !== "string" || typeof input.name.surname !== "string") {
