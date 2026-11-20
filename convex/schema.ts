@@ -1,3 +1,4 @@
+import { personHistoryFields } from "../lib/vault/personHistory";
 import { scoreRowFields } from "./personScoreModel";
 import { peopleExplorerPayload } from "../lib/vault/peopleExplorerValidator";
 import { defineSchema, defineTable } from "convex/server";
@@ -156,6 +157,19 @@ export default defineSchema({
   contextItemPeople: defineTable({personId: v.id("persons"), contextItemId: v.id("contextItems")}).index("by_person", ["personId"]).index("by_item", ["contextItemId"]),
   mediaPeople: defineTable({personId: v.id("persons"), mediaId: v.id("media")}).index("by_person", ["personId"]).index("by_media", ["mediaId"]),
 
+  personHistory: defineTable({
+    vaultOwnerId: v.string(),
+    personId: v.id("persons"),
+    sequence: v.number(),
+    at: v.number(),
+    operation: v.union(v.literal("create"), v.literal("edit")),
+    source: v.union(v.literal("website"), v.literal("mcp")),
+    grantId: v.optional(v.id("mcpGrants")),
+    fields: v.array(v.union(...(Object.keys(personHistoryFields) as (keyof typeof personHistoryFields)[]).map(key => v.literal(key)))),
+  })
+    .index("by_owner", ["vaultOwnerId", "personId", "sequence"])
+    .index("by_person_sequence", ["personId", "sequence"]),
+
   persons: defineTable({
     nameGivenKey: v.optional(v.string()),
     searchText: v.optional(v.string()),
@@ -262,6 +276,7 @@ export default defineSchema({
         evidenceStatus: v.union(v.literal("unsourced"), v.literal("source_linked")),
         operationId: v.string(),
         recordedAt: v.number(),
+        websiteActorVerified: v.optional(v.boolean()),
       })
     ),
     creationRole: v.optional(v.union(v.literal("starting_person"), v.literal("related_person"))),
@@ -2252,6 +2267,7 @@ export default defineSchema({
     requestHash: v.string(),
     resultJson: v.string(),
     clientId: v.string(),
+    personSaveGrantId: v.optional(v.id("mcpGrants")),
     createdAt: v.number(),
   })
     .index("by_owner", ["vaultOwnerId"])

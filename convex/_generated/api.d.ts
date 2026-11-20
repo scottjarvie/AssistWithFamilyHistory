@@ -35,6 +35,7 @@ import type * as mediaEvidenceControl from "../mediaEvidenceControl.js";
 import type * as mediaEvidenceStorage from "../mediaEvidenceStorage.js";
 import type * as peopleExplorer from "../peopleExplorer.js";
 import type * as personEvents from "../personEvents.js";
+import type * as personHistory from "../personHistory.js";
 import type * as personScoreModel from "../personScoreModel.js";
 import type * as personScores from "../personScores.js";
 import type * as persons from "../persons.js";
@@ -99,6 +100,7 @@ declare const fullApi: ApiFromModules<{
   mediaEvidenceStorage: typeof mediaEvidenceStorage;
   peopleExplorer: typeof peopleExplorer;
   personEvents: typeof personEvents;
+  personHistory: typeof personHistory;
   personScoreModel: typeof personScoreModel;
   personScores: typeof personScores;
   persons: typeof persons;

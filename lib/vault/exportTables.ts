@@ -6,7 +6,7 @@ import type { TableNames } from "../../convex/_generated/dataModel";
  * records), and the evidence-upload sessions (expiring tokens).
  */
 export const EXPORT_TABLES = [
-  "persons", "relationships", "events", "personEvents", "places", "sources", "citations", "citationLinks",
+  "persons", "personHistory", "relationships", "events", "personEvents", "places", "sources", "citations", "citationLinks",
   "sourceFacts", "sourceContents", "recordPersonas", "topics", "connections", "media", "contextItems",
   "importRuns", "familySearchSync", "researchTasks", "researchLog",
   "queueItems", "queueActivity", "documents", "stories", "storyReviewEvents", "provisionalRelatives",

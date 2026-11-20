@@ -34,6 +34,11 @@ export type GrantBoundary = {
   queueItemIds?: string[];
 };
 
+export function personWithinGrantBoundary(boundary: GrantBoundary, personId: string): boolean {
+  return boundary.kind === "whole_workspace"
+    || (boundary.kind === "selected_people" && boundary.personIds?.includes(personId) === true);
+}
+
 export type GrantStatus = "pending" | "active" | "paused" | "revoked" | "expired" | "denied";
 
 /**
@@ -364,9 +369,7 @@ function boundaryPermits(
     // than letting a selected-people grant be walked sideways into the rest of
     // the vault. `whole_workspace` is the grant for broad reading.
     if (named.unattributable) return false;
-    const allowed = boundary.personIds ?? [];
-    if (named.personIds.length === 0) return true;
-    return named.personIds.every((id) => allowed.includes(id));
+    return named.personIds.every((id) => personWithinGrantBoundary(boundary, id));
   }
 
   // whole_workspace: still bounded by scope, still bounded by owner, and still

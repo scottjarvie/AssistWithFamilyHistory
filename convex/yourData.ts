@@ -168,8 +168,17 @@ export const exportPageInternal = internalQuery({
     const page = await (ctx.db.query(args.table as ExportTable) as any)
       .withIndex("by_owner", (q: any) => q.eq("vaultOwnerId", args.vaultOwnerId)) // eslint-disable-line @typescript-eslint/no-explicit-any
       // Bound full source text pages by bytes as well as record count.
-      .paginate({ numItems: 200, maximumBytesRead: 1_000_000, cursor: args.cursor });
-    return { rows: page.page as unknown[], cursor: page.isDone ? null : (page.continueCursor as string) };
+      .paginate({ numItems: args.table === "personHistory" ? 12 : 200, maximumBytesRead: 1_000_000, cursor: args.cursor });
+    const cursor = page.isDone ? null : (page.continueCursor as string);
+    if (args.table !== "personHistory") return { rows: page.page as unknown[], cursor };
+
+    // History follows current Person ownership even if an older row's owner
+    // index is stale. Budget full Person documents independently of the page.
+    const details = page.page as Doc<"personHistory">[];
+    const personIds = [...new Set(details.map(change => change.personId))];
+    const people = await Promise.all(personIds.map(id => ctx.db.get(id)));
+    const owned = new Set(people.filter(person => person?.vaultOwnerId === args.vaultOwnerId).map(person => person!._id));
+    return { rows: details.filter(change => owned.has(change.personId)), cursor };
   },
 });
 

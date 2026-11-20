@@ -1,3 +1,4 @@
+import { purgePersonHistory } from "./personHistory";
 import { v } from "convex/values";
 import { internalMutation as mutation, internalQuery as query } from "./searchServer";
 import { Doc } from "./_generated/dataModel";
@@ -385,6 +386,8 @@ export const remove = mutation({
       await ctx.db.delete(pe._id);
     }
     
+    await purgePersonHistory(ctx, args.id);
+
     // Delete the person
     await ctx.db.delete(args.id);
     
