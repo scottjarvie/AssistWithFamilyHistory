@@ -384,7 +384,7 @@ export const recordGrantActivity = internalMutation({
  */
 export async function assertGrantPermits(
   ctx: QueryCtx | MutationCtx,
-  params: { owner: string; grantId?: string; toolName: string; input: unknown },
+  params: { owner: string; grantId?: string; toolName: string; input: unknown; principal?: { issuer: string; clientId: string } },
 ): Promise<Doc<"mcpGrants"> | null> {
   // A grantId is required for every grant-governed write. Absence is a refusal,
   // not a bypass.
@@ -397,7 +397,8 @@ export async function assertGrantPermits(
   }
   const normalized = ctx.db.normalizeId("mcpGrants", params.grantId);
   const row = normalized ? await ctx.db.get(normalized) : null;
-  if (!row || row.vaultOwnerId !== params.owner) {
+  if (!row || row.vaultOwnerId !== params.owner ||
+      (params.principal && (row.issuer !== params.principal.issuer || row.clientId !== params.principal.clientId))) {
     machineError(
       "GRANT_REQUIRED",
       "This AI connection has not been approved for Assist With Family History yet.",

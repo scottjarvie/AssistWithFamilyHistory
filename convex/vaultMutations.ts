@@ -1,5 +1,6 @@
 import { DEFAULT_LOCAL_VAULT_OWNER } from "../lib/vault/constants";
 import { invalidAudioFileError, checkVoiceNoteDuration, voiceNoteTooLongError, normalizeAudioMime } from "./lib/media/audio";
+import { appendPersonHistory, changedPersonFields, verifiedWebsiteOwner } from "./personHistory";
 import { requireWebsitePerson } from "./access";
 import { fileCapsFor, audioPolicyFor, reserveOperation, commitOperation, removeStoredBytes, summaryFor, assertFileSize, limitsFor, releaseExpiredWeb } from "./usageLimits";
 import { ConvexError, v } from "convex/values";
@@ -403,8 +404,15 @@ export const upsertPerson = mutation({
       updatedAt: now,
     };
 
+    const verifiedOwner = await verifiedWebsiteOwner(ctx, vaultOwnerId);
     if (existing) {
       await ctx.db.patch(existing._id, payload);
+      if (verifiedOwner && existing.vaultOwnerId === vaultOwnerId) {
+        await appendPersonHistory(ctx, {
+          vaultOwnerId, personId: existing._id, at: now, operation: "edit",
+          source: "website", fields: changedPersonFields(existing, payload),
+        });
+      }
       return { personId: existing._id, created: false };
     }
 
@@ -413,7 +421,11 @@ export const upsertPerson = mutation({
       researchStatus: "basic",
       createdAt: now,
     });
-
+    if (verifiedOwner) {
+      await appendPersonHistory(ctx, {
+        vaultOwnerId, personId, at: now, operation: "create", source: "website", fields: [],
+      });
+    }
     return { personId, created: true };
   },
 });
@@ -495,13 +507,17 @@ export const startPrivateWorkspace = mutation({
       surname: cleanFirstStartName(args.relatedPerson.surname ?? "", "Related person's family name", false),
     };
 
+    const personProvenance = {
+      ...provenance,
+      websiteActorVerified: await verifiedWebsiteOwner(ctx, vaultOwnerId) || undefined,
+    };
     const startingPersonId = await ctx.db.insert("persons", {
       vaultOwnerId,
       name: startingName,
       sex: "unknown",
       living: args.startingPerson.living,
       researchStatus: "basic",
-      creationProvenance: provenance,
+      creationProvenance: personProvenance,
       creationRole: "starting_person",
       createdAt: now,
       updatedAt: now,
@@ -512,7 +528,7 @@ export const startPrivateWorkspace = mutation({
       sex: "unknown",
       living: args.relatedPerson.living,
       researchStatus: "basic",
-      creationProvenance: provenance,
+      creationProvenance: personProvenance,
       creationRole: "related_person",
       createdAt: now,
       updatedAt: now,

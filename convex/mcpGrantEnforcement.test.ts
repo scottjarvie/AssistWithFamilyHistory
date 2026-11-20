@@ -670,3 +670,43 @@ test("new suggestion reads keep selected-person reach through open, dismissed, w
 
 // Explicit website JWT issuer for synthetic person identities; never an auth bypass.
 beforeEach(()=>vi.stubEnv("CLERK_JWT_ISSUER_DOMAIN","https://convex.test"));
+
+
+test("hosted Person batch records successful edits alongside failed rows and replays without duplicating history", async () => {
+  vi.stubEnv("CLERK_JWT_ISSUER_DOMAIN", ISSUER);
+  const t = convexTest(schema, modules, { transactionLimits: true });
+  const grantId = await seedGrant(t, { vaultOwnerId: OWNER_A, issuer: ISSUER, clientId: CLIENT_ID });
+  const create = await callTool(t, OWNER_A, "family_history_save_person", {
+    operationId: "synthetic-hosted-history-create",
+    mode: "create", createKey: "synthetic-hosted-history",
+    name: { given: "Eleanor", surname: "Example" }, sex: "unknown", living: false,
+  });
+  expect(create.isError).toBe(false);
+  const { id: personId, updatedAt } = create.body!.person as {
+    id: import("./_generated/dataModel").Id<"persons">;
+    updatedAt: number;
+  };
+  const args = {
+    operationId: "synthetic-hosted-history-batch", summary: "Synthetic Person edits",
+    people: [
+      { mode: "update", personId, expectedUpdatedAt: updatedAt - 1, researchStatus: "complete" },
+      { mode: "update", personId, expectedUpdatedAt: updatedAt, researchPriority: 3 },
+    ],
+  };
+  const edit = await callTool(t, OWNER_A, "family_history_save_records", args);
+  expect(edit.isError).toBe(false);
+  expect(edit.body?.counts).toMatchObject({ updated: 1, failed: 1 });
+  expect((await callTool(t, OWNER_A, "family_history_save_records", args)).body)
+    .toEqual({ ...edit.body, deduplicated: true });
+  const website = t.withIdentity({ subject: OWNER_A, issuer: ISSUER });
+  const history = await website.action(api.personHistory.page, { vaultOwnerId: OWNER_A, personId, before: null });
+  expect(history.rows).toMatchObject([
+    { action: "Edited", fields: ["researchPriority"], source: "Hosted MCP" },
+    { action: "Created", fields: [], source: "Hosted MCP" },
+  ]);
+  expect(history.rows[0].actor).toBe(history.rows[1].actor);
+  expect(history.rows[0].actor).toMatch(/^Connected AI · Connection [0-9A-F]{12}$/);
+  expect(JSON.stringify(history)).not.toContain(grantId);
+  await t.run(ctx => ctx.db.patch(grantId as import("./_generated/dataModel").Id<"mcpGrants">, { status: "revoked" }));
+  expect((await callTool(t, OWNER_A, "family_history_save_records", args)).isError).toBe(true);
+});

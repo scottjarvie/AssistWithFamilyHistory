@@ -1,3 +1,4 @@
+import { PersonHistory } from "@/components/vault/PersonHistory";
 import type { FunctionReturnType } from "convex/server";
 import { SafeAnchor, SafeLink } from "@/components/layout/SafeLink";
 import { ArchiveIllustration } from "@/components/design/ArchiveIllustration";
@@ -9,8 +10,8 @@ type PersonWorkspace = NonNullable<FunctionReturnType<typeof api.vaultReads.getP
 const plural = (count:number,one:string,many:string) => `${count} ${count===1?one:many}`;
 
 /** The identity dossier is server-rendered. Canonical details are not represented as proven source claims. */
-export function PersonHeader({person,stats,operations,routeId,researchTaskCount=0,evidence={},connections=[]}:{
-  person:PersonWorkspace["person"];stats:PersonWorkspace["stats"];operations:Pick<PersonWorkspace["operations"],"completionPercent"|"requiredMissingCount"|"recommendedMissingCount"|"staleChecksCount">;routeId:string;researchTaskCount?:number;evidence?:Record<string,{count:number;conflict:boolean;target:string}>;connections?:{id:string;name:string;label:string;href:string}[];
+export function PersonHeader({person,stats,operations,routeId,researchTaskCount=0,evidence={},connections=[],showHistory=false}:{
+  person:PersonWorkspace["person"];stats:PersonWorkspace["stats"];operations:Pick<PersonWorkspace["operations"],"completionPercent"|"requiredMissingCount"|"recommendedMissingCount"|"staleChecksCount">;routeId:string;showHistory?:boolean;researchTaskCount?:number;evidence?:Record<string,{count:number;conflict:boolean;target:string}>;connections?:{id:string;name:string;label:string;href:string}[];
 }) {
   const critical=operations.requiredMissingCount;
   const numbers=[
@@ -19,7 +20,7 @@ export function PersonHeader({person,stats,operations,routeId,researchTaskCount=
   return <>
     <SafeLink href="/app/people" className="mb-3 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><path d="m7 3-5 5 5 5 M2 8h12"/></svg>Back to People</SafeLink>
     <section className="rounded-lg border border-border bg-card p-4">
-      <div className="flex items-start gap-3"><ArchiveIllustration className="h-16 w-16 shrink-0 rounded bg-muted text-primary"/><div className="min-w-0"><p className="mb-1 font-mono text-xs uppercase tracking-[.12em] text-annotation">Person dossier</p><h1 className="text-3xl font-semibold leading-tight [overflow-wrap:anywhere]">{person.displayName}</h1><p className="mt-2 text-sm text-muted-foreground">{person.fsId || "Research subject"} · {person.living?"Living":"Deceased"}</p></div></div>
+      <div className="flex items-start gap-3"><ArchiveIllustration className="h-16 w-16 shrink-0 rounded bg-muted text-primary"/><div className="min-w-0"><p className="mb-1 font-mono text-xs uppercase tracking-[.12em] text-annotation">Person dossier</p><h1 className="text-3xl font-semibold leading-tight [overflow-wrap:anywhere]">{person.displayName}</h1><p className="mt-2 text-sm text-muted-foreground">{person.fsId || "Research subject"} · {person.living?"Living":"Deceased"}</p></div>{showHistory && <div className="ml-auto"><PersonHistory key={person._id} personId={person._id} /></div>}</div>
       {person.creationProvenance?.evidenceStatus === "unsourced" && <Badge variant="outline" className="mt-3 border-annotation/40 bg-annotation-surface text-annotation">Starting statement · needs a source</Badge>}
       <dl className="mt-4 grid grid-cols-2 gap-3 border-y border-border py-3 text-sm">
         <div><dt className="text-xs text-muted-foreground">Birth</dt><dd className="mt-1 font-medium">{person.birth?.date?.original || "Unknown birth"}</dd>{person.birth?.place?.original && <dd className="mt-1 text-muted-foreground">{person.birth.place.original}</dd>}{evidence.birth?.count ? <dd><SafeAnchor href={`#${evidence.birth.target}`} className={`inline-flex min-h-11 items-center text-xs underline ${evidence.birth.conflict?"text-annotation":"text-primary"}`}>{evidence.birth.conflict?"Conflict to review":"Source candidates"} · {evidence.birth.count}</SafeAnchor></dd>:<dd className="mt-1 text-xs text-muted-foreground">No source candidate</dd>}</div>

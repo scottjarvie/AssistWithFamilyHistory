@@ -15,6 +15,7 @@ import { mutation, internalMutation, internalQuery } from "./searchServer";
 import { anyApi } from "convex/server";
 import { FAMILY_HISTORY_MCP_LIMITS } from "../lib/mcp/contract";
 import { matchesVaultOwner } from "./vaultCore";
+import { appendPersonHistory, changedPersonFields, savesPerson } from "./personHistory";
 import { assertGrantPermits } from "./mcpGrants";
 
 const principalValidator = v.object({
@@ -173,6 +174,7 @@ async function replayReceipt(
   operationId: string,
   toolName: string,
   requestHash: string,
+  binding?: { grantId: Id<"mcpGrants">; clientId: string },
 ) {
   const row = await ctx.db
     .query("mcpOperations")
@@ -182,7 +184,31 @@ async function replayReceipt(
   if (row.toolName !== toolName || row.requestHash !== requestHash) {
     machineError("IDEMPOTENCY_CONFLICT", "This operation ID was already used for different Family History work.", "Reuse the original inputs or mint a new operation ID.");
   }
-  return { ...(JSON.parse(row.resultJson) as Record<string, unknown>), deduplicated: true };
+  if (binding) {
+    // Old receipts can be replayed only when the original transaction's activity
+    // pins a single grant. Never substitute the current grant for a client ID.
+    let originalGrant = row.personSaveGrantId;
+    if (!originalGrant) {
+      const activity = await ctx.db.query("agentActivity")
+        .withIndex("by_owner_request", q => q.eq("vaultOwnerId", owner).eq("requestId", operationId)).take(17);
+      const matching = activity.filter(entry => entry.createdAt === row.createdAt
+        && entry.route === "/mcp" && entry.method === "tools/call" && entry.principalKind === "mcp"
+        && entry.outcome === "ok" && entry.scope === toolName && entry.clientId === row.clientId);
+      if (activity.length < 17 && matching.length === 1) originalGrant = matching[0].grantId;
+    }
+    if (row.clientId !== binding.clientId || originalGrant !== binding.grantId) {
+      machineError("IDEMPOTENCY_CONFLICT", "This operation belongs to a different or unverified connection.", "Use a new operation ID for new work.");
+    }
+  }
+
+  const result = JSON.parse(row.resultJson);
+  if (binding) {
+    const people = [result.person, result.saved?.person, ...(result.results?.people ?? [])];
+    for (const person of people) {
+      if (typeof person?.id === "string") await owned(ctx, "persons", person.id, owner, "Person");
+    }
+  }
+  return { ...(result as Record<string, unknown>), deduplicated: true };
 }
 
 async function finishOperation(
@@ -191,6 +217,7 @@ async function finishOperation(
     owner: string;
     principal: McpPrincipal;
     grantId?: string;
+    personSaveGrantId?: Id<"mcpGrants">;
     operationId: string;
     toolName: string;
     requestHash: string;
@@ -211,6 +238,7 @@ async function finishOperation(
     requestHash: args.requestHash,
     resultJson,
     clientId: args.principal.clientId,
+    personSaveGrantId: args.personSaveGrantId,
     createdAt: now,
   });
   await ctx.db.insert("agentActivity", {
@@ -393,20 +421,24 @@ async function operation(
     requestHash: string;
     input: any;
   },
-  work: (owner: string, provenance: McpProvenance) => Promise<{ result: Record<string, unknown>; detail: string }>,
+  work: (owner: string, provenance: McpProvenance, personSaveGrantId?: Id<"mcpGrants">) => Promise<{ result: Record<string, unknown>; detail: string }>,
 ) {
   const owner = ownerFromPrincipal(args.principal);
   // Defense in depth. The transport already resolved and checked this grant;
   // the data layer refuses independently so a transport bug or a future caller
   // cannot turn an unapproved connection into a write.
-  await assertGrantPermits(ctx, {
+  const bindsPersonSave = savesPerson(args.toolName);
+  const grant = await assertGrantPermits(ctx, {
     owner,
     grantId: args.grantId,
     toolName: args.toolName,
     input: args.input,
+    principal: bindsPersonSave ? args.principal : undefined,
   });
+  const personSaveGrantId = bindsPersonSave ? grant?._id : undefined;
   const operationId = cleanText(args.operationId, "operationId", FAMILY_HISTORY_MCP_LIMITS.operationId, true)!;
-  const replay = await replayReceipt(ctx, owner, operationId, args.toolName, args.requestHash);
+  const replay = await replayReceipt(ctx, owner, operationId, args.toolName, args.requestHash,
+    personSaveGrantId ? { grantId: personSaveGrantId, clientId: args.principal.clientId } : undefined);
   if (replay) return replay;
   const batchItems=["people","relationships","events","sources","claims","stories","places","topics","connections","items"].reduce((n,key)=>n+(Array.isArray(args.input[key])?args.input[key].length:0),0);
   await assertWriteBatch(ctx,owner,args.toolName,Math.max(1,batchItems),new TextEncoder().encode(JSON.stringify(args.input)).byteLength);
@@ -427,7 +459,7 @@ async function operation(
 
     }
   }
-  const completed = await work(owner, mcpProvenance(args.principal, operationId));
+  const completed = await work(owner, mcpProvenance(args.principal, operationId), personSaveGrantId);
   const afterIds = await affectedStoryIds(ctx,owner,args.toolName,args.input,completed.result);
   const afterExposure = await publicExposures(ctx, owner, new Set([...beforeIds,...afterIds]));
   const direct = new Set(storyInputs.flatMap((item: any) => item.storyId ? [String(item.storyId)] : []));
@@ -466,10 +498,11 @@ async function operation(
         readinessSnapshot: { checked: "AI public exposure", operationId }, createdAt: Date.now(), updatedAt: Date.now() });
     }
   }
-  return finishOperation(ctx, { ...args, owner, operationId, ...completed });
+  return finishOperation(ctx, { ...args, owner, operationId, personSaveGrantId, ...completed });
 }
 
-async function savePersonRecord(ctx: MutationCtx, owner: string, input: any, provenance: McpProvenance) {
+async function savePersonRecord(ctx: MutationCtx, owner: string, input: any, provenance: McpProvenance, grantId?: Id<"mcpGrants">) {
+  if (!grantId) machineError("GRANT_REQUIRED", "This Person save requires a verified connection.", "Reconnect the MCP server.");
   const now = Date.now();
   await assertOwnedPlaceRefs(ctx, owner, input, "Person place");
   if (input.mode === "create") {
@@ -525,6 +558,10 @@ async function savePersonRecord(ctx: MutationCtx, owner: string, input: any, pro
   ]);
   if (patch.notes !== undefined) patch.notes = cleanText(patch.notes, "person notes", FAMILY_HISTORY_MCP_LIMITS.notes);
   await ctx.db.patch(row._id, { ...patch, updatedAt: now });
+  await appendPersonHistory(ctx, {
+    vaultOwnerId: owner, personId: row._id, at: now, operation: "edit",
+    source: "mcp", grantId, fields: changedPersonFields(row, patch),
+  });
   return { id: row._id, created: false, updatedAt: now };
 }
 
@@ -1647,7 +1684,7 @@ export const getRecordContext = internalQuery({
 
 export const savePerson = internalMutation({
   args: { principal: principalValidator, grantId: v.optional(v.string()), operationId: v.string(), requestHash: v.string(), input: v.any() },
-  handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_person" }, async (owner, provenance) => ({ result: { person: await savePersonRecord(ctx, owner, await resolvePlaceKeys(ctx, owner, new Map(), args.input), provenance) }, detail: "Saved a person record through MCP." })),
+  handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_person" }, async (owner, provenance, grantId) => ({ result: { person: await savePersonRecord(ctx, owner, await resolvePlaceKeys(ctx, owner, new Map(), args.input), provenance, grantId) }, detail: "Saved a person record through MCP." })),
 });
 
 export const saveRelationship = internalMutation({
@@ -1694,7 +1731,7 @@ export const unpublishStory = internalMutation({
 
 export const saveCompleteResult = internalMutation({
   args: { principal: principalValidator, grantId: v.optional(v.string()), operationId: v.string(), requestHash: v.string(), input: v.any() },
-  handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_complete_result" }, async (owner, provenance) => {
+  handler: (ctx, args) => operation(ctx, { ...args, toolName: "save_complete_result" }, async (owner, provenance, grantId) => {
     const cap = FAMILY_HISTORY_MCP_LIMITS.completeResultRowsPerKind;
     for (const [kind, rows] of Object.entries({ events: args.input.events ?? [], relationships: args.input.relationships ?? [], evidence: args.input.evidence ?? [], stories: args.input.stories ?? [] })) {
       if (!Array.isArray(rows) || rows.length > cap) machineError("VALIDATION_ERROR", `Complete result ${kind} exceed the safe batch limit.`, `Use at most ${cap} ${kind} per complete result or split the work.`);
@@ -1703,7 +1740,7 @@ export const saveCompleteResult = internalMutation({
     // Any placeCreateKey here must name a place saved by an earlier call.
     args = { ...args, input: await resolvePlaceKeys(ctx, owner, new Map(), args.input) };
     const results: Record<string, unknown> = {};
-    if (args.input.person) results.person = await savePersonRecord(ctx, owner, args.input.person, provenance);
+    if (args.input.person) results.person = await savePersonRecord(ctx, owner, args.input.person, provenance, grantId);
     const relationships = [];
     for (const item of args.input.relationships ?? []) relationships.push(await saveRelationshipRecord(ctx, owner, item, provenance));
     results.relationships = relationships;
@@ -1843,6 +1880,7 @@ async function saveOneBatchItem(
   kind: BatchItemKind,
   item: any,
   maps: BatchMaps,
+  grantId?: Id<"mcpGrants">,
 ): Promise<Omit<BatchItemOutcome, "keys">> {
   const createKey = typeof item?.createKey === "string" ? item.createKey : undefined;
   switch (kind) {
@@ -1855,7 +1893,7 @@ async function saveOneBatchItem(
       return { id: String(saved.id), status: statusOf(saved.created, item) };
     }
     case "people": {
-      const saved = await savePersonRecord(ctx, owner, await resolvePlaceKeys(ctx, owner, maps.places, item), provenance);
+      const saved = await savePersonRecord(ctx, owner, await resolvePlaceKeys(ctx, owner, maps.places, item), provenance, grantId);
       if (createKey) maps.people.set(createKey, String(saved.id));
       return {
         id: String(saved.id),
@@ -1956,7 +1994,7 @@ async function saveOneBatchItem(
  * if anything in the row throws, every write the row made is rolled back.
  */
 export const saveBatchItem = internalMutation({
-  args: { owner: v.string(), provenance: v.any(), kind: v.string(), item: v.any(), keys: v.any() },
+  args: { owner: v.string(), provenance: v.any(), kind: v.string(), item: v.any(), keys: v.any(), personSaveGrantId: v.optional(v.id("mcpGrants")) },
   handler: async (ctx, args): Promise<BatchItemOutcome> => {
     const kind = args.kind as BatchItemKind;
     if (!BATCH_ITEM_ORDER.includes(kind)) machineError("VALIDATION_ERROR", "Unknown batch row kind.", "Send rows only in the documented arrays.");
@@ -1964,7 +2002,7 @@ export const saveBatchItem = internalMutation({
     const maps = Object.fromEntries(
       (["people", "places", "topics", "events", "sources", "stories"] as const).map((name) => [name, new Map(given[name] ?? [])]),
     ) as BatchMaps;
-    const saved = await saveOneBatchItem(ctx, args.owner, args.provenance as McpProvenance, kind, args.item, maps);
+    const saved = await saveOneBatchItem(ctx, args.owner, args.provenance as McpProvenance, kind, args.item, maps, args.personSaveGrantId);
     const keys: BatchKeys = {};
     for (const [name, map] of Object.entries(maps) as Array<[BatchKeyKind, Map<string, string>]>) {
       const previous = new Map(given[name] ?? []);
@@ -1986,7 +2024,7 @@ export const saveBatchItem = internalMutation({
  */
 export const saveRecords = internalMutation({
   args: { principal: principalValidator, grantId: v.optional(v.string()), operationId: v.string(), requestHash: v.string(), input: v.any() },
-  handler: (ctx, args) => operation(ctx, { ...args, toolName: "family_history_save_records" }, async (owner, provenance) => {
+  handler: (ctx, args) => operation(ctx, { ...args, toolName: "family_history_save_records" }, async (owner, provenance, personSaveGrantId) => {
     const input = args.input ?? {};
     const caps: Array<[string, number]> = [
       ["people", FAMILY_HISTORY_MCP_LIMITS.batchPeople],
@@ -2038,6 +2076,7 @@ export const saveRecords = internalMutation({
           const outcome: BatchItemOutcome = await ctx.runMutation(anyApi.mcpFamilyHistory.saveBatchItem, {
             owner,
             provenance,
+            personSaveGrantId,
             kind,
             item,
             keys: Object.fromEntries(BATCH_KEYS_NEEDED[kind].map((name) => [name, [...keys[name]]])),
