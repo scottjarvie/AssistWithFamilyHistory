@@ -46,8 +46,6 @@ Durable guidance that stays accurate as the product evolves.
 - [Source-neutral intake boundary](importing/source-neutral-intake-boundary.md)
 - [Loose context ingestion model](importing/loose-context-ingestion-model.md)
 - [Legacy document route boundary](api/legacy-document-route-boundary.md)
-- [FamilySearch console extractor](importing/familysearch-console-extractor.md)
-- [FamilySearch console extractor quickstart](importing/familysearch-console-extractor-quickstart.md)
 - [Place and era research packs](context/place-era-research-packs.md)
 
 ## Reports & Snapshots
@@ -65,6 +63,7 @@ Point-in-time reports and audits. Useful as history, but read with their date in
 ## Archive
 
 - [Retired Convex setup guides (archived 2026-11-24)](archive/2026-convex-guides/)
+- [Retired FamilySearch console extractor (archived 2026-11-24)](archive/2026-console-extractor/)
 - [February 2026 Convex setup notes](archive/2026-02-convex-setup/)
 - [February 2026 import status](archive/2026-02-imports/import-summary.md)
 - [Historical implementation plans](archive/plans/)

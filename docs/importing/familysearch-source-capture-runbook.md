@@ -8,7 +8,7 @@ FamilySearch source capture is a core intake front door for the Research Vault. 
 - Priority page: `https://www.familysearch.org/en/tree/person/sources/<FAMILYSEARCH_ID>`.
 - Secondary page: `https://www.familysearch.org/en/tree/person/memories/<FAMILYSEARCH_ID>`.
 - Direct provider API access: pending. Do not design agent work that assumes API credentials or automated FamilySearch API calls are available.
-- Legacy fallback: console scripts documented in `docs/importing/familysearch-console-extractor.md`.
+- Retired: the old console scripts (now in `scripts/legacy/`, which no longer run); their guides are in `docs/archive/2026-console-extractor/`.
 
 ## Allowed Work
 
