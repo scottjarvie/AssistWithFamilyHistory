@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-09-05",
+  "product": "Assist With Family History",
+  "slug": "family-history",
+  "candidate": "FH03-M",
+  "selectionBasis": "Saved round-six board default plus conversation preferences; browser-local changed selections were not accessible.",
+  "selectionStatus": "Candidate package; final adoption is not implied",
+  "note": "FH03-M is the recommended mint/jade application of the preferred FH03, with FH06-M retained. The mint palette is not yet selected by Scott. The nine-person tree is too detailed for dependable 16 px recognition; refine a compact favicon before release.",
+  "svgMaster": {
+    "available": false,
+    "reason": "Current explored logo has no clean editable vector master"
+  },
+  "rasterBackground": "Opaque warm paper from source; not a transparent or dark-mode logo",
+  "faviconStatus": "Preview only: compact small-size drawing needed",
+  "icons": {
+    "ico": "icons/favicon.ico",
+    "sizes": [
+      16,
+      32,
+      48
+    ],
+    "apple": "icons/apple-touch-icon.png",
+    "any": [
+      "icons/app-icon-192.png",
+      "icons/app-icon-512.png"
+    ],
+    "maskable": "icons/app-icon-maskable-512.png"
+  },
+  "repository": {
+    "root": "J:/IDE/AssistWithFamilyHistory",
+    "destination": "docs/design/assist-family-brand-2026-09-05",
+    "framework": "Next.js",
+    "existingIconFiles": [
+      "app/favicon.ico",
+      "app/apple-icon.png",
+      "app/icon.svg"
+    ],
+    "integrationFiles": [
+      "extension/popup/index.html",
+      "app/layout.tsx",
+      "app/app/layout.tsx",
+      "app/app/settings/layout.tsx",
+      "app/app/source-docs/layout.tsx"
+    ]
+  },
+  "variants": [
+    {
+      "id": "FH03-M",
+      "name": "Ancestry tree · mint / jade",
+      "file": "variants/FH03-M.png",
+      "width": 899,
+      "height": 818,
+      "source": "sources/round-six--FH03-M.png",
+      "sourceWidth": 1254,
+      "sourceHeight": 1254,
+      "sourceCrop": [
+        180,
+        220,
+        899,
+        818
+      ],
+      "clip": null,
+      "sourceSha256": "3988445dd4f0369fb6e426c5a902882470ac7b33bd9c0fcecd3b39e46a154a87",
+      "palette": {
+        "primary": "#8FD7B4",
+        "accent": "#245A43",
+        "ground": "#F7F3E8",
+        "status": "Recommended family palette · logo study"
+      },
+      "status": "Current board candidate"
+    },
+    {
+      "id": "FH06-M",
+      "name": "Generations · mint / jade",
+      "file": "variants/FH06-M.png",
+      "width": 728,
+      "height": 823,
+      "source": "sources/round-six--FH06-M.png",
+      "sourceWidth": 1254,
+      "sourceHeight": 1254,
+      "sourceCrop": [
+        260,
+        212,
+        728,
+        823
+      ],
+      "clip": null,
+      "sourceSha256": "4b2062f736e21351a7af2cf0f76b0a3f4d019a255e3d69db083f2f5c0fea6aef",
+      "palette": {
+        "primary": "#8FD7B4",
+        "accent": "#245A43",
+        "ground": "#F7F3E8",
+        "status": "Recommended family palette · logo study"
+      },
+      "status": "Retained alternate"
+    }
+  ]
+}

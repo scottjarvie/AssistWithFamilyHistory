@@ -6,7 +6,7 @@ Status: backend Queue-local authority and expiry repair merged through protected
 
 The Family History Queue preserves a person's directive across sessions. It is not the internal Cards / Work Orders tracker, the research-operations readiness table, a generic todo list, or an autonomous task runner.
 
-The product exposes exactly four Queue states:
+The local implementation exposes exactly four Queue states. That differs from the current family model — see the Core-alignment note below this table.
 
 | State | Meaning | Required visible content |
 | --- | --- | --- |
@@ -14,6 +14,18 @@ The product exposes exactly four Queue states:
 | **Working** | An authorized person or AI has an unexpired claim and is actively doing bounded work | The current genealogy-language step and who picked it up |
 | **Waiting for your AI** | The directive is saved but nothing is running | Who it was left for, when, and connection/retry truth |
 | **Done** | The result or cancellation is recorded and traceable | Readable result, references, provenance, and remaining uncertainty |
+
+**Core alignment — recorded 2026-09-10, not actioned.** Core Philosophy v1.14.1
+§4 specifies **three lifecycle states — Waiting on AI · AI working · Answered —
+plus an independent Needs-your-input flag** raisable at any point, including on
+an Answered item; answering clears the flag and does not change the state. Core
+§4 also requires **archive** as a person's action distinct from delete, with a
+*Show archived* filter; the command table below has Delete and no Archive.
+The four states above describe the local implementation
+(`lib/queue/contract.ts:1-15`) and of Project Philosophy §"Four Queue states,
+exactly". This note does not change runtime behavior. It records the alignment work owed
+and that these tables must not be read as current family vocabulary by new
+design or MCP work. A runtime change must be scoped in the existing tracker and preserve stored records; no migration is performed by this documentation change.
 
 Failure, retry, disconnection, cancellation, completion, and handoff expiry are conditions inside those states. They are not a fifth state. A retryable failure returns to **Waiting for your AI** because nothing is running. An exhausted failure or expired handoff becomes **Needs You** with an exact action. A cancellation is **Done** with its reason retained.
 

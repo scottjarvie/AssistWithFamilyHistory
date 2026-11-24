@@ -15,6 +15,7 @@ dependency and must not block work.
    priorities, blockers, approved scope, evidence, and handoff truth.
 2. Read the stable repo docs for architecture and verification:
    - [`Assist With Family History Project Philosophy`](docs/planning/assist-with-family-history-project-philosophy.md) — canonical product purpose, domain language, responsibility split, design character, truth boundaries, and family-Core alignment
+   - [`Site Guide`](docs/planning/site-guide.md) — draft edition 1 (2026-10-06): building blocks, pages, routes, navigation, AI tools, and the open decisions in AWF-0052. Proposed, not yet canonical; the Project Philosophy wins until Scott rules
    - `docs/README.md`
    - `docs/operations/agent-handoff-runbook.md`
    - `docs/operations/product-health-gates.md`

@@ -1,23 +1,3 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
-  <title id="title">Compass Quill</title>
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#173745" />
-      <stop offset="100%" stop-color="#355f53" />
-    </linearGradient>
-    <linearGradient id="quill" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#f7f1e2" />
-      <stop offset="100%" stop-color="#e7d9be" />
-    </linearGradient>
-  </defs>
-
-  <rect width="512" height="512" rx="112" fill="url(#bg)" />
-  <circle cx="256" cy="244" r="154" fill="none" stroke="#ddb67f" stroke-width="16" />
-
-  <path d="M256 122l30 72 72 30-72 30-30 72-30-72-72-30 72-30z" fill="#f0c98d" />
-  <circle cx="256" cy="224" r="10" fill="#fef7ea" />
-
-  <path d="M170 368c56-36 116-52 174-52" fill="none" stroke="#f0dfbf" stroke-width="14" stroke-linecap="round" />
-  <path d="M332 301l18 16-16 18" fill="none" stroke="#f0dfbf" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" />
-  <path d="M326 313l48 52" fill="none" stroke="#d8c7a8" stroke-width="10" stroke-linecap="round" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="Family History favicon">
+<path d="M0 0H256V256H0Z" fill="#FAF8F1"/><path d="M68 94V126Q68 151 128 156Q188 151 188 126V94M128 154V177" fill="none" stroke="#245A43" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" /><g transform="translate(68 70) scale(2)"><g stroke="#245A43" stroke-width=".7"><circle cx="0" cy="-10" r="7" fill="#8FD7B4" /><path d="M-13 4Q-13-2 0-4Q13-2 13 4V10Q0 15-13 10Z" fill="#8FD7B4" /></g></g><g transform="translate(188 70) scale(2)"><g stroke="#245A43" stroke-width=".7"><circle cx="0" cy="-10" r="7" fill="#8FD7B4" /><path d="M-13 4Q-13-2 0-4Q13-2 13 4V10Q0 15-13 10Z" fill="#8FD7B4" /></g></g><g transform="translate(128 125) scale(1.4)"><g stroke="#245A43" stroke-width=".7"><circle cx="0" cy="-10" r="7" fill="#8FD7B4" /><path d="M-13 4Q-13-2 0-4Q13-2 13 4V10Q0 15-13 10Z" fill="#8FD7B4" /></g></g><g transform="translate(128 209) rotate(180) scale(1.5)"><path d="M-20 1Q-20-2-17-2H-12V-18Q-12-22-8-22T-4-18V-2H4V-18Q4-22 8-22T12-18V-2H17Q20-2 20 1V15Q20 29 7 34Q4 35 4 40H-4Q-4 35-7 34Q-20 29-20 15Z" fill="#245A43" /></g>
 </svg>

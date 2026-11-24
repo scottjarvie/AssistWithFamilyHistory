@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 2,
+  "date": "2026-09-05",
+  "name": "Family History",
+  "id": "FH06-M",
+  "kind": "Retained alternate SVG study",
+  "parent": "family-history",
+  "geometry": "Hand-authored editable paths, primitive shapes, and vector masks. No embedded raster images, fonts, scripts or remote assets.",
+  "transparency": "logo.svg uses real transparent cutouts; mono-white is the reverse version for dark backgrounds.",
+  "colors": "Exact intended palette tokens replace approximate shaded source pixels. Monochrome exports are separate variants.",
+  "notes": "FH06 medallion retained as an alternate with mint people and a jade cable.",
+  "files": {
+    "master": "logo.svg",
+    "reverse": "logo-mono-white.svg",
+    "monochrome": "logo-mono-ink.svg",
+    "png": "logo-512.png",
+    "favicon": "icons/favicon.svg",
+    "ico": "icons/favicon.ico",
+    "apple": "icons/apple-touch-icon.png",
+    "app": [
+      "icons/app-icon-192.png",
+      "icons/app-icon-512.png"
+    ],
+    "maskable": "icons/app-icon-maskable-512.png"
+  },
+  "faviconSimplified": false,
+  "approval": "Selected for the current family handoff. No live product adoption or deployment performed.",
+  "sourceCandidate": "FH03-M",
+  "masterViewBox": [
+    11,
+    4,
+    233,
+    253
+  ],
+  "pngSizing": "Logo PNGs preserve intrinsic proportions with a 512 px longest edge. App/favicons use separate square canvases.",
+  "selection": {
+    "date": "2026-09-05",
+    "review": "vector-refinements-v3",
+    "choice": "Kept from the accepted assortment",
+    "sourceRound": "vector-masters"
+  }
+}
