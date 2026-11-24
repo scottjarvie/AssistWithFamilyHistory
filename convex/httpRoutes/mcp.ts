@@ -2,7 +2,7 @@ import { mcpUploadRefusal } from "../../lib/media/uploadRefusal";
 import { AI_ACCESS_INSTRUCTIONS } from "../../lib/mcp/accessCopy";
 import { FAMILY_HISTORY_CONTROL_TOOLS } from "../../lib/mcp/catalog";
 /* eslint-disable @typescript-eslint/no-explicit-any -- Generated Convex references and SDK callbacks cross a runtime-validated MCP boundary. */
-import type { HttpRouter } from "convex/server";
+import type { FunctionReturnType, HttpRouter } from "convex/server";
 import { currentMediaForExport } from "../../lib/media/currentMediaForExport";
 import { EVIDENCE_UPLOAD_TYPES } from "../../lib/media/evidenceStandard";
 import { McpServer, createMcpHandler, type AuthInfo } from "@modelcontextprotocol/server";
@@ -24,6 +24,8 @@ import {
 } from "../../lib/mcp/authorize";
 import { effectiveScopes } from "../../lib/mcp/grantDefaults";
 import { EVIDENCE_SKIP_GUIDANCE } from "../mcpEvidence";
+import { storyWorkForAi } from "../vault";
+import { buildOperationSummary, RESEARCH_CHECK_DEFINITIONS } from "../vaultCore";
 
 const SERVER_NAME = "assist-with-family-history";
 const SERVER_VERSION = "0.3.0";
@@ -432,28 +434,40 @@ const storySave = z.discriminatedUnion("mode", [
   z.object({ mode: z.literal("update"), storyId: id, expectedUpdatedAt: z.number(), ...storyFields }).strict(),
 ]);
 
-function compactPersonWorkspace(workspace: any) {
+function compactPersonWorkspace(workspace: FunctionReturnType<typeof internal.vault.getPersonWorkspace>) {
   if (!workspace) return null;
   const cap = FAMILY_HISTORY_MCP_LIMITS.contextRows;
-  const living = workspace.person?.living === true;
+  const living = workspace.person.living !== false;
+  const deceasedRelationships = new Set(workspace.relationships.flatMap(relationship =>
+    relationship?.relatedPerson.living === false && relationship.relatedPerson.archivedAt === undefined ? [relationship._id] : [],
+  ));
+  const checks = workspace.researchChecks.map(check => ({
+    checkKey: check.checkKey,
+    status: check.status,
+    applicability: check.applicability,
+    completionSource: check.completionSource,
+    confidence: check.confidence,
+    lastReviewedAt: check.lastReviewedAt,
+    summary: RESEARCH_CHECK_DEFINITIONS.find(definition => definition.key === check.checkKey)?.label,
+  }));
   return {
     person: living ? { ...workspace.person, notes: undefined } : workspace.person,
-    relationships: (workspace.relationships ?? []).slice(0, cap).map((relationship: any) => ({ ...relationship, relatedPerson: relationship.relatedPerson?.living ? { ...relationship.relatedPerson, notes: undefined } : relationship.relatedPerson })),
+    relationships: workspace.relationships.slice(0, cap).map(relationship => relationship && ({ ...relationship, relatedPerson: relationship.relatedPerson.living !== false ? { ...relationship.relatedPerson, notes: undefined } : relationship.relatedPerson })),
     events: (workspace.events ?? []).slice(0, cap),
     sources: (workspace.sources ?? []).slice(0, cap),
     citations: (workspace.citations ?? []).slice(0, cap),
     sourceFacts: (workspace.sourceFacts ?? []).slice(0, cap),
     researchTasks: (workspace.researchTasks ?? []).slice(0, cap),
     researchLog: (workspace.researchLog ?? []).slice(0, cap),
-    stories: (workspace.stories ?? []).slice(0, cap),
+    stories: living ? [] : workspace.stories.filter(story => story.archivedAt === undefined && (!story.relationshipId || deceasedRelationships.has(story.relationshipId))).slice(0, cap).map(storyWorkForAi),
     contextItems: (workspace.contextItems ?? []).filter((item: any) => item.aiUseAllowed && item.reviewStatus === "reviewed").slice(0, cap),
     media: (workspace.media ?? []).filter((item: any) => item.aiUseAllowed && item.reviewStatus === "reviewed").slice(0, cap).map(currentMediaForExport),
     places: (workspace.places ?? []).slice(0, cap),
-    researchChecks: (workspace.researchChecks ?? []).slice(0, cap),
-    operations: workspace.operations,
+    researchChecks: checks.slice(0, cap),
+    operations: buildOperationSummary(checks),
     stats: workspace.stats,
     privacyNote: living ? "Living-person notes are withheld from this context response. Reviewed AI-allowed context and media remain eligible." : "Private owner-scoped context. Only reviewed AI-allowed loose context and media are included.",
-    truncated: ["relationships", "events", "sources", "citations", "sourceFacts", "researchTasks", "researchLog", "stories", "places"].some((key) => (workspace[key]?.length ?? 0) > cap),
+    truncated: (["relationships", "events", "sources", "citations", "sourceFacts", "researchTasks", "researchLog", "stories", "places"] as const).some(key => workspace[key].length > cap),
   };
 }
 

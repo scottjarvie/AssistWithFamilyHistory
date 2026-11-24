@@ -665,6 +665,47 @@ test.each(["person", "story"] as const)("%s context exports current media withou
   const text = JSON.stringify(payload); expect(text).not.toContain("replacedB2Files"); expect(text).not.toContain("synthetic-old-private"); expect(text).not.toContain("exact_private");
 });
 
+test("whole-person context keeps working drafts and withholds private review detail", async () => {
+  const t = convexTest(schema, modules);
+  await approvedConnection(t);
+  const { personId, storyId } = await t.run(async ctx => {
+    const fields = { vaultOwnerId: SUBJECT, createdAt: 1, updatedAt: 1 };
+    const personId = await ctx.db.insert("persons", {
+      ...fields, name: { given: "Synthetic", surname: "Ancestor" }, sex: "unknown", living: false, researchStatus: "basic",
+    });
+    const storyId = await ctx.db.insert("stories", {
+      ...fields, personId, title: "Synthetic draft", content: "Approved working draft", type: "biography",
+      status: "draft", generatedBy: "human", citationIds: [], unpublishReason: "private unpublish reason",
+      assignedReviewer: "private assigned reviewer", secondReviewer: "private second reviewer", promptUsed: "private prompt",
+    });
+    await ctx.db.insert("researchChecks", {
+      ...fields, personId, checkKey: "birth_record", status: "needs_review", applicability: "required",
+      completionSource: "user", confidence: 0.5, notes: "private check memo", summary: "private check summary",
+    });
+    return { personId, storyId };
+  });
+  const owner = t.withIdentity({ subject: SUBJECT });
+  const workspace = await owner.action(api.vaultReads.getPersonWorkspace, { vaultOwnerId: SUBJECT, personIdentifier: personId });
+  expect(workspace?.stories[0]).toMatchObject({ assignedReviewer: "private assigned reviewer" });
+  expect(workspace?.operations.nextActions).toContain("private check summary");
+
+  const token = await accessToken();
+  const read = async () => {
+    const response = await t.fetch("/mcp", modernRequest("tools/call", token, {
+      name: "family_history_get_context", arguments: { kind: "person", id: personId },
+    }, "family_history_get_context"));
+    const { result } = await response.json();
+    expect(result.isError).not.toBe(true);
+    return JSON.parse(result.content[0].text);
+  };
+  const context = await read();
+  expect(context.stories).toEqual([expect.objectContaining({ _id: storyId, content: "Approved working draft" })]);
+  expect(context.researchChecks).toContainEqual(expect.objectContaining({ checkKey: "birth_record", status: "needs_review" }));
+  expect(JSON.stringify(context)).not.toMatch(/private (unpublish reason|assigned reviewer|second reviewer|prompt|check memo|check summary)/);
+  await t.run(ctx => ctx.db.patch(personId, { living: true }));
+  expect((await read()).stories).toEqual([]);
+});
+
 test("story context includes approved material and withholds the human review bundle", async () => {
   const t = convexTest(schema, modules);
   await approvedConnection(t);

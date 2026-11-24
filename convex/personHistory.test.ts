@@ -138,6 +138,27 @@ test("re-importing a deceased subject without a death date preserves their saved
   expect(await t.run(ctx => ctx.db.get(personId))).toMatchObject({ living: false });
 });
 
+test("promoting a provisional relative keeps unknown living status private and preserves saved status", async () => {
+  const { t, site } = setup();
+  const anchor = await site.mutation(api.vaultMutations.upsertPerson, capturePerson);
+  const known = await site.mutation(api.vaultMutations.upsertPerson, {
+    ...capturePerson, fsId: "SYNTH-KNOWN", name: { given: "Pat", surname: "Example" }, living: false,
+  });
+  const provisional = (familySearchId: string, displayName: string) => t.run(ctx => ctx.db.insert("provisionalRelatives", {
+    vaultOwnerId: owner, anchorPersonId: anchor.personId, displayName, familySearchId, dedupeKey: familySearchId,
+    possibleDeathYear: 1897, sourceKeys: [], evidenceCount: 1, mergeState: "provisional", createdAt: 1, updatedAt: 1,
+  }));
+  const promoted = await site.mutation(api.vaultMutations.promoteProvisionalRelative, {
+    vaultOwnerId: owner, provisionalId: await provisional("SYNTH-UNVERIFIED", "Taylor Example"),
+  });
+  expect(await t.run(ctx => ctx.db.get(promoted.personId))).toMatchObject({ living: true });
+  const linked = await site.mutation(api.vaultMutations.promoteProvisionalRelative, {
+    vaultOwnerId: owner, provisionalId: await provisional("SYNTH-KNOWN", "Pat Example"),
+  });
+  expect(linked.personId).toBe(known.personId);
+  expect(await t.run(ctx => ctx.db.get(linked.personId))).toMatchObject({ living: false });
+});
+
 test("retains 64 details with stable paging, rechecks archive and owner, exports and purges only the affected records", async () => {
   const { t, site } = setup();
   const { personId } = await site.mutation(api.vaultMutations.upsertPerson, capturePerson);

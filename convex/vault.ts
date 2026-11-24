@@ -837,6 +837,20 @@ export function buildStoryBundle(
   };
 }
 
+/** Story work the connector may read, without human review metadata. */
+export function storyWorkForAi(story: Doc<"stories">) {
+  return {
+    _id: story._id,
+    title: story.title,
+    content: story.content,
+    type: story.type,
+    status: story.status,
+    generatedBy: story.generatedBy,
+    citationIds: story.citationIds,
+    updatedAt: story.updatedAt,
+  };
+}
+
 /** A draft and the approved material needed to work on it through MCP. */
 export function buildAiStoryContext(snapshot: VaultSnapshot, story: Doc<"stories">, person: Doc<"persons"> | null) {
   const operations = person ? buildPersonOperations(snapshot, buildSnapshotIndex(snapshot), person) : null;
@@ -844,14 +858,8 @@ export function buildAiStoryContext(snapshot: VaultSnapshot, story: Doc<"stories
   const citationIds = new Set(snapshot.citations.map(citation => citation._id));
   return {
     story: {
-      _id: story._id,
-      title: story.title,
-      content: story.content,
-      type: story.type,
-      status: story.status,
-      generatedBy: story.generatedBy,
+      ...storyWorkForAi(story),
       citationIds: story.citationIds.filter(id => citationIds.has(id)),
-      updatedAt: story.updatedAt,
     },
     person: person ? {
       _id: person._id,
