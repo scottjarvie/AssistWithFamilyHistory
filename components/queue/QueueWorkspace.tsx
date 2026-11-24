@@ -60,6 +60,7 @@ type QueueListResponse = {
   page: QueueItemRecord[];
   isDone: boolean;
   continueCursor: string;
+  counts?: { available: boolean; suggestions: number | null; needsInput: number | null };
   error?: string;
   details?: string;
 };
@@ -80,6 +81,8 @@ type QueueDetailResponse = {
 import {QueueActionForm as InlineAction,type QueueCommand} from "./QueueActionForm";
 import {QueueDrafts,useQueueDraft,useQueuePreview} from "./QueueDrafts";
 import {QueueCollection} from "./QueueCollection";
+import { useQueueNavCounts, type QueueCounts } from "./QueueNavCounts";
+import type { loadInitialWebsiteQueue } from "@/lib/queue/websiteReads";
 import {normalizeQueueFilters,queueMatchesView,type QueueFilterInput,type QueueFilters} from "@/lib/queue/viewFilters";
 import {queueSnapshot,initialQueueSnapshot,subscribeQueueURL,navigateQueue,closeQueueSelection} from "@/lib/queue/navigation";
 
@@ -537,16 +540,32 @@ function QueueDetail({
 }
 
 export type QueuePreview={items:QueueItemRecord[];activity:Record<string,QueueActivityRecord[]>;pageSize?:number;activityPageSize?:number;now?:number;problem?:QueueProblem;detailProblem?:QueueProblem};
-type QueueWorkspaceProps={preferenceKey:string;initialFilters?:QueueFilterInput;preview?:QueuePreview};
+type QueueWorkspaceProps = {
+  preferenceKey: string;
+  initialFilters?: QueueFilterInput;
+  initial?: Awaited<ReturnType<typeof loadInitialWebsiteQueue>>;
+  preview?: QueuePreview;
+};
+function availableCounts(counts: QueueListResponse["counts"]): QueueCounts {
+  return counts?.available && counts.suggestions !== null && counts.needsInput !== null
+    ? { suggestions: counts.suggestions, needsInput: counts.needsInput }
+    : null;
+}
+const queueListKey = ({ state, suggestions, archived }: QueueFilters) => JSON.stringify([state, suggestions, archived]);
 export function QueueWorkspace(props:QueueWorkspaceProps){
  const serialized=props.preview?JSON.stringify(props.preview):null;
  const preview=useMemo(()=>serialized?JSON.parse(serialized) as QueuePreview:undefined,[serialized]);
  return <QueueDrafts readonlyPreview={Boolean(preview)}><QueueController {...props} preview={preview}/></QueueDrafts>;
 }
-function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspaceProps) {
+function QueueController({preferenceKey,initialFilters={},initial,preview}:QueueWorkspaceProps) {
+  const { counts: sharedCounts, publish: publishCounts } = useQueueNavCounts();
   const snapshot=useSyncExternalStore(subscribeQueueURL,queueSnapshot,()=>initialQueueSnapshot(initialFilters));
   const filters=useMemo(()=>JSON.parse(snapshot) as QueueFilters,[snapshot]);
   const stateFilter=(filters.state||"all") as "all"|QueueState;
+  const listKey = queueListKey(filters);
+  const lastListKey = useRef(initial?.list ? queueListKey(normalizeQueueFilters(initialFilters)) : undefined);
+  const lastDetailId = useRef(initial?.detail ? String(initial.detail.item._id) : undefined);
+  const firstCounts = useRef(initial?.list?.counts);
   const listRequest=useRef(0),detailRequest=useRef(0);
   const collection=useRef<HTMLDivElement>(null);
   const origin=useRef<HTMLElement|null>(null);
@@ -558,27 +577,28 @@ function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspac
   const setSelectedId=(id:string|null)=>{if(id)navigateQueue({item:id});else closeSelection();};
   const applyFilters=(next:Record<string,string>)=>{const normalized=normalizeQueueFilters(next);navigateQueue({...normalized,item:normalized.state!==filters.state?"":filters.item});};
   const selectItem=(item:QueueItemRecord)=>{if(!filters.item){origin.current=document.activeElement instanceof HTMLElement?document.activeElement:null;navigateQueue({item:item._id},false);}else navigateQueue({item:item._id});};
-  const [serverCounts,setServerCounts]=useState<{suggestions:number;needsInput:number}|null>(null);
-  const [items, setItems] = useState<QueueItemRecord[]>([]);
+  const [previewCounts, setPreviewCounts] = useState<QueueCounts>(null);
+  const serverCounts = preview ? previewCounts : sharedCounts === undefined ? availableCounts(initial?.list?.counts) : sharedCounts;
+  const [items, setItems] = useState<QueueItemRecord[]>(initial?.list?.page ?? []);
   const visibleItems=useMemo(()=>items.filter(item=>queueMatchesView(item,filters,preview?.now??Date.now())),[items,filters,preview?.now]);
   const selectedId=filters.item||null;
   const navigationItems=renderedIds.map(id=>visibleItems.find(item=>item._id===id)).filter((item):item is QueueItemRecord=>Boolean(item));
   const navigationIndex=navigationItems.findIndex(item=>item._id===selectedId);
   useLayoutEffect(()=>{if(selectedId)returnItem.current=selectedId;},[selectedId]);
-  const [detail, setDetail] = useState<QueueDetailResponse | null>(null);
+  const [detail, setDetail] = useState<QueueDetailResponse | null>(() =>
+    initial?.detail ? { success: true, surfaceState: "ready", ...initial.detail } : null);
   const [problem, setProblem] = useState<QueueProblem | null>(null);
   const [detailProblem, setDetailProblem] = useState<QueueProblem | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [hasLoaded,setHasLoaded]=useState(false);
+  const [loading, setLoading] = useState(!initial?.list);
+  const [hasLoaded,setHasLoaded]=useState(Boolean(initial?.list));
   const [loadedState,setLoadedState]=useState<string>(stateFilter);
   const [loadingMore, setLoadingMore] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [activityLoading, setActivityLoading] = useState(false);
-  const [listCursor, setListCursor] = useState<string | null>(null);
-  const [listDone, setListDone] = useState(true);
+  const [listCursor, setListCursor] = useState<string | null>(initial?.list?.continueCursor || null);
+  const [listDone, setListDone] = useState(initial?.list?.isDone ?? true);
   const [showNew, setShowNew] = useState(false);
 
-  useEffect(()=>{if(serverCounts)window.dispatchEvent(new CustomEvent("queue-counts",{detail:serverCounts}));},[serverCounts]);
   const loadItems = useCallback(async (append = false, cursor?: string | null) => {
     const request=++listRequest.current;
     if (append) setLoadingMore(true);
@@ -588,7 +608,7 @@ function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspac
       if(preview){
         if(preview.problem){setProblem(preview.problem);setItems([]);return;}
         const projected=preview.items.map(queueIdentity);
-        setServerCounts({suggestions:projected.filter(i=>i.suggestionStatus==="open"&&!i.archivedAt).length,needsInput:projected.filter(i=>!!i.needsInput&&!i.archivedAt).length});
+        setPreviewCounts({suggestions:projected.filter(i=>i.suggestionStatus==="open"&&!i.archivedAt).length,needsInput:projected.filter(i=>!!i.needsInput&&!i.archivedAt).length});
         const matching=projected.filter(item=>!!item.archivedAt===!!filters.archived&&(stateFilter==="needs_you"?true:filters.suggestions?item.addedBy==="ai_suggestion":!["open","dismissed","withdrawn"].includes(item.suggestionStatus??""))&&(stateFilter==="all"||(stateFilter==="needs_you"?!!item.needsInput:item.state===stateFilter)));
         const start=Number(cursor||0),end=start+(preview.pageSize||25),page=matching.slice(start,end);
         setItems(current=>append?[...current,...page]:page);setLoadedState(stateFilter);setListCursor(end<matching.length?String(end):null);setListDone(end>=matching.length);
@@ -603,8 +623,7 @@ function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspac
       const payload = (await response.json()) as QueueListResponse;
       if (!response.ok || !payload.success) throw problemFromResponse(response, payload);
       if(request!==listRequest.current)return;
-      const totals=(payload as QueueListResponse & {counts?:{available:boolean;suggestions:number;needsInput:number}}).counts;
-      setServerCounts(totals?.available?totals:null);
+      publishCounts(availableCounts(payload.counts));
       setItems((current) => append ? [...current, ...payload.page] : payload.page);
       setLoadedState(stateFilter);
       setListCursor(payload.continueCursor || null);
@@ -620,7 +639,7 @@ function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspac
     } finally {
       if(request===listRequest.current){setHasLoaded(true);setLoading(false);setLoadingMore(false);}
     }
-  }, [stateFilter,filters.suggestions,filters.archived,preview]);
+  }, [stateFilter,filters.suggestions,filters.archived,preview,publishCounts]);
 
   const loadDetail = useCallback(async (id: string, appendActivity = false, cursor?: string | null, quiet = false) => {
     const request=++detailRequest.current;
@@ -663,8 +682,20 @@ function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspac
     }
   }, [preview]);
 
-  useEffect(() => { void loadItems(); }, [loadItems]);
   useEffect(() => {
+    if (firstCounts.current) {
+      publishCounts(availableCounts(firstCounts.current));
+      firstCounts.current = undefined;
+    }
+  }, [publishCounts]);
+  useEffect(() => {
+    if (lastListKey.current === listKey) return;
+    lastListKey.current = listKey;
+    void loadItems();
+  }, [listKey, loadItems]);
+  useEffect(() => {
+    if (lastDetailId.current === selectedId) return;
+    lastDetailId.current = selectedId ?? undefined;
     if (selectedId) void loadDetail(selectedId);
     else {++detailRequest.current;setDetail(null);setDetailLoading(false);setActivityLoading(false);}
   }, [selectedId, loadDetail]);
@@ -682,7 +713,6 @@ function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspac
   }
   function replaceItem(item: QueueItemRecord) {
     void loadItems();
-    window.dispatchEvent(new Event("queue-changed"));
     updateLoadedItem(item);
     if(item._id===selectedId){setDetail(current=>current?{...current,item}:current);void loadDetail(item._id,false,null,true);}
   }
@@ -699,6 +729,7 @@ function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspac
   function handleDeleted(deletedId:string) {
     setItems(current=>current.filter(item=>item._id!==deletedId));
     if(selectedId===deletedId){setSelectedId(null);setDetail(null);}
+    void loadItems();
   }
   async function reloadRow(id:string) {
     try {

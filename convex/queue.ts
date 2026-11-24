@@ -4,7 +4,7 @@ import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { ActionCtx, MutationCtx, QueryCtx } from "./_generated/server";
 import { action, internalAction, internalMutation, internalQuery, mutation } from "./_generated/server";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import {
   requireWebsitePerson,
   authorizeTenantAction,
@@ -12,6 +12,9 @@ import {
   type TenantAccessDecision,
 } from "./access";
 import { matchesVaultOwner } from "./vaultCore";
+import { assertGrantPermits } from "./mcpGrants";
+import { queueScopesForGrant } from "../lib/mcp/authorize";
+import { effectiveScopes } from "../lib/mcp/grantDefaults";
 import {
   QUEUE_LIMITS,
   assertCommandAllowed,
@@ -602,7 +605,7 @@ const listQueueArgs = {
 };
 
 export const listQueueItemsInternal = internalQuery({
-  args: listQueueArgs,
+  args: { ...listQueueArgs, includeCounts: v.optional(v.boolean()) },
   handler: async (ctx, args) => {
     let query=ctx.db.query("queueItems").withIndex("by_owner_updated",q=>q.eq("vaultOwnerId",args.vaultOwnerId)).order("desc");
     query=query.filter(q=>args.archived&&args.state!=="needs_you"?q.neq(q.field("archivedAt"),undefined):q.eq(q.field("archivedAt"),undefined));
@@ -617,8 +620,12 @@ export const listQueueItemsInternal = internalQuery({
       const legacy=args.state==="done"?hasResult:args.state==="working"?q.and(q.not(hasResult),q.neq(q.field("pickedUpAt"),undefined)):q.and(q.not(hasResult),q.eq(q.field("pickedUpAt"),undefined));
       return q.or(q.eq(q.field("state"),args.state),q.and(q.eq(q.field("state"),"needs_you"),legacy));
     });
-    const page=await query.paginate({...args.paginationOpts,numItems:Math.min(args.paginationOpts.numItems,QUEUE_LIMITS.itemPage)});
-    return {...page,page:await Promise.all(page.page.map(item=>queueForPerson(ctx,item,!!args.originTitles)))};
+    const [page, counts] = await Promise.all([
+      query.paginate({...args.paginationOpts,numItems:Math.min(args.paginationOpts.numItems,QUEUE_LIMITS.itemPage)}),
+      args.includeCounts ? readQueueCounts(ctx, args.vaultOwnerId) : undefined,
+    ]);
+    const projected = await Promise.all(page.page.map(item => queueForPerson(ctx, item, !!args.originTitles)));
+    return { ...page, page: projected, ...(counts ? { counts } : {}) };
   },
 });
 
@@ -676,14 +683,16 @@ export const listAllowedQueueItemsInternal = internalQuery({
 
 export const listQueueItems = action({
   args: listQueueArgs,
-  handler: async (ctx, args): Promise<PaginationResult<QueueItem>> => {
+  handler: async (ctx, args): Promise<PaginationResult<QueueItem> & { counts: Awaited<ReturnType<typeof readQueueCounts>> }> => {
     const decision = await authorizeQueueTenantAction(ctx, "queue.listQueueItems", args.vaultOwnerId);
     const result = await ctx.runQuery(internal.queue.listQueueItemsInternal, {
       ...args,
       originTitles:true,
+      includeCounts: true,
       vaultOwnerId: decision.owner,
     });
     const page: QueueItem[] = [];
+    let reconciledExpiry = false;
     for (const item of result.page) {
       const transition = queueExpiryTransition(queueIdentity(item), Date.now());
       if (!transition) {
@@ -694,11 +703,16 @@ export const listQueueItems = action({
         vaultOwnerId: decision.owner,
         queueItemId: item._id,
       });
+      // The reconciliation can add a Needs your input flag. Read its updated count.
+      reconciledExpiry = true;
       if (reconciled.item && (!args.state || reconciled.item.state === args.state)) {
         page.push(reconciled.item);
       }
     }
-    return { ...result, page: page.map(queueIdentity) };
+    const counts = reconciledExpiry || !result.counts
+      ? await ctx.runMutation(api.queue.queueCounts, { vaultOwnerId: decision.owner })
+      : result.counts;
+    return { ...result, counts, page: page.map(queueIdentity) };
   },
 });
 
@@ -1288,14 +1302,21 @@ export const deleteQueueItem = action({
 });
 
 /** AWL-0016: person-private suggestions share the Queue but are never actionable. */
+async function readQueueCounts(ctx: Pick<QueryCtx, "db">, owner: string) {
+  const counter = await ctx.db.query("queueCounters").withIndex("by_owner", q => q.eq("vaultOwnerId", owner)).unique();
+  if (counter) {
+    return counter.ready ? { available: true, suggestions: counter.openSuggestions, needsInput: counter.needsInput }
+      : { available: false, suggestions: null, needsInput: null };
+  }
+  const item = await ctx.db.query("queueItems").withIndex("by_owner", q => q.eq("vaultOwnerId", owner)).first();
+  return item ? { available: false, suggestions: null, needsInput: null } : { available: true, suggestions: 0, needsInput: 0 };
+}
+
 export const queueCounts = mutation({
   args:{vaultOwnerId:v.string()},
   handler:async(ctx,args)=>{
     const decision=await authorizeTenantMutation(ctx,"queue.queueCounts",args.vaultOwnerId);assertQueueTenantAllowed(decision);
-    const counter=await ctx.db.query("queueCounters").withIndex("by_owner",q=>q.eq("vaultOwnerId",decision.owner)).unique();
-    if(counter)return counter.ready?{available:true,suggestions:counter.openSuggestions,needsInput:counter.needsInput}:{available:false,suggestions:null,needsInput:null};
-    const item=await ctx.db.query("queueItems").withIndex("by_owner",q=>q.eq("vaultOwnerId",decision.owner)).first();
-    return item?{available:false,suggestions:null,needsInput:null}:{available:true,suggestions:0,needsInput:0};
+    return readQueueCounts(ctx, decision.owner);
   },
 });
 
@@ -1434,7 +1455,108 @@ export const agentArchiveQueueItem = internalMutation({
  }
 });
 
-/** Read/write preflight for new suggestion rows only; ordinary AWL-0015 Queue reach is unchanged. */
+const queueWriteTarget = {
+  queueItemId: v.id("queueItems"),
+  expectedVersion: v.number(),
+};
+const queueLease = { leaseMs: v.number(), nextStep: v.string() };
+
+/** Hosted MCP writes check the credential, live grant and current item in the
+ * same transaction as the command, including when the command returns a receipt.
+ */
+export const writeFromConnection = internalMutation({
+  args: {
+    grantId: v.optional(v.string()),
+    identity: v.object({ subject: v.string(), issuer: v.string(), clientId: v.string() }),
+    idempotencyKey: v.string(),
+    command: v.union(
+      v.object({
+        action: v.literal("add"), directive: v.string(),
+        addedBy: v.union(v.literal("ai_on_request"), v.literal("ai_suggestion")),
+        reason: v.optional(v.string()), options: v.optional(v.array(v.string())),
+        evidence: v.optional(v.array(v.string())), fromRecord: v.optional(contextValidator),
+      }),
+      v.object({ action: v.literal("withdraw"), ...queueWriteTarget }),
+      v.object({ action: v.literal("claim"), ...queueWriteTarget, ...queueLease }),
+      v.object({ action: v.literal("checkpoint"), ...queueWriteTarget, ...queueLease }),
+      v.object({ action: v.literal("request_user_action"), ...queueWriteTarget, requiredAction: v.string() }),
+      v.object({ action: v.literal("complete"), ...queueWriteTarget, resultSummary: v.string(), resultRefs: v.optional(v.array(v.string())) }),
+      v.object({
+        action: v.literal("fail"), ...queueWriteTarget, failureCode: v.string(),
+        failureSummary: v.string(), retryable: v.boolean(), nextRetryAt: v.optional(v.number()),
+      }),
+      v.object({ action: v.union(v.literal("archive"), v.literal("restore")), ...queueWriteTarget }),
+    ),
+  },
+  handler: async (ctx, args): Promise<{ item: QueueItem; deduplicated: boolean }> => {
+    const { command, identity, idempotencyKey } = args;
+    const owner = identity.subject;
+    const toolName = command.action === "add" ? "family_history_add_queue"
+      : command.action === "withdraw" ? "family_history_withdraw_suggestion"
+      : "family_history_update_queue";
+    const grant = await assertGrantPermits(ctx, { owner, grantId: args.grantId, principal: identity, toolName, input: command });
+    if (!grant) throw new Error("Queue write requires an approved connection");
+    const principal = {
+      ownerId: owner, actorId: "oauth-chosen-ai", actorKind: "chosen_ai" as const,
+      credentialId: `${identity.issuer}#${identity.clientId}`, scopes: queueScopesForGrant(effectiveScopes(grant)),
+    };
+    // Match the key format used by each existing command, including legacy receipts.
+    const usesRawKey = command.action === "add" || command.action === "withdraw" ||
+      command.action === "archive" || command.action === "restore";
+    const receiptKey = usesRawKey ? idempotencyKey : cleanIdempotencyKey(idempotencyKey);
+    const receipt = await ctx.db.query("queueCommandReceipts")
+      .withIndex("by_owner_key", q => q.eq("vaultOwnerId", owner).eq("idempotencyKey", receiptKey))
+      .unique();
+    if (command.action === "add") {
+      if (receipt?.command === "add" && receipt.actorId === principal.credentialId) {
+        const item = await ctx.db.get(receipt.queueItemId);
+        assertItemOwner(item, owner);
+        // Re-evaluate the original context when a retry supplies different fields.
+        await assertGrantPermits(ctx, {
+          owner, grantId: args.grantId, principal: identity, toolName,
+          input: { addedBy: item.addedBy, fromRecord: item.fromRecord },
+        });
+      }
+      return ctx.runMutation(internal.queue.agentAddQueueItem, {
+        principal, connectionId: grant._id, idempotencyKey, directive: command.directive,
+        addedBy: command.addedBy, reason: command.reason, options: command.options,
+        evidence: command.evidence, fromRecord: command.fromRecord,
+      });
+    }
+
+    const item = await ctx.db.get(command.queueItemId);
+    assertItemOwner(item, owner);
+    if (grant.boundary.kind === "selected_people" && !suggestionWithinPeople(item, grant.boundary.personIds ?? [])) {
+      throw new Error("Suggestion is outside this connection's approved reach");
+    }
+    if (receipt && receipt.queueItemId !== command.queueItemId) {
+      throw new Error("Idempotency key was already used for a different Queue item");
+    }
+    const common = { principal, queueItemId: command.queueItemId, expectedVersion: command.expectedVersion, idempotencyKey };
+    switch (command.action) {
+      case "withdraw":
+        return ctx.runMutation(internal.queue.agentWithdrawSuggestion, common);
+      case "archive":
+      case "restore":
+        return ctx.runMutation(internal.queue.agentArchiveQueueItem, { ...common, restore: command.action === "restore" });
+      case "claim":
+        return ctx.runMutation(internal.queue.agentClaimQueueItem, { ...common, leaseMs: command.leaseMs, nextStep: command.nextStep });
+      case "checkpoint":
+        return ctx.runMutation(internal.queue.agentCheckpointQueueItem, { ...common, leaseMs: command.leaseMs, nextStep: command.nextStep });
+      case "request_user_action":
+        return ctx.runMutation(internal.queue.agentRequestUserAction, { ...common, requiredAction: command.requiredAction });
+      case "complete":
+        return ctx.runMutation(internal.queue.agentCompleteQueueItem, { ...common, resultSummary: command.resultSummary, resultRefs: command.resultRefs });
+      case "fail":
+        return ctx.runMutation(internal.queue.agentFailQueueItem, {
+          ...common, failureCode: command.failureCode, failureSummary: command.failureSummary,
+          retryable: command.retryable, nextRetryAt: command.nextRetryAt,
+        });
+    }
+  },
+});
+
+/** Read preflight for new suggestion rows only; ordinary AWL-0015 Queue reach is unchanged. */
 export const suggestionReachInternal=internalQuery({
  args:{vaultOwnerId:v.string(),queueItemId:v.id("queueItems"),personIds:v.array(v.string())},
  handler:async(ctx,args)=>{const item=await ctx.db.get(args.queueItemId);return !!item&&matchesVaultOwner(item.vaultOwnerId,args.vaultOwnerId)&&suggestionWithinPeople(item,args.personIds);}

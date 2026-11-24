@@ -2,7 +2,7 @@ import { searchText } from "./searchWrites";
 import { searchRows } from "./searchRows";
 import { summaryFor, limitsFor, assertWriteBatch, fileCapsFor } from "./usageLimits";
 import {queueIdentity,suggestionWithinPeople} from "../lib/queue/identity";
-import { loadStoryScopedSnapshot, buildStoryBundle, buildPublicStoryBundle } from "./vault";
+import { loadStoryScopedSnapshot, buildStoryBundle, buildPublicStoryBundle, buildAiStoryContext } from "./vault";
 import { assessStoryPublishReadiness } from "../lib/stories/publishSafety";
 import { assertSafePublication } from "../lib/stories/sensitiveInfo";
 import { buildStoryPublicSlug } from "../lib/stories/slug";
@@ -1559,7 +1559,7 @@ export const search = internalQuery({
 });
 
 export const getRecordContext = internalQuery({
-  args: { principal: principalValidator, kind: v.string(), id: v.string() },
+  args: { principal: principalValidator, grantId: v.optional(v.string()), kind: v.string(), id: v.string() },
   handler: async (ctx, args) => {
     const owner = ownerFromPrincipal(args.principal);
     const max = FAMILY_HISTORY_MCP_LIMITS.contextRows;
@@ -1602,22 +1602,32 @@ export const getRecordContext = internalQuery({
       };
     }
     if (args.kind === "story") {
-      const story = await owned(ctx, "stories", args.id, owner, "Story");
-      const [person, relationship, citations, reviews] = await Promise.all([
+      await assertGrantPermits(ctx, {
+        owner,
+        grantId: args.grantId,
+        principal: args.principal,
+        toolName: "family_history_get_context",
+        input: { kind: args.kind, id: args.id },
+      });
+      const storyId = ctx.db.normalizeId("stories", args.id);
+      const story = storyId ? await ctx.db.get(storyId) : null;
+      if (!story || story.archivedAt !== undefined || !matchesVaultOwner(story.vaultOwnerId, owner)) return null;
+      const [person, relationship] = await Promise.all([
         story.personId ? ctx.db.get(story.personId) : null,
         story.relationshipId ? ctx.db.get(story.relationshipId) : null,
-        Promise.all(story.citationIds.slice(0, max).map((citationId) => ctx.db.get(citationId))),
-        ctx.db.query("storyReviewEvents").withIndex("by_story", (q) => q.eq("storyId", story._id)).order("desc").take(max + 1),
       ]);
-      return {
-        kind: "story",
-        story,
-        person: person && matchesVaultOwner(person.vaultOwnerId, owner) ? person : null,
-        relationship: relationship && matchesVaultOwner(relationship.vaultOwnerId, owner) ? relationship : null,
-        citations: citations.filter((row): row is Doc<"citations"> => Boolean(row && matchesVaultOwner(row.vaultOwnerId, owner))),
-        reviewEvents: reviews.filter((row) => matchesVaultOwner(row.vaultOwnerId, owner)).slice(0, max),
-        truncated: story.citationIds.length > max || reviews.length > max,
+      const canReadSubject = (subject: Doc<"persons"> | null) => {
+        return subject && subject.living === false && subject.archivedAt === undefined &&
+          matchesVaultOwner(subject.vaultOwnerId, owner);
       };
+      if (story.personId && !canReadSubject(person)) return null;
+      if (story.relationshipId) {
+        if (!relationship || !matchesVaultOwner(relationship.vaultOwnerId, owner)) return null;
+        const subjects = await Promise.all([ctx.db.get(relationship.person1), ctx.db.get(relationship.person2)]);
+        if (!subjects.every(canReadSubject)) return null;
+      }
+      const snapshot = await loadStoryScopedSnapshot(ctx, owner, story._id, "index");
+      return snapshot ? buildAiStoryContext(snapshot, story, person) : null;
     }
     if (args.kind === "source") {
       const source = await owned(ctx, "sources", args.id, owner, "Source");

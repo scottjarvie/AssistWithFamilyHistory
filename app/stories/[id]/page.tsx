@@ -1,6 +1,7 @@
 import { SafeLink as Link } from "@/components/layout/SafeLink";
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
+import { cache } from "react";
 import { BookOpen, FileText, MapPinned, Milestone, ShieldCheck, Users } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +23,10 @@ import { publicStoryPath } from "@/lib/stories/slug";
 
 export const dynamic = "force-dynamic";
 
+const loadPublishedStory = cache((storyIdentifier: string) =>
+  getConvexClient().query(api.vault.getPublishedStoryByIdentifier, { storyIdentifier }),
+);
+
 export async function generateMetadata({
   params,
 }: {
@@ -38,9 +43,7 @@ export async function generateMetadata({
   }
 
   try {
-    const bundle = await getConvexClient().query(api.vault.getPublishedStoryByIdentifier, {
-      storyIdentifier: id,
-    });
+    const bundle = await loadPublishedStory(id);
     const storyMetadata = bundle
       ? buildPublicStoryMetadata({
           story: bundle.story,
@@ -111,9 +114,7 @@ export default async function PublicStoryPage({
   let bundle;
 
   try {
-    bundle = await getConvexClient().query(api.vault.getPublishedStoryByIdentifier, {
-      storyIdentifier: id,
-    });
+    bundle = await loadPublishedStory(id);
   } catch (error) {
     // GEN-79: the public /stories/<id> route must never surface a 500 error
     // page to anonymous visitors. Known bad-identifier / not-found errors are a

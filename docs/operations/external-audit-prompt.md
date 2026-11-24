@@ -14,7 +14,7 @@ I want you to be **adversarial, not collegial**. Disagree with prior decisions i
 
 Read these files **in order**, then form opinions:
 
-1. `docs/operations/branch-wrap-up.md` — what shipped on this branch and why
+1. `docs/archive/2026-dated-records/branch-wrap-up.md` — what shipped on this branch and why
 2. `AGENTS.md` — operating rules
 3. `docs/context/place-era-research-packs.md` — load-bearing data contract for historical context
 4. `docs/importing/familysearch-capture-storage-map.md` — load-bearing data contract for intake

@@ -13,7 +13,8 @@ async function bounded<T>(range: AsyncIterable<T>, limit:number, bytes:number):P
 }
 const priorityScope = "Up to five people by assigned research priority. This covers assigned priorities only, not every evidence gap.";
 export type DashboardSummary = {firstStartEligible:boolean;counts:{people:number;places:number;stories:number;documents:number;imports:number;openTasks:number;provisionalRelatives:number};recentPeople:ReturnType<typeof personRow>[];recentImports:ReturnType<typeof importRow>[];operationsHighlights:ReturnType<typeof personRow>[];waitingTasks:ReturnType<typeof taskRow>[];priorityScope:string};
-export function dashboardFromSnapshot(snapshot:VaultSnapshot,firstStartEligible:boolean):DashboardSummary {
+export type DashboardRows = Pick<VaultSnapshot, "people" | "places" | "stories" | "documents" | "importRuns" | "researchTasks" | "provisionalRelatives">;
+export function dashboardFromSnapshot(snapshot:DashboardRows,firstStartEligible:boolean):DashboardSummary {
   const people = new Map(snapshot.people.map(p=>[String(p._id),p]));
   const byId = (id:unknown)=>people.get(String(id))??null;
   return {firstStartEligible,counts:{people:snapshot.people.length,places:snapshot.places.length,stories:snapshot.stories.length,documents:snapshot.documents.length,imports:snapshot.importRuns.length,openTasks:snapshot.researchTasks.filter(t=>t.status!=="done").length,provisionalRelatives:snapshot.provisionalRelatives.filter(r=>r.mergeState==="provisional").length},

@@ -77,7 +77,7 @@ export const getPersonWorkspace = action({
 });
 
 export const getOwnedMediaFile = action({
-  args: { vaultOwnerId: v.string(), mediaId: v.string() },
+  args: { vaultOwnerId: v.string(), mediaId: v.string(), rendition: v.optional(v.literal("tiny")) },
   handler: async (
     ctx,
     args,
@@ -271,10 +271,8 @@ export const getPlaceWorkspace = action({
   handler:async(ctx,args):Promise<PlaceWorkspace|null>=>{
     const vaultOwnerId=await authorizedOwner(ctx,"vault.getPlaceWorkspace",args.vaultOwnerId);
     const initial=await ctx.runQuery(internal.placePages.initial,{vaultOwnerId,placeId:args.placeId});
-    if(!initial)return null;if(initial.mode==="legacy")return initial.workspace;
-    const sections:PlaceSection[]=["events","people","sources","context","research","media"];
-    const results=await Promise.all(sections.map(section=>ctx.runQuery(internal.placePages.section,{vaultOwnerId,placeId:args.placeId,section,cursor:null})));
-    return {header:initial.header,pages:Object.fromEntries(sections.map((s,i)=>[s,results[i]]))as PlaceWorkspace["pages"]};
+    if (!initial) return null;
+    return initial.mode === "legacy" ? initial.workspace : { header: initial.header, pages: {} };
   },
 });
 

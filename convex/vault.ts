@@ -41,6 +41,18 @@ export type VaultSnapshot = {
   provisionalRelatives: Doc<"provisionalRelatives">[];
 };
 
+type VaultSnapshotTable = Exclude<(typeof FIRST_START_EMPTY_TABLES)[number], "queueItems">;
+
+/** Legacy counts may predate the projections. Read only the tables in use. */
+export async function activeOwnerRows<Table extends VaultSnapshotTable>(
+  ctx: QueryCtx, table: Table, owner: string,
+): Promise<Doc<Table>[]> {
+  const rows = await ctx.db.query<VaultSnapshotTable>(table)
+    .withIndex("by_owner", q => q.eq("vaultOwnerId", owner)).collect();
+  // The query was widened for the shared index signature, but still reads only table.
+  return rows.filter(row => !("archivedAt" in row) || row.archivedAt === undefined) as unknown as Doc<Table>[];
+}
+
 const storyWorkflowValidator = v.union(
   v.literal("needs_genealogy_evidence"),
   v.literal("needs_context_research"),
@@ -825,6 +837,40 @@ export function buildStoryBundle(
   };
 }
 
+/** A draft and the approved material needed to work on it through MCP. */
+export function buildAiStoryContext(snapshot: VaultSnapshot, story: Doc<"stories">, person: Doc<"persons"> | null) {
+  const operations = person ? buildPersonOperations(snapshot, buildSnapshotIndex(snapshot), person) : null;
+  const context = person && operations ? buildContextCoverage(snapshot, person, operations) : null;
+  const citationIds = new Set(snapshot.citations.map(citation => citation._id));
+  return {
+    story: {
+      _id: story._id,
+      title: story.title,
+      content: story.content,
+      type: story.type,
+      status: story.status,
+      generatedBy: story.generatedBy,
+      citationIds: story.citationIds.filter(id => citationIds.has(id)),
+      updatedAt: story.updatedAt,
+    },
+    person: person ? {
+      _id: person._id,
+      displayName: formatPersonName(person),
+      lifespan: getPersonLifespan(person),
+    } : null,
+    media: sortByTimestampDesc((operations?.relatedMedia ?? []).filter(item =>
+      item.reviewStatus === "reviewed" && item.aiUseAllowed === true && item.rightsStatus !== "restricted",
+    )).slice(0, 6).map(item => ({ _id: item._id, title: item.title, type: item.type })),
+    historicalContext: (context?.aiEligibleEntries ?? []).slice(0, 8).map(entry => ({
+      _id: entry._id,
+      title: entry.title,
+      topic: entry.topic,
+      content: entry.content,
+      timePeriod: entry.timePeriod,
+    })),
+  };
+}
+
 // Public story DTO — explicit allowlist of fields safe to return to an
 // unauthenticated client over the public Convex query surface
 // (`getPublishedStory`, `getPublishedStoryByIdentifier`).
@@ -1556,6 +1602,7 @@ export const getOwnedMediaFile = internalQuery({
   args: {
     vaultOwnerId: v.string(),
     mediaId: v.string(),
+    rendition: v.optional(v.literal("tiny")),
   },
   handler: async (ctx, args) => {
     const owner = normalizeVaultOwnerId(args.vaultOwnerId);
@@ -1565,11 +1612,13 @@ export const getOwnedMediaFile = internalQuery({
     // must never work as an existence oracle for another person's vault.
     if (!row || !matchesVaultOwner(row.vaultOwnerId, owner)) return null;
     if (row.mediaState === "ready" && row.b2Renditions?.medium) {
+      const rendition = args.rendition === "tiny" ? row.b2Renditions.tiny ?? row.b2Renditions.medium
+        : row.b2Renditions.medium;
       return {
-        b2: row.b2Renditions.medium,
-        mimeType: row.b2Renditions.medium.contentType,
+        b2: rendition,
+        mimeType: rendition.contentType,
         title: row.title,
-        sizeBytes: row.b2Renditions.medium.sizeBytes,
+        sizeBytes: rendition.sizeBytes,
       };
     }
     if (row.mediaState === "ready" && row.b2Original && !row.b2Renditions) return {b2:row.b2Original, mimeType:row.b2Original.contentType, title:row.title, sizeBytes:row.b2Original.sizeBytes};
@@ -2252,8 +2301,27 @@ export const getDashboardSummary = internalQuery({
   handler: async (ctx, args):Promise<DashboardSummary> => {
     const owner = normalizeVaultOwnerId(args.vaultOwnerId);
     if (await countsReady(ctx)) return readDashboard(ctx, owner);
-    const snapshot = await getVaultSnapshot(ctx, owner);
-    return dashboardFromSnapshot(snapshot, await isFirstStartEligible(ctx, owner, snapshot));
+    const tables = ["persons", "places", "stories", "documents", "importRuns", "researchTasks", "provisionalRelatives"] as const;
+    const [people, places, stories, documents, importRuns, researchTasks, provisionalRelatives] = await Promise.all([
+      activeOwnerRows(ctx, "persons", owner),
+      activeOwnerRows(ctx, "places", owner),
+      activeOwnerRows(ctx, "stories", owner),
+      activeOwnerRows(ctx, "documents", owner),
+      activeOwnerRows(ctx, "importRuns", owner),
+      activeOwnerRows(ctx, "researchTasks", owner),
+      activeOwnerRows(ctx, "provisionalRelatives", owner),
+    ]);
+    const snapshot = { people, places, stories, documents, importRuns, researchTasks, provisionalRelatives };
+    let firstStartEligible = false;
+    if (Object.values(snapshot).every(rows => rows.length === 0)) {
+      const checked = new Set<string>(tables);
+      const other = await Promise.all(FIRST_START_EMPTY_TABLES.filter(table => !checked.has(table)).map(table => {
+        const query = ctx.db.query(table).withIndex("by_owner", q => q.eq("vaultOwnerId", owner));
+        return table === "queueItems" ? query.first() : query.filter(q => q.eq(q.field("archivedAt"), undefined)).first();
+      }));
+      firstStartEligible = other.every(row => row === null);
+    }
+    return dashboardFromSnapshot(snapshot, firstStartEligible);
   },
 });
 

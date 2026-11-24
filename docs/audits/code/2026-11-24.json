@@ -1,0 +1,709 @@
+{
+  "date": "2026-11-24",
+  "head": "708a0dd38c47b8f862f315862aea437ccfcf8470",
+  "summary": [
+    "Opening a person loads the whole dossier, even when you only want the Overview.",
+    "Queue waits for the browser to start before it asks for your handoffs.",
+    "A place summary waits for six tabs that may never be opened.",
+    "Queue badges repeat count requests, and rare searches can read your whole list.",
+    "Some backend paths can continue after a failed owner check or use AI permissions that have just changed."
+  ],
+  "scope": "Reviewed `708a0dd38c47b8f862f315862aea437ccfcf8470`. The Mac mini sweep had usable timing only for an empty Workspace (534 ms median to its main action over three loads). The audit starts there, then follows the main signed-in routes. Findings and expected gains come from source inspection.",
+  "findings": [
+    {
+      "id": "F01",
+      "title": "Person pages load the full dossier before showing the Overview",
+      "lens": "Speed",
+      "files": [
+        {
+          "path": "app/app/people/[personId]/page.tsx",
+          "line": 33
+        },
+        {
+          "path": "app/app/people/[personId]/page.tsx",
+          "line": 53
+        },
+        {
+          "path": "convex/vault.ts",
+          "line": 1175
+        },
+        {
+          "path": "convex/vault.ts",
+          "line": 1271
+        },
+        {
+          "path": "convex/vault.ts",
+          "line": 1320
+        },
+        {
+          "path": "components/vault/PersonWorkspaceView.tsx",
+          "line": 263
+        },
+        {
+          "path": "components/records/RecordSections.tsx",
+          "line": 59
+        },
+        {
+          "path": "components/records/VisitedRecordPanel.tsx",
+          "line": 4
+        }
+      ],
+      "label": "safe to fix",
+      "size": "large",
+      "expectedGain": "Initial reads and payload can stop growing with unopened evidence and document bodies.",
+      "observation": "Open a person with many citations and long saved documents and stay on Overview. The request assembles the person’s evidence graph, and the route passes full document Markdown into a section supplied to the browser even though the tab panel delays mounting.",
+      "impact": "Reading one ancestor’s summary gets slower as their research grows.",
+      "proposedFix": "Return a small Overview and section metadata first. Page the evidence and fetch document bodies on demand. Keep section counts, deep links, draft state and the existing copy/download controls."
+    },
+    {
+      "id": "F02",
+      "title": "Queue waits for the browser before it fetches the first handoffs",
+      "lens": "Speed",
+      "files": [
+        {
+          "path": "app/app/queue/page.tsx",
+          "line": 15
+        },
+        {
+          "path": "components/queue/QueueWorkspace.tsx",
+          "line": 562
+        },
+        {
+          "path": "components/queue/QueueWorkspace.tsx",
+          "line": 602
+        },
+        {
+          "path": "components/queue/QueueWorkspace.tsx",
+          "line": 643
+        },
+        {
+          "path": "components/queue/QueueWorkspace.tsx",
+          "line": 666
+        },
+        {
+          "path": "components/queue/QueueWorkspace.tsx",
+          "line": 737
+        }
+      ],
+      "label": "safe to fix",
+      "size": "medium",
+      "expectedGain": "Removes the wait for client startup and the first browser-to-API round trip from the initial data path.",
+      "observation": "Load Queue directly or follow a saved item link with a cold browser. The route supplies filters only. The list and selected item requests start after the client component mounts.",
+      "impact": "The page can show a loading message before the person can read their handoff.",
+      "proposedFix": "Start the first list and selected detail reads on the server, in parallel when both are needed. Stream the shell and pass results to the client. Reuse the same owner checks, filters and refresh paths."
+    },
+    {
+      "id": "F03",
+      "title": "Place Overview waits for six tabs to load",
+      "lens": "Speed",
+      "files": [
+        {
+          "path": "convex/vaultReads.ts",
+          "line": 269
+        },
+        {
+          "path": "convex/placePages.ts",
+          "line": 64
+        },
+        {
+          "path": "convex/placePages.ts",
+          "line": 105
+        },
+        {
+          "path": "components/vault/PlaceWorkspaceView.tsx",
+          "line": 38
+        },
+        {
+          "path": "components/vault/PlaceWorkspaceView.tsx",
+          "line": 46
+        },
+        {
+          "path": "app/app/places/actions.ts",
+          "line": 14
+        }
+      ],
+      "label": "safe to fix",
+      "size": "medium",
+      "expectedGain": "Reduces the indexed Overview from seven data queries to one before it can render.",
+      "observation": "Open a place in indexed mode and stay on Overview. After the header returns, the action starts six first-page queries and waits for all of them, including the Context and Research bodies that belong to other tabs.",
+      "impact": "A busy town can take longer to open even when the person only wants its summary.",
+      "proposedFix": "Return the header and cheap counts first. Load the active section on selection or hash navigation using the existing section action. Preserve exact totals and existing loaded-row semantics for People and Sources."
+    },
+    {
+      "id": "F04",
+      "title": "One Queue badge can cause several count requests",
+      "lens": "Convex spend",
+      "files": [
+        {
+          "path": "app/app/layout.tsx",
+          "line": 46
+        },
+        {
+          "path": "components/layout/AppSidebar.tsx",
+          "line": 79
+        },
+        {
+          "path": "components/layout/AppSidebar.tsx",
+          "line": 143
+        },
+        {
+          "path": "components/layout/AppNavigationList.tsx",
+          "line": 105
+        },
+        {
+          "path": "components/queue/QueueNavCounts.tsx",
+          "line": 5
+        },
+        {
+          "path": "app/api/queue/route.ts",
+          "line": 59
+        },
+        {
+          "path": "app/api/queue/route.ts",
+          "line": 74
+        },
+        {
+          "path": "convex/queue.ts",
+          "line": 1291
+        }
+      ],
+      "label": "safe to fix",
+      "size": "small",
+      "expectedGain": "One count fetch per refresh event, with no extra badge fetch when current list counts are available.",
+      "observation": "On a phone, open a workspace page, then open the menu. The CSS-hidden desktop sidebar still mounts a badge, and the menu can mount another. Each fetches on mount and focus. Queue list loads also read counts after reading the page.",
+      "impact": "The site pays for repeat backend calls to display the same two numbers, and the count read delays the list response.",
+      "proposedFix": "Share an owner-scoped badge store across navigation and Queue, coalesce refreshes, and reuse counts already returned by the list. Preserve freshness after Queue changes and the unavailable state for unready counters."
+    },
+    {
+      "id": "F05",
+      "title": "Searching People or Places can read the entire list",
+      "lens": "Speed and Convex spend",
+      "files": [
+        {
+          "path": "convex/peopleExplorer.ts",
+          "line": 100
+        },
+        {
+          "path": "convex/peopleExplorer.ts",
+          "line": 112
+        },
+        {
+          "path": "components/vault/PaginatedPeopleExplorer.tsx",
+          "line": 12
+        },
+        {
+          "path": "convex/placePages.ts",
+          "line": 44
+        },
+        {
+          "path": "components/vault/PaginatedPlaces.tsx",
+          "line": 8
+        }
+      ],
+      "label": "needs Scott",
+      "size": "large",
+      "expectedGain": "Sparse searches can read mainly candidate matches instead of traversing every row for the owner.",
+      "observation": "In indexed mode, search a large vault for a substring with no matches or fewer than 50. The server filters after it reads each candidate page. Both clients automatically fetch successive pages until they have 50 results or reach the end. People can request up to 2,000 candidate rows per continuation, subject to its byte budget.",
+      "impact": "Rare names can take the longest to find and use the most database bandwidth.",
+      "proposedFix": "Index candidate selection while preserving exact substring matches, owner filters and existing order. Verify punctuation, IDs, dates and place text. Retain a bounded fallback for short terms the index cannot narrow. Scott must approve building the new search keys for existing People and Places records before cutover."
+    },
+    {
+      "id": "F06",
+      "title": "Workspace and Research can fall back to reading the whole vault",
+      "lens": "Convex spend",
+      "files": [
+        {
+          "path": "app/app/page.tsx",
+          "line": 35
+        },
+        {
+          "path": "convex/vault.ts",
+          "line": 54
+        },
+        {
+          "path": "convex/vault.ts",
+          "line": 91
+        },
+        {
+          "path": "convex/vault.ts",
+          "line": 2248
+        },
+        {
+          "path": "convex/vaultCounts.ts",
+          "line": 102
+        },
+        {
+          "path": "app/app/research/page.tsx",
+          "line": 40
+        },
+        {
+          "path": "convex/researchPages.ts",
+          "line": 28
+        },
+        {
+          "path": "convex/researchPages.ts",
+          "line": 59
+        },
+        {
+          "path": "convex/placePages.ts",
+          "line": 36
+        }
+      ],
+      "label": "safe to fix",
+      "size": "large",
+      "expectedGain": "Research stops doing two 20-table snapshots per initial view in fallback mode, with no need to retire compatibility reads.",
+      "observation": "Use a populated fixture with the count build markers incomplete. Workspace collects rows from 20 owner tables. Research requests tasks and log in parallel, and each loads its own copy of that same snapshot. Places list also uses the snapshot in this mode.",
+      "impact": "Until the indexes and counts are ready, opening a summary can cost as much as reading the library.",
+      "proposedFix": "Replace fallback snapshots with reads for the tables and fields each screen actually needs. Preserve ordering and count behavior for old rows. Keep the bounded indexed path and compare both modes before shipping."
+    },
+    {
+      "id": "F07",
+      "title": "Finding one previous import reads import history for every account",
+      "lens": "Convex spend",
+      "files": [
+        {
+          "path": "convex/importRuns.ts",
+          "line": 88
+        },
+        {
+          "path": "convex/schema.ts",
+          "line": 1334
+        },
+        {
+          "path": "lib/familysearch/importRunResolver.ts",
+          "line": 29
+        },
+        {
+          "path": "lib/familysearch/importRunResolver.ts",
+          "line": 44
+        },
+        {
+          "path": "app/api/people/[id]/raw/route.ts",
+          "line": 135
+        }
+      ],
+      "label": "safe to fix",
+      "size": "medium",
+      "expectedGain": "The one-result fallback reads a bounded set from the current owner instead of scanning every account.",
+      "observation": "Generate a raw document for an older capture that reaches the last-import fallback. Even with a requested limit of one, the query collects the global time index before applying owner, person and limit.",
+      "impact": "Document generation gets more expensive as anyone on the site imports more records.",
+      "proposedFix": "Put the owner and person selectors first in time-ordered indexes, merge the internal-ID and FamilySearch-ID paths where needed, and apply the limit to indexed reads. Verify equal timestamps and older stored identifiers."
+    },
+    {
+      "id": "F08",
+      "title": "Published story pages request the same evidence twice",
+      "lens": "Speed and Convex spend",
+      "files": [
+        {
+          "path": "app/stories/[id]/page.tsx",
+          "line": 25
+        },
+        {
+          "path": "app/stories/[id]/page.tsx",
+          "line": 41
+        },
+        {
+          "path": "app/stories/[id]/page.tsx",
+          "line": 110
+        },
+        {
+          "path": "convex/vault.ts",
+          "line": 1676
+        },
+        {
+          "path": "convex/vault.ts",
+          "line": 1708
+        }
+      ],
+      "label": "safe to fix",
+      "size": "small",
+      "expectedGain": "Two full-bundle calls become one per page render.",
+      "observation": "Open a published story directly. Metadata and body each call the same Convex query, which loads the story’s person and evidence before producing the public view.",
+      "impact": "Each public story visit asks Convex to assemble the same evidence twice.",
+      "proposedFix": "Use a shared request-local lookup for metadata and body. Verify canonical redirects, anonymous rendering and immediate unpublish across separate requests."
+    },
+    {
+      "id": "F09",
+      "title": "A Memories card can download a full file it cannot display",
+      "lens": "Speed and Convex spend",
+      "files": [
+        {
+          "path": "components/vault/MediaPrivacyReviewPanel.tsx",
+          "line": 168
+        },
+        {
+          "path": "components/vault/MediaPrivacyReviewPanel.tsx",
+          "line": 179
+        },
+        {
+          "path": "components/vault/MediaPrivacyReviewPanel.tsx",
+          "line": 199
+        },
+        {
+          "path": "convex/vault.ts",
+          "line": 1567
+        },
+        {
+          "path": "convex/mediaEvidenceStorage.ts",
+          "line": 539
+        },
+        {
+          "path": "app/api/media/[mediaId]/file/route.ts",
+          "line": 42
+        }
+      ],
+      "label": "safe to fix",
+      "size": "medium",
+      "expectedGain": "Fewer requests and fewer bytes on media-heavy profiles. Opening Memories no longer downloads non-image originals merely to paint cards.",
+      "observation": "Open Memories on a person with several photos and an original-only PDF or recording. Every stored row is treated as an image. Cards eagerly request the medium image, or original bytes when the file has no renditions.",
+      "impact": "A short scroll can transfer files the person never opened and show a broken image for a recording or PDF.",
+      "proposedFix": "Use MIME-aware cards, request the existing tiny rendition for image previews, and lazy-load below-fold images. Keep full files behind the appropriate viewer or playback control.",
+      "standard": "https://github.com/scottjarvie/assistwithlife/blob/main/planning/media-storage-standard.md#the-rules"
+    },
+    {
+      "id": "F10",
+      "title": "Backend ownership checks can log a refusal and still proceed",
+      "lens": "Safety",
+      "files": [
+        {
+          "path": "convex/access.ts",
+          "line": 34
+        },
+        {
+          "path": "convex/access.ts",
+          "line": 99
+        },
+        {
+          "path": "convex/access.ts",
+          "line": 164
+        },
+        {
+          "path": "convex/vaultReads.ts",
+          "line": 53
+        },
+        {
+          "path": "convex/vaultMigration.ts",
+          "line": 158
+        },
+        {
+          "path": "docs/tracker/cards/AWF-0080.md",
+          "line": 19
+        }
+      ],
+      "label": "needs Scott",
+      "size": "large",
+      "expectedGain": "Unauthorized reads and writes stop at the owner boundary even when deployment settings are missing.",
+      "observation": "Inspect or exercise the owner checks with two synthetic accounts in an isolated deployment with the default mode. Missing identity, mismatched owners and unauthorized references can be logged while a caller continues. The legacy guest transfer also uses this mode for its source-owner proof.",
+      "impact": "The code can leave private vault data or writes accessible outside the verified owner’s account.",
+      "proposedFix": "Require verified ownership at the Convex boundary and retain logging for denials. Prove signed-in, signed-out, public and guest paths before the change. Scott must decide whether to retain guest-to-account transfer with a signed proof of ownership, or explicitly turn that path off as part of production enforcement."
+    },
+    {
+      "id": "F11",
+      "title": "Queue writes can use connection permissions that have just changed",
+      "lens": "Safety",
+      "files": [
+        {
+          "path": "convex/httpRoutes/mcp.ts",
+          "line": 1067
+        },
+        {
+          "path": "convex/httpRoutes/mcp.ts",
+          "line": 1137
+        },
+        {
+          "path": "convex/queue.ts",
+          "line": 746
+        },
+        {
+          "path": "convex/queue.ts",
+          "line": 824
+        },
+        {
+          "path": "convex/queue.ts",
+          "line": 945
+        },
+        {
+          "path": "lib/queue/agentTools.ts",
+          "line": 66
+        },
+        {
+          "path": "convex/mcpFamilyHistory.ts",
+          "line": 438
+        }
+      ],
+      "label": "safe to fix",
+      "size": "medium",
+      "expectedGain": "An in-flight write that reaches the database after a permission change honors the new limit.",
+      "observation": "Use an isolated concurrency check with a synthetic connection. Change its permissions while a permitted Queue write is in flight and verify the commit uses the updated grant. The transport passes a snapshot of the scopes and the Queue mutation reads the item and item authority without reloading the grant.",
+      "impact": "An AI action already on its way to the database can still land after the person has narrowed or revoked the connection.",
+      "proposedFix": "Reuse the durable grant check inside each AI Queue write before any changes or replay response. Pass authenticated credential and grant identifiers, check current expiry, scopes and item reach, then preserve existing lease and item-authority checks.",
+      "standard": "https://github.com/scottjarvie/assistwithlife/blob/main/planning/bring-your-ai-mcp-oauth-standard.md#successful-sign-in-must-lead-to-useful-tools"
+    },
+    {
+      "id": "F12",
+      "title": "Legacy file links have no automatic expiry",
+      "lens": "Safety",
+      "files": [
+        {
+          "path": "convex/vaultReads.ts",
+          "line": 79
+        },
+        {
+          "path": "convex/vault.ts",
+          "line": 1575
+        },
+        {
+          "path": "app/api/media/[mediaId]/file/route.ts",
+          "line": 34
+        },
+        {
+          "path": "lib/media/evidenceB2.ts",
+          "line": 257
+        }
+      ],
+      "label": "safe to fix",
+      "size": "medium",
+      "expectedGain": "New owner and browser reads no longer issue non-expiring private file links.",
+      "observation": "Check the read contract against a synthetic legacy Convex-stored file. The callable action returns a storage bearer URL. The normal website route relays bytes, but the backend result still contains the raw URL. B2 URLs have a five-minute cap.",
+      "impact": "A copied legacy link can outlive a session or later changes to file access.",
+      "proposedFix": "Serve legacy bytes through an authenticated delivery path that keeps the provider URL server-side. Verify permitted playback and range requests and uniform not-found behavior. Inventory any links previously issued before proposing remediation that changes stored files.",
+      "standard": "https://docs.convex.dev/file-storage/serve-files",
+      "familyStandard": "https://github.com/scottjarvie/assistwithlife/blob/main/planning/assist-media-storage-standard.md#retrieval-sharing-and-publication"
+    },
+    {
+      "id": "F13",
+      "title": "The AI story reader receives the human review bundle",
+      "lens": "Safety",
+      "files": [
+        {
+          "path": "convex/httpRoutes/mcp.ts",
+          "line": 819
+        },
+        {
+          "path": "convex/vault.ts",
+          "line": 757
+        },
+        {
+          "path": "convex/vault.ts",
+          "line": 795
+        },
+        {
+          "path": "convex/vault.ts",
+          "line": 808
+        },
+        {
+          "path": "docs/tracker/cards/AWF-0076.md",
+          "line": 66
+        }
+      ],
+      "label": "safe to fix",
+      "size": "medium",
+      "expectedGain": "The story tool exposes only authorized material and sends less data.",
+      "observation": "Review the returned fields for a synthetic story with human review notes, a living relative and unreviewed context. The connector calls the human review query and changes only the media shape. That bundle includes raw related-person records, review history and private context.",
+      "impact": "Private family details can reach an AI during ordinary story work.",
+      "proposedFix": "Write an AI-specific allowlist, applying the connection’s approved reach and the site’s living, review and privacy rules before returning related records. Leave the human reviewer view intact."
+    },
+    {
+      "id": "F14",
+      "title": "Documents keyed by FamilySearch ID miss the living-person check",
+      "lens": "Safety",
+      "files": [
+        {
+          "path": "convex/documents.ts",
+          "line": 38
+        },
+        {
+          "path": "convex/documents.ts",
+          "line": 87
+        },
+        {
+          "path": "convex/mcpEvidence.ts",
+          "line": 227
+        },
+        {
+          "path": "convex/mcpEvidence.ts",
+          "line": 237
+        },
+        {
+          "path": "docs/tracker/cards/AWF-0076.md",
+          "line": 80
+        }
+      ],
+      "label": "safe to fix",
+      "size": "small",
+      "expectedGain": "Living-person protections apply consistently to both identifier formats.",
+      "observation": "Use synthetic living and deceased records with documents stored under both supported identifier formats. The document writer recognizes FamilySearch IDs. The evidence reader only resolves a Convex person ID and continues if no person is found.",
+      "impact": "A living person’s transcription can lose its protection because of how it was filed.",
+      "proposedFix": "Share an owner-scoped person resolver across document reads and writes. Confirm the resolved person belongs to the account and grant, and withhold AI evidence when the person cannot be resolved."
+    },
+    {
+      "id": "F15",
+      "title": "A related-person import can mark a living relative as deceased",
+      "lens": "Safety and real bug",
+      "files": [
+        {
+          "path": "lib/familysearch/importer.ts",
+          "line": 189
+        },
+        {
+          "path": "convex/vaultMutations.ts",
+          "line": 351
+        },
+        {
+          "path": "convex/vaultMutations.ts",
+          "line": 391
+        },
+        {
+          "path": "convex/vaultMutations.ts",
+          "line": 407
+        },
+        {
+          "path": "convex/vault.ts",
+          "line": 1676
+        },
+        {
+          "path": "docs/tracker/cards/AWF-0076.md",
+          "line": 38
+        }
+      ],
+      "label": "safe to fix",
+      "size": "small",
+      "expectedGain": "Future related-person imports preserve the living status already on file.",
+      "observation": "With invented data, import a source that mentions a relative already marked living, under that relative’s FamilySearch ID. The related-person import sends `living: false` without that evidence, and the upsert writes the value onto the matched person.",
+      "impact": "A routine import can remove a living relative’s protection on later reads.",
+      "proposedFix": "Preserve the saved living status when the capture does not establish it, and keep unknown status private. Correcting any existing affected records requires a separate reviewed data repair."
+    }
+  ],
+  "refactorProposals": [
+    {
+      "id": "R01",
+      "title": "Replace the Person workspace snapshot with a small header and section readers",
+      "lens": "Speed and Convex spend",
+      "files": [
+        {
+          "path": "app/app/people/[personId]/page.tsx",
+          "line": 33
+        },
+        {
+          "path": "convex/vault.ts",
+          "line": 1389
+        },
+        {
+          "path": "convex/vaultReads.ts",
+          "line": 70
+        },
+        {
+          "path": "components/vault/PersonWorkspaceView.tsx",
+          "line": 28
+        },
+        {
+          "path": "components/records/RecordSections.tsx",
+          "line": 15
+        }
+      ],
+      "label": "safe to fix",
+      "size": "large",
+      "expectedGain": "Less work before Overview and smaller reviewable queries for future changes.",
+      "proposal": "Separate the person Overview, section metadata and paginated evidence reads. Keep the story and connector contracts explicit so their callers do not inherit changes meant for the page.",
+      "verify": "Compare a large synthetic dossier before and after. Verify counts, order, direct section links, browser back/forward and document copy/download. Confirm no full document bodies are sent before the Documents tab is requested."
+    },
+    {
+      "id": "R02",
+      "title": "Replace Queue’s two startup paths with one owner-scoped loader",
+      "lens": "Speed and Convex spend",
+      "files": [
+        {
+          "path": "app/app/queue/page.tsx",
+          "line": 15
+        },
+        {
+          "path": "app/api/queue/route.ts",
+          "line": 50
+        },
+        {
+          "path": "components/queue/QueueWorkspace.tsx",
+          "line": 582
+        },
+        {
+          "path": "components/queue/QueueNavCounts.tsx",
+          "line": 3
+        },
+        {
+          "path": "convex/queue.ts",
+          "line": 679
+        }
+      ],
+      "label": "safe to fix",
+      "size": "medium",
+      "expectedGain": "Faster first list and fewer repeat count calls on every signed-in route.",
+      "proposal": "Use one initial list/detail load and one badge state per owner. Keep Queue expiry reconciliation and the client’s draft and retry handling explicit.",
+      "verify": "Compare cold list and deep-link navigation, then test phone menu, filters, pagination, drafts, lease expiry and counts after edits. Count requests on load and focus."
+    },
+    {
+      "id": "R03",
+      "title": "Move Queue connection enforcement into one write guard",
+      "lens": "Safety",
+      "files": [
+        {
+          "path": "convex/httpRoutes/mcp.ts",
+          "line": 1067
+        },
+        {
+          "path": "convex/queue.ts",
+          "line": 746
+        },
+        {
+          "path": "convex/queue.ts",
+          "line": 824
+        },
+        {
+          "path": "convex/mcpGrants.ts",
+          "line": 385
+        },
+        {
+          "path": "lib/queue/agentTools.ts",
+          "line": 66
+        }
+      ],
+      "label": "safe to fix",
+      "size": "medium",
+      "expectedGain": "Every write has one place to enforce permission changes and fewer chances for the connector and database rules to diverge.",
+      "proposal": "Use one transaction-side guard for AI Queue mutations. Bind the credential to the live grant and centralize how connection scopes and item reach combine with command authority.",
+      "verify": "Verify valid claims, checkpoints, replies, replay and expiry with synthetic accounts. Prove a permission edit racing a write can neither commit an unauthorized change nor return a protected replay."
+    },
+    {
+      "id": "R04",
+      "title": "Replace Place’s eager workspace loader with a header and tab loader",
+      "lens": "Speed and Convex spend",
+      "files": [
+        {
+          "path": "convex/vaultReads.ts",
+          "line": 269
+        },
+        {
+          "path": "convex/placePages.ts",
+          "line": 64
+        },
+        {
+          "path": "components/vault/PlaceWorkspaceView.tsx",
+          "line": 14
+        },
+        {
+          "path": "app/app/places/actions.ts",
+          "line": 14
+        }
+      ],
+      "label": "safe to fix",
+      "size": "medium",
+      "expectedGain": "Six fewer first-page queries before an indexed Overview can render. Section callers have a narrower interface.",
+      "proposal": "Give the route a stable header and let tab selection or a direct section link request the appropriate first page. Reuse existing section pagination and owner checks.",
+      "verify": "Compare record totals, People and Sources loaded counts, event-linked people, section links, pagination and median data-ready time. Check both readiness paths on synthetic data."
+    }
+  ],
+  "biggerThanToday": "Finish the production owner-enforcement transition across the site once Scott settles the guest-transfer choice in F10. This spans sign-in, legacy guest records, public stories, browser routes and Convex. Plan it as its own rollout with two synthetic accounts and a verified recovery path.",
+  "whatICouldNotVerify": [
+    "Production route timing on populated accounts, payload and bundle sizes, cache effects, and dollar impact. The sweep lacked usable timings on the other routes. This audit ran no browser session, tests, builds or production queries.",
+    "Production tenant enforcement, count/index readiness, legacy storage volume and previously issued file URLs. The affected code paths are present in the audited commit. Their live prevalence is unmeasured.",
+    "Full operator workflows, real AI-client behavior, concurrent grant changes and every backend entry point. Source inspection covered the operator usage-limit gate and selected connector, publication and media paths. The sweep’s signed-in profile lacked operator access."
+  ]
+}

@@ -7,8 +7,9 @@ owner testing, no outside users). Revisit when real users arrive.
 ## Why
 
 GitHub Actions minutes cost money, and most of what CI did here was repeated
-somewhere else: Vercel already builds every pull request, and every merge ran
-the whole suite a second time on `main` for code that had just passed. The
+somewhere else, and every merge ran the whole suite a second time on `main`
+for code that had just passed. (Vercel used to build every pull request too;
+since 2026-10-14 it builds only `main` and `preview/*`.) The
 cheapest feedback is a local preview, so the loop now leans on that and keeps
 paid checks for the moment a change is about to ship.
 

@@ -4,8 +4,6 @@ This directory contains maintenance, import, audit, and document-generation scri
 
 Active script docs live in:
 
-- [FamilySearch console extractor](../docs/importing/familysearch-console-extractor.md)
-- [FamilySearch console extractor quickstart](../docs/importing/familysearch-console-extractor-quickstart.md)
 - [FamilySearch capture to vault storage map](../docs/importing/familysearch-capture-storage-map.md)
 - [FamilySearch live capture pilot checklist](../docs/importing/familysearch-live-capture-pilot.md)
 - [Product health gates and person route QA](../docs/operations/product-health-gates.md)

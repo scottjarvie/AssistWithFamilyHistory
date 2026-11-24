@@ -60,7 +60,7 @@ export async function importCapturePackageToConvex({
     fsId: capture.person.familySearchId,
     name: personName,
     sex: inferSex(capture.sources),
-    living: inferLiving(capture.person.deathDate),
+    living: capture.person.deathDate ? false : undefined,
     birth: buildLifeFact(capture.person.birthDate),
     death: buildLifeFact(capture.person.deathDate),
     tags: ["familysearch-import"],
@@ -200,7 +200,6 @@ export async function importCapturePackageToConvex({
           fsId: relatedFamilySearchId,
           name: relatedPersonName,
           sex: inferSexFromRole(related.role),
-          living: false,
           notes: `Discovered from ${source.title}`,
         });
 
@@ -393,10 +392,6 @@ function parseDate(value?: string) {
     original: value,
     year: yearMatch ? Number(yearMatch[1]) : undefined,
   };
-}
-
-function inferLiving(deathDate?: string) {
-  return !deathDate;
 }
 
 function inferSex(sources: CaptureSource[]) {

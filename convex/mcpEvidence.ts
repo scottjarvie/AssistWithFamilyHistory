@@ -27,6 +27,7 @@ import type { Doc } from "./_generated/dataModel";
 import { internalQuery } from "./_generated/server";
 import { matchesVaultOwner } from "./vaultCore";
 import { assertGrantPermits } from "./mcpGrants";
+import { resolveOwnedDocumentPerson } from "./documents";
 import { FAMILY_HISTORY_MCP_LIMITS } from "../lib/mcp/contract";
 
 const principalValidator = v.object({
@@ -230,15 +231,14 @@ export const getEvidenceBatch = internalQuery({
         skipped.push(skip(item.id, item.kind, "OUTSIDE_GRANT_BOUNDARY"));
         continue;
       }
-      if (!boundaryAllowsPerson(boundary, [String(row.personId)])) {
+      const person = await resolveOwnedDocumentPerson(ctx, owner, row.personId, true);
+      if (!person || !boundaryAllowsPerson(boundary, [String(person._id)])) {
         skipped.push(skip(item.id, item.kind, "OUTSIDE_GRANT_BOUNDARY"));
         continue;
       }
       // Person documents carry no separate AI-use review flag, so the
       // living-person rule that governs the rest of this surface governs them.
-      const personId = ctx.db.normalizeId("persons", String(row.personId));
-      const person = personId ? await ctx.db.get(personId) : null;
-      if (person && matchesVaultOwner(person.vaultOwnerId, owner) && person.living === true) {
+      if (person.living !== false) {
         skipped.push(skip(item.id, item.kind, "AI_USE_NOT_ALLOWED"));
         continue;
       }

@@ -342,6 +342,11 @@ describe("product Queue foundation", () => {
       idempotencyKey: "create-expiry",
     });
     vi.setSystemTime(baseTime + 60_001);
+    const list = await t.withIdentity({ subject: OWNER_A }).action(api.queue.listQueueItems, {
+      vaultOwnerId: OWNER_A, paginationOpts: { numItems: 25, cursor: null },
+    });
+    expect(list.page[0]).toMatchObject({ _id: created.item._id, condition: "expired" });
+    expect(list.counts).toEqual({ available: true, suggestions: 0, needsInput: 1 });
     const detail = await t.withIdentity({ subject: OWNER_A }).action(api.queue.getQueueItem, {
       vaultOwnerId: OWNER_A,
       queueItemId: created.item._id,

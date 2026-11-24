@@ -18,6 +18,7 @@ import {localPublicAuthEnabled} from "@/lib/localLiveAuth";
 import { AppMobileNav, AppSidebar } from "@/components/layout/AppSidebar";
 import { AppFamilyRow } from "@/components/layout/FamilyRow";
 import { AppTopBar } from "@/components/layout/AppTopBar";
+import { QueueNavCountsProvider } from "@/components/queue/QueueNavCounts";
 import { GuestVaultMigrationGate } from "@/components/layout/GuestVaultMigrationGate";
 import { SafeLink } from "@/components/layout/SafeLink";
 import type { Metadata } from "next";
@@ -42,6 +43,7 @@ export default async function AppLayout({
   const accessContext = await getVaultAccessContext();
 
   return (
+    <QueueNavCountsProvider key={accessContext.vaultOwnerId}>
     <div className="min-h-screen bg-stone-50">
       <AppSidebar
         accountMode={accessContext.mode}
@@ -77,5 +79,6 @@ export default async function AppLayout({
         </footer></div>
       </main>
     </div>
+    </QueueNavCountsProvider>
   );
 }

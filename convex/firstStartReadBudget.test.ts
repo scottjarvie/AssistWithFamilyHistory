@@ -25,8 +25,17 @@ function fixture(rows: Record<string, Row[]> = {}, allowSnapshot = false) {
               let owner: string | undefined;
               select({ eq(field, value) { expect(field).toBe("vaultOwnerId"); owner = value; } });
               expect(owner).toBe(OWNER);
+              const first = (activeOnly: boolean) => {
+                reads.push(table);
+                return rows[table]?.find(row => row.vaultOwnerId === owner &&
+                  (!activeOnly || !("archivedAt" in row) || row.archivedAt === undefined)) ?? null;
+              };
               return {
-                async first() { reads.push(table); return rows[table]?.find(row => row.vaultOwnerId === owner) ?? null; },
+                async first() { return first(false); },
+                filter(select: (q: { eq: (field: string, value: undefined) => void; field: (field: string) => string }) => void) {
+                  select({ field: field => field, eq(field, value) { expect(field).toBe("archivedAt"); expect(value).toBeUndefined(); } });
+                  return { async first() { return first(true); } };
+                },
                 async collect() {
                   if (!allowSnapshot) throw new Error("Eligibility must never collect an owner table");
                   reads.push(`${table}:collect`); return (rows[table] ?? []).filter(row => row.vaultOwnerId === owner);
@@ -84,10 +93,19 @@ describe("first-start read budget", () => {
 });
 
 
-test("actual dashboard handler reuses its snapshot without 20 duplicate first reads", async () => {
+test("an empty dashboard checks all owner tables while collecting only the seven it displays", async () => {
   const f = fixture({}, true);
   const result = await getDashboardSummary._handler(f.ctx, { vaultOwnerId: OWNER });
   expect(result.firstStartEligible).toBe(true);
-  expect(f.reads.filter(read => read.endsWith(":collect"))).toHaveLength(20);
-  expect(f.reads.filter(read => !read.endsWith(":collect"))).toEqual(["queueItems"]);
+  expect(f.reads.filter(read => read.endsWith(":collect"))).toHaveLength(7);
+  expect(f.reads.map(read => read.replace(":collect", "")).sort()).toEqual([...FIRST_START_EMPTY_TABLES].sort());
+});
+
+test("a populated fallback dashboard skips unrelated records altogether", async () => {
+  const f = fixture({ places: [{ vaultOwnerId: OWNER }], media: [{ vaultOwnerId: OWNER, payload: "private bytes" }] }, true);
+  const result = await getDashboardSummary._handler(f.ctx, { vaultOwnerId: OWNER });
+  expect(result.firstStartEligible).toBe(false);
+  expect(result.counts.places).toBe(1);
+  expect(f.reads).toHaveLength(7);
+  expect(f.reads).not.toContain("media:collect");
 });

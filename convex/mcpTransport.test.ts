@@ -665,6 +665,61 @@ test.each(["person", "story"] as const)("%s context exports current media withou
   const text = JSON.stringify(payload); expect(text).not.toContain("replacedB2Files"); expect(text).not.toContain("synthetic-old-private"); expect(text).not.toContain("exact_private");
 });
 
+test("story context includes approved material and withholds the human review bundle", async () => {
+  const t = convexTest(schema, modules);
+  await approvedConnection(t);
+  const { personId, storyId } = await t.run(async ctx => {
+    const personId = await ctx.db.insert("persons", {
+      vaultOwnerId: SUBJECT, name: { given: "Synthetic", surname: "Ancestor" },
+      sex: "unknown", living: false, researchStatus: "basic", notes: "private subject memo", createdAt: 1, updatedAt: 1,
+    });
+    const storyId = await ctx.db.insert("stories", {
+      vaultOwnerId: SUBJECT, personId, title: "Synthetic draft", content: "Approved working draft",
+      type: "biography", status: "draft", generatedBy: "human", citationIds: [], createdAt: 1, updatedAt: 1,
+    });
+    const livingRelative = await ctx.db.insert("persons", {
+      vaultOwnerId: SUBJECT, name: { given: "InventedLivingRelative", surname: "Synthetic" },
+      sex: "unknown", living: true, researchStatus: "basic", createdAt: 1, updatedAt: 1,
+    });
+    await ctx.db.insert("relationships", {
+      vaultOwnerId: SUBJECT, type: "ParentChild", person1: personId, person2: livingRelative, createdAt: 1, updatedAt: 1,
+    });
+    await ctx.db.insert("storyReviewEvents", {
+      vaultOwnerId: SUBJECT, storyId, eventType: "draft_edit", actorRole: "reviewer",
+      humanReviewNote: "private reviewer memo", createdAt: 1, updatedAt: 1,
+    });
+    for (const approved of [false, true]) {
+      await ctx.db.insert("historicalContext", {
+        vaultOwnerId: SUBJECT, title: approved ? "Reviewed context" : "private historical note",
+        timePeriod: { startYear: 1700, endYear: 2000 }, topic: "daily_life",
+        content: "Invented background", sources: [], privacyLevel: approved ? "family_review" : "private",
+        reviewStatus: approved ? "reviewed" : "unreviewed", aiUseAllowed: approved, createdAt: 1, updatedAt: 1,
+      });
+    }
+    return { personId, storyId };
+  });
+  const ownerReview = await t.withIdentity({ subject: SUBJECT }).action(api.vaultReads.getStoryReview, {
+    vaultOwnerId: SUBJECT, storyId,
+  });
+  expect(ownerReview?.reviewHistory[0].humanReviewNote).toBe("private reviewer memo");
+  expect(ownerReview?.relationships[0]).toMatchObject({ relatedName: "InventedLivingRelative Synthetic" });
+  const token = await accessToken();
+  const read = async () => {
+    const response = await t.fetch("/mcp", modernRequest("tools/call", token, {
+      name: "family_history_get_context", arguments: { kind: "story", id: String(storyId) },
+    }, "family_history_get_context"));
+    return JSON.parse((await response.json()).result.content[0].text);
+  };
+  const context = await read();
+  expect(context).toMatchObject({
+    story: { content: "Approved working draft" },
+    historicalContext: [{ title: "Reviewed context" }],
+  });
+  expect(JSON.stringify(context)).not.toMatch(/private subject memo|private reviewer memo|private historical note|InventedLivingRelative/);
+  await t.run(ctx => ctx.db.patch(personId, { living: true }));
+  expect(await read()).toBeNull();
+});
+
 
 describe("AWL-0015 controls through the authenticated wire", () => {
   test("narrow, pause, describe, revoke and re-register without regaining authority", async () => {

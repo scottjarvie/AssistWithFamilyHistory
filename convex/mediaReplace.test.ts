@@ -72,6 +72,16 @@ async function seedB2Media(t: ReturnType<typeof convexTest>) {
 }
 
 describe("replacing a B2-backed file", () => {
+  test("a card can read the tiny rendition without changing the default file response", async () => {
+    const t = convexTest(schema, modules);
+    const { mediaId } = await seedB2Media(t);
+    const args = { vaultOwnerId: OWNER, mediaId: String(mediaId) };
+    const read = internal.vault.getOwnedMediaFile;
+    expect(await t.query(read, { ...args, rendition: "tiny" }))
+      .toMatchObject({ b2: { objectKey: "evidence/old/tiny" } });
+    expect(await t.query(read, args)).toMatchObject({ b2: { objectKey: "evidence/old/medium" } });
+    expect(await t.query(read, { ...args, vaultOwnerId: "synthetic-other", rendition: "tiny" })).toBeNull();
+  });
   test("the owner's file route and AI delivery serve the replacement, and the old original is kept as history", async () => {
     const t = convexTest(schema, modules);
     const { mediaId } = await seedB2Media(t);

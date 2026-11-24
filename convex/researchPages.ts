@@ -3,7 +3,7 @@ import { v } from "convex/values";
 import { internalQuery, type QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { countsReady, ownerTableCounter } from "./vaultCounts";
-import { getVaultSnapshot } from "./vault";
+import { activeOwnerRows } from "./vault";
 import { normalizeVaultOwnerId, sortByTimestampDesc } from "./vaultCore";
 
 const status = v.union(v.literal("todo"), v.literal("in_progress"), v.literal("blocked"), v.literal("done"));
@@ -22,6 +22,14 @@ async function personForRow(ctx:QueryCtx,owner:string,id:string|undefined){
  const bytes=person?new TextEncoder().encode(JSON.stringify(person)).byteLength:0;
  return {person:person?.vaultOwnerId===owner&&person.archivedAt===undefined?personSummary(person):null,bytes};
 }
+async function peopleForLegacyRows(ctx: QueryCtx, owner: string, ids: (string | undefined)[]) {
+  const uniqueIds = [...new Set(ids.filter((id): id is string => !!id))];
+  return new Map(await Promise.all(uniqueIds.map(async id => {
+    const personId = ctx.db.normalizeId("persons", id);
+    const person = personId && String(personId) === id ? await ctx.db.get(personId) : null;
+    return [id, person?.vaultOwnerId === owner && person.archivedAt === undefined ? personSummary(person) : null] as const;
+  })));
+}
 const afterKey=(cursor:string|null)=>cursor?.startsWith("r2:")?cursor.slice(3):"";
 // Pages hydrate only people referenced by the returned rows, not the whole tree.
 // Exactly one paginator in each query; a byte-split page may contain fewer than 50.
@@ -30,14 +38,22 @@ export const tasks = internalQuery({args: {...researchPageArgs, status: v.option
   const owner = normalizeVaultOwnerId(args.vaultOwnerId);
   const needle = args.search?.trim().toLowerCase();
   if (!ready) {
-    const snapshot = await getVaultSnapshot(ctx, owner);
-    const people = new Map(snapshot.people.map(p => [String(p._id), personSummary(p)]));
-    const all = sortByTimestampDesc(snapshot.researchTasks).map(t => ({...t, person: t.personId ? people.get(String(t.personId)) ?? null : null}));
-    const filtered = all.filter(t => (!args.status || t.status === args.status) && (!needle || `${t.title} ${t.description || t.type} ${t.person ? `${t.person.name.given} ${t.person.name.surname}` : ""}`.toLowerCase().includes(needle)));
     const offset = args.cursor?.startsWith("s:") ? Number(args.cursor.slice(2)) : 0;
+    const all = sortByTimestampDesc(await activeOwnerRows(ctx, "researchTasks", owner));
+    const matchingStatus = args.status ? all.filter(row => row.status === args.status) : all;
+    const candidates = needle ? matchingStatus : matchingStatus.slice(offset, offset + 50);
+    const people = await peopleForLegacyRows(ctx, owner, candidates.map(task => task.personId));
+    const hydrated = candidates.map(t => ({...t, person: people.get(String(t.personId)) ?? null}));
+    const filtered = needle ? hydrated.filter(t =>
+      `${t.title} ${t.description || t.type} ${t.person ? `${t.person.name.given} ${t.person.name.surname}` : ""}`.toLowerCase().includes(needle)
+    ) : hydrated;
     const totals: Record<string, number> = {active: all.length};
     for (const t of all) totals[`status:${t.status}`] = (totals[`status:${t.status}`] ?? 0) + 1;
-    return {page: filtered.slice(offset, offset + 50), isDone: offset + 50 >= filtered.length, continueCursor: `s:${offset + 50}`, totals};
+    return {
+      page: needle ? filtered.slice(offset, offset + 50) : filtered,
+      isDone: offset + 50 >= (needle ? filtered.length : matchingStatus.length),
+      continueCursor: `s:${offset + 50}`, totals,
+    };
   }
   const range = args.status
     ? ctx.db.query("researchTasks").withIndex("by_owner_active_status_cursor", q => q.eq("vaultOwnerId", owner).eq("archivedAt", undefined).eq("status", args.status!).gt("researchCursorKey",afterKey(args.cursor)))
@@ -59,13 +75,13 @@ export const tasks = internalQuery({args: {...researchPageArgs, status: v.option
 export const log = internalQuery({args: researchPageArgs, handler: async (ctx, args): Promise<LogPage> => {
   const owner = normalizeVaultOwnerId(args.vaultOwnerId);
   if (!await countsReady(ctx)) {
-    const snapshot = await getVaultSnapshot(ctx, owner);
-    const people = new Map(snapshot.people.map(p => [String(p._id), personSummary(p)]));
-    const all = sortByTimestampDesc(snapshot.researchLog);
+    const all = sortByTimestampDesc(await activeOwnerRows(ctx, "researchLog", owner));
     const offset = args.cursor?.startsWith("s:") ? Number(args.cursor.slice(2)) : 0;
+    const page = all.slice(offset, offset + 50);
+    const people = await peopleForLegacyRows(ctx, owner, page.map(row => row.entityType === "person" ? row.entityId : undefined));
     const totals: Record<string, number> = {active: all.length};
     for (const row of all) for (const key of [`activity:${row.activityType}`, `author:${row.creationProvenance?.actorKind ?? "unattributed"}`, `status:${row.status}`]) totals[key] = (totals[key] ?? 0) + 1;
-    return {page: all.slice(offset, offset + 50).map(row => ({...row, person: row.entityType === "person" && row.entityId ? people.get(String(row.entityId)) ?? null : null})), isDone: offset + 50 >= all.length, continueCursor: `s:${offset + 50}`, totals};
+    return {page: page.map(row => ({...row, person: row.entityType === "person" && row.entityId ? people.get(String(row.entityId)) ?? null : null})), isDone: offset + 50 >= all.length, continueCursor: `s:${offset + 50}`, totals};
   }
   const result = await ctx.db.query("researchLog").withIndex("by_owner_active_cursor", q => q.eq("vaultOwnerId", owner).eq("archivedAt", undefined).gt("researchCursorKey",afterKey(args.cursor)))
     .paginate({cursor:null, numItems: 50, maximumRowsRead: 50, maximumBytesRead: 250_000});

@@ -8,7 +8,7 @@
   "vaultReads.ts:getOperationsSummary": "df95caee5d5aa86a8af8034122b8eda03a5c7988013c3fa872a286782fe568b2",
   "vaultReads.ts:getVaultAudit": "ccbb834ba71d5ba670f4e6f7656aa77edce23f9efbb5dee70d10beb417208738",
   "vaultReads.ts:getContextCoverage": "a552186b55eb610f9c256d0be07deea74ab0c04d4824f29c2bd3dacd2b891cd5",
-  "vaultReads.ts:getPlaceWorkspace": "532a7c6226f363dde3ff2c184d70707d82889a619bfe293e7ef23a47ce294b59",
+  "vaultReads.ts:getPlaceWorkspace": "e561a892d7c1ec1cc942dad349a4610250689867f09752bca6bc86b4c3a3f04d",
   "vaultReads.ts:getDashboardSummary": "6a0629ca294f7c584b87603c2009cb878ed75b2259d98c7b21702f9d97361685",
   "vaultReads.ts:getContextPack": "3006868e7004222178cd2c73368b477c663b345324e27a2b4e3e67fb52414001",
   "queue.ts:listQueueItems": "e8a31afb2771a0482c1c4e7d4ac493c23250cb5c92d292523a7fd099d6a08ce0",

@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
 import { VaultStateCard } from "@/components/vault/VaultStateCard";
 import {
@@ -54,6 +54,9 @@ export default async function PlaceWorkspacePage({ params }: PageProps) {
   if (!workspace) {
     notFound();
   }
-  const workspaceKey = createHash("sha256").update(JSON.stringify(workspace)).digest("hex");
+  // Indexed section contents can change even when their totals stay the same.
+  // A server refresh discards the previous section pages.
+  const workspaceKey = workspace.header.indexed ? randomUUID()
+    : createHash("sha256").update(JSON.stringify(workspace)).digest("hex");
   return <PlaceWorkspaceView key={`${vaultOwnerId}:${placeId}:${workspaceKey}`} workspace={workspace} vaultOwnerId={vaultOwnerId}/>;
 }

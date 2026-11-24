@@ -1,0 +1,167 @@
+{
+  "repo": "scottjarvie/AssistWithFamilyHistory",
+  "audit": "ai-readiness",
+  "date": "2026-11-24",
+  "commit": "708a0dd",
+  "labelCounts": {
+    "safe to fix": 11,
+    "safe to fix, except": 2,
+    "needs Scott": 0,
+    "needs a production check": 0
+  },
+  "findings": [
+    {
+      "id": "AIR-01",
+      "title": "Convex guides listed as current tell an AI to deploy production by hand",
+      "files": [
+        "docs/deployment/convex-checklist.md",
+        "docs/convex/nextjs-integration.md",
+        "docs/convex/quick-reference.md",
+        "docs/convex/schema-migration.md",
+        "docs/README.md",
+        "convex/README.md"
+      ],
+      "label": "safe to fix",
+      "size": "small"
+    },
+    {
+      "id": "AIR-02",
+      "title": "The README describes the May product, not the current one",
+      "files": ["README.md"],
+      "label": "safe to fix",
+      "size": "small"
+    },
+    {
+      "id": "AIR-03",
+      "title": "Seven early backend files are no longer called by anything",
+      "files": [
+        "convex/helpers.ts",
+        "convex/events.ts",
+        "convex/sources.ts",
+        "convex/personEvents.ts",
+        "convex/media.ts",
+        "convex/persons.ts",
+        "convex/relationships.ts",
+        "convex/schema.ts"
+      ],
+      "label": "safe to fix, except the familySearchSync table (needs Scott: drop a table) and a production check that nobody runs these functions by hand from the Convex dashboard",
+      "size": "medium"
+    },
+    {
+      "id": "AIR-04",
+      "title": "Frozen \"before\" design copies live beside the live components",
+      "files": [
+        "components/design/",
+        "app/design-council-preview/page.tsx",
+        "design-council/"
+      ],
+      "label": "safe to fix, except deleting the preview page and design-council gallery (needs Scott: is the before/after comparison still wanted?)",
+      "size": "medium"
+    },
+    {
+      "id": "AIR-05",
+      "title": "Screen components and a prompt file with no importer",
+      "files": [
+        "components/layout/FeatureCard.tsx",
+        "components/marketing/Hero.tsx",
+        "components/marketing/CTASection.tsx",
+        "components/marketing/ValueProps.tsx",
+        "components/ui/scroll-area.tsx",
+        "components/ui/separator.tsx",
+        "features/source-docs/components/PersonCard.tsx",
+        "lib/prompts/formatPrompt.ts",
+        "package.json"
+      ],
+      "label": "safe to fix",
+      "size": "small"
+    },
+    {
+      "id": "AIR-06",
+      "title": "Scripts that cannot run, and two checks that never run",
+      "files": [
+        "scripts/legacy/",
+        "scripts/check-truthful-workspace-states.tsx",
+        "scripts/check-public-research-spine.ts",
+        "scripts/apply-favicon-variant.sh",
+        "docs/importing/familysearch-console-extractor.md",
+        "docs/importing/familysearch-console-extractor-quickstart.md"
+      ],
+      "label": "safe to fix",
+      "size": "small"
+    },
+    {
+      "id": "AIR-07",
+      "title": "The local check never type-checks or lints its own scripts and tests",
+      "files": ["tsconfig.json", "convex/tsconfig.json", "eslint.config.mjs", "scripts/verify.sh"],
+      "label": "safe to fix",
+      "size": "medium"
+    },
+    {
+      "id": "AIR-08",
+      "title": "Four test files are run by nothing, and one list has drifted",
+      "files": [
+        "scripts/test-record-only-snapshot.ts",
+        "scripts/local-development.test.mjs",
+        "tests/e2e/ai-connection-reapproval.spec.ts",
+        "tests/e2e/home-drawn.spec.ts",
+        "package.json"
+      ],
+      "label": "safe to fix",
+      "size": "small"
+    },
+    {
+      "id": "AIR-09",
+      "title": "Many newer files pack hundreds of characters on a line",
+      "files": [
+        "app/design-council-preview/page.tsx",
+        "convex/personScores.ts",
+        "components/collections/CollectionWorkspace.tsx",
+        "components/queue/QueueWorkspace.tsx",
+        "components/audit/AuditWorkspace.tsx",
+        "convex/placePages.ts"
+      ],
+      "label": "safe to fix",
+      "size": "medium"
+    },
+    {
+      "id": "AIR-10",
+      "title": "Six backend files are too large to edit safely",
+      "files": [
+        "convex/vaultMutations.ts",
+        "convex/vault.ts",
+        "convex/schema.ts",
+        "convex/mcpFamilyHistory.ts",
+        "convex/mcpGrants.ts",
+        "convex/httpRoutes/mcp.ts"
+      ],
+      "label": "safe to fix",
+      "size": "large"
+    },
+    {
+      "id": "AIR-11",
+      "title": "AGENTS.md is accurate but has no map and one path that breaks",
+      "files": ["AGENTS.md"],
+      "label": "safe to fix",
+      "size": "small"
+    },
+    {
+      "id": "AIR-12",
+      "title": "The docs index lists dated reports as current reference",
+      "files": [
+        "docs/README.md",
+        "docs/product/vision.md",
+        "docs/codebase-organization-audit.md",
+        "docs/operations/"
+      ],
+      "label": "safe to fix",
+      "size": "small"
+    },
+    {
+      "id": "AIR-13",
+      "title": "Two comments still say Vercel builds every pull request",
+      "files": ["scripts/verify.sh", "docs/operations/ci-review-and-preview-policy.md"],
+      "label": "safe to fix",
+      "size": "small"
+    }
+  ]
+}

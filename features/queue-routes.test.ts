@@ -9,6 +9,9 @@ vi.mock("@/lib/convex/server",()=>({isConvexConfigured:()=>true,getAuthedConvexC
 import {GET,POST} from "../app/api/queue/route";
 import {PATCH} from "../app/api/queue/[id]/route";
 import Suggestions from "../app/suggestions/page";
+import {loadInitialWebsiteQueue} from "../lib/queue/websiteReads";
+import {normalizeQueueFilters} from "../lib/queue/viewFilters";
+import type {ConvexHttpClient} from "convex/browser";
 const modules=import.meta.glob("../convex/**/*.ts");
 beforeEach(()=>{vi.stubEnv("TRUST_BOUNDARY_MODE","enforce");state.client=convexTest(schema,modules);state.owner="user_http_queue_A";});
 const request=(path:string,body?:unknown)=>new NextRequest(`https://family.test${path}`,body?{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify(body)}:undefined);
@@ -33,3 +36,19 @@ test("person POST defaults to person and legacy suggestions URL redirects",async
 
 // Explicit website JWT issuer for synthetic person identities; never an auth bypass.
 beforeEach(()=>vi.stubEnv("CLERK_JWT_ISSUER_DOMAIN","https://convex.test"));
+
+test("Queue server start uses the website list and detail scope, including selected items outside the filter", async () => {
+ const owner = state.owner!;
+ const site = state.client.withIdentity({subject:owner});
+ const {item} = await site.mutation(api.queue.createQueueItem, {
+  vaultOwnerId:owner,directive:"Read an invented record",idempotencyKey:"server-start",
+ });
+ const filters = normalizeQueueFilters({state:"working", item:item._id});
+ const start = await loadInitialWebsiteQueue(site as unknown as ConvexHttpClient, owner, filters);
+ expect(start.list).toMatchObject({page:[],isDone:true,counts:{available:true,suggestions:0,needsInput:0}});
+ expect(start.detail?.item).toMatchObject({_id:item._id,directive:"Read an invented record"});
+ const other = state.client.withIdentity({subject:"another-owner"});
+ const foreign = await loadInitialWebsiteQueue(other as unknown as ConvexHttpClient, "another-owner", filters);
+ expect(foreign.list?.page).toEqual([]);
+ expect(foreign.detail).toBeNull();
+});

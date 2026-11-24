@@ -323,7 +323,7 @@ export const upsertPerson = mutation({
       nickname: v.optional(v.string()),
     }),
     sex: v.union(v.literal("male"), v.literal("female"), v.literal("unknown")),
-    living: v.boolean(),
+    living: v.optional(v.boolean()),
     birth: v.optional(factValidator),
     death: v.optional(factValidator),
     notes: v.optional(v.string()),
@@ -393,7 +393,8 @@ export const upsertPerson = mutation({
       fsId: args.fsId ?? existing?.fsId,
       name: args.name,
       sex: args.sex,
-      living: args.living,
+      // A source mention often has no evidence of living status.
+      living: args.living ?? existing?.living ?? true,
       birth: args.birth ?? existing?.birth,
       death: args.death ?? existing?.death,
       notes: args.notes ?? existing?.notes,
