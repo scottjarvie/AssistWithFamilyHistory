@@ -12,8 +12,9 @@
 #   - build:extension (artifact build; check:extension already validates
 #     the checked-in artifacts against source)
 #
-# Set VERIFY_SKIP_BUILD=1 to leave out the production build. GitHub CI does
-# this because Vercel's preview build already proves the build on every PR.
+# Set VERIFY_SKIP_BUILD=1 to leave out the production build. GitHub-hosted CI
+# runners do this; the Mac mini runner builds. Vercel builds only main and
+# preview/* branches, so on an ordinary PR branch the local run proves the build.
 
 set +e
 
