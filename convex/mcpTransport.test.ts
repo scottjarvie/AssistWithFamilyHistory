@@ -7,8 +7,9 @@ import { exportJWK, generateKeyPair, SignJWT, type KeyLike } from "jose";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import schema from "./schema";
 import { api } from "./_generated/api";
-import { FAMILY_HISTORY_ALL_TOOL_NAMES, FAMILY_HISTORY_SCOPES } from "../lib/mcp/catalog";
+import { FAMILY_HISTORY_CANONICAL_TOOL_NAMES, FAMILY_HISTORY_SCOPES, FAMILY_HISTORY_TOOLS } from "../lib/mcp/catalog";
 import { seedGrant } from "../lib/mcp/testSupport";
+import { assertConnectorContract } from "./lib/mcpConnector/contract";
 
 const modules = import.meta.glob("./**/*.ts");
 const RESOURCE = "https://family-history.example.test/mcp";
@@ -68,6 +69,22 @@ async function accessToken(clientId = "synthetic-client", audience = RESOURCE) {
     .sign(privateKey);
 }
 
+async function connectOfficialClient(t: ReturnType<typeof convexTest>, token: string) {
+  const client = new Client(
+    { name: "family-history-official-client-proof", version: "1.0.0" },
+    { versionNegotiation: { mode: { pin: PROTOCOL_VERSION } } },
+  );
+  await client.connect(new StreamableHTTPClientTransport(new URL(RESOURCE), {
+    authProvider: { token: async () => token },
+    fetch: async (input, init) => {
+      const request = new Request(input, init);
+      const body = request.method === "GET" || request.method === "HEAD" ? undefined : await request.arrayBuffer();
+      return t.fetch(new URL(request.url).pathname, { method: request.method, headers: request.headers, body });
+    },
+  }));
+  return client;
+}
+
 beforeAll(async () => {
   const pair = await generateKeyPair("RS256");
   privateKey = pair.privateKey;
@@ -90,6 +107,32 @@ afterAll(() => {
 });
 
 describe("stateless Family History MCP transport", () => {
+  test.each(["full", "limited", "pending", "paused", "revoked", "expired"] as const)(
+    "initialize and tools/list satisfy the family connector contract in the %s state", async state => {
+      const t = convexTest(schema, modules);
+      const grantId = await seedGrant(t, {
+        vaultOwnerId: SUBJECT, clientId: CLIENT_ID, issuer: ISSUER,
+        status: state === "pending" || state === "revoked" ? state : "active",
+        expiresAt: state === "full" ? null : state === "expired" ? Date.now() - 1 : Date.now() + 10_000_000,
+        ...(state === "limited" ? { scopes: ["family_history:context:read" as const], boundary: { kind: "selected_people" as const, personIds: ["synthetic-person"] } } : {}),
+      });
+      if (state === "paused" || state === "revoked") await t.run(async ctx => {
+        const id = ctx.db.normalizeId("mcpGrants", grantId)!;
+        await ctx.db.patch(id, state === "paused" ? { pausedAt: Date.now() } : { revokedAt: Date.now() });
+      });
+      const client = await connectOfficialClient(t, await accessToken());
+      const text = client.getInstructions();
+      const { tools } = await client.listTools();
+      await client.close();
+      const authorityMarkers = ["ACCESS.", "Only the person can give access back", "You can never widen", "Permanent deletion", "Living-person records", "reviewed, AI-allowed media", "rights that permit AI use", "media-review"];
+      assertConnectorContract(text ?? "", authorityMarkers, tools, "family_history_");
+      expect(text).toContain(`Actual connection: ${state === "full" || state === "limited" ? "active" : state}`);
+      expect(tools.length).toBeGreaterThan(0);
+      const descriptions = new Map([...FAMILY_HISTORY_TOOLS, ...FAMILY_HISTORY_CONTROL_TOOLS].map(tool => [tool.name, tool.description]));
+      for (const tool of tools) expect(tool.description).toBe(descriptions.get(tool.name));
+    },
+  );
+
   test("publishes protected-resource metadata and a real anonymous OAuth challenge", async () => {
     const t = convexTest(schema, modules);
     const metadata = await t.fetch("/.well-known/oauth-protected-resource/mcp");
@@ -247,7 +290,7 @@ describe("stateless Family History MCP transport", () => {
     const payload = await response.json();
     expect(payload.error).toBeUndefined();
     expect(payload.result.tools.map((tool: { name: string }) => tool.name).sort()).toEqual(
-      [...FAMILY_HISTORY_ALL_TOOL_NAMES, ...FAMILY_HISTORY_CONTROL_TOOLS.map(t => t.name)].sort(),
+      [...FAMILY_HISTORY_CANONICAL_TOOL_NAMES, ...FAMILY_HISTORY_CONTROL_TOOLS.map(t => t.name)].sort(),
     );
     for (const tool of payload.result.tools) {
       expect(tool.inputSchema?.properties?.ownerId).toBeUndefined();
@@ -279,15 +322,13 @@ describe("stateless Family History MCP transport", () => {
       family_history_save_story_work: ["operationId", "mode", "createKey", "storyId", "title", "content"],
     };
     for (const [name, keys] of Object.entries(expected)) {
-      for (const toolName of [name, name.replace(/^family_history_/, "")]) {
-        const inputSchema = byName.get(toolName)!;
-        expect(inputSchema, toolName).toBeDefined();
-        expect(inputSchema.type, toolName).toBe("object");
-        expect(inputSchema.allOf, toolName).toBeUndefined();
-        expect(inputSchema.additionalProperties, toolName).toBe(false);
-        expect(inputSchema.required, toolName).toContain("operationId");
-        for (const key of keys) expect(Object.keys(inputSchema.properties), `${toolName}.${key}`).toContain(key);
-      }
+      const inputSchema = byName.get(name)!;
+      expect(inputSchema, name).toBeDefined();
+      expect(inputSchema.type, name).toBe("object");
+      expect(inputSchema.allOf, name).toBeUndefined();
+      expect(inputSchema.additionalProperties, name).toBe(false);
+      expect(inputSchema.required, name).toContain("operationId");
+      for (const key of keys) expect(Object.keys(inputSchema.properties), `${name}.${key}`).toContain(key);
     }
     expect(byName.get("family_history_save_person")!.properties.mode.enum).toEqual(["create", "update"]);
   });
@@ -316,29 +357,9 @@ describe("stateless Family History MCP transport", () => {
   test("the official v2 MCP client negotiates, lists tools, and saves through the stateless handler", async () => {
     const t = convexTest(schema, modules);
     await approvedConnection(t);
-    const token = await accessToken();
-    const client = new Client(
-      { name: "family-history-official-client-proof", version: "1.0.0" },
-      { versionNegotiation: { mode: { pin: PROTOCOL_VERSION } } },
-    );
-    const transport = new StreamableHTTPClientTransport(new URL(RESOURCE), {
-      authProvider: { token: async () => token },
-      fetch: async (input, init) => {
-        const request = new Request(input, init);
-        const body = request.method === "GET" || request.method === "HEAD"
-          ? undefined
-          : await request.arrayBuffer();
-        return t.fetch(new URL(request.url).pathname, {
-          method: request.method,
-          headers: request.headers,
-          body,
-        });
-      },
-    });
-
-    await client.connect(transport);
+    const client = await connectOfficialClient(t, await accessToken());
     const catalog = await client.listTools();
-    expect(catalog.tools.map((tool) => tool.name).sort()).toEqual([...FAMILY_HISTORY_ALL_TOOL_NAMES, ...FAMILY_HISTORY_CONTROL_TOOLS.map(t => t.name)].sort());
+    expect(catalog.tools.map((tool) => tool.name).sort()).toEqual([...FAMILY_HISTORY_CANONICAL_TOOL_NAMES, ...FAMILY_HISTORY_CONTROL_TOOLS.map(t => t.name)].sort());
     const result = await client.callTool({
       name: "save_person",
       arguments: {
@@ -460,6 +481,45 @@ describe("stateless Family History MCP transport", () => {
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toMatchObject({ error: "invalid_token" });
   });
+});
+
+test("all 14 hidden compatibility names still run canonical tools and record their use", async () => {
+  const t = convexTest(schema, modules);
+  await approvedConnection(t);
+  const token = await accessToken();
+  const used: string[] = [];
+  const call = async (name: string, args: Record<string, unknown> = {}) => {
+    const response = await t.fetch("/mcp", modernRequest("tools/call", token, { name, arguments: args }, name));
+    const body = await response.json();
+    expect(body.error, name).toBeUndefined();
+    expect(body.result.isError, name).not.toBe(true);
+    used.push(name);
+    return body.result.structuredContent;
+  };
+  const person = (prefix: string) => ({ mode: "create", createKey: `legacy-${prefix}`, name: { given: prefix, surname: "Synthetic" }, sex: "unknown", living: false });
+  const saved = await call("save_person", { operationId: "alias-person-operation", ...person("Legacy") });
+  const person1 = saved.person.id;
+  const person2 = (await call("save_person", { operationId: "alias-second-person", ...person("Related") })).person.id;
+  await call("get_family_history_brief");
+  await call("search_family_history", { query: "Legacy" });
+  expect((await call("get_family_history_context", { kind: "person", id: person1 })).person._id).toBe(person1);
+  await call("save_relationship", { operationId: "alias-relationship", mode: "create", createKey: "legacy-relationship", type: "Couple", person1, person2 });
+  await call("save_event", { operationId: "alias-event", mode: "create", createKey: "legacy-event", type: "census", personRoles: [{ personId: person1, role: "primary" }] });
+  await call("save_source_evidence", { operationId: "alias-source", source: { mode: "create", createKey: "legacy-source", type: "census", title: "Synthetic census" }, citation: { mode: "create", createKey: "legacy-citation", confidence: "high" } });
+  await call("save_research_work", { operationId: "alias-research", task: { mode: "create", createKey: "legacy-task", personId: person1, type: "record_search", title: "Synthetic task" } });
+  await call("save_story_work", { operationId: "alias-story", mode: "create", createKey: "legacy-story", personId: person1, type: "biography", title: "Synthetic draft", content: "A draft." });
+  await call("save_complete_result", { operationId: "alias-complete", summary: "Synthetic research pass", person: person("Complete") });
+  const suggestion = (await call("add_queue", { operationId: "alias-suggestion", addedBy: "ai_suggestion", directive: "Find another source", reason: "One is missing" })).item;
+  await call("withdraw_suggestion", { operationId: "alias-withdraw", expectedVersion: 1, queueItemId: suggestion._id });
+  const requested = (await call("add_queue", { operationId: "alias-requested", addedBy: "ai_on_request", directive: "Look for a source" })).item;
+  await call("get_queue", { action: "list" });
+  await call("update_queue", { action: "request_user_action", operationId: "alias-update", expectedVersion: 1, queueItemId: requested._id, requiredAction: "Which source?" });
+
+  const aliases = FAMILY_HISTORY_TOOLS.flatMap(tool => tool.alias ? [tool.alias] : []);
+  expect(aliases).toHaveLength(14);
+  expect(new Set(used)).toEqual(new Set(aliases));
+  const activity = await t.run(ctx => ctx.db.query("agentActivity").collect());
+  expect(new Set(activity.filter(row => row.detail === "Compatibility alias called.").map(row => row.scope))).toEqual(new Set(aliases));
 });
 
 /**
@@ -597,7 +657,7 @@ describe("reconnecting refreshes the tool list without a session to reset", () =
 
     const firstNames = (await first.json()).result.tools.map((tool: { name: string }) => tool.name).sort();
     const secondNames = (await second.json()).result.tools.map((tool: { name: string }) => tool.name).sort();
-    expect(firstNames).toEqual([...FAMILY_HISTORY_ALL_TOOL_NAMES, ...FAMILY_HISTORY_CONTROL_TOOLS.map(t => t.name)].sort());
+    expect(firstNames).toEqual([...FAMILY_HISTORY_CANONICAL_TOOL_NAMES, ...FAMILY_HISTORY_CONTROL_TOOLS.map(t => t.name)].sort());
     expect(secondNames).toEqual(firstNames);
   });
 
@@ -607,7 +667,7 @@ describe("reconnecting refreshes the tool list without a session to reset", () =
     const token = await accessToken();
 
     const before = (await (await t.fetch("/mcp", modernRequest("tools/list", token))).json()).result.tools;
-    expect(before.length).toBe(FAMILY_HISTORY_ALL_TOOL_NAMES.length + FAMILY_HISTORY_CONTROL_TOOLS.length);
+    expect(before.length).toBe(FAMILY_HISTORY_CANONICAL_TOOL_NAMES.length + FAMILY_HISTORY_CONTROL_TOOLS.length);
 
     // The person narrows the connection to reading only.
     await t.run(async (ctx) => {

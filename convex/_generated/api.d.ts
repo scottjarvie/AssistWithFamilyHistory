@@ -24,6 +24,7 @@ import type * as httpRoutes_evidenceOriginal from "../httpRoutes/evidenceOrigina
 import type * as httpRoutes_evidenceUpload from "../httpRoutes/evidenceUpload.js";
 import type * as httpRoutes_mcp from "../httpRoutes/mcp.js";
 import type * as importRuns from "../importRuns.js";
+import type * as lib_mcpConnector_contract from "../lib/mcpConnector/contract.js";
 import type * as lib_media_audio from "../lib/media/audio.js";
 import type * as lib_usageLimits_core from "../lib/usageLimits/core.js";
 import type * as mcpAcceptanceFixture from "../mcpAcceptanceFixture.js";
@@ -90,6 +91,7 @@ declare const fullApi: ApiFromModules<{
   "httpRoutes/evidenceUpload": typeof httpRoutes_evidenceUpload;
   "httpRoutes/mcp": typeof httpRoutes_mcp;
   importRuns: typeof importRuns;
+  "lib/mcpConnector/contract": typeof lib_mcpConnector_contract;
   "lib/media/audio": typeof lib_media_audio;
   "lib/usageLimits/core": typeof lib_usageLimits_core;
   mcpAcceptanceFixture: typeof mcpAcceptanceFixture;

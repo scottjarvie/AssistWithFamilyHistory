@@ -315,7 +315,7 @@ describe("grant states: sign-in approves, the person's no stands", () => {
 });
 
 describe("scope filtering", () => {
-  test("discovery shows exactly the approved surface, canonical plus alias", async () => {
+  test("discovery lists only approved canonical names, and an approved alias still works", async () => {
     const t = withGrantVersions(convexTest(schema, modules));
     await seedGrant(t, {
       vaultOwnerId: OWNER_A,
@@ -325,10 +325,11 @@ describe("scope filtering", () => {
     });
     const names = await toolNames(t, OWNER_A);
     expect(names).toContain("family_history_get_brief");
-    expect(names).toContain("get_family_history_brief");
+    expect(names).not.toContain("get_family_history_brief");
     expect(names).not.toContain("family_history_save_person");
     expect(names).not.toContain("save_person");
     expect(names).not.toContain("family_history_get_evidence");
+    expect((await callTool(t, OWNER_A, "get_family_history_brief", {})).isError).not.toBe(true);
   });
 
   test("a write tool outside the grant is refused with the same words as an unknown tool", async () => {
