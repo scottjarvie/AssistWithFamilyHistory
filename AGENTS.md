@@ -30,6 +30,8 @@ may drop the old 90-day term).
   `convex/mcpGrants.ts`, `lib/mcp/`. Queue: `convex/queue.ts`, `components/queue/`.
 - Media `lib/media/`; capture `extension/`, `lib/familysearch/`; checks `scripts/`.
   More in [convex/README.md](convex/README.md).
+- `components/design/Baseline*`, `*Fixture*`, `fixtures/`: frozen copies for the dev-only
+  `/design-council-preview`; never edit them for a site change.
 
 ## Delivering changes
 
@@ -46,8 +48,7 @@ may drop the old 90-day term).
   before touching `.github/workflows/` or `vercel.json`.
 - The AI merges and deploys routine work. Stop and ask before money, deleting
   real data, DNS, secrets, or changing who can access production data.
-- Preview with `pnpm dev:sandbox` (synthetic records) or `pnpm preview:local`.
-  `pnpm dev:live` stays withheld until its production binding is verified.
+- Preview with `pnpm dev:sandbox` or `pnpm preview:local`; `pnpm dev:live` stays withheld.
 
 ## Sign-in and screenshots
 
