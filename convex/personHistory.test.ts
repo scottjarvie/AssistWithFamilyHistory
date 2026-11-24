@@ -119,6 +119,24 @@ test("related-person imports preserve known living status and keep new relatives
     q.eq("vaultOwnerId", owner).eq("fsId", "SYNTH-UNKNOWN")).unique())).toMatchObject({ living: true });
 });
 
+test("re-importing a deceased subject without a death date preserves their saved status", async () => {
+  const { t, site } = setup();
+  const { capture, compatibilityMode } = parseCapturePackage(captureFixture);
+  const args = {
+    client: site as unknown as ConvexHttpClient, vaultOwnerId: owner, capture, compatibilityMode, artifactPaths: {},
+  };
+  const first = await importCapturePackageToConvex(args);
+  const personId = first.personId as Id<"persons">;
+  expect(await t.run(ctx => ctx.db.get(personId))).toMatchObject({ living: false });
+
+  const replay = await importCapturePackageToConvex({
+    ...args,
+    capture: { ...capture, person: { ...capture.person, deathDate: undefined } },
+  });
+  expect(replay.personId).toBe(first.personId);
+  expect(await t.run(ctx => ctx.db.get(personId))).toMatchObject({ living: false });
+});
+
 test("retains 64 details with stable paging, rechecks archive and owner, exports and purges only the affected records", async () => {
   const { t, site } = setup();
   const { personId } = await site.mutation(api.vaultMutations.upsertPerson, capturePerson);
