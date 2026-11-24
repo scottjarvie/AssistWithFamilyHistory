@@ -4,8 +4,8 @@ A private FamilySearch-first research vault, Queue and story workspace.
 
 ## Read first
 
-- [Site Guide](docs/planning/site-guide.md): product, privacy and AI-tool truth. Open questions: `docs/planning/site-guide-content.json`.
-- [Tracker Guide](docs/tracker/GUIDE.md) and the parked Cards (`docs/tracker/cards/`, status `backlog`).
+- [Site Guide](docs/planning/site-guide.md): product, privacy and AI-tool truth.
+- [Tracker Guide](docs/tracker/GUIDE.md) and parked Cards (`docs/tracker/cards/`).
 - [How production deploys](docs/operations/how-production-deploys.md) before any release.
 
 ## Privacy defaults
@@ -15,12 +15,19 @@ A private FamilySearch-first research vault, Queue and story workspace.
 - Treat AI handoff packets as private operational material.
 - Browser capture stays user-mediated unless approved FamilySearch API access exists.
 
+## Trust boundary
+
+A public Convex function that takes an owner id must match it to the signed-in
+caller before any private read, write or file signing, in **every**
+`TRUST_BOUNDARY_MODE`, using the `authorizeTenant*` and
+`authorizeOwnedReferenceMutation` helpers in `convex/access.ts`. The switch to
+`enforce` follows [the rollout runbook](docs/operations/gen-87-clerk-convex-auth-setup.md).
+
 ## AI connection defaults
 
 New grants are full scope with no end date. Read scopes and expiry only through
-`lib/mcp/grantDefaults.ts`; never extend its frozen legacy baseline. Old explicit
-or ambiguous end dates stay enforced (only matching automatic sign-in receipts
-may drop the old 90-day term).
+`lib/mcp/grantDefaults.ts`; never extend its frozen legacy baseline. Old
+explicit or ambiguous end dates stay enforced.
 
 ## Where things live
 
@@ -30,35 +37,30 @@ may drop the old 90-day term).
   `convex/mcpGrants.ts`, `lib/mcp/`. Queue: `convex/queue.ts`, `components/queue/`.
 - Media `lib/media/`; capture `extension/`, `lib/familysearch/`; checks `scripts/`.
   [Backend name map and contracts](convex/README.md#name-map).
-- `components/design/Baseline*`, `*Fixture*`, `fixtures/`: frozen copies for the dev-only
-  `/design-council-preview`; never edit them for a site change.
+- `components/design/Baseline*`, `*Fixture*`, `fixtures/` are frozen dev-only
+  preview copies; never edit them for a site change.
 
 ## Delivering changes
 
-- Source mutations must use `convex/searchServer.ts` builders (exact explorer
-  projections and owner counters; see [projections](docs/operations/people-explorer-scale.md),
+- Source mutations must use `convex/searchServer.ts` builders ([projections](docs/operations/people-explorer-scale.md),
   [counters](docs/operations/vault-counts-scale.md)).
-- `pnpm verify` is the full check (typecheck, lint, tests, every wired `check:*`, build). Run it before pushing code.
-- Merging to `main` deploys production (Vercel runs `convex deploy`, then the
-  Next build). Never run `convex deploy`, `convex dev` or `convex codegen` by
-  hand against production; a `--dry-run` is fine.
-- Vercel builds only `main` and `preview/*`. CI runs `pnpm verify` on ready
-  PRs, building only on the Mac mini runner; docs-only PRs pass on a path
-  check. Read the [CI policy](docs/operations/ci-review-and-preview-policy.md)
+- `pnpm verify` is the full check (typecheck, lint, tests, wired `check:*`, build); run it before pushing code.
+- Merging to `main` deploys production (`convex deploy`, then the Next build).
+  Never run `convex deploy`, `dev` or `codegen` by hand against production.
+- Vercel builds only `main` and `preview/*`; CI runs `pnpm verify` on ready PRs.
+  Read the [CI policy](docs/operations/ci-review-and-preview-policy.md)
   before touching `.github/workflows/` or `vercel.json`.
 - The AI merges and deploys routine work. Stop and ask before money, deleting
   real data, DNS, secrets, or changing who can access production data.
-- Preview with `pnpm dev:sandbox` or `pnpm preview:local`; `pnpm dev:live` stays withheld.
+- Preview private pages with `pnpm dev:sandbox`. `pnpm preview:local` has no
+  sign-in, so private pages refuse there; `pnpm dev:live` stays withheld.
 
 ## Sign-in and screenshots
 
 Once per checkout run `node <assist-local-dev>/screenshots/sandbox-profile.mjs .`
-(a clone of `scottjarvie/assist-local-dev`, usually beside this folder), then
-`pnpm dev:sandbox` (`http://family-history.localhost:3443`) and `shoot.mjs`. It
-signs in as the Clerk dev `+clerk_test` user, never Scott's account. See the
-[screenshots README](https://github.com/scottjarvie/assist-local-dev/blob/main/screenshots/README.md).
-
-**Scott's real account** is for read-mostly testing only (writes use the test user): `shoot.mjs --live --checkout .`; see the [standard](https://github.com/scottjarvie/assist-local-dev/blob/main/docs/sign-in-and-screenshots.md#scotts-real-account-approved-15-nov-2026).
+(a `scottjarvie/assist-local-dev` clone), then `pnpm dev:sandbox` and
+`shoot.mjs` as the Clerk dev `+clerk_test` user. Scott's real account is
+read-mostly (`--live`). See the [standard](https://github.com/scottjarvie/assist-local-dev/blob/main/docs/sign-in-and-screenshots.md).
 
 <!-- BEGIN:nextjs-agent-rules -->
 
