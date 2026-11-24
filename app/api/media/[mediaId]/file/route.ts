@@ -34,7 +34,8 @@ export async function GET(
     const capability=_request.nextUrl.searchParams.get("capability");
     if(capability && !permitsPlayback(capability,vaultOwnerId,mediaId)) return NextResponse.json({error:"That media item is not available."},{status:404});
     const client = await getAuthedConvexClient();
-    const file = await client.action(api.vaultReads.getOwnedMediaFile, { vaultOwnerId, mediaId });
+    const rendition = _request.nextUrl.searchParams.get("rendition") === "tiny" ? "tiny" : undefined;
+    const file = await client.action(api.vaultReads.getOwnedMediaFile, { vaultOwnerId, mediaId, rendition });
     if (!file) {
       return NextResponse.json({ error: "That media item is not available." }, { status: 404 });
     }

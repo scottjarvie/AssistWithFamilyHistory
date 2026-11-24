@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { mediaCardPreview } from "@/lib/media/cardPreview";
 import {
   MEDIA_UPLOAD_ACCEPT_ATTRIBUTE, mediaUploadError,
 } from "@/lib/media/uploadContract";
@@ -17,8 +18,9 @@ type MediaItem = {
   title: string;
   type: string;
   url?: string;
+  mimeType?: string;
   storageId?: string;
-  b2Original?: { sha256: string };
+  b2Original?: { sha256: string; contentType: string };
   b2Renditions?: { medium: { contentType: string } };
   sizeBytes?: number;
   description?: string;
@@ -176,11 +178,7 @@ export function MediaPrivacyReviewPanel({
             // reference that only this browser can follow — worth saying out
             // loud, because it is exactly the difference between an AI being
             // able to read the record and only being able to cite its title.
-            const held = Boolean(item.storageId || item.b2Renditions?.medium || item.b2Original);
-            const previewSrc = held
-              ? `/api/media/${item._id}/file`
-              : item.url;
-            const isImage = held ? true : Boolean(item.url);
+            const { held, src: previewSrc } = mediaCardPreview(item);
 
             return (
               <Card key={item._id} className="border-border">
@@ -196,10 +194,10 @@ export function MediaPrivacyReviewPanel({
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {previewSrc && isImage ? (
+                  {previewSrc ? (
                     <div className="overflow-hidden rounded-md border border-border bg-muted">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={previewSrc} alt={item.title} className="h-44 w-full object-cover" />
+                      <img src={previewSrc} alt={item.title} loading="lazy" className="h-44 w-full object-cover" />
                     </div>
                   ) : null}
 

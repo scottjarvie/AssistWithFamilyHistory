@@ -77,7 +77,7 @@ export const getPersonWorkspace = action({
 });
 
 export const getOwnedMediaFile = action({
-  args: { vaultOwnerId: v.string(), mediaId: v.string() },
+  args: { vaultOwnerId: v.string(), mediaId: v.string(), rendition: v.optional(v.literal("tiny")) },
   handler: async (
     ctx,
     args,

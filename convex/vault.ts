@@ -1602,6 +1602,7 @@ export const getOwnedMediaFile = internalQuery({
   args: {
     vaultOwnerId: v.string(),
     mediaId: v.string(),
+    rendition: v.optional(v.literal("tiny")),
   },
   handler: async (ctx, args) => {
     const owner = normalizeVaultOwnerId(args.vaultOwnerId);
@@ -1611,11 +1612,13 @@ export const getOwnedMediaFile = internalQuery({
     // must never work as an existence oracle for another person's vault.
     if (!row || !matchesVaultOwner(row.vaultOwnerId, owner)) return null;
     if (row.mediaState === "ready" && row.b2Renditions?.medium) {
+      const rendition = args.rendition === "tiny" ? row.b2Renditions.tiny ?? row.b2Renditions.medium
+        : row.b2Renditions.medium;
       return {
-        b2: row.b2Renditions.medium,
-        mimeType: row.b2Renditions.medium.contentType,
+        b2: rendition,
+        mimeType: rendition.contentType,
         title: row.title,
-        sizeBytes: row.b2Renditions.medium.sizeBytes,
+        sizeBytes: rendition.sizeBytes,
       };
     }
     if (row.mediaState === "ready" && row.b2Original && !row.b2Renditions) return {b2:row.b2Original, mimeType:row.b2Original.contentType, title:row.title, sizeBytes:row.b2Original.sizeBytes};
