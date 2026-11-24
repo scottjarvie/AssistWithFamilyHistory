@@ -816,15 +816,7 @@ export function createFamilyHistoryServer(
         const originals = await actionCtx.runQuery(mcp.getPersonOriginals, { principal, personId: String(workspace.person._id) });
         return { ...workspace, ...originals, truncated: workspace.truncated || originals.truncated };
       }
-      if (input.kind === "story") {
-        const bundle = await actionCtx.runQuery(vault.getStoryReview, {
-          vaultOwnerId: principal.subject,
-          storyId: input.id as any,
-        });
-        // The human review view retains history; AI context gets current media.
-        return bundle ? { ...bundle, media: bundle.media.map(currentMediaForExport) } : null;
-      }
-      return await actionCtx.runQuery(mcp.getRecordContext, { principal, kind: input.kind, id: input.id });
+      return await actionCtx.runQuery(mcp.getRecordContext, { principal, grantId, kind: input.kind, id: input.id });
     });
   });
 

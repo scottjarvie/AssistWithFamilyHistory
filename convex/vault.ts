@@ -825,6 +825,40 @@ export function buildStoryBundle(
   };
 }
 
+/** A draft and the approved material needed to work on it through MCP. */
+export function buildAiStoryContext(snapshot: VaultSnapshot, story: Doc<"stories">, person: Doc<"persons"> | null) {
+  const operations = person ? buildPersonOperations(snapshot, buildSnapshotIndex(snapshot), person) : null;
+  const context = person && operations ? buildContextCoverage(snapshot, person, operations) : null;
+  const citationIds = new Set(snapshot.citations.map(citation => citation._id));
+  return {
+    story: {
+      _id: story._id,
+      title: story.title,
+      content: story.content,
+      type: story.type,
+      status: story.status,
+      generatedBy: story.generatedBy,
+      citationIds: story.citationIds.filter(id => citationIds.has(id)),
+      updatedAt: story.updatedAt,
+    },
+    person: person ? {
+      _id: person._id,
+      displayName: formatPersonName(person),
+      lifespan: getPersonLifespan(person),
+    } : null,
+    media: sortByTimestampDesc((operations?.relatedMedia ?? []).filter(item =>
+      item.reviewStatus === "reviewed" && item.aiUseAllowed === true && item.rightsStatus !== "restricted",
+    )).slice(0, 6).map(item => ({ _id: item._id, title: item.title, type: item.type })),
+    historicalContext: (context?.aiEligibleEntries ?? []).slice(0, 8).map(entry => ({
+      _id: entry._id,
+      title: entry.title,
+      topic: entry.topic,
+      content: entry.content,
+      timePeriod: entry.timePeriod,
+    })),
+  };
+}
+
 // Public story DTO — explicit allowlist of fields safe to return to an
 // unauthenticated client over the public Convex query surface
 // (`getPublishedStory`, `getPublishedStoryByIdentifier`).
