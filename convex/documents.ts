@@ -13,6 +13,7 @@ import {
   authorizeTenantAction,
   authorizeTenantMutation,
 } from "./access";
+import { DEFAULT_LOCAL_VAULT_OWNER } from "../lib/vault/constants";
 import { filterByVaultOwner, matchesVaultOwner } from "./vaultCore";
 
 const documentTypeValidator = v.union(v.literal("PS"), v.literal("CST"));
@@ -41,22 +42,14 @@ async function resolveDocumentPersonForMutation(
   vaultOwnerId: string,
   personIdentifier: string,
 ) {
-  const personId = ctx.db.normalizeId("persons", personIdentifier);
-  if (personId) {
-    return authorizeOwnedReferenceMutation(
-      ctx,
-      functionName,
-      vaultOwnerId,
-      await ctx.db.get(personId),
-      "Person",
-    );
-  }
+  const owned = await resolveOwnedDocumentPerson(ctx, vaultOwnerId, personIdentifier);
+  if (owned) return owned;
 
-  const candidates = await ctx.db
-    .query("persons")
-    .withIndex("by_fsId", (q) => q.eq("fsId", personIdentifier))
-    .collect();
-  const candidate = filterByVaultOwner(candidates, vaultOwnerId)[0] ?? candidates[0] ?? null;
+  // Keep the existing reference check for foreign records in shadow mode.
+  const personId = ctx.db.normalizeId("persons", personIdentifier);
+  const candidate = personId
+    ? await ctx.db.get(personId)
+    : await ctx.db.query("persons").withIndex("by_fsId", q => q.eq("fsId", personIdentifier)).first();
   return authorizeOwnedReferenceMutation(
     ctx,
     functionName,
@@ -66,10 +59,11 @@ async function resolveDocumentPersonForMutation(
   );
 }
 
-async function resolveOwnedDocumentPerson(
+export async function resolveOwnedDocumentPerson(
   ctx: QueryCtx,
   vaultOwnerId: string,
   personIdentifier: string,
+  requireUnique = false,
 ) {
   const personId = ctx.db.normalizeId("persons", personIdentifier);
   if (personId) {
@@ -77,11 +71,15 @@ async function resolveOwnedDocumentPerson(
     return person && matchesVaultOwner(person.vaultOwnerId, vaultOwnerId) ? person : null;
   }
 
-  const candidates = await ctx.db
+  const owners = vaultOwnerId === DEFAULT_LOCAL_VAULT_OWNER
+    ? [vaultOwnerId, undefined, ""]
+    : [vaultOwnerId];
+  const candidates = (await Promise.all(owners.map(owner => ctx.db
     .query("persons")
-    .withIndex("by_fsId", (q) => q.eq("fsId", personIdentifier))
-    .collect();
-  return filterByVaultOwner(candidates, vaultOwnerId)[0] ?? null;
+    .withIndex("by_owner_fsId", q => q.eq("vaultOwnerId", owner).eq("fsId", personIdentifier))
+    .take(requireUnique ? 2 : 1)))).flat();
+  if (requireUnique && candidates.length !== 1) return null;
+  return candidates.sort((a, b) => a._creationTime - b._creationTime)[0] ?? null;
 }
 
 export const upsertDocument = mutation({

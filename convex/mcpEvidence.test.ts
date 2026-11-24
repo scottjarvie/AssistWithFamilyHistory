@@ -25,10 +25,11 @@ function principal(subject = OWNER) {
   };
 }
 
-async function seedPerson(t: ReturnType<typeof convexTest>, owner: string, living = false) {
+async function seedPerson(t: ReturnType<typeof convexTest>, owner: string, living = false, fsId?: string) {
   return await t.run(async (ctx) =>
     ctx.db.insert("persons", {
       vaultOwnerId: owner,
+      fsId,
       name: { given: "Evidence", surname: "Subject" },
       sex: "unknown",
       living,
@@ -281,6 +282,34 @@ describe("evidence gating", () => {
 });
 
 describe("evidence respects the grant", () => {
+  test("FamilySearch-keyed documents require a unique, owned and approved person", async () => {
+    const t = convexTest(schema, modules);
+    const deceased = await seedPerson(t, OWNER, false, "FS-DECEASED");
+    const living = await seedPerson(t, OWNER, true, "FS-LIVING");
+    await seedPerson(t, OTHER, false, "FS-FOREIGN");
+    await seedPerson(t, OWNER, false, "FS-AMBIGUOUS");
+    await seedPerson(t, OWNER, true, "FS-AMBIGUOUS");
+    const grantId = await seedGrant(t, {
+      vaultOwnerId: OWNER,
+      boundary: { kind: "selected_people", personIds: [String(deceased), String(living)] },
+    });
+    const items = await t.run(async ctx => Promise.all(
+      ["FS-DECEASED", "FS-LIVING", "FS-FOREIGN", "FS-MISSING", "FS-AMBIGUOUS"].map(async personId => ({
+        kind: "document" as const,
+        id: String(await ctx.db.insert("documents", {
+          vaultOwnerId: OWNER, personId, type: "PS", title: "Person sheet",
+          contentMarkdown: "Synthetic evidence", contentText: "Synthetic evidence",
+          createdAt: Date.now(), updatedAt: Date.now(),
+        })),
+      })),
+    ));
+    const result = await batch(t, grantId, items);
+    expect(result.delivered.map(item => item.id)).toEqual([items[0].id]);
+    expect(result.skipped.map(item => item.reason)).toEqual([
+      "AI_USE_NOT_ALLOWED", "OUTSIDE_GRANT_BOUNDARY", "OUTSIDE_GRANT_BOUNDARY", "OUTSIDE_GRANT_BOUNDARY",
+    ]);
+  });
+
   test("a selected-people boundary refuses evidence attached to another person", async () => {
     const t = convexTest(schema, modules);
     const inside = await seedPerson(t, OWNER);
