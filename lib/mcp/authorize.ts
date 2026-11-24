@@ -414,6 +414,11 @@ export function decideToolAccess(params: {
     recovery: `Only the person can restore this power at ${CONNECTION_SETTINGS_URL}.`,
   };
 
+  // The brief reads owner-wide records and has no input that can narrow them.
+  if (tool.name === "family_history_get_brief" && grant.boundary.kind !== "whole_workspace") {
+    return refusal("OUTSIDE_GRANT_BOUNDARY");
+  }
+
   if (input !== undefined) {
     const args = (input ?? {}) as Record<string, unknown>;
     if(tool.name==="family_history_add_queue"&&args.addedBy==="ai_suggestion"&&!effectiveScopes(grant).includes("family_history:queue:suggest"))return {...refusal("SCOPE_NOT_GRANTED"),message:"Missing power: Propose suggestions. Requested work can still use ai_on_request."};

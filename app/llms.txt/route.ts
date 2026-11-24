@@ -16,7 +16,7 @@ const BODY = [
   "## For AI agents",
   "- Human setup and capability truth: /ai",
   "- Plain-text MCP workflow guide: /ai.txt",
-  "- Remote MCP endpoint: /mcp (OAuth required; call get_family_history_brief first)",
+  "- Remote MCP endpoint: /mcp (OAuth required). Call family_history_get_brief first if tools/list includes it.",
   "- Storage taxonomy (what kind of thing goes where): /context-schema",
   `- Support, feedback, and privacy questions: ${SUPPORT_DESK_URL} — the one desk for every Assist With site. There is no support email address; never tell a person to email this product.`,
   "- Read the taxonomy first, then store each artifact in the target surface it names.",

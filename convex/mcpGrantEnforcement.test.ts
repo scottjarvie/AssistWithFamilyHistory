@@ -403,6 +403,10 @@ describe("record boundaries", () => {
     });
     expect(refused.isError).toBe(true);
     expect(refused.body.code).toBe("OUTSIDE_GRANT_BOUNDARY");
+
+    const search = await callTool(t, OWNER_A, "family_history_search", { query: "Boundary", kinds: ["person"] });
+    expect(search.isError).toBe(false);
+    expect(search.body.results).toEqual([expect.objectContaining({ id: inside })]);
   });
 
   test("a boundary refusal is identical for a real record and an invented one", async () => {
@@ -435,6 +439,11 @@ describe("record boundaries", () => {
     expect(names).toContain("family_history_get_queue");
     expect(names).not.toContain("family_history_get_brief");
     expect(names).not.toContain("family_history_save_person");
+    for (const name of ["family_history_get_brief", "get_family_history_brief"]) {
+      const brief = await callTool(t, OWNER_A, name, {});
+      expect(brief.isError).toBe(true);
+      expect(brief.body.code).toBe("OUTSIDE_GRANT_BOUNDARY");
+    }
   });
 
   test("a grant narrowed to named Queue items lists only those items", async () => {
@@ -666,7 +675,9 @@ test("new suggestion reads keep selected-person reach through open, dismissed, w
  await seedGrant(t,{vaultOwnerId:OWNER_A,clientId:CLIENT_ID,issuer:ISSUER,boundary:{kind:"selected_people",personIds:[String(inside)]}});
  for(const filter of [{suggestions:true},{suggestions:true,archived:true},{}]){let cursor:string|null=null;const ids:string[]=[];let done=false;do{const result=await callTool(t,OWNER_A,"family_history_get_queue",{action:"list",...filter,limit:1,cursor});expect(result.isError).toBe(false);const body=result.body as {page:Array<{_id:string}>;continueCursor:string;isDone:boolean};expect(JSON.stringify(body)).not.toContain("Private outside");expect(body.page.every(row=>!rows.some(r=>r.id===row._id&&!r.allowed))).toBe(true);ids.push(...body.page.map(row=>row._id));cursor=body.continueCursor;done=body.isDone;}while(!done);const wanted=rows.filter(row=>row.allowed&&(filter.suggestions?filter.archived?["dismissed","withdrawn"].includes(row.status):row.status==="open":row.status==="accepted")).map(row=>String(row.id));for(const id of wanted)expect(ids).toContain(id);}
  for(const row of rows){const detail=await callTool(t,OWNER_A,"family_history_get_queue",{action:"detail",queueItemId:String(row.id)});expect(detail.isError).toBe(!row.allowed);if(!row.allowed)expect(JSON.stringify(detail)).not.toContain("Private outside");}
- const brief=await callTool(t,OWNER_A,"family_history_get_brief",{});expect(JSON.stringify(brief)).not.toContain("Outside accepted");
+ const brief=await callTool(t,OWNER_A,"family_history_get_brief",{});
+ expect(brief.isError).toBe(true);
+ expect(brief.body.code).toBe("OUTSIDE_GRANT_BOUNDARY");
 });
 
 // Explicit website JWT issuer for synthetic person identities; never an auth bypass.
