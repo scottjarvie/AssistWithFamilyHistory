@@ -1,6 +1,12 @@
 # Convex Trust-Boundary Inventory
 
-Last verified: 2026-07-12.
+Last verified: 2026-07-12. **Counts and tables below are from that date.** The
+current registered list (name, kind and visibility of every function, plus
+HTTP routes) is pinned in
+`convex/__snapshots__/backendContract.test.ts.snap`; on 2026-11-24 it held
+3 public queries, 68 public mutations and 50 public actions. Use it, not this
+table, as the source of truth. See also the
+[backend name map](../../convex/README.md#name-map).
 
 The check:trust-boundary contract inventories the public surface and fails when
 a tenant-private function omits the shared guard.
@@ -17,9 +23,9 @@ a tenant-private function omits the shared guard.
 | Internal mutations | 34 |
 | Total registered functions | 163 |
 
-Protected reads are actions because a Convex query is read-only: the action can
-persist a shadow denial through an internal mutation before calling its
-internal query.
+Protected reads are actions because a Convex query is read-only: in shadow the
+action can persist a refusal through an internal mutation before it throws.
+Since 2026-11-24 the refusal happens in both modes.
 
 ## Function inventory
 

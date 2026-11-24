@@ -1,6 +1,8 @@
 # GEN-87/88 — Convex Trust Boundary
 
-Status: implemented behind guarded rollout on 2026-07-12.
+Status: implemented behind guarded rollout on 2026-07-12. Since 2026-11-24
+(pull request 170) tenant and reference checks refuse in both modes; see
+Guarded mode.
 
 ## Decision
 
@@ -12,8 +14,9 @@ public-story safety.
 - A verified Clerk identity.subject must match the requested vaultOwnerId.
 - Mutations authorize before their first business-data access and validate
   referenced records before linking or dereferencing them.
-- Protected reads enter through authenticated public actions, persist any
-  shadow denial through trustBoundary.recordShadowDenial, and then call an
+- Protected reads enter through authenticated public actions. A refused
+  caller gets an error; in shadow the action first persists the refusal
+  through trustBoundary.recordShadowDenial. An allowed caller reaches the
   internal query.
 - Only two queries are anonymous by design:
   vault.getPublishedStory and vault.getPublishedStoryByIdentifier.
@@ -31,17 +34,20 @@ The complete registration inventory is in
 
 TRUST_BOUNDARY_MODE accepts two values:
 
-| Mode | Tenant or policy denial | Shadow table |
-| --- | --- | --- |
-| unset or shadow | Log the would-be denial and preserve the legacy call | Insert one record containing function, caller, reason, and timestamp |
-| enforce | Throw before protected data is read or changed | No insert |
+| Mode | Tenant or reference denial | Guest-source rule | Where a shadow refusal is recorded |
+| --- | --- | --- | --- |
+| unset or shadow | Throw before protected data is read or changed | Log and allow | Actions: one trustBoundaryShadowLog row (function, caller, reason, timestamp). Mutations: a `Trust boundary shadow denial` Convex function-log line, because the refused mutation rolls back any row |
+| enforce | Throw before protected data is read or changed | Throw | Nothing; use Convex and Vercel error logs |
 
-Only the exact value enforce enables enforcement. Every other value defaults
-to shadow, which is the safe rollout default.
+Before 2026-11-24 shadow logged the tenant denial and preserved the legacy
+call. Pull request 170 made the tenant and reference checks refuse in every
+mode, in code, without changing any deployment setting. Only the exact value
+enforce enables enforcement. Every other value means shadow.
 
 The Next server mirrors this value. In enforce mode,
 getAuthedConvexClient() fails closed when Clerk, the issuer, the session, or
-the convex JWT token is unavailable. The public story page deliberately uses
+the convex JWT token is unavailable. In shadow it calls Convex without a token,
+and Convex refuses any private call. The public story page deliberately uses
 the unauthenticated client because its Convex queries are the public boundary.
 
 ## Publish boundary
@@ -63,7 +69,7 @@ now defense in depth, not the security boundary.
 
 ## Guest migration limit
 
-migrateGuestVault binds the destination to the authenticated Clerk subject.
+migrateGuestVault requires the destination's signed-in owner in both modes.
 The source guest cookie identifier is not a signed Convex principal:
 
 - shadow logs guest_source_unverified and preserves the existing migration;
