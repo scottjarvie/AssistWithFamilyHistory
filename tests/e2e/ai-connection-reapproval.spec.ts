@@ -24,7 +24,10 @@ for (const completeRow of [false, true]) {
       bundle: true, write: false, platform: "browser", format: "iife", jsx: "automatic",
       define: { "process.env.NODE_ENV": '"production"' },
     }).outputFiles[0].text;
-    await page.setContent('<div id="root"></div>');
+    // The component uses crypto.randomUUID for operation IDs. Serve the fixture
+    // on an intercepted secure origin so Chromium exposes it as in the app.
+    await page.route("https://connection.test/", route => route.fulfill({ contentType: "text/html", body: '<div id="root"></div>' }));
+    await page.goto("https://connection.test/");
     await page.evaluate(() => {
       const calls: Record<string, unknown>[] = [];
       Object.assign(window, { connectionCalls: calls });
@@ -52,13 +55,21 @@ for (const completeRow of [false, true]) {
       };
     });
     await page.addScriptTag({ content: bundle });
-    await page.getByRole("button", { name: "Turn it off now" }).click();
+    const revoke = page.getByRole("button", { name: "Revoke Synthetic AI" });
+    const revokeConnection = async () => {
+      await revoke.click();
+      await page.getByRole("dialog", { name: "Revoke Synthetic AI?" }).getByRole("button", { name: "Revoke connection" }).click();
+    };
+    const openReview = () => page.getByText("Review connection · Synthetic AI", { exact: true }).click();
+    await revokeConnection();
+    await openReview();
     await page.getByText("Review and approve again", { exact: true }).click();
     await page.getByRole("button", { name: /Approve/ }).click();
     // While approval is pending the previous active controls cannot reappear.
-    await expect(page.getByRole("button", { name: "Turn it off now" })).toHaveCount(0);
+    await expect(revoke).toHaveCount(0);
     await page.evaluate(() => (window as unknown as { releaseApproval: () => void }).releaseApproval());
-    await page.getByRole("button", { name: "Turn it off now" }).click();
+    await revokeConnection();
+    await openReview();
     await expect(page.getByText("Review and approve again", { exact: true })).toBeVisible();
     const calls = await page.evaluate(() => (window as unknown as { connectionCalls: Record<string, unknown>[] }).connectionCalls);
     expect(calls.map(({ action, grantId }) => ({ action, grantId }))).toEqual([
