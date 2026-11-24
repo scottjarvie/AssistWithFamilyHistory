@@ -58,10 +58,12 @@ const expectedPublic = [
   "/stories/abc",
   "/api/unknown",
   "/api/mcp-media-upload/example/capability",
+  "/api/mcp-evidence-original/capability",
 ];
 
 const publicCapabilityRoutes = new Set([
   "/api/mcp-media-upload/[uploadRef]/[token]",
+  "/api/mcp-evidence-original/[token]",
 ]);
 
 const failures: string[] = [];

@@ -236,7 +236,7 @@ export const FAMILY_HISTORY_TOOLS: readonly CatalogTool[] = [
     writes: false,
     title: "Get Family History evidence",
     description:
-      "BATCH. Ask for up to 10 evidence items at once by {kind,id} and receive the reviewed, AI-allowed ones as content blocks. Anything not delivered comes back in `skipped` with an exact reason and what to do. Never ask the person for a storage link; this is the only supported way to see a private file.",
+      "BATCH. Ask for up to 10 evidence items at once by {kind,id} and receive the reviewed, AI-allowed ones as content blocks. When an exact original is needed, explicitly request delivery `original` for one media item. Where the original is already eligible for AI use, this returns a Family History download link that expires within one minute and rechecks access at use. Cleaned copies remain eligible through the regular request. Anything not delivered comes back in `skipped` with the reason and what to do. Never ask the person for a storage link; this is the only supported way to see a private file.",
     humanSummary: "Receives the contents of files you marked reviewed and AI-allowed.",
     implementedBy: "convex/mcpEvidence.getEvidenceBatch",
   },

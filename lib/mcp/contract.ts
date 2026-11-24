@@ -106,6 +106,9 @@ export async function hashMcpInput(value: unknown): Promise<string> {
     .join("");
 }
 
+export const EVIDENCE_ORIGINAL_PATH = "/api/mcp-evidence-original/";
+export const EVIDENCE_ORIGINAL_TOKEN = /^[0-9a-f-]{36}$/;
+
 export function assertMcpToolContract(): void {
   if (new Set(FAMILY_HISTORY_MCP_TOOL_NAMES).size !== FAMILY_HISTORY_MCP_TOOL_NAMES.length) {
     throw new Error("Family History MCP tool names must be unique");

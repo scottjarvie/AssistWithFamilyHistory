@@ -3,7 +3,6 @@ import { AI_ACCESS_INSTRUCTIONS } from "../../lib/mcp/accessCopy";
 import { FAMILY_HISTORY_CONTROL_TOOLS } from "../../lib/mcp/catalog";
 /* eslint-disable @typescript-eslint/no-explicit-any -- Generated Convex references and SDK callbacks cross a runtime-validated MCP boundary. */
 import type { FunctionReturnType, HttpRouter } from "convex/server";
-import { currentMediaForExport } from "../../lib/media/currentMediaForExport";
 import { EVIDENCE_UPLOAD_TYPES } from "../../lib/media/evidenceStandard";
 import { McpServer, createMcpHandler, type AuthInfo } from "@modelcontextprotocol/server";
 import { createRemoteJWKSet, errors as joseErrors, jwtVerify } from "jose";
@@ -12,6 +11,7 @@ import { internal } from "../_generated/api";
 import { httpAction, type ActionCtx } from "../_generated/server";
 import {
   FAMILY_HISTORY_MCP_LIMITS,
+  EVIDENCE_ORIGINAL_PATH,
   hashMcpInput,
 } from "../../lib/mcp/contract";
 import { FAMILY_HISTORY_SCOPES, findTool } from "../../lib/mcp/catalog";
@@ -461,7 +461,17 @@ function compactPersonWorkspace(workspace: FunctionReturnType<typeof internal.va
     researchLog: (workspace.researchLog ?? []).slice(0, cap),
     stories: living ? [] : workspace.stories.filter(story => story.archivedAt === undefined && (!story.relationshipId || deceasedRelationships.has(story.relationshipId))).slice(0, cap).map(storyWorkForAi),
     contextItems: (workspace.contextItems ?? []).filter((item: any) => item.aiUseAllowed && item.reviewStatus === "reviewed").slice(0, cap),
-    media: (workspace.media ?? []).filter((item: any) => item.aiUseAllowed && item.reviewStatus === "reviewed").slice(0, cap).map(currentMediaForExport),
+    media: workspace.media.filter(item => item.aiUseAllowed && item.reviewStatus === "reviewed" && item.rightsStatus !== "restricted").slice(0, cap).map(item => ({
+      _id: item._id,
+      title: item.title,
+      type: item.type,
+      description: item.description,
+      mimeType: item.mimeType,
+      sizeBytes: item.sizeBytes,
+      personIds: item.personIds,
+      date: item.date,
+      rightsStatus: item.rightsStatus,
+    })),
     places: (workspace.places ?? []).slice(0, cap),
     researchChecks: checks.slice(0, cap),
     operations: buildOperationSummary(checks),
@@ -840,10 +850,27 @@ export function createFamilyHistoryServer(
         kind: z.enum(["media", "document"]),
         id,
       }).strict()).min(1).max(FAMILY_HISTORY_MCP_LIMITS.evidenceItems),
-    }).strict(),
+      delivery: z.literal("original").optional(),
+    }).strict().refine(input => !input.delivery || (input.items.length === 1 && input.items[0].kind === "media"), {
+      message: "Request an exact original using one media item.",
+    }),
     annotations: readOnly,
   }, async (input: any) => {
     try {
+      if (input.delivery === "original") {
+        // Never put a bearer link on a provider or backend hostname, even if
+        // someone has pointed the configured transport resource at one.
+        const resource = requiredUrl("MCP_RESOURCE_URL");
+        if (resource.hostname !== CANONICAL_RESOURCE_HOST || !grantId) throw new Error("Evidence is unavailable.");
+        const token = crypto.randomUUID();
+        const [{ id: mediaId }] = input.items;
+        const link = await actionCtx.runMutation(internal.mcpEvidence.mintOriginalLink, {
+          principal, grantId, mediaId, tokenHash: await hashMcpInput(token),
+        });
+        await touch("family_history_get_evidence");
+        if (!link) return toolResult({ delivered: [], skipped: [{ id: mediaId, kind: "media", reason: "ORIGINAL_UNAVAILABLE", whatToDo: "Request the usual evidence view if available. The original needs separate review when only a cleaned copy is approved." }] });
+        return toolResult({ id: mediaId, kind: "media", original: { url: new URL(`${EVIDENCE_ORIGINAL_PATH}${token}`, resource.origin).toString(), expiresAt: link.expiresAt } });
+      }
       const batch: any = await actionCtx.runQuery(evidence.getEvidenceBatch, {
         principal,
         grantId,

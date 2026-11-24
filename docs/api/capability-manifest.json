@@ -342,6 +342,17 @@
       "notes": "Streams a stored media file to its owner. The signed storage URL is resolved server-side and never returned. A missing item and another owner's item both answer 404. An AI reaches media through family_history_get_evidence, never this route."
     },
     {
+      "route": "/api/mcp-evidence-original/[token]",
+      "methods": ["GET"],
+      "capability": "mcp_private_evidence_original_read",
+      "environment": "mcp-first-party-relay",
+      "agentSupport": "restricted",
+      "reviewLevel": "opaque-session-capability",
+      "risk": "high",
+      "scopes": ["family_history:evidence:read"],
+      "notes": "Streams an eligible exact original on explicit request. The opaque link expires within one minute. Convex rechecks the active grant, the record boundary, review, rights and exact file version when the link is used. No storage-provider address is returned."
+    },
+    {
       "route": "/api/mcp-media-upload/[uploadRef]/[token]",
       "methods": [
         "PUT"

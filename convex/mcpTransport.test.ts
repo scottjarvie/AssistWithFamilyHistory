@@ -57,12 +57,12 @@ function modernRequest(
   };
 }
 
-async function accessToken(clientId = "synthetic-client") {
+async function accessToken(clientId = "synthetic-client", audience = RESOURCE) {
   return new SignJWT({ scope: "family_history:read family_history:write", client_id: clientId })
     .setProtectedHeader({ alg: "RS256", kid: "synthetic-key", typ: "at+jwt" })
     .setIssuer(ISSUER)
     .setSubject(SUBJECT)
-    .setAudience(RESOURCE)
+    .setAudience(audience)
     .setIssuedAt()
     .setExpirationTime("5m")
     .sign(privateKey);
@@ -651,7 +651,7 @@ test.each(["person", "story"] as const)("%s context exports current media withou
   const t = convexTest(schema, modules); await approvedConnection(t);
   const { personId, mediaId, storyId } = await t.run(async ctx => {
     const personId = await ctx.db.insert("persons", { vaultOwnerId: SUBJECT, name: { given: "Synthetic", surname: "Replacement" }, sex: "unknown", living: false, researchStatus: "basic", createdAt: 1, updatedAt: 1 });
-    const mediaId = await ctx.db.insert("media", { vaultOwnerId: SUBJECT, title: "Current reviewed replacement", type: "document", personIds: [personId], reviewStatus: "reviewed", privacyLevel: "family_review", rightsStatus: "owned", aiUseAllowed: true, createdAt: 1, updatedAt: 1,
+    const mediaId = await ctx.db.insert("media", { vaultOwnerId: SUBJECT, title: "Current reviewed replacement", type: "document", personIds: [personId], reviewStatus: "reviewed", privacyLevel: "family_review", rightsStatus: "owned", aiUseAllowed: true, url: "https://synthetic-storage.convex.cloud/api/storage/synthetic", createdAt: 1, updatedAt: 1,
       replacedB2Files: [{ replacedAt: 1, original: { bucketClass: "private", bucketName: "synthetic-old-private-bucket", objectKey: "synthetic-old-private-original", versionId: "old-version", sha256: "a".repeat(64), contentType: "image/jpeg", sizeBytes: 1, metadataClean: false, verifiedAt: "2026-10-01T00:00:00Z" }, metadataProposal: { temporal: { uploadTime: "2026-10-01T00:00:00Z" }, location: { latitude: 1.25, longitude: 2.5, source: "embedded_gps", status: "proposed", association: "person_media", precision: "exact_private", disclosurePrecision: "withheld" }, extractedFromOriginalSha256: "a".repeat(64), extractedAt: "2026-10-01T00:00:00Z", reversible: true, decision: "declined", declinedAt: "2026-10-02T00:00:00Z" } }],
     });
     const storyId = await ctx.db.insert("stories", { vaultOwnerId: SUBJECT, personId, title: "Synthetic draft", content: "Synthetic story content.", type: "biography", status: "draft", generatedBy: "human", citationIds: [], createdAt: 1, updatedAt: 1 });
@@ -663,6 +663,113 @@ test.each(["person", "story"] as const)("%s context exports current media withou
   expect(response.status).toBe(200); const payload = await response.json(); expect(payload.result.isError).not.toBe(true);
   const context = JSON.parse(payload.result.content[0].text); expect(context.media).toEqual([expect.objectContaining({ _id: mediaId, title: "Current reviewed replacement" })]);
   const text = JSON.stringify(payload); expect(text).not.toContain("replacedB2Files"); expect(text).not.toContain("synthetic-old-private"); expect(text).not.toContain("exact_private");
+  expect(text).not.toContain("synthetic-storage.convex.cloud");
+});
+
+test.each(["expired", "paused", "revoked", "narrowed", "scope removed", "media re-reviewed", "media replaced"] as const)(
+  "exact original links pass bytes on the product domain and stop working when %s", async change => {
+    const resource = "https://assistwithfamilyhistory.com/mcp";
+    vi.stubEnv("MCP_RESOURCE_URL", resource);
+    const t = convexTest(schema, modules);
+    const grantId = await approvedConnection(t);
+    const bytes = new Uint8Array([11, 23, 35, 47]);
+    const mediaId = await t.run(async ctx => {
+      const storageId = await ctx.storage.store(new Blob([bytes], { type: "image/png" }));
+      return ctx.db.insert("media", { vaultOwnerId: SUBJECT, storageId, mimeType: "image/png", sizeBytes: bytes.length,
+        title: "Original scan", type: "scan", personIds: [], reviewStatus: "reviewed", aiUseAllowed: true, rightsStatus: "owned", createdAt: 1, updatedAt: 1 });
+    });
+    const token = await accessToken(CLIENT_ID, resource);
+    const read = (delivery?: "original") => t.fetch("/mcp", modernRequest("tools/call", token, {
+      name: "family_history_get_evidence", arguments: { items: [{ kind: "media", id: mediaId }], delivery },
+    }, "family_history_get_evidence"));
+    const inline = await (await read()).json();
+    expect(inline.result.content[0]).toMatchObject({ type: "image", mimeType: "image/png" });
+    expect(JSON.stringify(inline)).not.toMatch(/mcp-evidence-original|\.convex\.(cloud|site)|backblazeb2/);
+
+    const started = Date.now();
+    const reply = await (await read("original")).json();
+    expect(reply.result.isError).not.toBe(true);
+    expect(JSON.stringify(reply)).not.toMatch(/\.convex\.(cloud|site)|backblazeb2/);
+    const { url, expiresAt } = reply.result.structuredContent.original;
+    const link = new URL(url);
+    expect(link.origin).toBe("https://assistwithfamilyhistory.com");
+    expect(expiresAt).toBeGreaterThan(started);
+    expect(expiresAt).toBeLessThanOrEqual(Date.now() + 60_000);
+    const download = await t.fetch(link.pathname);
+    expect(download.status).toBe(200);
+    expect(download.headers.get("location")).toBeNull();
+    expect(download.headers.get("cache-control")).toBe("private, no-store");
+    expect(download.headers.get("content-disposition")).toBe("attachment");
+    expect(new Uint8Array(await download.arrayBuffer())).toEqual(bytes);
+
+    if (change === "expired") {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(expiresAt);
+    } else {
+      await t.run(async ctx => {
+        const grant = ctx.db.normalizeId("mcpGrants", grantId)!;
+        if (change === "paused") await ctx.db.patch(grant, { pausedAt: Date.now() });
+        if (change === "revoked") await ctx.db.patch(grant, { status: "revoked", revokedAt: Date.now() });
+        if (change === "narrowed") await ctx.db.patch(grant, { boundary: { kind: "selected_people", personIds: ["different-person"] } });
+        if (change === "scope removed") await ctx.db.patch(grant, { scopes: ["family_history:context:read"] });
+        if (change === "media re-reviewed") await ctx.db.patch(mediaId, { aiUseAllowed: false });
+        if (change === "media replaced") await ctx.db.patch(mediaId, { storageId: await ctx.storage.store(new Blob(["different bytes"])) });
+      });
+    }
+    try {
+      const denied = await t.fetch(link.pathname);
+      expect(denied.status).toBe(404);
+      expect(await denied.text()).toBe("Evidence is unavailable.");
+    } finally {
+      if (change === "expired") vi.useRealTimers();
+    }
+  },
+);
+
+test("the exact-original relay uses Backblaze server-side and respects a cleaned-copy-only approval", async () => {
+  const resource = "https://assistwithfamilyhistory.com/mcp";
+  vi.stubEnv("MCP_RESOURCE_URL", resource);
+  vi.stubEnv("MEDIA_STORAGE_ENVIRONMENT", "development");
+  for (const kind of ["PRIVATE", "PUBLIC"]) {
+    vi.stubEnv(`B2_${kind}_ENDPOINT`, "https://b2.synthetic.example.test");
+    vi.stubEnv(`B2_${kind}_REGION`, "us-west-000");
+    vi.stubEnv(`B2_${kind}_BUCKET`, `synthetic-${kind.toLowerCase()}`);
+    vi.stubEnv(`B2_${kind}_KEY_ID`, "not-a-real-key-id");
+    vi.stubEnv(`B2_${kind}_APPLICATION_KEY`, "not-a-real-application-key");
+  }
+  const existingFetch = fetch;
+  const relayFetch = vi.fn((input: string | URL | Request, options?: RequestInit) => {
+    const url = new URL(input instanceof Request ? input.url : input);
+    if (url.hostname.endsWith("b2.synthetic.example.test")) {
+      expect(options?.redirect).toBe("error");
+      return Promise.resolve(new Response("exact B2 synthetic bytes"));
+    }
+    return existingFetch(input, options);
+  });
+  vi.stubGlobal("fetch", relayFetch);
+  const t = convexTest(schema, modules);
+  await approvedConnection(t);
+  const manifest = { bucketClass: "private" as const, bucketName: "synthetic-private", objectKey: "private-object",
+    versionId: "pinned-version", sha256: "a".repeat(64), sizeBytes: 24, contentType: "application/pdf", metadataClean: false,
+    verifiedAt: "2026-11-24T00:00:00Z" };
+  const mediaId = await t.run(ctx => ctx.db.insert("media", { vaultOwnerId: SUBJECT, title: "Synthetic original", type: "scan",
+    personIds: [], b2Original: manifest, mediaState: "ready", reviewStatus: "reviewed", aiUseAllowed: true, rightsStatus: "owned", createdAt: 1, updatedAt: 1 }));
+  const token = await accessToken(CLIENT_ID, resource);
+  const read = () => t.fetch("/mcp", modernRequest("tools/call", token, { name: "family_history_get_evidence",
+    arguments: { items: [{ kind: "media", id: mediaId }], delivery: "original" },
+  }, "family_history_get_evidence"));
+  const reply = await (await read()).json();
+  expect(JSON.stringify(reply)).not.toContain("b2.synthetic.example.test");
+  const link = new URL(reply.result.structuredContent.original.url);
+  const response = await t.fetch(link.pathname);
+  expect(response.status).toBe(200);
+  expect(response.headers.get("location")).toBeNull();
+  expect(await response.text()).toBe("exact B2 synthetic bytes");
+
+  await t.run(ctx => ctx.db.patch(mediaId, { b2Renditions: { tiny: manifest, medium: manifest, large: manifest } }));
+  expect((await t.fetch(link.pathname)).status).toBe(404);
+  const refused = await (await read()).json();
+  expect(refused.result.structuredContent.skipped).toMatchObject([{ reason: "ORIGINAL_UNAVAILABLE" }]);
 });
 
 test("whole-person context keeps working drafts and withholds private review detail", async () => {

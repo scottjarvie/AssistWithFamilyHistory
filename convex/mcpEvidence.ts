@@ -24,11 +24,12 @@
  */
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
-import { internalQuery } from "./_generated/server";
+import { internalMutation, internalQuery, type QueryCtx } from "./_generated/server";
 import { matchesVaultOwner } from "./vaultCore";
 import { assertGrantPermits } from "./mcpGrants";
 import { resolveOwnedDocumentPerson } from "./documents";
-import { FAMILY_HISTORY_MCP_LIMITS } from "../lib/mcp/contract";
+import { effectiveExpiry } from "../lib/mcp/grantDefaults";
+import { FAMILY_HISTORY_MCP_LIMITS, hashMcpInput } from "../lib/mcp/contract";
 
 const principalValidator = v.object({
   issuer: v.string(),
@@ -82,6 +83,62 @@ function boundaryAllowsPerson(
   // selected-people boundary, so it is refused rather than guessed at.
   return personIds.length > 0 && personIds.some((id) => allowed.has(id));
 }
+
+// The owner approved exact bytes through the existing evidence path for legacy
+// Convex files and B2 items with no display copy. For B2 records with a display
+// copy, that approval covered the cleaned copy only.
+async function originalForGrant(ctx: QueryCtx, grant: Doc<"mcpGrants">, mediaId: Doc<"media">["_id"]) {
+  const row = await ctx.db.get(mediaId);
+  if (!row || row.archivedAt !== undefined || !matchesVaultOwner(row.vaultOwnerId, grant.vaultOwnerId) ||
+      (row.mediaState !== undefined && row.mediaState !== "ready") ||
+      !boundaryAllowsPerson(grant.boundary, row.personIds.map(String)) ||
+      row.reviewStatus !== "reviewed" || row.aiUseAllowed !== true || row.rightsStatus === "restricted") return null;
+  if (row.mediaState === "ready" && row.b2Renditions) return null;
+  if (row.mediaState === "ready" && row.b2Original) {
+    if (row.b2Original.bucketClass !== "private") return null;
+    return { original: row.b2Original, version: JSON.stringify([row.b2Original.bucketName, row.b2Original.objectKey, row.b2Original.versionId]), mimeType: row.b2Original.contentType };
+  }
+  if (row.storageId) return { storageId: row.storageId, version: row.storageId, mimeType: row.mimeType ?? "application/octet-stream" };
+  return null;
+}
+
+export const mintOriginalLink = internalMutation({
+  args: { principal: principalValidator, grantId: v.string(), mediaId: v.string(), tokenHash: v.string() },
+  handler: async (ctx, args) => {
+    const grant = await assertGrantPermits(ctx, {
+      owner: args.principal.subject, grantId: args.grantId, principal: args.principal,
+      toolName: "family_history_get_evidence", input: { items: [{ kind: "media", id: args.mediaId }] },
+    });
+    const mediaId = ctx.db.normalizeId("media", args.mediaId);
+    if (!grant || !mediaId) return null;
+    const file = await originalForGrant(ctx, grant, mediaId);
+    if (!file) return null;
+    const now = Date.now();
+    const expiresAt = Math.min(now + 60_000, effectiveExpiry(grant) ?? Infinity);
+    const expired = await ctx.db.query("mcpEvidenceOriginalLinks").withIndex("by_expiry", q => q.lte("expiresAt", now)).take(20);
+    for (const row of expired) await ctx.db.delete(row._id);
+    await ctx.db.insert("mcpEvidenceOriginalLinks", {
+      tokenHash: args.tokenHash, grantId: grant._id, owner: grant.vaultOwnerId, issuer: grant.issuer,
+      clientId: grant.clientId, mediaId, fileVersion: file.version, expiresAt,
+    });
+    return { expiresAt };
+  },
+});
+
+export const resolveOriginalLink = internalQuery({
+  args: { token: v.string() },
+  handler: async (ctx, { token }) => {
+    const tokenHash = await hashMcpInput(token);
+    const link = await ctx.db.query("mcpEvidenceOriginalLinks").withIndex("by_hash", q => q.eq("tokenHash", tokenHash)).unique();
+    if (!link || link.expiresAt <= Date.now()) return null;
+    const grant = await assertGrantPermits(ctx, {
+      owner: link.owner, grantId: link.grantId, principal: link,
+      toolName: "family_history_get_evidence", input: { items: [{ kind: "media", id: link.mediaId }] },
+    });
+    const file = grant ? await originalForGrant(ctx, grant, link.mediaId) : null;
+    return file?.version === link.fileVersion ? file : null;
+  },
+});
 
 /**
  * Resolve one batch of evidence items. Text that genuinely lives in Convex is

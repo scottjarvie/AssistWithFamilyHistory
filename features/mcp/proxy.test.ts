@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { GET as getMetadata } from "../../app/.well-known/oauth-protected-resource/mcp/route";
+import { GET as getEvidenceOriginal } from "../../app/api/mcp-evidence-original/[token]/route";
 import { proxyFamilyHistoryMcpRequest } from "../../lib/mcp/proxy";
 
 const CLOUD_URL = "https://family-history-proxy-test.convex.cloud";
@@ -76,5 +77,33 @@ describe("branded Family History MCP proxy", () => {
     expect(response.headers.get("transfer-encoding")).toBeNull();
     releaseChunk();
     await expect(response.json()).resolves.toEqual({ resource: "streamed" });
+  });
+
+  test("streams exact originals on the site and never forwards an upstream storage redirect", async () => {
+    vi.stubEnv("CONVEX_SITE_URL", SITE_URL);
+    const token = "01234567-89ab-4cde-8fab-0123456789ab";
+    const path = `/api/mcp-evidence-original/${token}`;
+    const input = new Request(`https://assistwithfamilyhistory.com${path}`, {
+      headers: { Cookie: "synthetic-session=private", Authorization: "Bearer synthetic-authorization" },
+    });
+    const ctx = { params: Promise.resolve({ token }) };
+    const fetchMock = vi.fn(async (url: URL, options: RequestInit) => {
+      expect(url.toString()).toBe(`${SITE_URL}${path}`);
+      expect(new Headers(options.headers).has("Cookie")).toBe(false);
+      expect(new Headers(options.headers).has("Authorization")).toBe(false);
+      return new Response("original bytes", { headers: { "Content-Type": "image/png", "Cache-Control": "public", "X-Private-Provider": "synthetic-provider" } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const delivered = await getEvidenceOriginal(input, ctx);
+    expect(delivered.status).toBe(200);
+    expect(delivered.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(delivered.headers.get("X-Private-Provider")).toBeNull();
+    await expect(delivered.text()).resolves.toBe("original bytes");
+
+    fetchMock.mockResolvedValueOnce(Response.redirect("https://synthetic-storage.example.test/original"));
+    const refused = await getEvidenceOriginal(input, ctx);
+    expect(refused.status).toBe(404);
+    expect(refused.headers.get("Location")).toBeNull();
+    await expect(refused.text()).resolves.toBe("Evidence is unavailable.");
   });
 });

@@ -432,6 +432,16 @@ export const signMcpEvidenceRead = internalAction({
   },
 });
 
+/** Used only by the pass-through endpoint after it resolves a live capability. */
+export const signEvidenceOriginal = internalAction({
+  args: { bucketName: v.string(), objectKey: v.string(), versionId: v.string() },
+  handler: async (_ctx, args) => {
+    const store = storage();
+    if (args.bucketName !== store.config.bucket) throw new Error("Evidence is unavailable.");
+    return await store.signGet(args.objectKey, args.versionId, 60);
+  },
+});
+
 export const finishMcpEvidenceUpload = internalAction({
   args: {
     principal: principalValidator,
