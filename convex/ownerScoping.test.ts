@@ -178,7 +178,7 @@ describe("owner isolation (real withIndex(by_owner) paths)", () => {
     const a = await seedOwner(t, OWNER_A, "A");
     const b = await seedOwner(t, OWNER_B, "B");
 
-    const rowsA = await t.action(api.vaultReads.getPeopleExplorerPage, { vaultOwnerId: OWNER_A, cursor: null });
+    const rowsA = await t.withIdentity({ subject: OWNER_A }).action(api.vaultReads.getPeopleExplorerPage, { vaultOwnerId: OWNER_A, cursor: null });
     const namesA = rowsA.page.map((r) => r.displayName);
 
     // A sees exactly its two people, NONE of B's.
@@ -206,7 +206,7 @@ describe("owner isolation (real withIndex(by_owner) paths)", () => {
       );
     });
 
-    const ws = await t.action(api.vaultReads.getPersonWorkspace, {
+    const ws = await t.withIdentity({ subject: OWNER_A }).action(api.vaultReads.getPersonWorkspace, {
       vaultOwnerId: OWNER_A,
       personIdentifier: String(a.primary),
     });
@@ -254,7 +254,7 @@ describe("owner isolation (real withIndex(by_owner) paths)", () => {
       );
     });
 
-    const pack = await t.action(api.vaultReads.getContextPack, {
+    const pack = await t.withIdentity({ subject: OWNER_A }).action(api.vaultReads.getContextPack, {
       vaultOwnerId: OWNER_A,
       personIdentifier: String(a.primary),
     });
@@ -295,7 +295,7 @@ describe("owner isolation (real withIndex(by_owner) paths)", () => {
       );
     });
 
-    const pack = await t.action(api.vaultReads.getContextPack, {
+    const pack = await t.withIdentity({ subject: OWNER_A }).action(api.vaultReads.getContextPack, {
       vaultOwnerId: OWNER_A,
       personIdentifier: String(a.primary),
     });
@@ -332,7 +332,7 @@ describe("array-index regression (media.personIds element-contains)", () => {
     const t = convexTest(schema, modules);
     const a = await seedOwner(t, OWNER_A, "A");
 
-    const ws = await t.action(api.vaultReads.getPersonWorkspace, {
+    const ws = await t.withIdentity({ subject: OWNER_A }).action(api.vaultReads.getPersonWorkspace, {
       vaultOwnerId: OWNER_A,
       personIdentifier: String(a.primary),
     });
@@ -439,7 +439,7 @@ describe("migrateGuestVault (real mutation)", () => {
       return { guestPerson, guestMedia, guestStory, foreignGuest, existingUser };
     });
 
-    const result = await t.mutation(api.vaultMigration.migrateGuestVault, {
+    const result = await t.withIdentity({ subject: USER }).mutation(api.vaultMigration.migrateGuestVault, {
       fromVaultOwnerId: GUEST,
       toVaultOwnerId: USER,
     });
@@ -465,7 +465,7 @@ describe("migrateGuestVault (real mutation)", () => {
   test("rejects a non-guest source prefix", async () => {
     const t = convexTest(schema, modules);
     await expect(
-      t.mutation(api.vaultMigration.migrateGuestVault, {
+      t.withIdentity({ subject: USER }).mutation(api.vaultMigration.migrateGuestVault, {
         fromVaultOwnerId: USER, // not a guest_ id
         toVaultOwnerId: USER,
       })
@@ -475,7 +475,7 @@ describe("migrateGuestVault (real mutation)", () => {
   test("rejects a non-user destination prefix", async () => {
     const t = convexTest(schema, modules);
     await expect(
-      t.mutation(api.vaultMigration.migrateGuestVault, {
+      t.withIdentity({ subject: "guest_dddddddd-0000-0000-0000-000000000000" }).mutation(api.vaultMigration.migrateGuestVault, {
         fromVaultOwnerId: GUEST,
         toVaultOwnerId: "guest_dddddddd-0000-0000-0000-000000000000", // not a user_ id
       })
@@ -488,35 +488,40 @@ describe("migrateGuestVault (real mutation)", () => {
 // ---------------------------------------------------------------------------
 
 describe("guarded private reads", () => {
-  test("shadow mode preserves legacy data while logging a mismatched identity", async () => {
+  test("the Person overview omits document bodies and the separately loaded Documents tab keeps owner scope and order", async () => {
+    const t = convexTest(schema, modules);
+    const a = await seedOwner(t, OWNER_A, "A");
+    await seedOwner(t, OWNER_B, "A"); // The same FamilySearch ID in another vault.
+    const body = "Synthetic transcription line. ".repeat(4_096);
+    await t.run(async ctx => {
+      await ctx.db.insert("documents", { ...documentFields(OWNER_A, "FSID-A", "owner-PS"), type: "PS", contentMarkdown: body, contentText: body });
+      await ctx.db.insert("documents", { ...documentFields(OWNER_A, "FSID-A", "owner-CST"), contentMarkdown: body, contentText: body });
+      await ctx.db.insert("documents", documentFields(OWNER_B, "FSID-A", "foreign"));
+    });
+    const owner = t.withIdentity({ subject: OWNER_A });
+    const input = { vaultOwnerId: OWNER_A, personIdentifier: a.primary };
+    const full = await owner.action(api.vaultReads.getPersonWorkspace, input);
+    const overview = await owner.action(api.vaultReads.getPersonWorkspace, { ...input, documentsMetadataOnly: true });
+    expect(full?.documents.map(doc => doc.contentMarkdown)).toEqual([body, body]);
+    expect(overview?.documents.map(doc => doc.contentMarkdown)).toEqual(["", ""]);
+    expect(overview?.documents.map(doc => doc.contentText)).toEqual(["", ""]);
+    expect(overview?.stats).toEqual(full?.stats);
+    expect(overview?.researchChecks).toEqual(full?.researchChecks);
+    const tab = await owner.action(api.documents.getDocumentsByPerson, { vaultOwnerId: OWNER_A, personId: "FSID-A" });
+    expect(tab.map(doc => doc.type)).toEqual(["CST", "PS"]);
+    expect(tab.map(doc => doc.contentMarkdown)).toEqual([body, body]);
+    await expect(t.withIdentity({ subject: OWNER_B }).action(api.documents.getDocumentsByPerson, { vaultOwnerId: OWNER_A, personId: "FSID-A" })).rejects.toThrow(/owner_mismatch/);
+  });
+
+  test("shadow mode refuses a mismatched identity and logs the denial", async () => {
     const t = convexTest(schema, modules);
     const a = await seedOwner(t, OWNER_A, "A");
     await seedOwner(t, OWNER_B, "B");
 
-    const ws = await t.withIdentity({ subject: OWNER_B }).action(api.vaultReads.getPersonWorkspace, {
+    await expect(t.withIdentity({ subject: OWNER_B }).action(api.vaultReads.getPersonWorkspace, {
       vaultOwnerId: OWNER_A,
       personIdentifier: String(a.primary),
-    });
-
-    // NOT blocked: the workspace resolves to A's person...
-    expect(ws).not.toBeNull();
-    if (!ws) return;
-    expect(String(ws.person._id)).toBe(String(a.primary));
-    expect(ws.person.name.given).toBe("PrimaryA");
-
-    // ...and every owner-stamped row is A's, NOT the verified B identity's.
-    const ownerStamped = [
-      ...ws.media,
-      ...ws.contextItems,
-      ...ws.stories,
-      ...ws.sources.map((s) => s.source),
-      ...ws.relatedPeople,
-    ];
-    expect(ownerStamped.length).toBeGreaterThan(0);
-    for (const row of ownerStamped) {
-      expect(row.vaultOwnerId).toBe(OWNER_A);
-    }
-    expect(ws.relatedPeople.some((p) => p.name.given === "RelativeB")).toBe(false);
+    })).rejects.toThrow("Trust boundary denied: owner_mismatch");
 
     const logs = await t.run((ctx) => ctx.db.query("trustBoundaryShadowLog").collect());
     expect(logs).toHaveLength(1);

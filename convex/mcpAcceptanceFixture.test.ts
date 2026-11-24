@@ -291,8 +291,10 @@ describe("Family History joined MCP acceptance cleanup", () => {
     vi.stubEnv("CONVEX_CLOUD_URL", "https://accomplished-dodo-308.convex.cloud");
     const t = convexTest(schema, modules);
     await expect(t.action(api.mcpAcceptanceFixture.inspect, { vaultOwnerId: OWNER, runKey: RUN_KEY }))
-      .rejects.toThrow("requires the exact authenticated synthetic test identity");
+      .rejects.toThrow("Trust boundary denied: missing_identity");
     await expect(t.withIdentity({ subject: "user_someone_else" }).action(api.mcpAcceptanceFixture.inspect, { vaultOwnerId: OWNER, runKey: RUN_KEY }))
+      .rejects.toThrow("Trust boundary denied: owner_mismatch");
+    await expect(t.withIdentity({ subject: "user_someone_else" }).action(api.mcpAcceptanceFixture.inspect, { vaultOwnerId: "user_someone_else", runKey: RUN_KEY }))
       .rejects.toThrow("requires the exact authenticated synthetic test identity");
   });
 

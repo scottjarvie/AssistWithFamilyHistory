@@ -1,13 +1,20 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { validate, environment } from './local-development.mjs';
-import { readFileSync } from 'node:fs';
-const actualConfig=JSON.parse(readFileSync(new URL('./local-development.json',import.meta.url)));
+import fs from 'node:fs';
+const actualConfig=JSON.parse(fs.readFileSync(new URL('./local-development.json',import.meta.url)));
 const config=structuredClone(actualConfig); config.live.ownerEnforcementVerified=true;
 test('actual Live profile is withheld until production owner enforcement is verified',()=>assert.throws(()=>validate('live',values('live'),actualConfig),/withheld/));
 const values=(mode)=>({CONVEX_DEPLOYMENT:config[mode].deployment,NEXT_PUBLIC_CONVEX_URL:mode==='sandbox'?'https://'+config.sandbox.deployment.split(':')[1]+'.convex.cloud':config.live.backendURL,NEXT_PUBLIC_CONVEX_SITE_URL:'https://'+config[mode].deployment.split(':')[1]+'.convex.site',NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:(mode==='live'?'pk_live_':'pk_test_')+Buffer.from(config[mode].clerkHost+'$').toString('base64')});
 test('exact own identity/backend accepted in both modes',()=>{for(const mode of ['live','sandbox']) assert.deepEqual(validate(mode,values(mode),config),values(mode));});
 test('foreign backend and issuer rejected',()=>{for(const mode of ['live','sandbox']) {assert.throws(()=>validate(mode,{...values(mode),NEXT_PUBLIC_CONVEX_URL:'https://wrong.convex.cloud'},config));assert.throws(()=>validate(mode,{...values(mode),NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:'pk_test_'+Buffer.from('other.clerk.accounts.dev$').toString('base64')},config));}});
 test('server secrets and provider fields refused',()=>{assert.throws(()=>validate('live',{...values('live'),CLERK_SECRET_KEY:'sk_live_placeholder'},config));assert.throws(()=>validate('sandbox',{...values('sandbox'),OPENROUTER_API_KEY:'placeholder'},config));});
-test('inherited credentials blanked before dotenv reload',()=>{const env=environment(new URL('..',import.meta.url).pathname,values('live'),'live',{CLERK_SECRET_KEY:'placeholder',B2_APPLICATION_KEY:'placeholder',CONVEX_DEPLOY_KEY:'placeholder',OPENAI_API_KEY:'placeholder'});for(const key of ['CLERK_SECRET_KEY','B2_APPLICATION_KEY','CONVEX_DEPLOY_KEY','OPENAI_API_KEY'])assert.equal(env[key],'');});
+test('inherited and dotenv credentials are blanked before dotenv reload', t => {
+  t.mock.method(fs, 'readdirSync', () => ['.env.local']);
+  t.mock.method(fs, 'statSync', () => ({ isFile: () => true }));
+  t.mock.method(fs, 'readFileSync', () => 'SYNTHETIC_FILE_ONLY_KEY=fixture');
+  const inherited = { CLERK_SECRET_KEY: 'placeholder', B2_APPLICATION_KEY: 'placeholder', CONVEX_DEPLOY_KEY: 'placeholder', OPENAI_API_KEY: 'placeholder' };
+  const env = environment('synthetic-preview', values('live'), 'live', inherited);
+  for (const key of [...Object.keys(inherited), 'SYNTHETIC_FILE_ONLY_KEY']) assert.equal(env[key], '');
+});
 test('Sandbox is the provider-free cloud development backend, never the native or live one',()=>{assert.match(config.sandbox.deployment,/^dev:[a-z0-9-]+$/);assert.equal(config.sandbox.providerIsolationVerified,true);assert.throws(()=>validate('sandbox',{...values('sandbox'),CONVEX_DEPLOYMENT:config.nativeSandbox.deployment},config));assert.throws(()=>validate('sandbox',values('sandbox'),{...config,sandbox:{...config.sandbox,providerIsolationVerified:false}}));});

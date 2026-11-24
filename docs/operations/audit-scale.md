@@ -51,8 +51,8 @@ deduplicates.
 
 The record API returns only the six-field private record DTO, never recent raw
 context, evidence text, source URLs or narratives. The summary browser projection
-remains unchanged. New drilldowns always enforce a matched authenticated owner,
-even under the old summary shadow policy. Destination references repeat ownership
+remains unchanged. Drilldowns and, since 2026-11-24, the summary itself require
+a matched authenticated owner in both modes. Destination references repeat ownership
 and active checks. Guest person candidates recheck source ownership during adoption.
 
 Source/citation destinations traverse their specific reference indexes in pages

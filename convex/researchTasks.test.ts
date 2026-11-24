@@ -34,7 +34,7 @@ describe("research task lifecycle", () => {
       ctx.db.insert("researchTasks", taskFields(OWNER_A, "Find the 1900 census")),
     );
 
-    await t.mutation(api.researchTasks.claimResearchTask, {
+    await t.withIdentity({ subject: OWNER_A }).mutation(api.researchTasks.claimResearchTask, {
       vaultOwnerId: OWNER_A,
       taskId,
       assignedTo: "agent:test",
@@ -43,7 +43,7 @@ describe("research task lifecycle", () => {
     expect(task?.status).toBe("in_progress");
     expect(task?.assignedTo).toBe("agent:test");
 
-    await t.mutation(api.researchTasks.advanceResearchTask, {
+    await t.withIdentity({ subject: OWNER_A }).mutation(api.researchTasks.advanceResearchTask, {
       vaultOwnerId: OWNER_A,
       taskId,
       status: "done",
@@ -60,7 +60,7 @@ describe("research task lifecycle", () => {
       ctx.db.insert("researchTasks", { ...taskFields(OWNER_A, "x"), status: "done" as const }),
     );
     await expect(
-      t.mutation(api.researchTasks.advanceResearchTask, {
+      t.withIdentity({ subject: OWNER_A }).mutation(api.researchTasks.advanceResearchTask, {
         vaultOwnerId: OWNER_A,
         taskId,
         status: "blocked",
@@ -73,9 +73,9 @@ describe("research task lifecycle", () => {
     const taskId = await t.run(async (ctx) =>
       ctx.db.insert("researchTasks", taskFields(OWNER_A, "y")),
     );
-    await t.mutation(api.researchTasks.claimResearchTask, { vaultOwnerId: OWNER_A, taskId });
+    await t.withIdentity({ subject: OWNER_A }).mutation(api.researchTasks.claimResearchTask, { vaultOwnerId: OWNER_A, taskId });
     await expect(
-      t.mutation(api.researchTasks.advanceResearchTask, {
+      t.withIdentity({ subject: OWNER_A }).mutation(api.researchTasks.advanceResearchTask, {
         vaultOwnerId: OWNER_A,
         taskId,
         status: "done",
@@ -90,7 +90,7 @@ describe("research task lifecycle", () => {
       ctx.db.insert("researchTasks", taskFields(OWNER_A, "private")),
     );
     await expect(
-      t.mutation(api.researchTasks.claimResearchTask, { vaultOwnerId: OWNER_B, taskId }),
+      t.withIdentity({ subject: OWNER_B }).mutation(api.researchTasks.claimResearchTask, { vaultOwnerId: OWNER_B, taskId }),
     ).rejects.toThrow(/not found/);
   });
 
@@ -100,7 +100,7 @@ describe("research task lifecycle", () => {
       await ctx.db.insert("researchTasks", taskFields(OWNER_A, "a1"));
       await ctx.db.insert("researchTasks", taskFields(OWNER_B, "b1"));
     });
-    const list = await t.action(api.researchTasks.listResearchTasks, { vaultOwnerId: OWNER_A });
+    const list = await t.withIdentity({ subject: OWNER_A }).action(api.researchTasks.listResearchTasks, { vaultOwnerId: OWNER_A });
     expect(list.length).toBe(1);
     expect(list[0].title).toBe("a1");
   });
@@ -125,7 +125,7 @@ describe("research task lifecycle", () => {
       }),
     );
 
-    const list = await t.action(api.researchTasks.listResearchTasks, {
+    const list = await t.withIdentity({ subject: OWNER_A }).action(api.researchTasks.listResearchTasks, {
       vaultOwnerId: OWNER_A,
       personId: foreignPersonId,
     });

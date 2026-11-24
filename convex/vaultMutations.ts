@@ -2628,7 +2628,8 @@ export const promoteProvisionalRelative = mutation({
           surname: provisional.displayName.split(/\s+/).slice(-1)[0] || provisional.displayName,
         },
         sex: "unknown",
-        living: false,
+        // A provisional identity can carry a possible death year, but is not proof.
+        living: true,
         researchStatus: "not_started",
         notes: provisional.notes,
         createdAt: now,

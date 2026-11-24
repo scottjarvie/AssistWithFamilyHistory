@@ -1,9 +1,8 @@
 import { mcpUploadRefusal } from "../../lib/media/uploadRefusal";
-import { AI_ACCESS_INSTRUCTIONS } from "../../lib/mcp/accessCopy";
+import { MCP_AUTHORITY_INSTRUCTIONS, QUEUE_AI_INSTRUCTIONS } from "../../lib/mcp/accessCopy";
 import { FAMILY_HISTORY_CONTROL_TOOLS } from "../../lib/mcp/catalog";
 /* eslint-disable @typescript-eslint/no-explicit-any -- Generated Convex references and SDK callbacks cross a runtime-validated MCP boundary. */
-import type { HttpRouter } from "convex/server";
-import { currentMediaForExport } from "../../lib/media/currentMediaForExport";
+import type { FunctionReturnType, HttpRouter } from "convex/server";
 import { EVIDENCE_UPLOAD_TYPES } from "../../lib/media/evidenceStandard";
 import { McpServer, createMcpHandler, type AuthInfo } from "@modelcontextprotocol/server";
 import { createRemoteJWKSet, errors as joseErrors, jwtVerify } from "jose";
@@ -12,6 +11,7 @@ import { internal } from "../_generated/api";
 import { httpAction, type ActionCtx } from "../_generated/server";
 import {
   FAMILY_HISTORY_MCP_LIMITS,
+  EVIDENCE_ORIGINAL_PATH,
   hashMcpInput,
 } from "../../lib/mcp/contract";
 import { FAMILY_HISTORY_SCOPES, findTool } from "../../lib/mcp/catalog";
@@ -24,6 +24,9 @@ import {
 } from "../../lib/mcp/authorize";
 import { effectiveScopes } from "../../lib/mcp/grantDefaults";
 import { EVIDENCE_SKIP_GUIDANCE } from "../mcpEvidence";
+import { buildInstructions } from "../lib/mcpConnector/contract";
+import { storyWorkForAi } from "../vault";
+import { buildOperationSummary, RESEARCH_CHECK_DEFINITIONS } from "../vaultCore";
 
 const SERVER_NAME = "assist-with-family-history";
 const SERVER_VERSION = "0.3.0";
@@ -432,28 +435,50 @@ const storySave = z.discriminatedUnion("mode", [
   z.object({ mode: z.literal("update"), storyId: id, expectedUpdatedAt: z.number(), ...storyFields }).strict(),
 ]);
 
-function compactPersonWorkspace(workspace: any) {
+function compactPersonWorkspace(workspace: FunctionReturnType<typeof internal.vault.getPersonWorkspace>) {
   if (!workspace) return null;
   const cap = FAMILY_HISTORY_MCP_LIMITS.contextRows;
-  const living = workspace.person?.living === true;
+  const living = workspace.person.living !== false;
+  const deceasedRelationships = new Set(workspace.relationships.flatMap(relationship =>
+    relationship?.relatedPerson.living === false && relationship.relatedPerson.archivedAt === undefined ? [relationship._id] : [],
+  ));
+  const checks = workspace.researchChecks.map(check => ({
+    checkKey: check.checkKey,
+    status: check.status,
+    applicability: check.applicability,
+    completionSource: check.completionSource,
+    confidence: check.confidence,
+    lastReviewedAt: check.lastReviewedAt,
+    summary: RESEARCH_CHECK_DEFINITIONS.find(definition => definition.key === check.checkKey)?.label,
+  }));
   return {
     person: living ? { ...workspace.person, notes: undefined } : workspace.person,
-    relationships: (workspace.relationships ?? []).slice(0, cap).map((relationship: any) => ({ ...relationship, relatedPerson: relationship.relatedPerson?.living ? { ...relationship.relatedPerson, notes: undefined } : relationship.relatedPerson })),
+    relationships: workspace.relationships.slice(0, cap).map(relationship => relationship && ({ ...relationship, relatedPerson: relationship.relatedPerson.living !== false ? { ...relationship.relatedPerson, notes: undefined } : relationship.relatedPerson })),
     events: (workspace.events ?? []).slice(0, cap),
     sources: (workspace.sources ?? []).slice(0, cap),
     citations: (workspace.citations ?? []).slice(0, cap),
     sourceFacts: (workspace.sourceFacts ?? []).slice(0, cap),
     researchTasks: (workspace.researchTasks ?? []).slice(0, cap),
     researchLog: (workspace.researchLog ?? []).slice(0, cap),
-    stories: (workspace.stories ?? []).slice(0, cap),
+    stories: living ? [] : workspace.stories.filter(story => story.archivedAt === undefined && (!story.relationshipId || deceasedRelationships.has(story.relationshipId))).slice(0, cap).map(storyWorkForAi),
     contextItems: (workspace.contextItems ?? []).filter((item: any) => item.aiUseAllowed && item.reviewStatus === "reviewed").slice(0, cap),
-    media: (workspace.media ?? []).filter((item: any) => item.aiUseAllowed && item.reviewStatus === "reviewed").slice(0, cap).map(currentMediaForExport),
+    media: workspace.media.filter(item => item.aiUseAllowed && item.reviewStatus === "reviewed" && item.rightsStatus !== "restricted").slice(0, cap).map(item => ({
+      _id: item._id,
+      title: item.title,
+      type: item.type,
+      description: item.description,
+      mimeType: item.mimeType,
+      sizeBytes: item.sizeBytes,
+      personIds: item.personIds,
+      date: item.date,
+      rightsStatus: item.rightsStatus,
+    })),
     places: (workspace.places ?? []).slice(0, cap),
-    researchChecks: (workspace.researchChecks ?? []).slice(0, cap),
-    operations: workspace.operations,
+    researchChecks: checks.slice(0, cap),
+    operations: buildOperationSummary(checks),
     stats: workspace.stats,
     privacyNote: living ? "Living-person notes are withheld from this context response. Reviewed AI-allowed context and media remain eligible." : "Private owner-scoped context. Only reviewed AI-allowed loose context and media are included.",
-    truncated: ["relationships", "events", "sources", "citations", "sourceFacts", "researchTasks", "researchLog", "stories", "places"].some((key) => (workspace[key]?.length ?? 0) > cap),
+    truncated: (["relationships", "events", "sources", "citations", "sourceFacts", "researchTasks", "researchLog", "stories", "places"] as const).some(key => workspace[key].length > cap),
   };
 }
 
@@ -656,14 +681,23 @@ export function createFamilyHistoryServer(
 
   const identity = { subject: principal.subject, issuer: principal.issuer, clientId: principal.clientId };
   const connection = { state: resolution.state, reason: "reason" in resolution ? resolution.reason : resolution.state, changedAt: "at" in resolution ? resolution.at : null, endsAt: grant?.expiresAt };
-  const instructions = `${AI_ACCESS_INSTRUCTIONS} Actual connection: ${connection.state}; reason: ${connection.reason}${connection.changedAt ? `; changed ${new Date(connection.changedAt).toISOString()}` : ""}; end date ${connection.endsAt ? new Date(connection.endsAt).toISOString() : "none"}. Call family_history_connection for current details. Read storage in the brief and upload replies: these are counters only. A USAGE_LIMIT_REACHED refusal affects one upload; keep this connection and retry the same operation after room is available. Start research with family_history_get_brief, search, then hydrate stable IDs before editing.`;
+  const instructions = buildInstructions({
+    opening: "Assist With Family History is the person's private research and story workspace.",
+    authority: MCP_AUTHORITY_INSTRUCTIONS,
+    connectionNow: `Actual connection: ${connection.state}; reason: ${connection.reason}${connection.changedAt ? `; changed ${new Date(connection.changedAt).toISOString()}` : ""}; end date ${connection.endsAt ? new Date(connection.endsAt).toISOString() : "none"}. Call family_history_connection for current state, revision, powers and limits.`,
+    sections: [
+      "When using family_history_limit_connection, include the current revision and a unique opId. A retry of the same operation is safe.",
+      QUEUE_AI_INSTRUCTIONS,
+      "Read storage in the brief and upload replies: these are counters only. A USAGE_LIMIT_REACHED refusal affects one upload; keep this connection and retry the same operation after room is available. Start research with family_history_get_brief, search, then hydrate stable IDs before editing.",
+    ],
+  });
 
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, {
     instructions,
     maxToolInputElements: MAX_MCP_TOOL_INPUT_ELEMENTS,
   });
 
-  /** Register the canonical name and its compatibility alias on ONE handler. */
+  /** The transport dispatches old names to these canonical registrations. */
   const registerTool = (
     canonicalName: string,
     config: { inputSchema: z.ZodType; annotations: Record<string, boolean> },
@@ -677,16 +711,6 @@ export function createFamilyHistoryServer(
       inputSchema: config.inputSchema as any,
       annotations: config.annotations,
     }, handler as any);
-    if (tool.alias) {
-      // Same handler, same scope. Kept so a client that connected before
-      // Family History namespacing keeps working while it refreshes.
-      server.registerTool(tool.alias, {
-        title: tool.title,
-        description: `DEPRECATED NAME for ${tool.name}. Identical behaviour and identical permission; prefer the ${tool.name} name. ${tool.description}`,
-        inputSchema: config.inputSchema as any,
-        annotations: config.annotations,
-      }, handler as any);
-    }
   };
 
   const touch = async (toolName: string) => {
@@ -751,7 +775,7 @@ export function createFamilyHistoryServer(
 
   for (const tool of FAMILY_HISTORY_CONTROL_TOOLS) {
     const isRead = tool.name === "family_history_connection";
-    server.registerTool(tool.name, { title: tool.title, description: tool.humanSummary,
+    server.registerTool(tool.name, { title: tool.title, description: tool.description,
       inputSchema: isRead ? z.object({}).strict() : z.object({
         action: z.enum(["limit", "pause", "revoke"]), revision: z.number().int().nonnegative(), opId: z.string().min(1).max(160),
         removeScopes: z.array(z.string()).optional(), endsAt: z.number().optional(), reason: z.string().max(300).optional(),
@@ -826,10 +850,27 @@ export function createFamilyHistoryServer(
         kind: z.enum(["media", "document"]),
         id,
       }).strict()).min(1).max(FAMILY_HISTORY_MCP_LIMITS.evidenceItems),
-    }).strict(),
+      delivery: z.literal("original").optional(),
+    }).strict().refine(input => !input.delivery || (input.items.length === 1 && input.items[0].kind === "media"), {
+      message: "Request an exact original using one media item.",
+    }),
     annotations: readOnly,
   }, async (input: any) => {
     try {
+      if (input.delivery === "original") {
+        // Never put a bearer link on a provider or backend hostname, even if
+        // someone has pointed the configured transport resource at one.
+        const resource = requiredUrl("MCP_RESOURCE_URL");
+        if (resource.hostname !== CANONICAL_RESOURCE_HOST || !grantId) throw new Error("Evidence is unavailable.");
+        const token = crypto.randomUUID();
+        const [{ id: mediaId }] = input.items;
+        const link = await actionCtx.runMutation(internal.mcpEvidence.mintOriginalLink, {
+          principal, grantId, mediaId, tokenHash: await hashMcpInput(token),
+        });
+        await touch("family_history_get_evidence");
+        if (!link) return toolResult({ delivered: [], skipped: [{ id: mediaId, kind: "media", reason: "ORIGINAL_UNAVAILABLE", whatToDo: "Request the usual evidence view if available. The original needs separate review when only a cleaned copy is approved." }] });
+        return toolResult({ id: mediaId, kind: "media", original: { url: new URL(`${EVIDENCE_ORIGINAL_PATH}${token}`, resource.origin).toString(), expiresAt: link.expiresAt } });
+      }
       const batch: any = await actionCtx.runQuery(evidence.getEvidenceBatch, {
         principal,
         grantId,
@@ -1271,7 +1312,32 @@ async function handleMcp(actionCtx: ActionCtx, request: Request) {
     () => createFamilyHistoryServer(actionCtx, principal, resolution),
     { legacy: "stateless", responseMode: "json", maxRequestBodySize: FAMILY_HISTORY_MCP_LIMITS.requestBytes, onerror: () => console.error("[MCP] Family History protocol error") },
   );
-  return await handler.fetch(request, { authInfo: auth });
+  // Old names are callable with the exact same schema, authorization, and
+  // idempotency envelope, but only canonical registrations enter tools/list.
+  const call = parsedBody as { method?: unknown; params?: { name?: unknown } } | null;
+  const requested = call?.method === "tools/call" && typeof call.params?.name === "string" ? call.params.name : undefined;
+  const canonical = requested && findTool(requested);
+  if (!canonical || canonical.name === requested) return await handler.fetch(request, { authInfo: auth });
+
+  const headers = new Headers(request.headers);
+  headers.delete("content-length");
+  if (headers.get("mcp-name") === requested) headers.set("mcp-name", canonical.name);
+  const canonicalRequest = new Request(request.url, {
+    method: request.method, headers,
+    body: JSON.stringify({ ...call, params: { ...call?.params, name: canonical.name } }),
+  });
+  const response = await handler.fetch(canonicalRequest, { authInfo: auth });
+  try {
+    const body = await response.clone().json();
+    await actionCtx.runMutation(grants.recordGrantActivity, {
+      vaultOwnerId: subject, requestId: `legacy-tool:${crypto.randomUUID()}`,
+      grantId: resolution.state === "active" ? resolution.grant.grantId : undefined,
+      clientId: auth.clientId, toolName: requested,
+      outcome: response.ok && !body.error && !body.result?.isError ? "ok" : "error",
+      statusCode: response.status, detail: "Compatibility alias called.",
+    });
+  } catch { /* Compatibility usage tracking must not disrupt calls. */ }
+  return response;
 }
 
 /** Only initialize may supply a reported name. Per-request metadata, tool

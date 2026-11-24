@@ -43,11 +43,11 @@ export function GET() {
     ),
     "",
     "## Tools",
-    "Canonical names are family_history_*. The pre-namespace names are kept as deprecated aliases on the same handlers and the same permission, so a client that connected earlier keeps working; prefer the canonical name.",
-    ...FAMILY_HISTORY_CONTROL_TOOLS.map(tool => `- ${tool.name} (no permission required) — ${tool.humanSummary}`),
+    "Use the family_history_* names listed here. Older clients can still call a compatibility alias with the same permission. Each alias retires after 30 days without a recorded call.",
+    ...FAMILY_HISTORY_CONTROL_TOOLS.map(tool => `- ${tool.name} (no permission required) — ${tool.description}`),
     ...FAMILY_HISTORY_TOOLS.map(
       (tool) =>
-        `- ${tool.name} (${tool.activeGrantOnly ? "active connection only; no publish power required" : tool.requiredScope}${tool.writes ? ", writes" : ", read-only"})${tool.alias ? ` [alias: ${tool.alias}]` : ""} — ${tool.humanSummary}`,
+        `- ${tool.name} (${tool.activeGrantOnly ? "active connection only; no publish power required" : tool.requiredScope}${tool.writes ? ", writes" : ", read-only"}) — ${tool.description}`,
     ),
     "",
     "## Never available through this connection",
@@ -58,7 +58,7 @@ export function GET() {
     "- Do not put family_history:* permissions in the OAuth scope parameter of your authorization request. They are product permissions, not provider scopes: the sign-in provider does not issue them and will refuse the whole request with an invalid-scope error before the person ever sees a consent screen. Ask the provider only for its ordinary identity scopes. Full access starts on sign-in. Only the person can restore removed powers at https://assistwithfamilyhistory.com/settings/ai.",
     "- Never provide or invent userId, ownerId, workspaceId, vaultOwnerId, or tenant IDs. The server derives the vault from verified OAuth.",
     "- Before publishing unlisted or public stories, scrub secrets; one acknowledgeContactDetails: { emails, phones, addresses } covers all email addresses, phone numbers and street addresses in the whole batch, also on the first call. Remove only the person’s own private details; business contacts are expected. You may unpublish too. Never permanently delete, merge identities, invite new people or perform external FamilySearch actions.",
-    "- Never ask a person for a link to a private file, and never fetch one yourself. Use family_history_get_evidence; it returns reviewed, AI-allowed items as content blocks and tells you honestly what it could not deliver and why.",
+    "- Never ask a person for a link to a private file or fetch a storage-provider URL. Use family_history_get_evidence for reviewed, AI-allowed items. For an eligible exact original, follow the one-minute Family History link returned on explicit request.",
     "- Broad discovery withholds living-person notes. Person hydration includes only reviewed AI-allowed loose context and media.",
     "- Evidence facts do not silently overwrite canonical person conclusions. Save candidates/conflicts and let the person review.",
     "- Story writes are draft or review only. Published stories are human-gated and cannot be edited here.",

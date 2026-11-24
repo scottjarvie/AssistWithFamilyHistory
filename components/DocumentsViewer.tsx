@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { loadPersonDocuments } from "@/app/app/people/actions";
 import { UtcDate } from "@/components/design/UtcDate";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,17 +17,28 @@ export interface DocumentRecord {
 }
 
 interface DocumentsViewerProps {
-  /**
-   * Documents rendered on the server and passed in as a prop. The page already
-   * loads these alongside the vault snapshot, so the client component no longer
-   * re-fetches over REST — it only handles copy/download/tab interactions.
-   */
   documents: DocumentRecord[];
   /**
    * Optional message when the documents store is unavailable (e.g. Convex not
    * configured). When set, an "unavailable" state renders instead of the list.
    */
   error?: string | null;
+}
+
+/** Mounted by the visited panel only when Documents is first opened. */
+export function DeferredDocumentsViewer({ personId, owner }: { personId: string; owner: string }) {
+  const [result, setResult] = useState<{ documents: DocumentRecord[]; error?: string }>();
+  useEffect(() => {
+    let current = true;
+    void loadPersonDocuments(personId, owner).then(
+      documents => { if (current) setResult({ documents }); },
+      () => { if (current) setResult({ documents: [], error: "Failed to load documents" }); },
+    );
+    return () => { current = false; };
+  }, [personId, owner]);
+
+  if (!result) return <p role="status" className="text-sm text-muted-foreground">Loading documents…</p>;
+  return <DocumentsViewer documents={result.documents} error={result.error} />;
 }
 
 export function DocumentsViewer({ documents, error = null }: DocumentsViewerProps) {

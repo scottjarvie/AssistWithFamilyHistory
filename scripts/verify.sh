@@ -78,6 +78,8 @@ steps=(
   "check:settings-responsive"
   "check:connection-center"
   "check:public-ai-truth"
+  "check:truthful-workspace-states"
+  "check:public-research-spine"
 )
 
 if [ "${VERIFY_SKIP_BUILD:-}" != "1" ]; then

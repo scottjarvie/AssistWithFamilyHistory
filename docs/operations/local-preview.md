@@ -39,6 +39,12 @@ prints (for example `http://192.168.1.20:3443`).
 - **No sign-in.** Sign-in is switched off locally, so you land straight in the
   app as the local owner. That also means the sign-in screens themselves are
   not part of this preview.
+- **Private pages refuse here since 2026-11-24.** The backend now requires a
+  signed-in owner for every private read and write, and this preview has no
+  sign-in, so vault pages show an error. Public pages still work. To click
+  through private pages, use the signed-in Sandbox (`pnpm dev:sandbox`, see
+  [local development](./local-development.md)). Whether this preview should get
+  a trusted local sign-in is an open decision.
 - **No AI keys needed** to click around. Features that call an AI provider need
   their usual keys in `.env.local`.
 

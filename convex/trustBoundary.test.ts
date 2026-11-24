@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { convexTest } from "convex-test";
+import { getFunctionName, type FunctionArgs, type FunctionReference } from "convex/server";
 import schema from "./schema";
 import { api } from "./_generated/api";
 
@@ -29,15 +30,115 @@ async function seedPerson(t: ReturnType<typeof convexTest>, owner = OWNER_A) {
 }
 
 describe("TRUST_BOUNDARY_MODE", () => {
-  test("unset mode defaults to shadow, allows an anonymous private read, and persists the denial", async () => {
+  test.each(["shadow", "enforce"])("%s protects private reads, including the media address", async (mode) => {
+    vi.stubEnv("TRUST_BOUNDARY_MODE", mode);
+    const t = convexTest(schema, modules);
+    const personId = await seedPerson(t);
+    const { mediaId, storyId, placeId, citationId, sourceId } = await t.run(async (ctx) => {
+      const fields = { vaultOwnerId: OWNER_A, createdAt: 1, updatedAt: 1 };
+      const storageId = await ctx.storage.store(new Blob(["synthetic file"], { type: "image/png" }));
+      const mediaId = await ctx.db.insert("media", { ...fields, storageId, title: "Synthetic file", type: "photo", mimeType: "image/png", personIds: [personId] });
+      const storyId = await ctx.db.insert("stories", { ...fields, personId, title: "Synthetic story", content: "Draft", type: "biography", generatedBy: "human", status: "draft", citationIds: [] });
+      const placeId = await ctx.db.insert("places", { ...fields, name: "Synthetic place", fullName: "Synthetic place", type: "parish", familySearchId: "PLACE-1" });
+      const sourceId = await ctx.db.insert("sources", { ...fields, title: "Synthetic source", type: "other" });
+      const citationId = await ctx.db.insert("citations", { ...fields, sourceId, isEvidence: true, confidence: "high" });
+      return { mediaId, storyId, placeId, citationId, sourceId };
+    });
+    const owner = t.withIdentity({ subject: OWNER_A });
+    const other = t.withIdentity({ subject: OWNER_B });
+    const scope = { vaultOwnerId: OWNER_A };
+    const page = { ...scope, cursor: null };
+    const person = { ...scope, personIdentifier: String(personId) };
+    const legacyDocument = { ...scope, personId: String(personId) };
+    const vault = api.vaultReads;
+    const cases: Array<() => Promise<void>> = [];
+    function check<F extends FunctionReference<"action">>(fn: F, args: FunctionArgs<F>) {
+      cases.push(async () => {
+        const name = getFunctionName(fn);
+        await expect(owner.action(fn, args), name).resolves.not.toBeUndefined();
+        await expect(other.action(fn, args), name).rejects.toThrow("Trust boundary denied: owner_mismatch");
+        await expect(t.action(fn, args), name).rejects.toThrow("Trust boundary denied: missing_identity");
+      });
+    }
+
+    check(vault.getOwnedMediaFile, { ...scope, mediaId });
+    check(vault.getPeopleExplorerPage, page);
+    check(vault.getPersonWorkspace, person);
+    check(vault.getStoriesIndex, scope);
+    check(vault.getStoryReview, { ...scope, storyId });
+    check(vault.getPersonResearchChecks, person);
+    check(vault.getProvisionalRelatives, person);
+    check(vault.getOperationsQueue, scope);
+    check(vault.getOperationsSummary, scope);
+    check(vault.getVaultAudit, scope);
+    check(vault.getContextCoverage, person);
+    check(vault.getStoryReadinessPage, scope);
+    check(vault.getPlacesPage, page);
+    check(vault.getPlaceSection, { ...page, placeId, section: "people" });
+    check(vault.getPlaceMentions, { ...scope, placeId });
+    check(vault.getPlaceWorkspace, { ...scope, placeId });
+    check(vault.getFirstStartEligibility, scope);
+    check(vault.getDashboardSummary, scope);
+    check(vault.getResearchTasksPage, page);
+    check(vault.getResearchLogPage, page);
+    check(vault.getContextPack, person);
+    check(api.apiKeys.listKeys, scope);
+    check(api.citations.get, { ...scope, id: citationId });
+    check(api.citations.getForSource, { ...scope, sourceId });
+    check(api.citations.getForTarget, { ...scope, targetType: "person", targetId: personId });
+    check(api.citations.list, scope);
+    check(api.documents.getDocumentsByPerson, legacyDocument);
+    check(api.documents.getDocument, { ...legacyDocument, type: "PS" });
+    check(api.documents.list, scope);
+    check(api.importRuns.listRecent, scope);
+    check(api.importRuns.getByCaptureId, { ...scope, captureId: "synthetic" });
+    check(api.places.getByFsId, { ...scope, fsId: "PLACE-1" });
+    check(api.places.list, scope);
+    check(api.researchLog.listForEntity, { ...scope, entityType: "person", entityId: personId });
+    check(api.researchTasks.listResearchTasks, scope);
+
+    for (const run of cases) await run();
+    await expect(owner.action(vault.getOwnedMediaFile, { ...scope, mediaId })).resolves.toMatchObject({
+      url: expect.stringMatching(/^https?:\/\//), mimeType: "image/png", title: "Synthetic file",
+    });
+    await expect(other.action(vault.getOwnedMediaFile, { vaultOwnerId: OWNER_B, mediaId })).resolves.toBeNull();
+    const logs = await t.run((ctx) => ctx.db.query("trustBoundaryShadowLog").collect());
+    expect(logs).toHaveLength(mode === "shadow" ? cases.length * 2 : 0);
+  });
+
+  test.each(["shadow", "enforce"])("%s signs a private B2 file only for its owner", async (mode) => {
+    vi.stubEnv("TRUST_BOUNDARY_MODE", mode);
+    vi.stubEnv("MEDIA_STORAGE_ENVIRONMENT", "development");
+    vi.stubEnv("B2_PRIVATE_ENDPOINT", "https://media.example.test");
+    vi.stubEnv("B2_PRIVATE_REGION", "us-west-000");
+    vi.stubEnv("B2_PRIVATE_BUCKET", "synthetic-private");
+    vi.stubEnv("B2_PRIVATE_KEY_ID", "not-a-real-key-id");
+    vi.stubEnv("B2_PRIVATE_APPLICATION_KEY", "not-a-real-application-key");
+    const t = convexTest(schema, modules);
+    const mediaId = await t.run(ctx => ctx.db.insert("media", {
+      vaultOwnerId: OWNER_A, title: "Synthetic B2 file", type: "scan", personIds: [], createdAt: 1, updatedAt: 1,
+      mediaState: "ready", b2Original: {
+        bucketClass: "private", bucketName: "synthetic-private", objectKey: "synthetic-object", versionId: "synthetic-version",
+        sha256: "a".repeat(64), contentType: "image/png", sizeBytes: 4, metadataClean: false, verifiedAt: "2026-11-24T00:00:00Z",
+      },
+    }));
+    const args = { vaultOwnerId: OWNER_A, mediaId };
+    const read = api.vaultReads.getOwnedMediaFile;
+    const file = await t.withIdentity({ subject: OWNER_A }).action(read, args);
+    expect(file?.title).toBe("Synthetic B2 file");
+    expect(new URL(file!.url).hostname).toMatch(/media\.example\.test$/);
+    await expect(t.withIdentity({ subject: OWNER_B }).action(read, args)).rejects.toThrow(/owner_mismatch/);
+    await expect(t.action(read, args)).rejects.toThrow(/missing_identity/);
+  });
+
+  test("unset mode defaults to shadow, refuses an anonymous private read, and persists the denial", async () => {
     vi.stubEnv("TRUST_BOUNDARY_MODE", "");
     const t = convexTest(schema, modules);
     await seedPerson(t);
 
-    const rows = await t.action(api.vaultReads.getPeopleExplorerPage, {
+    await expect(t.action(api.vaultReads.getPeopleExplorerPage, {
       vaultOwnerId: OWNER_A, cursor: null,
-    });
-    expect(rows.page).toHaveLength(1);
+    })).rejects.toThrow("Trust boundary denied: missing_identity");
 
     const logs = await t.run((ctx) => ctx.db.query("trustBoundaryShadowLog").collect());
     expect(logs).toHaveLength(1);
@@ -47,6 +148,29 @@ describe("TRUST_BOUNDARY_MODE", () => {
       callerKind: "anonymous",
       reason: "missing_identity",
     });
+  });
+
+  test.each(["shadow", "enforce"])("%s protects private write results and refuses guest transfers to a foreign destination", async (mode) => {
+    vi.stubEnv("TRUST_BOUNDARY_MODE", mode);
+    const t = convexTest(schema, modules);
+    const log = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const personId = await seedPerson(t);
+      const owner = t.withIdentity({ subject: OWNER_A });
+      const other = t.withIdentity({ subject: OWNER_B });
+      const personArgs = { vaultOwnerId: OWNER_A, fsId: "SAFE-PUBLIC-1", name: { given: "Mary", surname: "Example" }, sex: "female" as const };
+      await expect(owner.mutation(api.vaultMutations.upsertPerson, personArgs)).resolves.toEqual({ personId, created: false });
+
+      const migrationArgs = { toVaultOwnerId: OWNER_A, fromVaultOwnerId: "guest_synthetic" };
+      await expect(other.mutation(api.vaultMutations.upsertPerson, personArgs)).rejects.toThrow("Trust boundary denied: owner_mismatch");
+      await expect(t.mutation(api.vaultMutations.upsertPerson, personArgs)).rejects.toThrow("Trust boundary denied: missing_identity");
+      await expect(other.mutation(api.vaultMigration.migrateGuestVault, migrationArgs)).rejects.toThrow("Trust boundary denied: owner_mismatch");
+      await expect(t.mutation(api.vaultMigration.migrateGuestVault, migrationArgs)).rejects.toThrow("Trust boundary denied: missing_identity");
+      expect(log).toHaveBeenCalledTimes(mode === "shadow" ? 4 : 0);
+      expect(await t.run((ctx) => ctx.db.query("persons").collect())).toHaveLength(1);
+    } finally {
+      log.mockRestore();
+    }
   });
 
   test("enforce mode denies an anonymous private read without touching tenant data", async () => {
@@ -100,8 +224,9 @@ describe("TRUST_BOUNDARY_MODE", () => {
     expect(citations).toHaveLength(0);
   });
 
-  test("shadow mode records and preserves a legacy foreign-reference call", async () => {
+  test("shadow mode records and refuses a foreign-reference call", async () => {
     vi.stubEnv("TRUST_BOUNDARY_MODE", "shadow");
+    const log = vi.spyOn(console, "warn").mockImplementation(() => {});
     const t = convexTest(schema, modules);
     const foreignSourceId = await t.run((ctx) =>
       ctx.db.insert("sources", {
@@ -113,20 +238,22 @@ describe("TRUST_BOUNDARY_MODE", () => {
       }),
     );
 
-    await t.withIdentity({ subject: OWNER_A }).mutation(api.vaultMutations.upsertCitation, {
-      vaultOwnerId: OWNER_A,
-      sourceId: foreignSourceId,
-      isEvidence: true,
-      confidence: "high",
-    });
-
-    const logs = await t.run((ctx) => ctx.db.query("trustBoundaryShadowLog").collect());
-    expect(logs).toHaveLength(1);
-    expect(logs[0]).toMatchObject({
-      functionName: "vaultMutations.upsertCitation",
-      caller: OWNER_A,
-      reason: "reference_owner_mismatch",
-    });
+    try {
+      await expect(t.withIdentity({ subject: OWNER_A }).mutation(api.vaultMutations.upsertCitation, {
+        vaultOwnerId: OWNER_A,
+        sourceId: foreignSourceId,
+        isEvidence: true,
+        confidence: "high",
+      })).rejects.toThrow("Trust boundary denied: reference_owner_mismatch");
+      expect(log).toHaveBeenCalledWith("Trust boundary shadow denial", expect.objectContaining({
+        functionName: "vaultMutations.upsertCitation",
+        caller: OWNER_A,
+        reason: "reference_owner_mismatch",
+      }));
+      expect(await t.run((ctx) => ctx.db.query("citations").collect())).toEqual([]);
+    } finally {
+      log.mockRestore();
+    }
   });
 
   test("draft and review stories remain unreadable anonymously", async () => {

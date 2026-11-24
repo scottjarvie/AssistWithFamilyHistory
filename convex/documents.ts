@@ -154,10 +154,10 @@ export const getDocumentsByPersonInternal = internalQuery({
   args: getDocumentsByPersonArgs,
   handler: async (ctx, args) => {
     if (!(await resolveOwnedDocumentPerson(ctx, args.vaultOwnerId, args.personId))) return [];
-    const results = await ctx.db
-      .query("documents")
-      .withIndex("by_personId", (q) => q.eq("personId", args.personId))
-      .collect();
+    const documents = ctx.db.query("documents");
+    const results = args.vaultOwnerId === DEFAULT_LOCAL_VAULT_OWNER
+      ? await documents.withIndex("by_personId", q => q.eq("personId", args.personId)).collect()
+      : await documents.withIndex("by_owner_personId", q => q.eq("vaultOwnerId", args.vaultOwnerId).eq("personId", args.personId)).collect();
 
     return filterByVaultOwner(results, args.vaultOwnerId).sort((a, b) =>
       a.type.localeCompare(b.type)

@@ -137,7 +137,7 @@ export default function AiSetupPage() {
                 Connecting signs into the same private account. No research runs automatically, and your AI may publish stories after scrubbing secrets and confirming contact details; permanent deletion stays unavailable.
               </p>
               <p className="mt-4 text-sm leading-6">{AI_ACCESS_INSTRUCTIONS}</p>
-              <ul className="mt-3 text-sm">{FAMILY_HISTORY_CONTROL_TOOLS.map(tool => <li key={tool.name}><code>{tool.name}</code> — {tool.humanSummary}</li>)}</ul>
+              <ul className="mt-3 text-sm">{FAMILY_HISTORY_CONTROL_TOOLS.map(tool => <li key={tool.name}><code>{tool.name}</code> — {tool.description}</li>)}</ul>
             </aside>
           </div>
         </section>

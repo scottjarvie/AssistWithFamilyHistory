@@ -33,6 +33,7 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
     workspace = await client.action(api.vaultReads.getPersonWorkspace, {
       vaultOwnerId,
       personIdentifier: personId,
+      documentsMetadataOnly: true,
     });
   } catch (error) {
     const issue = getConvexRuntimeIssue(error);
@@ -48,11 +49,5 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
     notFound();
   }
 
-  // The owner-scoped person snapshot already contains these PS/CST records.
-  // Keep the Documents tab's order and send only the fields the viewer uses.
-  const documents = [...workspace.documents]
-    .sort((a, b) => a.type.localeCompare(b.type) || a._creationTime - b._creationTime)
-    .map(({ _id, type, title, contentMarkdown, updatedAt }) => ({ _id, type, title, contentMarkdown, updatedAt }));
-
-  return <PersonWorkspaceView workspace={workspace} personId={personId} documents={documents} documentsError={null} />;
+  return <PersonWorkspaceView workspace={workspace} personId={personId} documents={[]} documentsError={null} documentsOwner={vaultOwnerId} />;
 }

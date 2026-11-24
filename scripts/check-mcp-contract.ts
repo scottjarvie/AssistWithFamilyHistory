@@ -7,6 +7,7 @@
  * failure mode that turns a permission model into decoration.
  */
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 import {
@@ -23,9 +24,16 @@ import {
 } from "../lib/mcp/catalog";
 import { assertMcpToolContract, FAMILY_HISTORY_MCP_TOOL_NAMES } from "../lib/mcp/contract";
 import { decideToolAccess, queueScopesForGrant } from "../lib/mcp/authorize";
+import { MCP_CONNECTOR_CONTRACT_VERSION } from "../convex/lib/mcpConnector/contract";
 
 assertFamilyHistoryCatalogContract();
 assertMcpToolContract();
+
+const syncedContract = readFileSync("convex/lib/mcpConnector/contract.ts", "utf8").replace(/\r\n?/g, "\n");
+const [fingerprint, syncedFrom, ...sharedContract] = syncedContract.split("\n");
+const expectedContractHash = createHash("sha256").update(sharedContract.join("\n")).digest("hex");
+assert.equal(fingerprint, `// assist-mcp-connector-contract v${MCP_CONNECTOR_CONTRACT_VERSION} sha256:${expectedContractHash}`);
+assert.match(syncedFrom, /^\/\/ Synced from assistwithlife /);
 
 /* ------------------------------------------------- scope -> tool, both ways */
 
@@ -147,8 +155,8 @@ assert.ok(
   "the transport must resolve the product grant on every request",
 );
 assert.ok(
-  /if \(tool\.alias\)/.test(transport),
-  "the transport must register every compatibility alias on the same handler",
+  transport.includes("findTool(requested)") && !transport.includes("registerTool(tool.alias"),
+  "the transport must route compatibility aliases to canonical registrations without listing them",
 );
 assert.ok(
   transport.includes("queueScopesForGrant"),

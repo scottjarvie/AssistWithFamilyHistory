@@ -3,6 +3,14 @@
 This is the production procedure for moving the Convex trust boundary from
 shadow to enforce. Do not skip the observation window.
 
+Since 2026-11-24 (pull request 170) Convex refuses a missing identity, a
+mismatched owner or a foreign reference in **both** modes. Shadow no longer
+lets those calls through, so a legitimate flow that lacks a token already fails
+in shadow. The flip still changes two things: the Next server refuses to call
+Convex without a token (lib/convex/server.ts), and the legacy guest-source
+transfer is refused (`guest_source_unverified`). The observation window below
+is how you prove legitimate traffic carries a token before that.
+
 ## 1. Configure Clerk identity
 
 In the production Clerk instance:
@@ -91,11 +99,17 @@ Do not flip unless:
 Hostile probes may make total nonzero. The acceptance condition is **zero
 legitimate denials**, not necessarily zero hostile traffic.
 
+The summary counts refused actions only. A refused mutation rolls back its own
+writes, so shadow reports it as a `Trust boundary shadow denial` line in the
+Convex function logs instead. Search the production logs for that text over the
+same window and apply the same zero-legitimate-denials rule.
+
 ## 5. Flip to enforce
 
 1. Set Vercel Production to TRUST_BOUNDARY_MODE=enforce and redeploy Next
-   first. Convex remains permissive while the server proves it can mint and
-   attach the token.
+   first, so the server proves it can mint and attach the token. (Convex owner
+   checks already refuse in shadow; only the guest-source rule is still
+   permissive there.)
 2. Confirm one signed-in private request succeeds.
 3. Flip Convex:
 
@@ -112,8 +126,10 @@ Vercel error logs for new enforcement incidents.
 
 ## 6. Roll back
 
-Restore Convex first so protected calls immediately become permissive and
-observable:
+Restore Convex first so refusals are recorded again in the shadow summary and
+function logs. Since pull request 170 this does **not** reopen owner checks: a
+call without a matching signed-in owner stays refused in shadow. Only the
+guest-source transfer becomes permissive again.
 
 ~~~bash
 pnpm exec convex env set --prod TRUST_BOUNDARY_MODE shadow

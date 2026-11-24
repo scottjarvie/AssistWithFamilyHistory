@@ -51,11 +51,11 @@ async function checkGeneratedAgentGuide(aiTxt: string) {
 for (const tool of FAMILY_HISTORY_TOOLS) {
   assert.ok(aiTxt.includes(tool.name), `/ai.txt must publish the tool ${tool.name}`);
   assert.ok(
-    aiTxt.includes(tool.humanSummary),
+    aiTxt.includes(tool.description),
     `/ai.txt must publish what ${tool.name} is for, in the catalog's own words`,
   );
   if (tool.alias) {
-    assert.ok(aiTxt.includes(tool.alias), `/ai.txt must keep naming the alias ${tool.alias}`);
+    assert.ok(!aiTxt.includes(`[alias: ${tool.alias}]`), `/ai.txt must only list canonical tools (${tool.alias})`);
   }
 }
 for (const scope of FAMILY_HISTORY_SCOPE_INFO) {

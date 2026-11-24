@@ -25,9 +25,9 @@ const mintArgs = (owner: string, keyId: string, label: string) => ({
 describe("api key lifecycle", () => {
   test("mint then list returns the key without its secret hash", async () => {
     const t = convexTest(schema, modules);
-    await t.mutation(api.apiKeys.mintKey, mintArgs(OWNER_A, "dts_live_aaa111", "Claude Code"));
+    await t.withIdentity({ subject: OWNER_A }).mutation(api.apiKeys.mintKey, mintArgs(OWNER_A, "dts_live_aaa111", "Claude Code"));
 
-    const keys = await t.action(api.apiKeys.listKeys, { vaultOwnerId: OWNER_A });
+    const keys = await t.withIdentity({ subject: OWNER_A }).action(api.apiKeys.listKeys, { vaultOwnerId: OWNER_A });
     expect(keys.length).toBe(1);
     expect(keys[0].keyId).toBe("dts_live_aaa111");
     expect(keys[0].status).toBe("active");
@@ -37,15 +37,15 @@ describe("api key lifecycle", () => {
 
   test("revoke flips status and is owner-guarded", async () => {
     const t = convexTest(schema, modules);
-    await t.mutation(api.apiKeys.mintKey, mintArgs(OWNER_A, "dts_live_bbb222", "key"));
+    await t.withIdentity({ subject: OWNER_A }).mutation(api.apiKeys.mintKey, mintArgs(OWNER_A, "dts_live_bbb222", "key"));
 
     // another owner cannot revoke it
     await expect(
-      t.mutation(api.apiKeys.revokeKey, { vaultOwnerId: OWNER_B, keyId: "dts_live_bbb222" }),
+      t.withIdentity({ subject: OWNER_B }).mutation(api.apiKeys.revokeKey, { vaultOwnerId: OWNER_B, keyId: "dts_live_bbb222" }),
     ).rejects.toThrow(/not found/);
 
-    await t.mutation(api.apiKeys.revokeKey, { vaultOwnerId: OWNER_A, keyId: "dts_live_bbb222" });
-    const keys = await t.action(api.apiKeys.listKeys, { vaultOwnerId: OWNER_A });
+    await t.withIdentity({ subject: OWNER_A }).mutation(api.apiKeys.revokeKey, { vaultOwnerId: OWNER_A, keyId: "dts_live_bbb222" });
+    const keys = await t.withIdentity({ subject: OWNER_A }).action(api.apiKeys.listKeys, { vaultOwnerId: OWNER_A });
     expect(keys[0].status).toBe("revoked");
     expect(typeof keys[0].revokedAt).toBe("number");
   });
@@ -53,36 +53,36 @@ describe("api key lifecycle", () => {
   test("mint rejects a non-dts key id and an empty label", async () => {
     const t = convexTest(schema, modules);
     await expect(
-      t.mutation(api.apiKeys.mintKey, { ...mintArgs(OWNER_A, "bad_prefix_1", "x") }),
+      t.withIdentity({ subject: OWNER_A }).mutation(api.apiKeys.mintKey, { ...mintArgs(OWNER_A, "bad_prefix_1", "x") }),
     ).rejects.toThrow(/prefix/);
     await expect(
-      t.mutation(api.apiKeys.mintKey, { ...mintArgs(OWNER_A, "dts_live_ccc333", "   ") }),
+      t.withIdentity({ subject: OWNER_A }).mutation(api.apiKeys.mintKey, { ...mintArgs(OWNER_A, "dts_live_ccc333", "   ") }),
     ).rejects.toThrow(/label/);
   });
 
   test("suspend then reactivate; revoked keys cannot be reactivated", async () => {
     const t = convexTest(schema, modules);
-    await t.mutation(api.apiKeys.mintKey, mintArgs(OWNER_A, "dts_live_ddd444", "key"));
+    await t.withIdentity({ subject: OWNER_A }).mutation(api.apiKeys.mintKey, mintArgs(OWNER_A, "dts_live_ddd444", "key"));
 
-    await t.mutation(api.apiKeys.setKeyStatus, {
+    await t.withIdentity({ subject: OWNER_A }).mutation(api.apiKeys.setKeyStatus, {
       vaultOwnerId: OWNER_A,
       keyId: "dts_live_ddd444",
       status: "suspended",
     });
-    let keys = await t.action(api.apiKeys.listKeys, { vaultOwnerId: OWNER_A });
+    let keys = await t.withIdentity({ subject: OWNER_A }).action(api.apiKeys.listKeys, { vaultOwnerId: OWNER_A });
     expect(keys[0].status).toBe("suspended");
 
-    await t.mutation(api.apiKeys.setKeyStatus, {
+    await t.withIdentity({ subject: OWNER_A }).mutation(api.apiKeys.setKeyStatus, {
       vaultOwnerId: OWNER_A,
       keyId: "dts_live_ddd444",
       status: "active",
     });
-    keys = await t.action(api.apiKeys.listKeys, { vaultOwnerId: OWNER_A });
+    keys = await t.withIdentity({ subject: OWNER_A }).action(api.apiKeys.listKeys, { vaultOwnerId: OWNER_A });
     expect(keys[0].status).toBe("active");
 
-    await t.mutation(api.apiKeys.revokeKey, { vaultOwnerId: OWNER_A, keyId: "dts_live_ddd444" });
+    await t.withIdentity({ subject: OWNER_A }).mutation(api.apiKeys.revokeKey, { vaultOwnerId: OWNER_A, keyId: "dts_live_ddd444" });
     await expect(
-      t.mutation(api.apiKeys.setKeyStatus, {
+      t.withIdentity({ subject: OWNER_A }).mutation(api.apiKeys.setKeyStatus, {
         vaultOwnerId: OWNER_A,
         keyId: "dts_live_ddd444",
         status: "active",
@@ -92,9 +92,9 @@ describe("api key lifecycle", () => {
 
   test("list is owner-scoped", async () => {
     const t = convexTest(schema, modules);
-    await t.mutation(api.apiKeys.mintKey, mintArgs(OWNER_A, "dts_live_aaa", "a"));
-    await t.mutation(api.apiKeys.mintKey, mintArgs(OWNER_B, "dts_live_bbb", "b"));
-    const aKeys = await t.action(api.apiKeys.listKeys, { vaultOwnerId: OWNER_A });
+    await t.withIdentity({ subject: OWNER_A }).mutation(api.apiKeys.mintKey, mintArgs(OWNER_A, "dts_live_aaa", "a"));
+    await t.withIdentity({ subject: OWNER_B }).mutation(api.apiKeys.mintKey, mintArgs(OWNER_B, "dts_live_bbb", "b"));
+    const aKeys = await t.withIdentity({ subject: OWNER_A }).action(api.apiKeys.listKeys, { vaultOwnerId: OWNER_A });
     expect(aKeys.length).toBe(1);
     expect(aKeys[0].keyId).toBe("dts_live_aaa");
   });

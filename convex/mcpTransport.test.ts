@@ -7,8 +7,9 @@ import { exportJWK, generateKeyPair, SignJWT, type KeyLike } from "jose";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import schema from "./schema";
 import { api } from "./_generated/api";
-import { FAMILY_HISTORY_ALL_TOOL_NAMES, FAMILY_HISTORY_SCOPES } from "../lib/mcp/catalog";
+import { FAMILY_HISTORY_CANONICAL_TOOL_NAMES, FAMILY_HISTORY_SCOPES, FAMILY_HISTORY_TOOLS } from "../lib/mcp/catalog";
 import { seedGrant } from "../lib/mcp/testSupport";
+import { assertConnectorContract } from "./lib/mcpConnector/contract";
 
 const modules = import.meta.glob("./**/*.ts");
 const RESOURCE = "https://family-history.example.test/mcp";
@@ -57,15 +58,31 @@ function modernRequest(
   };
 }
 
-async function accessToken(clientId = "synthetic-client") {
+async function accessToken(clientId = "synthetic-client", audience = RESOURCE) {
   return new SignJWT({ scope: "family_history:read family_history:write", client_id: clientId })
     .setProtectedHeader({ alg: "RS256", kid: "synthetic-key", typ: "at+jwt" })
     .setIssuer(ISSUER)
     .setSubject(SUBJECT)
-    .setAudience(RESOURCE)
+    .setAudience(audience)
     .setIssuedAt()
     .setExpirationTime("5m")
     .sign(privateKey);
+}
+
+async function connectOfficialClient(t: ReturnType<typeof convexTest>, token: string) {
+  const client = new Client(
+    { name: "family-history-official-client-proof", version: "1.0.0" },
+    { versionNegotiation: { mode: { pin: PROTOCOL_VERSION } } },
+  );
+  await client.connect(new StreamableHTTPClientTransport(new URL(RESOURCE), {
+    authProvider: { token: async () => token },
+    fetch: async (input, init) => {
+      const request = new Request(input, init);
+      const body = request.method === "GET" || request.method === "HEAD" ? undefined : await request.arrayBuffer();
+      return t.fetch(new URL(request.url).pathname, { method: request.method, headers: request.headers, body });
+    },
+  }));
+  return client;
 }
 
 beforeAll(async () => {
@@ -90,6 +107,32 @@ afterAll(() => {
 });
 
 describe("stateless Family History MCP transport", () => {
+  test.each(["full", "limited", "pending", "paused", "revoked", "expired"] as const)(
+    "initialize and tools/list satisfy the family connector contract in the %s state", async state => {
+      const t = convexTest(schema, modules);
+      const grantId = await seedGrant(t, {
+        vaultOwnerId: SUBJECT, clientId: CLIENT_ID, issuer: ISSUER,
+        status: state === "pending" || state === "revoked" ? state : "active",
+        expiresAt: state === "full" ? null : state === "expired" ? Date.now() - 1 : Date.now() + 10_000_000,
+        ...(state === "limited" ? { scopes: ["family_history:context:read" as const], boundary: { kind: "selected_people" as const, personIds: ["synthetic-person"] } } : {}),
+      });
+      if (state === "paused" || state === "revoked") await t.run(async ctx => {
+        const id = ctx.db.normalizeId("mcpGrants", grantId)!;
+        await ctx.db.patch(id, state === "paused" ? { pausedAt: Date.now() } : { revokedAt: Date.now() });
+      });
+      const client = await connectOfficialClient(t, await accessToken());
+      const text = client.getInstructions();
+      const { tools } = await client.listTools();
+      await client.close();
+      const authorityMarkers = ["ACCESS.", "Only the person can give access back", "You can never widen", "Permanent deletion", "Living-person records", "reviewed, AI-allowed media", "rights that permit AI use", "media-review"];
+      assertConnectorContract(text ?? "", authorityMarkers, tools, "family_history_");
+      expect(text).toContain(`Actual connection: ${state === "full" || state === "limited" ? "active" : state}`);
+      expect(tools.length).toBeGreaterThan(0);
+      const descriptions = new Map([...FAMILY_HISTORY_TOOLS, ...FAMILY_HISTORY_CONTROL_TOOLS].map(tool => [tool.name, tool.description]));
+      for (const tool of tools) expect(tool.description).toBe(descriptions.get(tool.name));
+    },
+  );
+
   test("publishes protected-resource metadata and a real anonymous OAuth challenge", async () => {
     const t = convexTest(schema, modules);
     const metadata = await t.fetch("/.well-known/oauth-protected-resource/mcp");
@@ -247,7 +290,7 @@ describe("stateless Family History MCP transport", () => {
     const payload = await response.json();
     expect(payload.error).toBeUndefined();
     expect(payload.result.tools.map((tool: { name: string }) => tool.name).sort()).toEqual(
-      [...FAMILY_HISTORY_ALL_TOOL_NAMES, ...FAMILY_HISTORY_CONTROL_TOOLS.map(t => t.name)].sort(),
+      [...FAMILY_HISTORY_CANONICAL_TOOL_NAMES, ...FAMILY_HISTORY_CONTROL_TOOLS.map(t => t.name)].sort(),
     );
     for (const tool of payload.result.tools) {
       expect(tool.inputSchema?.properties?.ownerId).toBeUndefined();
@@ -279,15 +322,13 @@ describe("stateless Family History MCP transport", () => {
       family_history_save_story_work: ["operationId", "mode", "createKey", "storyId", "title", "content"],
     };
     for (const [name, keys] of Object.entries(expected)) {
-      for (const toolName of [name, name.replace(/^family_history_/, "")]) {
-        const inputSchema = byName.get(toolName)!;
-        expect(inputSchema, toolName).toBeDefined();
-        expect(inputSchema.type, toolName).toBe("object");
-        expect(inputSchema.allOf, toolName).toBeUndefined();
-        expect(inputSchema.additionalProperties, toolName).toBe(false);
-        expect(inputSchema.required, toolName).toContain("operationId");
-        for (const key of keys) expect(Object.keys(inputSchema.properties), `${toolName}.${key}`).toContain(key);
-      }
+      const inputSchema = byName.get(name)!;
+      expect(inputSchema, name).toBeDefined();
+      expect(inputSchema.type, name).toBe("object");
+      expect(inputSchema.allOf, name).toBeUndefined();
+      expect(inputSchema.additionalProperties, name).toBe(false);
+      expect(inputSchema.required, name).toContain("operationId");
+      for (const key of keys) expect(Object.keys(inputSchema.properties), `${name}.${key}`).toContain(key);
     }
     expect(byName.get("family_history_save_person")!.properties.mode.enum).toEqual(["create", "update"]);
   });
@@ -316,29 +357,9 @@ describe("stateless Family History MCP transport", () => {
   test("the official v2 MCP client negotiates, lists tools, and saves through the stateless handler", async () => {
     const t = convexTest(schema, modules);
     await approvedConnection(t);
-    const token = await accessToken();
-    const client = new Client(
-      { name: "family-history-official-client-proof", version: "1.0.0" },
-      { versionNegotiation: { mode: { pin: PROTOCOL_VERSION } } },
-    );
-    const transport = new StreamableHTTPClientTransport(new URL(RESOURCE), {
-      authProvider: { token: async () => token },
-      fetch: async (input, init) => {
-        const request = new Request(input, init);
-        const body = request.method === "GET" || request.method === "HEAD"
-          ? undefined
-          : await request.arrayBuffer();
-        return t.fetch(new URL(request.url).pathname, {
-          method: request.method,
-          headers: request.headers,
-          body,
-        });
-      },
-    });
-
-    await client.connect(transport);
+    const client = await connectOfficialClient(t, await accessToken());
     const catalog = await client.listTools();
-    expect(catalog.tools.map((tool) => tool.name).sort()).toEqual([...FAMILY_HISTORY_ALL_TOOL_NAMES, ...FAMILY_HISTORY_CONTROL_TOOLS.map(t => t.name)].sort());
+    expect(catalog.tools.map((tool) => tool.name).sort()).toEqual([...FAMILY_HISTORY_CANONICAL_TOOL_NAMES, ...FAMILY_HISTORY_CONTROL_TOOLS.map(t => t.name)].sort());
     const result = await client.callTool({
       name: "save_person",
       arguments: {
@@ -460,6 +481,45 @@ describe("stateless Family History MCP transport", () => {
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toMatchObject({ error: "invalid_token" });
   });
+});
+
+test("all 14 hidden compatibility names still run canonical tools and record their use", async () => {
+  const t = convexTest(schema, modules);
+  await approvedConnection(t);
+  const token = await accessToken();
+  const used: string[] = [];
+  const call = async (name: string, args: Record<string, unknown> = {}) => {
+    const response = await t.fetch("/mcp", modernRequest("tools/call", token, { name, arguments: args }, name));
+    const body = await response.json();
+    expect(body.error, name).toBeUndefined();
+    expect(body.result.isError, name).not.toBe(true);
+    used.push(name);
+    return body.result.structuredContent;
+  };
+  const person = (prefix: string) => ({ mode: "create", createKey: `legacy-${prefix}`, name: { given: prefix, surname: "Synthetic" }, sex: "unknown", living: false });
+  const saved = await call("save_person", { operationId: "alias-person-operation", ...person("Legacy") });
+  const person1 = saved.person.id;
+  const person2 = (await call("save_person", { operationId: "alias-second-person", ...person("Related") })).person.id;
+  await call("get_family_history_brief");
+  await call("search_family_history", { query: "Legacy" });
+  expect((await call("get_family_history_context", { kind: "person", id: person1 })).person._id).toBe(person1);
+  await call("save_relationship", { operationId: "alias-relationship", mode: "create", createKey: "legacy-relationship", type: "Couple", person1, person2 });
+  await call("save_event", { operationId: "alias-event", mode: "create", createKey: "legacy-event", type: "census", personRoles: [{ personId: person1, role: "primary" }] });
+  await call("save_source_evidence", { operationId: "alias-source", source: { mode: "create", createKey: "legacy-source", type: "census", title: "Synthetic census" }, citation: { mode: "create", createKey: "legacy-citation", confidence: "high" } });
+  await call("save_research_work", { operationId: "alias-research", task: { mode: "create", createKey: "legacy-task", personId: person1, type: "record_search", title: "Synthetic task" } });
+  await call("save_story_work", { operationId: "alias-story", mode: "create", createKey: "legacy-story", personId: person1, type: "biography", title: "Synthetic draft", content: "A draft." });
+  await call("save_complete_result", { operationId: "alias-complete", summary: "Synthetic research pass", person: person("Complete") });
+  const suggestion = (await call("add_queue", { operationId: "alias-suggestion", addedBy: "ai_suggestion", directive: "Find another source", reason: "One is missing" })).item;
+  await call("withdraw_suggestion", { operationId: "alias-withdraw", expectedVersion: 1, queueItemId: suggestion._id });
+  const requested = (await call("add_queue", { operationId: "alias-requested", addedBy: "ai_on_request", directive: "Look for a source" })).item;
+  await call("get_queue", { action: "list" });
+  await call("update_queue", { action: "request_user_action", operationId: "alias-update", expectedVersion: 1, queueItemId: requested._id, requiredAction: "Which source?" });
+
+  const aliases = FAMILY_HISTORY_TOOLS.flatMap(tool => tool.alias ? [tool.alias] : []);
+  expect(aliases).toHaveLength(14);
+  expect(new Set(used)).toEqual(new Set(aliases));
+  const activity = await t.run(ctx => ctx.db.query("agentActivity").collect());
+  expect(new Set(activity.filter(row => row.detail === "Compatibility alias called.").map(row => row.scope))).toEqual(new Set(aliases));
 });
 
 /**
@@ -597,7 +657,7 @@ describe("reconnecting refreshes the tool list without a session to reset", () =
 
     const firstNames = (await first.json()).result.tools.map((tool: { name: string }) => tool.name).sort();
     const secondNames = (await second.json()).result.tools.map((tool: { name: string }) => tool.name).sort();
-    expect(firstNames).toEqual([...FAMILY_HISTORY_ALL_TOOL_NAMES, ...FAMILY_HISTORY_CONTROL_TOOLS.map(t => t.name)].sort());
+    expect(firstNames).toEqual([...FAMILY_HISTORY_CANONICAL_TOOL_NAMES, ...FAMILY_HISTORY_CONTROL_TOOLS.map(t => t.name)].sort());
     expect(secondNames).toEqual(firstNames);
   });
 
@@ -607,7 +667,7 @@ describe("reconnecting refreshes the tool list without a session to reset", () =
     const token = await accessToken();
 
     const before = (await (await t.fetch("/mcp", modernRequest("tools/list", token))).json()).result.tools;
-    expect(before.length).toBe(FAMILY_HISTORY_ALL_TOOL_NAMES.length + FAMILY_HISTORY_CONTROL_TOOLS.length);
+    expect(before.length).toBe(FAMILY_HISTORY_CANONICAL_TOOL_NAMES.length + FAMILY_HISTORY_CONTROL_TOOLS.length);
 
     // The person narrows the connection to reading only.
     await t.run(async (ctx) => {
@@ -651,7 +711,7 @@ test.each(["person", "story"] as const)("%s context exports current media withou
   const t = convexTest(schema, modules); await approvedConnection(t);
   const { personId, mediaId, storyId } = await t.run(async ctx => {
     const personId = await ctx.db.insert("persons", { vaultOwnerId: SUBJECT, name: { given: "Synthetic", surname: "Replacement" }, sex: "unknown", living: false, researchStatus: "basic", createdAt: 1, updatedAt: 1 });
-    const mediaId = await ctx.db.insert("media", { vaultOwnerId: SUBJECT, title: "Current reviewed replacement", type: "document", personIds: [personId], reviewStatus: "reviewed", privacyLevel: "family_review", rightsStatus: "owned", aiUseAllowed: true, createdAt: 1, updatedAt: 1,
+    const mediaId = await ctx.db.insert("media", { vaultOwnerId: SUBJECT, title: "Current reviewed replacement", type: "document", personIds: [personId], reviewStatus: "reviewed", privacyLevel: "family_review", rightsStatus: "owned", aiUseAllowed: true, url: "https://synthetic-storage.convex.cloud/api/storage/synthetic", createdAt: 1, updatedAt: 1,
       replacedB2Files: [{ replacedAt: 1, original: { bucketClass: "private", bucketName: "synthetic-old-private-bucket", objectKey: "synthetic-old-private-original", versionId: "old-version", sha256: "a".repeat(64), contentType: "image/jpeg", sizeBytes: 1, metadataClean: false, verifiedAt: "2026-10-01T00:00:00Z" }, metadataProposal: { temporal: { uploadTime: "2026-10-01T00:00:00Z" }, location: { latitude: 1.25, longitude: 2.5, source: "embedded_gps", status: "proposed", association: "person_media", precision: "exact_private", disclosurePrecision: "withheld" }, extractedFromOriginalSha256: "a".repeat(64), extractedAt: "2026-10-01T00:00:00Z", reversible: true, decision: "declined", declinedAt: "2026-10-02T00:00:00Z" } }],
     });
     const storyId = await ctx.db.insert("stories", { vaultOwnerId: SUBJECT, personId, title: "Synthetic draft", content: "Synthetic story content.", type: "biography", status: "draft", generatedBy: "human", citationIds: [], createdAt: 1, updatedAt: 1 });
@@ -663,6 +723,154 @@ test.each(["person", "story"] as const)("%s context exports current media withou
   expect(response.status).toBe(200); const payload = await response.json(); expect(payload.result.isError).not.toBe(true);
   const context = JSON.parse(payload.result.content[0].text); expect(context.media).toEqual([expect.objectContaining({ _id: mediaId, title: "Current reviewed replacement" })]);
   const text = JSON.stringify(payload); expect(text).not.toContain("replacedB2Files"); expect(text).not.toContain("synthetic-old-private"); expect(text).not.toContain("exact_private");
+  expect(text).not.toContain("synthetic-storage.convex.cloud");
+});
+
+test.each(["expired", "paused", "revoked", "narrowed", "scope removed", "media re-reviewed", "media replaced"] as const)(
+  "exact original links pass bytes on the product domain and stop working when %s", async change => {
+    const resource = "https://assistwithfamilyhistory.com/mcp";
+    vi.stubEnv("MCP_RESOURCE_URL", resource);
+    const t = convexTest(schema, modules);
+    const grantId = await approvedConnection(t);
+    const bytes = new Uint8Array([11, 23, 35, 47]);
+    const mediaId = await t.run(async ctx => {
+      const storageId = await ctx.storage.store(new Blob([bytes], { type: "image/png" }));
+      return ctx.db.insert("media", { vaultOwnerId: SUBJECT, storageId, mimeType: "image/png", sizeBytes: bytes.length,
+        title: "Original scan", type: "scan", personIds: [], reviewStatus: "reviewed", aiUseAllowed: true, rightsStatus: "owned", createdAt: 1, updatedAt: 1 });
+    });
+    const token = await accessToken(CLIENT_ID, resource);
+    const read = (delivery?: "original") => t.fetch("/mcp", modernRequest("tools/call", token, {
+      name: "family_history_get_evidence", arguments: { items: [{ kind: "media", id: mediaId }], delivery },
+    }, "family_history_get_evidence"));
+    const inline = await (await read()).json();
+    expect(inline.result.content[0]).toMatchObject({ type: "image", mimeType: "image/png" });
+    expect(JSON.stringify(inline)).not.toMatch(/mcp-evidence-original|\.convex\.(cloud|site)|backblazeb2/);
+
+    const started = Date.now();
+    const reply = await (await read("original")).json();
+    expect(reply.result.isError).not.toBe(true);
+    expect(JSON.stringify(reply)).not.toMatch(/\.convex\.(cloud|site)|backblazeb2/);
+    const { url, expiresAt } = reply.result.structuredContent.original;
+    const link = new URL(url);
+    expect(link.origin).toBe("https://assistwithfamilyhistory.com");
+    expect(expiresAt).toBeGreaterThan(started);
+    expect(expiresAt).toBeLessThanOrEqual(Date.now() + 60_000);
+    const download = await t.fetch(link.pathname);
+    expect(download.status).toBe(200);
+    expect(download.headers.get("location")).toBeNull();
+    expect(download.headers.get("cache-control")).toBe("private, no-store");
+    expect(download.headers.get("content-disposition")).toBe("attachment");
+    expect(new Uint8Array(await download.arrayBuffer())).toEqual(bytes);
+
+    if (change === "expired") {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(expiresAt);
+    } else {
+      await t.run(async ctx => {
+        const grant = ctx.db.normalizeId("mcpGrants", grantId)!;
+        if (change === "paused") await ctx.db.patch(grant, { pausedAt: Date.now() });
+        if (change === "revoked") await ctx.db.patch(grant, { status: "revoked", revokedAt: Date.now() });
+        if (change === "narrowed") await ctx.db.patch(grant, { boundary: { kind: "selected_people", personIds: ["different-person"] } });
+        if (change === "scope removed") await ctx.db.patch(grant, { scopes: ["family_history:context:read"] });
+        if (change === "media re-reviewed") await ctx.db.patch(mediaId, { aiUseAllowed: false });
+        if (change === "media replaced") await ctx.db.patch(mediaId, { storageId: await ctx.storage.store(new Blob(["different bytes"])) });
+      });
+    }
+    try {
+      const denied = await t.fetch(link.pathname);
+      expect(denied.status).toBe(404);
+      expect(await denied.text()).toBe("Evidence is unavailable.");
+    } finally {
+      if (change === "expired") vi.useRealTimers();
+    }
+  },
+);
+
+test("the exact-original relay uses Backblaze server-side and respects a cleaned-copy-only approval", async () => {
+  const resource = "https://assistwithfamilyhistory.com/mcp";
+  vi.stubEnv("MCP_RESOURCE_URL", resource);
+  vi.stubEnv("MEDIA_STORAGE_ENVIRONMENT", "development");
+  for (const kind of ["PRIVATE", "PUBLIC"]) {
+    vi.stubEnv(`B2_${kind}_ENDPOINT`, "https://b2.synthetic.example.test");
+    vi.stubEnv(`B2_${kind}_REGION`, "us-west-000");
+    vi.stubEnv(`B2_${kind}_BUCKET`, `synthetic-${kind.toLowerCase()}`);
+    vi.stubEnv(`B2_${kind}_KEY_ID`, "not-a-real-key-id");
+    vi.stubEnv(`B2_${kind}_APPLICATION_KEY`, "not-a-real-application-key");
+  }
+  const existingFetch = fetch;
+  const relayFetch = vi.fn((input: string | URL | Request, options?: RequestInit) => {
+    const url = new URL(input instanceof Request ? input.url : input);
+    if (url.hostname.endsWith("b2.synthetic.example.test")) {
+      expect(options?.redirect).toBe("error");
+      return Promise.resolve(new Response("exact B2 synthetic bytes"));
+    }
+    return existingFetch(input, options);
+  });
+  vi.stubGlobal("fetch", relayFetch);
+  const t = convexTest(schema, modules);
+  await approvedConnection(t);
+  const manifest = { bucketClass: "private" as const, bucketName: "synthetic-private", objectKey: "private-object",
+    versionId: "pinned-version", sha256: "a".repeat(64), sizeBytes: 24, contentType: "application/pdf", metadataClean: false,
+    verifiedAt: "2026-11-24T00:00:00Z" };
+  const mediaId = await t.run(ctx => ctx.db.insert("media", { vaultOwnerId: SUBJECT, title: "Synthetic original", type: "scan",
+    personIds: [], b2Original: manifest, mediaState: "ready", reviewStatus: "reviewed", aiUseAllowed: true, rightsStatus: "owned", createdAt: 1, updatedAt: 1 }));
+  const token = await accessToken(CLIENT_ID, resource);
+  const read = () => t.fetch("/mcp", modernRequest("tools/call", token, { name: "family_history_get_evidence",
+    arguments: { items: [{ kind: "media", id: mediaId }], delivery: "original" },
+  }, "family_history_get_evidence"));
+  const reply = await (await read()).json();
+  expect(JSON.stringify(reply)).not.toContain("b2.synthetic.example.test");
+  const link = new URL(reply.result.structuredContent.original.url);
+  const response = await t.fetch(link.pathname);
+  expect(response.status).toBe(200);
+  expect(response.headers.get("location")).toBeNull();
+  expect(await response.text()).toBe("exact B2 synthetic bytes");
+
+  await t.run(ctx => ctx.db.patch(mediaId, { b2Renditions: { tiny: manifest, medium: manifest, large: manifest } }));
+  expect((await t.fetch(link.pathname)).status).toBe(404);
+  const refused = await (await read()).json();
+  expect(refused.result.structuredContent.skipped).toMatchObject([{ reason: "ORIGINAL_UNAVAILABLE" }]);
+});
+
+test("whole-person context keeps working drafts and withholds private review detail", async () => {
+  const t = convexTest(schema, modules);
+  await approvedConnection(t);
+  const { personId, storyId } = await t.run(async ctx => {
+    const fields = { vaultOwnerId: SUBJECT, createdAt: 1, updatedAt: 1 };
+    const personId = await ctx.db.insert("persons", {
+      ...fields, name: { given: "Synthetic", surname: "Ancestor" }, sex: "unknown", living: false, researchStatus: "basic",
+    });
+    const storyId = await ctx.db.insert("stories", {
+      ...fields, personId, title: "Synthetic draft", content: "Approved working draft", type: "biography",
+      status: "draft", generatedBy: "human", citationIds: [], unpublishReason: "private unpublish reason",
+      assignedReviewer: "private assigned reviewer", secondReviewer: "private second reviewer", promptUsed: "private prompt",
+    });
+    await ctx.db.insert("researchChecks", {
+      ...fields, personId, checkKey: "birth_record", status: "needs_review", applicability: "required",
+      completionSource: "user", confidence: 0.5, notes: "private check memo", summary: "private check summary",
+    });
+    return { personId, storyId };
+  });
+  const owner = t.withIdentity({ subject: SUBJECT });
+  const workspace = await owner.action(api.vaultReads.getPersonWorkspace, { vaultOwnerId: SUBJECT, personIdentifier: personId });
+  expect(workspace?.stories[0]).toMatchObject({ assignedReviewer: "private assigned reviewer" });
+  expect(workspace?.operations.nextActions).toContain("private check summary");
+
+  const token = await accessToken();
+  const read = async () => {
+    const response = await t.fetch("/mcp", modernRequest("tools/call", token, {
+      name: "family_history_get_context", arguments: { kind: "person", id: personId },
+    }, "family_history_get_context"));
+    const { result } = await response.json();
+    expect(result.isError).not.toBe(true);
+    return JSON.parse(result.content[0].text);
+  };
+  const context = await read();
+  expect(context.stories).toEqual([expect.objectContaining({ _id: storyId, content: "Approved working draft" })]);
+  expect(context.researchChecks).toContainEqual(expect.objectContaining({ checkKey: "birth_record", status: "needs_review" }));
+  expect(JSON.stringify(context)).not.toMatch(/private (unpublish reason|assigned reviewer|second reviewer|prompt|check memo|check summary)/);
+  await t.run(ctx => ctx.db.patch(personId, { living: true }));
+  expect((await read()).stories).toEqual([]);
 });
 
 test("story context includes approved material and withholds the human review bundle", async () => {

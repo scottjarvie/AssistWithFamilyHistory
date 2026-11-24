@@ -68,7 +68,7 @@ export const getPeopleExplorerPage = action({
 });
 
 export const getPersonWorkspace = action({
-  args: { vaultOwnerId: v.string(), personIdentifier: v.string() },
+  args: { vaultOwnerId: v.string(), personIdentifier: v.string(), documentsMetadataOnly: v.optional(v.boolean()) },
   handler: async (ctx, args): Promise<FunctionReturnType<typeof vaultInternal.getPersonWorkspace>> =>
     ctx.runQuery(vaultInternal.getPersonWorkspace, {
       ...args,
@@ -208,9 +208,7 @@ export const getVaultAudit = action({
     cursor: v.optional(v.union(v.string(),v.null())),
   },
   handler: async (ctx, args): Promise<FunctionReturnType<typeof vaultInternal.getVaultAudit>> => {
-    // New record drilldowns always require the matched authenticated owner,
-    // including during the legacy shadow rollout. Ordinary summary callers
-    // retain their existing authorization and response behavior.
+    // Check drilldown ownership before validating pagination arguments.
     if (args.metric) {
       const identity = await ctx.auth.getUserIdentity();
       const decision = decideTenantAccess({identitySubject: identity?.subject, suppliedOwner: args.vaultOwnerId, mode: "enforce"});

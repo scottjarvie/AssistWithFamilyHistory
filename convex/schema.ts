@@ -90,6 +90,18 @@ const mediaMetadataProposalValidator = v.object({
 
 export default defineSchema({
   ...usageLimitTables,
+  // Short-lived bearer capabilities for exact originals. Authority is read
+  // again from the grant and media rows whenever the link is used.
+  mcpEvidenceOriginalLinks: defineTable({
+    tokenHash: v.string(),
+    grantId: v.id("mcpGrants"),
+    owner: v.string(),
+    issuer: v.string(),
+    clientId: v.string(),
+    mediaId: v.id("media"),
+    fileVersion: v.string(),
+    expiresAt: v.number(),
+  }).index("by_hash", ["tokenHash"]).index("by_expiry", ["expiresAt"]),
   /**
    * PERSONS
    * Core entity representing an individual (alive or deceased)
