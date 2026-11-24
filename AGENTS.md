@@ -29,7 +29,7 @@ may drop the old 90-day term).
 - AI connector: `convex/httpRoutes/mcp.ts` over `convex/mcpFamilyHistory.ts`,
   `convex/mcpGrants.ts`, `lib/mcp/`. Queue: `convex/queue.ts`, `components/queue/`.
 - Media `lib/media/`; capture `extension/`, `lib/familysearch/`; checks `scripts/`.
-  More in [convex/README.md](convex/README.md).
+  [Backend name map and contracts](convex/README.md#name-map).
 - `components/design/Baseline*`, `*Fixture*`, `fixtures/`: frozen copies for the dev-only
   `/design-council-preview`; never edit them for a site change.
 
