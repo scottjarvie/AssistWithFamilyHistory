@@ -200,7 +200,6 @@ export async function importCapturePackageToConvex({
           fsId: relatedFamilySearchId,
           name: relatedPersonName,
           sex: inferSexFromRole(related.role),
-          living: false,
           notes: `Discovered from ${source.title}`,
         });
 

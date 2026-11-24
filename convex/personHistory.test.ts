@@ -89,6 +89,36 @@ test("shadow writes cannot forge an owner byline", async () => {
   expect(await t.run(ctx => ctx.db.query("personHistory").collect())).toEqual([]);
 });
 
+test("related-person imports preserve known living status and keep new relatives private", async () => {
+  const { t, site } = setup();
+  const living = await site.mutation(api.vaultMutations.upsertPerson, capturePerson);
+  const deceased = await site.mutation(api.vaultMutations.upsertPerson, {
+    ...capturePerson, fsId: "SYNTH-DECEASED", name: { given: "Alex", surname: "Example" }, living: false,
+  });
+  const { capture, compatibilityMode } = parseCapturePackage(captureFixture);
+  await importCapturePackageToConvex({
+    client: site as unknown as ConvexHttpClient,
+    vaultOwnerId: owner,
+    compatibilityMode,
+    artifactPaths: {},
+    capture: {
+      ...capture,
+      sources: [{
+        ...capture.sources[0]!,
+        relatedPeople: [
+          { name: "Drew Example", role: "sibling", familySearchId: capturePerson.fsId },
+          { name: "Alex Example", role: "sibling", familySearchId: "SYNTH-DECEASED" },
+          { name: "Jo Example", role: "sibling", familySearchId: "SYNTH-UNKNOWN" },
+        ],
+      }],
+    },
+  });
+  expect(await t.run(ctx => ctx.db.get(living.personId))).toMatchObject({ living: true });
+  expect(await t.run(ctx => ctx.db.get(deceased.personId))).toMatchObject({ living: false });
+  expect(await t.run(ctx => ctx.db.query("persons").withIndex("by_owner_fsId", q =>
+    q.eq("vaultOwnerId", owner).eq("fsId", "SYNTH-UNKNOWN")).unique())).toMatchObject({ living: true });
+});
+
 test("retains 64 details with stable paging, rechecks archive and owner, exports and purges only the affected records", async () => {
   const { t, site } = setup();
   const { personId } = await site.mutation(api.vaultMutations.upsertPerson, capturePerson);
