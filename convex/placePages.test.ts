@@ -33,12 +33,16 @@ test("place pages keep exact totals, accepted unique media, complete bounded sec
   return {a,b,p,p2,p3,foreign,media,explicit,c1,c2,lastEvent:lastEvent!};
  });
  const before=await t.query(internal.placePages.initial,{vaultOwnerId:owner,placeId:ids.a});
- expect(before?.mode).toBe("legacy");if(before?.mode==="legacy")expect(before.workspace.header.totals.media).toBe(1);
+ expect(before?.mode).toBe("legacy");if(before?.mode==="legacy"){
+  expect(before.workspace.header.totals.media).toBe(1);
+  expect(before.workspace.pages.context?.page).toHaveLength(2);
+ }
  const legacyList=await t.query(internal.placePages.list,{vaultOwnerId:owner,cursor:null,search:"ashford"});
  expect(legacyList).toMatchObject({total:2,mediaMode:"mentions",page:[{_id:ids.a,stats:{events:120,citations:1,media:1}}]});
  while(!await t.mutation(internal.vaultCounts.backfillStep,{})) { /* resume */ }
  const initial=await t.withIdentity({subject:owner}).action(api.vaultReads.getPlaceWorkspace,{vaultOwnerId:owner,placeId:ids.a});
  expect(initial?.header.totals).toEqual({events:120,citations:1,media:2,context:2,research:4});
+ expect(initial?.pages).toEqual({});
  expect(initial?.header.firstYear).toBe(1800);expect(initial?.header.lastYear).toBe(1919);
  async function all(section:PlaceSection){let cursor:string|null=null;const rows=[];for(let calls=0;calls<100;calls++){const r=await t.query(internal.placePages.section,{vaultOwnerId:owner,placeId:ids.a,section,cursor});expect(r.page.length).toBeLessThanOrEqual(50);rows.push(...r.page);if(r.isDone)return rows;expect(r.continueCursor).not.toBe(cursor);cursor=r.continueCursor;}throw Error("No continuation progress");}
  expect(await all("events")).toHaveLength(120);

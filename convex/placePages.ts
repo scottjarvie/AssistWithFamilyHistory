@@ -21,7 +21,7 @@ export type SectionRows={events:EventRow;people:PersonRow;sources:SourceRow;cont
 export type SectionPage<S extends PlaceSection=PlaceSection>={page:SectionRows[S][];continueCursor:string;isDone:boolean};
 export type WorkspacePages={[S in PlaceSection]:SectionPage<S>};
 export type PlaceHeader={place:Pick<PlaceRow,"_id"|"name"|"fullName"|"type">;totals:{events:number;citations:number;media:number;context:number;research:number};firstYear:number|null;lastYear:number|null;indexed:boolean};
-export type PlaceWorkspace={header:PlaceHeader;pages:WorkspacePages};
+export type PlaceWorkspace={header:PlaceHeader;pages:Partial<WorkspacePages>};
 const visible=<T extends {vaultOwnerId?:string}>(row:T|null,owner:string):row is T=>!!row&&row.vaultOwnerId===owner&&(!("archivedAt"in row)||row.archivedAt===undefined);
 const eventRow=(e:Doc<"events">):EventRow=>({id:String(e._id),type:e.type,date:e.date?{original:e.date.original,year:e.date.year}:undefined,description:e.description});
 const personRow=(p:Doc<"persons">):PersonRow=>({id:String(p._id),routeId:p.fsId||String(p._id),name:[p.name.prefix,p.name.given,p.name.surname,p.name.suffix].filter(Boolean).join(" "),birthYear:p.birth?.date?.year,deathYear:p.death?.date?.year});
