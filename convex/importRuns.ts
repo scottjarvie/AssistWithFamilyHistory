@@ -7,7 +7,8 @@ import {
   authorizeTenantAction,
   authorizeTenantMutation,
 } from "./access";
-import { filterByVaultOwner } from "./vaultCore";
+import { DEFAULT_LOCAL_VAULT_OWNER } from "../lib/vault/constants";
+import { filterByVaultOwner, normalizeVaultOwnerId } from "./vaultCore";
 
 const pageTypeValidator = v.union(
   v.literal("sources"),
@@ -88,22 +89,32 @@ const listRecentArgs = {
 export const listRecentInternal = internalQuery({
   args: listRecentArgs,
   handler: async (ctx, args) => {
-    let rows = await ctx.db
-      .query("importRuns")
-      .withIndex("by_imported_at")
-      .order("desc")
-      .collect();
-    rows = filterByVaultOwner(rows, args.vaultOwnerId);
-
-    if (args.personIdentifier) {
-      rows = rows.filter(
-        (row) =>
-          row.personFsId === args.personIdentifier ||
-          (row.personId ? String(row.personId) === args.personIdentifier : false)
-      );
-    }
-
-    return args.limit ? rows.slice(0, args.limit) : rows;
+    const owner = normalizeVaultOwnerId(args.vaultOwnerId);
+    const owners = owner === DEFAULT_LOCAL_VAULT_OWNER ? [owner, undefined, ""] : [owner];
+    const identifier = args.personIdentifier;
+    const personId = identifier ? ctx.db.normalizeId("persons", identifier) : null;
+    const limit = args.limit;
+    const indexedLimit = limit && limit > 0 && Number.isSafeInteger(Math.trunc(limit))
+      ? Math.trunc(limit)
+      : undefined;
+    if (indexedLimit === 0) return [];
+    const queries = owners.flatMap(vaultOwnerId => {
+      const table = () => ctx.db.query("importRuns");
+      if (!identifier) {
+        return [table().withIndex("by_owner_imported_at", q => q.eq("vaultOwnerId", vaultOwnerId))];
+      }
+      const byFsId = table().withIndex("by_owner_fs_imported_at", q =>
+        q.eq("vaultOwnerId", vaultOwnerId).eq("personFsId", identifier));
+      return personId ? [byFsId, table().withIndex("by_owner_person_imported_at", q =>
+        q.eq("vaultOwnerId", vaultOwnerId).eq("personId", personId))] : [byFsId];
+    });
+    const batches = await Promise.all(queries.map(query => {
+      const descending = query.order("desc");
+      return indexedLimit === undefined ? descending.collect() : descending.take(indexedLimit);
+    }));
+    const rows = [...new Map(batches.flat().map(row => [row._id, row])).values()].sort((a, b) =>
+      b.importedAt - a.importedAt || b._creationTime - a._creationTime);
+    return limit ? rows.slice(0, limit) : rows;
   },
 });
 

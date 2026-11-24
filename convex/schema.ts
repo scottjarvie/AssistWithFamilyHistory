@@ -1333,6 +1333,9 @@ export default defineSchema({
     .index("by_person_fsId", ["personFsId"])
     .index("by_owner_person_fsId", ["vaultOwnerId", "personFsId"])
     .index("by_imported_at", ["importedAt"])
+    .index("by_owner_imported_at", ["vaultOwnerId", "importedAt"])
+    .index("by_owner_person_imported_at", ["vaultOwnerId", "personId", "importedAt"])
+    .index("by_owner_fs_imported_at", ["vaultOwnerId", "personFsId", "importedAt"])
     .index("by_capture_id", ["captureId"]),
 
   /**
