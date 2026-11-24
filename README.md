@@ -20,7 +20,8 @@ pnpm verify         # the full local check before any push
 
 `pnpm dev:sandbox` needs the sandbox environment file first; see
 [Local Live and Sandbox](docs/operations/local-development.md).
-`pnpm preview:local` is the lighter preview. Merging to `main` deploys
+`pnpm preview:local` is the lighter preview, without sign-in, so it shows public
+pages only. Merging to `main` deploys
 production; see [How production deploys](docs/operations/how-production-deploys.md).
 
 ## Where things live
