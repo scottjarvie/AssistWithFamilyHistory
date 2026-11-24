@@ -68,3 +68,19 @@ pnpm test:convex
 The first check inventories every public Convex registration and requires the
 shared guard outside the explicit public-query allowlist. The second prevents a
 private app or API call from using an unauthenticated Convex client.
+
+## Tests that nothing runs yet
+
+These files sit beside the code but no script or `pnpm verify` step runs them.
+Do not treat the behaviour they cover as protected until they are wired.
+
+| File | Why it is not wired |
+| --- | --- |
+| `tests/e2e/ai-connection-reapproval.spec.ts` | No `test:e2e` script and no Playwright config; only `tracker:verify-browser` runs a spec (`tracker-reader-ordering.spec.ts`). |
+| `tests/e2e/home-drawn.spec.ts` | Same: no runner. |
+| `scripts/test-record-only-snapshot.ts` | Needs a generated `sandbox-backend/` folder; fails on a clean checkout ([AWF-0077](../tracker/cards/AWF-0077.md)). |
+| `scripts/local-development.test.mjs` | Reads the checkout's real env files; run by hand (see [Local Live and Sandbox](local-development.md)). |
+
+`pnpm test:coverage` uses its own file list and leaves out five files that
+`pnpm test` runs: `test-canonical-production-url.ts`, `test-local-auth.ts`,
+`test-usage-limits-copy.ts`, `test-family-row.ts` and `test-home-drawn.ts`.
