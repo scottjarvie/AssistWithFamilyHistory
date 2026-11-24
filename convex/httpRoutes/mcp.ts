@@ -1066,6 +1066,10 @@ export function createFamilyHistoryServer(
     scopes: queueScopesForGrant(grant ? effectiveScopes(grant) : []),
     credentialId: `${principal.issuer}#${principal.clientId}`,
   };
+  const queueConnection = {
+    grantId,
+    identity: { subject: principal.subject, issuer: principal.issuer, clientId: principal.clientId },
+  };
 
   const suggestionPersonIds=grant?.boundary.kind==="selected_people"?grant.boundary.personIds??[]:undefined;
   const assertSuggestionReach=async(queueItemId:string)=>{
@@ -1078,11 +1082,17 @@ export function createFamilyHistoryServer(
     const decision=decideToolAccess({toolName:"family_history_add_queue",resolution,now:Date.now(),input});if(!decision.allowed)return refusalResult(decision);
     if(!input.addedBy)return refusalResult({allowed:false,code:"VALIDATION_ERROR",message:"AI adds require addedBy: ai_on_request or ai_suggestion",recovery:"Choose ai_on_request for requested work; ai_suggestion for your own idea."});
     if(input.addedBy==="ai_suggestion"&&!queuePrincipal.scopes.includes("queue:suggest"))return refusalResult({allowed:false,code:"SCOPE_NOT_GRANTED",message:"Propose suggestions power is off. Requested work can still use ai_on_request.",recovery:"Only the person can restore Propose suggestions in Settings."});
-    return read("family_history_add_queue",()=>actionCtx.runMutation(queue.agentAddQueueItem,{principal:queuePrincipal,connectionId:grantId as any,directive:input.directive,addedBy:input.addedBy,reason:input.reason,options:input.options,evidence:input.evidence,fromRecord:input.fromRecord,idempotencyKey:input.operationId}));
+    const { operationId, ...command } = input;
+    return read("family_history_add_queue", () => actionCtx.runMutation(queue.writeFromConnection, {
+      ...queueConnection, idempotencyKey: operationId, command: { action: "add", ...command },
+    }));
   });
   registerTool("family_history_withdraw_suggestion",{inputSchema:z.object({operationId,queueItemId:id,expectedVersion:z.number().int().min(1)}).strict(),annotations:writeSafe},async(input:any)=>{
     const decision=decideToolAccess({toolName:"family_history_withdraw_suggestion",resolution,now:Date.now(),input});if(!decision.allowed)return refusalResult(decision);
-    return read("family_history_withdraw_suggestion",async()=>{await assertSuggestionReach(input.queueItemId);return actionCtx.runMutation(queue.agentWithdrawSuggestion,{principal:queuePrincipal,queueItemId:input.queueItemId,expectedVersion:input.expectedVersion,idempotencyKey:input.operationId});});
+    const { operationId, ...command } = input;
+    return read("family_history_withdraw_suggestion", () => actionCtx.runMutation(queue.writeFromConnection, {
+      ...queueConnection, idempotencyKey: operationId, command: { action: "withdraw", ...command },
+    }));
   });
   registerTool("family_history_get_queue", {
     inputSchema: z.discriminatedUnion("action", [
@@ -1129,16 +1139,10 @@ export function createFamilyHistoryServer(
   }, async (input: any) => {
     const decision = decideToolAccess({ toolName: "family_history_update_queue", resolution, now: Date.now(), input });
     if (!decision.allowed) return refusalResult(decision);
-    return read("family_history_update_queue", async () => {
-      await assertSuggestionReach(input.queueItemId);
-      const common = { principal: queuePrincipal, queueItemId: input.queueItemId as any, expectedVersion: input.expectedVersion, idempotencyKey: input.operationId };
-      if(input.action==="archive"||input.action==="restore")return await actionCtx.runMutation(queue.agentArchiveQueueItem,{...common,restore:input.action==="restore"});
-      if (input.action === "claim") return await actionCtx.runMutation(queue.agentClaimQueueItem, { ...common, leaseMs: input.leaseMs, nextStep: input.nextStep });
-      if (input.action === "checkpoint") return await actionCtx.runMutation(queue.agentCheckpointQueueItem, { ...common, leaseMs: input.leaseMs, nextStep: input.nextStep });
-      if (input.action === "request_user_action") return await actionCtx.runMutation(queue.agentRequestUserAction, { ...common, requiredAction: input.requiredAction });
-      if (input.action === "complete") return await actionCtx.runMutation(queue.agentCompleteQueueItem, { ...common, resultSummary: input.resultSummary, resultRefs: input.resultRefs });
-      return await actionCtx.runMutation(queue.agentFailQueueItem, { ...common, failureCode: input.failureCode, failureSummary: input.failureSummary, retryable: input.retryable, nextRetryAt: input.nextRetryAt });
-    });
+    const { operationId, ...command } = input;
+    return read("family_history_update_queue", () => actionCtx.runMutation(queue.writeFromConnection, {
+      ...queueConnection, idempotencyKey: operationId, command,
+    }));
   });
 
   return server;

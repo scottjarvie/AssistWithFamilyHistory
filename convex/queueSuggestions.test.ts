@@ -4,12 +4,46 @@ import type {Id} from "./_generated/dataModel";
 import schema from "./schema";
 import {api,internal} from "./_generated/api";
 import {queueIdentity} from "../lib/queue/identity";
+import {seedGrant} from "../lib/mcp/testSupport";
 const modules=import.meta.glob("./**/*.ts"),owner="user_suggestion_owner_A",other="user_suggestion_owner_B";
 const principal={ownerId:owner,actorKind:"chosen_ai" as const,actorId:"oauth-chosen-ai",credentialId:"https://issuer.test#research-ai",scopes:["queue:read","queue:add","queue:suggest","queue:claim","queue:update","queue:complete"]};
 afterEach(()=>vi.unstubAllEnvs());
 function setup(){vi.stubEnv("TRUST_BOUNDARY_MODE","enforce");return convexTest(schema,modules);}
 const add=(t:ReturnType<typeof setup>,key="add",extra={})=>t.mutation(internal.queue.agentAddQueueItem,{principal,directive:"Research the missing burial",addedBy:"ai_suggestion",reason:"No burial citation in the census research",idempotencyKey:key,...extra});
 const review=(t:ReturnType<typeof setup>,item:{_id:Id<"queueItems">;version:number},action:"accept"|"dismiss"|"restore"|"archive"|"clear_input",extra={})=>t.withIdentity({subject:owner}).mutation(api.queue.reviewQueueItem,{vaultOwnerId:owner,queueItemId:item._id,expectedVersion:item.version,idempotencyKey:crypto.randomUUID(),action,...extra});
+
+test("hosted Queue writes and replays use the grant as it exists at commit time", async () => {
+  const t = setup();
+  const identity = { subject: owner, issuer: "https://issuer.test", clientId: "research-ai" };
+  const grantId = await seedGrant(t, { vaultOwnerId: owner, issuer: identity.issuer, clientId: identity.clientId });
+  const target = internal.queue.writeFromConnection;
+  const addRequest = {
+    grantId, identity, idempotencyKey: " active-add ",
+    command: { action: "add", addedBy: "ai_on_request", directive: "Read the register" } as const,
+  };
+  await expect(t.mutation(target, { ...addRequest, identity: { ...identity, clientId: "another-client" } }))
+    .rejects.toThrow(/GRANT_REQUIRED/);
+  const { item } = await t.mutation(target, addRequest);
+  const claim = {
+    grantId, identity, idempotencyKey: "active-claim",
+    command: { action: "claim", queueItemId: item._id, expectedVersion: 1, leaseMs: 60_000, nextStep: "Open the register" } as const,
+  };
+  expect((await t.mutation(target, claim)).item.version).toBe(2);
+  expect((await t.mutation(target, claim)).deduplicated).toBe(true);
+  const updateGrant = async (patch: Partial<import("./_generated/dataModel").Doc<"mcpGrants">>) => {
+    await t.run(ctx => ctx.db.patch(grantId as Id<"mcpGrants">, patch));
+  };
+  await updateGrant({ boundary: { kind: "queue_only", queueItemIds: [String(await add(t, "other-item").then(r => r.item._id))] } });
+  await expect(t.mutation(target, claim)).rejects.toThrow(/OUTSIDE_GRANT_BOUNDARY/);
+  await updateGrant({ boundary: { kind: "whole_workspace" }, scopes: ["family_history:queue:read"] });
+  await expect(t.mutation(target, addRequest)).rejects.toThrow(/SCOPE_NOT_GRANTED/);
+  await expect(t.mutation(target, claim)).rejects.toThrow(/SCOPE_NOT_GRANTED/);
+  await updateGrant({ scopes: ["family_history:queue:work"], status: "revoked" });
+  await expect(t.mutation(target, {
+    ...claim, idempotencyKey: "stale-checkpoint", command: { ...claim.command, action: "checkpoint", expectedVersion: 2 },
+  })).rejects.toThrow(/GRANT_REVOKED/);
+  expect((await t.run(ctx => ctx.db.get(item._id)))?.version).toBe(2);
+});
 
 test("AI adds must classify intent; power refusal leaves requests available; read defaults never rewrite",async()=>{
  const t=setup();await expect(add(t,"missing",{addedBy:undefined})).rejects.toThrow(/addedBy: ai_on_request or ai_suggestion/);

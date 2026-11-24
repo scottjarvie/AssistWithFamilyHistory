@@ -12,6 +12,9 @@ import {
   type TenantAccessDecision,
 } from "./access";
 import { matchesVaultOwner } from "./vaultCore";
+import { assertGrantPermits } from "./mcpGrants";
+import { queueScopesForGrant } from "../lib/mcp/authorize";
+import { effectiveScopes } from "../lib/mcp/grantDefaults";
 import {
   QUEUE_LIMITS,
   assertCommandAllowed,
@@ -1434,7 +1437,108 @@ export const agentArchiveQueueItem = internalMutation({
  }
 });
 
-/** Read/write preflight for new suggestion rows only; ordinary AWL-0015 Queue reach is unchanged. */
+const queueWriteTarget = {
+  queueItemId: v.id("queueItems"),
+  expectedVersion: v.number(),
+};
+const queueLease = { leaseMs: v.number(), nextStep: v.string() };
+
+/** Hosted MCP writes check the credential, live grant and current item in the
+ * same transaction as the command, including when the command returns a receipt.
+ */
+export const writeFromConnection = internalMutation({
+  args: {
+    grantId: v.optional(v.string()),
+    identity: v.object({ subject: v.string(), issuer: v.string(), clientId: v.string() }),
+    idempotencyKey: v.string(),
+    command: v.union(
+      v.object({
+        action: v.literal("add"), directive: v.string(),
+        addedBy: v.union(v.literal("ai_on_request"), v.literal("ai_suggestion")),
+        reason: v.optional(v.string()), options: v.optional(v.array(v.string())),
+        evidence: v.optional(v.array(v.string())), fromRecord: v.optional(contextValidator),
+      }),
+      v.object({ action: v.literal("withdraw"), ...queueWriteTarget }),
+      v.object({ action: v.literal("claim"), ...queueWriteTarget, ...queueLease }),
+      v.object({ action: v.literal("checkpoint"), ...queueWriteTarget, ...queueLease }),
+      v.object({ action: v.literal("request_user_action"), ...queueWriteTarget, requiredAction: v.string() }),
+      v.object({ action: v.literal("complete"), ...queueWriteTarget, resultSummary: v.string(), resultRefs: v.optional(v.array(v.string())) }),
+      v.object({
+        action: v.literal("fail"), ...queueWriteTarget, failureCode: v.string(),
+        failureSummary: v.string(), retryable: v.boolean(), nextRetryAt: v.optional(v.number()),
+      }),
+      v.object({ action: v.union(v.literal("archive"), v.literal("restore")), ...queueWriteTarget }),
+    ),
+  },
+  handler: async (ctx, args): Promise<{ item: QueueItem; deduplicated: boolean }> => {
+    const { command, identity, idempotencyKey } = args;
+    const owner = identity.subject;
+    const toolName = command.action === "add" ? "family_history_add_queue"
+      : command.action === "withdraw" ? "family_history_withdraw_suggestion"
+      : "family_history_update_queue";
+    const grant = await assertGrantPermits(ctx, { owner, grantId: args.grantId, principal: identity, toolName, input: command });
+    if (!grant) throw new Error("Queue write requires an approved connection");
+    const principal = {
+      ownerId: owner, actorId: "oauth-chosen-ai", actorKind: "chosen_ai" as const,
+      credentialId: `${identity.issuer}#${identity.clientId}`, scopes: queueScopesForGrant(effectiveScopes(grant)),
+    };
+    // Match the key format used by each existing command, including legacy receipts.
+    const usesRawKey = command.action === "add" || command.action === "withdraw" ||
+      command.action === "archive" || command.action === "restore";
+    const receiptKey = usesRawKey ? idempotencyKey : cleanIdempotencyKey(idempotencyKey);
+    const receipt = await ctx.db.query("queueCommandReceipts")
+      .withIndex("by_owner_key", q => q.eq("vaultOwnerId", owner).eq("idempotencyKey", receiptKey))
+      .unique();
+    if (command.action === "add") {
+      if (receipt?.command === "add" && receipt.actorId === principal.credentialId) {
+        const item = await ctx.db.get(receipt.queueItemId);
+        assertItemOwner(item, owner);
+        // Re-evaluate the original context when a retry supplies different fields.
+        await assertGrantPermits(ctx, {
+          owner, grantId: args.grantId, principal: identity, toolName,
+          input: { addedBy: item.addedBy, fromRecord: item.fromRecord },
+        });
+      }
+      return ctx.runMutation(internal.queue.agentAddQueueItem, {
+        principal, connectionId: grant._id, idempotencyKey, directive: command.directive,
+        addedBy: command.addedBy, reason: command.reason, options: command.options,
+        evidence: command.evidence, fromRecord: command.fromRecord,
+      });
+    }
+
+    const item = await ctx.db.get(command.queueItemId);
+    assertItemOwner(item, owner);
+    if (grant.boundary.kind === "selected_people" && !suggestionWithinPeople(item, grant.boundary.personIds ?? [])) {
+      throw new Error("Suggestion is outside this connection's approved reach");
+    }
+    if (receipt && receipt.queueItemId !== command.queueItemId) {
+      throw new Error("Idempotency key was already used for a different Queue item");
+    }
+    const common = { principal, queueItemId: command.queueItemId, expectedVersion: command.expectedVersion, idempotencyKey };
+    switch (command.action) {
+      case "withdraw":
+        return ctx.runMutation(internal.queue.agentWithdrawSuggestion, common);
+      case "archive":
+      case "restore":
+        return ctx.runMutation(internal.queue.agentArchiveQueueItem, { ...common, restore: command.action === "restore" });
+      case "claim":
+        return ctx.runMutation(internal.queue.agentClaimQueueItem, { ...common, leaseMs: command.leaseMs, nextStep: command.nextStep });
+      case "checkpoint":
+        return ctx.runMutation(internal.queue.agentCheckpointQueueItem, { ...common, leaseMs: command.leaseMs, nextStep: command.nextStep });
+      case "request_user_action":
+        return ctx.runMutation(internal.queue.agentRequestUserAction, { ...common, requiredAction: command.requiredAction });
+      case "complete":
+        return ctx.runMutation(internal.queue.agentCompleteQueueItem, { ...common, resultSummary: command.resultSummary, resultRefs: command.resultRefs });
+      case "fail":
+        return ctx.runMutation(internal.queue.agentFailQueueItem, {
+          ...common, failureCode: command.failureCode, failureSummary: command.failureSummary,
+          retryable: command.retryable, nextRetryAt: command.nextRetryAt,
+        });
+    }
+  },
+});
+
+/** Read preflight for new suggestion rows only; ordinary AWL-0015 Queue reach is unchanged. */
 export const suggestionReachInternal=internalQuery({
  args:{vaultOwnerId:v.string(),queueItemId:v.id("queueItems"),personIds:v.array(v.string())},
  handler:async(ctx,args)=>{const item=await ctx.db.get(args.queueItemId);return !!item&&matchesVaultOwner(item.vaultOwnerId,args.vaultOwnerId)&&suggestionWithinPeople(item,args.personIds);}
