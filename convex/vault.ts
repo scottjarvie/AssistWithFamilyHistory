@@ -41,6 +41,18 @@ export type VaultSnapshot = {
   provisionalRelatives: Doc<"provisionalRelatives">[];
 };
 
+type VaultSnapshotTable = Exclude<(typeof FIRST_START_EMPTY_TABLES)[number], "queueItems">;
+
+/** Legacy counts may predate the projections. Read only the tables in use. */
+export async function activeOwnerRows<Table extends VaultSnapshotTable>(
+  ctx: QueryCtx, table: Table, owner: string,
+): Promise<Doc<Table>[]> {
+  const rows = await ctx.db.query<VaultSnapshotTable>(table)
+    .withIndex("by_owner", q => q.eq("vaultOwnerId", owner)).collect();
+  // The query was widened for the shared index signature, but still reads only table.
+  return rows.filter(row => !("archivedAt" in row) || row.archivedAt === undefined) as unknown as Doc<Table>[];
+}
+
 const storyWorkflowValidator = v.union(
   v.literal("needs_genealogy_evidence"),
   v.literal("needs_context_research"),
@@ -2286,8 +2298,27 @@ export const getDashboardSummary = internalQuery({
   handler: async (ctx, args):Promise<DashboardSummary> => {
     const owner = normalizeVaultOwnerId(args.vaultOwnerId);
     if (await countsReady(ctx)) return readDashboard(ctx, owner);
-    const snapshot = await getVaultSnapshot(ctx, owner);
-    return dashboardFromSnapshot(snapshot, await isFirstStartEligible(ctx, owner, snapshot));
+    const tables = ["persons", "places", "stories", "documents", "importRuns", "researchTasks", "provisionalRelatives"] as const;
+    const [people, places, stories, documents, importRuns, researchTasks, provisionalRelatives] = await Promise.all([
+      activeOwnerRows(ctx, "persons", owner),
+      activeOwnerRows(ctx, "places", owner),
+      activeOwnerRows(ctx, "stories", owner),
+      activeOwnerRows(ctx, "documents", owner),
+      activeOwnerRows(ctx, "importRuns", owner),
+      activeOwnerRows(ctx, "researchTasks", owner),
+      activeOwnerRows(ctx, "provisionalRelatives", owner),
+    ]);
+    const snapshot = { people, places, stories, documents, importRuns, researchTasks, provisionalRelatives };
+    let firstStartEligible = false;
+    if (Object.values(snapshot).every(rows => rows.length === 0)) {
+      const checked = new Set<string>(tables);
+      const other = await Promise.all(FIRST_START_EMPTY_TABLES.filter(table => !checked.has(table)).map(table => {
+        const query = ctx.db.query(table).withIndex("by_owner", q => q.eq("vaultOwnerId", owner));
+        return table === "queueItems" ? query.first() : query.filter(q => q.eq(q.field("archivedAt"), undefined)).first();
+      }));
+      firstStartEligible = other.every(row => row === null);
+    }
+    return dashboardFromSnapshot(snapshot, firstStartEligible);
   },
 });
 

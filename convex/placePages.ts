@@ -3,7 +3,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { internalQuery, type QueryCtx } from "./_generated/server";
 import { countsReady, ownerTableCounter } from "./vaultCounts";
 import { placeTotals } from "./placeCounts";
-import { readLegacyPlaceWorkspace } from "./vault";
+import { activeOwnerRows, readLegacyPlaceWorkspace } from "./vault";
 import { normalizeVaultOwnerId } from "./vaultCore";
 export const placePageArgs={vaultOwnerId:v.string(),cursor:v.union(v.string(),v.null())};
 export const sectionValidator=v.union(v.literal("events"),v.literal("people"),v.literal("sources"),v.literal("context"),v.literal("research"),v.literal("media"));
@@ -36,10 +36,14 @@ async function ownedPlace(ctx:QueryCtx,owner:string,id:Id<"places">){const p=awa
 export const list = internalQuery({args:{...placePageArgs,search:v.optional(v.string())},handler:async(ctx,args):Promise<PlaceListPage>=>{
  const owner=normalizeVaultOwnerId(args.vaultOwnerId),needle=args.search?.trim().toLowerCase();
  if(!await countsReady(ctx)) {
-   const {getVaultSnapshot}=await import("./vault");
-   const s=await getVaultSnapshot(ctx,owner);const offset=args.cursor?.startsWith("s:")?Number(args.cursor.slice(2)):0;
-   const rows=s.places.filter(p=>!needle||`${p.name} ${p.fullName}`.toLowerCase().includes(needle)).map(p=>({_id:p._id,name:p.name,fullName:p.fullName,type:p.type,stats:{events:s.events.filter(e=>e.place?.placeId===p._id).length,citations:s.citationLinks.filter(l=>l.targetType==="place"&&l.targetId===String(p._id)).length,media:s.media.filter(m=>m.description?.includes(p.name)||m.title.includes(p.name)).length}}));
-   return {page:rows.slice(offset,offset+50),continueCursor:`s:${offset+50}`,isDone:offset+50>=rows.length,total:s.places.length,mediaMode:"mentions"};
+   const [places, events, citationLinks, media] = await Promise.all([
+     activeOwnerRows(ctx, "places", owner), activeOwnerRows(ctx, "events", owner),
+     activeOwnerRows(ctx, "citationLinks", owner), activeOwnerRows(ctx, "media", owner),
+   ]);
+   const offset=args.cursor?.startsWith("s:")?Number(args.cursor.slice(2)):0;
+   const matches = places.filter(p=>!needle||`${p.name} ${p.fullName}`.toLowerCase().includes(needle));
+   const page=matches.slice(offset,offset+50).map(p=>({_id:p._id,name:p.name,fullName:p.fullName,type:p.type,stats:{events:events.filter(e=>e.place?.placeId===p._id).length,citations:citationLinks.filter(l=>l.targetType==="place"&&l.targetId===String(p._id)).length,media:media.filter(m=>m.description?.includes(p.name)||m.title.includes(p.name)).length}}));
+   return {page,continueCursor:`s:${offset+50}`,isDone:offset+50>=matches.length,total:places.length,mediaMode:"mentions"};
  }
  const result=await ctx.db.query("places").withIndex("by_owner_active",q=>q.eq("vaultOwnerId",owner).eq("archivedAt",undefined)).paginate({cursor:nativeCursor(args.cursor),numItems:50,maximumRowsRead:50,maximumBytesRead:250_000});
  const matching=result.page.filter(p=>!needle||`${p.name} ${p.fullName}`.toLowerCase().includes(needle));

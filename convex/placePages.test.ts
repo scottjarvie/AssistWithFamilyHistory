@@ -34,6 +34,8 @@ test("place pages keep exact totals, accepted unique media, complete bounded sec
  });
  const before=await t.query(internal.placePages.initial,{vaultOwnerId:owner,placeId:ids.a});
  expect(before?.mode).toBe("legacy");if(before?.mode==="legacy")expect(before.workspace.header.totals.media).toBe(1);
+ const legacyList=await t.query(internal.placePages.list,{vaultOwnerId:owner,cursor:null,search:"ashford"});
+ expect(legacyList).toMatchObject({total:2,mediaMode:"mentions",page:[{_id:ids.a,stats:{events:120,citations:1,media:1}}]});
  while(!await t.mutation(internal.vaultCounts.backfillStep,{})) { /* resume */ }
  const initial=await t.withIdentity({subject:owner}).action(api.vaultReads.getPlaceWorkspace,{vaultOwnerId:owner,placeId:ids.a});
  expect(initial?.header.totals).toEqual({events:120,citations:1,media:2,context:2,research:4});

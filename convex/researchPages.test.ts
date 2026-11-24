@@ -20,6 +20,12 @@ test("Research pages reproduce legacy rows/order with exact global facets and ow
   const legacy = await t.query(internal.vault.getResearchOverview, {vaultOwnerId: owner});
   const publicBefore = await t.withIdentity({subject: owner}).action(api.vaultReads.getResearchTasksPage, {vaultOwnerId: owner,cursor:null});
   expect(publicBefore.page.map(projectResearchTask)).toEqual(legacy.tasks.slice(0,50).map(projectResearchTask));
+  const fallbackSearch = await t.query(internal.researchPages.tasks, {vaultOwnerId: owner, cursor: null, status: "todo", search: "invented reed"});
+  expect(fallbackSearch.page.map(projectResearchTask)).toEqual(
+    legacy.tasks.filter(row => row.status === "todo" && row.person?._id === personId).slice(0, 50).map(projectResearchTask),
+  );
+  const logBefore = await t.query(internal.researchPages.log, {vaultOwnerId: owner, cursor: null});
+  expect(logBefore.page.map(projectResearchLog)).toEqual(legacy.logEntries.slice(0, 50).map(projectResearchLog));
   while (!await t.mutation(internal.vaultCounts.backfillStep, {})) { /* resume */ }
   const stripKey = <T extends {researchOrderTime?: number}>(row: T) => {const {researchOrderTime: _key, ...rest} = row; void _key; return rest;};
   let cursor: string | null = null;
