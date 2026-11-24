@@ -88,12 +88,18 @@ function throwDenied(reason: TrustBoundaryDenialReason): never {
   throw new Error(`Trust boundary denied: ${reason}`);
 }
 
+function logShadowMutationDenial(entry: TrustBoundaryShadowEntry): void {
+  // A mutation that refuses the request rolls back its database writes,
+  // including any log row. Emit this denial through Convex function logs.
+  console.warn("Trust boundary shadow denial", entry);
+}
+
 async function authorizeTenant(
   ctx: AuthContext,
   params: {
     functionName: string;
     suppliedOwner?: string | null;
-    persistShadowEntry: (entry: TrustBoundaryShadowEntry) => Promise<unknown>;
+    recordShadowEntry: (entry: TrustBoundaryShadowEntry) => void | Promise<unknown>;
   },
 ): Promise<TenantAccessDecision> {
   const identity = await ctx.auth.getUserIdentity();
@@ -103,17 +109,13 @@ async function authorizeTenant(
   });
 
   if (decision.allowed) return decision;
-  if (decision.mode === "enforce") throwDenied(decision.reason!);
-
-  await params.persistShadowEntry(
-    shadowEntry(
-      params.functionName,
-      decision.caller,
-      decision.callerKind,
-      decision.reason!,
-    ),
-  );
-  return decision;
+  const reason = decision.reason ?? "missing_identity";
+  if (decision.mode === "shadow") {
+    await params.recordShadowEntry(
+      shadowEntry(params.functionName, decision.caller, decision.callerKind, reason),
+    );
+  }
+  throwDenied(reason);
 }
 
 export function authorizeTenantMutation(
@@ -124,7 +126,7 @@ export function authorizeTenantMutation(
   return authorizeTenant(ctx, {
     functionName,
     suppliedOwner,
-    persistShadowEntry: (entry) => ctx.db.insert("trustBoundaryShadowLog", entry),
+    recordShadowEntry: logShadowMutationDenial,
   });
 }
 
@@ -132,9 +134,9 @@ export function authorizeTenantAction(
   ctx: Pick<ActionCtx, "auth">,
   functionName: string,
   suppliedOwner: string | null | undefined,
-  persistShadowEntry: (entry: TrustBoundaryShadowEntry) => Promise<unknown>,
+  recordShadowEntry: (entry: TrustBoundaryShadowEntry) => Promise<unknown>,
 ): Promise<TenantAccessDecision> {
-  return authorizeTenant(ctx, { functionName, suppliedOwner, persistShadowEntry });
+  return authorizeTenant(ctx, { functionName, suppliedOwner, recordShadowEntry });
 }
 
 export async function handlePolicyViolationMutation(
@@ -157,9 +159,8 @@ export async function handlePolicyViolationMutation(
 
 /**
  * Validate a record reference after the caller guard has run. Missing records
- * remain ordinary not-found errors in both modes. A real cross-tenant record is
- * a trust-boundary denial: shadow mode records and preserves legacy behavior;
- * enforce mode throws before the reference can be stored or dereferenced.
+ * remain ordinary not-found errors in both modes. Refuse foreign references
+ * before they can be stored or dereferenced, including in shadow mode.
  */
 export async function authorizeOwnedReferenceMutation<
   T extends { vaultOwnerId?: string },
@@ -172,11 +173,15 @@ export async function authorizeOwnedReferenceMutation<
 ): Promise<T> {
   if (!row) throw new Error(`${label} not found`);
   if (!matchesVaultOwner(row.vaultOwnerId, vaultOwnerId)) {
-    await handlePolicyViolationMutation(
-      ctx,
-      functionName,
-      "reference_owner_mismatch",
-    );
+    const reason = "reference_owner_mismatch";
+    if (getTrustBoundaryMode() === "shadow") {
+      const identity = await ctx.auth.getUserIdentity();
+      const caller = identity?.subject?.trim();
+      logShadowMutationDenial(
+        shadowEntry(functionName, caller || "<anonymous>", caller ? "authenticated" : "anonymous", reason),
+      );
+    }
+    throwDenied(reason);
   }
   return row;
 }

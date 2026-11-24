@@ -52,7 +52,7 @@ test("Audit pages are bounded, stable across equal titles and never truncate the
  assert.throws(()=>buildAuditRecordPage(input,people,owner,"untrusted" as AuditMetric),/Unknown Audit/);
 });
 
-test("New drilldowns require the matched identity in both legacy modes; ordinary callers retain their policy",async()=>{
+test("Audit summaries and drilldowns require the matched identity in both modes",async()=>{
  const handler=(auditRead as unknown as {_handler:(ctx:ActionCtx,args:{vaultOwnerId:string;metric?:AuditMetric;offset?:number})=>Promise<unknown>})._handler;
  const original=process.env.TRUST_BOUNDARY_MODE;
  try {for(const mode of ["shadow","enforce"]){process.env.TRUST_BOUNDARY_MODE=mode;
@@ -63,8 +63,11 @@ test("New drilldowns require the matched identity in both legacy modes; ordinary
    else {await assert.rejects(()=>handler(ctx,{vaultOwnerId:owner,metric:"people"}),/Trust boundary denied/);assert.equal(reads,0);}
    assert.equal(denialLogs,0,"strict new reads do not depend on shadow logging");
    reads=0;
-   if(mode==="enforce"&&subject!==owner)await assert.rejects(()=>handler(ctx,{vaultOwnerId:owner}),/Trust boundary denied/);
-   else {await handler(ctx,{vaultOwnerId:owner});assert.equal(reads,2);assert.equal(denialLogs,subject===owner?0:1);}
+   if(subject!==owner) {
+    await assert.rejects(()=>handler(ctx,{vaultOwnerId:owner}),/Trust boundary denied/);
+    assert.equal(reads,0);
+    assert.equal(denialLogs,mode==="shadow"?1:0);
+   } else {await handler(ctx,{vaultOwnerId:owner});assert.equal(reads,2);assert.equal(denialLogs,0);}
   }
  }
  const ctx={auth:{getUserIdentity:async()=>({subject:owner})},runQuery:async()=>{throw Error("must not query");}} as unknown as ActionCtx;

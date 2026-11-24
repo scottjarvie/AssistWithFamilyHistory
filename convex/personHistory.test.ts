@@ -50,14 +50,15 @@ test("First Start adapts the native creation stamp once and denies other viewers
   await expect(t.action(api.personHistory.page, request)).rejects.toThrow(/website person session/);
   await expect(t.withIdentity({ subject: owner, issuer, scope: "openid" }).action(api.personHistory.page, request))
     .rejects.toThrow(/website person session/);
-  await expect(t.withIdentity({ subject: other, issuer }).action(api.personHistory.page, request)).rejects.toThrow(/unavailable/);
+  await expect(t.withIdentity({ subject: other, issuer }).action(api.personHistory.page, request)).rejects.toThrow(/owner_mismatch/);
   expect(await t.run(ctx => ctx.db.query("personHistory").collect())).toEqual([]);
   expect(await t.run(ctx => ctx.db.query("trustBoundaryShadowLog").collect())).toEqual([]);
 });
 
-test("the legacy First Start identity fallback does not produce a verified byline", async () => {
+test("a legacy First Start record without a verified subject has no verified byline", async () => {
   const { t, site } = setup();
-  const { startingPersonId } = await t.mutation(api.vaultMutations.startPrivateWorkspace, firstStart);
+  // The original write lacked trusted website attribution. The record remains readable.
+  const { startingPersonId } = await t.withIdentity({ subject: owner }).mutation(api.vaultMutations.startPrivateWorkspace, firstStart);
   expect((await site.action(api.personHistory.page, { vaultOwnerId: owner, personId: startingPersonId, before: null })).rows[0])
     .toMatchObject({ action: "Created", actor: "Writer unrecorded", source: "Website · First Start" });
 });
@@ -81,11 +82,11 @@ test("native capture retries keep import artifacts and genealogy links without d
   expect((await t.run(ctx => ctx.db.query("citationLinks").collect())).length).toBeGreaterThan(0);
 });
 
-test("shadow writes cannot forge an owner byline", async () => {
-  const { t, site } = setup();
-  const { personId } = await t.withIdentity({ subject: other, issuer }).mutation(api.vaultMutations.upsertPerson, capturePerson);
-  const request = { vaultOwnerId: owner, personId, before: null };
-  expect((await site.action(api.personHistory.page, request)).rows[0]).toMatchObject({ actor: "Writer unrecorded", source: "Source unrecorded" });
+test("shadow refuses foreign writes before recording an owner byline", async () => {
+  const { t } = setup();
+  await expect(t.withIdentity({ subject: other, issuer }).mutation(api.vaultMutations.upsertPerson, capturePerson))
+    .rejects.toThrow(/owner_mismatch/);
+  expect(await t.run(ctx => ctx.db.query("persons").collect())).toEqual([]);
   expect(await t.run(ctx => ctx.db.query("personHistory").collect())).toEqual([]);
 });
 
