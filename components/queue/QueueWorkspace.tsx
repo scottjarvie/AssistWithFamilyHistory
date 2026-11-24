@@ -80,6 +80,7 @@ type QueueDetailResponse = {
 import {QueueActionForm as InlineAction,type QueueCommand} from "./QueueActionForm";
 import {QueueDrafts,useQueueDraft,useQueuePreview} from "./QueueDrafts";
 import {QueueCollection} from "./QueueCollection";
+import { usePublishQueueCounts } from "./QueueNavCounts";
 import {normalizeQueueFilters,queueMatchesView,type QueueFilterInput,type QueueFilters} from "@/lib/queue/viewFilters";
 import {queueSnapshot,initialQueueSnapshot,subscribeQueueURL,navigateQueue,closeQueueSelection} from "@/lib/queue/navigation";
 
@@ -544,6 +545,7 @@ export function QueueWorkspace(props:QueueWorkspaceProps){
  return <QueueDrafts readonlyPreview={Boolean(preview)}><QueueController {...props} preview={preview}/></QueueDrafts>;
 }
 function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspaceProps) {
+  const publishCounts = usePublishQueueCounts();
   const snapshot=useSyncExternalStore(subscribeQueueURL,queueSnapshot,()=>initialQueueSnapshot(initialFilters));
   const filters=useMemo(()=>JSON.parse(snapshot) as QueueFilters,[snapshot]);
   const stateFilter=(filters.state||"all") as "all"|QueueState;
@@ -578,7 +580,6 @@ function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspac
   const [listDone, setListDone] = useState(true);
   const [showNew, setShowNew] = useState(false);
 
-  useEffect(()=>{if(serverCounts)window.dispatchEvent(new CustomEvent("queue-counts",{detail:serverCounts}));},[serverCounts]);
   const loadItems = useCallback(async (append = false, cursor?: string | null) => {
     const request=++listRequest.current;
     if (append) setLoadingMore(true);
@@ -604,7 +605,9 @@ function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspac
       if (!response.ok || !payload.success) throw problemFromResponse(response, payload);
       if(request!==listRequest.current)return;
       const totals=(payload as QueueListResponse & {counts?:{available:boolean;suggestions:number;needsInput:number}}).counts;
-      setServerCounts(totals?.available?totals:null);
+      const counts = totals?.available ? totals : null;
+      setServerCounts(counts);
+      publishCounts(counts);
       setItems((current) => append ? [...current, ...payload.page] : payload.page);
       setLoadedState(stateFilter);
       setListCursor(payload.continueCursor || null);
@@ -620,7 +623,7 @@ function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspac
     } finally {
       if(request===listRequest.current){setHasLoaded(true);setLoading(false);setLoadingMore(false);}
     }
-  }, [stateFilter,filters.suggestions,filters.archived,preview]);
+  }, [stateFilter,filters.suggestions,filters.archived,preview,publishCounts]);
 
   const loadDetail = useCallback(async (id: string, appendActivity = false, cursor?: string | null, quiet = false) => {
     const request=++detailRequest.current;
@@ -682,7 +685,6 @@ function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspac
   }
   function replaceItem(item: QueueItemRecord) {
     void loadItems();
-    window.dispatchEvent(new Event("queue-changed"));
     updateLoadedItem(item);
     if(item._id===selectedId){setDetail(current=>current?{...current,item}:current);void loadDetail(item._id,false,null,true);}
   }
@@ -699,6 +701,7 @@ function QueueController({preferenceKey,initialFilters={},preview}:QueueWorkspac
   function handleDeleted(deletedId:string) {
     setItems(current=>current.filter(item=>item._id!==deletedId));
     if(selectedId===deletedId){setSelectedId(null);setDetail(null);}
+    void loadItems();
   }
   async function reloadRow(id:string) {
     try {

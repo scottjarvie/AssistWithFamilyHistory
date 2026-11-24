@@ -71,9 +71,7 @@ export async function GET(request: NextRequest) {
         cursor: request.nextUrl.searchParams.get("cursor"),
       },
     });
-    const counts=await client.mutation(api.queue.queueCounts,{vaultOwnerId});
     return NextResponse.json({
-      counts,
       success: true,
       surfaceState: page.page.length === 0 ? "empty" : "ready",
       ...page,

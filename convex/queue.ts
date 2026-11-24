@@ -4,7 +4,7 @@ import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { ActionCtx, MutationCtx, QueryCtx } from "./_generated/server";
 import { action, internalAction, internalMutation, internalQuery, mutation } from "./_generated/server";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import {
   requireWebsitePerson,
   authorizeTenantAction,
@@ -605,7 +605,7 @@ const listQueueArgs = {
 };
 
 export const listQueueItemsInternal = internalQuery({
-  args: listQueueArgs,
+  args: { ...listQueueArgs, includeCounts: v.optional(v.boolean()) },
   handler: async (ctx, args) => {
     let query=ctx.db.query("queueItems").withIndex("by_owner_updated",q=>q.eq("vaultOwnerId",args.vaultOwnerId)).order("desc");
     query=query.filter(q=>args.archived&&args.state!=="needs_you"?q.neq(q.field("archivedAt"),undefined):q.eq(q.field("archivedAt"),undefined));
@@ -620,8 +620,12 @@ export const listQueueItemsInternal = internalQuery({
       const legacy=args.state==="done"?hasResult:args.state==="working"?q.and(q.not(hasResult),q.neq(q.field("pickedUpAt"),undefined)):q.and(q.not(hasResult),q.eq(q.field("pickedUpAt"),undefined));
       return q.or(q.eq(q.field("state"),args.state),q.and(q.eq(q.field("state"),"needs_you"),legacy));
     });
-    const page=await query.paginate({...args.paginationOpts,numItems:Math.min(args.paginationOpts.numItems,QUEUE_LIMITS.itemPage)});
-    return {...page,page:await Promise.all(page.page.map(item=>queueForPerson(ctx,item,!!args.originTitles)))};
+    const [page, counts] = await Promise.all([
+      query.paginate({...args.paginationOpts,numItems:Math.min(args.paginationOpts.numItems,QUEUE_LIMITS.itemPage)}),
+      args.includeCounts ? readQueueCounts(ctx, args.vaultOwnerId) : undefined,
+    ]);
+    const projected = await Promise.all(page.page.map(item => queueForPerson(ctx, item, !!args.originTitles)));
+    return { ...page, page: projected, ...(counts ? { counts } : {}) };
   },
 });
 
@@ -679,14 +683,16 @@ export const listAllowedQueueItemsInternal = internalQuery({
 
 export const listQueueItems = action({
   args: listQueueArgs,
-  handler: async (ctx, args): Promise<PaginationResult<QueueItem>> => {
+  handler: async (ctx, args): Promise<PaginationResult<QueueItem> & { counts: Awaited<ReturnType<typeof readQueueCounts>> }> => {
     const decision = await authorizeQueueTenantAction(ctx, "queue.listQueueItems", args.vaultOwnerId);
     const result = await ctx.runQuery(internal.queue.listQueueItemsInternal, {
       ...args,
       originTitles:true,
+      includeCounts: true,
       vaultOwnerId: decision.owner,
     });
     const page: QueueItem[] = [];
+    let reconciledExpiry = false;
     for (const item of result.page) {
       const transition = queueExpiryTransition(queueIdentity(item), Date.now());
       if (!transition) {
@@ -697,11 +703,16 @@ export const listQueueItems = action({
         vaultOwnerId: decision.owner,
         queueItemId: item._id,
       });
+      // The reconciliation can add a Needs your input flag. Read its updated count.
+      reconciledExpiry = true;
       if (reconciled.item && (!args.state || reconciled.item.state === args.state)) {
         page.push(reconciled.item);
       }
     }
-    return { ...result, page: page.map(queueIdentity) };
+    const counts = reconciledExpiry || !result.counts
+      ? await ctx.runMutation(api.queue.queueCounts, { vaultOwnerId: decision.owner })
+      : result.counts;
+    return { ...result, counts, page: page.map(queueIdentity) };
   },
 });
 
@@ -1291,14 +1302,21 @@ export const deleteQueueItem = action({
 });
 
 /** AWL-0016: person-private suggestions share the Queue but are never actionable. */
+async function readQueueCounts(ctx: Pick<QueryCtx, "db">, owner: string) {
+  const counter = await ctx.db.query("queueCounters").withIndex("by_owner", q => q.eq("vaultOwnerId", owner)).unique();
+  if (counter) {
+    return counter.ready ? { available: true, suggestions: counter.openSuggestions, needsInput: counter.needsInput }
+      : { available: false, suggestions: null, needsInput: null };
+  }
+  const item = await ctx.db.query("queueItems").withIndex("by_owner", q => q.eq("vaultOwnerId", owner)).first();
+  return item ? { available: false, suggestions: null, needsInput: null } : { available: true, suggestions: 0, needsInput: 0 };
+}
+
 export const queueCounts = mutation({
   args:{vaultOwnerId:v.string()},
   handler:async(ctx,args)=>{
     const decision=await authorizeTenantMutation(ctx,"queue.queueCounts",args.vaultOwnerId);assertQueueTenantAllowed(decision);
-    const counter=await ctx.db.query("queueCounters").withIndex("by_owner",q=>q.eq("vaultOwnerId",decision.owner)).unique();
-    if(counter)return counter.ready?{available:true,suggestions:counter.openSuggestions,needsInput:counter.needsInput}:{available:false,suggestions:null,needsInput:null};
-    const item=await ctx.db.query("queueItems").withIndex("by_owner",q=>q.eq("vaultOwnerId",decision.owner)).first();
-    return item?{available:false,suggestions:null,needsInput:null}:{available:true,suggestions:0,needsInput:0};
+    return readQueueCounts(ctx, decision.owner);
   },
 });
 
