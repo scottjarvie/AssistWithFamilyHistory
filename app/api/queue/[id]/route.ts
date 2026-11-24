@@ -4,6 +4,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { getAuthedConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
 import { getVaultAccessContext } from "@/lib/vault/server";
+import { readWebsiteQueueDetail } from "@/lib/queue/websiteReads";
 
 const CommandSchema = z.discriminatedUnion("command", [
  z.object({command:z.literal("review"),action:z.enum(["accept","dismiss","archive","restore","clear_input","edit"]),directive:z.string().max(4000).optional(),reason:z.string().max(4000).optional(),optionIndex:z.number().int().min(0).optional(),expectedVersion:z.number().int().positive(),idempotencyKey:z.string().min(1).max(160)}),
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const { id } = await context.params;
     const { vaultOwnerId } = await getVaultAccessContext();
     const client = await getAuthedConvexClient();
-    const result = await client.action(api.queue.getQueueItem, {
+    const result = await readWebsiteQueueDetail(client, {
       vaultOwnerId,
       queueItemId: id as Id<"queueItems">,
       activityPagination: {

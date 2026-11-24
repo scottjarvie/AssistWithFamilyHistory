@@ -4,13 +4,13 @@ import { usePathname } from "next/navigation";
 
 export type QueueCounts = { suggestions: number; needsInput: number } | null;
 const QueueCountsContext = createContext({
-  counts: null as QueueCounts,
+  counts: undefined as QueueCounts | undefined,
   publish: (_counts: QueueCounts) => {},
 });
 
 export function QueueNavCountsProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const [counts, setCounts] = useState<QueueCounts>(null);
+  const [counts, setCounts] = useState<QueueCounts | undefined>(undefined);
   const received = useRef(false);
   const inFlight = useRef<AbortController | null>(null);
   const publish = useCallback((next: QueueCounts) => {
@@ -45,8 +45,8 @@ export function QueueNavCountsProvider({ children }: { children: ReactNode }) {
   return <QueueCountsContext.Provider value={value}>{children}</QueueCountsContext.Provider>;
 }
 
-export function usePublishQueueCounts() {
-  return useContext(QueueCountsContext).publish;
+export function useQueueNavCounts() {
+  return useContext(QueueCountsContext);
 }
 
 export function QueueNavCounts(){

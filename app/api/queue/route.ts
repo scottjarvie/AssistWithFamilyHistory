@@ -4,6 +4,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { getAuthedConvexClient, getConvexRuntimeIssue, isConvexConfigured } from "@/lib/convex/server";
 import { getVaultAccessContext } from "@/lib/vault/server";
+import { readWebsiteQueueList } from "@/lib/queue/websiteReads";
 
 const ContextSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("person"), refId: z.string().min(1) }),
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest) {
     const limit = Number.isFinite(parsedLimit) ? Math.max(1, Math.min(parsedLimit, 50)) : 25;
     const client = await getAuthedConvexClient();
     if(request.nextUrl.searchParams.get("counts")==="true")return NextResponse.json({success:true,counts:await client.mutation(api.queue.queueCounts,{vaultOwnerId})});
-    const page = await client.action(api.queue.listQueueItems, {
+    const page = await readWebsiteQueueList(client, {
       vaultOwnerId,
       suggestions: request.nextUrl.searchParams.get("suggestions")==="true",
       archived: request.nextUrl.searchParams.get("archived")==="true",
