@@ -1585,14 +1585,20 @@ export const getPersonWorkspace = internalQuery({
   args: {
     vaultOwnerId: v.string(),
     personIdentifier: v.string(),
+    documentsMetadataOnly: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     // GEN-92: per-person loader — fetches only this person's related rows.
-    return assemblePersonWorkspaceScoped(
+    const workspace = await assemblePersonWorkspaceScoped(
       ctx,
       normalizeVaultOwnerId(args.vaultOwnerId),
       args.personIdentifier
     );
+    if (!workspace || !args.documentsMetadataOnly) return workspace;
+    return {
+      ...workspace,
+      documents: workspace.documents.map(doc => ({ ...doc, contentMarkdown: "", contentText: "" })),
+    };
   },
 });
 

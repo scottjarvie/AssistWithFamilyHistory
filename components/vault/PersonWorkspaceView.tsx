@@ -7,7 +7,7 @@ import { Prose } from "@/components/prose/Prose";
 import { LifeTimeline, type TimelineEvent } from "@/components/viz/LifeTimeline";
 import type { api } from "@/convex/_generated/api";
 import type { FunctionReturnType } from "convex/server";
-import { DocumentsViewer } from "@/components/DocumentsViewer";
+import { DeferredDocumentsViewer, DocumentsViewer } from "@/components/DocumentsViewer";
 import { ResearchChecksPanel } from "@/components/vault/ResearchChecksPanel";
 import { MediaPrivacyReviewPanel } from "@/components/vault/MediaPrivacyReviewPanel";
 import { ContextItemsPanel } from "@/components/vault/ContextItemsPanel";
@@ -25,8 +25,9 @@ function latestUpdate(rows: readonly ({updatedAt?:number|string;createdAt?:numbe
 }
 
 /** Server-rendered dossier and preserved evidence/review sections. */
-export function PersonWorkspaceView({workspace,personId,documents,documentsError,readonlyPreview=false}:{workspace:PersonWorkspace;personId:string;documents:DocumentRecord[];documentsError:string|null;readonlyPreview?:boolean}) {
+export function PersonWorkspaceView({workspace,personId,documents,documentsError,documentsOwner,readonlyPreview=false}:{workspace:PersonWorkspace;personId:string;documents:DocumentRecord[];documentsError:string|null;documentsOwner?:string;readonlyPreview?:boolean}) {
   const routeId = workspace.person.routeId || personId;
+  const documentSummaries = documentsOwner ? workspace.documents : documents;
   const hasStoredRuns = workspace.importRuns.length > 0;
   const storyCheckLabels: Record<string, string> = {
     biography: "Biography or draft",
@@ -260,7 +261,7 @@ export function PersonWorkspaceView({workspace,personId,documents,documentsError
             />
           ) : null}
         </div>},
-{id:"documents",label:"Documents",count:documentsError?null:documents.length,updatedAt:latestUpdate(documents),content:<div className="">
+{id:"documents",label:"Documents",count:documentsError?null:documentSummaries.length,updatedAt:latestUpdate(documentSummaries),content:<div className="">
           <Card className="border-border">
             <CardHeader>
               <CardTitle role="heading" aria-level={2} className="flex items-center gap-2">
@@ -278,7 +279,9 @@ export function PersonWorkspaceView({workspace,personId,documents,documentsError
                   <SafeLink href={`/app/people/${personId}/contextualized`}>Contextualized Dossier</SafeLink>
                 </Button>
               </div>
-              <DocumentsViewer documents={documents} error={documentsError} />
+              {documentsOwner && documentSummaries.length > 0
+                ? <DeferredDocumentsViewer key={`${documentsOwner}:${routeId}`} personId={routeId} owner={documentsOwner} />
+                : <DocumentsViewer documents={documents} error={documentsError} />}
             </CardContent>
           </Card>
         </div>},

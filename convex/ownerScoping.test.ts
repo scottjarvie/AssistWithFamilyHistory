@@ -488,6 +488,31 @@ describe("migrateGuestVault (real mutation)", () => {
 // ---------------------------------------------------------------------------
 
 describe("guarded private reads", () => {
+  test("the Person overview omits document bodies and the separately loaded Documents tab keeps owner scope and order", async () => {
+    const t = convexTest(schema, modules);
+    const a = await seedOwner(t, OWNER_A, "A");
+    await seedOwner(t, OWNER_B, "A"); // The same FamilySearch ID in another vault.
+    const body = "Synthetic transcription line. ".repeat(4_096);
+    await t.run(async ctx => {
+      await ctx.db.insert("documents", { ...documentFields(OWNER_A, "FSID-A", "owner-PS"), type: "PS", contentMarkdown: body, contentText: body });
+      await ctx.db.insert("documents", { ...documentFields(OWNER_A, "FSID-A", "owner-CST"), contentMarkdown: body, contentText: body });
+      await ctx.db.insert("documents", documentFields(OWNER_B, "FSID-A", "foreign"));
+    });
+    const owner = t.withIdentity({ subject: OWNER_A });
+    const input = { vaultOwnerId: OWNER_A, personIdentifier: a.primary };
+    const full = await owner.action(api.vaultReads.getPersonWorkspace, input);
+    const overview = await owner.action(api.vaultReads.getPersonWorkspace, { ...input, documentsMetadataOnly: true });
+    expect(full?.documents.map(doc => doc.contentMarkdown)).toEqual([body, body]);
+    expect(overview?.documents.map(doc => doc.contentMarkdown)).toEqual(["", ""]);
+    expect(overview?.documents.map(doc => doc.contentText)).toEqual(["", ""]);
+    expect(overview?.stats).toEqual(full?.stats);
+    expect(overview?.researchChecks).toEqual(full?.researchChecks);
+    const tab = await owner.action(api.documents.getDocumentsByPerson, { vaultOwnerId: OWNER_A, personId: "FSID-A" });
+    expect(tab.map(doc => doc.type)).toEqual(["CST", "PS"]);
+    expect(tab.map(doc => doc.contentMarkdown)).toEqual([body, body]);
+    await expect(t.withIdentity({ subject: OWNER_B }).action(api.documents.getDocumentsByPerson, { vaultOwnerId: OWNER_A, personId: "FSID-A" })).rejects.toThrow(/owner_mismatch/);
+  });
+
   test("shadow mode refuses a mismatched identity and logs the denial", async () => {
     const t = convexTest(schema, modules);
     const a = await seedOwner(t, OWNER_A, "A");

@@ -17,3 +17,11 @@ export async function loadPersonHistory(personId: Id<"persons">, before: number 
   const client = await getAuthedConvexClient({ requireAuthentication: true });
   return client.action(api.personHistory.page, { vaultOwnerId, personId, before });
 }
+
+export async function loadPersonDocuments(personId: string, expectedOwner: string) {
+  const { vaultOwnerId } = await getVaultAccessContext();
+  if (expectedOwner !== vaultOwnerId) throw new Error("The active tree changed. Reload this person to continue.");
+  const client = await getAuthedConvexClient();
+  const documents = await client.action(api.documents.getDocumentsByPerson, { personId, vaultOwnerId });
+  return documents.map(({ _id, type, title, contentMarkdown, updatedAt }) => ({ _id, type, title, contentMarkdown, updatedAt }));
+}

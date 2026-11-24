@@ -68,7 +68,7 @@ export const getPeopleExplorerPage = action({
 });
 
 export const getPersonWorkspace = action({
-  args: { vaultOwnerId: v.string(), personIdentifier: v.string() },
+  args: { vaultOwnerId: v.string(), personIdentifier: v.string(), documentsMetadataOnly: v.optional(v.boolean()) },
   handler: async (ctx, args): Promise<FunctionReturnType<typeof vaultInternal.getPersonWorkspace>> =>
     ctx.runQuery(vaultInternal.getPersonWorkspace, {
       ...args,
