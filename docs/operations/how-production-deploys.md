@@ -11,10 +11,11 @@ repository's `main` branch and builds every commit on it. The build command is
 npx --no-install convex deploy --cmd 'npx --no-install next build'
 ```
 
-so **Convex is deployed first, then the Next.js frontend is built against it.**
-That ordering is deliberate: new backend functions and tables exist before any
-page can call them. When you merge a pull request into `main`, the release is
-already on its way out.
+For this production command, the pinned Convex CLI (1.39.1) runs and awaits the
+Next.js build before pushing Convex functions and schema. A failed Next.js
+build stops the command before that push. Vercel can release the built frontend
+only after the configured command succeeds, including the Convex push. When you
+merge a pull request into `main`, Vercel starts that release process.
 
 Hosted production fails before invoking any build command if the deploy key is
 missing, has the wrong type or deployment, or the frontend backend URL does not
@@ -67,10 +68,9 @@ outside; only one of them changes when you deploy.
   offers to push to it. The production Convex deployment for this product is
   **`accomplished-dodo-308`**; see §0·0 of
   `docs/operations/bring-your-ai-provider-actions.md`.
-- **Deployed is not proved.** A green production build proves the code is
-  running. It does not prove any AI client can complete a connection lifecycle
-  against it. Those are two separate claims and this product keeps them separate:
-  the honest residue after a deploy is *awaiting real-client proof*.
+- **Real-client proof follows release.** After Vercel releases the deployment,
+  verify what production is serving, then prove that an AI client can complete
+  a connection lifecycle against it.
 
 ## History
 

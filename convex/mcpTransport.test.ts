@@ -487,6 +487,55 @@ describe("stateless Family History MCP transport", () => {
   });
 });
 
+test("selected-person search and its alias keep coverage independent of hidden rows", async () => {
+  const t = convexTest(schema, modules);
+  const person = {
+    vaultOwnerId: SUBJECT, name: { given: "Synthetic", surname: "Selected" },
+    sex: "unknown" as const, living: false, researchStatus: "basic" as const, createdAt: 1, updatedAt: 1,
+  };
+  const personId = await t.run(async ctx => {
+    await ctx.db.insert("persons", { ...person, vaultOwnerId: "user_other_synthetic" });
+    await ctx.db.insert("persons", { ...person, archivedAt: 1 });
+    return ctx.db.insert("persons", person);
+  });
+  await seedGrant(t, {
+    vaultOwnerId: SUBJECT, clientId: CLIENT_ID, issuer: ISSUER,
+    boundary: { kind: "selected_people", personIds: [personId] },
+  });
+  const token = await accessToken();
+  const search = async (name: string, args: { query: string; kinds: string[]; limit?: number }) => {
+    const response = await t.fetch("/mcp", modernRequest("tools/call", token, { name, arguments: args }, name));
+    const body = await response.json();
+    expect(body.error).toBeUndefined();
+    expect(body.result.isError).not.toBe(true);
+    return body.result.structuredContent;
+  };
+  const kinds = ["source", "person"];
+  const canonical = "family_history_search";
+  const alias = "search_family_history";
+  const allowed = await search(canonical, { query: "Synthetic", kinds });
+  const hidden = await search(canonical, { query: "Hidden", kinds });
+  expect(allowed).toMatchObject({
+    results: [{ kind: "person", id: personId, name: "Synthetic Selected" }],
+    coverage: { status: "unavailable" }, truncated: false,
+  });
+  expect(hidden).toMatchObject({ results: [], coverage: { status: "unavailable" }, truncated: false });
+  await t.run(async ctx => {
+    for (let i = 0; i < 251; i++) {
+      await ctx.db.insert("persons", { ...person, name: { given: "Synthetic", surname: "Hidden" } });
+    }
+    await ctx.db.insert("sources", { vaultOwnerId: SUBJECT, type: "census", title: "Synthetic Hidden", createdAt: 1, updatedAt: 1 });
+  });
+  expect(await search(alias, { query: "Synthetic", kinds })).toEqual(allowed);
+  expect(await search(alias, { query: "Hidden", kinds })).toEqual(hidden);
+  expect(await search(alias, { query: "Synthetic", kinds: ["source"] })).toMatchObject({
+    results: [], coverage: { status: "unavailable" }, truncated: false,
+  });
+  expect(await search(alias, { query: "Synthetic", kinds, limit: 1 })).toMatchObject({
+    results: [{ id: personId }], coverage: { status: "unavailable" }, truncated: true,
+  });
+});
+
 test("all 14 hidden compatibility names still run canonical tools and record their use", async () => {
   const t = convexTest(schema, modules);
   await approvedConnection(t);
@@ -505,7 +554,10 @@ test("all 14 hidden compatibility names still run canonical tools and record the
   const person1 = saved.person.id;
   const person2 = (await call("save_person", { operationId: "alias-second-person", ...person("Related") })).person.id;
   await call("get_family_history_brief");
-  await call("search_family_history", { query: "Legacy" });
+  expect(await call("search_family_history", { query: "Legacy", kinds: ["person"] })).toMatchObject({
+    results: [{ kind: "person", id: person1 }],
+    coverage: { visitedKinds: [{ kind: "person", source: "recent_window" }] },
+  });
   expect((await call("get_family_history_context", { kind: "person", id: person1 })).person._id).toBe(person1);
   await call("save_relationship", { operationId: "alias-relationship", mode: "create", createKey: "legacy-relationship", type: "Couple", person1, person2 });
   await call("save_event", { operationId: "alias-event", mode: "create", createKey: "legacy-event", type: "census", personRoles: [{ personId: person1, role: "primary" }] });
