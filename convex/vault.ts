@@ -6,6 +6,7 @@ import { v } from "convex/values";
 import { internalQuery, query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { buildStoryPublicSlug } from "../lib/stories/slug";
+import { PERSON_STORY_PAGE_SIZE } from "../lib/records/personStories";
 import { redactPublicText } from "../lib/privacy/publicTextRedaction";
 import { buildContextPack } from "./contextPackBuilder";
 import {
@@ -1599,6 +1600,49 @@ export const getPersonWorkspace = internalQuery({
       ...workspace,
       documents: workspace.documents.map(doc => ({ ...doc, contentMarkdown: "", contentText: "" })),
     };
+  },
+});
+
+export const getPersonOverview = internalQuery({
+  args: { vaultOwnerId: v.string(), personIdentifier: v.string() },
+  handler: async (ctx, args) => {
+    const workspace = await assemblePersonWorkspaceScoped(
+      ctx, normalizeVaultOwnerId(args.vaultOwnerId), args.personIdentifier
+    );
+    if (!workspace) return null;
+    const { person, stats, operations, importRuns, researchLog, researchChecks,
+      contextCoverage, sources, sourceFacts, timeline, relationships, provisionalRelatives,
+      places, media, researchTasks, contextItems, stories, documents } = workspace;
+    const latestUpdate = (rows: { updatedAt: number }[]) => rows.reduce(
+      (latest, row) => Number.isFinite(row.updatedAt) ? Math.max(latest, row.updatedAt) : latest, 0
+    ) || undefined;
+    // Convex reads complete rows. Keep only the metadata the website needs
+    // for these two tabs, and reuse the workspace's exact order and readiness.
+    return {
+      person, stats, operations, importRuns, researchLog, researchChecks,
+      contextCoverage, sources, sourceFacts, timeline, relationships, provisionalRelatives,
+      places, media, researchTasks, contextItems,
+      storyTab: { ids: stories.map(story => story._id), updatedAt: latestUpdate(stories) },
+      documentTab: { count: documents.length, updatedAt: latestUpdate(documents) },
+    };
+  },
+});
+
+export const getPersonStoryPage = internalQuery({
+  args: { vaultOwnerId: v.string(), personId: v.id("persons"), storyIds: v.array(v.id("stories")) },
+  handler: async (ctx, { vaultOwnerId, personId, storyIds }) => {
+    if (storyIds.length === 0 || storyIds.length > PERSON_STORY_PAGE_SIZE) throw new Error("Invalid story page size");
+    const owner = normalizeVaultOwnerId(vaultOwnerId);
+    const person = await ctx.db.get(personId);
+    if (!person || person.archivedAt !== undefined || !matchesVaultOwner(person.vaultOwnerId, owner)) return null;
+    const stories = await Promise.all(storyIds.map(id => ctx.db.get(id)));
+    const page = [];
+    for (const story of stories) {
+      if (!story || story.archivedAt !== undefined || story.personId !== personId || !matchesVaultOwner(story.vaultOwnerId, owner)) return null;
+      const { _id, title, type, status, content, publicSlug } = story;
+      page.push({ _id, title, type, status, content, publicSlug });
+    }
+    return page;
   },
 });
 

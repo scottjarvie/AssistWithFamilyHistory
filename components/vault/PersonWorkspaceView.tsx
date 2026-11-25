@@ -3,7 +3,6 @@ import {RecordArrow as ArrowRight,RecordComplete as CheckCircle2,RecordWarning a
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Prose } from "@/components/prose/Prose";
 import { LifeTimeline, type TimelineEvent } from "@/components/viz/LifeTimeline";
 import type { api } from "@/convex/_generated/api";
 import type { FunctionReturnType } from "convex/server";
@@ -12,12 +11,13 @@ import { ResearchChecksPanel } from "@/components/vault/ResearchChecksPanel";
 import { MediaPrivacyReviewPanel } from "@/components/vault/MediaPrivacyReviewPanel";
 import { ContextItemsPanel } from "@/components/vault/ContextItemsPanel";
 import { PersonHeader } from "@/components/vault/PersonHeader";
-import { publicStoryPath } from "@/lib/stories/slug";
+import { DeferredPersonStoryCards, PersonStoryCards } from "@/components/vault/PersonStoryCards";
 
 import { RecordSections, type RecordSection } from "@/components/records/RecordSections";
 import { EvidenceStream, type EvidenceStreamEntry } from "@/components/records/EvidenceStream";
 import type { DocumentRecord } from "@/components/DocumentsViewer";
 export type PersonWorkspace = NonNullable<FunctionReturnType<typeof api.vaultReads.getPersonWorkspace>>;
+type PersonOverview = NonNullable<FunctionReturnType<typeof api.vaultReads.getPersonOverview>>;
 
 function latestUpdate(rows: readonly ({updatedAt?:number|string;createdAt?:number;_creationTime?:number;lastReviewedAt?:number}|null)[]) {
   const dates=rows.map(row=>{const value=row?.updatedAt ?? row?.lastReviewedAt ?? row?.createdAt ?? row?._creationTime; return typeof value === "string" ? Date.parse(value) : value || 0;}).filter(Number.isFinite);
@@ -25,9 +25,11 @@ function latestUpdate(rows: readonly ({updatedAt?:number|string;createdAt?:numbe
 }
 
 /** Server-rendered dossier and preserved evidence/review sections. */
-export function PersonWorkspaceView({workspace,personId,documents,documentsError,documentsOwner,readonlyPreview=false}:{workspace:PersonWorkspace;personId:string;documents:DocumentRecord[];documentsError:string|null;documentsOwner?:string;readonlyPreview?:boolean}) {
+export function PersonWorkspaceView({workspace,personId,documents=[],documentsError=null,documentsOwner,readonlyPreview=false}:{workspace:PersonWorkspace|PersonOverview;personId:string;documents?:DocumentRecord[];documentsError?:string|null;documentsOwner?:string;readonlyPreview?:boolean}) {
   const routeId = workspace.person.routeId || personId;
-  const documentSummaries = documentsOwner ? workspace.documents : documents;
+  const documentTab = "documentTab" in workspace ? workspace.documentTab : { count: documents.length, updatedAt: latestUpdate(documents) };
+  const previewStories = "stories" in workspace ? workspace.stories : [];
+  const storyTab = "storyTab" in workspace ? workspace.storyTab : { ids: previewStories.map(story => story._id), updatedAt: latestUpdate(previewStories) };
   const hasStoredRuns = workspace.importRuns.length > 0;
   const storyCheckLabels: Record<string, string> = {
     biography: "Biography or draft",
@@ -46,7 +48,7 @@ export function PersonWorkspaceView({workspace,personId,documents,documentsError
       status: check.status,
       summary: check.summary,
     }));
-  const currentStory = workspace.stories[0] ?? null;
+  const latestStoryId = storyTab.ids[0];
   const sourceFacts = workspace.sourceFacts ?? [];
   const contextItems = workspace.contextItems ?? [];
   const media = workspace.media ?? [];
@@ -261,7 +263,7 @@ export function PersonWorkspaceView({workspace,personId,documents,documentsError
             />
           ) : null}
         </div>},
-{id:"documents",label:"Documents",count:documentsError?null:documentSummaries.length,updatedAt:latestUpdate(documentSummaries),content:<div className="">
+{id:"documents",label:"Documents",count:documentsError?null:documentTab.count,updatedAt:documentTab.updatedAt,content:<div className="">
           <Card className="border-border">
             <CardHeader>
               <CardTitle role="heading" aria-level={2} className="flex items-center gap-2">
@@ -279,13 +281,13 @@ export function PersonWorkspaceView({workspace,personId,documents,documentsError
                   <SafeLink href={`/app/people/${personId}/contextualized`}>Contextualized Dossier</SafeLink>
                 </Button>
               </div>
-              {documentsOwner && documentSummaries.length > 0
+              {documentsOwner && documentTab.count > 0
                 ? <DeferredDocumentsViewer key={`${documentsOwner}:${routeId}`} personId={routeId} owner={documentsOwner} />
                 : <DocumentsViewer documents={documents} error={documentsError} />}
             </CardContent>
           </Card>
         </div>},
-{id:"stories",label:"Stories",count:workspace.stories.length,updatedAt:latestUpdate(workspace.stories),content:<div className="">
+{id:"stories",label:"Stories",count:storyTab.ids.length,updatedAt:storyTab.updatedAt,content:<div className="">
           <div className="grid gap-4">
             <Card className="border-border bg-gradient-to-br from-card to-annotation-surface/60">
               <CardHeader>
@@ -298,35 +300,15 @@ export function PersonWorkspaceView({workspace,personId,documents,documentsError
                 </Button>
               </CardContent>
             </Card>
-            {workspace.stories.length === 0 ? (
+            {storyTab.ids.length === 0 ? (
               <Card className="border-dashed">
                 <CardContent className="py-12 text-center text-muted-foreground">
                   No saved story outputs yet. Start from Story Writer or export a context pack to another AI tool.
                 </CardContent>
               </Card>
-            ) : (
-              workspace.stories.map((story) => (
-                <Card key={String(story._id)} className="border-border">
-                  <CardHeader>
-                    <CardTitle role="heading" aria-level={2}>{story.title}</CardTitle>
-                    <CardDescription>{story.type.replace(/_/g, " ")} · {story.status}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <Prose markdown={story.content} variant="compact" className="text-sm text-muted-foreground" />
-                    <div className="flex flex-wrap gap-3">
-                      <Button asChild variant="outline" size="sm">
-                        <SafeLink href={`/app/stories/${story._id}`}>Review in Story Studio</SafeLink>
-                      </Button>
-                      {story.status === "published" ? (
-                        <Button asChild variant="outline" size="sm">
-                          <SafeLink href={publicStoryPath(story.publicSlug ?? String(story._id))} target="_blank">Open public page</SafeLink>
-                        </Button>
-                      ) : null}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            )}
+            ) : documentsOwner ? (
+              <DeferredPersonStoryCards key={`${storyTab.updatedAt}:${storyTab.ids.join(",")}`} personId={workspace.person._id} storyIds={storyTab.ids} owner={documentsOwner} />
+            ) : <PersonStoryCards stories={previewStories.map(({ _id, title, type, status, content, publicSlug }) => ({ _id, title, type, status, content, publicSlug }))} />}
           </div>
         </div>},
 {id:"research",label:"Research",count:workspace.researchTasks.length + contextItems.length,detail:`${workspace.researchTasks.length} ${workspace.researchTasks.length===1?"task":"tasks"} · ${contextItems.length} ${contextItems.length===1?"context item":"context items"} · ${workspace.researchChecks.filter(check=>check.status==="missing"||check.status==="needs_review").length} checks need attention`,updatedAt:latestUpdate([...workspace.researchTasks,...contextItems]),content:<div className="">
@@ -402,9 +384,9 @@ export function PersonWorkspaceView({workspace,personId,documents,documentsError
                   <Button asChild variant="outline">
                     <SafeLink href="/app/stories">Open Story Studio</SafeLink>
                   </Button>
-                  {currentStory ? (
+                  {latestStoryId ? (
                     <Button asChild variant="outline">
-                      <SafeLink href={`/app/stories/${currentStory._id}`}>Review latest saved story</SafeLink>
+                      <SafeLink href={`/app/stories/${latestStoryId}`}>Review latest saved story</SafeLink>
                     </Button>
                   ) : null}
                 </div>
