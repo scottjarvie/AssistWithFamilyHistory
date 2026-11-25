@@ -4,7 +4,7 @@ const files = {
   processRoute: read("app/api/process/route.ts"),
   openRouter: read("lib/ai/openrouter.ts"),
   privacy: read("lib/ai/privacy.ts"),
-  sourceAiPage: read("app/app/source-docs/[personId]/ai/page.tsx"),
+  sourceAiPage: read("app/app/people/[personId]/ai/page.tsx"),
   storyWriter: read("components/vault/StoryWriterStudio.tsx"),
   schema: read("convex/schema.ts"),
   importer: read("lib/familysearch/importer.ts"),
