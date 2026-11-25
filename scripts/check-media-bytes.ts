@@ -55,8 +55,10 @@ assert.match(
 
 /* ------------------------------- an upload is not a permission to read it */
 
-const attachBody = mutations.slice(mutations.indexOf("export const attachMediaFile"));
-const attachSection = attachBody.slice(0, attachBody.indexOf("export const reviewMedia"));
+const attachStart = mutations.indexOf("export const attachMediaFile");
+const attachEnd = mutations.indexOf("export const reviewMedia");
+assert.ok(attachStart >= 0 && attachEnd > attachStart, "expected attachMediaFile before reviewMedia in vaultMutations.ts");
+const attachSection = mutations.slice(attachStart, attachEnd);
 assert.match(
   attachSection,
   /aiUseAllowed:\s*false/,
@@ -80,7 +82,10 @@ assert.doesNotMatch(
 
 /* ----------------------------- delivery goes through the same gates as ever */
 
-const mediaGate = evidence.slice(evidence.indexOf("function mediaSkipReason("), evidence.indexOf("async function evidenceGrant("));
+const gateStart = evidence.indexOf("function mediaSkipReason(");
+const gateEnd = evidence.indexOf("async function evidenceGrant(");
+assert.ok(gateStart >= 0 && gateEnd > gateStart, "expected mediaSkipReason before evidenceGrant in mcpEvidence.ts");
+const mediaGate = evidence.slice(gateStart, gateEnd);
 for (const gate of [
   'reviewStatus !== "reviewed"',
   "aiUseAllowed !== true",
@@ -105,7 +110,10 @@ assert.match(
   /actionCtx\.storage\.get\(/,
   "the transport must read stored objects directly rather than fetching a URL",
 );
-const storedLoop = transport.slice(transport.indexOf("for (const item of batch.stored)"), transport.indexOf("for (const item of batch.b2Stored)"));
+const storedStart = transport.indexOf("for (const item of batch.stored)");
+const storedEnd = transport.indexOf("for (const item of batch.b2Stored)");
+assert.ok(storedStart >= 0 && storedEnd > storedStart, "expected batch.stored before batch.b2Stored in evidenceDelivery.ts");
+const storedLoop = transport.slice(storedStart, storedEnd);
 assert.doesNotMatch(
   storedLoop,
   /getUrl|item\.url/,
