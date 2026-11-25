@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import ts from "typescript";
 import { PrivateFamilyStart } from "../components/vault/PrivateFamilyStart";
 
 const markup = renderToStaticMarkup(<PrivateFamilyStart />);
@@ -46,13 +47,28 @@ assert.match(mutationSource, /isFirstStartEligible\(ctx, vaultOwnerId\)/);
 
 // Every table the whole-vault snapshot reads, plus the Queue, decides emptiness.
 const vaultSource = readFileSync(new URL("../convex/vault.ts", import.meta.url), "utf8");
-const snapshotSource = vaultSource.slice(
-  vaultSource.indexOf("export async function getVaultSnapshot"),
-  vaultSource.indexOf("export async function getVaultSnapshot") + 3_000,
+const vaultModule = ts.createSourceFile("convex/vault.ts", vaultSource, ts.ScriptTarget.Latest, true);
+const snapshot = vaultModule.statements.find(
+  (statement): statement is ts.FunctionDeclaration =>
+    ts.isFunctionDeclaration(statement) && statement.name?.text === "getVaultSnapshot",
 );
+assert.ok(
+  snapshot?.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword),
+  "convex/vault.ts must export getVaultSnapshot",
+);
+const snapshotEnd = snapshot.body?.getChildren().at(-1);
+assert.ok(
+  snapshotEnd?.kind === ts.SyntaxKind.CloseBraceToken && snapshotEnd.getWidth() > 0,
+  "getVaultSnapshot must have a complete function body",
+);
+const snapshotSource = snapshot.getText();
 const snapshotTables = [...snapshotSource.matchAll(/byOwner\("(\w+)"\)/g)].map((match) => match[1]);
-const emptyTablesSource = vaultSource.slice(vaultSource.indexOf("export const FIRST_START_EMPTY_TABLES"));
-const emptyTables = [...emptyTablesSource.slice(0, emptyTablesSource.indexOf("] as const")).matchAll(/"(\w+)"/g)].map((match) => match[1]);
+const emptyTablesStart = vaultSource.indexOf("export const FIRST_START_EMPTY_TABLES = [");
+assert.ok(emptyTablesStart >= 0, "convex/vault.ts must define FIRST_START_EMPTY_TABLES");
+const emptyTablesEnd = vaultSource.indexOf("\n] as const;", emptyTablesStart);
+assert.ok(emptyTablesEnd > emptyTablesStart, "FIRST_START_EMPTY_TABLES must have a closing bracket");
+const emptyTablesSource = vaultSource.slice(emptyTablesStart, emptyTablesEnd);
+const emptyTables = [...emptyTablesSource.matchAll(/"(\w+)"/g)].map((match) => match[1]);
 assert.ok(snapshotTables.length >= 20, "found the snapshot's owner tables");
 assert.deepEqual([...emptyTables].sort(), [...snapshotTables, "queueItems"].sort());
 
