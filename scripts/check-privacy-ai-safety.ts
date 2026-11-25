@@ -18,9 +18,11 @@ assert(files.processRoute.includes("privacyAcknowledged"), "AI process route mus
 assert(files.processRoute.includes("redactionMode"), "AI process route must require redaction mode.");
 assert(files.processRoute.includes("AI redaction mode required"), "AI process route must reject a missing redaction mode.");
 const egressScanIndex = files.processRoute.indexOf("const egressScan = scanAiEgressForLivingPersonPII");
-const rateLimitIndex = files.processRoute.indexOf("checkAndIncrementRateLimit");
+const rateLimitIndex = files.processRoute.indexOf("api.rateLimits.checkAndIncrementRateLimit");
 const providerIndex = files.processRoute.indexOf("await chatCompletion");
 assert(egressScanIndex !== -1, "AI process route must scan the exact provider-bound egress surfaces.");
+assert(rateLimitIndex !== -1, "AI process route must call the rate-limit mutation.");
+assert(providerIndex !== -1, "AI process route must call the AI provider.");
 assert(
   egressScanIndex < rateLimitIndex && egressScanIndex < providerIndex,
   "AI egress refusal must run before rate-limit mutation and provider work.",

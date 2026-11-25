@@ -1,5 +1,7 @@
+import assert from "node:assert/strict";
 import { readFileSync } from "fs";
 import path from "path";
+import ts from "typescript";
 import { canRenderPublicStory } from "../lib/stories/publicStoryPolicy";
 
 const publicRoutePath = path.join(process.cwd(), "app", "stories", "[id]", "page.tsx");
@@ -32,43 +34,48 @@ if (!convexVault.includes('story.status !== "published"')) {
 // GEN-77: public Convex queries must use buildPublicStoryBundle (explicit
 // field allowlist), not buildStoryBundle({publicView: true}) which only
 // gated 2 of 12 fields and returned the full internal review bundle.
-if (!convexVault.includes("export function buildPublicStoryBundle")) {
-  failures.push("convex/vault.ts must export buildPublicStoryBundle (the public DTO)");
-}
+const publishedStoryStart = convexVault.indexOf("export const getPublishedStory =");
+const publishedStoryByIdentifierStart = convexVault.indexOf("export const getPublishedStoryByIdentifier =");
+const researchChecksStart = convexVault.indexOf("export const getPersonResearchChecks =");
+assert.ok(publishedStoryStart >= 0, "convex/vault.ts must define getPublishedStory");
+assert.ok(
+  publishedStoryByIdentifierStart > publishedStoryStart,
+  "getPublishedStoryByIdentifier must follow getPublishedStory in convex/vault.ts",
+);
+assert.ok(
+  researchChecksStart > publishedStoryByIdentifierStart,
+  "getPersonResearchChecks must follow the public story queries in convex/vault.ts",
+);
 
-const publicQueryBlock = (() => {
-  const start = convexVault.indexOf("export const getPublishedStory");
-  if (start < 0) return "";
-  const end = convexVault.indexOf("export const getPersonResearchChecks", start);
-  return convexVault.slice(start, end > 0 ? end : start + 2000);
-})();
-
-if (!publicQueryBlock.includes("buildPublicStoryBundle(")) {
-  failures.push("getPublishedStory / getPublishedStoryByIdentifier must call buildPublicStoryBundle, not buildStoryBundle({publicView: true})");
-}
-
-if (/buildStoryBundle\([^)]*publicView/.test(publicQueryBlock)) {
-  failures.push("Public queries must not call buildStoryBundle with publicView; the leaky 2-field gate has been replaced by buildPublicStoryBundle");
-}
-
-// Behavioral: assert the public bundle shape does NOT carry forbidden
-// internal fields. Parse buildPublicStoryBundle's return statement and
-// confirm none of these keys appear at the top level.
-const publicBundleBlock = (() => {
-  const start = convexVault.indexOf("export function buildPublicStoryBundle");
-  if (start < 0) return "";
-  // Find the matching closing brace by walking the body.
-  const bodyStart = convexVault.indexOf("{", start);
-  let depth = 0;
-  for (let i = bodyStart; i < convexVault.length; i++) {
-    if (convexVault[i] === "{") depth++;
-    else if (convexVault[i] === "}") {
-      depth--;
-      if (depth === 0) return convexVault.slice(start, i + 1);
-    }
+for (const [name, source] of [
+  ["getPublishedStory", convexVault.slice(publishedStoryStart, publishedStoryByIdentifierStart)],
+  ["getPublishedStoryByIdentifier", convexVault.slice(publishedStoryByIdentifierStart, researchChecksStart)],
+]) {
+  if (!source.includes("buildPublicStoryBundle(")) {
+    failures.push(`${name} must call buildPublicStoryBundle`);
   }
-  return convexVault.slice(start);
-})();
+  if (/buildStoryBundle\([^)]*publicView/.test(source)) {
+    failures.push(`${name} must not call buildStoryBundle with publicView`);
+  }
+}
+
+// Require the exported DTO builder and its complete body before checking for
+// forbidden fields. TypeScript handles braces in strings, comments and types.
+const vaultModule = ts.createSourceFile(convexVaultPath, convexVault, ts.ScriptTarget.Latest, true);
+const publicBundle = vaultModule.statements.find(
+  (statement): statement is ts.FunctionDeclaration =>
+    ts.isFunctionDeclaration(statement) && statement.name?.text === "buildPublicStoryBundle",
+);
+assert.ok(
+  publicBundle?.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword),
+  "convex/vault.ts must export buildPublicStoryBundle (the public DTO)",
+);
+const publicBundleEnd = publicBundle.body?.getLastToken();
+assert.ok(
+  publicBundleEnd?.kind === ts.SyntaxKind.CloseBraceToken && publicBundleEnd.getWidth() > 0,
+  "buildPublicStoryBundle must have a complete function body",
+);
+const publicBundleBlock = publicBundle.getText();
 
 const forbiddenInPublicBundle = [
   "contextCoverage:",
