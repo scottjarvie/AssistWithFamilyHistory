@@ -20,6 +20,19 @@ async function fixture() {
 }
 
 describe("AWL-0015 revisioned connection authority", () => {
+  test("describes the brief as held back after narrowing to selected people", async () => {
+    const { t, row, describe } = await fixture();
+    expect((await describe()).tools).toContain("family_history_get_brief");
+    await t.run(ctx => ctx.db.patch(row._id, { boundary: { kind: "selected_people", personIds: [] } }));
+
+    const narrowed = await describe();
+    expect(narrowed.powers).toContain("family_history:context:read");
+    expect(narrowed.tools).toContain("family_history_connection");
+    expect(narrowed.tools).toContain("family_history_search");
+    expect(narrowed.tools).not.toContain("family_history_get_brief");
+    expect(narrowed.heldBack).toContainEqual(expect.objectContaining({ tool: "family_history_get_brief" }));
+  });
+
   test("starts full, follows future powers minus removed ones, and never resets on sign-in", async () => {
     const { t, describe, limit } = await fixture();
     expect(await describe()).toMatchObject({ state: "active", powers: [...FAMILY_HISTORY_SCOPES], endsAt: null, revision: 0 });
