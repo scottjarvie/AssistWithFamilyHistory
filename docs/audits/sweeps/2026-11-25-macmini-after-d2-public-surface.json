@@ -8,8 +8,9 @@
   "checks": [
     {"route": "/", "result": "main and heading present; no generic application error observed"},
     {"route": "/ai", "result": "main and heading present; no generic application error observed"},
-    {"route": "/mcp", "method": "GET", "status": 405, "result": "message says MCP uses POST and points to setup", "authentication_challenge": null, "challenge_reason": "response headers not exposed by this browser check"}
+    {"route": "/mcp", "method": "GET", "status": 405, "result": "message says MCP uses POST and points to setup", "authentication_challenge": null, "challenge_reason": "response headers not exposed by this browser check"},
+    {"route": "/mcp", "method": "POST", "status": 401, "body": "omitted", "credentials": "omitted", "bearer_challenge_present": true}
   ],
   "unverified": ["signed-in surfaces", "evidence bytes", "B2 pinned-version behavior", "hosted HEIC delivery"],
-  "constraints": "No signed-in profile, POST, credentials, OAuth flow, tool call, media, record, fixture or provider access."
+  "constraints": "No signed-in profile, credentials, OAuth flow, tool call, media, record, fixture or provider access; one anonymous bodyless POST as noted."
 }
