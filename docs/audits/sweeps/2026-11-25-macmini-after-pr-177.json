@@ -1,0 +1,13 @@
+{
+  "date_utc": "2026-11-25",
+  "machine": "macmini",
+  "production_handoff_commit": "d03c5d8d406f4979e44b3d8b8e8b0b0a850405ec",
+  "handoff_ready_utc": "2026-11-25 08:39:37",
+  "serving_metadata_independently_verified": false,
+  "browser": "T3 preview incognito; reported hidden; tab closed",
+  "checks": [
+    {"route": "/", "main": true, "heading": true, "generic_error": false},
+    {"route": "/design-council-preview", "navigation_status": 404, "not_found_text": true, "preview_labelled_ui_in_body": false}
+  ],
+  "scope": "Ordinary signed-out production navigation only; no alternate discovery, authenticated account, provider or app writes."
+}
