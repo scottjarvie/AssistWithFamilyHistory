@@ -1,0 +1,340 @@
+{
+  "repo": "scottjarvie/AssistWithFamilyHistory",
+  "audit": "ai-readiness",
+  "date": "2026-11-25",
+  "commit": "d5199a35f24c36979822156ad32b81e3095dba75",
+  "companion": "docs/audits/ai-readiness/2026-11-25.md",
+  "priorAudit": "docs/audits/ai-readiness/2026-11-24.md",
+  "structureMap": "docs/audits/structure/2026-11-24.md",
+  "dispositionAgainst20261124": {
+    "fixed": ["AIR-01", "AIR-02", "AIR-05", "AIR-11", "AIR-13"],
+    "partiallyFixed": ["AIR-04", "AIR-06", "AIR-08", "AIR-10", "AIR-12"],
+    "stillOpen": ["AIR-03", "AIR-07", "AIR-09"],
+    "newOrUnresolvedMap": ["AIR25-04", "AIR25-06", "AIR25-07", "AIR25-11", "AIR25-12"]
+  },
+  "structureMapStatus": {
+    "confirmedDone": ["S3", "S4", "S5", "S6", "S7", "S8", "S11", "S12"],
+    "partiallyDone": ["S1"],
+    "unresolvedSafe": ["S2", "S9", "S10", "S13", "S14", "S15", "S16"],
+    "unresolvedNeedsScott": ["N0", "N1", "N2", "N3", "N4", "N5", "N6", "N7"]
+  },
+  "labelCounts": {
+    "safe to fix": 8,
+    "safe to fix, except": 3,
+    "needs Scott": 1,
+    "needs a production check": 0
+  },
+  "findings": [
+    {
+      "id": "AIR25-01",
+      "priorId": "AIR-03",
+      "status": "still open",
+      "title": "Seven early backend modules (2,178 lines) remain uncalled in live code",
+      "files": [
+        "convex/helpers.ts",
+        "convex/events.ts",
+        "convex/sources.ts",
+        "convex/personEvents.ts",
+        "convex/media.ts",
+        "convex/persons.ts",
+        "convex/relationships.ts",
+        "convex/schema.ts"
+      ],
+      "evidence": [
+        "convex/helpers.ts:1-569",
+        "convex/events.ts:1-288",
+        "convex/sources.ts:1-167",
+        "convex/personEvents.ts:1-85",
+        "convex/media.ts:1-76",
+        "convex/persons.ts:1-561",
+        "convex/relationships.ts:1-432",
+        "convex/personHistory.test.ts:204",
+        "scripts/test-family-tree.ts:19-24",
+        "convex/schema.ts:1258"
+      ],
+      "label": "safe to fix, except dropping familySearchSync (needs Scott: confirm table drop) and a production check that no operator/dashboard workflow invokes these internal functions or relies on familySearchSync rows",
+      "size": "medium"
+    },
+    {
+      "id": "AIR25-02",
+      "priorId": "AIR-07",
+      "status": "still open",
+      "title": "Local verification still skips type-checking and linting scripts and Convex tests",
+      "files": [
+        "tsconfig.json",
+        "convex/tsconfig.json",
+        "eslint.config.mjs",
+        "scripts/verify.sh"
+      ],
+      "evidence": [
+        "tsconfig.json:53-54",
+        "convex/tsconfig.json:24",
+        "eslint.config.mjs:16"
+      ],
+      "label": "safe to fix",
+      "size": "medium"
+    },
+    {
+      "id": "AIR25-03",
+      "priorId": "AIR-10",
+      "status": "partially fixed",
+      "title": "Four oversized backend hotspots remain after #181; map steps S9, S10, S13-S16, N0-N5 stay open",
+      "files": [
+        "convex/vaultMutations.ts",
+        "convex/vault.ts",
+        "convex/mcpFamilyHistory.ts",
+        "convex/httpRoutes/mcp.ts",
+        "convex/lib/vaultWrites/evidence.ts"
+      ],
+      "evidence": [
+        "convex/vaultMutations.ts:1234-1290",
+        "convex/vaultMutations.ts:1962-2332",
+        "convex/vault.ts:67-308",
+        "convex/vault.ts:408-506",
+        "convex/vault.ts:508-1017",
+        "convex/vault.ts:1018-1560",
+        "convex/mcpFamilyHistory.ts:54-74",
+        "convex/mcpFamilyHistory.ts:143-315",
+        "convex/mcpFamilyHistory.ts:1092-1445",
+        "convex/httpRoutes/mcp.ts:267-635"
+      ],
+      "label": "safe to fix, except N0-N5 (needs Scott: approve pure behavior-preserving moves of living/privacy/publishing code when pin tests, guard updates, and pnpm verify ship in the same commit)",
+      "size": "large"
+    },
+    {
+      "id": "AIR25-04",
+      "priorId": "S1",
+      "status": "partially fixed",
+      "title": "Source guards verify anchors (S1) but stay single-path coupled, and check-trust-boundary skips convex subdirectories",
+      "files": [
+        "scripts/check-private-first-start.tsx",
+        "scripts/check-public-story-policy.ts",
+        "scripts/check-media-bytes.ts",
+        "scripts/check-story-slugs.ts",
+        "scripts/check-loose-context-contract.ts",
+        "scripts/check-queue-foundation.ts",
+        "scripts/check-trust-boundary.ts"
+      ],
+      "evidence": [
+        "scripts/check-private-first-start.tsx:49-58",
+        "scripts/check-public-story-policy.ts:33-45",
+        "scripts/check-public-story-policy.ts:72-86",
+        "scripts/check-media-bytes.ts:35",
+        "scripts/check-media-bytes.ts:58-76",
+        "scripts/check-story-slugs.ts:29-30",
+        "scripts/check-loose-context-contract.ts:5-6",
+        "scripts/check-queue-foundation.ts:8",
+        "scripts/check-trust-boundary.ts:317-326"
+      ],
+      "label": "safe to fix",
+      "size": "small"
+    },
+    {
+      "id": "AIR25-05",
+      "priorId": "AIR-09",
+      "status": "still open",
+      "title": "25 non-test source files still pack 300-3,982 characters per line with no formatter",
+      "files": [
+        "components/collections/CollectionWorkspace.tsx",
+        "components/queue/QueueWorkspace.tsx",
+        "components/audit/AuditWorkspace.tsx",
+        "app/design-council-preview/page.tsx",
+        "lib/mcp/catalog.ts",
+        "components/vault/PlaceWorkspaceView.tsx",
+        "app/ai.txt/route.ts",
+        "components/activity/ActivityLedger.tsx"
+      ],
+      "evidence": [
+        "components/collections/CollectionWorkspace.tsx:1-131",
+        "components/queue/QueueWorkspace.tsx:1-773",
+        "components/audit/AuditWorkspace.tsx:1-117",
+        "app/design-council-preview/page.tsx:1-98",
+        "lib/mcp/catalog.ts:1-507",
+        "components/vault/PlaceWorkspaceView.tsx:1-74",
+        "components/activity/ActivityLedger.tsx:1-77"
+      ],
+      "label": "safe to fix",
+      "size": "medium"
+    },
+    {
+      "id": "AIR25-06",
+      "priorId": "S11",
+      "status": "new",
+      "title": "Eight convex/vaultMutations.ts exports still have zero direct test or check callers after #180",
+      "files": [
+        "convex/vaultMutations.ts",
+        "convex/vaultEvidenceWrites.test.ts"
+      ],
+      "evidence": [
+        "convex/vaultMutations.ts:1160",
+        "convex/vaultMutations.ts:1582",
+        "convex/vaultMutations.ts:1618",
+        "convex/vaultMutations.ts:1680",
+        "convex/vaultMutations.ts:1740",
+        "convex/vaultMutations.ts:1878",
+        "convex/vaultMutations.ts:2423",
+        "convex/vaultMutations.ts:2534"
+      ],
+      "label": "safe to fix",
+      "size": "medium"
+    },
+    {
+      "id": "AIR25-07",
+      "priorId": "S2",
+      "status": "still open",
+      "title": "Six (internal as any).X casts bypass type safety and machineError stays triplicated",
+      "files": [
+        "convex/httpRoutes/mcp.ts",
+        "convex/mcpClientTrust.ts",
+        "convex/mcpFamilyHistory.ts",
+        "convex/mcpGrants.ts",
+        "convex/mediaEvidenceControl.ts"
+      ],
+      "evidence": [
+        "convex/httpRoutes/mcp.ts:43-47",
+        "convex/mcpClientTrust.ts:21",
+        "convex/mcpFamilyHistory.ts:50",
+        "convex/mcpGrants.ts:60",
+        "convex/mediaEvidenceControl.ts:62"
+      ],
+      "label": "safe to fix",
+      "size": "small"
+    },
+    {
+      "id": "AIR25-08",
+      "priorId": "AIR-06",
+      "status": "partially fixed",
+      "title": "Non-runnable scripts/legacy/ (3,395 lines) and unreferenced favicon script remain",
+      "files": [
+        "scripts/legacy/",
+        "scripts/legacy/README.md",
+        "scripts/apply-favicon-variant.sh"
+      ],
+      "evidence": [
+        "scripts/legacy/README.md:5",
+        "scripts/legacy/README.md:11",
+        "scripts/apply-favicon-variant.sh:1-45"
+      ],
+      "label": "safe to fix",
+      "size": "small"
+    },
+    {
+      "id": "AIR25-09",
+      "priorId": "AIR-12",
+      "status": "partially fixed",
+      "title": "Four active docs carry stale local-preview, checkout-path, or May-route statements",
+      "files": [
+        "docs/operations/local-development.md",
+        "docs/operations/local-preview.md",
+        "docs/operations/ci-review-and-preview-policy.md",
+        "docs/README.md",
+        "docs/product/product-map.md",
+        "docs/product/route-audit.md"
+      ],
+      "evidence": [
+        "docs/operations/local-development.md:25",
+        "docs/operations/local-preview.md:39-44",
+        "docs/operations/ci-review-and-preview-policy.md:20",
+        "docs/README.md:15-16",
+        "docs/product/product-map.md:27",
+        "docs/product/route-audit.md:3-34"
+      ],
+      "label": "safe to fix",
+      "size": "small"
+    },
+    {
+      "id": "AIR25-10",
+      "priorId": "AIR-04/AIR-08",
+      "status": "partially fixed",
+      "title": "Frozen preview gallery awaits delete decision and test-record-only-snapshot.ts stays unwired",
+      "files": [
+        "components/design-preview/",
+        "app/design-council-preview/page.tsx",
+        "design-council/",
+        "scripts/test-record-only-snapshot.ts",
+        "scripts/run-unit-tests.mjs",
+        "docs/operations/product-health-gates.md"
+      ],
+      "evidence": [
+        "app/design-council-preview/page.tsx:64",
+        "scripts/run-unit-tests.mjs:3-29",
+        "docs/operations/product-health-gates.md:79-81"
+      ],
+      "label": "safe to fix, except deleting components/design-preview/, app/design-council-preview/page.tsx, and design-council/ (needs Scott: is the 2026-11-05 Family Folio before/after comparison still wanted?)",
+      "size": "small"
+    },
+    {
+      "id": "AIR25-11",
+      "priorId": null,
+      "status": "new",
+      "title": "Three of four upstream-synced files lack local hash checks and linguist-generated markers",
+      "files": [
+        "convex/lib/mcpConnector/contract.ts",
+        "convex/lib/mcpConnector/mediaRead.ts",
+        "convex/lib/media/audio.ts",
+        "convex/lib/usageLimits/core.ts",
+        ".gitattributes",
+        "scripts/check-mcp-contract.ts"
+      ],
+      "evidence": [
+        "scripts/check-mcp-contract.ts:32-36",
+        "convex/lib/mcpConnector/mediaRead.ts:1-2",
+        "convex/lib/media/audio.ts:1-2",
+        "convex/lib/usageLimits/core.ts:1-2",
+        ".gitattributes:1-12"
+      ],
+      "label": "safe to fix",
+      "size": "small"
+    },
+    {
+      "id": "AIR25-12",
+      "priorId": "N6/N7",
+      "status": "still open",
+      "title": "Person writes stay split across five live paths (N6) and living checks across three idioms (N7)",
+      "files": [
+        "convex/vaultMutations.ts",
+        "convex/mcpFamilyHistory.ts",
+        "convex/vault.ts",
+        "convex/mcpEvidence.ts",
+        "convex/schema.ts"
+      ],
+      "evidence": [
+        "convex/vaultMutations.ts:391",
+        "convex/vaultMutations.ts:486",
+        "convex/vaultMutations.ts:497",
+        "convex/vaultMutations.ts:2376",
+        "convex/mcpFamilyHistory.ts:516",
+        "convex/vault.ts:997",
+        "convex/vault.ts:1803",
+        "convex/vault.ts:1824",
+        "convex/vault.ts:1855",
+        "convex/mcpEvidence.ts:331",
+        "convex/mcpFamilyHistory.ts:1645",
+        "convex/schema.ts:229"
+      ],
+      "label": "needs Scott: approve behavior-touching consolidation of person creation (N6) and one named living-person predicate (N7)",
+      "size": "large"
+    }
+  ],
+  "passingSpendObservations": [
+    "Legacy whole-vault snapshot readers remain on live fallback/audit paths: convex/peopleExplorer.ts:72,98, convex/placePages.ts:71,114, convex/vault.ts:2089,2096.",
+    "Unpaginated .collect() calls stay concentrated in convex/vaultMutations.ts (28) + convex/lib/vaultWrites/evidence.ts (9) and convex/vault.ts (24).",
+    "Only one scheduled cron exists: a 15-minute upload-reservation sweep (convex/crons.ts:4)."
+  ],
+  "unverified": [
+    "Nothing was installed, built, or executed (pnpm verify, test:convex, test:e2e, check:production-live).",
+    "Admin or authorized signed-in trial (live Clerk/sandbox session, operator Convex dashboard callers of the seven legacy modules, and whether familySearchSync holds production rows).",
+    "Old media provider and HEIC availability (live Backblaze B2 bucket credentials/versions at convex/mediaEvidenceStorage.ts:55-72, legacy Convex-stored vs B2-migrated rows, and deployed sharp HEIF/HEVC decoding for lib/media/evidenceFinalize.ts:86-91 and lib/media/evidenceWebsite.ts:13-14).",
+    "GitHub CI_RUNNER variable state, practical withholding of pnpm dev:live beyond scripts/local-development.json:9-10, and /tmp log paths in scripts/verify.sh:95 on Windows."
+  ],
+  "passedToOtherAudits": {
+    "code": [
+      "In-app OpenRouter path (app/api/process/route.ts, lib/ai/openrouter.ts, components/settings/ProviderSettings.tsx) remains live despite docs/planning/site-guide.md:24 (tracked in docs/tracker/cards/AWF-0079.md:97-98; removal needs Scott).",
+      "Boundedness of .collect() calls in vaultMutations.ts, lib/vaultWrites/evidence.ts, and vault.ts plus legacy fallback readers."
+    ],
+    "connector": [
+      "convex/mcpFamilyHistory.ts:1581 still emits retired alias nextRecommendedTool \"get_family_history_context\" instead of canonical \"family_history_get_context\".",
+      "Upstream byte-parity of synced mediaRead.ts, audio.ts, and usageLimits/core.ts against scottjarvie/assistwithlife."
+    ]
+  }
+}
