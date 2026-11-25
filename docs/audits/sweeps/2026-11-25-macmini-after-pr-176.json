@@ -1,0 +1,16 @@
+{
+  "date_utc": "2026-11-25",
+  "observed_at_utc": "2026-11-25 08:18:29",
+  "machine": "macmini",
+  "production_handoff_commit": "45d612fe7c3cc509a63b08587aed1a98b99bef1c",
+  "handoff_ready_utc": "2026-11-25 08:15:34",
+  "serving_metadata_independently_verified": false,
+  "browser": "T3 preview incognito; reported hidden; tab closed",
+  "home": {"main": true, "heading": true, "generic_error": false},
+  "raw_route_checks": [
+    {"route": "/app/people/[personId]/raw", "method": "GET", "status": 307, "resolved_destination": "same-origin /sign-in", "exact_synthetic_path_and_query_preserved": true},
+    {"route": "/app/source-docs/[personId]/raw", "method": "GET", "status": 307, "resolved_destination": "same-origin /sign-in", "exact_synthetic_path_and_query_preserved": true}
+  ],
+  "limitation": "curl redirect_url reports the resolved destination; literal Location header form was not captured. One request per route, without following redirects; bodies discarded.",
+  "constraints": "No signed-in access, private records, app writes or provider operations."
+}
