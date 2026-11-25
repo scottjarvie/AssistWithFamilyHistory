@@ -21,4 +21,4 @@ const params:Record<string,string|undefined>={}; const mode="local" as string;co
 const rows=operationFixtures.map(r=>({id:r.id,rowType:r.rowType,personIdentifier:r.personIdentifier,displayName:r.name,lifespan:r.lifespan,keyPlaces:r.places,completionPercent:r.coverage,sourceCount:r.sources,memoryCount:r.memories,documentCount:r.documents,contextReportCount:r.context,storyCount:r.stories,storyWorkflow:r.workflow,missingCritical:r.missing,nextActions:r.nextActions,staleChecksCount:r.stale,anchorPersonIdentifier:r.anchor,badge:r.badge}));
 const queue={rows,summary:{visibleRows:4,provisionalRows:1,missingRequired:8,missingRecommended:2,staleChecks:2,averageCompletion:75}};
 '''
-Path('components/design/BaselineOperations.tsx').write_text('/** Original route JSX at76b04ba; invented data/current runtime, no canonical backend. */\n'+imports+fixture+body)
+Path('components/design-preview/BaselineOperations.tsx').write_text('/** Original route JSX at76b04ba; invented data/current runtime, no canonical backend. */\n'+imports+fixture+body)

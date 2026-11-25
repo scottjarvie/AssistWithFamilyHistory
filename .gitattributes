@@ -7,6 +7,6 @@ docs/tracker/board.html linguist-generated=true
 docs/tracker/guide.html linguist-generated=true
 docs/api/capability-manifest.json linguist-generated=true
 scripts/record-only-action-hashes.json linguist-generated=true
-components/design/fixtures/*.json linguist-generated=true
+components/design-preview/fixtures/*.json linguist-generated=true
 features/aiUpload/*Baseline.json linguist-generated=true
 convex/lib/media/audio.ts linguist-generated=true
