@@ -1,0 +1,33 @@
+{
+  "site": "https://assistwithfamilyhistory.com",
+  "date_utc": "2026-11-25",
+  "machine": "macmini",
+  "profile": "incognito",
+  "baseline_head": "ab8e3e34f2ea49594db5ae651730460ea6393960",
+  "release": {
+    "pr": 172,
+    "sha": "4d64adccc00945f7bc8645eacd5cdb293dee0532",
+    "github_production": 8049982562,
+    "success_utc": "2026-11-25T06:16:54Z",
+    "vercel": "dpl_47HfpjXGkhh425vbddJeJWd3uMYG",
+    "alias_matched": true,
+    "browser_revision_verified": false
+  },
+  "observations": {
+    "public_home_heading": true,
+    "public_home_main": true,
+    "public_home_generic_error_observed": false,
+    "signed_out_app_queue_redirected_to_sign_in": true
+  },
+  "signed_in_queue_checked": false,
+  "signed_in_coverage_limit": "The exact app layout mounts GuestVaultMigrationGate, which can POST after sign-in and change data or cookies. No signed-in navigation was made.",
+  "production_enforce_trial_checked": false,
+  "owned_tab_closed": true,
+  "production_writes": false,
+  "earlier_findings_modified": false,
+  "publication": {
+    "via": "Coordinator GitHub append of Mac mini observations",
+    "physical_cwd_error": "pwd: .: Operation not permitted",
+    "approx_observed_utc": "2026-11-25T06:20:02Z"
+  }
+}
