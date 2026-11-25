@@ -1,0 +1,14 @@
+{
+  "date_utc": "2026-11-25",
+  "machine": "macmini",
+  "production_handoff_commit": "39553bc89c88e6f330408be27ac3f3e2c3e0df0e",
+  "handoff_ready_utc": "2026-11-25 14:31:11",
+  "serving_metadata_independently_verified": false,
+  "browser": "T3 preview incognito; reported hidden; tab closed",
+  "source": {"setup_and_sample_conditional": true, "brief_requires_whole_workspace_and_context_read": true},
+  "checks": [
+    {"route": "/ai", "main": true, "heading": true, "conditional_setup": true, "conditional_sample": true, "available_tools_wording": true, "exact_whole_workspace_catalog_description_in_dom": false},
+    {"route": "/ai.txt", "status": 200, "whole_workspace_context_read_description": true, "brief_conditional_on_tools_list": true, "tools_list_filtered_by_approval": true, "batch_guidance_conditional": true}
+  ],
+  "scope": "Public wording only; no authenticated account, credential, connector session, grant, action, private data or app write. Live grant behavior unverified."
+}

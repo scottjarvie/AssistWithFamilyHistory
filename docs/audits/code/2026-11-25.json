@@ -1,0 +1,1113 @@
+{
+  "date": "2026-11-25",
+  "head": "d5199a35f24c36979822156ad32b81e3095dba75",
+  "production": {
+    "deploymentId": "8063870028",
+    "pullRequest": 181,
+    "signedOutHealth": "healthy in supplied sweep"
+  },
+  "scope": "Independent read-only code review of deployed #181. Production 8063870028 and signed-out health were supplied by the closing sweep. The source was the exact deployed commit on the assigned isolated oma900 worktree. Prior dispositions compare the November 24 code audit already on main.",
+  "priorAudit": "docs/audits/code/2026-11-24.md",
+  "summary": [
+    "Ordinary owner and reference checks now deny in both modes. Legacy guest transfer still relies on shadow-mode source handling.",
+    "Person Overview defers website story and document bodies, but Convex still reads the complete rows.",
+    "MCP brief scoping, search coverage and registered write parity hold in the audited source.",
+    "Legacy website media addresses, inline exact recordings and original-only photo coverage remain open."
+  ],
+  "standards": [
+    {
+      "title": "Family Core Philosophy",
+      "url": "https://github.com/scottjarvie/assistwithlife/blob/main/planning/assist-with-sites-core-philosophy.md"
+    },
+    {
+      "title": "MCP/OAuth standard",
+      "url": "https://github.com/scottjarvie/assistwithlife/blob/main/planning/bring-your-ai-mcp-oauth-standard.md"
+    },
+    {
+      "title": "Media storage standard, November 24 amendment",
+      "url": "https://github.com/scottjarvie/assistwithlife/blob/main/planning/assist-media-storage-standard.md#amendment-2026-11-24--copies-first-originals-by-a-one-minute-own-domain-link-nothing-permanent"
+    }
+  ],
+  "disposition": [
+    {
+      "ids": [
+        "F01",
+        "R01"
+      ],
+      "status": "still open",
+      "note": "Story and document bodies are deferred in the website response. Overview still reads the full rows, and most other sections remain eager. See C04.",
+      "files": [
+        {
+          "path": "convex/vault.ts",
+          "line": 1331
+        },
+        {
+          "path": "convex/vault.ts",
+          "line": 1606
+        },
+        {
+          "path": "components/vault/PersonWorkspaceView.tsx",
+          "line": 284
+        }
+      ]
+    },
+    {
+      "ids": [
+        "F02",
+        "R02"
+      ],
+      "status": "fixed",
+      "note": "Queue starts list and selected detail server-side in parallel. Successful initial reads seed the client and suppress duplicate startup requests.",
+      "files": [
+        {
+          "path": "app/app/queue/page.tsx",
+          "line": 21
+        },
+        {
+          "path": "lib/queue/websiteReads.ts",
+          "line": 15
+        },
+        {
+          "path": "components/queue/QueueWorkspace.tsx",
+          "line": 566
+        },
+        {
+          "path": "components/queue/QueueWorkspace.tsx",
+          "line": 685
+        }
+      ]
+    },
+    {
+      "ids": [
+        "F03",
+        "R04"
+      ],
+      "status": "fixed",
+      "note": "Indexed Place Overview returns a header with empty section pages. Legacy mode still assembles section pages when counts are unavailable.",
+      "files": [
+        {
+          "path": "convex/vaultReads.ts",
+          "line": 285
+        },
+        {
+          "path": "convex/placePages.ts",
+          "line": 64
+        },
+        {
+          "path": "components/vault/PlaceWorkspaceView.tsx",
+          "line": 38
+        }
+      ]
+    },
+    {
+      "ids": [
+        "F04"
+      ],
+      "status": "fixed",
+      "note": "One shared Queue count provider coalesces requests and receives list counts. The audited duplicate badge-mount requests are gone.",
+      "files": [
+        {
+          "path": "components/queue/QueueNavCounts.tsx",
+          "line": 11
+        },
+        {
+          "path": "components/queue/QueueWorkspace.tsx",
+          "line": 685
+        }
+      ]
+    },
+    {
+      "ids": [
+        "F05"
+      ],
+      "status": "still open",
+      "note": "Website People and Places still search candidate pages after reading them. #174 is an MCP change. See C06.",
+      "files": [
+        {
+          "path": "convex/peopleExplorer.ts",
+          "line": 105
+        },
+        {
+          "path": "convex/placePages.ts",
+          "line": 48
+        }
+      ]
+    },
+    {
+      "ids": [
+        "F06"
+      ],
+      "status": "fixed",
+      "note": "The cited whole-vault fallback is gone from Workspace, Research and the Places list. Targeted fallback collections can still read all rows of a requested table.",
+      "files": [
+        {
+          "path": "convex/vault.ts",
+          "line": 2378
+        },
+        {
+          "path": "convex/researchPages.ts",
+          "line": 40
+        },
+        {
+          "path": "convex/researchPages.ts",
+          "line": 77
+        },
+        {
+          "path": "convex/placePages.ts",
+          "line": 38
+        }
+      ]
+    },
+    {
+      "ids": [
+        "F07"
+      ],
+      "status": "fixed",
+      "note": "Recent import lookup uses owner-first ranges and applies a positive limit before merging results.",
+      "files": [
+        {
+          "path": "convex/importRuns.ts",
+          "line": 90
+        }
+      ]
+    },
+    {
+      "ids": [
+        "F08"
+      ],
+      "status": "fixed",
+      "note": "Published-story metadata and page body share a request-local cached lookup.",
+      "files": [
+        {
+          "path": "app/stories/[id]/page.tsx",
+          "line": 26
+        }
+      ]
+    },
+    {
+      "ids": [
+        "F09"
+      ],
+      "status": "still open",
+      "note": "Known non-images no longer get image previews, and images use lazy tiny requests. Original-only images can still transfer the original. See C10.",
+      "files": [
+        {
+          "path": "lib/media/cardPreview.ts",
+          "line": 11
+        },
+        {
+          "path": "components/vault/MediaPrivacyReviewPanel.tsx",
+          "line": 200
+        },
+        {
+          "path": "convex/vault.ts",
+          "line": 1699
+        }
+      ]
+    },
+    {
+      "ids": [
+        "F10"
+      ],
+      "status": "still open",
+      "note": "Standard tenant and reference guards deny in both modes. Legacy guest transfer still uses a shadow-only warning for an unverified source. See C01.",
+      "files": [
+        {
+          "path": "convex/access.ts",
+          "line": 97
+        },
+        {
+          "path": "convex/access.ts",
+          "line": 165
+        },
+        {
+          "path": "convex/vaultMigration.ts",
+          "line": 152
+        }
+      ]
+    },
+    {
+      "ids": [
+        "F11",
+        "R03"
+      ],
+      "status": "fixed",
+      "note": "Hosted Queue writes recheck the current grant in the write transaction before dispatch and recheck item reach on replay.",
+      "files": [
+        {
+          "path": "convex/queue.ts",
+          "line": 1467
+        },
+        {
+          "path": "convex/queue.ts",
+          "line": 1497
+        },
+        {
+          "path": "convex/queue.ts",
+          "line": 1515
+        }
+      ]
+    },
+    {
+      "ids": [
+        "F12"
+      ],
+      "status": "still open",
+      "note": "The separate MCP original relay has a one-minute capability. The public, owner-authenticated website action still returns a non-expiring legacy address. See C02.",
+      "files": [
+        {
+          "path": "convex/mcpEvidence.ts",
+          "line": 174
+        },
+        {
+          "path": "convex/vaultReads.ts",
+          "line": 97
+        },
+        {
+          "path": "convex/vault.ts",
+          "line": 1701
+        }
+      ]
+    },
+    {
+      "ids": [
+        "F13"
+      ],
+      "status": "fixed",
+      "note": "Direct story context uses its own AI projection and deceased-subject checks. It no longer returns the human review bundle.",
+      "files": [
+        {
+          "path": "convex/mcpFamilyHistory.ts",
+          "line": 1629
+        },
+        {
+          "path": "convex/vault.ts",
+          "line": 855
+        }
+      ]
+    },
+    {
+      "ids": [
+        "F14"
+      ],
+      "status": "fixed",
+      "note": "Evidence reads use the owner resolver for both identifier forms, require an unambiguous subject in reach and withhold living-person documents.",
+      "files": [
+        {
+          "path": "convex/documents.ts",
+          "line": 62
+        },
+        {
+          "path": "convex/mcpEvidence.ts",
+          "line": 318
+        }
+      ]
+    },
+    {
+      "ids": [
+        "F15"
+      ],
+      "status": "fixed",
+      "note": "An import without death evidence preserves the saved living state and defaults unknown people to protected. Newly promoted provisional relatives also default to protected.",
+      "files": [
+        {
+          "path": "lib/familysearch/importer.ts",
+          "line": 63
+        },
+        {
+          "path": "lib/familysearch/importer.ts",
+          "line": 189
+        },
+        {
+          "path": "convex/vaultMutations.ts",
+          "line": 367
+        },
+        {
+          "path": "convex/vaultMutations.ts",
+          "line": 2384
+        }
+      ]
+    },
+    {
+      "ids": [
+        "C03",
+        "C05",
+        "C07",
+        "C08",
+        "C09",
+        "C11",
+        "C12"
+      ],
+      "status": "new",
+      "note": "Newly recorded findings follow. Some paths predate this audit.",
+      "files": []
+    }
+  ],
+  "rechecks": [
+    {
+      "id": "R01",
+      "title": "Overview response versus actual Convex reads",
+      "note": "The staged document and story changes remove bodies from the Overview response. The sources and relationship cards and research stream are still built for unopened sections. Story IDs grow with story count. Stories fetch the submitted slice on demand with owner, person and archive checks. Documents fetch the person's documents on tab open. There is no source-level reduction in initial story/document row reads, and no measured payload size or latency in this audit.",
+      "files": [
+        {
+          "path": "convex/vault.ts",
+          "line": 1315
+        },
+        {
+          "path": "convex/vault.ts",
+          "line": 1606
+        },
+        {
+          "path": "convex/vault.ts",
+          "line": 1648
+        },
+        {
+          "path": "components/vault/PersonWorkspaceView.tsx",
+          "line": 58
+        },
+        {
+          "path": "components/vault/PersonWorkspaceView.tsx",
+          "line": 284
+        },
+        {
+          "path": "components/vault/PersonStoryCards.tsx",
+          "line": 51
+        },
+        {
+          "path": "app/app/people/actions.ts",
+          "line": 21
+        }
+      ]
+    },
+    {
+      "id": "#171",
+      "title": "Workspace brief restriction",
+      "note": "The shared predicate requires the context scope and whole-workspace boundary. Discovery, direct call refusal and connection metadata use that predicate or its boundary helper. Alias lookup happens through the same grant decision, and request resolution runs before tool dispatch. Queue content still depends on Queue scope and any named item IDs. Source tests pin both brief names after grant narrowing.",
+      "files": [
+        {
+          "path": "lib/mcp/authorize.ts",
+          "line": 385
+        },
+        {
+          "path": "lib/mcp/authorize.ts",
+          "line": 405
+        },
+        {
+          "path": "convex/httpRoutes/mcp.ts",
+          "line": 670
+        },
+        {
+          "path": "convex/httpRoutes/mcp.ts",
+          "line": 771
+        },
+        {
+          "path": "convex/httpRoutes/mcp.ts",
+          "line": 1078
+        },
+        {
+          "path": "convex/httpRoutes/mcp.ts",
+          "line": 1145
+        },
+        {
+          "path": "convex/mcpGrants.ts",
+          "line": 976
+        },
+        {
+          "path": "convex/mcpTransport.test.ts",
+          "line": 745
+        }
+      ]
+    },
+    {
+      "id": "#174",
+      "title": "MCP search coverage",
+      "note": "Whole-workspace results expose visited kinds, indexed versus recent-window mode, a potentially incomplete full window, local omissions, unvisited kinds and the reply cap. The ready path uses owner- and archive-filtered text search. The fallback keeps substring matching over up to 251 active rows per kind. A selected-people grant resolves only its approved IDs and reports coverage unavailable. These flags clarify partial results. They do not make the recent window exhaustive or unify indexed word/prefix and fallback substring behavior.",
+      "files": [
+        {
+          "path": "convex/searchRows.ts",
+          "line": 10
+        },
+        {
+          "path": "convex/mcpFamilyHistory.ts",
+          "line": 1514
+        },
+        {
+          "path": "convex/mcpFamilyHistory.ts",
+          "line": 1526
+        },
+        {
+          "path": "convex/mcpFamilyHistory.ts",
+          "line": 1564
+        },
+        {
+          "path": "convex/searchPerformance.test.ts",
+          "line": 47
+        },
+        {
+          "path": "convex/mcpTransport.test.ts",
+          "line": 490
+        }
+      ]
+    },
+    {
+      "id": "#173",
+      "title": "D2 media",
+      "note": "Reviewed, AI-allowed ready photos are planned within reply limits with cursor binding. Website-held originals can produce transient cleaned JPEG blocks. B2 copies use pinned manifests with size, hash and content checks. The batch rechecks current metadata and authority before returning. Explicit eligible originals use a first-party, version-bound relay that checks the live grant again. Original-only B2 images, regular inline recordings and repeat render work remain in C03, C05 and C07.",
+      "files": [
+        {
+          "path": "convex/mcpEvidence.ts",
+          "line": 97
+        },
+        {
+          "path": "convex/mcpEvidence.ts",
+          "line": 162
+        },
+        {
+          "path": "convex/httpRoutes/evidenceDelivery.ts",
+          "line": 125
+        },
+        {
+          "path": "convex/httpRoutes/evidenceDelivery.ts",
+          "line": 183
+        },
+        {
+          "path": "convex/httpRoutes/evidenceDelivery.ts",
+          "line": 221
+        },
+        {
+          "path": "convex/httpRoutes/evidenceDelivery.ts",
+          "line": 269
+        },
+        {
+          "path": "convex/httpRoutes/evidenceDelivery.ts",
+          "line": 301
+        },
+        {
+          "path": "convex/httpRoutes/evidenceOriginal.ts",
+          "line": 19
+        }
+      ]
+    },
+    {
+      "id": "#179",
+      "title": "Website projection and compatibility",
+      "note": "The omission is at the website projection, after scoped membership checks. The pinned tests compare the rest of the card in both membership modes and verify the legacy workspace still returns personIds. MCP Person context still calls the legacy internal workspace and intentionally selects personIds for its reviewed media metadata. MCP evidence separately reads persisted membership for reach. Known consumers keep their fields and the website still receives more manifest data than it uses.",
+      "files": [
+        {
+          "path": "convex/vault.ts",
+          "line": 1373
+        },
+        {
+          "path": "convex/vault.ts",
+          "line": 1585
+        },
+        {
+          "path": "convex/vault.ts",
+          "line": 1625
+        },
+        {
+          "path": "convex/ownerScoping.test.ts",
+          "line": 584
+        },
+        {
+          "path": "convex/httpRoutes/mcp.ts",
+          "line": 464
+        },
+        {
+          "path": "convex/httpRoutes/mcp.ts",
+          "line": 807
+        },
+        {
+          "path": "convex/mcpEvidence.ts",
+          "line": 97
+        }
+      ]
+    },
+    {
+      "id": "#180/#181",
+      "title": "Evidence and research write parity",
+      "note": "Compared all six pre-extraction bodies against the helpers after indentation normalization. All six bodies and wrapper prefixes matched, including validators and authorization. The wrappers still use searchServer's mutation builder and pass its context through. The tests pin refusal and shadow logging, IDs and updates, search, counts, score and review membership in both modes. Research registration and bodies were outside the extraction, and the generated map adds the helper module. The parity conclusion is static.",
+      "files": [
+        {
+          "path": "convex/vaultMutations.ts",
+          "line": 7
+        },
+        {
+          "path": "convex/vaultMutations.ts",
+          "line": 527
+        },
+        {
+          "path": "convex/vaultMutations.ts",
+          "line": 565
+        },
+        {
+          "path": "convex/vaultMutations.ts",
+          "line": 602
+        },
+        {
+          "path": "convex/vaultMutations.ts",
+          "line": 651
+        },
+        {
+          "path": "convex/vaultMutations.ts",
+          "line": 688
+        },
+        {
+          "path": "convex/vaultMutations.ts",
+          "line": 874
+        },
+        {
+          "path": "convex/vaultMutations.ts",
+          "line": 1962
+        },
+        {
+          "path": "convex/lib/vaultWrites/evidence.ts",
+          "line": 8
+        },
+        {
+          "path": "convex/vaultEvidenceWrites.test.ts",
+          "line": 60
+        },
+        {
+          "path": "convex/vaultEvidenceWrites.test.ts",
+          "line": 103
+        },
+        {
+          "path": "convex/vaultEvidenceWrites.test.ts",
+          "line": 233
+        },
+        {
+          "path": "convex/vaultEvidenceWrites.test.ts",
+          "line": 281
+        },
+        {
+          "path": "convex/_generated/api.d.ts",
+          "line": 104
+        }
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "rank": 1,
+      "id": "C01",
+      "title": "Guest transfer still lacks backend proof of source ownership",
+      "lens": "Defensive safety",
+      "label": "needs Scott",
+      "size": "medium",
+      "observation": "The public mutation authenticates the destination. Source verification goes through a policy helper that logs and returns in shadow mode. The website route reads the guest cookie, but Convex independently receives only the owner identifiers.",
+      "impact": "Where shadow mode and legacy guest records coexist, the backend does not establish authority over the records it will transfer.",
+      "fix": "Decide whether to retain guest recovery using verified source proof or retire this transfer path. Keep the destination check and record the disposition in the rollout runbook.",
+      "expectedGain": "Zero transfers without verified source authority in either mode.",
+      "files": [
+        {
+          "path": "convex/vaultMigration.ts",
+          "line": 152
+        },
+        {
+          "path": "convex/access.ts",
+          "line": 142
+        },
+        {
+          "path": "app/api/vault/migrate-guest/route.ts",
+          "line": 42
+        },
+        {
+          "path": "docs/operations/gen-87-clerk-convex-auth-setup.md",
+          "line": 107
+        }
+      ]
+    },
+    {
+      "rank": 2,
+      "id": "C02",
+      "title": "The legacy owner file action returns a permanent storage address",
+      "lens": "Defensive safety",
+      "label": "safe to fix",
+      "size": "medium",
+      "observation": "The owner action returns the Convex storage URL received from the internal query. The normal Next file route relays bytes, but the public Convex action itself still returns the provider address to its authenticated caller.",
+      "impact": "An address issued for a legacy file can outlive the owner's session and later changes to access.",
+      "fix": "Stream authorized legacy bytes through first-party delivery and keep the provider address server-side. Preserve range, MIME and not-found behavior. Treat remediation of old addresses as a separate owner decision.",
+      "expectedGain": "Zero newly issued permanent storage addresses from this action.",
+      "files": [
+        {
+          "path": "convex/vaultReads.ts",
+          "line": 97
+        },
+        {
+          "path": "convex/vault.ts",
+          "line": 1699
+        },
+        {
+          "path": "app/api/media/[mediaId]/file/route.ts",
+          "line": 38
+        }
+      ]
+    },
+    {
+      "rank": 3,
+      "id": "C03",
+      "title": "Regular MCP evidence reads can deliver exact recordings inline",
+      "lens": "Defensive safety and correctness",
+      "label": "safe to fix",
+      "size": "medium",
+      "observation": "The regular batch treats an eligible B2 recording as an original slot and an eligible older Convex recording as a non-image file. Delivery emits those exact bytes as resource content. The tool catalog and family standard put exact recordings on the explicit one-minute original path.",
+      "impact": "AI clients can receive original audio without the separate original request and subsequent live access check required by the delivery standard.",
+      "fix": "Keep the transcript and an actionable original-on-request response in the batch. Route eligible exact audio through the existing explicit first-party relay.",
+      "expectedGain": "Zero exact recording bytes in regular MCP evidence replies. Each authorized original link has a lifetime of at most 60 seconds.",
+      "files": [
+        {
+          "path": "convex/mcpEvidence.ts",
+          "line": 264
+        },
+        {
+          "path": "convex/mcpEvidence.ts",
+          "line": 281
+        },
+        {
+          "path": "convex/httpRoutes/evidenceDelivery.ts",
+          "line": 152
+        },
+        {
+          "path": "convex/httpRoutes/evidenceDelivery.ts",
+          "line": 273
+        },
+        {
+          "path": "lib/mcp/catalog.ts",
+          "line": 234
+        }
+      ]
+    },
+    {
+      "rank": 4,
+      "id": "C04",
+      "title": "Person Overview still reads the dossier before trimming it",
+      "lens": "Speed and Convex spend",
+      "label": "safe to fix",
+      "size": "large",
+      "observation": "Overview invokes the same scoped snapshot and assembly as the legacy workspace. The query collects complete stories and documents and builds readiness before returning story IDs and dates and a document count and date. The result still eagerly carries import runs, linked citation text, source facts, timeline, relationships with person rows, research log and tasks, places, media and Context content.",
+      "impact": "A large person's unopened sections still add database read bytes and server work. Opening Stories or Documents later can read their rows again.",
+      "fix": "Start with narrow story and document metadata and the readiness facts it needs. Use independent section reads for the remaining tab-only bodies as their Overview dependencies are identified.",
+      "expectedGain": "Target zero story or document content bytes read by the initial Overview query, and zero section-only citation and research body bytes in its response. Measure Convex rows/bytes, Convex-to-Next bytes and the browser response independently.",
+      "files": [
+        {
+          "path": "app/app/people/[personId]/page.tsx",
+          "line": 33
+        },
+        {
+          "path": "convex/vault.ts",
+          "line": 1249
+        },
+        {
+          "path": "convex/vault.ts",
+          "line": 1315
+        },
+        {
+          "path": "convex/vault.ts",
+          "line": 1373
+        },
+        {
+          "path": "convex/vault.ts",
+          "line": 1606
+        },
+        {
+          "path": "components/vault/PersonWorkspaceView.tsx",
+          "line": 58
+        },
+        {
+          "path": "app/app/people/actions.ts",
+          "line": 21
+        }
+      ]
+    },
+    {
+      "rank": 5,
+      "id": "C05",
+      "title": "D2 cleaned copies cover only one class of original-only photo",
+      "lens": "Correctness and media",
+      "label": "safe to fix",
+      "size": "medium",
+      "observation": "The website Convex-original renderer accepts a MIME allowlist and rejects multi-page images or sources above 32 million pixels. B2 original-only images are returned as CLEAN_COPY_UNAVAILABLE before the renderer. HEIC/HEIF and TIFF are documented original-only upload types.",
+      "impact": "A reviewed photo may be saved and available as an eligible exact original while the normal AI read cannot supply its cleaned copy. This is a code-path gap even if the deployed HEIC decoder works.",
+      "fix": "Define an on-demand cleaned-copy path for eligible original-only B2 images and explicitly define behavior for images beyond the decoder budget. Keep the existing review, pinned-version and source bounds.",
+      "expectedGain": "An eligible supported original-only B2 image produces a bounded cleaned image block. Unsupported inputs get an accurate reason and zero original bytes in the ordinary reply.",
+      "files": [
+        {
+          "path": "convex/mcpEvidence.ts",
+          "line": 121
+        },
+        {
+          "path": "convex/mcpEvidence.ts",
+          "line": 281
+        },
+        {
+          "path": "convex/mcpEvidence.ts",
+          "line": 297
+        },
+        {
+          "path": "lib/media/evidenceFinalize.ts",
+          "line": 80
+        },
+        {
+          "path": "lib/mcp/catalog.ts",
+          "line": 243
+        }
+      ]
+    },
+    {
+      "rank": 6,
+      "id": "C06",
+      "title": "Rare website People and Places searches traverse the list",
+      "lens": "Speed and Convex spend",
+      "label": "needs Scott",
+      "size": "large",
+      "observation": "Both indexed website routes apply substring matching after candidate pagination. Both clients automatically request subsequent candidate pages until they reach their target or the end. The MCP search patch does not change these routes.",
+      "impact": "A sparse or zero-hit search can read the full owner list across requests and hold the user in a searching state.",
+      "fix": "Introduce owner-scoped candidate selection with exact verification and a bounded short-term fallback. The new keys, historical backfill and any search behavior change warrant an explicit decision.",
+      "expectedGain": "Measure total candidate rows and continuations for rare terms on a fixed large fixture. Selective indexed terms should read candidate ranges, with no full traversal for a zero-hit term supported by the index.",
+      "files": [
+        {
+          "path": "convex/peopleExplorer.ts",
+          "line": 100
+        },
+        {
+          "path": "components/vault/PaginatedPeopleExplorer.tsx",
+          "line": 12
+        },
+        {
+          "path": "convex/placePages.ts",
+          "line": 48
+        },
+        {
+          "path": "components/vault/PaginatedPlaces.tsx",
+          "line": 8
+        }
+      ]
+    },
+    {
+      "rank": 7,
+      "id": "C07",
+      "title": "Repeated website photo reads repeat original fetch and rendering",
+      "lens": "Speed and Convex spend",
+      "label": "safe to fix",
+      "size": "medium",
+      "observation": "Each eligible website photo delivered through D2 goes through a Node action that reads the full original and renders JPEG copies in memory. The copies are returned to that call; the read path does not persist or reuse them. Per reply, the caller bounds the work to two attempts and 50 MiB of original bytes.",
+      "impact": "Reading the same approved image again pays the original fetch, decode and encode cost again.",
+      "fix": "Evaluate version-bound reuse limited to on-demand generated copies. Keep fresh authority checks and account for any durable copy in storage and deletion.",
+      "expectedGain": "For an unchanged photo with a reusable copy, reduce original bytes fetched and renderer calls from one full read and one render to zero on repeat delivery.",
+      "files": [
+        {
+          "path": "convex/httpRoutes/evidenceDelivery.ts",
+          "line": 32
+        },
+        {
+          "path": "convex/httpRoutes/evidenceDelivery.ts",
+          "line": 208
+        },
+        {
+          "path": "convex/mediaEvidenceStorage.ts",
+          "line": 427
+        }
+      ]
+    },
+    {
+      "rank": 8,
+      "id": "C08",
+      "title": "MCP fallback bounds returned active candidates, while archived rows can still cost reads",
+      "lens": "Convex spend",
+      "label": "safe to fix",
+      "size": "medium",
+      "observation": "The recent fallback uses an owner-only index, filters out archived rows and takes 251 active candidates. Coverage describes that candidate window. Archived rows are outside the result but inside the scanned index range.",
+      "impact": "An archive-heavy vault can spend more on a fallback search than the coverage window suggests.",
+      "fix": "Use owner-and-active index ranges where available and align the remaining fallback indexes. Preserve the recent-window order, substring behavior and coverage fields.",
+      "expectedGain": "In a fixture with a large archived prefix, target zero archived rows read while returning the same 251 active candidates per searched kind.",
+      "files": [
+        {
+          "path": "convex/searchRows.ts",
+          "line": 11
+        },
+        {
+          "path": "convex/mcpFamilyHistory.ts",
+          "line": 1564
+        },
+        {
+          "path": "convex/schema.ts",
+          "line": 530
+        },
+        {
+          "path": "convex/schema.ts",
+          "line": 1347
+        }
+      ]
+    },
+    {
+      "rank": 9,
+      "id": "C09",
+      "title": "Evidence event dedup can read every tenant's events of one type",
+      "lens": "Convex spend",
+      "label": "safe to fix",
+      "size": "medium",
+      "observation": "The extracted event writer still collects the type-only index after an import-key miss, then filters by owner and compares original date, place and description. The event import-key lookup also collects before owner filtering.",
+      "impact": "One ordinary event save can get slower and use more database bandwidth as unrelated vaults add events. The extraction preserved this behavior.",
+      "fix": "Add owner-first event dedup lookups and preserve the original match order, legacy local-owner buckets and search/counter trigger path.",
+      "expectedGain": "Zero foreign event rows read by either dedup branch. Keep the same matched row and write receipt for equivalent legacy and current fixtures.",
+      "files": [
+        {
+          "path": "convex/lib/vaultWrites/evidence.ts",
+          "line": 94
+        },
+        {
+          "path": "convex/schema.ts",
+          "line": 415
+        },
+        {
+          "path": "convex/vaultMutations.ts",
+          "line": 602
+        }
+      ]
+    },
+    {
+      "rank": 10,
+      "id": "C10",
+      "title": "A tiny Memories request can still serve an original image",
+      "lens": "Speed and Convex spend",
+      "label": "safe to fix",
+      "size": "medium",
+      "observation": "Image cards request tiny even for original-only rows. The resolver falls back to a B2 original when no renditions exist and to the stored Convex file when no ready B2 object applies.",
+      "impact": "Scrolling into view can transfer a large original or invoke a browser decoder for an unsupported original format.",
+      "fix": "Use bounded derivatives for image cards and a file placeholder when none is available. Preserve explicit file opening.",
+      "expectedGain": "Zero original-file body bytes sent merely to render a thumbnail for an original-only row.",
+      "files": [
+        {
+          "path": "lib/media/cardPreview.ts",
+          "line": 11
+        },
+        {
+          "path": "components/vault/MediaPrivacyReviewPanel.tsx",
+          "line": 181
+        },
+        {
+          "path": "convex/vault.ts",
+          "line": 1689
+        }
+      ]
+    },
+    {
+      "rank": 11,
+      "id": "C11",
+      "title": "Overview media still carries storage manifests past the server boundary",
+      "lens": "Defensive safety and payload",
+      "label": "safe to fix",
+      "size": "small",
+      "observation": "#179 strips personIds from the Overview media list. It otherwise spreads the stored cards, including full B2 manifests when present, into the response consumed by the client media panel. The preview needs content type and a held-file indicator. Media review also needs its displayed review fields.",
+      "impact": "The private page response carries provider identifiers and extra rendition metadata that the browser can avoid receiving.",
+      "fix": "Use an explicit website media card projection, retaining display and review inputs. Keep the separate legacy workspace and MCP contracts covered by their own parity checks.",
+      "expectedGain": "Zero B2 bucket, object key and provider version fields in website media-card props. Compare bytes per B2-backed card on a fixture.",
+      "files": [
+        {
+          "path": "convex/vault.ts",
+          "line": 1621
+        },
+        {
+          "path": "components/vault/PersonWorkspaceView.tsx",
+          "line": 256
+        },
+        {
+          "path": "components/vault/MediaPrivacyReviewPanel.tsx",
+          "line": 16
+        },
+        {
+          "path": "lib/media/cardPreview.ts",
+          "line": 11
+        }
+      ]
+    },
+    {
+      "rank": 12,
+      "id": "C12",
+      "title": "MCP connection context can silently omit links",
+      "lens": "Correctness",
+      "label": "safe to fix",
+      "size": "small",
+      "observation": "The shared reader fetches up to max plus one in each direction, merges eligible links and slices the combined list to max. Its truncated flag checks individual direction sizes only.",
+      "impact": "When both directions fit individually but exceed the cap together, the AI can incorrectly treat the returned connections as complete.",
+      "fix": "Include the eligible merged count in the truncation decision and preserve the conservative per-direction flags.",
+      "expectedGain": "Every merged set above the reply cap reports truncation, including sets split across directions.",
+      "files": [
+        {
+          "path": "convex/mcpFamilyHistory.ts",
+          "line": 1433
+        },
+        {
+          "path": "convex/mcpFamilyHistory.ts",
+          "line": 2188
+        }
+      ]
+    }
+  ],
+  "refactorProposals": [
+    {
+      "id": "R01a",
+      "title": "Read Person story and document summary from narrow rows",
+      "label": "safe to fix",
+      "size": "medium",
+      "plan": "Extract the minimum metadata/readiness needed for Overview. Preserve old identifier semantics and defer the rest of the Person section redesign.",
+      "expectedGain": "Zero content body bytes for both tables on initial Overview. Read volume scales with summary rows.",
+      "verify": "Compare counts, latest dates, readiness and stable Story/Documents links for legacy and current fixtures.",
+      "files": [
+        {
+          "path": "convex/vault.ts",
+          "line": 1315
+        },
+        {
+          "path": "convex/vault.ts",
+          "line": 1606
+        },
+        {
+          "path": "app/app/people/actions.ts",
+          "line": 21
+        }
+      ]
+    },
+    {
+      "id": "R05",
+      "title": "Use one explicit media-card contract for the Person website",
+      "label": "safe to fix",
+      "size": "small",
+      "plan": "Expose only card fields, held-file state and eligible preview availability. Preserve review and explicit file opening.",
+      "expectedGain": "Zero provider manifest fields in media card props and zero original-only image requests from the card.",
+      "verify": "Compare held and remote references, original-only items, tiny previews and review controls.",
+      "files": [
+        {
+          "path": "convex/vault.ts",
+          "line": 1625
+        },
+        {
+          "path": "lib/media/cardPreview.ts",
+          "line": 11
+        },
+        {
+          "path": "components/vault/MediaPrivacyReviewPanel.tsx",
+          "line": 16
+        }
+      ]
+    },
+    {
+      "id": "R06",
+      "title": "Factor the evidence delivery decision by file role",
+      "label": "safe to fix",
+      "size": "medium",
+      "plan": "Use one classification for cleaned copy, transcript and explicitly requested exact original across the two storage paths. Retain the current per-page and version checks.",
+      "expectedGain": "Zero inline originals for recordings. One classification handles both storage backends.",
+      "verify": "Compare allowed and refused audio, transcript delivery, copied image labels, revocation checks and one-minute expiry.",
+      "files": [
+        {
+          "path": "convex/mcpEvidence.ts",
+          "line": 256
+        },
+        {
+          "path": "convex/httpRoutes/evidenceDelivery.ts",
+          "line": 152
+        },
+        {
+          "path": "convex/httpRoutes/evidenceOriginal.ts",
+          "line": 14
+        }
+      ]
+    },
+    {
+      "id": "R07",
+      "title": "Narrow fallback search ranges to active records",
+      "label": "safe to fix",
+      "size": "medium",
+      "plan": "Apply owner-and-active indexed ranges to recent windows while keeping coverage and sorting. Keep website search redesign separate.",
+      "expectedGain": "Zero archived candidate rows scanned on fixture tables with the new range.",
+      "verify": "Compare candidate order, full-window and unvisited-kind flags and selected-people isolation.",
+      "files": [
+        {
+          "path": "convex/searchRows.ts",
+          "line": 11
+        },
+        {
+          "path": "convex/mcpFamilyHistory.ts",
+          "line": 1564
+        }
+      ]
+    },
+    {
+      "id": "R08",
+      "title": "Use owner-first indexes for event dedup",
+      "label": "safe to fix",
+      "size": "medium",
+      "plan": "Narrow event match inputs within the extracted helper without changing match keys, precedence or mutation registration.",
+      "expectedGain": "Zero foreign rows scanned on either event match branch.",
+      "verify": "Compare created flags and IDs, then check persisted event, search text, place counts and equal-key order on synthetic rows.",
+      "files": [
+        {
+          "path": "convex/lib/vaultWrites/evidence.ts",
+          "line": 94
+        },
+        {
+          "path": "convex/vaultEvidenceWrites.test.ts",
+          "line": 107
+        }
+      ]
+    }
+  ],
+  "biggerThanToday": [
+    {
+      "id": "L01",
+      "title": "Prove guest source authority or retire guest recovery",
+      "note": "Needs Scott. Choose whether to retain guest transfer and confirm if legacy guest data still needs recovery before any production change. Successful outcome is a verified source for every permitted transfer in either mode.",
+      "files": [
+        {
+          "path": "convex/vaultMigration.ts",
+          "line": 152
+        },
+        {
+          "path": "docs/operations/gen-87-clerk-convex-auth-setup.md",
+          "line": 107
+        }
+      ]
+    },
+    {
+      "id": "L02",
+      "title": "Index website substring search",
+      "note": "Needs Scott. Treat People and Places indexing, historical backfill, short-term behavior, ordering and rollback as one deliberate change. Benchmark total reads and continuation count on sparse and zero-hit searches.",
+      "files": [
+        {
+          "path": "convex/peopleExplorer.ts",
+          "line": 100
+        },
+        {
+          "path": "convex/placePages.ts",
+          "line": 48
+        }
+      ]
+    },
+    {
+      "id": "L03",
+      "title": "Close historical media addresses and extend original-only photo coverage",
+      "note": "Needs Scott for re-addressing stored originals or bulk changes. Qualify the on-demand path first. If prior permanent addresses warrant remediation, inventory eligible legacy objects and agree on verified byte identity, rollback and deletion before moving them.",
+      "files": [
+        {
+          "path": "convex/vault.ts",
+          "line": 1699
+        },
+        {
+          "path": "convex/mcpEvidence.ts",
+          "line": 281
+        },
+        {
+          "path": "convex/mediaEvidenceStorage.ts",
+          "line": 427
+        }
+      ]
+    }
+  ],
+  "whatICouldNotVerify": [
+    "Signed-out health and deployment identity are supplied sweep evidence. This review did not verify an authorized signed-in trial, admin/usage-limit operations, production modes or count/search readiness. Signed-out success does not establish those results.",
+    "Old Convex objects and original-only B2 availability, legacy object counts, issued permanent links and runtime HEIC/HEIF decoding were not verified. The existence of a source branch or MIME label establishes only the code path.",
+    "Performance targets are expected structural gains. Production rows, bytes, latency, dollar spend, concurrent changes and real client behavior were not measured. No install, build, product tests, dev server, live probe or production/account/provider operation was performed."
+  ]
+}
