@@ -30,6 +30,7 @@ import type * as lib_mcpConnector_mediaRead from "../lib/mcpConnector/mediaRead.
 import type * as lib_media_audio from "../lib/media/audio.js";
 import type * as lib_usageLimits_core from "../lib/usageLimits/core.js";
 import type * as lib_validators from "../lib/validators.js";
+import type * as lib_vaultWrites_evidence from "../lib/vaultWrites/evidence.js";
 import type * as mcpAcceptanceFixture from "../mcpAcceptanceFixture.js";
 import type * as mcpClientTrust from "../mcpClientTrust.js";
 import type * as mcpEvidence from "../mcpEvidence.js";
@@ -100,6 +101,7 @@ declare const fullApi: ApiFromModules<{
   "lib/media/audio": typeof lib_media_audio;
   "lib/usageLimits/core": typeof lib_usageLimits_core;
   "lib/validators": typeof lib_validators;
+  "lib/vaultWrites/evidence": typeof lib_vaultWrites_evidence;
   mcpAcceptanceFixture: typeof mcpAcceptanceFixture;
   mcpClientTrust: typeof mcpClientTrust;
   mcpEvidence: typeof mcpEvidence;
