@@ -25,6 +25,7 @@ type PublicFunction = {
   initializer: ts.CallExpression;
   sourceFile: ts.SourceFile;
   verifiedActionHelpers: ReadonlySet<string>;
+  verifiedMutationHelper: string | null;
 };
 
 const PUBLIC_QUERY_ALLOWLIST: Record<string, string> = {
@@ -53,6 +54,7 @@ const PUBLIC_ACTION_CAPABILITY_ALLOWLIST: Record<string, string> = {
 
 const GENERATED_SERVER_MODULE = "./_generated/server";
 const PUBLIC_BUILDERS = new Set<PublicFunctionKind>(["query", "mutation", "action"]);
+const QUEUE_MUTATION_HELPER = "authorizeWebsitePersonTenantMutation";
 const convexDir = path.join(process.cwd(), "convex");
 const failures: string[] = [];
 const inventory: PublicFunction[] = [];
@@ -79,12 +81,12 @@ function unwrapExpression(expression: ts.Expression): ts.Expression {
   return current;
 }
 
-function importedBuilders(sourceFile: ts.SourceFile): Map<string, string> {
-  const builders = new Map<string, string>();
+function importedNames(sourceFile: ts.SourceFile, modules: string[]): Map<string, string> {
+  const names = new Map<string, string>();
 
   for (const statement of sourceFile.statements) {
     if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
-    if (![GENERATED_SERVER_MODULE, "./searchServer"].includes(statement.moduleSpecifier.text)) continue;
+    if (!modules.includes(statement.moduleSpecifier.text)) continue;
 
     const bindings = statement.importClause?.namedBindings;
     if (!bindings || !ts.isNamedImports(bindings)) continue;
@@ -92,11 +94,11 @@ function importedBuilders(sourceFile: ts.SourceFile): Map<string, string> {
     for (const specifier of bindings.elements) {
       if (specifier.isTypeOnly) continue;
       const importedName = specifier.propertyName?.text ?? specifier.name.text;
-      builders.set(specifier.name.text, importedName);
+      names.set(specifier.name.text, importedName);
     }
   }
 
-  return builders;
+  return names;
 }
 
 function getHandlerNode(initializer: ts.CallExpression): ts.Node | null {
@@ -244,6 +246,32 @@ function verifiedLocalActionHelpers(sourceFile: ts.SourceFile): Set<string> {
   return helpers;
 }
 
+/** Recognize the Queue wrapper only when it awaits the website guard and returns the shared tenant decision. */
+function verifiedQueueMutationHelper(sourceFile: ts.SourceFile): string | null {
+  const helper = sourceFile.statements.find(
+    (statement): statement is ts.FunctionDeclaration =>
+      ts.isFunctionDeclaration(statement) &&
+      statement.name?.text === QUEUE_MUTATION_HELPER &&
+      !ts.getModifiers(statement)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword),
+  );
+  const statements = helper?.body?.statements;
+  if (!statements || statements.length !== 2) return null;
+
+  const [requirePerson, authorizeTenant] = statements;
+  if (!ts.isExpressionStatement(requirePerson) || !ts.isAwaitExpression(requirePerson.expression) ||
+      !ts.isReturnStatement(authorizeTenant) || !authorizeTenant.expression) return null;
+
+  const websiteCall = requirePerson.expression.expression;
+  const tenantCall = authorizeTenant.expression;
+  if (!ts.isCallExpression(websiteCall) || !ts.isCallExpression(tenantCall)) return null;
+
+  const accessImports = importedNames(sourceFile, ["./access"]);
+  return accessImports.get(callIdentifier(websiteCall) ?? "") === "requireWebsitePerson" &&
+    accessImports.get(callIdentifier(tenantCall) ?? "") === "authorizeTenantMutation"
+    ? QUEUE_MUTATION_HELPER
+    : null;
+}
+
 function containsIdentifier(node: ts.Node, identifier: string): boolean {
   let found = false;
   const visit = (child: ts.Node) => {
@@ -284,9 +312,10 @@ const sourceFiles = readdirSync(convexDir, { withFileTypes: true })
 for (const file of sourceFiles) {
   const source = readFileSync(file, "utf8");
   const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-  const builders = importedBuilders(sourceFile);
+  const builders = importedNames(sourceFile, [GENERATED_SERVER_MODULE, "./searchServer"]);
   const actionHelpers = verifiedLocalActionHelpers(sourceFile);
   const moduleName = path.basename(file, ".ts");
+  const mutationHelper = moduleName === "queue" ? verifiedQueueMutationHelper(sourceFile) : null;
   const trackedPublicCalls = new Set<ts.CallExpression>();
 
   for (const statement of sourceFile.statements) {
@@ -310,6 +339,7 @@ for (const file of sourceFiles) {
         initializer,
         sourceFile,
         verifiedActionHelpers: actionHelpers,
+        verifiedMutationHelper: mutationHelper,
       };
       inventory.push(entry);
       trackedPublicCalls.add(initializer);
@@ -366,15 +396,16 @@ for (const entry of inventory) {
   const isCapabilityAllowlisted =
     entry.kind === "action" && Boolean(PUBLIC_ACTION_CAPABILITY_ALLOWLIST[entry.key]);
 
-  const callsVerifiedActionHelper =
-    entry.kind === "action" &&
-    [...entry.verifiedActionHelpers].some((helperName) => containsCall(handler, helperName));
+  const acceptedGuards = new Set([
+    requiredGuard,
+    ...(entry.kind === "action" ? entry.verifiedActionHelpers : []),
+    ...(entry.kind === "mutation" && entry.verifiedMutationHelper ? [entry.verifiedMutationHelper] : []),
+  ]);
 
   if (
     !isSystemAllowlisted &&
     !isCapabilityAllowlisted &&
-    !containsCall(handler, requiredGuard) &&
-    !callsVerifiedActionHelper
+    ![...acceptedGuards].some((guard) => containsCall(handler, guard))
   ) {
     const mentionOnly = containsIdentifier(handler, "vaultOwnerId");
     failures.push(
@@ -387,10 +418,6 @@ for (const entry of inventory) {
   }
 
   if (!isSystemAllowlisted && !isCapabilityAllowlisted) {
-    const acceptedGuards = new Set([
-      requiredGuard,
-      ...(entry.kind === "action" ? [...entry.verifiedActionHelpers] : []),
-    ]);
     const firstGuard = firstExecutionCall(
       handler,
       (call) => acceptedGuards.has(callIdentifier(call) ?? ""),

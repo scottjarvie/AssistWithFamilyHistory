@@ -96,7 +96,7 @@ function assertQueueTenantAllowed(
   }
 }
 
-async function authorizeTenantMutation(ctx:MutationCtx,functionName:string,suppliedOwner?:string|null){
+async function authorizeWebsitePersonTenantMutation(ctx:MutationCtx,functionName:string,suppliedOwner?:string|null){
  await requireWebsitePerson(ctx);return authorizeTenantMutationBase(ctx,functionName,suppliedOwner);
 }
 
@@ -349,7 +349,7 @@ export const createQueueItem = mutation({
     idempotencyKey: v.string(),
   },
   handler: async (ctx, args) => {
-    const decision = await authorizeTenantMutation(ctx, "queue.createQueueItem", args.vaultOwnerId);
+    const decision = await authorizeWebsitePersonTenantMutation(ctx, "queue.createQueueItem", args.vaultOwnerId);
     assertQueueTenantAllowed(decision);
     const owner = decision.owner;
     const actor = actorForUser(owner);
@@ -434,7 +434,7 @@ export const assignQueueItemToAi = mutation({
     idempotencyKey: v.string(),
   },
   handler: async (ctx, args) => {
-    const decision = await authorizeTenantMutation(ctx, "queue.assignQueueItemToAi", args.vaultOwnerId);
+    const decision = await authorizeWebsitePersonTenantMutation(ctx, "queue.assignQueueItemToAi", args.vaultOwnerId);
     assertQueueTenantAllowed(decision);
     const chosenAiId = normalizeRequiredText(args.chosenAiId, "Chosen AI id", 160);
     assertFutureHandoffExpiration(args.handoffExpiresAt, Date.now());
@@ -487,7 +487,7 @@ export const claimQueueItemAsUser = mutation({
     idempotencyKey: v.string(),
   },
   handler: async (ctx, args) => {
-    const decision = await authorizeTenantMutation(ctx, "queue.claimQueueItemAsUser", args.vaultOwnerId);
+    const decision = await authorizeWebsitePersonTenantMutation(ctx, "queue.claimQueueItemAsUser", args.vaultOwnerId);
     assertQueueTenantAllowed(decision);
     assertLeaseDuration(args.leaseMs);
     const nextStep = normalizeRequiredText(args.nextStep, "Next step", QUEUE_LIMITS.nextStep);
@@ -527,7 +527,7 @@ export const checkpointQueueItemAsUser = mutation({
     idempotencyKey: v.string(),
   },
   handler: async (ctx, args) => {
-    const decision = await authorizeTenantMutation(ctx, "queue.checkpointQueueItemAsUser", args.vaultOwnerId);
+    const decision = await authorizeWebsitePersonTenantMutation(ctx, "queue.checkpointQueueItemAsUser", args.vaultOwnerId);
     assertQueueTenantAllowed(decision);
     assertLeaseDuration(args.leaseMs);
     const nextStep = normalizeRequiredText(args.nextStep, "Next step", QUEUE_LIMITS.nextStep);
@@ -556,7 +556,7 @@ export const completeQueueItemAsUser = mutation({
     idempotencyKey: v.string(),
   },
   handler: async (ctx, args) => {
-    const decision = await authorizeTenantMutation(ctx, "queue.completeQueueItemAsUser", args.vaultOwnerId);
+    const decision = await authorizeWebsitePersonTenantMutation(ctx, "queue.completeQueueItemAsUser", args.vaultOwnerId);
     assertQueueTenantAllowed(decision);
     const resultSummary = normalizeRequiredText(args.resultSummary, "Result", QUEUE_LIMITS.resultSummary);
     const resultRefs = (args.resultRefs ?? []).map((ref) => normalizeRequiredText(ref, "Result reference", 500));
@@ -1011,7 +1011,7 @@ export const resumeQueueItem = mutation({
     idempotencyKey: v.string(),
   },
   handler: async (ctx, args) => {
-    const decision = await authorizeTenantMutation(ctx, "queue.resumeQueueItem", args.vaultOwnerId);
+    const decision = await authorizeWebsitePersonTenantMutation(ctx, "queue.resumeQueueItem", args.vaultOwnerId);
     assertQueueTenantAllowed(decision);
     const answerSummary = normalizeRequiredText(args.answerSummary, "Answer summary", 1_000);
     return runCommand(ctx, {
@@ -1050,7 +1050,7 @@ export const cancelQueueItem = mutation({
     idempotencyKey: v.string(),
   },
   handler: async (ctx, args) => {
-    const decision = await authorizeTenantMutation(ctx, "queue.cancelQueueItem", args.vaultOwnerId);
+    const decision = await authorizeWebsitePersonTenantMutation(ctx, "queue.cancelQueueItem", args.vaultOwnerId);
     assertQueueTenantAllowed(decision);
     const reason = normalizeRequiredText(args.reason, "Cancellation reason", 1_000);
     return runCommand(ctx, {
@@ -1091,7 +1091,7 @@ export const reopenQueueItem = mutation({
     idempotencyKey: v.string(),
   },
   handler: async (ctx, args) => {
-    const decision = await authorizeTenantMutation(ctx, "queue.reopenQueueItem", args.vaultOwnerId);
+    const decision = await authorizeWebsitePersonTenantMutation(ctx, "queue.reopenQueueItem", args.vaultOwnerId);
     assertQueueTenantAllowed(decision);
     const reason = normalizeRequiredText(args.reason, "Reopen reason", 1_000);
     return runCommand(ctx, {
@@ -1315,7 +1315,7 @@ async function readQueueCounts(ctx: Pick<QueryCtx, "db">, owner: string) {
 export const queueCounts = mutation({
   args:{vaultOwnerId:v.string()},
   handler:async(ctx,args)=>{
-    const decision=await authorizeTenantMutation(ctx,"queue.queueCounts",args.vaultOwnerId);assertQueueTenantAllowed(decision);
+    const decision=await authorizeWebsitePersonTenantMutation(ctx,"queue.queueCounts",args.vaultOwnerId);assertQueueTenantAllowed(decision);
     return readQueueCounts(ctx, decision.owner);
   },
 });
@@ -1354,7 +1354,7 @@ const reviewAction=v.union(v.literal("accept"),v.literal("dismiss"),v.literal("a
 export const reviewQueueItem = mutation({
  args:{vaultOwnerId:v.string(),queueItemId:v.id("queueItems"),expectedVersion:v.number(),idempotencyKey:v.string(),action:reviewAction,directive:v.optional(v.string()),reason:v.optional(v.string()),optionIndex:v.optional(v.number())},
  handler:async(ctx,args)=>{
-  const decision=await authorizeTenantMutation(ctx,"queue.reviewQueueItem",args.vaultOwnerId);assertQueueTenantAllowed(decision);
+  const decision=await authorizeWebsitePersonTenantMutation(ctx,"queue.reviewQueueItem",args.vaultOwnerId);assertQueueTenantAllowed(decision);
   const actor=actorForUser(decision.owner),command=`review:${args.action}`;
   const replay=await existingReceipt(ctx,{owner:decision.owner,idempotencyKey:args.idempotencyKey,command,actor});if(replay)return replay;
   const raw=await ctx.db.get(args.queueItemId);assertItemOwner(raw,decision.owner);assertVersion(raw,args.expectedVersion);const item=queueIdentity(raw),now=Date.now();
@@ -1402,7 +1402,7 @@ export const agentWithdrawSuggestion = internalMutation({
 export const getQueueOrigin = mutation({
  args:{vaultOwnerId:v.string(),queueItemId:v.id("queueItems")},
  handler:async(ctx,args)=>{
-  const decision=await authorizeTenantMutation(ctx,"queue.getQueueOrigin",args.vaultOwnerId);assertQueueTenantAllowed(decision);
+  const decision=await authorizeWebsitePersonTenantMutation(ctx,"queue.getQueueOrigin",args.vaultOwnerId);assertQueueTenantAllowed(decision);
   const item=await ctx.db.get(args.queueItemId);assertItemOwner(item,decision.owner);
   if(!item.fromRecord)return null;
   const table=queueContextTables[item.fromRecord.kind as keyof typeof queueContextTables];
