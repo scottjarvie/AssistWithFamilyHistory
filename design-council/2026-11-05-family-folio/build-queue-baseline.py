@@ -15,5 +15,5 @@ s=s.replace('  }, [stateFilter]);','  }, [stateFilter,preview]);').replace('  },
 s=s.replace('    event.preventDefault();','    event.preventDefault();\n    if(readonlyPreview)return;').replace('  function deleteItem() {','  function deleteItem() {\n    if(readonlyPreview)return;')
 # Semantic wrapper adaptation avoids nested main landmarks in the preview harness.
 s=s.replace('<main className="queue-ledger','<fieldset disabled className="min-w-0 border-0 p-0"><div className="queue-ledger').replace('</main>','</div></fieldset>')
-(root/'components/design/BaselineQueueWorkspace.tsx').write_text('/** Reconstructed original Queue JSX. Invented data/current runtime, all controls disabled. */\n'+s)
+(root/'components/design-preview/BaselineQueueWorkspace.tsx').write_text('/** Reconstructed original Queue JSX. Invented data/current runtime, all controls disabled. */\n'+s)
 print('Original Queue presentation reconstructed with synthetic read-only data.')

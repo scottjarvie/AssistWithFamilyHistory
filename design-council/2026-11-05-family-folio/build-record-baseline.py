@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { ContextReportForm } from "@/components/vault/ContextReportForm";
 import type {PlaceWorkspace} from "@/components/vault/PlaceWorkspaceView";
 '''
-(root/'components/design/BaselinePlaceWorkspace.tsx').write_text('/** Original JSX with invented records and current shared runtime; mutations disabled. */\n'+imports+'export function BaselinePlaceWorkspace({workspace}:{workspace:PlaceWorkspace}) {\n'+body)
+(root/'components/design-preview/BaselinePlaceWorkspace.tsx').write_text('/** Original JSX with invented records and current shared runtime; mutations disabled. */\n'+imports+'export function BaselinePlaceWorkspace({workspace}:{workspace:PlaceWorkspace}) {\n'+body)
 story=original('app/app/stories/[storyId]/page.tsx')
 head=story[:story.index('export const metadata')]
 head=head.replace('import { notFound } from "next/navigation";\n','').replace('import type { Metadata } from "next";\n','')
@@ -25,5 +25,5 @@ body=story[story.index('  const {\n    story,'):]
 body=body.replace('<StoryStatusActions','<fieldset disabled className="min-w-0"><StoryStatusActions').replace('publishReadiness={publishReadiness}\n            />','publishReadiness={publishReadiness}\n            /></fieldset>')
 body=body.replace('<StoryReviewAssignmentForm','<fieldset disabled className="min-w-0"><StoryReviewAssignmentForm').replace('secondReviewedAt={story.secondReviewedAt}\n              />','secondReviewedAt={story.secondReviewedAt}\n              /></fieldset>')
 body=body.replace('<StoryEditorForm','<StoryEditorForm readonlyPreview')
-(root/'components/design/BaselineStoryReview.tsx').write_text('/** Original JSX with invented records and current shared runtime; mutations disabled. */\n'+head+'\n'+helpers+'\nexport function BaselineStoryReview({bundle}:{bundle:StoryReviewBundle}) {\n'+body)
+(root/'components/design-preview/BaselineStoryReview.tsx').write_text('/** Original JSX with invented records and current shared runtime; mutations disabled. */\n'+head+'\n'+helpers+'\nexport function BaselineStoryReview({bundle}:{bundle:StoryReviewBundle}) {\n'+body)
 print('Reconstructed Place/Story original JSX; current shared runtime, invented data, no backend reads.')

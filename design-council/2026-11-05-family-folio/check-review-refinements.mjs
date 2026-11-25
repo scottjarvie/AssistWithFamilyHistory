@@ -3,7 +3,7 @@ import {chromium,expect} from '@playwright/test';
 import assert from 'node:assert/strict';
 import {readFileSync,writeFileSync} from 'node:fs';
 const base='http://localhost:3457/design-council-preview';
-const fixture=JSON.parse(readFileSync('components/design/fixtures/queue.json','utf8'));
+const fixture=JSON.parse(readFileSync('components/design-preview/fixtures/queue.json','utf8'));
 const report={checkedAt:new Date().toISOString(),checks:[],errors:[],unexpectedAPIs:[],mockWrites:[]};
 const pass=text=>{report.checks.push(text);console.log('ok '+text);};
 const observe=p=>{p.on('pageerror',e=>report.errors.push(String(e)));p.on('console',m=>{if(m.type()==='error'&&!m.text().includes('409'))report.errors.push(m.text());});};

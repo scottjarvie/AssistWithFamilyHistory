@@ -2,7 +2,7 @@
 import {chromium,expect} from '@playwright/test';
 import assert from 'node:assert/strict';
 import {mkdirSync,writeFileSync} from 'node:fs';
-import settingsFixtureModule from '../../components/design/settingsFixtures.ts';
+import settingsFixtureModule from '../../components/design-preview/settingsFixtures.ts';
 const {settingsConnections,settingsKeys}=settingsFixtureModule;
 import catalogModule from '../../lib/mcp/catalog.ts';
 const {FAMILY_HISTORY_SCOPES}=catalogModule;

@@ -2,7 +2,7 @@
 import {chromium,expect} from '@playwright/test';
 import assert from 'node:assert/strict';
 import {readFileSync,writeFileSync} from 'node:fs';
-const fixture=JSON.parse(readFileSync('components/design/fixtures/queue.json','utf8'));
+const fixture=JSON.parse(readFileSync('components/design-preview/fixtures/queue.json','utf8'));
 const store=new Map(fixture.items.map(item=>[item._id,structuredClone(item)]));
 const report={checkedAt:new Date().toISOString(),checks:[],mockWrites:[],mockReads:[],unexpectedAPIs:[],errors:[]};
 const pass=text=>{report.checks.push(text);console.log('ok '+text);};

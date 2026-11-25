@@ -25,7 +25,7 @@ import { DocumentsViewer } from "@/components/DocumentsViewer";
 import { ResearchChecksPanel } from "@/components/vault/ResearchChecksPanel";
 import { MediaPrivacyReviewPanel } from "@/components/vault/MediaPrivacyReviewPanel";
 import { ContextItemsPanel } from "@/components/vault/ContextItemsPanel";
-import { BaselinePersonHeader as PersonHeader } from "@/components/design/BaselinePersonHeader";
+import { BaselinePersonHeader as PersonHeader } from "@/components/design-preview/BaselinePersonHeader";
 import { publicStoryPath } from "@/lib/stories/slug";
 
 import type {PersonWorkspace} from "@/components/vault/PersonWorkspaceView";

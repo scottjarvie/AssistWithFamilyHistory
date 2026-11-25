@@ -37,8 +37,7 @@ explicit or ambiguous end dates stay enforced.
   `convex/mcpGrants.ts`, `lib/mcp/`. Queue: `convex/queue.ts`, `components/queue/`.
 - Media `lib/media/`; capture `extension/`, `lib/familysearch/`; checks `scripts/`.
   [Backend name map and contracts](convex/README.md#name-map).
-- `components/design/Baseline*`, `*Fixture*`, `fixtures/` are frozen dev-only
-  preview copies; never edit them for a site change.
+- `components/design/` is live. `components/design-preview/` is frozen dev-only.
 
 ## Delivering changes
 
