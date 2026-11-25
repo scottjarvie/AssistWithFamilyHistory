@@ -1,0 +1,15 @@
+{
+  "date_utc": "2026-11-25",
+  "machine": "macmini",
+  "production_handoff_commit": "8a091ea796c683bdbdfa1de953ae5d83e28fbd40",
+  "handoff_ready_utc": "2026-11-25 07:08:12",
+  "serving_metadata_independently_verified": false,
+  "browser": "T3 preview, incognito; reported hidden; tab closed",
+  "checks": [
+    {"route": "/", "result": "main and heading present; no generic application error observed"},
+    {"route": "/ai", "result": "main and heading present; no generic application error observed"},
+    {"route": "/mcp", "method": "GET", "status": 405, "result": "message says MCP uses POST and points to setup", "authentication_challenge": null, "challenge_reason": "response headers not exposed by this browser check"}
+  ],
+  "unverified": ["signed-in surfaces", "evidence bytes", "B2 pinned-version behavior", "hosted HEIC delivery"],
+  "constraints": "No signed-in profile, POST, credentials, OAuth flow, tool call, media, record, fixture or provider access."
+}
