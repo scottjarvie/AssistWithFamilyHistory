@@ -30,10 +30,9 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
   let workspace;
 
   try {
-    workspace = await client.action(api.vaultReads.getPersonWorkspace, {
+    workspace = await client.action(api.vaultReads.getPersonOverview, {
       vaultOwnerId,
       personIdentifier: personId,
-      documentsMetadataOnly: true,
     });
   } catch (error) {
     const issue = getConvexRuntimeIssue(error);
@@ -49,5 +48,5 @@ export default async function PersonWorkspacePage({ params }: PageProps) {
     notFound();
   }
 
-  return <PersonWorkspaceView workspace={workspace} personId={personId} documents={[]} documentsError={null} documentsOwner={vaultOwnerId} />;
+  return <PersonWorkspaceView key={`${vaultOwnerId}:${workspace.person._id}`} workspace={workspace} personId={personId} documentsOwner={vaultOwnerId} />;
 }

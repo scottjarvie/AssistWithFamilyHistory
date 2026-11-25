@@ -26,6 +26,7 @@ import { v } from "convex/values";
 import schema from "./schema";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { PERSON_STORY_PAGE_SIZE } from "../lib/records/personStories";
 
 // Pass the module map explicitly so convex-test can find the function modules
 // regardless of cwd (this file sits in convex/, the default functions dir).
@@ -488,6 +489,109 @@ describe("migrateGuestVault (real mutation)", () => {
 // ---------------------------------------------------------------------------
 
 describe("guarded private reads", () => {
+  test("the website Overview shrinks a large dossier and ordered story pages preserve its full content", async () => {
+    const t = convexTest(schema, modules);
+    const a = await seedOwner(t, OWNER_A, "A");
+    const storyBody = "TEST synthetic story paragraph.\n\n".repeat(1_024);
+    const documentBody = "TEST synthetic document paragraph.\n\n".repeat(2_048);
+    await t.run(async ctx => {
+      for (let i = 0; i < 48; i++) {
+        await ctx.db.insert("stories", {
+          ...storyFields(OWNER_A, a.primary, `TEST story ${i}`),
+          content: storyBody,
+          updatedAt: now + (i % 8),
+        });
+      }
+      for (const type of ["PS", "CST"] as const) {
+        await ctx.db.insert("documents", {
+          ...documentFields(OWNER_A, "FSID-A", type), type,
+          contentMarkdown: documentBody, contentText: documentBody,
+        });
+      }
+    });
+    const owner = t.withIdentity({ subject: OWNER_A });
+    const input = { vaultOwnerId: OWNER_A, personIdentifier: a.primary };
+    const baseline = await owner.action(api.vaultReads.getPersonWorkspace, { ...input, documentsMetadataOnly: true });
+    const overview = await owner.action(api.vaultReads.getPersonOverview, input);
+    if (!baseline || !overview) throw new Error("Missing synthetic dossier");
+    const { stories, documents, events, citations, relatedPeople, contextItems, ...eagerFields } = baseline;
+    expect(stories).toHaveLength(49);
+    expect(documents).toHaveLength(2);
+    expect(overview).not.toHaveProperty("events");
+    expect(overview).not.toHaveProperty("citations");
+    expect(overview).not.toHaveProperty("relatedPeople");
+    // These duplicate top-level arrays are already represented by the timeline,
+    // grouped sources and relationship rows used by the website.
+    expect(events).toHaveLength(eagerFields.timeline.length);
+    expect(citations).toHaveLength(eagerFields.stats.citations);
+    expect(relatedPeople).toContainEqual(expect.objectContaining({ _id: a.relative }));
+    expect(overview).toEqual({
+      ...eagerFields,
+      contextItems: contextItems.map(({ _id, title, itemType, evidenceRole, content, sourceLabel,
+        privacyLevel, reviewStatus, aiUseAllowed, updatedAt }) => ({
+        _id, title, itemType, evidenceRole, content, sourceLabel, privacyLevel, reviewStatus, aiUseAllowed, updatedAt,
+      })),
+      storyTab: { ids: stories.map(story => story._id), updatedAt: now + 7 },
+      documentTab: { count: 2, updatedAt: now },
+    });
+    const initialJson = JSON.stringify(overview);
+    expect(initialJson).not.toMatch(/TEST synthetic (story|document) paragraph/);
+    const initialBytes = Buffer.byteLength(initialJson);
+    const baselineBytes = Buffer.byteLength(JSON.stringify(baseline));
+    expect(initialBytes).toBeLessThan(baselineBytes * 0.1);
+    process.stdout.write(`Person initial JSON bytes: ${baselineBytes} → ${initialBytes}\n`);
+
+    const readPage = (storyIds: Id<"stories">[]) => owner.action(api.vaultReads.getPersonStoryPage, {
+      vaultOwnerId: OWNER_A, personId: a.primary, storyIds,
+    });
+    for (let offset = 0; offset < stories.length; offset += PERSON_STORY_PAGE_SIZE) {
+      const end = offset + PERSON_STORY_PAGE_SIZE;
+      expect(await readPage(overview.storyTab.ids.slice(offset, end))).toEqual(
+        stories.slice(offset, end).map(({ _id, title, type, status, content, publicSlug }) => ({ _id, title, type, status, content, publicSlug }))
+      );
+    }
+    await expect(readPage(overview.storyTab.ids.slice(0, PERSON_STORY_PAGE_SIZE + 1))).rejects.toThrow(/Invalid story page size/);
+    const foreign = await t.run(ctx => ctx.db.insert("stories", storyFields(OWNER_B, a.primary, "Foreign story on an owner A person")));
+    await expect(readPage([stories[0]._id, foreign])).resolves.toBeNull();
+    await t.run(ctx => ctx.db.patch(stories[0]._id, { archivedAt: now }));
+    await expect(readPage([stories[0]._id])).resolves.toBeNull();
+    expect((await owner.action(api.vaultReads.getPersonOverview, input))?.storyTab.ids).not.toContain(stories[0]._id);
+    await t.run(ctx => ctx.db.patch(a.primary, { archivedAt: now }));
+    await expect(readPage([stories[1]._id])).resolves.toBeNull();
+  });
+
+  test("the website Overview keeps context display fields without stored cross-vault references", async () => {
+    const t = convexTest(schema, modules);
+    const a = await seedOwner(t, OWNER_A, "A");
+    const b = await seedOwner(t, OWNER_B, "B");
+    await t.run((ctx) => ctx.db.patch(a.contextItem, {
+      personIds: [a.primary, b.primary],
+      storyIds: [a.story, b.story],
+      sourceIds: [b.source],
+      sourceLabel: "TEST synthetic source label",
+    }));
+    const owner = t.withIdentity({ subject: OWNER_A });
+    const overview = await owner.action(api.vaultReads.getPersonOverview, {
+      vaultOwnerId: OWNER_A, personIdentifier: a.primary,
+    });
+    expect(overview?.contextItems).toEqual([{
+      _id: a.contextItem,
+      title: "Note-A",
+      itemType: "note",
+      evidenceRole: "background_context",
+      content: "content for Note-A",
+      sourceLabel: "TEST synthetic source label",
+      privacyLevel: "public_source",
+      reviewStatus: "reviewed",
+      aiUseAllowed: true,
+      updatedAt: now,
+    }]);
+    const payload = JSON.stringify(overview);
+    expect(payload).not.toContain(b.story);
+    expect(payload).not.toContain(b.primary);
+    expect(payload).not.toContain(b.source);
+  });
+
   test("the Person overview omits document bodies and the separately loaded Documents tab keeps owner scope and order", async () => {
     const t = convexTest(schema, modules);
     const a = await seedOwner(t, OWNER_A, "A");

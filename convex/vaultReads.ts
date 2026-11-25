@@ -76,6 +76,24 @@ export const getPersonWorkspace = action({
     }),
 });
 
+export const getPersonOverview = action({
+  args: { vaultOwnerId: v.string(), personIdentifier: v.string() },
+  handler: async (ctx, args): Promise<FunctionReturnType<typeof vaultInternal.getPersonOverview>> =>
+    ctx.runQuery(vaultInternal.getPersonOverview, {
+      ...args,
+      vaultOwnerId: await authorizedOwner(ctx, "vault.getPersonOverview", args.vaultOwnerId),
+    }),
+});
+
+export const getPersonStoryPage = action({
+  args: { vaultOwnerId: v.string(), personId: v.id("persons"), storyIds: v.array(v.id("stories")) },
+  handler: async (ctx, args): Promise<FunctionReturnType<typeof vaultInternal.getPersonStoryPage>> =>
+    ctx.runQuery(vaultInternal.getPersonStoryPage, {
+      ...args,
+      vaultOwnerId: await authorizedOwner(ctx, "vault.getPersonStoryPage", args.vaultOwnerId),
+    }),
+});
+
 export const getOwnedMediaFile = action({
   args: { vaultOwnerId: v.string(), mediaId: v.string(), rendition: v.optional(v.literal("tiny")) },
   handler: async (

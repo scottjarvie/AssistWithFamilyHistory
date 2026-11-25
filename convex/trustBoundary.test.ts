@@ -64,6 +64,8 @@ describe("TRUST_BOUNDARY_MODE", () => {
     check(vault.getOwnedMediaFile, { ...scope, mediaId });
     check(vault.getPeopleExplorerPage, page);
     check(vault.getPersonWorkspace, person);
+    check(vault.getPersonOverview, person);
+    check(vault.getPersonStoryPage, { ...scope, personId, storyIds: [storyId] });
     check(vault.getStoriesIndex, scope);
     check(vault.getStoryReview, { ...scope, storyId });
     check(vault.getPersonResearchChecks, person);
@@ -102,6 +104,10 @@ describe("TRUST_BOUNDARY_MODE", () => {
       url: expect.stringMatching(/^https?:\/\//), mimeType: "image/png", title: "Synthetic file",
     });
     await expect(other.action(vault.getOwnedMediaFile, { vaultOwnerId: OWNER_B, mediaId })).resolves.toBeNull();
+    await expect(other.action(vault.getPersonOverview, { ...person, vaultOwnerId: OWNER_B })).resolves.toBeNull();
+    await expect(other.action(vault.getPersonStoryPage, { vaultOwnerId: OWNER_B, personId, storyIds: [storyId] })).resolves.toBeNull();
+    const differentPersonId = await seedPerson(t);
+    await expect(owner.action(vault.getPersonStoryPage, { ...scope, personId: differentPersonId, storyIds: [storyId] })).resolves.toBeNull();
     const logs = await t.run((ctx) => ctx.db.query("trustBoundaryShadowLog").collect());
     expect(logs).toHaveLength(mode === "shadow" ? cases.length * 2 : 0);
   });
