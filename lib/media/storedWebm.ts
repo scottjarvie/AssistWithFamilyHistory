@@ -23,6 +23,44 @@ function vint(bytes: Uint8Array, at: number, end: number, maxWidth: number, keep
 
 type Element = { id: number; body: number; end: number; unknown: boolean };
 
+/** Check sizes in Block/SimpleBlock lacing without interpreting frame bytes. */
+function hasCompleteWebmFrames(bytes: Uint8Array, start: number, end: number, lacing: number): boolean {
+  if (start >= end) return false;
+  if (lacing === 0) return true;
+
+  let at = start;
+  const count = bytes[at++] + 1;
+  if (count < 2 || end - at < count) return false;
+  if (lacing === 2) return (end - at) % count === 0;
+
+  let previousSize = 0;
+  let declaredBytes = 0;
+  // The final frame consumes the remainder. All other sizes are in the lace header.
+  for (let frame = 0; frame < count - 1; frame++) {
+    let size = 0;
+    if (lacing === 1) {
+      let next: number;
+      do {
+        if (at >= end) return false;
+        next = bytes[at++];
+        size += next;
+        if (size > end - at - declaredBytes) return false;
+      } while (next === 0xff);
+    } else {
+      const length = vint(bytes, at, end, 8);
+      if (!length || !Number.isSafeInteger(length.value)) return false;
+      // After the first EBML frame size, each VINT is a signed delta.
+      const bias = 2 ** (7 * (length.next - at) - 1) - 1;
+      size = frame === 0 ? length.value : previousSize + length.value - bias;
+      at = length.next;
+    }
+    if (size <= 0 || size > end - at - declaredBytes) return false;
+    declaredBytes += size;
+    previousSize = size;
+  }
+  return declaredBytes < end - at;
+}
+
 /** Check stored WebM framing and a video-track block. Codec payloads stay opaque. */
 export function hasStoredWebmVideo(bytes: Uint8Array): boolean {
   if (sniffAudioType(bytes.subarray(0, 64 * 1024)) !== "audio/webm") return false;
@@ -77,6 +115,10 @@ export function hasStoredWebmVideo(bytes: Uint8Array): boolean {
     // After the track number come a signed two-byte timestamp, flags and data.
     if (!track || track.unknown || !track.value || block.end - track.next <= 3) {
       throw new Error("Invalid WebM block framing.");
+    }
+    const lacing = (bytes[track.next + 2] >> 1) & 3;
+    if (!hasCompleteWebmFrames(bytes, track.next + 3, block.end, lacing)) {
+      throw new Error("Invalid WebM frame boundaries.");
     }
     blockTracks.add(track.value);
   }

@@ -2,6 +2,28 @@ import { expect, test, vi } from "vitest";
 import sharp from "sharp";
 import type { ActionCtx } from "../_generated/server";
 import { deliverEvidence } from "./evidenceDelivery";
+import { hasStoredWebmVideo } from "../../lib/media/storedWebm";
+
+function videoWithBlock(flags: number, frameData: number[], grouped: boolean) {
+  const element = (id: number[], body: number[]) => [...id, 0x80 | body.length, ...body];
+  const header = element([0x1a, 0x45, 0xdf, 0xa3], element([0x42, 0x82], [0x77, 0x65, 0x62, 0x6d]));
+  const videoTrack = element([0xae], [...element([0xd7], [1]), ...element([0x83], [1])]);
+  const tracks = element([0x16, 0x54, 0xae, 0x6b], videoTrack);
+  const payload = [0x81, 0, 0, flags, ...frameData];
+  const block = grouped ? element([0xa0], element([0xa1], payload)) : element([0xa3], payload);
+  const cluster = element([0x1f, 0x43, 0xb6, 0x75], [...element([0xe7], [0]), ...block]);
+  return Uint8Array.from([...header, ...element([0x18, 0x53, 0x80, 0x67], [...tracks, ...cluster])]);
+}
+
+test.each([false, true])("validates WebM lace frame boundaries (grouped=%s)", grouped => {
+  expect(hasStoredWebmVideo(videoWithBlock(0x02, [1, 2, 0x11, 0x12, 0x21], grouped))).toBe(true);
+  expect(hasStoredWebmVideo(videoWithBlock(0x04, [1, 0x11, 0x21], grouped))).toBe(true);
+  expect(hasStoredWebmVideo(videoWithBlock(0x06, [2, 0x82, 0xbe, 0x11, 0x12, 0x21, 0x31], grouped))).toBe(true);
+  expect(hasStoredWebmVideo(videoWithBlock(0x04, [1], grouped))).toBe(false);
+  expect(hasStoredWebmVideo(videoWithBlock(0x04, [1, 0x11, 0x21, 0x31], grouped))).toBe(false);
+  expect(hasStoredWebmVideo(videoWithBlock(0x02, [1, 3, 0x11, 0x12, 0x21], grouped))).toBe(false);
+  expect(hasStoredWebmVideo(videoWithBlock(0x06, [2, 0x82, 0xbb, 0x11, 0x12, 0x31], grouped))).toBe(false);
+});
 
 const inputBytes = 25 * 1024 * 1024;
 const principal = { issuer: "https://test.invalid", subject: "synthetic-owner", clientId: "synthetic-client", scopes: [] };
