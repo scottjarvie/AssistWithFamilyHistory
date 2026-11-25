@@ -1,0 +1,15 @@
+{
+  "date_utc": "2026-11-25",
+  "machine": "macmini",
+  "production_handoff_commit": "08fdf77472685e59a5b0b35ed0222ae3cfe61856",
+  "handoff_ready_utc": "2026-11-25 07:26:35",
+  "serving_metadata_independently_verified": false,
+  "browser": "T3 preview incognito; reported hidden; tab closed",
+  "checks": [
+    {"route": "/", "main": true, "heading": true, "generic_error": false},
+    {"route": "/ai", "main": true, "heading": true, "generic_error": false},
+    {"route": "/mcp", "method": "POST", "body": "omitted", "credentials": "omitted", "status": 401, "bearer_challenge_present": true}
+  ],
+  "unverified": ["signed-in search coverage metadata on live owner data"],
+  "constraints": "No authenticated profile, tokens, OAuth flow, tool calls, private search data, fixtures or app data changes."
+}
