@@ -69,7 +69,7 @@ test("Person tabs preserve lazy loads, history and document actions while naviga
   await expect(tab("Stories")).toHaveText("Stories9");
   const headings = page.getByRole("tabpanel", { name: "Stories" }).getByRole("heading");
   await expect(headings).toHaveText(Array.from({ length: 8 }, (_, i) => `First story ${i + 1}`));
-  await page.getByRole("button", { name: "Load more" }).click();
+  await page.getByRole("button", { name: "Show more stories", exact: true }).click();
   await expect(headings).toHaveText(Array.from({ length: 9 }, (_, i) => `First story ${i + 1}`));
   expect(await calls()).toEqual([["First", "stories", ["1", "2", "3", "4", "5", "6", "7", "8"]], ["First", "stories", ["9"]]]);
 

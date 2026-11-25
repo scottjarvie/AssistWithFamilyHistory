@@ -71,7 +71,7 @@ export function DeferredPersonStoryCards({ personId, storyIds, owner }: {
     {pending ? <p role="status" className="text-sm text-muted-foreground">Loading stories…</p>
       : result.failed ? <p role="alert" className="text-sm text-annotation">Failed to load stories. Reload this person to continue.</p>
       : result.stories.length < storyIds.length && (
-        <Button variant="outline" onClick={() => setOffset(result.stories.length)}>Load more</Button>
+        <Button variant="outline" onClick={() => setOffset(result.stories.length)}>Show more stories</Button>
       )}
   </>;
 }
