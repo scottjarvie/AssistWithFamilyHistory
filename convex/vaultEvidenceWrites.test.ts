@@ -55,6 +55,7 @@ async function fixture() {
     people: await db.query("peopleExplorerRows").collect(),
     scores: await db.query("personScoreRows").collect(),
     reviews: await db.query("personScoreReviews").collect(),
+    shadowLog: await db.query("trustBoundaryShadowLog").collect(),
   }));
   async function refuses<F extends FunctionReference<"mutation">>(
     table: CountTable,
@@ -62,15 +63,27 @@ async function fixture() {
     args: FunctionArgs<F>,
     foreignReferences: Record<string, Partial<FunctionArgs<F>>>,
   ) {
-    const before = await snapshot(table);
-    await expect(t.mutation(mutation, args)).rejects.toThrow(/missing_identity/);
-    expect(await snapshot(table), "anonymous call").toEqual(before);
-    await expect(other.mutation(mutation, args)).rejects.toThrow(/Trust boundary denied: owner_mismatch/);
-    expect(await snapshot(table), "wrong owner call").toEqual(before);
-    for (const [reference, override] of Object.entries(foreignReferences)) {
-      await expect(owner.mutation(mutation, { ...args, ...override }), reference)
-        .rejects.toThrow(/reference_owner_mismatch/);
-      expect(await snapshot(table), reference).toEqual(before);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const before = await snapshot(table);
+      await expect(t.mutation(mutation, args)).rejects.toThrow(/missing_identity/);
+      expect(await snapshot(table), "anonymous call").toEqual(before);
+      await expect(other.mutation(mutation, args)).rejects.toThrow(/Trust boundary denied: owner_mismatch/);
+      expect(await snapshot(table), "wrong owner call").toEqual(before);
+      for (const [reference, override] of Object.entries(foreignReferences)) {
+        await expect(owner.mutation(mutation, { ...args, ...override }), reference)
+          .rejects.toThrow(/reference_owner_mismatch/);
+        expect(await snapshot(table), reference).toEqual(before);
+      }
+      const denialWarnings = warn.mock.calls
+        .filter(([message]) => message === "Trust boundary shadow denial")
+        .map(([, entry]) => entry?.reason);
+      const shadowReasons = ["missing_identity", "owner_mismatch",
+        ...Object.keys(foreignReferences).map(() => "reference_owner_mismatch"),
+      ];
+      expect(denialWarnings).toEqual(process.env.TRUST_BOUNDARY_MODE === "shadow" ? shadowReasons : []);
+    } finally {
+      warn.mockRestore();
     }
   }
   async function counts(table: CountTable, expected: Record<string, number> = { active: 1 }) {
@@ -267,6 +280,11 @@ describe.each(["shadow", "enforce"])("vault evidence writes in %s mode", (mode) 
 
   test("upsertResearchCheck updates the person’s score and replaces the review membership", async () => {
     const { t, owner, own, foreign, partnerId, refuses, counts, score, read } = await fixture();
+    const reviewTimes = async () => {
+      const reviews = await t.run(({ db }) => db.query("personScoreReviews")
+        .withIndex("by_record", (q) => q.eq("recordId", own.personId)).collect());
+      return reviews.map(({ reviewedAt }) => reviewedAt);
+    };
     const args = {
       ...scope, personId: own.personId, checkKey: "identity_review",
       status: "needs_review", applicability: "required", completionSource: "user", confidence: 0.5,
@@ -277,6 +295,7 @@ describe.each(["shadow", "enforce"])("vault evidence writes in %s mode", (mode) 
     expect(created).toBe(true);
     expect(await read(checkId)).toMatchObject(args);
     expect((await score(own.personId))?.operation.missingCritical).toContain(args.checkKey);
+    expect(await reviewTimes()).toEqual([100]);
 
     const edited = { ...args, status: "complete" as const, confidence: 0.9, lastReviewedAt: 200 };
     await refuses("researchChecks", writes.upsertResearchCheck, edited, {
@@ -292,9 +311,7 @@ describe.each(["shadow", "enforce"])("vault evidence writes in %s mode", (mode) 
       checkKey: args.checkKey, status: "complete", applicability: "required", lastReviewedAt: 200,
     });
     expect(updated?.operation.missingCritical).not.toContain(args.checkKey);
-    const reviews = await t.run(({ db }) => db.query("personScoreReviews")
-      .withIndex("by_record", (q) => q.eq("recordId", own.personId)).collect());
-    expect(reviews.map(({ reviewedAt }) => reviewedAt)).toEqual([200]);
+    expect(await reviewTimes()).toEqual([200]);
     await counts("researchChecks");
   });
 });
