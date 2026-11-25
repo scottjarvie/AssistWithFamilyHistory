@@ -27,32 +27,14 @@ import {
   matchesVaultOwner,
 } from "./vaultCore";
 
-const dateValidator = v.object({
-  original: v.string(),
-  formal: v.optional(v.string()),
-  year: v.optional(v.number()),
-  month: v.optional(v.number()),
-  day: v.optional(v.number()),
-  approximate: v.optional(v.boolean()),
-});
-
-const placeRefValidator = v.object({
-  original: v.string(),
-  placeId: v.optional(v.id("places")),
-});
-
-const factValidator = v.object({
-  date: v.optional(dateValidator),
-  place: v.optional(placeRefValidator),
-  description: v.optional(v.string()),
-});
-
-const relationshipFactValidator = v.object({
-  type: v.string(),
-  date: v.optional(dateValidator),
-  place: v.optional(placeRefValidator),
-  description: v.optional(v.string()),
-});
+import {
+  eventDateValidator,
+  eventEndDateValidator,
+  factValidator,
+  placeRefValidator,
+  relationshipFactValidator,
+  sourceFactFields,
+} from "./lib/validators";
 
 const firstStartPersonValidator = v.object({
   given: v.string(),
@@ -152,25 +134,6 @@ const researchPackCategoryBlockValidator = v.object({
 });
 
 const storyStatusValidator = v.union(v.literal("draft"), v.literal("review"), v.literal("published"));
-
-const sourceFactTypeValidator = v.union(
-  v.literal("name"),
-  v.literal("sex"),
-  v.literal("birth"),
-  v.literal("death"),
-  v.literal("marriage"),
-  v.literal("census_residence"),
-  v.literal("residence"),
-  v.literal("occupation"),
-  v.literal("other")
-);
-
-const sourceFactStatusValidator = v.union(
-  v.literal("candidate"),
-  v.literal("accepted"),
-  v.literal("conflict"),
-  v.literal("rejected")
-);
 
 const contextItemTypeValidator = v.union(
   v.literal("note"),
@@ -718,26 +681,8 @@ export const upsertEvent = mutation({
       v.literal("custom")
     ),
     customType: v.optional(v.string()),
-    date: v.optional(
-      v.object({
-        original: v.string(),
-        formal: v.optional(v.string()),
-        year: v.optional(v.number()),
-        month: v.optional(v.number()),
-        day: v.optional(v.number()),
-        approximate: v.optional(v.boolean()),
-        range: v.optional(v.boolean()),
-      })
-    ),
-    endDate: v.optional(
-      v.object({
-        original: v.string(),
-        formal: v.optional(v.string()),
-        year: v.optional(v.number()),
-        month: v.optional(v.number()),
-        day: v.optional(v.number()),
-      })
-    ),
+    date: v.optional(eventDateValidator),
+    endDate: v.optional(eventEndDateValidator),
     place: v.optional(placeRefValidator),
     description: v.optional(v.string()),
     notes: v.optional(v.string()),
@@ -1089,18 +1034,7 @@ export const upsertMedia = mutation({
 export const upsertSourceFact = mutation({
   args: {
     vaultOwnerId: v.string(),
-    personId: v.id("persons"),
-    sourceId: v.id("sources"),
-    citationId: v.id("citations"),
-    importKey: v.string(),
-    factType: sourceFactTypeValidator,
-    label: v.string(),
-    value: v.string(),
-    date: v.optional(v.string()),
-    place: v.optional(v.string()),
-    confidence: v.union(v.literal("high"), v.literal("medium"), v.literal("low")),
-    status: sourceFactStatusValidator,
-    conflictReason: v.optional(v.string()),
+    ...sourceFactFields,
   },
   handler: async (ctx, args) => {
     const { owner: vaultOwnerId } = await authorizeTenantMutation(

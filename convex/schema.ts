@@ -4,6 +4,14 @@ import { peopleExplorerPayload } from "../lib/vault/peopleExplorerValidator";
 import { defineSchema, defineTable } from "convex/server";
 import { usageLimitTables } from "./usageLimitsSchema";
 import { v } from "convex/values";
+import {
+  eventDateValidator,
+  eventEndDateValidator,
+  factValidator,
+  placeRefValidator,
+  relationshipFactValidator,
+  sourceFactFields,
+} from "./lib/validators";
 
 /**
  * Assist With Family History - Convex Schema
@@ -222,48 +230,8 @@ export default defineSchema({
     
     // Embedded common facts for fast reads (GEDCOM X: Facts)
     // These are duplicated in the events table for complex queries
-    birth: v.optional(
-      v.object({
-        date: v.optional(
-          v.object({
-            original: v.string(),               // "1 Jan 1900" (user-entered)
-            formal: v.optional(v.string()),     // "+1900-01-01" (GEDCOM X format)
-            year: v.optional(v.number()),
-            month: v.optional(v.number()),
-            day: v.optional(v.number()),
-            approximate: v.optional(v.boolean()),
-          })
-        ),
-        place: v.optional(
-          v.object({
-            original: v.string(),               // "Salt Lake City, Utah"
-            placeId: v.optional(v.id("places")),
-          })
-        ),
-        description: v.optional(v.string()),
-      })
-    ),
-    death: v.optional(
-      v.object({
-        date: v.optional(
-          v.object({
-            original: v.string(),
-            formal: v.optional(v.string()),
-            year: v.optional(v.number()),
-            month: v.optional(v.number()),
-            day: v.optional(v.number()),
-            approximate: v.optional(v.boolean()),
-          })
-        ),
-        place: v.optional(
-          v.object({
-            original: v.string(),
-            placeId: v.optional(v.id("places")),
-          })
-        ),
-        description: v.optional(v.string()),
-      })
-    ),
+    birth: v.optional(factValidator),
+    death: v.optional(factValidator),
     
     // Research tracking
     researchStatus: v.union(
@@ -356,30 +324,7 @@ export default defineSchema({
     person2: v.id("persons"),                   // Child or Spouse2
     
     // Relationship facts (e.g., marriage date/place for Couple relationships)
-    facts: v.optional(
-      v.array(
-        v.object({
-          type: v.string(),                     // "Marriage", "Divorce", "Annulment", etc.
-          date: v.optional(
-            v.object({
-              original: v.string(),
-              formal: v.optional(v.string()),
-              year: v.optional(v.number()),
-              month: v.optional(v.number()),
-              day: v.optional(v.number()),
-              approximate: v.optional(v.boolean()),
-            })
-          ),
-          place: v.optional(
-            v.object({
-              original: v.string(),
-              placeId: v.optional(v.id("places")),
-            })
-          ),
-          description: v.optional(v.string()),
-        })
-      )
-    ),
+    facts: v.optional(v.array(relationshipFactValidator)),
     
     // FamilySearch integration
     familySearchId: v.optional(v.string()),
@@ -454,34 +399,11 @@ export default defineSchema({
     customType: v.optional(v.string()),
     
     // Date information
-    date: v.optional(
-      v.object({
-        original: v.string(),
-        formal: v.optional(v.string()),
-        year: v.optional(v.number()),
-        month: v.optional(v.number()),
-        day: v.optional(v.number()),
-        approximate: v.optional(v.boolean()),
-        range: v.optional(v.boolean()),
-      })
-    ),
-    endDate: v.optional(
-      v.object({
-        original: v.string(),
-        formal: v.optional(v.string()),
-        year: v.optional(v.number()),
-        month: v.optional(v.number()),
-        day: v.optional(v.number()),
-      })
-    ),
+    date: v.optional(eventDateValidator),
+    endDate: v.optional(eventEndDateValidator),
     
     // Location and details
-    place: v.optional(
-      v.object({
-        original: v.string(),
-        placeId: v.optional(v.id("places")),
-      })
-    ),
+    place: v.optional(placeRefValidator),
     description: v.optional(v.string()),
     notes: v.optional(v.string()),
     importKey: v.optional(v.string()),
@@ -681,10 +603,7 @@ export default defineSchema({
     // elsewhere. Text bodies (transcriptions, indexed fields, translations,
     // AI readings) live in sourceContents, each attributed to who made it.
     recordDate: v.optional(v.string()),
-    recordPlace: v.optional(v.object({
-      original: v.string(),
-      placeId: v.optional(v.id("places")),
-    })),
+    recordPlace: v.optional(placeRefValidator),
     language: v.optional(v.string()),
     citationText: v.optional(v.string()),
     imageUrl: v.optional(v.string()),
@@ -798,33 +717,7 @@ export default defineSchema({
    */
   sourceFacts: defineTable({
     vaultOwnerId: v.optional(v.string()),
-    personId: v.id("persons"),
-    sourceId: v.id("sources"),
-    citationId: v.id("citations"),
-    importKey: v.string(),
-    factType: v.union(
-      v.literal("name"),
-      v.literal("sex"),
-      v.literal("birth"),
-      v.literal("death"),
-      v.literal("marriage"),
-      v.literal("census_residence"),
-      v.literal("residence"),
-      v.literal("occupation"),
-      v.literal("other")
-    ),
-    label: v.string(),
-    value: v.string(),
-    date: v.optional(v.string()),
-    place: v.optional(v.string()),
-    confidence: v.union(v.literal("high"), v.literal("medium"), v.literal("low")),
-    status: v.union(
-      v.literal("candidate"),
-      v.literal("accepted"),
-      v.literal("conflict"),
-      v.literal("rejected")
-    ),
-    conflictReason: v.optional(v.string()),
+    ...sourceFactFields,
     // Claim detail: the exact words in the source this claim rests on, whether
     // the informant likely had first-hand knowledge, and which person in the
     // record (persona) it was read from.
