@@ -297,12 +297,13 @@ export const getEvidenceBatch = internalQuery({
         } else if (row.storageId) {
           const mimeType = row.mimeType?.toLowerCase() ?? "";
           const clean = mimeType.startsWith("image/");
+          const webm = mimeType.split(";", 1)[0].trim() === "video/webm";
           const limit = clean ? WEBSITE_PHOTO_MAX_BYTES : FAMILY_HISTORY_MCP_LIMITS.evidencePerItemBytes;
           const file = await ctx.db.system.get(row.storageId);
           if ((row.sizeBytes ?? 0) > limit || (file?.size ?? 0) > limit) {
             skipped.push(skip(item.id, item.kind, "TOO_LARGE"));
           } else if (!file || file.size <= 0 || (file.contentType && file.contentType.toLowerCase() !== mimeType) ||
-              !(clean ? WEBSITE_IMAGE_FORMATS.has(mimeType) : isAcceptedMediaUploadType(mimeType))) {
+              !(clean ? WEBSITE_IMAGE_FORMATS.has(mimeType) : webm || isAcceptedMediaUploadType(mimeType))) {
             skipped.push(skip(item.id, item.kind, clean ? "CLEAN_COPY_UNAVAILABLE" : "BYTES_NOT_AVAILABLE"));
           } else {
             stored.push({ ...common, storageId: row.storageId, mimeType, sizeBytes: file.size, clean });

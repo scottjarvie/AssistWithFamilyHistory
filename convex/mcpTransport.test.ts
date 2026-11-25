@@ -809,13 +809,19 @@ test("the exact-original relay uses Backblaze server-side and respects a cleaned
   const { sha256Hex } = await import("../lib/media/evidenceB2");
   const onTiny = vi.fn<() => Promise<void>>();
   const b2Reads: string[] = [];
+  let returnWrongMediumBytes = false;
   const relayFetch = vi.fn(async (input: string | URL | Request, options?: RequestInit) => {
     const url = new URL(input instanceof Request ? input.url : input);
     if (url.hostname.endsWith("b2.synthetic.example.test")) {
       expect(options?.redirect).toBe("error");
       const object = url.pathname.split("/").at(-1)!;
       b2Reads.push(object);
-      if (object === "medium") return new Response("Missing copy", { status: 404 });
+      if (object === "medium") {
+        if (!returnWrongMediumBytes) return new Response("Missing copy", { status: 404 });
+        const wrongBytes = tinyBytes.slice();
+        wrongBytes[wrongBytes.length - 1] ^= 1;
+        return new Response(wrongBytes);
+      }
       if (object === "tiny") {
         await onTiny();
         return new Response(tinyBytes);
@@ -844,6 +850,17 @@ test("the exact-original relay uses Backblaze server-side and respects a cleaned
   expect(response.headers.get("location")).toBeNull();
   expect(await response.text()).toBe("exact B2 synthetic bytes");
 
+  await t.run(ctx => ctx.db.patch(mediaId, { b2Original: { ...manifest, contentType: "image/tiff" } }));
+  b2Reads.length = 0;
+  const noCopy = (await (await t.fetch("/mcp", modernRequest("tools/call", token, {
+    name: "family_history_get_evidence", arguments: { items: [{ kind: "media", id: mediaId }] },
+  }, "family_history_get_evidence"))).json()).result;
+  expect(noCopy.structuredContent.skipped).toMatchObject([{ reason: "CLEAN_COPY_UNAVAILABLE" }]);
+  expect(noCopy.content.every((block: { type: string }) => block.type === "text")).toBe(true);
+  expect(b2Reads).toEqual([]);
+  const explicitOriginal = (await (await read()).json()).result.structuredContent.original.url;
+  expect(new URL(explicitOriginal).hostname).toBe(new URL(resource).hostname);
+
   await t.run(ctx => ctx.db.patch(mediaId, { b2Renditions: { tiny: manifest, medium: manifest, large: manifest } }));
   expect((await t.fetch(link.pathname)).status).toBe(404);
   const refused = await (await read()).json();
@@ -867,6 +884,12 @@ test("the exact-original relay uses Backblaze server-side and respects a cleaned
   b2Reads.length = 0;
   expect((await inline()).result.structuredContent.delivered).toMatchObject([{ label: "Smaller copy." }]);
   expect(b2Reads).toEqual(["medium", "tiny"]);
+  returnWrongMediumBytes = true;
+  b2Reads.length = 0;
+  const wrongVersion = (await inline()).result;
+  expect(b2Reads).toEqual(["medium", "tiny"]);
+  expect(wrongVersion.structuredContent.delivered).toMatchObject([{ label: "Smaller copy." }]);
+  expect(wrongVersion.content[0]).toMatchObject({ type: "image", data: Buffer.from(tinyBytes).toString("base64") });
   onTiny.mockImplementation(async () => t.run(ctx => ctx.db.patch(ctx.db.normalizeId("mcpGrants", grantId)!, { pausedAt: Date.now() })));
   const interrupted = (await inline()).result;
   expect(interrupted.isError).toBe(true);
@@ -961,6 +984,57 @@ test("website photos are cleaned on demand and paged with inline documents and f
   await t.run(ctx => ctx.db.patch(mediaId, { aiUseAllowed: false }));
   const denied = (await read([{ kind: "media", id: mediaId }])).result;
   expect(denied.structuredContent).toMatchObject({ delivered: [], skipped: [{ reason: "AI_USE_NOT_ALLOWED" }] });
+  expect(denied.content.every((block: { type: string }) => block.type === "text")).toBe(true);
+});
+
+test("website WebM and UTF-16 evidence keeps its exact bytes after type checks", async () => {
+  const t = convexTest(schema, modules);
+  await approvedConnection(t);
+  const files = [
+    { type: "video", mimeType: "video/webm;codecs=vp9", bytes: new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 0x87, 0x42, 0x82, 0x84, 0x77, 0x65, 0x62, 0x6d]), allowed: true },
+    { type: "document", mimeType: "text/plain", bytes: new Uint8Array([0xff, 0xfe, 0x41, 0, 0x0a, 0]), allowed: true },
+    { type: "document", mimeType: "text/plain", bytes: new Uint8Array([0xfe, 0xff, 0, 0x41, 0, 0x0a]), allowed: true },
+    { type: "document", mimeType: "text/plain", bytes: new Uint8Array([0xff, 0xfe, 0, 0]), allowed: false },
+    { type: "document", mimeType: "text/plain", bytes: new Uint8Array([0xfe, 0xff, 0x41]), allowed: false },
+    { type: "video", mimeType: "video/webm;codecs=vp9", bytes: new TextEncoder().encode("not WebM"), allowed: false },
+  ] as const;
+  const items = await t.run(async ctx => Promise.all(files.map(async file => ({
+    kind: "media",
+    id: await ctx.db.insert("media", {
+      vaultOwnerId: SUBJECT, type: file.type, title: "Synthetic website evidence", personIds: [],
+      storageId: await ctx.storage.store(new Blob([file.bytes], { type: file.mimeType })),
+      mimeType: file.mimeType, reviewStatus: "reviewed", aiUseAllowed: true, rightsStatus: "owned", createdAt: 1, updatedAt: 1,
+    }),
+  }))));
+  const token = await accessToken();
+  const read = async () => (await t.fetch("/mcp", modernRequest("tools/call", token, {
+    name: "family_history_get_evidence", arguments: { items },
+  }, "family_history_get_evidence"))).json();
+  const { result } = await read();
+
+  const resources = result.content.filter((block: { type: string }) => block.type === "resource");
+  expect(resources).toEqual(files.flatMap((file, index) => file.allowed ? [{
+    type: "resource",
+    resource: {
+      uri: `familyhistory://media/${items[index].id}`,
+      mimeType: file.mimeType,
+      blob: Buffer.from(file.bytes).toString("base64"),
+    },
+  }] : []));
+  expect(result.structuredContent.skipped).toMatchObject(files.flatMap((file, index) =>
+    file.allowed ? [] : [{ id: items[index].id, reason: "BYTES_NOT_AVAILABLE" }],
+  ));
+
+  await t.run(async ctx => {
+    for (const [index, item] of items.entries()) {
+      if (files[index].allowed) await ctx.db.patch(item.id, { aiUseAllowed: false });
+    }
+  });
+  const denied = (await read()).result;
+  expect(denied.structuredContent.delivered).toEqual([]);
+  expect(denied.structuredContent.skipped).toEqual(expect.arrayContaining(files.flatMap((file, index) =>
+    file.allowed ? [expect.objectContaining({ id: items[index].id, reason: "AI_USE_NOT_ALLOWED" })] : [],
+  )));
   expect(denied.content.every((block: { type: string }) => block.type === "text")).toBe(true);
 });
 

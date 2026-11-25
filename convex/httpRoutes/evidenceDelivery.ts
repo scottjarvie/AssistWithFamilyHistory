@@ -69,15 +69,37 @@ async function readExactResponse(response: Response, size: number): Promise<Uint
   }
 }
 
+function isBomMarkedUtf16Text(bytes: Uint8Array): boolean {
+  const encoding = bytes[0] === 0xff && bytes[1] === 0xfe ? "utf-16le"
+    : bytes[0] === 0xfe && bytes[1] === 0xff ? "utf-16be" : null;
+  if (!encoding) return false;
+  try {
+    const text = new TextDecoder(encoding, { fatal: true }).decode(bytes);
+    for (let index = 0; index < text.length; index++) {
+      const code = text.charCodeAt(index);
+      if (code < 0x20 && (code < 0x09 || code > 0x0d)) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function matchesStoredFileType(bytes: Uint8Array, mimeType: string) {
   // Website uploads are not all decoded at upload time. An image submitted
   // under another MIME type must not get the exact non-image path.
+  const baseMimeType = mimeType.split(";", 1)[0].trim().toLowerCase();
   const sniffed = sniffEvidenceFile(bytes);
-  if (!mimeType.startsWith("video/")) return sniffed === (normalizeAudioMime(mimeType) || mimeType);
+  if (baseMimeType === "text/plain") {
+    return sniffed === "text/plain" || (sniffed === null && isBomMarkedUtf16Text(bytes));
+  }
+  if (!baseMimeType.startsWith("video/")) {
+    return sniffed === (normalizeAudioMime(baseMimeType) || baseMimeType);
+  }
   const header = String.fromCharCode(...bytes.subarray(0, 12));
-  if (mimeType === "video/webm") return sniffed === "audio/webm";
-  if (mimeType === "video/mp4") return sniffed === "audio/mp4";
-  return mimeType === "video/quicktime" && bytes.length >= 12 &&
+  if (baseMimeType === "video/webm") return sniffed === "audio/webm";
+  if (baseMimeType === "video/mp4") return sniffed === "audio/mp4";
+  return baseMimeType === "video/quicktime" && bytes.length >= 12 &&
     ["ftypqt  ", "moov", "mdat", "wide"].some(tag => header.startsWith(tag, 4));
 }
 
