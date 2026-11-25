@@ -1,0 +1,200 @@
+{
+  "report": "structure-map",
+  "repo": "scottjarvie/AssistWithFamilyHistory",
+  "date": "2026-11-24",
+  "commit": "40a93cf",
+  "companion": "docs/audits/structure/2026-11-24.md",
+  "relatedAudits": ["docs/audits/code/2026-11-24.md", "docs/audits/ai-readiness/2026-11-24.md"],
+  "verdict": {
+    "summary": "Moderate distance: about two weeks of short, careful threads, not a rebuild. Four backend files of 2,200-2,800 lines; three of them do five or six jobs each. One decision from Scott (N0) unlocks most of the remaining split work.",
+    "topReasons": [
+      "People are written in five live places (plus two dead copies); F15 was in one copy.",
+      "Privacy guards are source-text checks at fixed file paths; several assert absence between two function names and would pass vacuously after a move.",
+      "One idea, several names: 'operations' has three meanings, 'connections' two, and there are two queues, with no name map."
+    ]
+  },
+  "census": {
+    "method": "git ls-files; line count of every tracked text file (final line without newline counts); binaries excluded. Classes: generated-or-data = convex/_generated, pnpm-lock.yaml, .json/.yaml/.yml/.toml, fixture files; stylesheet = .css; test = *.test.*, *.spec.*, tests/, scripts/test-*; hand-written = remaining .ts/.tsx/.js/.mjs/.cjs/.sh/.py; docs = .md/.html.",
+    "classes": {
+      "handWritten": { "files": 539, "lines": 82436, "over500": 33, "over1000": 11, "over2000": 4, "over4000": 0 },
+      "generatedOrData": { "files": 121, "lines": 20655, "over500": 6, "over1000": 1, "over2000": 1, "over4000": 1 },
+      "stylesheets": { "files": 4, "lines": 1203, "over500": 1, "over1000": 0, "over2000": 0, "over4000": 0 },
+      "tests": { "files": 101, "lines": 16909, "over500": 5, "over1000": 0, "over2000": 0, "over4000": 0 },
+      "docs": { "files": 248, "lines": 30525, "over500": 8, "over1000": 1, "over2000": 0, "over4000": 0 }
+    },
+    "notes": [
+      "Only file over 4,000 lines: pnpm-lock.yaml (7,445).",
+      "Largest test: convex/mcpTransport.test.ts (875).",
+      "Dense files that behave like 1,500-line files: components/queue/QueueWorkspace.tsx (773 lines, 52 KB, longest line 1,108), components/vault/StoryReviewView.tsx (554, 40 KB, longest 3,025), components/vault/PersonWorkspaceView.tsx (574, 37 KB), lib/mcp/catalog.ts (528, 32 KB, longest 2,230). AIR-09 (formatter) addresses these."
+    ]
+  },
+  "bigFiles": [
+    {
+      "path": "convex/vaultMutations.ts", "lines": 2794, "commits90d": 15, "users": 30, "usersTestsOrScripts": 14,
+      "jobs": ["person and first-start writes :314-555", "evidence writes (sources, citations, events, person-events, relationships, source facts) :556-958, :1089-1170", "media upload/attach/review :959-1088, :1171-1406, :2741-2794", "context items and historical context :1407-1480, :1987-2124", "stories :1538-1986", "research checks, tasks, provisional relatives :1481-1537, :2125-2740"],
+      "action": "split",
+      "targets": ["convex/lib/vaultWrites/evidence.ts (SAFE)", "convex/lib/vaultWrites/research.ts (SAFE)", "convex/lib/vaultWrites/people.ts (NEEDS SCOTT)", "convex/lib/vaultWrites/stories.ts (NEEDS SCOTT)", "convex/lib/vaultWrites/media.ts (NEEDS SCOTT)", "convex/lib/vaultWrites/context.ts (NEEDS SCOTT)"],
+      "benefit": "Six jobs that change and are tested separately; a story-review change loads 2,794 lines to edit 450. Registered exports stay (api.vaultMutations.* paths used by 14 API routes and 13 tests).",
+      "class": "partly SAFE, partly NEEDS SCOTT", "size": "L", "risk": "medium",
+      "unguardedExports": ["upsertEvent", "upsertPersonEvent", "upsertRelationship", "upsertSourceFact", "upsertContextItemForPerson", "ensureResearchTask", "createResearchTask", "upsertResearchCheck", "upsertHistoricalContext", "upsertProvisionalRelative", "promoteProvisionalRelative", "mergeProvisionalRelative", "assignStoryReviewer", "recordStoryReviewEvent"]
+    },
+    {
+      "path": "convex/vault.ts", "lines": 2374, "commits90d": 14, "users": 32, "usersTestsOrScripts": 18,
+      "jobs": ["snapshot loading :21-305, :1150-1533", "person assembly :309-500, :1009-1149", "privacy and publish gates :503-717", "story bundles incl. public allowlist :718-1008, :1639-1681", "22 query exports :1534-2374"],
+      "action": "split",
+      "targets": ["convex/lib/vaultSnapshot.ts (SAFE)", "convex/lib/personAssembly.ts (SAFE)", "convex/lib/storyBundles.ts (NEEDS SCOTT)"],
+      "benefit": "21 files import its helpers, mostly the snapshot loaders; they get a reusable home with their parity tests. Re-export from vault.ts so importers do not change.",
+      "class": "partly SAFE, partly NEEDS SCOTT", "size": "L", "risk": "medium",
+      "overlap": "R01 rewrites the person-workspace loader; split after it."
+    },
+    {
+      "path": "convex/schema.ts", "lines": 2325, "commits90d": 26, "users": 51, "usersTestsOrScripts": 51,
+      "jobs": ["catalogue of 57 tables"],
+      "action": "leave; extract shared validators",
+      "reason": "One job; tables are found by name; parallel edits touch different hunks. The date/place shape is repeated 8 times here, 4 in vaultMutations.ts, once in Zod in httpRoutes/mcp.ts.",
+      "targets": ["convex/lib/validators.ts"],
+      "class": "SAFE", "size": "S", "risk": "low"
+    },
+    {
+      "path": "convex/mcpFamilyHistory.ts", "lines": 2233, "commits90d": 18, "users": 14, "usersTestsOrScripts": 13,
+      "jobs": ["operation envelope: receipts, provenance, story-exposure re-check :22-515", "record writers :516-1411", "read tools :1412-1706", "batch saving :1795-2047", "registered exports"],
+      "action": "split (partly)",
+      "targets": ["convex/lib/mcpWrites/receipts.ts (SAFE)", "convex/lib/mcpWrites/records.ts (SAFE: place, topic, connection, persona, source content)", "operation(), person/story writers, read tools (NEEDS SCOTT)"],
+      "benefit": "124 KB, largest file by size; a connector change today means reading every record type.",
+      "class": "partly SAFE, partly NEEDS SCOTT", "size": "M", "risk": "medium",
+      "overlap": "Second pass replaces machineError (:50) and likely the cleaners (:54-75)."
+    },
+    {
+      "path": "convex/queue.ts", "lines": 1563, "commits90d": 5, "users": 12, "usersTestsOrScripts": 7,
+      "jobs": ["Queue item lifecycle and authority"],
+      "action": "leave; one rename",
+      "reason": "One job, low churn, well tested. Local authorizeTenantMutation (:99) shadows access.ts export with different behaviour.",
+      "class": "SAFE", "size": "S", "risk": "low"
+    },
+    {
+      "path": "convex/mcpGrants.ts", "lines": 1401, "commits90d": 8, "users": 14, "usersTestsOrScripts": 8,
+      "jobs": ["AI connection authority"],
+      "action": "leave",
+      "reason": "One job; all access logic (needs Scott for any change); six test files.",
+      "class": "n/a", "size": "none", "risk": "none"
+    },
+    {
+      "path": "convex/httpRoutes/mcp.ts", "lines": 1294, "commits90d": 25, "users": 2, "usersTestsOrScripts": 1,
+      "jobs": ["OAuth discovery and token checks :54-238", "Zod tool input schemas :265-614", "tool registration :647-1152", "request handler :1153-1298"],
+      "action": "split one part",
+      "targets": ["convex/httpRoutes/mcpInputSchemas.ts"],
+      "benefit": "Input schemas are the AI-facing contract, change with tool design not transport, and are pure values. OAuth stays (sign-in code).",
+      "class": "SAFE", "size": "M", "risk": "low",
+      "overlap": "High: connector rule file changes toolResult/toolError (:239-264) and limits."
+    },
+    {
+      "path": "convex/lib/media/audio.ts", "lines": 1232, "commits90d": 1, "users": 10, "usersTestsOrScripts": 1,
+      "jobs": ["synced Assist audio core"],
+      "action": "leave", "reason": "Synced copy from assistwithlife; header says do not edit here.",
+      "class": "n/a", "size": "none", "risk": "none"
+    },
+    {
+      "path": "components/design/BaselineAiConnectionCenter.tsx", "lines": 1138, "commits90d": 2, "users": 1, "usersTestsOrScripts": 0,
+      "jobs": ["frozen before-copy for dev-only design preview"],
+      "action": "move", "targets": ["components/design-preview/"], "reason": "AIR-04 move (pull request 168 only named it in AGENTS.md). Deletion needs Scott.",
+      "class": "SAFE", "size": "S", "risk": "low"
+    },
+    {
+      "path": "scripts/tracker-build.mjs", "lines": 1119, "commits90d": 2, "users": 0, "usersTestsOrScripts": 0,
+      "jobs": ["render tracker board and guide HTML"],
+      "action": "leave", "reason": "One job, rarely changes; run from package.json.",
+      "class": "n/a", "size": "none", "risk": "none"
+    },
+    {
+      "path": "components/ai/AiConnectionCenter.tsx", "lines": 1102, "commits90d": 6, "users": 2, "usersTestsOrScripts": 1,
+      "jobs": ["AI Connections screen"],
+      "action": "leave", "reason": "One screen, already divided into named sub-components; changes are wording and access (Scott's). Long lines are the issue (AIR-09).",
+      "class": "n/a", "size": "none", "risk": "none"
+    }
+  ],
+  "organisationProblems": [
+    { "id": "O1", "title": "People are written in five live places", "evidence": ["convex/vaultMutations.ts:420", "convex/vaultMutations.ts:515", "convex/vaultMutations.ts:526", "convex/vaultMutations.ts:2623", "convex/mcpFamilyHistory.ts:530", "convex/helpers.ts:53 (dead)", "convex/persons.ts:87 (dead)"], "class": "NEEDS SCOTT", "step": "N6" },
+    { "id": "O2", "title": "Living rule written three ways in about 15 places", "evidence": ["convex/vault.ts:988,1728,1749,1780 (person.living)", "convex/mcpEvidence.ts:241 (living !== false)", "convex/mcpFamilyHistory.ts:1620 (living === false)", "convex/schema.ts:207 (required boolean)"], "class": "NEEDS SCOTT", "step": "N7" },
+    { "id": "O3", "title": "Date/place validator shape written out 13 times", "evidence": ["convex/schema.ts (8)", "convex/vaultMutations.ts:30-55 (4)", "convex/httpRoutes/mcp.ts:269-279 (Zod)"], "class": "SAFE", "step": "S3,S4" },
+    { "id": "O4", "title": "machineError defined three times", "evidence": ["convex/mcpFamilyHistory.ts:50", "convex/mcpGrants.ts:59", "convex/mediaEvidenceControl.ts:62"], "class": "second pass", "step": null },
+    { "id": "O5", "title": "Two different functions named authorizeTenantMutation", "evidence": ["convex/access.ts:119", "convex/queue.ts:99"], "class": "SAFE", "step": "S5" },
+    {
+      "id": "O6", "title": "One idea, several names", "class": "SAFE (glossary only)", "step": "S8",
+      "nameMap": [
+        { "idea": "An AI's access", "backend": ["mcpGrants", "mcpGrantHistory", "mcpCarriedRestrictions", "convex/mcpGrants.ts"], "connector": ["family_history_connection", "family_history_limit_connection"], "screens": ["AI Connections", "Connect your AI", "AiConnectionCenter", "app/api/ai-connections"] },
+        { "idea": "A link between two records", "backend": ["connections table", "placeMediaConnectionEdges"], "connector": ["connection record kind"], "screens": [] },
+        { "idea": "Hand-offs to and from AI", "backend": ["queueItems", "convex/queue.ts"], "connector": ["family_history_*_queue"], "screens": ["Your Queue", "/app/queue", "/app/suggestions (redirect)"] },
+        { "idea": "Research to-dos", "backend": ["researchTasks", "researchChecks", "provisionalRelatives", "vault.getOperationsQueue", "buildPersonOperations"], "connector": ["save_research_work (task)"], "screens": ["Research Queue at /app/operations", "components/operations", "lib/operations", "app/api/operations"] },
+        { "idea": "Research history", "backend": ["researchLog"], "connector": ["finding"], "screens": ["Research Log", "/app/research"] },
+        { "idea": "Retry receipts", "backend": ["mcpOperations", "queueCommandReceipts"], "connector": ["operationId"], "screens": [] },
+        { "idea": "Evidence", "backend": ["sources", "citations", "citationLinks", "sourceFacts", "sourceContents", "recordPersonas", "documents"], "connector": ["source evidence", "add_source_content"], "screens": ["Imports", "Library", "Archive", "source-docs folder"] },
+        { "idea": "Background material", "backend": ["contextItems (loose context)", "historicalContext (research packs, context pack)", "topics"], "connector": ["topic"], "screens": ["Context and Research tabs"] },
+        { "idea": "Stories", "backend": ["stories", "storyReviewEvents"], "connector": ["story work"], "screens": ["Story Studio", "Story Writer"] },
+        { "idea": "Usage by AI", "backend": ["agentActivity", "apiKeys"], "connector": ["per-call activity"], "screens": ["API Center", "/app/api"] }
+      ]
+    },
+    { "id": "O7", "title": "Folders whose names mislead", "evidence": ["app/app/source-docs/[personId]/* holds code for /app/people/[id]/ai|raw|contextualized", "features/ is mostly tests plus source-doc helpers", "components/v2/admin/ is usage-limit operator screens", "dead convex/events.ts, sources.ts, persons.ts, relationships.ts (AIR-03 open)", "scripts/legacy/ still present (15 files)"], "class": "SAFE", "step": "S6" },
+    { "id": "O8", "title": "Generated or data files that look hand-written", "evidence": ["docs/tracker/board.html (1.1 MB, one 398,475-character line)", "docs/tracker/guide.html", "docs/api/capability-manifest.json", "scripts/record-only-action-hashes.json", "components/design/fixtures/*.json", "features/aiUpload/*Baseline.json", "convex/lib/media/audio.ts (synced)"], "class": "SAFE", "step": "S7" },
+    { "id": "O9", "title": "Checks that read code at fixed file paths", "evidence": ["vaultMutations.ts read by 7", "vault.ts read by 7", "schema.ts read by 8", "httpRoutes/mcp.ts read by 2", "scripts/check-media-bytes.ts:57-73 slices between two export names and asserts absence"], "class": "SAFE", "step": "S1" },
+    { "id": "O10", "title": "Untyped backend references", "evidence": ["convex/httpRoutes/mcp.ts:40-45", "convex/mcpClientTrust.ts"], "class": "SAFE", "step": "S2" }
+  ],
+  "plan": {
+    "startsAfter": "second pass (convex/lib/mcpConnector/contract.ts adoption and unreached safe items). If not covered there, do AIR-03, AIR-04 move, AIR-09, R01 first, in that order.",
+    "supersedes": "AIR-10 split list",
+    "sharedCheck": "pnpm verify",
+    "steps": [
+      { "id": "S1", "what": "Harden source-text checks (anchors must be found; read the set of files a concern can live in)", "files": ["scripts/check-media-bytes.ts", "scripts/check-story-slugs.ts", "scripts/check-loose-context-contract.ts", "scripts/check-privacy-ai-safety.ts", "scripts/check-context-pack-contract.ts", "scripts/check-private-first-start.tsx", "scripts/check-public-story-policy.ts", "scripts/check-mcp-contract.ts", "scripts/check-queue-foundation.ts"], "dependsOn": ["second pass"], "proof": "All checks pass; removing an anchor locally fails loudly.", "class": "SAFE", "size": "M", "touchesSecondPassFiles": true },
+      { "id": "S2", "what": "Typed internal.X instead of (internal as any).X", "files": ["convex/httpRoutes/mcp.ts", "convex/mcpClientTrust.ts"], "dependsOn": ["second pass"], "proof": "typecheck; mcpTransport.test.ts; mcpClientTrust.test.ts", "class": "SAFE", "size": "S", "touchesSecondPassFiles": true },
+      { "id": "S3", "what": "Pin schema shape with a serialised-validator snapshot test", "files": ["convex/schemaShape.test.ts (new)"], "dependsOn": [], "proof": "New test passes on unchanged main.", "class": "SAFE", "size": "S", "touchesSecondPassFiles": false },
+      { "id": "S4", "what": "Extract shared date/place/fact validators", "files": ["convex/lib/validators.ts (new)", "convex/schema.ts", "convex/vaultMutations.ts"], "dependsOn": ["S3"], "proof": "S3 snapshot unchanged; convex tests.", "class": "SAFE", "size": "S", "touchesSecondPassFiles": false },
+      { "id": "S5", "what": "Rename Queue's local authorizeTenantMutation", "files": ["convex/queue.ts"], "dependsOn": [], "proof": "queue.test.ts; ownerScoping.test.ts; features/queue-routes.test.ts", "class": "SAFE", "size": "S", "touchesSecondPassFiles": false },
+      { "id": "S6", "what": "Move person ai/raw/contextualized pages into app/app/people/[personId]; source-docs re-exports", "files": ["app/app/source-docs/[personId]/*", "app/app/people/[personId]/{ai,raw,contextualized}/page.tsx"], "dependsOn": [], "proof": "build; check-capture-import-surface; both addresses open locally.", "class": "SAFE", "size": "S", "touchesSecondPassFiles": false },
+      { "id": "S7", "what": "Mark generated files; keep searches out of the tracker board", "files": [".gitattributes (new)", ".ignore (new)"], "dependsOn": [], "proof": "pnpm verify", "class": "SAFE", "size": "S", "touchesSecondPassFiles": false },
+      { "id": "S8", "what": "Name glossary in backend README", "files": ["convex/README.md"], "dependsOn": [], "proof": "docs only", "class": "SAFE", "size": "S", "touchesSecondPassFiles": false },
+      { "id": "S9", "what": "Move snapshot loaders out of vault.ts (re-exported)", "files": ["convex/lib/vaultSnapshot.ts (new)", "convex/vault.ts"], "dependsOn": ["S1", "R01 if queued"], "proof": "scripts/test-person-snapshot-parity.ts; scripts/test-context-coverage-parity.ts; firstStartReadBudget.test.ts; vaultPagesB.test.ts; dashboard.test.ts", "class": "SAFE", "size": "M", "touchesSecondPassFiles": false },
+      { "id": "S10", "what": "Move person assembly out of vault.ts", "files": ["convex/lib/personAssembly.ts (new)", "convex/vault.ts"], "dependsOn": ["S9"], "proof": "test-person-snapshot-parity.ts; personScores.test.ts; peopleExplorer.test.ts; dashboard.test.ts", "class": "SAFE", "size": "M", "touchesSecondPassFiles": false },
+      { "id": "S11", "what": "Pin tests for unguarded evidence and research writers", "files": ["convex/vaultEvidenceWrites.test.ts (new)"], "dependsOn": ["S1"], "proof": "New tests pass on unchanged code, including search rows and counters.", "class": "SAFE", "size": "M", "touchesSecondPassFiles": false },
+      { "id": "S12", "what": "Move evidence writer bodies; thin exports stay", "files": ["convex/lib/vaultWrites/evidence.ts (new)", "convex/vaultMutations.ts"], "dependsOn": ["S4", "S11"], "proof": "S11 tests; searchPerformance.test.ts; peopleExplorer.test.ts; personHistory.test.ts", "class": "SAFE", "size": "M", "touchesSecondPassFiles": false },
+      { "id": "S13", "what": "Move research check and task bodies", "files": ["convex/lib/vaultWrites/research.ts (new)", "convex/vaultMutations.ts"], "dependsOn": ["S12"], "proof": "S11 tests; researchTasks.test.ts; researchPages.test.ts", "class": "SAFE", "size": "M", "touchesSecondPassFiles": false },
+      { "id": "S14", "what": "Move connector receipts and input cleaners", "files": ["convex/lib/mcpWrites/receipts.ts (new)", "convex/mcpFamilyHistory.ts"], "dependsOn": ["second pass", "S2"], "proof": "mcpBatch.test.ts; mcpProvenance.test.ts; mcpFamilyHistory.test.ts; mcpAcceptanceFixture.test.ts", "class": "SAFE", "size": "M", "touchesSecondPassFiles": true },
+      { "id": "S15", "what": "Move place/topic/connection/persona/source-content writers", "files": ["convex/lib/mcpWrites/records.ts (new)", "convex/mcpFamilyHistory.ts"], "dependsOn": ["S14"], "proof": "mcpBatch.test.ts; mcpOriginalRecords.test.ts; mcpFamilyHistory.test.ts", "class": "SAFE", "size": "M", "touchesSecondPassFiles": true },
+      { "id": "S16", "what": "Move tool input schemas out of the transport", "files": ["convex/httpRoutes/mcpInputSchemas.ts (new)", "convex/httpRoutes/mcp.ts", "scripts/check-mcp-contract.ts"], "dependsOn": ["second pass", "S1", "S2"], "proof": "mcpTransport.test.ts; mcpInputBudget.test.ts; check-mcp-contract; check-api-inventory", "class": "SAFE", "size": "M", "touchesSecondPassFiles": true }
+    ],
+    "batches": [
+      { "id": "A", "name": "Guards and small fixes", "steps": ["S1", "S3", "S4", "S5", "S6", "S7", "S8"], "parallelWith": [], "note": "Merge first." },
+      { "id": "B", "name": "Split vault.ts", "steps": ["S9", "S10"], "parallelWith": ["C", "D"] },
+      { "id": "C", "name": "Split vaultMutations.ts", "steps": ["S11", "S12", "S13"], "parallelWith": ["B", "D"] },
+      { "id": "D", "name": "Connector", "steps": ["S2", "S14", "S15", "S16"], "parallelWith": ["B", "C"] }
+    ],
+    "needsScott": [
+      { "id": "N0", "what": "Blanket approval for pure moves of living/privacy/publishing code when a pin test comes first, privacy checks are updated in the same commit, and pnpm verify passes", "recommendation": "yes", "unlocks": ["N1", "N2", "N3", "N4", "N5"] },
+      { "id": "N1", "what": "vault.ts privacy gates and story bundles to convex/lib/storyBundles.ts", "size": "M" },
+      { "id": "N2", "what": "vaultMutations.ts person, first-start, provisional-relative writes to convex/lib/vaultWrites/people.ts (pin tests first)", "size": "M" },
+      { "id": "N3", "what": "vaultMutations.ts story writes to convex/lib/vaultWrites/stories.ts", "size": "M" },
+      { "id": "N4", "what": "vaultMutations.ts media and context writes to convex/lib/vaultWrites/media.ts and context.ts", "size": "M" },
+      { "id": "N5", "what": "mcpFamilyHistory.ts operation(), person/story writers, read tools to convex/lib/mcpWrites/ and convex/lib/mcpReads.ts", "size": "M" },
+      { "id": "N6", "what": "One shared person writer for website, import, first start and AI (behaviour change)", "size": "L" },
+      { "id": "N7", "what": "One named living-person rule used everywhere", "size": "S" }
+    ],
+    "alreadyScottsFromEarlierAudits": ["AIR-04 delete frozen copies and design-council/", "AIR-03 drop familySearchSync table", "F10 owner enforcement and guest transfer"],
+    "totals": { "safeSteps": 16, "batches": 4, "needsScottSteps": 7, "safeThreadHours": 14, "needsScottThreadHours": 12 }
+  },
+  "goodShape": [
+    "Read/write layering (vaultReads -> vault; vaultMutations + searchServer builders) is documented and followed.",
+    "usageLimits.ts + lib/usageLimits/core.ts + usageLimitsSchema.ts is the pattern to copy.",
+    "Connector heavily tested (about 20 mcp*.test.ts); snapshot loaders have byte-for-byte parity tests.",
+    "queue.ts, mcpGrants.ts, schema.ts: long but coherent.",
+    "Synced audio core has a clear do-not-edit header and version hash.",
+    "AGENTS.md short, accurate, with a map.",
+    "CI lean: drafts skip, docs-only path check, one workflow."
+  ],
+  "couldNotVerify": [
+    "Whether pnpm verify passes today (nothing installed or run).",
+    "That the S3 schema snapshot can be read as serialised validator JSON.",
+    "Whether typed internal.X references (S2) hit TypeScript's depth limit.",
+    "Whether anything outside the repo calls researchTasks.claimResearchTask, advanceResearchTask or listResearchTasks (only a test does inside it).",
+    "Line ranges are at 40a93cf; the second pass will shift them.",
+    "Thread-hour estimates are rough."
+  ],
+  "briefFeedback": "Clear and well scoped; the open question of what the second pass includes (AIR-09, R01) forces the plan to hedge its starting point."
+}
