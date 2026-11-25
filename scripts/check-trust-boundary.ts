@@ -246,7 +246,7 @@ function verifiedLocalActionHelpers(sourceFile: ts.SourceFile): Set<string> {
   return helpers;
 }
 
-/** Recognize the Queue wrapper only when it awaits the website guard and returns the shared tenant decision. */
+/** Recognize the Queue wrapper only when it calls both shared guards with the original arguments. */
 function verifiedQueueMutationHelper(sourceFile: ts.SourceFile): string | null {
   const helper = sourceFile.statements.find(
     (statement): statement is ts.FunctionDeclaration =>
@@ -255,7 +255,14 @@ function verifiedQueueMutationHelper(sourceFile: ts.SourceFile): string | null {
       !ts.getModifiers(statement)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword),
   );
   const statements = helper?.body?.statements;
-  if (!statements || statements.length !== 2) return null;
+  if (!helper || !statements || statements.length !== 2 || helper.parameters.length !== 3) return null;
+
+  const parameters = helper.parameters.map((parameter) =>
+    ts.isIdentifier(parameter.name) && !parameter.initializer && !parameter.dotDotDotToken
+      ? parameter.name.text
+      : null,
+  );
+  if (parameters.some((name) => name === null)) return null;
 
   const [requirePerson, authorizeTenant] = statements;
   if (!ts.isExpressionStatement(requirePerson) || !ts.isAwaitExpression(requirePerson.expression) ||
@@ -266,8 +273,17 @@ function verifiedQueueMutationHelper(sourceFile: ts.SourceFile): string | null {
   if (!ts.isCallExpression(websiteCall) || !ts.isCallExpression(tenantCall)) return null;
 
   const accessImports = importedNames(sourceFile, ["./access"]);
-  return accessImports.get(callIdentifier(websiteCall) ?? "") === "requireWebsitePerson" &&
-    accessImports.get(callIdentifier(tenantCall) ?? "") === "authorizeTenantMutation"
+  const websiteGuard = callIdentifier(websiteCall) ?? "";
+  const tenantGuard = callIdentifier(tenantCall) ?? "";
+  const forwards = (call: ts.CallExpression, names: readonly (string | null)[]) =>
+    call.arguments.length === names.length &&
+    call.arguments.every((argument, index) => ts.isIdentifier(argument) && argument.text === names[index]);
+
+  return !parameters.includes(websiteGuard) && !parameters.includes(tenantGuard) &&
+    accessImports.get(websiteGuard) === "requireWebsitePerson" &&
+    accessImports.get(tenantGuard) === "authorizeTenantMutation" &&
+    forwards(websiteCall, parameters.slice(0, 1)) &&
+    forwards(tenantCall, parameters)
     ? QUEUE_MUTATION_HELPER
     : null;
 }
