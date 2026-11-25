@@ -23,7 +23,7 @@ import {
   type GrantResolution,
 } from "../../lib/mcp/authorize";
 import { effectiveScopes } from "../../lib/mcp/grantDefaults";
-import { EVIDENCE_SKIP_GUIDANCE } from "../mcpEvidence";
+import { deliverEvidence } from "./evidenceDelivery";
 import { buildInstructions } from "../lib/mcpConnector/contract";
 import { storyWorkForAi } from "../vault";
 import { buildOperationSummary, RESEARCH_CHECK_DEFINITIONS } from "../vaultCore";
@@ -43,7 +43,6 @@ const CANONICAL_ISSUER_HOST = "clerk.assistwithfamilyhistory.com";
 const mcp = (internal as any).mcpFamilyHistory;
 const vault = (internal as any).vault;
 const queue = (internal as any).queue;
-const evidence = (internal as any).mcpEvidence;
 const mediaEvidence = (internal as any).mediaEvidenceStorage;
 const grants = (internal as any).mcpGrants;
 
@@ -637,36 +636,6 @@ const batchStorySave = z.discriminatedUnion("mode", [
 
 /* --------------------------------------------------------- content encoding */
 
-function base64FromBytes(bytes: Uint8Array): string {
-  let binary = "";
-  const chunk = 0x8000;
-  for (let offset = 0; offset < bytes.length; offset += chunk) {
-    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunk));
-  }
-  return btoa(binary);
-}
-
-/**
- * Deliver evidence as MCP content blocks. The `uri` is an opaque product
- * reference, never the storage URL the bytes came from — handing a model a
- * private link is on the NEVER_EXPOSED list, and the whole reason this tool
- * exists is protected delivery instead of scraping.
- */
-function evidenceBlock(item: { id: string; kind: string; mimeType: string; title: string }, bytes: Uint8Array) {
-  const data = base64FromBytes(bytes);
-  if (item.mimeType.startsWith("image/")) {
-    return { type: "image" as const, data, mimeType: item.mimeType };
-  }
-  return {
-    type: "resource" as const,
-    resource: {
-      uri: `familyhistory://${item.kind}/${item.id}`,
-      mimeType: item.mimeType,
-      blob: data,
-    },
-  };
-}
-
 /* ------------------------------------------------------------------- server */
 
 export function createFamilyHistoryServer(
@@ -851,7 +820,8 @@ export function createFamilyHistoryServer(
         id,
       }).strict()).min(1).max(FAMILY_HISTORY_MCP_LIMITS.evidenceItems),
       delivery: z.literal("original").optional(),
-    }).strict().refine(input => !input.delivery || (input.items.length === 1 && input.items[0].kind === "media"), {
+      cursor: z.string().max(160).describe("Use nextCursor with the same items in the same order.").optional(),
+    }).strict().refine(input => !input.delivery || (input.cursor === undefined && input.items.length === 1 && input.items[0].kind === "media"), {
       message: "Request an exact original using one media item.",
     }),
     annotations: readOnly,
@@ -868,118 +838,13 @@ export function createFamilyHistoryServer(
           principal, grantId, mediaId, tokenHash: await hashMcpInput(token),
         });
         await touch("family_history_get_evidence");
-        if (!link) return toolResult({ delivered: [], skipped: [{ id: mediaId, kind: "media", reason: "ORIGINAL_UNAVAILABLE", whatToDo: "Request the usual evidence view if available. The original needs separate review when only a cleaned copy is approved." }] });
+        if (!link || !await actionCtx.runQuery(internal.mcpEvidence.resolveOriginalLink, { token })) {
+          return toolResult({ delivered: [], skipped: [{ id: mediaId, kind: "media", reason: "ORIGINAL_UNAVAILABLE", whatToDo: "Request the usual evidence view if available. The original needs separate review when only a cleaned copy is approved." }] });
+        }
         return toolResult({ id: mediaId, kind: "media", original: { url: new URL(`${EVIDENCE_ORIGINAL_PATH}${token}`, resource.origin).toString(), expiresAt: link.expiresAt } });
       }
-      const batch: any = await actionCtx.runQuery(evidence.getEvidenceBatch, {
-        principal,
-        grantId,
-        items: input.items,
-      });
-      const content: any[] = [];
-      const delivered: any[] = [];
-      const skipped: any[] = [...batch.skipped];
-      let spent = 0;
-
-      for (const item of batch.delivered) {
-        if (spent + item.sizeBytes > FAMILY_HISTORY_MCP_LIMITS.evidenceTotalBytes) {
-          skipped.push({
-            id: item.id,
-            kind: item.kind,
-            reason: "TOO_LARGE",
-            whatToDo: "This call's delivery budget ran out before this item. Ask for it in a second, smaller call.",
-          });
-          continue;
-        }
-        spent += item.sizeBytes;
-        content.push({ type: "text" as const, text: `# ${item.title}\n\n${item.text}` });
-        delivered.push({ id: item.id, kind: item.kind, title: item.title, mimeType: item.mimeType, sizeBytes: item.sizeBytes });
-      }
-
-      // Files the vault holds come first: they are the evidence a person
-      // deliberately put here, they are read straight out of private storage
-      // with no URL involved, and they are the only media path that reliably
-      // works. A scanned census page reaches the model as real image bytes.
-      for (const item of batch.stored) {
-        if (spent >= FAMILY_HISTORY_MCP_LIMITS.evidenceTotalBytes) {
-          skipped.push({
-            id: item.id,
-            kind: item.kind,
-            reason: "TOO_LARGE",
-            whatToDo: "This call's delivery budget ran out before this item. Ask for it in a second, smaller call.",
-          });
-          continue;
-        }
-        try {
-          const blob = await actionCtx.storage.get(item.storageId as any);
-          if (!blob) throw new Error("missing");
-          const bytes = new Uint8Array(await blob.arrayBuffer());
-          if (bytes.byteLength > FAMILY_HISTORY_MCP_LIMITS.evidencePerItemBytes) {
-            skipped.push({ id: item.id, kind: item.kind, reason: "TOO_LARGE", whatToDo: EVIDENCE_SKIP_GUIDANCE.TOO_LARGE });
-            continue;
-          }
-          if (spent + bytes.byteLength > FAMILY_HISTORY_MCP_LIMITS.evidenceTotalBytes) {
-            skipped.push({
-              id: item.id,
-              kind: item.kind,
-              reason: "TOO_LARGE",
-              whatToDo: "This call's delivery budget ran out before this item. Ask for it in a second, smaller call.",
-            });
-            continue;
-          }
-          spent += bytes.byteLength;
-          content.push(evidenceBlock(item, bytes));
-          if(item.transcript) content.push({type:"text" as const,text:`A saved transcript accompanies this audio. Treat it as a transcript, and consult the original audio when checking wording.\n\n${item.transcript}`});
-          delivered.push({ id: item.id, kind: item.kind, title: item.title, mimeType: item.mimeType, sizeBytes: bytes.byteLength });
-        } catch {
-          skipped.push({ id: item.id, kind: item.kind, reason: "BYTES_NOT_AVAILABLE", whatToDo: EVIDENCE_SKIP_GUIDANCE.BYTES_NOT_AVAILABLE });
-        }
-      }
-
-      // B2-backed evidence is always the metadata-clean medium rendition.
-      // The private provider URL is minted and consumed server-to-server and
-      // never enters this tool result.
-      for (const item of batch.b2Stored ?? []) {
-        if (spent + item.sizeBytes > FAMILY_HISTORY_MCP_LIMITS.evidenceTotalBytes) {
-          skipped.push({
-            id: item.id,
-            kind: item.kind,
-            reason: "TOO_LARGE",
-            whatToDo: "This call's delivery budget ran out before this item. Ask for it in a second, smaller call.",
-          });
-          continue;
-        }
-        try {
-          const signed = await actionCtx.runAction(mediaEvidence.signMcpEvidenceRead, {
-            principal,
-            grantId,
-            mediaId: item.id,
-          });
-          const response = await fetch(signed.url, { redirect: "error" });
-          if (!response.ok) throw new Error("unavailable");
-          const bytes = new Uint8Array(await response.arrayBuffer());
-          if (bytes.byteLength !== item.sizeBytes) throw new Error("length changed");
-          spent += bytes.byteLength;
-          content.push(evidenceBlock(item, bytes));
-          if(item.transcript) content.push({type:"text" as const,text:`A saved transcript accompanies this audio. Treat it as a transcript, and consult the original audio when checking wording.\n\n${item.transcript}`});
-          delivered.push({ id: item.id, kind: item.kind, title: item.title, mimeType: item.mimeType, sizeBytes: bytes.byteLength });
-        } catch {
-          skipped.push({ id: item.id, kind: item.kind, reason: "BYTES_NOT_AVAILABLE", whatToDo: EVIDENCE_SKIP_GUIDANCE.BYTES_NOT_AVAILABLE });
-        }
-      }
-
-      const summary = {
-        delivered,
-        skipped,
-        note: skipped.length === 0
-          ? "Every item you asked for was delivered."
-          : "Some items were not delivered. Each one says why and what to do. Name the gap in your result rather than guessing at the missing evidence, and never ask the person for a file link.",
-      };
-      await touch("family_history_get_evidence");
-      return {
-        content: [...content, { type: "text" as const, text: JSON.stringify(summary) }],
-        structuredContent: summary as Record<string, unknown>,
-      };
+      return await deliverEvidence(actionCtx, { principal, grantId, items: input.items }, input.cursor,
+        () => touch("family_history_get_evidence"));
     } catch (error) {
       return toolError(error);
     }

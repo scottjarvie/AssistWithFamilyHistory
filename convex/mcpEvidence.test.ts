@@ -11,6 +11,7 @@ import schema from "./schema";
 import { internal } from "./_generated/api";
 import { seedGrant } from "../lib/mcp/testSupport";
 import { FAMILY_HISTORY_MCP_LIMITS } from "../lib/mcp/contract";
+import { WEBSITE_PHOTO_MAX_BYTES } from "../lib/media/evidenceWebsite";
 
 const modules = import.meta.glob("./**/*.ts");
 const OWNER = "user_evidence_owner_AAAAAAAAAA";
@@ -209,7 +210,7 @@ describe("evidence gating", () => {
     const person = await seedPerson(t, OWNER);
     const huge = await seedMedia(t, OWNER, [person], {
       storageId: await storeBytes(t, new Uint8Array([1])),
-      sizeBytes: FAMILY_HISTORY_MCP_LIMITS.evidencePerItemBytes + 1,
+      sizeBytes: WEBSITE_PHOTO_MAX_BYTES + 1,
     });
 
     const result = await batch(t, grantId, [{ kind: "media", id: String(huge) }]);

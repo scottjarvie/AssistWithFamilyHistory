@@ -34,7 +34,8 @@ function code(relative: string) {
 const schema = read("convex/schema.ts");
 const mutations = code("convex/vaultMutations.ts");
 const evidence = code("convex/mcpEvidence.ts");
-const transport = code("convex/httpRoutes/mcp.ts");
+const transport = code("convex/httpRoutes/evidenceDelivery.ts");
+const storage = code("convex/mediaEvidenceStorage.ts");
 const uploadRoute = code("app/api/media/upload/route.ts");
 const fileRoute = code("app/api/media/[mediaId]/file/route.ts");
 const vaultReads = read("convex/vault.ts");
@@ -79,26 +80,21 @@ assert.doesNotMatch(
 
 /* ----------------------------- delivery goes through the same gates as ever */
 
-const batchStart = evidence.indexOf("export const getEvidenceBatch");
-const gates = evidence.slice(batchStart);
-const storedPush = gates.indexOf("stored.push(");
+const mediaGate = evidence.slice(evidence.indexOf("function mediaSkipReason("), evidence.indexOf("async function evidenceGrant("));
 for (const gate of [
   'reviewStatus !== "reviewed"',
   "aiUseAllowed !== true",
   'rightsStatus === "restricted"',
-  "boundaryAllowsPerson(boundary",
-  "matchesVaultOwner(row.vaultOwnerId, owner)",
+  "boundaryAllowsPerson(grant.boundary",
+  "matchesVaultOwner(row.vaultOwnerId, grant.vaultOwnerId)",
 ]) {
-  const at = gates.indexOf(gate);
-  assert.ok(at !== -1, `evidence delivery must still enforce: ${gate}`);
-  assert.ok(
-    at < storedPush,
-    `${gate} must be checked before a stored file is offered for delivery`,
-  );
+  assert.ok(mediaGate.includes(gate), `evidence delivery must still enforce: ${gate}`);
 }
+const gates = evidence.slice(evidence.indexOf("export const getEvidenceBatch"));
+assert.match(gates, /mediaSkipReason\(row, grant\)[\s\S]*stored\.push\(/);
 assert.match(
   gates,
-  /row\.sizeBytes > FAMILY_HISTORY_MCP_LIMITS\.evidencePerItemBytes/,
+  /\(file\?\.size \?\? 0\) > limit/,
   "an over-budget stored file must be skipped before its bytes are read",
 );
 
@@ -109,17 +105,19 @@ assert.match(
   /actionCtx\.storage\.get\(/,
   "the transport must read stored objects directly rather than fetching a URL",
 );
-const storedLoop = transport.slice(transport.indexOf("for (const item of batch.stored)"));
+const storedLoop = transport.slice(transport.indexOf("for (const item of batch.stored)"), transport.indexOf("for (const item of batch.b2Stored)"));
 assert.doesNotMatch(
-  storedLoop.slice(0, storedLoop.indexOf("for (const item of batch.fetchable)")),
+  storedLoop,
   /getUrl|item\.url/,
   "the stored-file delivery path must never mint or follow a URL",
 );
 assert.doesNotMatch(
-  evidence.slice(batchStart, batchStart + evidence.slice(batchStart).indexOf("stored.push(")),
+  evidence,
   /storage\.getUrl/,
   "the evidence query must hand the transport a storage id, never a signed URL",
 );
+assert.match(storage, /authorizeWebsitePhoto, args\)[\s\S]*ctx\.storage\.get\(args\.originalId\)[\s\S]*authorizeWebsitePhoto, args\)[\s\S]*makeWebsiteEvidenceCopies\(/,
+  "a live media decision must precede both reading and converting the source");
 
 /* --------------------------- the person's own browser gets bytes, not a URL */
 

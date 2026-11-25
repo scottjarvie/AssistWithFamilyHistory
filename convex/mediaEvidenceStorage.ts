@@ -13,7 +13,9 @@ import {
   loadEvidenceB2Config,
   sha256Hex,
 } from "../lib/media/evidenceB2";
-import { finalizeEvidenceFile, finalizeEvidenceImage } from "../lib/media/evidenceFinalize";
+import { finalizeEvidenceFile, finalizeEvidenceImage, makeWebsiteEvidenceCopies } from "../lib/media/evidenceFinalize";
+import { AI_COPY_LONG_EDGE } from "./lib/mcpConnector/mediaRead";
+import { internal } from "./_generated/api";
 import {
   EVIDENCE_LARGE_UPLOAD_TTL_SECONDS,
   EVIDENCE_PART_BYTES,
@@ -389,46 +391,57 @@ export const verifyEvidenceStorageProvider = internalAction({
 });
 
 /**
- * Mint a server-to-server read for the metadata-clean medium rendition only.
- * The MCP transport consumes this URL immediately; it never enters a tool
- * result, model transcript, or browser response.
+ * Sign the exact version selected by the live evidence query. This URL is
+ * consumed by the transport and never enters a tool result.
  */
 export const signMcpEvidenceRead = internalAction({
   args: {
     principal: principalValidator,
     grantId: v.optional(v.string()),
     mediaId: v.string(),
+    slot: v.optional(v.union(v.literal("medium"), v.literal("tiny"), v.literal("original"))),
+    expectedVersion: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
-    const batch = await ctx.runQuery(internalApi.mcpEvidence.getEvidenceBatch, {
+  handler: async (ctx, args): Promise<{
+    url: string; id: string; kind: string; title: string; mimeType: string; sizeBytes: number;
+  }> => {
+    const batch = await ctx.runQuery(internal.mcpEvidence.getEvidenceBatch, {
       principal: args.principal,
       grantId: args.grantId,
       items: [{ kind: "media", id: args.mediaId }],
     });
-    const item = batch.b2Stored?.find((candidate: any) => candidate.id === args.mediaId);
-    if (!item) throw new Error("Evidence is not available to this connection.");
-    const cleanupState = await ctx.runQuery(internalApi.mediaEvidenceControl.sessionForCleanup, {
-      uploadRef: (await ctx.runQuery(internalApi.mediaEvidenceControl.mediaUploadRef, {
-        vaultOwnerId: args.principal.subject,
-        mediaId: args.mediaId,
-      }))?.uploadRef ?? "",
-    });
-    // Images are read as their metadata-clean medium copy; files without
-    // display copies are read as the exact original, size-capped upstream.
-    const manifest = cleanupState?.manifests?.medium ?? cleanupState?.manifests?.original;
-    if (!manifest) throw new Error("Evidence is not available to this connection.");
+    const item = batch.b2Stored.find(candidate => candidate.id === args.mediaId);
+    const manifest = (args.slot ? item?.copies.find(copy => copy.slot === args.slot) : item?.copies[0])?.file;
+    if (!item || !manifest || (args.expectedVersion !== undefined && args.expectedVersion !== JSON.stringify(manifest))) {
+      throw new Error("Evidence is not available to this connection.");
+    }
     const store = storage();
     if (manifest.bucketClass !== "private" || manifest.bucketName !== store.config.bucket) {
       throw new Error("Evidence manifest does not match the private store.");
     }
-    return {
-      url: await store.signGet(manifest.objectKey, manifest.versionId),
-      id: item.id,
-      kind: item.kind,
-      title: item.title,
-      mimeType: item.mimeType,
-      sizeBytes: item.sizeBytes,
-    };
+    return { url: await store.signGet(manifest.objectKey, manifest.versionId), id: item.id, kind: item.kind,
+      title: item.title, mimeType: manifest.contentType, sizeBytes: manifest.sizeBytes };
+  },
+});
+
+export const renderWebsitePhotoCopies = internalAction({
+  args: {
+    principal: principalValidator,
+    grantId: v.optional(v.string()),
+    mediaId: v.id("media"),
+    originalId: v.id("_storage"),
+    expectedSizeBytes: v.number(),
+  },
+  handler: async (ctx, { expectedSizeBytes, ...args }): Promise<{ medium: ArrayBuffer; tiny: ArrayBuffer } | null> => {
+    const source = await ctx.runQuery(internal.mcpEvidence.authorizeWebsitePhoto, args);
+    if (!source || source.sizeBytes !== expectedSizeBytes) return null;
+    const blob = await ctx.storage.get(args.originalId);
+    if (!blob || blob.size !== source.sizeBytes) return null;
+    const original = new Uint8Array(await blob.arrayBuffer());
+    const current = await ctx.runQuery(internal.mcpEvidence.authorizeWebsitePhoto, args);
+    if (!current || current.mimeType !== source.mimeType || current.sizeBytes !== source.sizeBytes) return null;
+    const copies = await makeWebsiteEvidenceCopies(original, source.mimeType, AI_COPY_LONG_EDGE);
+    return await ctx.runQuery(internal.mcpEvidence.authorizeWebsitePhoto, args) ? copies : null;
   },
 });
 

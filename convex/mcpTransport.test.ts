@@ -1,4 +1,5 @@
 import { FAMILY_HISTORY_CONTROL_TOOLS } from "../lib/mcp/catalog";
+import { readFileSync } from "node:fs";
 /// <reference types="vite/client" />
 
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
@@ -10,6 +11,9 @@ import { api } from "./_generated/api";
 import { FAMILY_HISTORY_CANONICAL_TOOL_NAMES, FAMILY_HISTORY_SCOPES, FAMILY_HISTORY_TOOLS } from "../lib/mcp/catalog";
 import { seedGrant } from "../lib/mcp/testSupport";
 import { assertConnectorContract } from "./lib/mcpConnector/contract";
+import { hasEmbeddedImageMetadata } from "../lib/media/evidenceStandard";
+import { AI_COPY_MAX_BYTES } from "./lib/mcpConnector/mediaRead";
+import sharp from "sharp";
 
 const modules = import.meta.glob("./**/*.ts");
 const RESOURCE = "https://family-history.example.test/mcp";
@@ -732,7 +736,9 @@ test.each(["expired", "paused", "revoked", "narrowed", "scope removed", "media r
     vi.stubEnv("MCP_RESOURCE_URL", resource);
     const t = convexTest(schema, modules);
     const grantId = await approvedConnection(t);
-    const bytes = new Uint8Array([11, 23, 35, 47]);
+    const bytes = Uint8Array.from(await sharp({
+      create: { width: 12, height: 8, channels: 3, background: "#145789" },
+    }).png().toBuffer());
     const mediaId = await t.run(async ctx => {
       const storageId = await ctx.storage.store(new Blob([bytes], { type: "image/png" }));
       return ctx.db.insert("media", { vaultOwnerId: SUBJECT, storageId, mimeType: "image/png", sizeBytes: bytes.length,
@@ -743,7 +749,7 @@ test.each(["expired", "paused", "revoked", "narrowed", "scope removed", "media r
       name: "family_history_get_evidence", arguments: { items: [{ kind: "media", id: mediaId }], delivery },
     }, "family_history_get_evidence"));
     const inline = await (await read()).json();
-    expect(inline.result.content[0]).toMatchObject({ type: "image", mimeType: "image/png" });
+    expect(inline.result.content[0]).toMatchObject({ type: "image", mimeType: "image/jpeg" });
     expect(JSON.stringify(inline)).not.toMatch(/mcp-evidence-original|\.convex\.(cloud|site)|backblazeb2/);
 
     const started = Date.now();
@@ -798,17 +804,36 @@ test("the exact-original relay uses Backblaze server-side and respects a cleaned
     vi.stubEnv(`B2_${kind}_APPLICATION_KEY`, "not-a-real-application-key");
   }
   const existingFetch = fetch;
-  const relayFetch = vi.fn((input: string | URL | Request, options?: RequestInit) => {
+  const tinyBytes = Uint8Array.from(await sharp({
+    create: { width: 6, height: 4, channels: 3, background: "#254689" },
+  }).jpeg().toBuffer());
+  const { sha256Hex } = await import("../lib/media/evidenceB2");
+  const onTiny = vi.fn<() => Promise<void>>();
+  const b2Reads: string[] = [];
+  let returnWrongMediumBytes = false;
+  const relayFetch = vi.fn(async (input: string | URL | Request, options?: RequestInit) => {
     const url = new URL(input instanceof Request ? input.url : input);
     if (url.hostname.endsWith("b2.synthetic.example.test")) {
       expect(options?.redirect).toBe("error");
-      return Promise.resolve(new Response("exact B2 synthetic bytes"));
+      const object = url.pathname.split("/").at(-1)!;
+      b2Reads.push(object);
+      if (object === "medium") {
+        if (!returnWrongMediumBytes) return new Response("Missing copy", { status: 404 });
+        const wrongBytes = tinyBytes.slice();
+        wrongBytes[wrongBytes.length - 1] ^= 1;
+        return new Response(wrongBytes);
+      }
+      if (object === "tiny") {
+        await onTiny();
+        return new Response(tinyBytes);
+      }
+      return new Response("exact B2 synthetic bytes");
     }
     return existingFetch(input, options);
   });
   vi.stubGlobal("fetch", relayFetch);
   const t = convexTest(schema, modules);
-  await approvedConnection(t);
+  const grantId = await approvedConnection(t);
   const manifest = { bucketClass: "private" as const, bucketName: "synthetic-private", objectKey: "private-object",
     versionId: "pinned-version", sha256: "a".repeat(64), sizeBytes: 24, contentType: "application/pdf", metadataClean: false,
     verifiedAt: "2026-11-24T00:00:00Z" };
@@ -826,10 +851,230 @@ test("the exact-original relay uses Backblaze server-side and respects a cleaned
   expect(response.headers.get("location")).toBeNull();
   expect(await response.text()).toBe("exact B2 synthetic bytes");
 
+  await t.run(ctx => ctx.db.patch(mediaId, { b2Original: { ...manifest, contentType: "image/tiff" } }));
+  b2Reads.length = 0;
+  const noCopy = (await (await t.fetch("/mcp", modernRequest("tools/call", token, {
+    name: "family_history_get_evidence", arguments: { items: [{ kind: "media", id: mediaId }] },
+  }, "family_history_get_evidence"))).json()).result;
+  expect(noCopy.structuredContent.skipped).toMatchObject([{ reason: "CLEAN_COPY_UNAVAILABLE" }]);
+  expect(noCopy.content.every((block: { type: string }) => block.type === "text")).toBe(true);
+  expect(b2Reads).toEqual([]);
+  const explicitOriginal = (await (await read()).json()).result.structuredContent.original.url;
+  expect(new URL(explicitOriginal).hostname).toBe(new URL(resource).hostname);
+
   await t.run(ctx => ctx.db.patch(mediaId, { b2Renditions: { tiny: manifest, medium: manifest, large: manifest } }));
   expect((await t.fetch(link.pathname)).status).toBe(404);
   const refused = await (await read()).json();
   expect(refused.result.structuredContent.skipped).toMatchObject([{ reason: "ORIGINAL_UNAVAILABLE" }]);
+
+  const tiny = { ...manifest, objectKey: "tiny", sizeBytes: tinyBytes.byteLength, sha256: sha256Hex(tinyBytes),
+    contentType: "image/jpeg", metadataClean: true };
+  const medium = { ...tiny, objectKey: "medium", sizeBytes: AI_COPY_MAX_BYTES + 1 };
+  const inline = async () => (await t.fetch("/mcp", modernRequest("tools/call", token, {
+    name: "family_history_get_evidence", arguments: { items: [{ kind: "media", id: mediaId }] },
+  }, "family_history_get_evidence"))).json();
+  await t.run(ctx => ctx.db.patch(mediaId, { b2Renditions: { tiny, medium, large: medium } }));
+  b2Reads.length = 0;
+  const fallback = (await inline()).result;
+  expect(b2Reads).toEqual(["tiny"]);
+  expect(fallback.structuredContent.delivered).toMatchObject([{ id: mediaId, label: "Smaller copy." }]);
+  expect(fallback.content[0]).toMatchObject({ type: "image", data: Buffer.from(tinyBytes).toString("base64") });
+  expect(JSON.stringify(fallback)).not.toMatch(/synthetic-private|pinned-version|private-object/);
+
+  await t.run(ctx => ctx.db.patch(mediaId, { b2Renditions: { tiny, medium: { ...medium, sizeBytes: tiny.sizeBytes }, large: medium } }));
+  b2Reads.length = 0;
+  expect((await inline()).result.structuredContent.delivered).toMatchObject([{ label: "Smaller copy." }]);
+  expect(b2Reads).toEqual(["medium", "tiny"]);
+  returnWrongMediumBytes = true;
+  b2Reads.length = 0;
+  const wrongVersion = (await inline()).result;
+  expect(b2Reads).toEqual(["medium", "tiny"]);
+  expect(wrongVersion.structuredContent.delivered).toMatchObject([{ label: "Smaller copy." }]);
+  expect(wrongVersion.content[0]).toMatchObject({ type: "image", data: Buffer.from(tinyBytes).toString("base64") });
+  onTiny.mockImplementation(async () => t.run(ctx => ctx.db.patch(ctx.db.normalizeId("mcpGrants", grantId)!, { pausedAt: Date.now() })));
+  const interrupted = (await inline()).result;
+  expect(interrupted.isError).toBe(true);
+  expect(interrupted.content.every((block: { type: string }) => block.type === "text")).toBe(true);
+  expect(interrupted.structuredContent.nextCursor).toBeUndefined();
+});
+
+test("website photos are cleaned on demand and paged with inline documents and files", async () => {
+  const t = convexTest(schema, modules);
+  const grantId = await approvedConnection(t);
+  const original = Uint8Array.from(await sharp({
+    create: { width: 80, height: 40, channels: 3, background: "#254689" },
+  }).withExif({ IFD0: { Artist: "Synthetic metadata marker" } }).jpeg().toBuffer());
+  expect(hasEmbeddedImageMetadata(original, "image/jpeg")).toBe(true);
+  const pdfBytes = "%PDF-1.7\nSynthetic evidence fixture.\n";
+  const { items, mediaId, personId, originalId, unapprovedId, pdfId } = await t.run(async ctx => {
+    const fields = { vaultOwnerId: SUBJECT, createdAt: 1, updatedAt: 1 };
+    const personId = await ctx.db.insert("persons", {
+      ...fields, name: { given: "Synthetic", surname: "Ancestor" }, sex: "unknown", living: false, researchStatus: "basic",
+    });
+    const livingId = await ctx.db.insert("persons", {
+      ...fields, name: { given: "Synthetic", surname: "Living" }, sex: "unknown", living: true, researchStatus: "basic",
+    });
+    const docs = await Promise.all([personId, personId, personId, livingId].map((ownerPerson, index) =>
+      ctx.db.insert("documents", {
+        ...fields, personId: ownerPerson, type: "PS", title: `Synthetic document ${index}`,
+        contentMarkdown: "",
+        contentText: index === 3 ? "Synthetic living person's private document." : "a".repeat(900_000),
+      })));
+    const originalId = await ctx.storage.store(new Blob([original], { type: "image/jpeg" }));
+    const photo = { ...fields, type: "photo" as const, title: "Synthetic photo", personIds: [personId],
+      mimeType: "image/jpeg", rightsStatus: "owned" as const };
+    const mediaId = await ctx.db.insert("media", {
+      ...photo, storageId: originalId, reviewStatus: "reviewed", aiUseAllowed: true,
+    });
+    const unapprovedId = await ctx.db.insert("media", {
+      ...photo, storageId: await ctx.storage.store(new Blob([original], { type: "image/jpeg" })),
+      reviewStatus: "unreviewed", aiUseAllowed: false,
+    });
+    const pdfId = await ctx.db.insert("media", {
+      ...photo, type: "document", title: "Synthetic PDF", mimeType: "application/pdf",
+      storageId: await ctx.storage.store(new Blob([pdfBytes], { type: "application/pdf" })),
+      reviewStatus: "reviewed", aiUseAllowed: true,
+    });
+    return { personId, mediaId, originalId, unapprovedId, pdfId, items: [
+      ...docs.map(id => ({ kind: "document", id })),
+      { kind: "media", id: mediaId }, { kind: "media", id: unapprovedId }, { kind: "media", id: pdfId },
+    ] };
+  });
+  const token = await accessToken();
+  const read = async (selection = items, cursor?: string) => (await t.fetch("/mcp", modernRequest("tools/call", token, {
+    name: "family_history_get_evidence", arguments: { items: selection, ...(cursor === undefined ? {} : { cursor }) },
+  }, "family_history_get_evidence"))).json();
+  const storedObjects = () => t.run(ctx => ctx.db.system.query("_storage").collect());
+  const before = await storedObjects();
+  expect((await read(items, "")).result.structuredContent.error.code).toBe("INVALID_MEDIA_CURSOR");
+
+  const first = (await read()).result;
+  const cursor = first.structuredContent.nextCursor;
+  expect(cursor).toMatch(/^e2\.2\./);
+  expect(first.structuredContent.delivered.map((item: { id: string }) => item.id)).toEqual(items.slice(0, 2).map(item => item.id));
+  expect(first.structuredContent.skipped).toMatchObject([
+    { id: items[3].id, reason: "AI_USE_NOT_ALLOWED" }, { id: unapprovedId, reason: "NOT_REVIEWED" },
+  ]);
+  const second = (await read(items, cursor)).result;
+  expect(second.structuredContent.nextCursor).toBeUndefined();
+  expect(second.structuredContent.delivered).toMatchObject([
+    { id: items[2].id, mimeType: "text/markdown" }, { id: mediaId, mimeType: "image/jpeg", label: "Cleaned copy." },
+    { id: pdfId, mimeType: "application/pdf" },
+  ]);
+  const image = second.content.find((block: { type: string }) => block.type === "image");
+  const cleaned = Buffer.from(image.data, "base64");
+  expect(hasEmbeddedImageMetadata(cleaned, "image/jpeg")).toBe(false);
+  expect((await sharp(cleaned).metadata()).exif).toBeUndefined();
+  expect(cleaned).not.toEqual(Buffer.from(original));
+  expect(JSON.stringify(second)).not.toContain(originalId);
+  expect(JSON.stringify(second)).not.toContain("private document");
+  expect(second.content).toContainEqual({
+    type: "resource", resource: { uri: `familyhistory://media/${pdfId}`, mimeType: "application/pdf",
+      blob: Buffer.from(pdfBytes).toString("base64") },
+  });
+  expect((await read([{ kind: "media", id: mediaId }])).result.content[0]).toEqual(image);
+  expect(await storedObjects()).toEqual(before);
+  expect((await read([...items].reverse(), cursor)).result.structuredContent.error.code).toBe("INVALID_MEDIA_CURSOR");
+  const altered = cursor.slice(0, -1) + (cursor.endsWith("0") ? "1" : "0");
+  expect((await read(items, altered)).result.structuredContent.error.code).toBe("INVALID_MEDIA_CURSOR");
+
+  await t.run(async ctx => ctx.db.patch(ctx.db.normalizeId("mcpGrants", grantId)!, {
+    boundary: { kind: "selected_people", personIds: [String(personId)] },
+  }));
+  expect((await read(items, cursor)).result.structuredContent.error.code).toBe("INVALID_MEDIA_CURSOR");
+  await t.run(ctx => ctx.db.patch(mediaId, { aiUseAllowed: false }));
+  const denied = (await read([{ kind: "media", id: mediaId }])).result;
+  expect(denied.structuredContent).toMatchObject({ delivered: [], skipped: [{ reason: "AI_USE_NOT_ALLOWED" }] });
+  expect(denied.content.every((block: { type: string }) => block.type === "text")).toBe(true);
+});
+
+test("website WebM and UTF-16 evidence keeps its exact bytes after type checks", async () => {
+  const t = convexTest(schema, modules);
+  await approvedConnection(t);
+  const fixture = readFileSync("lib/media/fixtures/audio/video.webm");
+  const video = Uint8Array.from(fixture);
+  const segmentSizeAt = fixture.indexOf(Buffer.from("18538067", "hex")) + 4;
+  const clusterSizeAt = fixture.indexOf(Buffer.from("1f43b675", "hex")) + 4;
+  const streamingVideo = video.slice();
+  // Keep the fixture's existing size-field widths, but mark both masters unknown.
+  streamingVideo.set([0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff], segmentSizeAt);
+  streamingVideo.set([0x7f, 0xff], clusterSizeAt);
+  const files = [
+    { type: "video", mimeType: "video/webm;codecs=vp9", bytes: video, allowed: true },
+    { type: "video", mimeType: "video/webm;codecs=vp9", bytes: streamingVideo, allowed: true },
+    { type: "video", mimeType: "video/webm;codecs=vp9", bytes: new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 0x87, 0x42, 0x82, 0x84, 0x77, 0x65, 0x62, 0x6d]), allowed: false },
+    { type: "video", mimeType: "video/webm;codecs=vp9", bytes: video.slice(0, -1), allowed: false },
+    { type: "video", mimeType: "video/webm;codecs=vp9", bytes: streamingVideo.slice(0, clusterSizeAt + 12), allowed: false },
+    { type: "document", mimeType: "text/plain", bytes: new Uint8Array([0xff, 0xfe, 0x41, 0, 0x0a, 0]), allowed: true },
+    { type: "document", mimeType: "text/plain", bytes: new Uint8Array([0xfe, 0xff, 0, 0x41, 0, 0x0a]), allowed: true },
+    { type: "document", mimeType: "text/plain", bytes: new Uint8Array([0xff, 0xfe, 0, 0]), allowed: false },
+    { type: "document", mimeType: "text/plain", bytes: new Uint8Array([0xfe, 0xff, 0x41]), allowed: false },
+    { type: "video", mimeType: "video/webm;codecs=vp9", bytes: new TextEncoder().encode("not WebM"), allowed: false },
+  ] as const;
+  const items = await t.run(async ctx => Promise.all(files.map(async file => ({
+    kind: "media",
+    id: await ctx.db.insert("media", {
+      vaultOwnerId: SUBJECT, type: file.type, title: "Synthetic website evidence", personIds: [],
+      storageId: await ctx.storage.store(new Blob([file.bytes], { type: file.mimeType })),
+      mimeType: file.mimeType, reviewStatus: "reviewed", aiUseAllowed: true, rightsStatus: "owned", createdAt: 1, updatedAt: 1,
+    }),
+  }))));
+  const token = await accessToken();
+  const read = async () => (await t.fetch("/mcp", modernRequest("tools/call", token, {
+    name: "family_history_get_evidence", arguments: { items },
+  }, "family_history_get_evidence"))).json();
+  const { result } = await read();
+
+  const resources = result.content.filter((block: { type: string }) => block.type === "resource");
+  expect(resources).toEqual(files.flatMap((file, index) => file.allowed ? [{
+    type: "resource",
+    resource: {
+      uri: `familyhistory://media/${items[index].id}`,
+      mimeType: file.mimeType,
+      blob: Buffer.from(file.bytes).toString("base64"),
+    },
+  }] : []));
+  expect(result.structuredContent.skipped).toMatchObject(files.flatMap((file, index) =>
+    file.allowed ? [] : [{ id: items[index].id, reason: "BYTES_NOT_AVAILABLE" }],
+  ));
+
+  await t.run(async ctx => {
+    for (const [index, item] of items.entries()) {
+      if (files[index].allowed) await ctx.db.patch(item.id, { aiUseAllowed: false });
+    }
+  });
+  const denied = (await read()).result;
+  expect(denied.structuredContent.delivered).toEqual([]);
+  expect(denied.structuredContent.skipped).toEqual(expect.arrayContaining(files.flatMap((file, index) =>
+    file.allowed ? [expect.objectContaining({ id: items[index].id, reason: "AI_USE_NOT_ALLOWED" })] : [],
+  )));
+  expect(denied.content.every((block: { type: string }) => block.type === "text")).toBe(true);
+});
+
+test("an invalid website image returns no bytes, and a reviewed replacement can retry", async () => {
+  const t = convexTest(schema, modules);
+  await approvedConnection(t);
+  const mediaId = await t.run(async ctx => ctx.db.insert("media", {
+    vaultOwnerId: SUBJECT, type: "photo", title: "Synthetic invalid photo", personIds: [],
+    storageId: await ctx.storage.store(new Blob(["not an image"], { type: "image/jpeg" })),
+    mimeType: "image/jpeg", reviewStatus: "reviewed", aiUseAllowed: true, rightsStatus: "owned", createdAt: 1, updatedAt: 1,
+  }));
+  const token = await accessToken();
+  const read = async () => (await t.fetch("/mcp", modernRequest("tools/call", token, {
+    name: "family_history_get_evidence", arguments: { items: [{ kind: "media", id: mediaId }] },
+  }, "family_history_get_evidence"))).json();
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const failed = (await read()).result;
+    expect(failed.structuredContent).toMatchObject({ delivered: [], skipped: [{ reason: "CLEAN_COPY_UNAVAILABLE" }] });
+    expect(failed.content).toHaveLength(1);
+  }
+  const corrected = Uint8Array.from(await sharp({
+    create: { width: 4, height: 7, channels: 3, background: "#254689" },
+  }).jpeg().toBuffer());
+  await t.run(async ctx => ctx.db.patch(mediaId, {
+    storageId: await ctx.storage.store(new Blob([corrected], { type: "image/jpeg" })),
+  }));
+  expect((await read()).result.content[0]).toMatchObject({ type: "image", mimeType: "image/jpeg" });
 });
 
 test("whole-person context keeps working drafts and withholds private review detail", async () => {

@@ -1,4 +1,4 @@
-// assist-usage-limits-core v1.4.2 sha256:3134094c922204ae2b92f97170bbdc9af53e848c8b6db80387c23482c7cb4b11
+// assist-usage-limits-core v1.5.0 sha256:cf15d62ef4f00396794a7ead175fa2a8f52b0614532f7280bff9f99aab49ac7d
 // Synced from assistwithlife shared/usage-limits/core.ts. Do not edit here; change it upstream and re-sync.
 /**
  * Assist family upload and usage limits — framework-free core.
@@ -6,7 +6,7 @@
  * sites receive it through scripts/sync-usage-limits.mjs and must not edit it locally.
  */
 
-export const USAGE_LIMITS_CORE_VERSION = "1.4.2";
+export const USAGE_LIMITS_CORE_VERSION = "1.5.0";
 
 export type Enforcement = "off" | "warn" | "on";
 
@@ -297,6 +297,9 @@ export function aiStorage(s: StorageSummary): AiStorage {
 }
 
 export const AI_STORAGE_NOTE = "The reply carries `storage`: when storage.ready is true, storage.remainingBytes is the room left; when it is false the account is still being counted and no upload is refused for storage. An upload that does not fit is refused with the room left, and the connection is unaffected.";
+
+/** Short connector-instruction summary; use AI_STORAGE_NOTE for tool detail. */
+export const AI_STORAGE_INSTRUCTIONS_NOTE = "Upload replies show the storage room left when counting is complete, and a storage refusal leaves the connection unchanged.";
 
 // ---- Counter transitions (pure; the site adapter persists them) ------------------
 

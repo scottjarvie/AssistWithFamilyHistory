@@ -36,6 +36,7 @@ import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/cli
 import schema from "./schema";
 import { FAMILY_HISTORY_CANONICAL_TOOL_NAMES, findTool } from "../lib/mcp/catalog";
 import { seedGrant } from "../lib/mcp/testSupport";
+import { hasEmbeddedImageMetadata, sniffEvidenceImage } from "../lib/media/evidenceStandard";
 
 const modules = import.meta.glob("./**/*.ts");
 const RESOURCE = "https://family-history.example.test/mcp";
@@ -230,8 +231,8 @@ describe("chosen-AI lifecycle ladder (locally provable rungs)", () => {
       scopes: ["family_history:evidence:read"],
     });
 
-    // A one-pixel PNG standing in for a scanned census page: small, but real
-    // bytes that must survive storage, the budget check, and base64 transport.
+    // A one-pixel PNG standing in for a scanned census page. The AI gets a
+    // real cleaned copy over the same budgeted base64 transport.
     const scanBytes = Uint8Array.from(
       atob(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
@@ -296,16 +297,19 @@ describe("chosen-AI lifecycle ladder (locally provable rungs)", () => {
     expect(summary.delivered[0]).toMatchObject({
       id: String(storedId),
       title: "1900 census page",
-      mimeType: "image/png",
-      sizeBytes: scanBytes.byteLength,
+      mimeType: "image/jpeg",
+      originalSizeBytes: scanBytes.byteLength,
+      label: "Cleaned copy.",
     });
 
-    // The model receives an actual image block whose bytes round-trip exactly.
     const image = (result.content as Array<{ type: string; data?: string; mimeType?: string }>).find(
       (block) => block.type === "image",
     );
-    expect(image?.mimeType).toBe("image/png");
-    expect(Uint8Array.from(atob(image!.data!), (character) => character.charCodeAt(0))).toEqual(scanBytes);
+    expect(image?.mimeType).toBe("image/jpeg");
+    const cleaned = Uint8Array.from(atob(image!.data!), character => character.charCodeAt(0));
+    expect(cleaned.byteLength).toBe(summary.delivered[0].sizeBytes);
+    expect(sniffEvidenceImage(cleaned)).toMatchObject({ contentType: "image/jpeg", width: 1, height: 1 });
+    expect(hasEmbeddedImageMetadata(cleaned, "image/jpeg")).toBe(false);
 
     // And the row that holds only a reference is refused honestly rather than
     // dressed up as a delivery or handed over as a link to go fetch.

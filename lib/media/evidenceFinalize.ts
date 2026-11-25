@@ -1,9 +1,10 @@
 import { ConvexError } from "convex/values";
 import { normalizeAudioMime, validateAudioContainer, audioContainerError, checkVoiceNoteDuration, voiceNoteTooLongError } from "../../convex/lib/media/audio";
-import sharp from "sharp";
+import sharp, { type Raw } from "sharp";
 import type { EvidenceB2Head } from "./evidenceB2";
 import { sha256Hex } from "./evidenceB2";
 import { extractEvidenceMetadata } from "./evidenceMetadata";
+import { WEBSITE_IMAGE_FORMATS, WEBSITE_PHOTO_COPY_BYTES } from "./evidenceWebsite";
 import {
   EVIDENCE_RENDITION_MAX_BYTES,
   hasEmbeddedImageMetadata,
@@ -51,13 +52,15 @@ async function cleanRendition(
   original: Uint8Array,
   slot: EvidenceRenditionSlot,
   cap: number,
+  edge = EDGE[slot],
+  raw?: Raw,
 ): Promise<{ bytes: Uint8Array; width: number; height: number }> {
   for (const quality of QUALITY) {
-    const encoded = await sharp(Buffer.from(original), { failOn: "warning" })
+    const encoded = await sharp(Buffer.from(original), { failOn: "warning", raw })
       .rotate()
       .resize({
-        width: EDGE[slot],
-        height: EDGE[slot],
+        width: edge,
+        height: edge,
         fit: "inside",
         withoutEnlargement: true,
       })
@@ -72,6 +75,37 @@ async function cleanRendition(
     return { bytes, width: encoded.info.width, height: encoded.info.height };
   }
   throw new Error(`${slot} evidence rendition exceeded its byte ceiling.`);
+}
+
+export async function makeWebsiteEvidenceCopies(
+  original: Uint8Array,
+  mimeType: string,
+  maxEdge: number,
+) {
+  const limitInputPixels = 32_000_000;
+  const source = sharp(Buffer.from(original), { failOn: "warning", limitInputPixels });
+  const metadata = await source.metadata();
+  if (metadata.format !== WEBSITE_IMAGE_FORMATS.get(mimeType) || (metadata.pages ?? 1) !== 1 ||
+      !metadata.width || !metadata.height || metadata.width * metadata.height > limitInputPixels ||
+      (metadata.format === "heif" && metadata.compression !== "hevc")) {
+    throw new Error("Unsupported or invalid evidence image.");
+  }
+  // Decode the compressed source once. Quality retries work from the bounded,
+  // orientation-corrected pixels, with no access to original metadata.
+  const { data, info } = await source
+    .rotate()
+    .resize({ width: maxEdge, height: maxEdge, fit: "inside", withoutEnlargement: true })
+    .flatten({ background: "#ffffff" })
+    .toColourspace("srgb")
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const raw = { width: info.width, height: info.height, channels: info.channels };
+  const tiny = await cleanRendition(data, "tiny", WEBSITE_PHOTO_COPY_BYTES.tiny, EDGE.tiny, raw);
+  // A difficult image can fit after downscaling even when it did not fit at
+  // the preferred size.
+  const medium = await cleanRendition(data, "medium", WEBSITE_PHOTO_COPY_BYTES.medium, maxEdge, raw)
+    .catch(() => tiny);
+  return { medium: Uint8Array.from(medium.bytes).buffer, tiny: Uint8Array.from(tiny.bytes).buffer };
 }
 
 /**
