@@ -1,1 +1,4 @@
 convex/lib/mcpConnector/contract.ts text eol=lf
+convex/lib/mcpConnector/mediaRead.ts text eol=lf
+convex/lib/media/audio.ts text eol=lf
+convex/lib/usageLimits/core.ts text eol=lf

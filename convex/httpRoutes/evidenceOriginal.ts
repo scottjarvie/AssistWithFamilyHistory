@@ -21,6 +21,10 @@ export function registerEvidenceOriginalRoutes(http: HttpRouter) {
       try {
         const file = await ctx.runQuery(internal.mcpEvidence.resolveOriginalLink, { token });
         if (!file) return unavailable();
+        const stillAllowed = async () => {
+          const current = await ctx.runQuery(internal.mcpEvidence.resolveOriginalLink, { token }).catch(() => null);
+          return current?.version === file.version && current.mimeType === file.mimeType;
+        };
         let stream: ReadableStream<Uint8Array>;
         if (file.storageId) {
           const blob = await ctx.storage.get(file.storageId);
@@ -29,10 +33,15 @@ export function registerEvidenceOriginalRoutes(http: HttpRouter) {
         } else if (file.original) {
           const { bucketName, objectKey, versionId } = file.original;
           const url = await ctx.runAction(internal.mediaEvidenceStorage.signEvidenceOriginal, { bucketName, objectKey, versionId });
+          if (!await stillAllowed()) return unavailable();
           const response = await fetch(url, { redirect: "error" });
           if (!response.ok || !response.body) return unavailable();
           stream = response.body;
         } else return unavailable();
+        if (!await stillAllowed()) {
+          await stream.cancel().catch(() => {});
+          return unavailable();
+        }
         return new Response(stream, {
           headers: { ...privateHeaders, "Content-Type": file.mimeType, "Content-Disposition": "attachment" },
         });

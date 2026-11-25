@@ -10,6 +10,9 @@ import { api } from "./_generated/api";
 import { FAMILY_HISTORY_CANONICAL_TOOL_NAMES, FAMILY_HISTORY_SCOPES, FAMILY_HISTORY_TOOLS } from "../lib/mcp/catalog";
 import { seedGrant } from "../lib/mcp/testSupport";
 import { assertConnectorContract } from "./lib/mcpConnector/contract";
+import { hasEmbeddedImageMetadata } from "../lib/media/evidenceStandard";
+import { AI_COPY_MAX_BYTES } from "./lib/mcpConnector/mediaRead";
+import sharp from "sharp";
 
 const modules = import.meta.glob("./**/*.ts");
 const RESOURCE = "https://family-history.example.test/mcp";
@@ -732,7 +735,9 @@ test.each(["expired", "paused", "revoked", "narrowed", "scope removed", "media r
     vi.stubEnv("MCP_RESOURCE_URL", resource);
     const t = convexTest(schema, modules);
     const grantId = await approvedConnection(t);
-    const bytes = new Uint8Array([11, 23, 35, 47]);
+    const bytes = Uint8Array.from(await sharp({
+      create: { width: 12, height: 8, channels: 3, background: "#145789" },
+    }).png().toBuffer());
     const mediaId = await t.run(async ctx => {
       const storageId = await ctx.storage.store(new Blob([bytes], { type: "image/png" }));
       return ctx.db.insert("media", { vaultOwnerId: SUBJECT, storageId, mimeType: "image/png", sizeBytes: bytes.length,
@@ -743,7 +748,7 @@ test.each(["expired", "paused", "revoked", "narrowed", "scope removed", "media r
       name: "family_history_get_evidence", arguments: { items: [{ kind: "media", id: mediaId }], delivery },
     }, "family_history_get_evidence"));
     const inline = await (await read()).json();
-    expect(inline.result.content[0]).toMatchObject({ type: "image", mimeType: "image/png" });
+    expect(inline.result.content[0]).toMatchObject({ type: "image", mimeType: "image/jpeg" });
     expect(JSON.stringify(inline)).not.toMatch(/mcp-evidence-original|\.convex\.(cloud|site)|backblazeb2/);
 
     const started = Date.now();
@@ -798,17 +803,30 @@ test("the exact-original relay uses Backblaze server-side and respects a cleaned
     vi.stubEnv(`B2_${kind}_APPLICATION_KEY`, "not-a-real-application-key");
   }
   const existingFetch = fetch;
-  const relayFetch = vi.fn((input: string | URL | Request, options?: RequestInit) => {
+  const tinyBytes = Uint8Array.from(await sharp({
+    create: { width: 6, height: 4, channels: 3, background: "#254689" },
+  }).jpeg().toBuffer());
+  const { sha256Hex } = await import("../lib/media/evidenceB2");
+  const onTiny = vi.fn<() => Promise<void>>();
+  const b2Reads: string[] = [];
+  const relayFetch = vi.fn(async (input: string | URL | Request, options?: RequestInit) => {
     const url = new URL(input instanceof Request ? input.url : input);
     if (url.hostname.endsWith("b2.synthetic.example.test")) {
       expect(options?.redirect).toBe("error");
-      return Promise.resolve(new Response("exact B2 synthetic bytes"));
+      const object = url.pathname.split("/").at(-1)!;
+      b2Reads.push(object);
+      if (object === "medium") return new Response("Missing copy", { status: 404 });
+      if (object === "tiny") {
+        await onTiny();
+        return new Response(tinyBytes);
+      }
+      return new Response("exact B2 synthetic bytes");
     }
     return existingFetch(input, options);
   });
   vi.stubGlobal("fetch", relayFetch);
   const t = convexTest(schema, modules);
-  await approvedConnection(t);
+  const grantId = await approvedConnection(t);
   const manifest = { bucketClass: "private" as const, bucketName: "synthetic-private", objectKey: "private-object",
     versionId: "pinned-version", sha256: "a".repeat(64), sizeBytes: 24, contentType: "application/pdf", metadataClean: false,
     verifiedAt: "2026-11-24T00:00:00Z" };
@@ -830,6 +848,146 @@ test("the exact-original relay uses Backblaze server-side and respects a cleaned
   expect((await t.fetch(link.pathname)).status).toBe(404);
   const refused = await (await read()).json();
   expect(refused.result.structuredContent.skipped).toMatchObject([{ reason: "ORIGINAL_UNAVAILABLE" }]);
+
+  const tiny = { ...manifest, objectKey: "tiny", sizeBytes: tinyBytes.byteLength, sha256: sha256Hex(tinyBytes),
+    contentType: "image/jpeg", metadataClean: true };
+  const medium = { ...tiny, objectKey: "medium", sizeBytes: AI_COPY_MAX_BYTES + 1 };
+  const inline = async () => (await t.fetch("/mcp", modernRequest("tools/call", token, {
+    name: "family_history_get_evidence", arguments: { items: [{ kind: "media", id: mediaId }] },
+  }, "family_history_get_evidence"))).json();
+  await t.run(ctx => ctx.db.patch(mediaId, { b2Renditions: { tiny, medium, large: medium } }));
+  b2Reads.length = 0;
+  const fallback = (await inline()).result;
+  expect(b2Reads).toEqual(["tiny"]);
+  expect(fallback.structuredContent.delivered).toMatchObject([{ id: mediaId, label: "Smaller copy." }]);
+  expect(fallback.content[0]).toMatchObject({ type: "image", data: Buffer.from(tinyBytes).toString("base64") });
+  expect(JSON.stringify(fallback)).not.toMatch(/synthetic-private|pinned-version|private-object/);
+
+  await t.run(ctx => ctx.db.patch(mediaId, { b2Renditions: { tiny, medium: { ...medium, sizeBytes: tiny.sizeBytes }, large: medium } }));
+  b2Reads.length = 0;
+  expect((await inline()).result.structuredContent.delivered).toMatchObject([{ label: "Smaller copy." }]);
+  expect(b2Reads).toEqual(["medium", "tiny"]);
+  onTiny.mockImplementation(async () => t.run(ctx => ctx.db.patch(ctx.db.normalizeId("mcpGrants", grantId)!, { pausedAt: Date.now() })));
+  const interrupted = (await inline()).result;
+  expect(interrupted.isError).toBe(true);
+  expect(interrupted.content.every((block: { type: string }) => block.type === "text")).toBe(true);
+  expect(interrupted.structuredContent.nextCursor).toBeUndefined();
+});
+
+test("website photos are cleaned on demand and paged with inline documents and files", async () => {
+  const t = convexTest(schema, modules);
+  const grantId = await approvedConnection(t);
+  const original = Uint8Array.from(await sharp({
+    create: { width: 80, height: 40, channels: 3, background: "#254689" },
+  }).withExif({ IFD0: { Artist: "Synthetic metadata marker" } }).jpeg().toBuffer());
+  expect(hasEmbeddedImageMetadata(original, "image/jpeg")).toBe(true);
+  const pdfBytes = "%PDF-1.7\nSynthetic evidence fixture.\n";
+  const { items, mediaId, personId, originalId, unapprovedId, pdfId } = await t.run(async ctx => {
+    const fields = { vaultOwnerId: SUBJECT, createdAt: 1, updatedAt: 1 };
+    const personId = await ctx.db.insert("persons", {
+      ...fields, name: { given: "Synthetic", surname: "Ancestor" }, sex: "unknown", living: false, researchStatus: "basic",
+    });
+    const livingId = await ctx.db.insert("persons", {
+      ...fields, name: { given: "Synthetic", surname: "Living" }, sex: "unknown", living: true, researchStatus: "basic",
+    });
+    const docs = await Promise.all([personId, personId, personId, livingId].map((ownerPerson, index) =>
+      ctx.db.insert("documents", {
+        ...fields, personId: ownerPerson, type: "PS", title: `Synthetic document ${index}`,
+        contentMarkdown: "",
+        contentText: index === 3 ? "Synthetic living person's private document." : "a".repeat(900_000),
+      })));
+    const originalId = await ctx.storage.store(new Blob([original], { type: "image/jpeg" }));
+    const photo = { ...fields, type: "photo" as const, title: "Synthetic photo", personIds: [personId],
+      mimeType: "image/jpeg", rightsStatus: "owned" as const };
+    const mediaId = await ctx.db.insert("media", {
+      ...photo, storageId: originalId, reviewStatus: "reviewed", aiUseAllowed: true,
+    });
+    const unapprovedId = await ctx.db.insert("media", {
+      ...photo, storageId: await ctx.storage.store(new Blob([original], { type: "image/jpeg" })),
+      reviewStatus: "unreviewed", aiUseAllowed: false,
+    });
+    const pdfId = await ctx.db.insert("media", {
+      ...photo, type: "document", title: "Synthetic PDF", mimeType: "application/pdf",
+      storageId: await ctx.storage.store(new Blob([pdfBytes], { type: "application/pdf" })),
+      reviewStatus: "reviewed", aiUseAllowed: true,
+    });
+    return { personId, mediaId, originalId, unapprovedId, pdfId, items: [
+      ...docs.map(id => ({ kind: "document", id })),
+      { kind: "media", id: mediaId }, { kind: "media", id: unapprovedId }, { kind: "media", id: pdfId },
+    ] };
+  });
+  const token = await accessToken();
+  const read = async (selection = items, cursor?: string) => (await t.fetch("/mcp", modernRequest("tools/call", token, {
+    name: "family_history_get_evidence", arguments: { items: selection, ...(cursor === undefined ? {} : { cursor }) },
+  }, "family_history_get_evidence"))).json();
+  const storedObjects = () => t.run(ctx => ctx.db.system.query("_storage").collect());
+  const before = await storedObjects();
+  expect((await read(items, "")).result.structuredContent.error.code).toBe("INVALID_MEDIA_CURSOR");
+
+  const first = (await read()).result;
+  const cursor = first.structuredContent.nextCursor;
+  expect(cursor).toMatch(/^m1\./);
+  expect(first.structuredContent.delivered.map((item: { id: string }) => item.id)).toEqual(items.slice(0, 2).map(item => item.id));
+  expect(first.structuredContent.skipped).toMatchObject([
+    { id: items[3].id, reason: "AI_USE_NOT_ALLOWED" }, { id: unapprovedId, reason: "NOT_REVIEWED" },
+  ]);
+  const second = (await read(items, cursor)).result;
+  expect(second.structuredContent.nextCursor).toBeUndefined();
+  expect(second.structuredContent.delivered).toMatchObject([
+    { id: items[2].id, mimeType: "text/markdown" }, { id: mediaId, mimeType: "image/jpeg", label: "Cleaned copy." },
+    { id: pdfId, mimeType: "application/pdf" },
+  ]);
+  const image = second.content.find((block: { type: string }) => block.type === "image");
+  const cleaned = Buffer.from(image.data, "base64");
+  expect(hasEmbeddedImageMetadata(cleaned, "image/jpeg")).toBe(false);
+  expect((await sharp(cleaned).metadata()).exif).toBeUndefined();
+  expect(cleaned).not.toEqual(Buffer.from(original));
+  expect(JSON.stringify(second)).not.toContain(originalId);
+  expect(JSON.stringify(second)).not.toContain("private document");
+  expect(second.content).toContainEqual({
+    type: "resource", resource: { uri: `familyhistory://media/${pdfId}`, mimeType: "application/pdf",
+      blob: Buffer.from(pdfBytes).toString("base64") },
+  });
+  expect((await read([{ kind: "media", id: mediaId }])).result.content[0]).toEqual(image);
+  expect(await storedObjects()).toEqual(before);
+  expect((await read([...items].reverse(), cursor)).result.structuredContent.error.code).toBe("INVALID_MEDIA_CURSOR");
+  const altered = cursor.slice(0, -1) + (cursor.endsWith("0") ? "1" : "0");
+  expect((await read(items, altered)).result.structuredContent.error.code).toBe("INVALID_MEDIA_CURSOR");
+
+  await t.run(async ctx => ctx.db.patch(ctx.db.normalizeId("mcpGrants", grantId)!, {
+    boundary: { kind: "selected_people", personIds: [String(personId)] },
+  }));
+  expect((await read(items, cursor)).result.structuredContent.error.code).toBe("INVALID_MEDIA_CURSOR");
+  await t.run(ctx => ctx.db.patch(mediaId, { aiUseAllowed: false }));
+  const denied = (await read([{ kind: "media", id: mediaId }])).result;
+  expect(denied.structuredContent).toMatchObject({ delivered: [], skipped: [{ reason: "AI_USE_NOT_ALLOWED" }] });
+  expect(denied.content.every((block: { type: string }) => block.type === "text")).toBe(true);
+});
+
+test("an invalid website image returns no bytes, and a reviewed replacement can retry", async () => {
+  const t = convexTest(schema, modules);
+  await approvedConnection(t);
+  const mediaId = await t.run(async ctx => ctx.db.insert("media", {
+    vaultOwnerId: SUBJECT, type: "photo", title: "Synthetic invalid photo", personIds: [],
+    storageId: await ctx.storage.store(new Blob(["not an image"], { type: "image/jpeg" })),
+    mimeType: "image/jpeg", reviewStatus: "reviewed", aiUseAllowed: true, rightsStatus: "owned", createdAt: 1, updatedAt: 1,
+  }));
+  const token = await accessToken();
+  const read = async () => (await t.fetch("/mcp", modernRequest("tools/call", token, {
+    name: "family_history_get_evidence", arguments: { items: [{ kind: "media", id: mediaId }] },
+  }, "family_history_get_evidence"))).json();
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const failed = (await read()).result;
+    expect(failed.structuredContent).toMatchObject({ delivered: [], skipped: [{ reason: "CLEAN_COPY_UNAVAILABLE" }] });
+    expect(failed.content).toHaveLength(1);
+  }
+  const corrected = Uint8Array.from(await sharp({
+    create: { width: 4, height: 7, channels: 3, background: "#254689" },
+  }).jpeg().toBuffer());
+  await t.run(async ctx => ctx.db.patch(mediaId, {
+    storageId: await ctx.storage.store(new Blob([corrected], { type: "image/jpeg" })),
+  }));
+  expect((await read()).result.content[0]).toMatchObject({ type: "image", mimeType: "image/jpeg" });
 });
 
 test("whole-person context keeps working drafts and withholds private review detail", async () => {

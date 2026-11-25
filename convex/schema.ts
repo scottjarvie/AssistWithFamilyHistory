@@ -102,6 +102,8 @@ export default defineSchema({
     fileVersion: v.string(),
     expiresAt: v.number(),
   }).index("by_hash", ["tokenHash"]).index("by_expiry", ["expiresAt"]),
+  // Deployment-only HMAC key for scoped evidence continuations.
+  mcpEvidenceCursorKeys: defineTable({ key: v.bytes() }),
   /**
    * PERSONS
    * Core entity representing an individual (alive or deceased)

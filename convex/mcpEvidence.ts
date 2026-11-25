@@ -7,10 +7,8 @@
  *
  * Three kinds of item exist, in descending order of trust:
  *
- * 1. **Stored files** (`storageId`) — bytes the vault actually holds, in
- *    private Convex file storage. The transport reads the object directly, so
- *    a scanned census page reaches a model as image bytes and no link is ever
- *    minted. This is the path a person's own upload takes.
+ * 1. **Stored files** — private Convex uploads and pinned Backblaze objects.
+ *    The transport serves cleaned image copies and eligible inline files.
  * 2. **Documents** — person document text, which genuinely lives in Convex.
  * 3. **Remote references** (`url`) — usually a FamilySearch memory. These stay
  *    user-mediated. The server does not fetch arbitrary record URLs; the item
@@ -30,6 +28,9 @@ import { assertGrantPermits } from "./mcpGrants";
 import { resolveOwnedDocumentPerson } from "./documents";
 import { effectiveExpiry } from "../lib/mcp/grantDefaults";
 import { FAMILY_HISTORY_MCP_LIMITS, hashMcpInput } from "../lib/mcp/contract";
+import { isRenderedEvidenceImage } from "../lib/media/evidenceStandard";
+import { isAcceptedMediaUploadType } from "../lib/media/uploadContract";
+import { WEBSITE_IMAGE_FORMATS, WEBSITE_PHOTO_MAX_BYTES } from "../lib/media/evidenceWebsite";
 
 const principalValidator = v.object({
   issuer: v.string(),
@@ -37,12 +38,19 @@ const principalValidator = v.object({
   clientId: v.string(),
   scopes: v.array(v.string()),
 });
+const photoArgs = {
+  principal: principalValidator,
+  grantId: v.optional(v.string()),
+  mediaId: v.id("media"),
+  originalId: v.id("_storage"),
+};
 
 export type EvidenceSkipReason =
   | "NOT_REVIEWED"
   | "AI_USE_NOT_ALLOWED"
   | "RIGHTS_RESTRICTED"
   | "TOO_LARGE"
+  | "CLEAN_COPY_UNAVAILABLE"
   | "BYTES_NOT_AVAILABLE"
   | "OUTSIDE_GRANT_BOUNDARY";
 
@@ -59,7 +67,9 @@ export const EVIDENCE_SKIP_GUIDANCE: Record<EvidenceSkipReason, string> = {
   RIGHTS_RESTRICTED:
     "This item's rights status is restricted, so it cannot be sent to an AI. Cite it by title in your result rather than quoting it.",
   TOO_LARGE:
-    "This item is larger than one protected delivery allows. Ask for it on its own, or work from its title and description.",
+    "This item exceeds a protected delivery limit. Work from its title and any linked citation.",
+  CLEAN_COPY_UNAVAILABLE:
+    "A cleaned image could not be delivered. Work from its title and any linked citation.",
   BYTES_NOT_AVAILABLE:
     "Assist With Family History holds a reference to this file but not its bytes, so there is nothing to deliver. Use its title, description, and any linked citation, and tell the person that uploading the file to this item would let you read it.",
   OUTSIDE_GRANT_BOUNDARY:
@@ -84,15 +94,62 @@ function boundaryAllowsPerson(
   return personIds.length > 0 && personIds.some((id) => allowed.has(id));
 }
 
+function mediaSkipReason(row: Doc<"media"> | null, grant: Doc<"mcpGrants">): EvidenceSkipReason | null {
+  if (!row || row.archivedAt !== undefined || !matchesVaultOwner(row.vaultOwnerId, grant.vaultOwnerId) ||
+      !boundaryAllowsPerson(grant.boundary, row.personIds.map(String))) return "OUTSIDE_GRANT_BOUNDARY";
+  if (row.reviewStatus !== "reviewed") return "NOT_REVIEWED";
+  if (row.aiUseAllowed !== true) return "AI_USE_NOT_ALLOWED";
+  if (row.rightsStatus === "restricted") return "RIGHTS_RESTRICTED";
+  if (row.mediaState !== undefined && row.mediaState !== "ready") return "BYTES_NOT_AVAILABLE";
+  return null;
+}
+
+async function evidenceGrant(ctx: QueryCtx, args: {
+  principal: { subject: string; issuer: string; clientId: string };
+  grantId?: string;
+  items: { kind: string; id: string }[];
+}) {
+  return (await assertGrantPermits(ctx, {
+    owner: args.principal.subject.trim(),
+    principal: args.principal,
+    grantId: args.grantId,
+    toolName: "family_history_get_evidence",
+    input: { items: args.items },
+  }))!;
+}
+
+export const authorizeWebsitePhoto = internalQuery({
+  args: photoArgs,
+  handler: async (ctx, args) => {
+    const grant = await evidenceGrant(ctx, { ...args, items: [{ kind: "media", id: args.mediaId }] });
+    const row = await ctx.db.get(args.mediaId);
+    if (!row || mediaSkipReason(row, grant) || row.b2Original || row.b2Renditions || row.storageId !== args.originalId) return null;
+    const mimeType = row.mimeType?.toLowerCase() ?? "";
+    if (!WEBSITE_IMAGE_FORMATS.has(mimeType)) return null;
+    const file = await ctx.db.system.get(args.originalId);
+    if (!file || file.size <= 0 || file.size > WEBSITE_PHOTO_MAX_BYTES ||
+        (file.contentType && file.contentType.toLowerCase() !== mimeType)) return null;
+    return { mimeType, sizeBytes: file.size };
+  },
+});
+
+export const evidenceCursorKey = internalMutation({
+  args: { key: v.bytes() },
+  handler: async (ctx, { key }) => {
+    const existing = await ctx.db.query("mcpEvidenceCursorKeys").first();
+    if (existing) return existing.key;
+    if (key.byteLength !== 32) throw new Error("Invalid evidence cursor key.");
+    await ctx.db.insert("mcpEvidenceCursorKeys", { key });
+    return key;
+  },
+});
+
 // The owner approved exact bytes through the existing evidence path for legacy
 // Convex files and B2 items with no display copy. For B2 records with a display
 // copy, that approval covered the cleaned copy only.
 async function originalForGrant(ctx: QueryCtx, grant: Doc<"mcpGrants">, mediaId: Doc<"media">["_id"]) {
   const row = await ctx.db.get(mediaId);
-  if (!row || row.archivedAt !== undefined || !matchesVaultOwner(row.vaultOwnerId, grant.vaultOwnerId) ||
-      (row.mediaState !== undefined && row.mediaState !== "ready") ||
-      !boundaryAllowsPerson(grant.boundary, row.personIds.map(String)) ||
-      row.reviewStatus !== "reviewed" || row.aiUseAllowed !== true || row.rightsStatus === "restricted") return null;
+  if (!row || mediaSkipReason(row, grant)) return null;
   if (row.mediaState === "ready" && row.b2Renditions) return null;
   if (row.mediaState === "ready" && row.b2Original) {
     if (row.b2Original.bucketClass !== "private") return null;
@@ -142,9 +199,8 @@ export const resolveOriginalLink = internalQuery({
 
 /**
  * Resolve one batch of evidence items. Text that genuinely lives in Convex is
- * returned inline; stored files and remote references are handed to the
- * transport action, which reads or fetches them under a byte budget, so this
- * query stays pure.
+ * available inline. Private object descriptors stay inside the backend, where
+ * the transport uses them to plan and reauthorize each read.
  */
 export const getEvidenceBatch = internalQuery({
   args: {
@@ -154,13 +210,8 @@ export const getEvidenceBatch = internalQuery({
   },
   handler: async (ctx, args) => {
     const owner = args.principal.subject.trim();
-    const grant = await assertGrantPermits(ctx, {
-      owner,
-      grantId: args.grantId,
-      toolName: "family_history_get_evidence",
-      input: { items: args.items },
-    });
-    const boundary = grant!.boundary;
+    const grant = await evidenceGrant(ctx, args);
+    const boundary = grant.boundary;
 
     const delivered: Array<{
       id: string;
@@ -174,12 +225,13 @@ export const getEvidenceBatch = internalQuery({
     // directly out of private storage — no URL is minted, so there is nothing
     // for a model or a proxy to follow.
     const stored: Array<{
-      id: string;
+      id: Doc<"media">["_id"];
       kind: string;
       title: string;
       mimeType: string;
-      storageId: string;
-      sizeBytes: number | null;
+      storageId: NonNullable<Doc<"media">["storageId"]>;
+      sizeBytes: number;
+      clean: boolean;
       transcript?: string;
     }> = [];
     const b2Stored: Array<{
@@ -187,8 +239,11 @@ export const getEvidenceBatch = internalQuery({
       id: string;
       kind: string;
       title: string;
-      mimeType: string;
-      sizeBytes: number;
+      originalSizeBytes?: number;
+      copies: {
+        slot: "medium" | "tiny" | "original";
+        file: NonNullable<Doc<"media">["b2Original"]>;
+      }[];
     }> = [];
     const skipped: Skip[] = [];
 
@@ -201,84 +256,61 @@ export const getEvidenceBatch = internalQuery({
       if (item.kind === "media") {
         const id = ctx.db.normalizeId("media", item.id);
         const row = id ? await ctx.db.get(id) : null;
-        if (!row || !matchesVaultOwner(row.vaultOwnerId, owner)) {
-          skipped.push(skip(item.id, item.kind, "OUTSIDE_GRANT_BOUNDARY"));
+        const reason = mediaSkipReason(row, grant);
+        if (reason || !row) {
+          skipped.push(skip(item.id, item.kind, reason ?? "OUTSIDE_GRANT_BOUNDARY"));
           continue;
         }
-        if (!boundaryAllowsPerson(boundary, row.personIds.map(String))) {
-          skipped.push(skip(item.id, item.kind, "OUTSIDE_GRANT_BOUNDARY"));
-          continue;
-        }
-        // Exactly the gate the existing person-context path uses, plus rights.
-        if (row.reviewStatus !== "reviewed") {
-          skipped.push(skip(item.id, item.kind, "NOT_REVIEWED"));
-          continue;
-        }
-        if (row.aiUseAllowed !== true) {
-          skipped.push(skip(item.id, item.kind, "AI_USE_NOT_ALLOWED"));
-          continue;
-        }
-        if (row.rightsStatus === "restricted") {
-          skipped.push(skip(item.id, item.kind, "RIGHTS_RESTRICTED"));
-          continue;
-        }
-        if (row.mediaState === "ready" && row.b2Renditions?.medium) {
-          const rendition = row.b2Renditions.medium;
-          if (rendition.sizeBytes > FAMILY_HISTORY_MCP_LIMITS.evidencePerItemBytes) {
-            skipped.push(skip(item.id, item.kind, "TOO_LARGE"));
+        const common = { id: row._id, kind: "media" as const, title: row.title,
+          ...(row.type === "audio" && row.transcript ? { transcript: row.transcript } : {}) };
+        if (row.b2Original || row.b2Renditions) {
+          if (row.mediaState !== "ready") {
+            skipped.push(skip(item.id, item.kind, "BYTES_NOT_AVAILABLE"));
             continue;
           }
-          b2Stored.push({
-            id: String(row._id),
-            kind: "media",
-            title: row.title,
-            mimeType: rendition.contentType,
-            sizeBytes: rendition.sizeBytes,
-          });
-          continue;
-        }
-        if (row.mediaState === "ready" && !row.b2Renditions && row.b2Original) {
-          // A PDF, TIFF, HEIC, audio or text original with no display copy:
-          // delivered exact, within the same per-item budget.
-          if (row.b2Original.sizeBytes > FAMILY_HISTORY_MCP_LIMITS.evidencePerItemBytes) {
-            skipped.push(skip(item.id, item.kind, "TOO_LARGE"));
-            continue;
+          const copies: (typeof b2Stored)[number]["copies"] = [];
+          if (row.b2Renditions) {
+            for (const slot of ["medium", "tiny"] as const) {
+              const file = row.b2Renditions[slot];
+              if (file.metadataClean && file.bucketClass === "private" &&
+                  isRenderedEvidenceImage(file.contentType) &&
+                  (!file.sourceSha256 || file.sourceSha256 === row.b2Original?.sha256) &&
+                  Number.isSafeInteger(file.sizeBytes) && file.sizeBytes > 0) copies.push({ slot, file });
+            }
+            if (!copies.length) skipped.push(skip(item.id, item.kind, "CLEAN_COPY_UNAVAILABLE"));
+          } else if (row.b2Original) {
+            const file = row.b2Original;
+            if (file.contentType.toLowerCase().startsWith("image/")) {
+              skipped.push(skip(item.id, item.kind, "CLEAN_COPY_UNAVAILABLE"));
+            } else if (file.sizeBytes > FAMILY_HISTORY_MCP_LIMITS.evidencePerItemBytes) {
+              skipped.push(skip(item.id, item.kind, "TOO_LARGE"));
+            } else if (file.bucketClass === "private" && isAcceptedMediaUploadType(file.contentType) &&
+                Number.isSafeInteger(file.sizeBytes) && file.sizeBytes > 0) {
+              copies.push({ slot: "original", file });
+            } else {
+              skipped.push(skip(item.id, item.kind, "BYTES_NOT_AVAILABLE"));
+            }
           }
-          b2Stored.push({
-            id: String(row._id),
-            kind: "media",
-            title: row.title,
-            mimeType: row.b2Original.contentType,
-            sizeBytes: row.b2Original.sizeBytes,
-            ...(row.type === "audio" && row.transcript ? {transcript:row.transcript}:{}),
-          });
-          continue;
-        }
-        if (row.storageId) {
-          // A file the vault holds. Refuse it here rather than spending the
-          // transport's budget on an object we already know is over the cap.
-          if (
-            typeof row.sizeBytes === "number" &&
-            row.sizeBytes > FAMILY_HISTORY_MCP_LIMITS.evidencePerItemBytes
-          ) {
+          if (copies.length) b2Stored.push({ ...common, copies, ...(row.b2Original ? {
+            originalSizeBytes: row.b2Original.sizeBytes,
+          } : {}) });
+        } else if (row.storageId) {
+          const mimeType = row.mimeType?.toLowerCase() ?? "";
+          const clean = mimeType.startsWith("image/");
+          const limit = clean ? WEBSITE_PHOTO_MAX_BYTES : FAMILY_HISTORY_MCP_LIMITS.evidencePerItemBytes;
+          const file = await ctx.db.system.get(row.storageId);
+          if ((row.sizeBytes ?? 0) > limit || (file?.size ?? 0) > limit) {
             skipped.push(skip(item.id, item.kind, "TOO_LARGE"));
-            continue;
+          } else if (!file || file.size <= 0 || (file.contentType && file.contentType.toLowerCase() !== mimeType) ||
+              !(clean ? WEBSITE_IMAGE_FORMATS.has(mimeType) : isAcceptedMediaUploadType(mimeType))) {
+            skipped.push(skip(item.id, item.kind, clean ? "CLEAN_COPY_UNAVAILABLE" : "BYTES_NOT_AVAILABLE"));
+          } else {
+            stored.push({ ...common, storageId: row.storageId, mimeType, sizeBytes: file.size, clean });
           }
-          stored.push({
-            id: String(row._id),
-            kind: "media",
-            title: row.title,
-            mimeType: row.mimeType ?? "application/octet-stream",
-            storageId: row.storageId,
-            ...(row.type === "audio" && row.transcript ? {transcript:row.transcript}:{}),
-            sizeBytes: typeof row.sizeBytes === "number" ? row.sizeBytes : null,
-          });
-          continue;
+        } else {
+          // FamilySearch and other remote references are always user-mediated.
+          skipped.push(skip(item.id, item.kind, "BYTES_NOT_AVAILABLE"));
         }
-        // FamilySearch/private provider references remain browser-mediated.
-        // Fetching a caller-controlled remote URL here would create an SSRF
-        // path and would blur reference metadata into bytes the vault holds.
-        skipped.push(skip(item.id, item.kind, "BYTES_NOT_AVAILABLE"));
         continue;
       }
 
@@ -332,6 +364,6 @@ export const getEvidenceBatch = internalQuery({
 
     // Kept as an always-empty field for old internal consumers while the
     // former arbitrary remote-fetch path is retired.
-    return { delivered, stored, b2Stored, fetchable: [] as never[], skipped };
+    return { delivered, stored, b2Stored, fetchable: [] as never[], skipped, boundary };
   },
 });

@@ -1,7 +1,7 @@
-// assist-audio-core v1.1.0 sha256:efd7038dc9460b97022686ce5099386be0919b4828b066c312c5cf16698a913d
+// assist-audio-core v1.1.1 sha256:20ca695fe524fc4b69bd1509b8dc16d59b2baef10eee76c6c7cd406307c27a35
 // Synced from assistwithlife shared/media/audio.ts. Do not edit here; change it upstream and re-sync.
 /** Assist family audio policy. Canonical copy: assistwithlife; sync, do not fork. */
-export const AUDIO_CORE_VERSION = "1.1.0";
+export const AUDIO_CORE_VERSION = "1.1.1";
 
 export const AUDIO_TYPES = ["audio/webm", "audio/ogg", "audio/mp4", "audio/aac", "audio/mpeg", "audio/wav", "audio/flac"] as const;
 export type AudioType = (typeof AUDIO_TYPES)[number];
@@ -212,6 +212,7 @@ const AUDIO_INDEX_PAGE_ENTRIES = 4096;
 const AUDIO_MAX_INDEX_ENTRIES = 1_048_576;
 const AUDIO_MAX_ACTIVE_STREAMS = 64;
 const containerNeed = (ok: unknown): void => { if (!ok) throw new Error("Invalid audio container"); };
+type ByteCoverage = "complete" | "may-skip";
 const containerText = (b: Uint8Array) => Array.from(b, (v) => String.fromCharCode(v)).join("");
 const u32 = (b: Uint8Array, at = 0, little = false) => new DataView(b.buffer, b.byteOffset, b.byteLength).getUint32(at, little);
 const u16 = (b: Uint8Array, at = 0, little = false) => new DataView(b.buffer, b.byteOffset, b.byteLength).getUint16(at, little);
@@ -281,16 +282,17 @@ export async function validateAudioContainer(input: Uint8Array | AudioChunkReade
     const r = new AudioReader(input);
     containerNeed(Number.isSafeInteger(r.size) && r.size > 0);
     let durationSeconds: number | null;
+    let byteCoverage: ByteCoverage = "may-skip";
     switch (type) {
       case "audio/wav": durationSeconds = await containerWav(r); break;
       case "audio/flac": durationSeconds = await containerFlac(r); break;
       case "audio/mpeg": case "audio/aac": durationSeconds = await containerMpeg(r, type); break;
-      case "audio/ogg": durationSeconds = await containerOgg(r); break;
+      case "audio/ogg": ({ durationSeconds, byteCoverage } = await containerOgg(r)); break;
       case "audio/webm": durationSeconds = await containerWebm(r); break;
       case "audio/mp4": durationSeconds = await containerMp4(r); break;
     }
-    // Also proves skipped opaque metadata/payload bytes really exist in the reader.
-    await r.touch(0, r.size);
+    // Parsers that skip opaque metadata or payload must still prove it exists.
+    if (byteCoverage !== "complete") await r.touch(0, r.size);
     containerNeed(durationSeconds === null || (Number.isFinite(durationSeconds) && durationSeconds > 0));
     return { valid: true, type, durationSeconds };
   } catch (error) { return { valid: false, reason: error instanceof AudioVideoTrack ? "video-track" : error instanceof AudioUnsupportedType ? "unsupported-type" : "invalid-container" }; }
@@ -490,7 +492,7 @@ async function containerFlac(r: AudioReader): Promise<number> {
   containerNeed(frames > 0 && (!expected || expected === samples)); return samples / rate;
 }
 
-async function containerOgg(r: AudioReader): Promise<number> {
+async function containerOgg(r: AudioReader): Promise<{ durationSeconds: number; byteCoverage: ByteCoverage }> {
   type Stream = { packet: number[]; page: number; body: number; length: number; packets: number; ended: boolean; sequence: number; preSkip: number; streamCount: number; samples: number; granule: number; audio: number };
   const streams = new Map<number, Stream>(); let audio = 0, duration = 0;
   for (let at = 0; at < r.size;) {
@@ -558,7 +560,9 @@ async function containerOgg(r: AudioReader): Promise<number> {
     }
     at = end;
   }
-  containerNeed(audio > 0 && streams.size === 0); return duration;
+  containerNeed(audio > 0 && streams.size === 0);
+  // Each page was read in full for its checksum, from byte zero to EOF.
+  return { durationSeconds: duration, byteCoverage: "complete" };
 }
 
 type AudioEbml = { id: number; body: number; end: number; unknown: boolean };
