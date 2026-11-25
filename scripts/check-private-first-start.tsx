@@ -56,7 +56,7 @@ assert.ok(
   snapshot?.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword),
   "convex/vault.ts must export getVaultSnapshot",
 );
-const snapshotEnd = snapshot.body?.getLastToken();
+const snapshotEnd = snapshot.body?.getChildren().at(-1);
 assert.ok(
   snapshotEnd?.kind === ts.SyntaxKind.CloseBraceToken && snapshotEnd.getWidth() > 0,
   "getVaultSnapshot must have a complete function body",

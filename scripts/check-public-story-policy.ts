@@ -27,10 +27,6 @@ if (!publicRoute.includes("canRenderPublicStory(bundle.story.status)")) {
   failures.push("Public story page must enforce the shared public story policy");
 }
 
-if (!convexVault.includes('story.status !== "published"')) {
-  failures.push("Convex getPublishedStory must reject non-published stories before building a public bundle");
-}
-
 // GEN-77: public Convex queries must use buildPublicStoryBundle (explicit
 // field allowlist), not buildStoryBundle({publicView: true}) which only
 // gated 2 of 12 fields and returned the full internal review bundle.
@@ -47,12 +43,24 @@ assert.ok(
   "getPersonResearchChecks must follow the public story queries in convex/vault.ts",
 );
 
-for (const [name, source] of [
-  ["getPublishedStory", convexVault.slice(publishedStoryStart, publishedStoryByIdentifierStart)],
-  ["getPublishedStoryByIdentifier", convexVault.slice(publishedStoryByIdentifierStart, researchChecksStart)],
+for (const [name, storyVariable, source] of [
+  ["getPublishedStory", "story", convexVault.slice(publishedStoryStart, publishedStoryByIdentifierStart)],
+  ["getPublishedStoryByIdentifier", "candidate", convexVault.slice(publishedStoryByIdentifierStart, researchChecksStart)],
 ]) {
-  if (!source.includes("buildPublicStoryBundle(")) {
+  const buildBundle = source.indexOf("buildPublicStoryBundle(");
+  if (buildBundle < 0) {
     failures.push(`${name} must call buildPublicStoryBundle`);
+  } else {
+    const beforeBundle = source.slice(0, buildBundle);
+    const rejectUnpublished = new RegExp(
+      String.raw`if\s*\([^)]*\b${storyVariable}\.status\s*!==\s*"published"[^)]*\)\s*return\s+null\b`,
+    );
+    if (!rejectUnpublished.test(beforeBundle)) {
+      failures.push(`${name} must reject non-published stories before building a public bundle`);
+    }
+    if (!/if\s*\([^)]*\bperson\.living\s*\)\s*return\s+null\b/.test(beforeBundle)) {
+      failures.push(`${name} must reject living subjects before building a public bundle`);
+    }
   }
   if (/buildStoryBundle\([^)]*publicView/.test(source)) {
     failures.push(`${name} must not call buildStoryBundle with publicView`);
@@ -70,7 +78,7 @@ assert.ok(
   publicBundle?.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword),
   "convex/vault.ts must export buildPublicStoryBundle (the public DTO)",
 );
-const publicBundleEnd = publicBundle.body?.getLastToken();
+const publicBundleEnd = publicBundle.body?.getChildren().at(-1);
 assert.ok(
   publicBundleEnd?.kind === ts.SyntaxKind.CloseBraceToken && publicBundleEnd.getWidth() > 0,
   "buildPublicStoryBundle must have a complete function body",
