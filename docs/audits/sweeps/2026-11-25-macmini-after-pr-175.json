@@ -1,0 +1,48 @@
+{
+  "date_utc": "2026-11-25",
+  "machine": "macmini",
+  "release_pr": 175,
+  "production": {
+    "commit": "5d5cf9e61f6f7dbe1d36a5f31f877d46b1985c43",
+    "github_deployment_id": 8051534575,
+    "succeeded_at_utc": "2026-11-25T07:48:43Z",
+    "vercel_deployment_id": "dpl_fEFREiQ5GqFQU3mUDA7ruBHHKqNW",
+    "canonical_alias": "https://assistwithfamilyhistory.com",
+    "canonical_alias_independently_verified": true,
+    "browser_revision_observed": false
+  },
+  "browser": "T3 incognito; owned tab closed",
+  "checks": [
+    {
+      "route": "/",
+      "main": true,
+      "heading": true,
+      "generic_error": false
+    },
+    {
+      "route": "/ai",
+      "main": true,
+      "heading": true,
+      "generic_error": false
+    },
+    {
+      "route": "/mcp",
+      "method": "POST",
+      "body": "omitted",
+      "credentials": "omitted",
+      "status": 401,
+      "bearer_challenge_present": true
+    }
+  ],
+  "unverified": [
+    "authenticated behavior",
+    "provider behavior"
+  ],
+  "publication": {
+    "local_checkout_error_at_utc": "2026-11-25T07:52:17Z",
+    "command": "/bin/pwd -P",
+    "exit_code": 1,
+    "error": "pwd: .: Operation not permitted",
+    "method": "GitHub existing draft branch"
+  }
+}
