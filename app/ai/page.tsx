@@ -180,7 +180,7 @@ export default function AiSetupPage() {
                   ["Choose a compatible client", "It must support remote Streamable HTTP MCP and OAuth. Exact menu names differ by client."],
                   ["Add the MCP address", "Use https://assistwithfamilyhistory.com/mcp as the server URL."],
                   ["Sign in", "Signing in gives the connection every current and future tool in your workspace with no end date by default. You can choose fewer permissions, set an end date, or turn it off at /settings/ai."],
-                  ["Ask for the Family History brief", "Your AI should call family_history_get_brief first, then search and hydrate before changing records."],
+                  ["Start with the tools your connection allows", "If your connection includes the Family History brief, ask your AI to start there. Use the search and context tools your connection allows before changing records."],
                 ].map(([title, copy], index) => (
                   <li key={title} className="grid grid-cols-[2.5rem_1fr] gap-4">
                     <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#98702b]/40 font-mono text-xs font-semibold text-[#98702b]">{index + 1}</span>
@@ -192,7 +192,7 @@ export default function AiSetupPage() {
             <div className="rounded-[2rem] bg-[#24312c] p-6 text-[#fffaf2] sm:p-8">
               <p className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-[#d8b16d]"><Bot className="h-4 w-4" aria-hidden="true" /> First-session instruction</p>
               <blockquote className="mt-6 border-l border-[#d8b16d] pl-5 font-[family-name:var(--font-cormorant-garamond)] text-2xl leading-9">
-                “Start with my Family History brief. Search before creating duplicates, hydrate stable IDs before corrections, preserve source provenance and uncertainty, prefer the complete-result save for a finished pass, and scrub sensitive information before publishing and never permanently delete.”
+                “Start with my Family History brief if this connection allows it. Search before creating duplicates, hydrate stable IDs before corrections, preserve source provenance and uncertainty, prefer the complete-result save for a finished pass, and scrub sensitive information before publishing and never permanently delete.”
               </blockquote>
               <div className="mt-8 grid gap-3 border-t border-[#53635d] pt-6 sm:grid-cols-2">
                 {[

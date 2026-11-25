@@ -35,6 +35,7 @@ import {
   type FamilyHistoryScope,
 } from "../lib/mcp/catalog";
 import {
+  allowsWorkspaceBrief,
   decideToolAccess,
   isGrantExpired,
   type GrantResolution,
@@ -972,7 +973,13 @@ function describeConnection(row: Doc<"mcpGrants"> | null) {
   const state = !row ? "absent" : row.status === "revoked" || row.status === "denied" || row.status === "pending" ? row.status
     : row.pausedAt ? "paused" : isGrantExpired(row, Date.now()) ? "expired" : "active";
   const scopes = row ? effectiveScopes(row) : [];
-  const heldBack = FAMILY_HISTORY_TOOLS.filter(t => state !== "active" || !scopes.includes(t.requiredScope) || (row?.boundary.kind === "queue_only" && !t.requiredScope.includes(":queue:")))
+  const heldBack = FAMILY_HISTORY_TOOLS.filter(tool =>
+    !row
+    || state !== "active"
+    || !scopes.includes(tool.requiredScope)
+    || (row.boundary.kind === "queue_only" && !tool.requiredScope.includes(":queue:"))
+    || (tool.name === "family_history_get_brief" && !allowsWorkspaceBrief(row.boundary)),
+  )
     .map(t => ({ tool: t.name, missingPower: t.requiredScope, reason: state === "active" ? "Power removed or outside the record boundary" : `Connection ${state}`, restore: `Only the person can restore access at ${AI_SETTINGS_URL}` }));
   return { state, revision: row?.revision ?? 0, powers: scopes, boundary: row?.boundary ?? null, withheldScopes: row ? effectiveWithheldScopes(row) : [],
     tools: [...FAMILY_HISTORY_CONTROL_TOOLS.map(t => t.name), ...FAMILY_HISTORY_TOOLS.filter(t => !heldBack.some(h => h.tool === t.name)).map(t => t.name)],

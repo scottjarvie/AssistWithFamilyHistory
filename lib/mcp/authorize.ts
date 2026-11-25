@@ -382,6 +382,11 @@ function boundaryPermits(
 
 /* ------------------------------------------------------------- the decision */
 
+/** The workspace brief has no input that can narrow its owner-wide reads. */
+export function allowsWorkspaceBrief(boundary: GrantBoundary): boolean {
+  return boundary.kind === "whole_workspace";
+}
+
 /**
  * Decide one tool interaction. `input` is omitted for discovery and supplied
  * for a call, so the same predicate answers both questions.
@@ -413,6 +418,10 @@ export function decideToolAccess(params: {
     ...refusal("SCOPE_NOT_GRANTED"), message: `Missing power: ${tool.requiredScope}. Only the person can restore it.`,
     recovery: `Only the person can restore this power at ${CONNECTION_SETTINGS_URL}.`,
   };
+
+  if (tool.name === "family_history_get_brief" && !allowsWorkspaceBrief(grant.boundary)) {
+    return refusal("OUTSIDE_GRANT_BOUNDARY");
+  }
 
   if (input !== undefined) {
     const args = (input ?? {}) as Record<string, unknown>;

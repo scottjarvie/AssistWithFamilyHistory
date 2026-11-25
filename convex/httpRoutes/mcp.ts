@@ -657,7 +657,7 @@ export function createFamilyHistoryServer(
     sections: [
       "When using family_history_limit_connection, include the current revision and a unique opId. A retry of the same operation is safe.",
       QUEUE_AI_INSTRUCTIONS,
-      "Read storage in the brief and upload replies: these are counters only. A USAGE_LIMIT_REACHED refusal affects one upload; keep this connection and retry the same operation after room is available. Start research with family_history_get_brief, search, then hydrate stable IDs before editing.",
+      "Read counter-only storage in upload replies and in the brief when available. A USAGE_LIMIT_REACHED refusal affects one upload; keep this connection and retry the same operation after room is available. Start research with family_history_get_brief if tools/list includes it. Use permitted search and context tools to find and hydrate stable IDs before editing.",
     ],
   });
 
@@ -771,7 +771,11 @@ export function createFamilyHistoryServer(
   registerTool("family_history_get_brief", {
     inputSchema: z.object({}).strict(),
     annotations: readOnly,
-  }, () => read("family_history_get_brief", () => actionCtx.runQuery(mcp.getBrief, { principal,queueRead:!!grant&&effectiveScopes(grant).some(scope=>scope==="family_history:queue:read"||scope==="family_history:queue:work"),queueItemIds:grant?.boundary.queueItemIds?.length?grant.boundary.queueItemIds:undefined,suggestionPersonIds:grant?.boundary.kind==="selected_people"?grant.boundary.personIds??[]:undefined })));
+  }, () => read("family_history_get_brief", () => actionCtx.runQuery(mcp.getBrief, {
+    principal,
+    queueRead: !!grant && effectiveScopes(grant).some(scope => scope === "family_history:queue:read" || scope === "family_history:queue:work"),
+    queueItemIds: grant?.boundary.queueItemIds?.length ? grant.boundary.queueItemIds : undefined,
+  })));
 
   registerTool("family_history_search", {
     inputSchema: z.object({

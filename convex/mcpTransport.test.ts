@@ -742,6 +742,54 @@ describe("reconnecting refreshes the tool list without a session to reset", () =
     }
   });
 
+  test.each(["selected_people", "queue_only"] as const)("narrowing to %s blocks both brief names before private reads on the same token", async kind => {
+    // Convex-test calls this loader when dispatching a function in mcpFamilyHistory.
+    const loadFamilyHistory = vi.fn(modules["./mcpFamilyHistory.ts"]);
+    const t = convexTest(schema, { ...modules, "./mcpFamilyHistory.ts": loadFamilyHistory });
+    const grantId = await approvedConnection(t);
+    const token = await accessToken();
+    const brief = "family_history_get_brief";
+    const listTools = async () => {
+      const response = await t.fetch("/mcp", modernRequest("tools/list", token));
+      const body = await response.json();
+      return body.result.tools.map((tool: { name: string }) => tool.name);
+    };
+    const callBrief = async (name: string) => {
+      const response = await t.fetch("/mcp", modernRequest("tools/call", token, { name, arguments: {} }, name));
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.error).toBeUndefined();
+      return body.result;
+    };
+
+    expect(await listTools()).toContain(brief);
+    expect(await callBrief(brief)).toMatchObject({
+      structuredContent: { workspace: "Assist With Family History", recentPeople: [] },
+    });
+    expect(loadFamilyHistory).toHaveBeenCalled();
+    loadFamilyHistory.mockClear();
+
+    await t.run(async ctx => {
+      const id = ctx.db.normalizeId("mcpGrants", grantId)!;
+      await ctx.db.patch(id, { boundary: kind === "selected_people" ? { kind, personIds: ["synthetic-person"] } : { kind } });
+    });
+    const names = await listTools();
+    expect(names).not.toContain(brief);
+    expect(names).not.toContain("get_family_history_brief");
+    expect(names).toContain("family_history_get_queue");
+    if (kind === "selected_people") expect(names).toContain("family_history_search");
+
+    const denied = await callBrief(brief);
+    expect(denied).toMatchObject({
+      resultType: "complete",
+      isError: true,
+      structuredContent: { error: { code: "OUTSIDE_GRANT_BOUNDARY", message: expect.any(String), recovery: expect.any(String) } },
+    });
+    expect(JSON.parse(denied.content[0].text)).toEqual(denied.structuredContent.error);
+    expect(await callBrief("get_family_history_brief")).toEqual(denied);
+    expect(loadFamilyHistory).not.toHaveBeenCalled();
+  });
+
   test("a tools/list after revocation returns the refusal, not a cached catalog", async () => {
     const t = convexTest(schema, modules);
     const grantId = await approvedConnection(t);
