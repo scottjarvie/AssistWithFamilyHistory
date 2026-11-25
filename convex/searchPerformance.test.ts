@@ -6,6 +6,80 @@ import { api, internal } from "./_generated/api";
 import { withSearchWrites } from "./searchWrites";
 const modules = import.meta.glob("./**/*.ts");
 const principal = { issuer: "https://synthetic.example", subject: "user_search_synthetic", clientId: "synthetic", scopes: ["family_history:read"] };
+
+function syntheticPerson(given: string) {
+  return {
+    vaultOwnerId: principal.subject,
+    name: { given, surname: "Synthetic" },
+    sex: "unknown" as const,
+    living: false,
+    researchStatus: "basic" as const,
+    createdAt: 1,
+    updatedAt: 1,
+  };
+}
+
+test("a full recent window signals uncertainty with one or zero matches", async () => {
+  const t = convexTest(schema, modules);
+  const oldest = await t.run(async ctx => {
+    const id = await ctx.db.insert("persons", syntheticPerson("Rareancestor"));
+    for (let i = 0; i < 250; i++) await ctx.db.insert("persons", syntheticPerson("Common"));
+    return id;
+  });
+  const search = (query: string) => t.query(internal.mcpFamilyHistory.search, { principal, query, kinds: ["person"] });
+  expect(await search("Rareancestor")).toMatchObject({
+    results: [{ id: oldest }],
+    truncated: true,
+    coverage: {
+      visitedKinds: [{ kind: "person", source: "recent_window", windowReached: true, matchesOmitted: false }],
+      unvisitedKinds: [],
+      replyCapReached: false,
+    },
+  });
+  await t.run(ctx => ctx.db.insert("persons", syntheticPerson("Common")));
+  expect(await search("Rareancestor")).toMatchObject({
+    results: [], truncated: true,
+    coverage: { visitedKinds: [{ kind: "person", windowReached: true }], replyCapReached: false },
+  });
+  while (!await t.mutation(internal.searchBackfill.step, { table: "persons" })) { /* page through migration */ }
+  expect(await search("Rareancestor")).toMatchObject({
+    results: [{ id: oldest }], truncated: false,
+    coverage: { visitedKinds: [{ kind: "person", source: "text_index" }], replyCapReached: false },
+  });
+  expect((await search("")).coverage).toMatchObject({
+    visitedKinds: [{ kind: "person", source: "recent_window", windowReached: true, matchesOmitted: true }],
+  });
+});
+
+test("reply cap separates proven omitted matches from kinds the search never visited", async () => {
+  const t = convexTest(schema, modules);
+  const first = await t.run(ctx => ctx.db.insert("persons", syntheticPerson("Common")));
+  const search = () => t.query(internal.mcpFamilyHistory.search, {
+    principal, query: "Common", kinds: ["topic", "place", "source", "person"], limit: 1,
+  });
+  expect(await search()).toMatchObject({
+    results: [{ kind: "person", id: first }], truncated: true,
+    coverage: {
+      visitedKinds: [{ kind: "person", source: "recent_window", windowReached: false, matchesOmitted: false }],
+      unvisitedKinds: ["source", "place", "topic"],
+      replyCapReached: true,
+    },
+  });
+  const newest = await t.run(ctx => ctx.db.insert("persons", syntheticPerson("Common")));
+  expect(await search()).toMatchObject({
+    results: [{ kind: "person", id: newest }], truncated: true,
+    coverage: { visitedKinds: [{ kind: "person", source: "recent_window", windowReached: false, matchesOmitted: true }] },
+  });
+  await t.mutation(internal.searchBackfill.step, { table: "persons" });
+  const indexed = await search();
+  expect(indexed.results).toHaveLength(1);
+  expect(indexed.truncated).toBe(true);
+  expect(indexed.coverage).toEqual({
+    status: "reported", visitedKinds: [{ kind: "person", source: "text_index" }],
+    unvisitedKinds: ["source", "place", "topic"], replyCapReached: true,
+  });
+});
+
 test("migration gates old-row search; indexed names, aliases and tags survive edits without cross-owner or archived hits", async () => {
  const t = convexTest(schema, modules);
  const id = await t.run(async ctx => {

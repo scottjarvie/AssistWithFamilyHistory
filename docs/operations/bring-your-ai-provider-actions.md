@@ -6,8 +6,8 @@ The active media branch adds source code for a private B2 image path and two
 new MCP upload tools. It is **not deployed or provider-configured**. The live
 fourteen-tool/six-permission statements later in this file remain correct for
 the currently observed deployment; the branch will publish sixteen tools and
-seven product permissions only after its normal PR, CI, Convex-first Vercel
-build, and live proof all pass.
+seven product permissions only after its normal PR, CI, coordinated Vercel
+deployment, and live proof all pass.
 
 Read-only audit on 2026-09-02 established three facts without reading any
 secret value:
@@ -68,7 +68,8 @@ existing conversation retains the old network policy.
 > `assistwithfamilyhistory.com`. Section 0 below is kept as the historical
 > record of a deploy that has already happened; **do not perform it again.**
 > Deployment is not a ceremony in this repository: Vercel auto-deploys `main`,
-> and `scripts/vercel-build.mjs` deploys Convex first as part of that build.
+> and `scripts/vercel-build.mjs` coordinates the Next.js build and Convex push
+> before Vercel releases the frontend.
 > Pushing to `main` *is* the deploy.
 >
 > Proof, re-probed read-only:
@@ -378,7 +379,7 @@ pnpm verify                                        # expect: All 57 verification
 pnpm exec tsc --noEmit -p convex/tsconfig.json      # expect: no output, exit 0
 ```
 
-### 0c. Ordering — the Convex backend goes first, and the build already does it
+### 0c. Build and release order
 
 `vercel.json` sets the build command to `node scripts/vercel-build.mjs`. With a
 production `CONVEX_DEPLOY_KEY` present — and it **is** present on Vercel
@@ -388,10 +389,10 @@ Production, confirmed 2026-08-17 — that wrapper runs:
 npx --no-install convex deploy --cmd 'npx --no-install next build'
 ```
 
-`convex deploy --cmd` pushes the Convex functions and schema **first**, then runs
-the Next.js build against the deployed backend, and only then does Vercel publish
-the frontend. That is the ordering this release needs: the new `family_history_*`
-tools and the new tables must exist before any page can call them.
+For this production command, the pinned Convex CLI (1.39.1) runs the Next.js
+build first. If it succeeds, the CLI pushes the Convex functions and schema.
+Vercel can publish the built frontend only after the configured command
+succeeds, including the Convex push.
 
 So the deploy is a single act — publishing `$SHA` to Vercel Production — not two.
 **Do not also run `convex deploy` by hand.** It takes no `--prod` flag because it
@@ -503,7 +504,7 @@ pnpm exec tsc --noEmit -p convex/tsconfig.json  # expect: no output, exit 0
 # the modules on disk, so the typecheck above is a real fresh-bindings typecheck —
 # the same thing `convex deploy` does. This is what 0·0 said the gate used to miss.
 
-# ── the deploy · one act, Convex first, then the frontend ─────────────────────
+# ── the deploy · Next build, Convex push, then frontend release ──────────────
 pnpm dlx vercel@latest deploy --prod --yes
 # Do NOT also run `convex deploy` by hand. The build already did it.
 
@@ -765,9 +766,9 @@ NEXT_PUBLIC_CONVEX_SITE_URL
 Confirm the list yourself with `pnpm dlx vercel@latest env ls production`. Two notes
 that matter for this release:
 
-- `CONVEX_DEPLOY_KEY` being present is what makes item 0c's backend-first
-  ordering automatic. If it were removed, Vercel would ship the new frontend
-  against the old backend — the exact drift GEN-110 exists to prevent.
+- A valid production `CONVEX_DEPLOY_KEY` is required for item 0c's coordinated
+  deployment. With a missing or mismatched key, the production wrapper fails
+  before invoking the build.
 - `CONVEX_SITE_URL` is **not** set, and does not need to be.
   `lib/mcp/proxy.ts` derives the `.convex.site` origin from
   `NEXT_PUBLIC_CONVEX_URL` when it is absent, which is why `/mcp` proxies

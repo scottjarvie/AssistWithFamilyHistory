@@ -45,7 +45,9 @@ explicit or ambiguous end dates stay enforced.
 - Source mutations must use `convex/searchServer.ts` builders ([projections](docs/operations/people-explorer-scale.md),
   [counters](docs/operations/vault-counts-scale.md)).
 - `pnpm verify` is the full check (typecheck, lint, tests, wired `check:*`, build); run it before pushing code.
-- Merging to `main` deploys production (`convex deploy`, then the Next build).
+- Merging to `main` triggers Vercel production deployment. The configured
+  Convex CLI runs the Next build, then pushes Convex before Vercel can release
+  the frontend.
   Never run `convex deploy`, `dev` or `codegen` by hand against production.
 - Vercel builds only `main` and `preview/*`; CI runs `pnpm verify` on ready PRs.
   Read the [CI policy](docs/operations/ci-review-and-preview-policy.md)

@@ -1,5 +1,5 @@
-import { searchText } from "./searchWrites";
-import { searchRows } from "./searchRows";
+import { searchText, type SearchTable } from "./searchWrites";
+import { searchRows, type SearchRowCoverage } from "./searchRows";
 import { summaryFor, limitsFor, assertWriteBatch, fileCapsFor } from "./usageLimits";
 import {queueIdentity,suggestionWithinPeople} from "../lib/queue/identity";
 import { loadStoryScopedSnapshot, buildStoryBundle, buildPublicStoryBundle, buildAiStoryContext } from "./vault";
@@ -1511,8 +1511,15 @@ export const search = internalQuery({
     const needle = args.query.trim().toLowerCase();
     if ((needle.match(/[\p{L}\p{N}]+/gu)?.length ?? 0) > 16) machineError("VALIDATION_ERROR", "Search accepts at most 16 terms.", "Use a shorter name or phrase.");
     const limit = Math.max(1, Math.min(Math.floor(args.limit ?? 25), FAMILY_HISTORY_MCP_LIMITS.searchLimit));
-    const kinds = new Set(args.kinds?.length ? args.kinds : ["person", "source", "place", "topic", "story", "research_task", "research_finding", "event"]);
+    const searchOrder = ["person", "source", "story", "research_task", "research_finding", "event", "place", "topic"];
+    const kinds = new Set(args.kinds?.length ? args.kinds : searchOrder);
     const results: Array<Record<string, unknown>> = [];
+    const visitedKinds: Array<{ kind: string } & SearchRowCoverage> = [];
+    const readKind = async <T extends SearchTable>(kind: string, table: T) => {
+      const { rows, coverage } = await searchRows(ctx, table, owner, needle, limit - results.length);
+      visitedKinds.push({ kind, ...coverage });
+      return rows;
+    };
     const add = (kind: string, rows: Array<Record<string, unknown>>) => {
       for (const row of rows) if (results.length < limit) results.push({ kind, ...row });
     };
@@ -1523,38 +1530,56 @@ export const search = internalQuery({
         const normalized = ctx.db.normalizeId("persons", id);
         const row = normalized ? await ctx.db.get(normalized) : null;
         return row && matchesVaultOwner(row.vaultOwnerId, owner) && row.archivedAt === undefined ? row : null;
-      }))).filter((row): row is Doc<"persons"> => row !== null).filter(row => searchText("persons", row).toLowerCase().includes(needle)).slice(0, limit) : await searchRows(ctx, "persons", owner, needle, limit - results.length);
+      }))).filter((row): row is Doc<"persons"> => row !== null).filter(row => searchText("persons", row).toLowerCase().includes(needle)).slice(0, limit) : await readKind("person", "persons");
       add("person", rows.map((row) => ({ id: row._id, name: `${row.name.given} ${row.name.surname}`.trim(), living: row.living, researchStatus: row.researchStatus, updatedAt: row.updatedAt })));
     }
     if (!args.personIds && kinds.has("source") && results.length < limit) {
-      const rows = await searchRows(ctx, "sources", owner, needle, limit - results.length);
+      const rows = await readKind("source", "sources");
       add("source", rows.map((row) => ({ id: row._id, title: row.title, type: row.type, repository: row.repository, updatedAt: row.updatedAt })));
     }
     if (!args.personIds && kinds.has("story") && results.length < limit) {
-      const rows = await searchRows(ctx, "stories", owner, needle, limit - results.length);
+      const rows = await readKind("story", "stories");
       add("story", rows.map((row) => ({ id: row._id, title: row.title, type: row.type, status: row.status, personId: row.personId, updatedAt: row.updatedAt })));
     }
     if (!args.personIds && kinds.has("research_task") && results.length < limit) {
-      const rows = await searchRows(ctx, "researchTasks", owner, needle, limit - results.length);
+      const rows = await readKind("research_task", "researchTasks");
       add("research_task", rows.map((row) => ({ id: row._id, title: row.title, status: row.status, priority: row.priority, personId: row.personId, updatedAt: row.updatedAt })));
     }
     if (!args.personIds && kinds.has("research_finding") && results.length < limit) {
-      const rows = await searchRows(ctx, "researchLog", owner, needle, limit - results.length);
+      const rows = await readKind("research_finding", "researchLog");
       add("research_finding", rows.map((row) => ({ id: row._id, summary: row.summary, entityType: row.entityType, entityId: row.entityId, status: row.status, updatedAt: row.updatedAt })));
     }
     if (!args.personIds && kinds.has("event") && results.length < limit) {
-      const rows = await searchRows(ctx, "events", owner, needle, limit - results.length);
+      const rows = await readKind("event", "events");
       add("event", rows.map((row) => ({ id: row._id, type: row.type, customType: row.customType, date: row.date, place: row.place, description: row.description, updatedAt: row.updatedAt })));
     }
     if (!args.personIds && kinds.has("place") && results.length < limit) {
-      const rows = await searchRows(ctx, "places", owner, needle, limit - results.length);
+      const rows = await readKind("place", "places");
       add("place", rows.map((row) => ({ id: row._id, name: row.name, fullName: row.fullName, type: row.type, parentId: row.parentId, updatedAt: row.updatedAt })));
     }
     if (!args.personIds && kinds.has("topic") && results.length < limit) {
-      const rows = await searchRows(ctx, "topics", owner, needle, limit - results.length);
+      const rows = await readKind("topic", "topics");
       add("topic", rows.map((row) => ({ id: row._id, name: row.name, kind: row.kind, updatedAt: row.updatedAt })));
     }
-    return { query: args.query, results, limit, truncated: results.length === limit, nextRecommendedTool: "get_family_history_context" };
+    const replyCapReached = results.length === limit;
+    const windowReached = visitedKinds.some(read => read.source === "recent_window" && read.windowReached);
+    // A full reply is potentially truncated even when the indexed take cannot
+    // establish that more matches exist. A full recent window matters even
+    // when it yields no matches.
+    return {
+      query: args.query,
+      results,
+      limit,
+      truncated: replyCapReached || windowReached,
+      // Selected-person diagnostics stay independent of owner-wide search state.
+      coverage: args.personIds ? { status: "unavailable" as const } : {
+        status: "reported" as const,
+        visitedKinds,
+        unvisitedKinds: searchOrder.filter(kind => kinds.has(kind) && !visitedKinds.some(read => read.kind === kind)),
+        replyCapReached,
+      },
+      nextRecommendedTool: "get_family_history_context",
+    };
   },
 });
 
