@@ -1,6 +1,6 @@
 import { ConvexError } from "convex/values";
 import { normalizeAudioMime, validateAudioContainer, audioContainerError, checkVoiceNoteDuration, voiceNoteTooLongError } from "../../convex/lib/media/audio";
-import sharp from "sharp";
+import sharp, { type Raw } from "sharp";
 import type { EvidenceB2Head } from "./evidenceB2";
 import { sha256Hex } from "./evidenceB2";
 import { extractEvidenceMetadata } from "./evidenceMetadata";
@@ -53,10 +53,10 @@ async function cleanRendition(
   slot: EvidenceRenditionSlot,
   cap: number,
   edge = EDGE[slot],
-  limitInputPixels?: number,
+  raw?: Raw,
 ): Promise<{ bytes: Uint8Array; width: number; height: number }> {
   for (const quality of QUALITY) {
-    const encoded = await sharp(Buffer.from(original), { failOn: "warning", limitInputPixels })
+    const encoded = await sharp(Buffer.from(original), { failOn: "warning", raw })
       .rotate()
       .resize({
         width: edge,
@@ -83,16 +83,27 @@ export async function makeWebsiteEvidenceCopies(
   maxEdge: number,
 ) {
   const limitInputPixels = 32_000_000;
-  const metadata = await sharp(Buffer.from(original), { failOn: "warning", limitInputPixels }).metadata();
+  const source = sharp(Buffer.from(original), { failOn: "warning", limitInputPixels });
+  const metadata = await source.metadata();
   if (metadata.format !== WEBSITE_IMAGE_FORMATS.get(mimeType) || (metadata.pages ?? 1) !== 1 ||
       !metadata.width || !metadata.height || metadata.width * metadata.height > limitInputPixels ||
       (metadata.format === "heif" && metadata.compression !== "hevc")) {
     throw new Error("Unsupported or invalid evidence image.");
   }
-  const tiny = await cleanRendition(original, "tiny", WEBSITE_PHOTO_COPY_BYTES.tiny, EDGE.tiny, limitInputPixels);
+  // Decode the compressed source once. Quality retries work from the bounded,
+  // orientation-corrected pixels, with no access to original metadata.
+  const { data, info } = await source
+    .rotate()
+    .resize({ width: maxEdge, height: maxEdge, fit: "inside", withoutEnlargement: true })
+    .flatten({ background: "#ffffff" })
+    .toColourspace("srgb")
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const raw = { width: info.width, height: info.height, channels: info.channels };
+  const tiny = await cleanRendition(data, "tiny", WEBSITE_PHOTO_COPY_BYTES.tiny, EDGE.tiny, raw);
   // A difficult image can fit after downscaling even when it did not fit at
   // the preferred size.
-  const medium = await cleanRendition(original, "medium", WEBSITE_PHOTO_COPY_BYTES.medium, maxEdge, limitInputPixels)
+  const medium = await cleanRendition(data, "medium", WEBSITE_PHOTO_COPY_BYTES.medium, maxEdge, raw)
     .catch(() => tiny);
   return { medium: Uint8Array.from(medium.bytes).buffer, tiny: Uint8Array.from(tiny.bytes).buffer };
 }

@@ -430,10 +430,11 @@ export const renderWebsitePhotoCopies = internalAction({
     grantId: v.optional(v.string()),
     mediaId: v.id("media"),
     originalId: v.id("_storage"),
+    expectedSizeBytes: v.number(),
   },
-  handler: async (ctx, args): Promise<{ medium: ArrayBuffer; tiny: ArrayBuffer } | null> => {
+  handler: async (ctx, { expectedSizeBytes, ...args }): Promise<{ medium: ArrayBuffer; tiny: ArrayBuffer } | null> => {
     const source = await ctx.runQuery(internal.mcpEvidence.authorizeWebsitePhoto, args);
-    if (!source) return null;
+    if (!source || source.sizeBytes !== expectedSizeBytes) return null;
     const blob = await ctx.storage.get(args.originalId);
     if (!blob || blob.size !== source.sizeBytes) return null;
     const original = new Uint8Array(await blob.arrayBuffer());

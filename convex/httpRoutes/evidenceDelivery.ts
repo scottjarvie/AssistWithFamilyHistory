@@ -1,11 +1,13 @@
 import type { FunctionArgs } from "convex/server";
 import { FAMILY_HISTORY_MCP_LIMITS, hashMcpInput } from "../../lib/mcp/contract";
 import { hasEmbeddedImageMetadata, sniffEvidenceFile, sniffEvidenceImage } from "../../lib/media/evidenceStandard";
+import { WEBSITE_PHOTO_COPY_BYTES } from "../../lib/media/evidenceWebsite";
 import { internal } from "../_generated/api";
 import type { ActionCtx } from "../_generated/server";
 import { normalizeAudioMime } from "../lib/media/audio";
 import { AI_COPY_MAX_BYTES, MEDIA_READ_LABELS, planMediaReply } from "../lib/mcpConnector/mediaRead";
 import { EVIDENCE_SKIP_GUIDANCE, type EvidenceSkipReason } from "../mcpEvidence";
+import type { Id } from "../_generated/dataModel";
 
 type BatchArgs = FunctionArgs<typeof internal.mcpEvidence.getEvidenceBatch>;
 type Choice = {
@@ -23,7 +25,11 @@ type Candidate = {
   text?: string;
   transcript?: string;
   originalSizeBytes?: number;
+  websitePhoto?: { mediaId: Id<"media">; originalId: Id<"_storage">; sizeBytes: number };
 };
+
+const MAX_WEBSITE_PHOTO_ATTEMPTS = 2;
+const MAX_WEBSITE_PHOTO_SOURCE_BYTES = 50 * 1024 * 1024;
 
 function base64FromBytes(bytes: Uint8Array): string {
   let binary = "";
@@ -97,20 +103,19 @@ export async function deliverEvidence(
     key: crypto.getRandomValues(new Uint8Array(32)).buffer,
   });
   const cursorKey = await crypto.subtle.importKey("raw", key, { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
-  // The outer tag authenticates the live selection before we read or render
-  // anything. The shared planner also checks the exact rendition sizes below.
-  const selectionMessage = (inner: string) => new TextEncoder().encode(JSON.stringify(["family-evidence-v1", requestKey, inner]));
+  const selectionMessage = (offset: number) => new TextEncoder().encode(JSON.stringify(["family-evidence-v2", requestKey, offset]));
+  const selectionLength = batch.delivered.length + batch.stored.length + batch.b2Stored.length;
   const resuming = cursor !== undefined;
-  let innerCursor: string | undefined;
+  let offset = 0;
   if (resuming) {
-    const match = /^(m1\.[1-9]\d{0,15}\.[0-9a-f]{64})\.([0-9a-f]{64})$/.exec(cursor);
+    const match = /^e2\.([1-9]\d?)\.([0-9a-f]{64})$/.exec(cursor);
     if (!match || match[0] !== cursor) return invalidCursor();
+    offset = Number(match[1]);
     const tag = Uint8Array.from(match[2].match(/../g)!, byte => Number.parseInt(byte, 16));
-    if (!await crypto.subtle.verify("HMAC", cursorKey, tag, selectionMessage(match[1]))) return invalidCursor();
-    innerCursor = match[1];
+    if (offset >= selectionLength || !await crypto.subtle.verify("HMAC", cursorKey, tag, selectionMessage(offset))) return invalidCursor();
   }
 
-  const candidates: Candidate[] = batch.delivered.map(item => ({
+  const selection: Candidate[] = batch.delivered.map(item => ({
     ...item, kind: "document",
     copies: [{ id: "inline", sizeBytes: item.sizeBytes, mimeType: item.mimeType }],
   }));
@@ -123,7 +128,7 @@ export async function deliverEvidence(
 
   for (const item of batch.stored) {
     if (!item.clean) {
-      candidates.push({
+      selection.push({
         ...item, kind: "file",
         copies: [{
           id: "inline", sizeBytes: item.sizeBytes, mimeType: item.mimeType,
@@ -139,22 +144,15 @@ export async function deliverEvidence(
       });
       continue;
     }
-    const photo = { principal, grantId, mediaId: item.id, originalId: item.storageId };
-    const copies = await actionCtx.runAction(internal.mediaEvidenceStorage.renderWebsitePhotoCopies, photo).catch(() => null);
-    if (!copies) {
-      if (!resuming) omit(item.id, item.kind, "CLEAN_COPY_UNAVAILABLE");
-      continue;
-    }
-    candidates.push({
+    selection.push({
       ...item, kind: "image", originalSizeBytes: item.sizeBytes,
-      copies: (["medium", "tiny"] as const).map(slot => ({
-        id: slot, sizeBytes: copies[slot].byteLength, mimeType: "image/jpeg",
-        read: () => Promise.resolve(new Uint8Array(copies[slot])),
-      })),
+      websitePhoto: { mediaId: item.id, originalId: item.storageId, sizeBytes: item.sizeBytes },
+      // Reserve enough reply space for the tiny rendition before opening the source.
+      copies: [{ id: "tiny", sizeBytes: WEBSITE_PHOTO_COPY_BYTES.tiny, mimeType: "image/jpeg" }],
     });
   }
   for (const item of batch.b2Stored) {
-    candidates.push({
+    selection.push({
       ...item, kind: item.copies[0].slot === "original" ? "file" : "image",
       copies: item.copies.map(({ slot, file }) => ({
         id: slot, sizeBytes: file.sizeBytes, mimeType: file.contentType.toLowerCase(),
@@ -174,7 +172,7 @@ export async function deliverEvidence(
     });
   }
 
-  const plan = await planMediaReply(candidates.map(item => ({
+  const planFor = (items: Candidate[]) => planMediaReply(items.map(item => ({
     id: item.id,
     kind: item.kind,
     copies: item.copies.map(choice => ({
@@ -182,8 +180,44 @@ export async function deliverEvidence(
       sizeBytes: choice.sizeBytes + (item.transcript ? textSize(item.transcript) : 0),
       longEdge: choice.longEdge,
     })),
-  })), { requestKey, cursorKey, cursor: innerCursor, budget: { maxItems: FAMILY_HISTORY_MCP_LIMITS.evidenceItems } });
-  if (!plan.ok) return invalidCursor();
+  })), { requestKey, cursorKey, budget: { maxItems: FAMILY_HISTORY_MCP_LIMITS.evidenceItems } });
+
+  const candidates: Candidate[] = [];
+  let attempts = 0;
+  let sourceBytes = 0;
+  let stop: "source" | "reply" = "reply";
+  for (; offset < selection.length; offset++) {
+    const item = selection[offset];
+    const photo = item.websitePhoto;
+    const proposed = await planFor([...candidates, item]);
+    if (!proposed.ok || proposed.nextCursor) break;
+    if (photo) {
+      // A transcript can make the reservation too large even when the actual
+      // tiny copy fits. Give it a fresh page before reading the source.
+      if (proposed.send.at(-1)?.status === "placeholder" && candidates.length) break;
+      if (attempts >= MAX_WEBSITE_PHOTO_ATTEMPTS || sourceBytes + photo.sizeBytes > MAX_WEBSITE_PHOTO_SOURCE_BYTES) {
+        stop = "source";
+        break;
+      }
+      attempts++;
+      sourceBytes += photo.sizeBytes;
+      const copies = await actionCtx.runAction(internal.mediaEvidenceStorage.renderWebsitePhotoCopies, {
+        principal, grantId, mediaId: photo.mediaId, originalId: photo.originalId, expectedSizeBytes: photo.sizeBytes,
+      }).catch(() => null);
+      item.copies = copies && copies.tiny.byteLength > 0 && copies.tiny.byteLength <= WEBSITE_PHOTO_COPY_BYTES.tiny
+        ? (["medium", "tiny"] as const).filter(slot => copies[slot].byteLength > 0 &&
+          copies[slot].byteLength <= WEBSITE_PHOTO_COPY_BYTES[slot]).map(slot => ({
+          id: slot, sizeBytes: copies[slot].byteLength, mimeType: "image/jpeg",
+          read: () => Promise.resolve(new Uint8Array(copies[slot])),
+        }))
+        : [];
+    }
+    candidates.push(item);
+  }
+  const plan = await planFor(candidates);
+  if (!plan.ok || plan.nextCursor || (!candidates.length && offset < selection.length)) {
+    throw new Error("Evidence page did not fit.");
+  }
 
   const blocks: (ReturnType<typeof evidenceBlock> | { type: "text"; text: string })[] = [];
   const delivered: {
@@ -195,7 +229,7 @@ export async function deliverEvidence(
     const item = byId.get(pick.id)!;
     const kind = item.kind === "document" ? "document" : "media";
     if (pick.status === "placeholder") {
-      omit(item.id, kind, "TOO_LARGE");
+      omit(item.id, kind, item.websitePhoto && !item.copies.length ? "CLEAN_COPY_UNAVAILABLE" : "TOO_LARGE");
       continue;
     }
     const selected = item.copies.find(copy => copy.id === pick.copy.id)!;
@@ -228,13 +262,15 @@ export async function deliverEvidence(
     }
     if (!success) omit(item.id, kind, item.kind === "image" ? "CLEAN_COPY_UNAVAILABLE" : "BYTES_NOT_AVAILABLE");
   }
-  const nextCursor = plan.nextCursor ? plan.nextCursor + "." + hex(new Uint8Array(
-    await crypto.subtle.sign("HMAC", cursorKey, selectionMessage(plan.nextCursor)),
+  const nextCursor = offset < selection.length ? `e2.${offset}.` + hex(new Uint8Array(
+    await crypto.subtle.sign("HMAC", cursorKey, selectionMessage(offset)),
   )) : null;
   const summary = {
     delivered,
     skipped,
-    ...(nextCursor ? { nextCursor, note: plan.nextPageLabel } : {
+    ...(nextCursor ? { nextCursor, note: `${stop === "source"
+      ? "This page reached the website photo processing limit."
+      : "The reply size limit leaves too little room to safely plan the next item."} Call again with the same items and nextCursor as cursor.` } : {
       note: skipped.length ? "Some items could not be delivered. Each item says why and what to do." : "Every item on this page was delivered.",
     }),
   };

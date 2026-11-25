@@ -926,7 +926,7 @@ test("website photos are cleaned on demand and paged with inline documents and f
 
   const first = (await read()).result;
   const cursor = first.structuredContent.nextCursor;
-  expect(cursor).toMatch(/^m1\./);
+  expect(cursor).toMatch(/^e2\.2\./);
   expect(first.structuredContent.delivered.map((item: { id: string }) => item.id)).toEqual(items.slice(0, 2).map(item => item.id));
   expect(first.structuredContent.skipped).toMatchObject([
     { id: items[3].id, reason: "AI_USE_NOT_ALLOWED" }, { id: unapprovedId, reason: "NOT_REVIEWED" },
