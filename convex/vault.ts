@@ -1621,7 +1621,12 @@ export const getPersonOverview = internalQuery({
     return {
       person, stats, operations, importRuns, researchLog, researchChecks,
       contextCoverage, sources, sourceFacts, timeline, relationships, provisionalRelatives,
-      places, media, researchTasks,
+      places, researchTasks,
+      // The scoped loader has already checked owner and person membership.
+      media: media.map(({ personIds, ...card }) => {
+        void personIds;
+        return card;
+      }),
       contextItems: contextItems.map((item) => ({
         _id: item._id,
         title: item.title,

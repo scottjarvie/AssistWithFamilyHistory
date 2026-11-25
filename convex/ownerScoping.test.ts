@@ -514,7 +514,7 @@ describe("guarded private reads", () => {
     const baseline = await owner.action(api.vaultReads.getPersonWorkspace, { ...input, documentsMetadataOnly: true });
     const overview = await owner.action(api.vaultReads.getPersonOverview, input);
     if (!baseline || !overview) throw new Error("Missing synthetic dossier");
-    const { stories, documents, events, citations, relatedPeople, contextItems, ...eagerFields } = baseline;
+    const { stories, documents, events, citations, relatedPeople, media, contextItems, ...eagerFields } = baseline;
     expect(stories).toHaveLength(49);
     expect(documents).toHaveLength(2);
     expect(overview).not.toHaveProperty("events");
@@ -527,6 +527,10 @@ describe("guarded private reads", () => {
     expect(relatedPeople).toContainEqual(expect.objectContaining({ _id: a.relative }));
     expect(overview).toEqual({
       ...eagerFields,
+      media: media.map(({ personIds, ...card }) => {
+        expect(personIds).toEqual([a.primary]);
+        return card;
+      }),
       contextItems: contextItems.map(({ _id, title, itemType, evidenceRole, content, sourceLabel,
         privacyLevel, reviewStatus, aiUseAllowed, updatedAt }) => ({
         _id, title, itemType, evidenceRole, content, sourceLabel, privacyLevel, reviewStatus, aiUseAllowed, updatedAt,
@@ -558,6 +562,41 @@ describe("guarded private reads", () => {
     expect((await owner.action(api.vaultReads.getPersonOverview, input))?.storyTab.ids).not.toContain(stories[0]._id);
     await t.run(ctx => ctx.db.patch(a.primary, { archivedAt: now }));
     await expect(readPage([stories[1]._id])).resolves.toBeNull();
+  });
+
+  test("the website Overview keeps a linked media card without stored person references", async () => {
+    const t = convexTest(schema, modules);
+    const { primary, relative, foreign, media } = await t.run(async (ctx) => {
+      const primary = await ctx.db.insert("persons", personFields(OWNER_A, "Primary", "Synthetic"));
+      const relative = await ctx.db.insert("persons", personFields(OWNER_A, "Relative", "Synthetic"));
+      const foreign = await ctx.db.insert("persons", personFields(OWNER_B, "Foreign", "Synthetic"));
+      // Seed the malformed historical row directly, including its foreign reference.
+      const media = await ctx.db.insert("media", {
+        ...mediaFields(OWNER_A, "TEST synthetic photo", [primary, relative, foreign]),
+        url: "https://example.invalid/synthetic-photo.jpg",
+        mimeType: "image/jpeg",
+        privacyReviewNote: "TEST synthetic review",
+      });
+      return { primary, relative, foreign, media };
+    });
+    const owner = t.withIdentity({ subject: OWNER_A });
+    const input = { vaultOwnerId: OWNER_A, personIdentifier: primary };
+    const workspace = await owner.action(api.vaultReads.getPersonWorkspace, input);
+    expect(workspace?.media).toHaveLength(1);
+    const { personIds, ...card } = workspace!.media[0];
+    expect(personIds).toEqual([primary, relative, foreign]);
+    expect(card._id).toBe(media);
+
+    for (const personIdentifier of [primary, relative]) {
+      const overview = await owner.action(api.vaultReads.getPersonOverview, { ...input, personIdentifier });
+      expect(overview?.media).toStrictEqual([card]);
+      expect(overview?.stats.memories).toBe(1);
+      expect(JSON.stringify(overview)).not.toContain(foreign);
+    }
+    const foreignOverview = await t.withIdentity({ subject: OWNER_B }).action(api.vaultReads.getPersonOverview, {
+      vaultOwnerId: OWNER_B, personIdentifier: foreign,
+    });
+    expect(foreignOverview?.media).toEqual([]);
   });
 
   test("the website Overview keeps context display fields without stored cross-vault references", async () => {
