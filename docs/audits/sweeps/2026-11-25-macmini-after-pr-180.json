@@ -1,0 +1,13 @@
+{
+  "date_utc": "2026-11-25",
+  "observed_at_utc": "2026-11-25 15:40:16",
+  "machine": "macmini",
+  "production_handoff_commit": "1507a151fb5c18fde8da5a844ff175162611eb11",
+  "coordinator_reported_ready_utc": "2026-11-25 15:38:17",
+  "driver_reported_change": "test-only; no runtime diff",
+  "serving_metadata_independently_verified": false,
+  "browser": "T3 preview incognito; reported hidden; tab closed",
+  "home": {"main": true, "heading": true, "generic_error": false},
+  "gate": {"route": "/app/people/[personId]", "method": "GET", "status": 307, "raw_location": "relative /sign-in", "exact_synthetic_path_preserved": true, "matches_prior_179": true},
+  "constraints": "One synthetic credential-free request, no redirect follow; no signed-in account, real data, provider operation, app write or MCP probe."
+}
