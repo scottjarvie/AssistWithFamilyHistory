@@ -1,4 +1,5 @@
 import { FAMILY_HISTORY_CONTROL_TOOLS } from "../lib/mcp/catalog";
+import { readFileSync } from "node:fs";
 /// <reference types="vite/client" />
 
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
@@ -990,8 +991,20 @@ test("website photos are cleaned on demand and paged with inline documents and f
 test("website WebM and UTF-16 evidence keeps its exact bytes after type checks", async () => {
   const t = convexTest(schema, modules);
   await approvedConnection(t);
+  const fixture = readFileSync("lib/media/fixtures/audio/video.webm");
+  const video = Uint8Array.from(fixture);
+  const segmentSizeAt = fixture.indexOf(Buffer.from("18538067", "hex")) + 4;
+  const clusterSizeAt = fixture.indexOf(Buffer.from("1f43b675", "hex")) + 4;
+  const streamingVideo = video.slice();
+  // Keep the fixture's existing size-field widths, but mark both masters unknown.
+  streamingVideo.set([0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff], segmentSizeAt);
+  streamingVideo.set([0x7f, 0xff], clusterSizeAt);
   const files = [
-    { type: "video", mimeType: "video/webm;codecs=vp9", bytes: new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 0x87, 0x42, 0x82, 0x84, 0x77, 0x65, 0x62, 0x6d]), allowed: true },
+    { type: "video", mimeType: "video/webm;codecs=vp9", bytes: video, allowed: true },
+    { type: "video", mimeType: "video/webm;codecs=vp9", bytes: streamingVideo, allowed: true },
+    { type: "video", mimeType: "video/webm;codecs=vp9", bytes: new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 0x87, 0x42, 0x82, 0x84, 0x77, 0x65, 0x62, 0x6d]), allowed: false },
+    { type: "video", mimeType: "video/webm;codecs=vp9", bytes: video.slice(0, -1), allowed: false },
+    { type: "video", mimeType: "video/webm;codecs=vp9", bytes: streamingVideo.slice(0, clusterSizeAt + 12), allowed: false },
     { type: "document", mimeType: "text/plain", bytes: new Uint8Array([0xff, 0xfe, 0x41, 0, 0x0a, 0]), allowed: true },
     { type: "document", mimeType: "text/plain", bytes: new Uint8Array([0xfe, 0xff, 0, 0x41, 0, 0x0a]), allowed: true },
     { type: "document", mimeType: "text/plain", bytes: new Uint8Array([0xff, 0xfe, 0, 0]), allowed: false },

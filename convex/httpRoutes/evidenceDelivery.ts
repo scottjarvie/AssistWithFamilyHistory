@@ -1,6 +1,7 @@
 import type { FunctionArgs } from "convex/server";
 import { FAMILY_HISTORY_MCP_LIMITS, hashMcpInput } from "../../lib/mcp/contract";
 import { hasEmbeddedImageMetadata, sniffEvidenceFile, sniffEvidenceImage } from "../../lib/media/evidenceStandard";
+import { hasStoredWebmVideo } from "../../lib/media/storedWebm";
 import { WEBSITE_PHOTO_COPY_BYTES } from "../../lib/media/evidenceWebsite";
 import { internal } from "../_generated/api";
 import type { ActionCtx } from "../_generated/server";
@@ -89,6 +90,7 @@ function matchesStoredFileType(bytes: Uint8Array, mimeType: string) {
   // Website uploads are not all decoded at upload time. An image submitted
   // under another MIME type must not get the exact non-image path.
   const baseMimeType = mimeType.split(";", 1)[0].trim().toLowerCase();
+  if (baseMimeType === "video/webm") return hasStoredWebmVideo(bytes);
   const sniffed = sniffEvidenceFile(bytes);
   if (baseMimeType === "text/plain") {
     return sniffed === "text/plain" || (sniffed === null && isBomMarkedUtf16Text(bytes));
@@ -97,7 +99,6 @@ function matchesStoredFileType(bytes: Uint8Array, mimeType: string) {
     return sniffed === (normalizeAudioMime(baseMimeType) || baseMimeType);
   }
   const header = String.fromCharCode(...bytes.subarray(0, 12));
-  if (baseMimeType === "video/webm") return sniffed === "audio/webm";
   if (baseMimeType === "video/mp4") return sniffed === "audio/mp4";
   return baseMimeType === "video/quicktime" && bytes.length >= 12 &&
     ["ftypqt  ", "moov", "mdat", "wide"].some(tag => header.startsWith(tag, 4));
