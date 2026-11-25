@@ -16,12 +16,13 @@
     "confirmedDone": ["S3", "S4", "S5", "S6", "S7", "S8", "S11", "S12"],
     "partiallyDone": ["S1"],
     "unresolvedSafe": ["S2", "S9", "S10", "S13", "S14", "S15", "S16"],
-    "unresolvedNeedsScott": ["N0", "N1", "N2", "N3", "N4", "N5", "N6", "N7"]
+    "approvedPureMoveConditions": ["N0"],
+    "unresolvedWithStandingApproval": ["N1", "N2", "N3", "N4", "N5", "N6", "N7"]
   },
   "labelCounts": {
-    "safe to fix": 8,
+    "safe to fix": 9,
     "safe to fix, except": 3,
-    "needs Scott": 1,
+    "needs Scott": 0,
     "needs a production check": 0
   },
   "findings": [
@@ -78,7 +79,7 @@
       "id": "AIR25-03",
       "priorId": "AIR-10",
       "status": "partially fixed",
-      "title": "Four oversized backend hotspots remain after #181; map steps S9, S10, S13-S16, N0-N5 stay open",
+      "title": "Four oversized backend hotspots remain after #181; map steps S9, S10, S13-S16, N1-N5 stay open",
       "files": [
         "convex/vaultMutations.ts",
         "convex/vault.ts",
@@ -98,7 +99,7 @@
         "convex/mcpFamilyHistory.ts:1092-1445",
         "convex/httpRoutes/mcp.ts:267-635"
       ],
-      "label": "safe to fix, except N0-N5 (needs Scott: approve pure behavior-preserving moves of living/privacy/publishing code when pin tests, guard updates, and pnpm verify ship in the same commit)",
+      "label": "safe to fix under the standing N0 approval for pure moves of living, privacy and publishing code with behavior pins, guard updates and pnpm verify",
       "size": "large"
     },
     {
@@ -312,7 +313,7 @@
         "convex/mcpFamilyHistory.ts:1645",
         "convex/schema.ts:229"
       ],
-      "label": "needs Scott: approve behavior-touching consolidation of person creation (N6) and one named living-person predicate (N7)",
+      "label": "safe to fix, except changing person creation beyond proved identical behavior (N6). Apply the more protective existing living-person rule (N7) and disclose any behavior difference.",
       "size": "large"
     }
   ],
