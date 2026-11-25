@@ -1621,7 +1621,19 @@ export const getPersonOverview = internalQuery({
     return {
       person, stats, operations, importRuns, researchLog, researchChecks,
       contextCoverage, sources, sourceFacts, timeline, relationships, provisionalRelatives,
-      places, media, researchTasks, contextItems,
+      places, media, researchTasks,
+      contextItems: contextItems.map((item) => ({
+        _id: item._id,
+        title: item.title,
+        itemType: item.itemType,
+        evidenceRole: item.evidenceRole,
+        content: item.content,
+        sourceLabel: item.sourceLabel,
+        privacyLevel: item.privacyLevel,
+        reviewStatus: item.reviewStatus,
+        aiUseAllowed: item.aiUseAllowed,
+        updatedAt: item.updatedAt,
+      })),
       storyTab: { ids: stories.map(story => story._id), updatedAt: latestUpdate(stories) },
       documentTab: { count: documents.length, updatedAt: latestUpdate(documents) },
     };

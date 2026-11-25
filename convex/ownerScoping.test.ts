@@ -514,7 +514,7 @@ describe("guarded private reads", () => {
     const baseline = await owner.action(api.vaultReads.getPersonWorkspace, { ...input, documentsMetadataOnly: true });
     const overview = await owner.action(api.vaultReads.getPersonOverview, input);
     if (!baseline || !overview) throw new Error("Missing synthetic dossier");
-    const { stories, documents, events, citations, relatedPeople, ...eagerFields } = baseline;
+    const { stories, documents, events, citations, relatedPeople, contextItems, ...eagerFields } = baseline;
     expect(stories).toHaveLength(49);
     expect(documents).toHaveLength(2);
     expect(overview).not.toHaveProperty("events");
@@ -527,6 +527,10 @@ describe("guarded private reads", () => {
     expect(relatedPeople).toContainEqual(expect.objectContaining({ _id: a.relative }));
     expect(overview).toEqual({
       ...eagerFields,
+      contextItems: contextItems.map(({ _id, title, itemType, evidenceRole, content, sourceLabel,
+        privacyLevel, reviewStatus, aiUseAllowed, updatedAt }) => ({
+        _id, title, itemType, evidenceRole, content, sourceLabel, privacyLevel, reviewStatus, aiUseAllowed, updatedAt,
+      })),
       storyTab: { ids: stories.map(story => story._id), updatedAt: now + 7 },
       documentTab: { count: 2, updatedAt: now },
     });
@@ -554,6 +558,38 @@ describe("guarded private reads", () => {
     expect((await owner.action(api.vaultReads.getPersonOverview, input))?.storyTab.ids).not.toContain(stories[0]._id);
     await t.run(ctx => ctx.db.patch(a.primary, { archivedAt: now }));
     await expect(readPage([stories[1]._id])).resolves.toBeNull();
+  });
+
+  test("the website Overview keeps context display fields without stored cross-vault references", async () => {
+    const t = convexTest(schema, modules);
+    const a = await seedOwner(t, OWNER_A, "A");
+    const b = await seedOwner(t, OWNER_B, "B");
+    await t.run((ctx) => ctx.db.patch(a.contextItem, {
+      personIds: [a.primary, b.primary],
+      storyIds: [a.story, b.story],
+      sourceIds: [b.source],
+      sourceLabel: "TEST synthetic source label",
+    }));
+    const owner = t.withIdentity({ subject: OWNER_A });
+    const overview = await owner.action(api.vaultReads.getPersonOverview, {
+      vaultOwnerId: OWNER_A, personIdentifier: a.primary,
+    });
+    expect(overview?.contextItems).toEqual([{
+      _id: a.contextItem,
+      title: "Note-A",
+      itemType: "note",
+      evidenceRole: "background_context",
+      content: "content for Note-A",
+      sourceLabel: "TEST synthetic source label",
+      privacyLevel: "public_source",
+      reviewStatus: "reviewed",
+      aiUseAllowed: true,
+      updatedAt: now,
+    }]);
+    const payload = JSON.stringify(overview);
+    expect(payload).not.toContain(b.story);
+    expect(payload).not.toContain(b.primary);
+    expect(payload).not.toContain(b.source);
   });
 
   test("the Person overview omits document bodies and the separately loaded Documents tab keeps owner scope and order", async () => {
