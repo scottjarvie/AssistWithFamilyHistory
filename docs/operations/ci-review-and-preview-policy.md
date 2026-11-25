@@ -22,7 +22,7 @@ paid checks for the moment a change is about to ship.
 | Code review | Logic, privacy and trust boundaries, product intent, whether the right test exists | Every PR before merge | Free |
 | Vercel preview build | `next build` succeeds (and the Convex preview deploy, when a preview key is set) | Pushes to `preview/*` branches only, except docs-only | Vercel build minutes |
 | GitHub CI (`.github/workflows/ci.yml`) | `pnpm verify` (without the build on GitHub-hosted runners; with it on the Mac mini runner) | Ready (non-draft) PR pushes, or by hand | GitHub minutes, about 1 minute a run |
-| Vercel production build | Convex deploy then build, on merge | Every merge to `main`, except docs-only | Vercel build minutes |
+| Vercel production build | Next.js build, then Convex push, then Vercel frontend release on success | Every merge to `main`, except docs-only | Vercel build minutes |
 
 ## The rules
 
