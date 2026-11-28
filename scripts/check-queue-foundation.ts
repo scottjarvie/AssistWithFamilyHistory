@@ -3,9 +3,10 @@ import { readFileSync } from "node:fs";
 import { QUEUE_AGENT_TOOLS } from "../lib/queue/agentTools";
 import { QUEUE_SERVICE_STATES, QUEUE_STATES, QUEUE_STATE_LABELS } from "../lib/queue/contract";
 import { SCOPES } from "../lib/auth/scopes";
+import { combineConcernSources, readConcernFiles } from "./lib/sourceGuards";
 
 const schema = readFileSync("convex/schema.ts", "utf8");
-const queueModule = readFileSync("convex/queue.ts", "utf8");
+const queueModule = combineConcernSources(readConcernFiles(["convex/queue.ts"]));
 const handoff = readFileSync("docs/product/queue-foundation-design-handoff.md", "utf8");
 const siteGuide = readFileSync("docs/planning/site-guide.md", "utf8");
 const route = readFileSync("app/api/queue/route.ts", "utf8");

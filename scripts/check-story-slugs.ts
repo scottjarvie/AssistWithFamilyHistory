@@ -21,13 +21,31 @@ import { readFileSync } from "fs";
 import path from "path";
 import { buildStoryPublicSlug, getStoryIdSuffix, publicStoryPath, slugifyStoryPart } from "../lib/stories/slug";
 import { buildPublicStoryMetadata, buildPublicStorySharePreview } from "../lib/stories/publicStoryPolicy";
+import {
+  extractImplementationWithDelegatedHelpers,
+  findUniqueExportedVariable,
+  readConcernFiles,
+} from "./lib/sourceGuards";
 
 const failures: string[] = [];
 
 // -- 2. Structural integration sources -----------------------------------
 const schema = readFileSync(path.join(process.cwd(), "convex", "schema.ts"), "utf8");
-const vaultQuery = readFileSync(path.join(process.cwd(), "convex", "vault.ts"), "utf8");
-const vaultMutations = readFileSync(path.join(process.cwd(), "convex", "vaultMutations.ts"), "utf8");
+const vaultEntryFile = readConcernFiles(["convex/vault.ts"]);
+const storyReadFiles = readConcernFiles(["convex/vault.ts", "convex/lib/storyBundles.ts"]);
+const vaultMutationEntryFile = readConcernFiles(["convex/vaultMutations.ts"]);
+const storyMutationFiles = readConcernFiles([
+  "convex/vaultMutations.ts",
+  "convex/lib/vaultWrites/stories.ts",
+]);
+const vaultQuery = extractImplementationWithDelegatedHelpers(
+  findUniqueExportedVariable(vaultEntryFile, "getPublishedStoryByIdentifier"),
+  storyReadFiles,
+);
+const vaultMutations = extractImplementationWithDelegatedHelpers(
+  findUniqueExportedVariable(vaultMutationEntryFile, "backfillStoryPublicSlugs"),
+  storyMutationFiles,
+);
 const publicRoute = readFileSync(path.join(process.cwd(), "app", "stories", "[id]", "page.tsx"), "utf8");
 const ogRoute = readFileSync(path.join(process.cwd(), "app", "stories", "[id]", "opengraph-image.tsx"), "utf8");
 

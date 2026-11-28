@@ -1,13 +1,21 @@
-import assert from "node:assert/strict";
 import { readFileSync } from "fs";
 import path from "path";
-import ts from "typescript";
 import { canRenderPublicStory } from "../lib/stories/publicStoryPolicy";
+import {
+  extractImplementationWithDelegatedHelpers,
+  findUniqueExportedVariable,
+  findUniqueFunctionDeclaration,
+  findUniqueIndex,
+  readConcernFiles,
+} from "./lib/sourceGuards";
 
 const publicRoutePath = path.join(process.cwd(), "app", "stories", "[id]", "page.tsx");
-const convexVaultPath = path.join(process.cwd(), "convex", "vault.ts");
 const publicRoute = readFileSync(publicRoutePath, "utf8");
-const convexVault = readFileSync(convexVaultPath, "utf8");
+const vaultEntryFile = readConcernFiles(["convex/vault.ts"]);
+const storyBundleFiles = readConcernFiles([
+  "convex/vault.ts",
+  "convex/lib/storyBundles.ts",
+]);
 
 const failures: string[] = [];
 
@@ -30,37 +38,37 @@ if (!publicRoute.includes("canRenderPublicStory(bundle.story.status)")) {
 // GEN-77: public Convex queries must use buildPublicStoryBundle (explicit
 // field allowlist), not buildStoryBundle({publicView: true}) which only
 // gated 2 of 12 fields and returned the full internal review bundle.
-const publishedStoryStart = convexVault.indexOf("export const getPublishedStory =");
-const publishedStoryByIdentifierStart = convexVault.indexOf("export const getPublishedStoryByIdentifier =");
-const researchChecksStart = convexVault.indexOf("export const getPersonResearchChecks =");
-assert.ok(publishedStoryStart >= 0, "convex/vault.ts must define getPublishedStory");
-assert.ok(
-  publishedStoryByIdentifierStart > publishedStoryStart,
-  "getPublishedStoryByIdentifier must follow getPublishedStory in convex/vault.ts",
+const publishedStorySource = extractImplementationWithDelegatedHelpers(
+  findUniqueExportedVariable(vaultEntryFile, "getPublishedStory", { stripComments: true }),
+  storyBundleFiles,
+  { stripComments: true },
 );
-assert.ok(
-  researchChecksStart > publishedStoryByIdentifierStart,
-  "getPersonResearchChecks must follow the public story queries in convex/vault.ts",
+const publishedStoryByIdentifierSource = extractImplementationWithDelegatedHelpers(
+  findUniqueExportedVariable(vaultEntryFile, "getPublishedStoryByIdentifier", {
+    stripComments: true,
+  }),
+  storyBundleFiles,
+  { stripComments: true },
 );
 
 for (const [name, storyVariable, source] of [
-  ["getPublishedStory", "story", convexVault.slice(publishedStoryStart, publishedStoryByIdentifierStart)],
-  ["getPublishedStoryByIdentifier", "candidate", convexVault.slice(publishedStoryByIdentifierStart, researchChecksStart)],
+  ["getPublishedStory", "story", publishedStorySource],
+  ["getPublishedStoryByIdentifier", "candidate", publishedStoryByIdentifierSource],
 ]) {
-  const buildBundle = source.indexOf("buildPublicStoryBundle(");
-  if (buildBundle < 0) {
-    failures.push(`${name} must call buildPublicStoryBundle`);
-  } else {
-    const beforeBundle = source.slice(0, buildBundle);
-    const rejectUnpublished = new RegExp(
-      String.raw`if\s*\([^)]*\b${storyVariable}\.status\s*!==\s*"published"[^)]*\)\s*return\s+null\b`,
-    );
-    if (!rejectUnpublished.test(beforeBundle)) {
-      failures.push(`${name} must reject non-published stories before building a public bundle`);
-    }
-    if (!/if\s*\([^)]*\bperson\.living\s*\)\s*return\s+null\b/.test(beforeBundle)) {
-      failures.push(`${name} must reject living subjects before building a public bundle`);
-    }
+  const buildBundle = findUniqueIndex(
+    source,
+    "buildPublicStoryBundle(",
+    `${name} buildPublicStoryBundle call`,
+  );
+  const beforeBundle = source.slice(0, buildBundle);
+  const rejectUnpublished = new RegExp(
+    String.raw`if\s*\([^)]*\b${storyVariable}\.status\s*!==\s*"published"[^)]*\)\s*return\s+null\b`,
+  );
+  if (!rejectUnpublished.test(beforeBundle)) {
+    failures.push(`${name} must reject non-published stories before building a public bundle`);
+  }
+  if (!/if\s*\([^)]*\bperson\.living\s*\)\s*return\s+null\b/.test(beforeBundle)) {
+    failures.push(`${name} must reject living subjects before building a public bundle`);
   }
   if (/buildStoryBundle\([^)]*publicView/.test(source)) {
     failures.push(`${name} must not call buildStoryBundle with publicView`);
@@ -69,21 +77,11 @@ for (const [name, storyVariable, source] of [
 
 // Require the exported DTO builder and its complete body before checking for
 // forbidden fields. TypeScript handles braces in strings, comments and types.
-const vaultModule = ts.createSourceFile(convexVaultPath, convexVault, ts.ScriptTarget.Latest, true);
-const publicBundle = vaultModule.statements.find(
-  (statement): statement is ts.FunctionDeclaration =>
-    ts.isFunctionDeclaration(statement) && statement.name?.text === "buildPublicStoryBundle",
-);
-assert.ok(
-  publicBundle?.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword),
-  "convex/vault.ts must export buildPublicStoryBundle (the public DTO)",
-);
-const publicBundleEnd = publicBundle.body?.getChildren().at(-1);
-assert.ok(
-  publicBundleEnd?.kind === ts.SyntaxKind.CloseBraceToken && publicBundleEnd.getWidth() > 0,
-  "buildPublicStoryBundle must have a complete function body",
-);
-const publicBundleBlock = publicBundle.getText();
+const publicBundleBlock = findUniqueFunctionDeclaration(
+  storyBundleFiles,
+  "buildPublicStoryBundle",
+  { exportedOnly: true, stripComments: true },
+).text;
 
 const forbiddenInPublicBundle = [
   "contextCoverage:",

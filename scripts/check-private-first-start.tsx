@@ -2,17 +2,32 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import ts from "typescript";
 import { PrivateFamilyStart } from "../components/vault/PrivateFamilyStart";
+import {
+  extractImplementationWithDelegatedHelpers,
+  extractStringArrayElements,
+  findUniqueExportedVariable,
+  findUniqueFunctionDeclaration,
+  readConcernFiles,
+} from "./lib/sourceGuards";
 
 const markup = renderToStaticMarkup(<PrivateFamilyStart />);
 const componentSource = readFileSync(
   new URL("../components/vault/PrivateFamilyStart.tsx", import.meta.url),
   "utf8",
 );
-const mutationSource = readFileSync(
-  new URL("../convex/vaultMutations.ts", import.meta.url),
-  "utf8",
+const firstStartMutationFiles = readConcernFiles([
+  "convex/vaultMutations.ts",
+  "convex/lib/vaultWrites/people.ts",
+]);
+const mutationEntryFile = readConcernFiles(["convex/vaultMutations.ts"]);
+const startWorkspaceDecl = findUniqueExportedVariable(
+  mutationEntryFile,
+  "startPrivateWorkspace",
+);
+const mutationSource = extractImplementationWithDelegatedHelpers(
+  startWorkspaceDecl,
+  firstStartMutationFiles,
 );
 
 assert.match(markup, /Who belongs in this first connection/);
@@ -46,29 +61,21 @@ for (const page of ["../app/app/people/page.tsx", "../app/app/people/new/page.ts
 assert.match(mutationSource, /isFirstStartEligible\(ctx, vaultOwnerId\)/);
 
 // Every table the whole-vault snapshot reads, plus the Queue, decides emptiness.
-const vaultSource = readFileSync(new URL("../convex/vault.ts", import.meta.url), "utf8");
-const vaultModule = ts.createSourceFile("convex/vault.ts", vaultSource, ts.ScriptTarget.Latest, true);
-const snapshot = vaultModule.statements.find(
-  (statement): statement is ts.FunctionDeclaration =>
-    ts.isFunctionDeclaration(statement) && statement.name?.text === "getVaultSnapshot",
+const vaultSnapshotFiles = readConcernFiles([
+  "convex/vault.ts",
+  "convex/lib/vaultSnapshot.ts",
+]);
+const snapshotDecl = findUniqueFunctionDeclaration(
+  vaultSnapshotFiles,
+  "getVaultSnapshot",
+  { exportedOnly: true },
 );
-assert.ok(
-  snapshot?.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword),
-  "convex/vault.ts must export getVaultSnapshot",
+const snapshotTables = [...snapshotDecl.text.matchAll(/byOwner\("(\w+)"\)/g)].map((match) => match[1]);
+const emptyTablesDecl = findUniqueExportedVariable(
+  vaultSnapshotFiles,
+  "FIRST_START_EMPTY_TABLES",
 );
-const snapshotEnd = snapshot.body?.getChildren().at(-1);
-assert.ok(
-  snapshotEnd?.kind === ts.SyntaxKind.CloseBraceToken && snapshotEnd.getWidth() > 0,
-  "getVaultSnapshot must have a complete function body",
-);
-const snapshotSource = snapshot.getText();
-const snapshotTables = [...snapshotSource.matchAll(/byOwner\("(\w+)"\)/g)].map((match) => match[1]);
-const emptyTablesStart = vaultSource.indexOf("export const FIRST_START_EMPTY_TABLES = [");
-assert.ok(emptyTablesStart >= 0, "convex/vault.ts must define FIRST_START_EMPTY_TABLES");
-const emptyTablesEnd = vaultSource.indexOf("\n] as const;", emptyTablesStart);
-assert.ok(emptyTablesEnd > emptyTablesStart, "FIRST_START_EMPTY_TABLES must have a closing bracket");
-const emptyTablesSource = vaultSource.slice(emptyTablesStart, emptyTablesEnd);
-const emptyTables = [...emptyTablesSource.matchAll(/"(\w+)"/g)].map((match) => match[1]);
+const emptyTables = extractStringArrayElements(emptyTablesDecl, "FIRST_START_EMPTY_TABLES");
 assert.ok(snapshotTables.length >= 20, "found the snapshot's owner tables");
 assert.deepEqual([...emptyTables].sort(), [...snapshotTables, "queueItems"].sort());
 

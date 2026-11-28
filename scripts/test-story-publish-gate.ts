@@ -12,6 +12,11 @@ import {
   type StoryPublishGateDecisionInput,
   type StoryPublishSafetyInput,
 } from "@/lib/stories/publishSafety";
+import {
+  extractImplementationWithDelegatedHelpers,
+  findUniqueExportedVariable,
+  readConcernFiles,
+} from "./lib/sourceGuards";
 
 const NOW_YEAR = 2026;
 
@@ -102,7 +107,15 @@ describe("evaluateStoryPublishGate", () => {
 
 test("route and writer retain the same authoritative publish-gate contract", () => {
   const route = readFileSync("app/api/stories/[id]/status/route.ts", "utf8");
-  const writer = readFileSync("convex/vaultMutations.ts", "utf8");
+  const mutationEntryFile = readConcernFiles(["convex/vaultMutations.ts"]);
+  const storyMutationFiles = readConcernFiles([
+    "convex/vaultMutations.ts",
+    "convex/lib/vaultWrites/stories.ts",
+  ]);
+  const writer = extractImplementationWithDelegatedHelpers(
+    findUniqueExportedVariable(mutationEntryFile, "updateStoryStatus"),
+    storyMutationFiles,
+  );
 
   assert.ok(writer.includes("evaluateStoryPublishGate({"));
   assert.ok(writer.includes("buildStoryBundle(snapshot, currentStory)"));

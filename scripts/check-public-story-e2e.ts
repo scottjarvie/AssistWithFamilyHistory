@@ -2,13 +2,26 @@ import { readFileSync } from "fs";
 import path from "path";
 import { buildPublicStoryMetadata, canRenderPublicStory } from "../lib/stories/publicStoryPolicy";
 import { buildStoryPublicSlug, publicStoryPath } from "../lib/stories/slug";
+import {
+  extractImplementationWithDelegatedHelpers,
+  findUniqueExportedVariable,
+  readConcernFiles,
+} from "./lib/sourceGuards";
 
 const failures: string[] = [];
 const publicRoutePath = path.join(process.cwd(), "app", "stories", "[id]", "page.tsx");
 const statusRoutePath = path.join(process.cwd(), "app", "api", "stories", "[id]", "status", "route.ts");
 const publicRoute = readFileSync(publicRoutePath, "utf8");
 const statusRoute = readFileSync(statusRoutePath, "utf8");
-const vaultMutations = readFileSync(path.join(process.cwd(), "convex", "vaultMutations.ts"), "utf8");
+const mutationEntryFile = readConcernFiles(["convex/vaultMutations.ts"]);
+const storyMutationFiles = readConcernFiles([
+  "convex/vaultMutations.ts",
+  "convex/lib/vaultWrites/stories.ts",
+]);
+const vaultMutations = extractImplementationWithDelegatedHelpers(
+  findUniqueExportedVariable(mutationEntryFile, "updateStoryStatus"),
+  storyMutationFiles,
+);
 const ogRoute = readFileSync(path.join(process.cwd(), "app", "stories", "[id]", "opengraph-image.tsx"), "utf8");
 
 const statuses = [

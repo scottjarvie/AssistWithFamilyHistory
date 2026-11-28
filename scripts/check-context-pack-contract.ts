@@ -23,6 +23,7 @@ import {
   isContextPackEligibleHistoricalContext,
   isPublishablePublicHistoricalContext,
 } from "../convex/vault";
+import { combineConcernSources, readConcernFiles } from "./lib/sourceGuards";
 
 // -- 1. Behavioral assertions on the actual gate functions ----------------
 
@@ -139,10 +140,15 @@ for (const token of [
 
 // -- 3. UI surface contract assertions (string-match against TSX) --------
 
-const contextPackSource = [
-  readFileSync("convex/vault.ts", "utf8"),
-  readFileSync("convex/contextPackBuilder.ts", "utf8"),
-].join("\n");
+const contextPackSource = combineConcernSources(
+  readConcernFiles([
+    "convex/vault.ts",
+    "convex/contextPackBuilder.ts",
+    "convex/lib/storyBundles.ts",
+    "convex/lib/personAssembly.ts",
+    "convex/lib/vaultSnapshot.ts",
+  ]),
+);
 for (const token of [
   // These describe the structured/markdown context-pack export shape.
   // Behavior-level assertions for these would require a Convex query

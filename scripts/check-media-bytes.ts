@@ -19,6 +19,15 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import {
+  combineConcernSources,
+  extractImplementationWithDelegatedHelpers,
+  findUniqueExportedVariable,
+  findUniqueForOfStatement,
+  findUniqueFunctionDeclaration,
+  readConcernFiles,
+  stripComments,
+} from "./lib/sourceGuards";
 
 function read(relative: string) {
   return readFileSync(path.join(process.cwd(), relative), "utf8");
@@ -26,15 +35,23 @@ function read(relative: string) {
 
 /** Assertions about behaviour should read code, not the prose explaining it. */
 function code(relative: string) {
-  return read(relative)
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/^\s*\/\/.*$/gm, "");
+  return stripComments(read(relative), relative);
 }
 
 const schema = read("convex/schema.ts");
-const mutations = code("convex/vaultMutations.ts");
-const evidence = code("convex/mcpEvidence.ts");
-const transport = code("convex/httpRoutes/evidenceDelivery.ts");
+const mutationFiles = readConcernFiles([
+  "convex/vaultMutations.ts",
+  "convex/lib/vaultWrites/media.ts",
+]);
+const mutationEntryFile = readConcernFiles(["convex/vaultMutations.ts"]);
+const evidenceFiles = readConcernFiles([
+  "convex/mcpEvidence.ts",
+  "convex/lib/mcpReads.ts",
+]);
+const evidenceEntryFile = readConcernFiles(["convex/mcpEvidence.ts"]);
+const transportFiles = readConcernFiles(["convex/httpRoutes/evidenceDelivery.ts"]);
+const evidence = combineConcernSources(evidenceFiles, { stripComments: true });
+const transport = combineConcernSources(transportFiles, { stripComments: true });
 const storage = code("convex/mediaEvidenceStorage.ts");
 const uploadRoute = code("app/api/media/upload/route.ts");
 const fileRoute = code("app/api/media/[mediaId]/file/route.ts");
@@ -47,18 +64,20 @@ assert.match(
   /storageId:\s*v\.optional\(v\.id\("_storage"\)\)/,
   "media rows must be able to carry stored bytes, not only a reference",
 );
+const attachDecl = findUniqueExportedVariable(mutationEntryFile, "attachMediaFile", {
+  stripComments: true,
+});
 assert.match(
-  mutations,
+  attachDecl.text,
   /export const attachMediaFile = mutation\(/,
   "attachMediaFile is how bytes become part of a media row",
 );
 
 /* ------------------------------- an upload is not a permission to read it */
 
-const attachStart = mutations.indexOf("export const attachMediaFile");
-const attachEnd = mutations.indexOf("export const reviewMedia");
-assert.ok(attachStart >= 0 && attachEnd > attachStart, "expected attachMediaFile before reviewMedia in vaultMutations.ts");
-const attachSection = mutations.slice(attachStart, attachEnd);
+const attachSection = extractImplementationWithDelegatedHelpers(attachDecl, mutationFiles, {
+  stripComments: true,
+});
 assert.match(
   attachSection,
   /aiUseAllowed:\s*false/,
@@ -82,10 +101,9 @@ assert.doesNotMatch(
 
 /* ----------------------------- delivery goes through the same gates as ever */
 
-const gateStart = evidence.indexOf("function mediaSkipReason(");
-const gateEnd = evidence.indexOf("async function evidenceGrant(");
-assert.ok(gateStart >= 0 && gateEnd > gateStart, "expected mediaSkipReason before evidenceGrant in mcpEvidence.ts");
-const mediaGate = evidence.slice(gateStart, gateEnd);
+const mediaGate = findUniqueFunctionDeclaration(evidenceFiles, "mediaSkipReason", {
+  stripComments: true,
+}).text;
 for (const gate of [
   'reviewStatus !== "reviewed"',
   "aiUseAllowed !== true",
@@ -95,7 +113,12 @@ for (const gate of [
 ]) {
   assert.ok(mediaGate.includes(gate), `evidence delivery must still enforce: ${gate}`);
 }
-const gates = evidence.slice(evidence.indexOf("export const getEvidenceBatch"));
+const evidenceBatchDecl = findUniqueExportedVariable(evidenceEntryFile, "getEvidenceBatch", {
+  stripComments: true,
+});
+const gates = extractImplementationWithDelegatedHelpers(evidenceBatchDecl, evidenceFiles, {
+  stripComments: true,
+});
 assert.match(gates, /mediaSkipReason\(row, grant\)[\s\S]*stored\.push\(/);
 assert.match(
   gates,
@@ -110,10 +133,12 @@ assert.match(
   /actionCtx\.storage\.get\(/,
   "the transport must read stored objects directly rather than fetching a URL",
 );
-const storedStart = transport.indexOf("for (const item of batch.stored)");
-const storedEnd = transport.indexOf("for (const item of batch.b2Stored)");
-assert.ok(storedStart >= 0 && storedEnd > storedStart, "expected batch.stored before batch.b2Stored in evidenceDelivery.ts");
-const storedLoop = transport.slice(storedStart, storedEnd);
+const storedLoop = findUniqueForOfStatement(
+  transportFiles,
+  "batch.stored",
+  "stored media delivery loop",
+  { stripComments: true },
+).text;
 assert.doesNotMatch(
   storedLoop,
   /getUrl|item\.url/,

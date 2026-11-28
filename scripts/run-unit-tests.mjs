@@ -25,6 +25,7 @@ const tests = [
   "test-usage-limits-copy.ts",
   "test-family-row.ts",
   "test-home-drawn.ts",
+  "test-source-guards.ts",
   "local-development.test.mjs",
 ];
 

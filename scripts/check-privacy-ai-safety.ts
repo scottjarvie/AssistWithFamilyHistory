@@ -1,4 +1,17 @@
 import { readFileSync } from "node:fs";
+import {
+  combineConcernSources,
+  findUniqueIndex,
+  readConcernFiles,
+  stripComments,
+} from "./lib/sourceGuards";
+
+const vaultContextFiles = readConcernFiles([
+  "convex/vault.ts",
+  "convex/contextPackBuilder.ts",
+  "convex/lib/storyBundles.ts",
+  "convex/lib/personAssembly.ts",
+]);
 
 const files = {
   processRoute: read("app/api/process/route.ts"),
@@ -8,7 +21,7 @@ const files = {
   storyWriter: read("components/vault/StoryWriterStudio.tsx"),
   schema: read("convex/schema.ts"),
   importer: read("lib/familysearch/importer.ts"),
-  vault: [read("convex/vault.ts"), read("convex/contextPackBuilder.ts")].join("\n"),
+  vault: combineConcernSources(vaultContextFiles),
   mediaReview: read("components/vault/MediaPrivacyReviewPanel.tsx"),
   safeLog: read("lib/server/safeLog.ts"),
   convexServer: read("lib/convex/server.ts"),
@@ -17,12 +30,22 @@ const files = {
 assert(files.processRoute.includes("privacyAcknowledged"), "AI process route must require privacy acknowledgement.");
 assert(files.processRoute.includes("redactionMode"), "AI process route must require redaction mode.");
 assert(files.processRoute.includes("AI redaction mode required"), "AI process route must reject a missing redaction mode.");
-const egressScanIndex = files.processRoute.indexOf("const egressScan = scanAiEgressForLivingPersonPII");
-const rateLimitIndex = files.processRoute.indexOf("api.rateLimits.checkAndIncrementRateLimit");
-const providerIndex = files.processRoute.indexOf("await chatCompletion");
-assert(egressScanIndex !== -1, "AI process route must scan the exact provider-bound egress surfaces.");
-assert(rateLimitIndex !== -1, "AI process route must call the rate-limit mutation.");
-assert(providerIndex !== -1, "AI process route must call the AI provider.");
+const processRouteCode = stripComments(files.processRoute, "app/api/process/route.ts");
+const egressScanIndex = findUniqueIndex(
+  processRouteCode,
+  "const egressScan = scanAiEgressForLivingPersonPII",
+  "AI process route egress scan",
+);
+const rateLimitIndex = findUniqueIndex(
+  processRouteCode,
+  "api.rateLimits.checkAndIncrementRateLimit",
+  "AI process route rate-limit mutation",
+);
+const providerIndex = findUniqueIndex(
+  processRouteCode,
+  "await chatCompletion",
+  "AI process route provider call",
+);
 assert(
   egressScanIndex < rateLimitIndex && egressScanIndex < providerIndex,
   "AI egress refusal must run before rate-limit mutation and provider work.",

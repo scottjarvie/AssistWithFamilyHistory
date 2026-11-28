@@ -1,9 +1,22 @@
 import { readFileSync } from "node:fs";
+import {
+  combineConcernSources,
+  findUniqueExportedVariable,
+  readConcernFiles,
+} from "./lib/sourceGuards";
+
+const mutationEntryFile = readConcernFiles(["convex/vaultMutations.ts"]);
+const contextVaultFiles = readConcernFiles([
+  "convex/vault.ts",
+  "convex/contextPackBuilder.ts",
+  "convex/lib/storyBundles.ts",
+  "convex/lib/personAssembly.ts",
+]);
 
 const files = {
   schema: read("convex/schema.ts"),
-  mutations: read("convex/vaultMutations.ts"),
-  vault: read("convex/vault.ts"),
+  mutations: findUniqueExportedVariable(mutationEntryFile, "upsertContextItemForPerson").text,
+  vault: combineConcernSources(contextVaultFiles),
   route: read("app/api/context-items/route.ts"),
   panel: read("components/vault/ContextItemsPanel.tsx"),
   personPage: read("app/app/people/[personId]/page.tsx"),

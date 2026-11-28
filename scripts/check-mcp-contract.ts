@@ -25,6 +25,12 @@ import {
 import { assertMcpToolContract, FAMILY_HISTORY_MCP_TOOL_NAMES } from "../lib/mcp/contract";
 import { decideToolAccess, queueScopesForGrant } from "../lib/mcp/authorize";
 import { MCP_CONNECTOR_CONTRACT_VERSION } from "../convex/lib/mcpConnector/contract";
+import {
+  combineConcernSources,
+  findObjectLiteralsWithStringProperty,
+  findUniqueExportedVariable,
+  readConcernFiles,
+} from "./lib/sourceGuards";
 
 assertFamilyHistoryCatalogContract();
 assertMcpToolContract();
@@ -143,7 +149,11 @@ assert.deepEqual(
 
 /* ------------------------------------------------------- source-level parity */
 
-const transport = readFileSync("convex/httpRoutes/mcp.ts", "utf8");
+const transportFiles = readConcernFiles([
+  "convex/httpRoutes/mcp.ts",
+  "convex/httpRoutes/mcpInputSchemas.ts",
+]);
+const transport = combineConcernSources(transportFiles);
 for (const name of FAMILY_HISTORY_CANONICAL_TOOL_NAMES) {
   assert.ok(
     transport.includes(`registerTool("${name}"`),
@@ -178,7 +188,14 @@ for (const tool of FAMILY_HISTORY_TOOLS) {
 }
 
 // The data layer must refuse independently of the transport.
-const domain = readFileSync("convex/mcpFamilyHistory.ts", "utf8");
+const domain = combineConcernSources(
+  readConcernFiles([
+    "convex/mcpFamilyHistory.ts",
+    "convex/lib/mcpWrites/receipts.ts",
+    "convex/lib/mcpWrites/records.ts",
+    "convex/lib/mcpReads.ts",
+  ]),
+);
 assert.ok(
   domain.includes("assertGrantPermits"),
   "MCP writes must re-validate the grant inside the mutation",
@@ -193,10 +210,12 @@ assert.ok(
 // conforming client rejects both as malformed — so the person's AI sees a broken
 // server instead of "ask them to approve this", which is the exact opposite of
 // what those two branches exist to do.
-const jsonRpcResults: string[] = [];
-for (let index = transport.indexOf('jsonrpc: "2.0"'); index >= 0; index = transport.indexOf('jsonrpc: "2.0"', index + 1)) {
-  jsonRpcResults.push(transport.slice(index, index + 700));
-}
+const jsonRpcResults = findObjectLiteralsWithStringProperty(
+  transportFiles,
+  "jsonrpc",
+  "2.0",
+  { stripComments: true },
+).map((match) => match.text);
 assert.ok(jsonRpcResults.length >= 1, "the preflight-refusal wire path must exist");
 for (const block of jsonRpcResults) {
   assert.ok(
@@ -214,12 +233,12 @@ assert.ok(transport.includes("limitCallingConnection"));
 assert.ok(transport.includes('message?.method !== "initialize"'));
 assert.ok(transport.includes("message.params?.clientInfo?.name"));
 assert.ok(!transport.includes('headers.get("user-agent")'));
-const grantSource = readFileSync("convex/mcpGrants.ts", "utf8");
+const grantFiles = readConcernFiles(["convex/mcpGrants.ts"]);
+const grantSource = combineConcernSources(grantFiles);
 assert.ok(grantSource.includes("registeredName ?? trimmed(args.observedClientName"));
-const connectStart = grantSource.indexOf("export const resolveForRequest");
-const connectEnd = grantSource.indexOf("export const touchGrantUse");
-assert.ok(connectStart >= 0 && connectEnd > connectStart, "expected resolveForRequest before touchGrantUse in mcpGrants.ts");
-const connectSource = grantSource.slice(connectStart, connectEnd);
+const connectSource = findUniqueExportedVariable(grantFiles, "resolveForRequest", {
+  stripComments: true,
+}).text;
 assert.ok(!grantSource.includes("resolveClientAlias"));
 assert.ok(!grantSource.includes("normalizedClientName"));
 assert.ok(connectSource.includes("carried.entries.map"));
